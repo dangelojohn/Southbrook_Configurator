@@ -152,27 +152,55 @@ class SaleOrder(models.Model):
     )
 
     # ------------------------------------------------------------------
-    # 3D kitchen-run viewport — Track 1 commit 6 (2026-05-30).
+    # 3D kitchen-run viewport — Track 1 commits 6 + 7 (2026-05-30).
     #
     # Returns a multi-cabinet 3D payload spanning every order_line whose
-    # product matches one of the 12 Q8-locked SB cabinet SKUs. Cabinets
-    # are laid out left-to-right along the X axis in line order; the
-    # zone field (Q21) determines each line's Y floor — wall cabinets
-    # float at 1400 mm above the floor, everything else sits at y=0.
+    # product matches one of the 12 Q8-locked SB cabinet SKUs.
+    #
+    # Track 1 commit 7 layout — zone-aware X positioning:
+    #
+    #   Real kitchen elevation looks like:
+    #
+    #       [W1][W2][W3]                    ← wall cabs at Y=1400mm
+    #       [B1][B2][B3] [T1]               ← base + tall at Y=0mm
+    #                          [WT1]        ← worktop at Y=762mm
+    #                                       ← island at Z=-2500mm
+    #
+    #   Each zone gets its OWN cumulative X cursor so wall cabinets
+    #   share the X range with the base cabinets they sit above
+    #   (visually aligned in elevation), while tall extends the ground
+    #   cursor (continues the run to the right), and island/other use
+    #   distinct Z offsets so they don't collide visually with the
+    #   main run.
     #
     # The same _SKU_DEFAULTS / _cut_list_to_3d_payload pipeline that
     # drives the single-cabinet wizard viewport also drives this one,
     # so a change to the named geometric constants (BOX_TH, BACK_TH,
     # DOOR_TH, TOEKICK_H) propagates to BOTH views — no fork.
     # ------------------------------------------------------------------
-    _ZONE_FLOOR_Y = {
-        "base_run": 0,
-        "wall":     1400,    # wall mount height above counter
-        "tall":     0,       # full-height cabinets on floor
-        "island":   0,
-        "accessory": 0,
-        "other":    0,
+    # Zone → (cursor_name, y_floor_mm, z_offset_mm). Zones sharing a
+    # cursor_name accumulate along the same X axis.
+    _ZONE_LAYOUT = {
+        # GROUND cursor: base + tall + accessory continue the floor run
+        # left to right. Wall cabinets get their own cursor so they
+        # share the X range with their base partners, not extending
+        # past them.
+        "base_run":  ("ground", 0,    0),
+        "wall":      ("wall",   1400, 0),       # wall mount height
+        "tall":      ("ground", 0,    0),       # extends ground run
+        "island":    ("island", 0,    -2500),   # separate Z plane
+        "accessory": ("ground", 0,    0),
+        "other":     ("other",  0,    -3000),   # tucked away
     }
+    # Worktop family override — countertop sits at Y=762mm regardless
+    # of zone. T1C7 dispatches by FAMILY for worktops; the zone field
+    # is still respected for everything else.
+    _WORKTOP_Y_FLOOR = 762
+    _WORKTOP_CURSOR = "ground"
+
+    # Legacy alias for T1C6 callers (just zone → y_floor). Kept for
+    # backwards-compat with any test that grew up against commit 6.
+    _ZONE_FLOOR_Y = {z: l[1] for z, l in _ZONE_LAYOUT.items()}
 
     def get_kitchen_3d_payload(self):
         """Multi-cabinet 3D payload for the OWL kitchen viewport.
@@ -198,9 +226,14 @@ class SaleOrder(models.Model):
         Bom = self.env["mrp.bom"]
         sku_defaults = Session._SKU_DEFAULTS
 
-        cumulative_x = 0      # mm — X position of next cabinet's left edge
+        # Per-zone X cursors — T1C7. Each cursor accumulates the
+        # cabinet widths placed under it. Zones in _ZONE_LAYOUT
+        # share a cursor name when they belong on the same horizontal
+        # axis (e.g. base_run, tall, accessory all advance "ground").
+        cursors = {"ground": 0, "wall": 0, "island": 0, "other": 0}
         max_h = 0             # tallest cabinet's top, for camera framing
         max_d = 0             # deepest cabinet, for camera framing
+        max_z_back = 0        # most negative Z reached (for camera + bounds)
         all_panels = []
 
         for line in self.order_line:
@@ -211,7 +244,19 @@ class SaleOrder(models.Model):
                 continue   # non-southbrook product → skip; only SB SKUs render
 
             fam, doors, drawers, w, h, d = row
-            y_floor = self._ZONE_FLOOR_Y.get(line.zone or "base_run", 0)
+
+            # T1C7 dispatch: worktops sit on the counter (Y=762) and
+            # share the ground X cursor regardless of zone. Everything
+            # else dispatches by zone via _ZONE_LAYOUT.
+            if fam == "worktop":
+                cursor_name = self._WORKTOP_CURSOR
+                y_floor = self._WORKTOP_Y_FLOOR
+                z_offset = 0
+            else:
+                zone = line.zone or "base_run"
+                cursor_name, y_floor, z_offset = self._ZONE_LAYOUT.get(
+                    zone, ("ground", 0, 0),
+                )
 
             cab_inputs = {
                 "width_mm":   w,
@@ -229,22 +274,31 @@ class SaleOrder(models.Model):
             )
             single = Session._cut_list_to_3d_payload(cab_inputs, cut)
 
-            x_offset = cumulative_x + w / 2
+            x_offset = cursors[cursor_name] + w / 2
             line_tag = f"L{line.id}_"
             for panel in single["panels"]:
                 p = dict(panel)
                 p["pos"] = {
                     "x": panel["pos"]["x"] + x_offset,
                     "y": panel["pos"]["y"] + y_floor,
-                    "z": panel["pos"]["z"],
+                    "z": panel["pos"]["z"] + z_offset,
                 }
                 p["name"] = line_tag + panel["name"]
                 all_panels.append(p)
 
-            cumulative_x += w
+            cursors[cursor_name] += w
             cabinet_top = (h if fam != "worktop" else 25) + y_floor
             max_h = max(max_h, cabinet_top)
             max_d = max(max_d, d)
+            # Z bounds — most-negative z (back of farthest cabinet) used
+            # for camera framing + scene bounds.
+            cabinet_back_z = z_offset - d
+            if cabinet_back_z < max_z_back:
+                max_z_back = cabinet_back_z
+
+        # Widest cursor determines the camera framing width.
+        widest = max(cursors.values())
+        cumulative_x = widest
 
         # Frame the camera around the full kitchen run.
         if cumulative_x == 0:
@@ -267,11 +321,21 @@ class SaleOrder(models.Model):
             }
 
         kitchen_w = cumulative_x
-        cam_target = [kitchen_w / 2, max_h / 2, -max_d / 2]
+        # Z extent — from the farthest-back cabinet (negative Z) to
+        # the front of the deepest cabinet at the main row (~0).
+        scene_z_back = max_z_back - max_d
+        scene_z_front = 0
+        scene_z_centre = (scene_z_back + scene_z_front) / 2
+
+        cam_target = [kitchen_w / 2, max_h / 2, scene_z_centre]
         # Camera distance scales with kitchen footprint so wide runs
         # still frame cleanly without manual zoom.
-        cam_dist = max(kitchen_w, max_h, max_d) * 1.8
-        cam_position = [kitchen_w / 2, max_h * 1.4, cam_dist]
+        cam_dist = max(kitchen_w, max_h, abs(scene_z_back)) * 1.8
+        cam_position = [
+            kitchen_w / 2,
+            max_h * 1.4,
+            scene_z_front + cam_dist,
+        ]
 
         return {
             "panels": all_panels,
@@ -285,11 +349,12 @@ class SaleOrder(models.Model):
                 "kitchen_width_mm":  kitchen_w,
                 "kitchen_height_mm": max_h,
                 "kitchen_depth_mm":  max_d,
+                "cursors": dict(cursors),  # diagnostic: per-zone X totals
             },
             "camera": {"target": cam_target, "position": cam_position},
             "bounds": {
-                "min": [0, 0, -max_d],
-                "max": [kitchen_w, max_h, 0],
+                "min": [0, 0, scene_z_back],
+                "max": [kitchen_w, max_h, scene_z_front],
             },
         }
 
