@@ -30,6 +30,9 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        # Commit 2 — seed parameters + res.partner view extension
+        "data/config_parameters.xml",
+        "views/res_partner_views.xml",
     ],
     "installable": True,
     "application": True,
