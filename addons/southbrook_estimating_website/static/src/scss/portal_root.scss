@@ -1,98 +1,193 @@
-// Southbrook portal — minimal styling for Track 2 commit 1 scaffold.
-// Palette tokens follow the OWL mockup. Hard-coded today; move to
-// CSS variables when the canonical Signature-Series palette spec
-// lands (NF15).
-
-.o_southbrook_portal_header {
-    background: #fbf7ef;            // --paper
-    border: 1px solid #d8cfbf;      // --rule
-}
+// Southbrook portal — Track 2 commit 3 (2026-05-30): design tokens.
+//
+// The palette + font stacks lift directly from
+// docs/southbrook_owl_mockup.html and are scoped to the
+// .o_southbrook_owl_mount container so they don't leak into other
+// portal pages (the dealer's /my, /shop, etc. stay on their default
+// Bootstrap/Odoo styles).
+//
+// NF15 framing: this commit IS the "palette tokens → CSS vars"
+// migration the earlier code blocks promised. All subsequent OWL
+// component styling references var(--sb-*) tokens instead of
+// hex literals.
 
 .o_southbrook_owl_mount {
-    min-height: 600px;
-    background: #fbf7ef;
-    border: 1px solid #d8cfbf;
+    // ----- Palette tokens (Sky / Walnut / Linen — mockup canonical) ---
+    --sb-linen:    #f4ede2;                  // page-warm off-white
+    --sb-paper:    #fbf7ef;                  // card / panel
+    --sb-ink:      #1a1814;                  // primary text
+    --sb-ink-dim:  #6b665e;                  // secondary text
+    --sb-walnut:   #6b3f2a;                  // primary brand accent
+    --sb-walnut-d: #4a2b1d;                  // walnut darker (hover)
+    --sb-walnut-l: #c89e85;                  // walnut lighter (panel tint)
+    --sb-sky:      #2b4f6b;                  // secondary accent
+    --sb-sky-l:    #d8e3ec;                  // sky tint background
+    --sb-carbon:   #1a1814;                  // pure black-ish
+    --sb-rule:     #d8cfbf;                  // divider rule
+    --sb-rule-d:   #b5a890;                  // divider darker
+    --sb-ok:       #4a6f3e;                  // success
+    --sb-warn:     #b35a1a;                  // warning
+    --sb-alert:    #a83a2b;                  // alert / error
+    --sb-hl:       #f9e9b9;                  // highlight (selected row)
+    --sb-component-tint: rgba(43, 79, 107, 0.04);  // for OWL boundaries overlay
+
+    // ----- Font stacks ---------------------------------------------
+    // Roboto Flex is the canonical UI font (variable-axes opsz +
+    // wght). It's not bundled in this commit (Phase 3 polish vendors
+    // it locally — see PRODBOARD_MANIFEST §8.1 + NF15) — so the
+    // stack falls back to widely-installed sans-serifs that render
+    // closely enough to keep the visual register consistent.
+    //
+    // JetBrains Mono is used for prices, codes, and monospace
+    // numerics. Same fallback story.
+    --sb-font-sans:
+        'Roboto Flex',
+        'Inter',
+        'Helvetica Neue',
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        sans-serif;
+    --sb-font-mono:
+        'JetBrains Mono',
+        ui-monospace,
+        SFMono-Regular,
+        'SF Mono',
+        Menlo,
+        Consolas,
+        'Liberation Mono',
+        monospace;
+    --sb-font-display:
+        'Roboto Flex',
+        'Inter',
+        sans-serif;
+
+    // ----- Scoped baseline ---------------------------------------
+    // Apply the design font to everything inside the OWL mount so
+    // the components inherit cleanly. body / portal chrome stays
+    // on Odoo's default font (intentional — we want the SPA to
+    // visually stand apart from the standard portal furniture).
+    font-family: var(--sb-font-sans);
+    color: var(--sb-ink);
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
     border-radius: 2px;
     padding: 24px;
+    min-height: 600px;
 }
 
-// T2C2 — minimal styling for the empty OrderBuilder root.
-.o_southbrook_owl_root {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 32px 28px;
-    background: #f4ede2;
-    border: 1px solid #d8cfbf;
-    border-radius: 4px;
-    color: #1a1814;
-    line-height: 1.55;
-
-    .o_owl_heading {
-        font-size: 18px;
-        color: #6b3f2a;
-        margin-bottom: 8px;
-        font-weight: 600;
-    }
-
-    .o_owl_subhead {
-        font-size: 13px;
-        color: #6b665e;
-        margin-bottom: 16px;
-    }
-
-    .o_owl_counter_btn {
-        font-family: 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 13px;
-        margin-top: 4px;
-    }
-
-    .o_owl_status {
-        font-size: 11px;
-        margin-top: 18px;
-        padding-top: 12px;
-        border-top: 1px solid #d8cfbf;
-    }
-
-    code {
-        font-family: 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 11px;
-        background: #fbf7ef;
-        border: 1px solid #d8cfbf;
-        padding: 1px 5px;
-        border-radius: 2px;
-    }
-}
-
+// ----- Placeholder (no-JS / mount failure fallback) ----------------
 .o_southbrook_owl_placeholder {
     max-width: 640px;
     margin: 0 auto;
     padding: 40px 32px;
-    background: #f4ede2;            // --linen
-    border: 1px solid #d8cfbf;
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
     border-radius: 4px;
     text-align: center;
-    color: #1a1814;                 // --ink
+    color: var(--sb-ink);
     line-height: 1.55;
 
     strong {
         display: block;
         font-size: 16px;
         margin-bottom: 12px;
-        color: #6b3f2a;             // --walnut
+        color: var(--sb-walnut);
     }
 
     code {
-        font-family: 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 12px;
-        background: #fbf7ef;
-        border: 1px solid #d8cfbf;
+        font-family: var(--sb-font-mono);
+        font-size: 11px;
+        background: var(--sb-paper);
+        border: 1px solid var(--sb-rule);
         padding: 1px 6px;
         border-radius: 2px;
-        color: #1a1814;
+        color: var(--sb-ink);
     }
 
     p {
         margin: 12px 0;
         font-size: 13px;
+    }
+}
+
+// ----- Outer header card --------------------------------------------
+// T1 placement note: this lives OUTSIDE .o_southbrook_owl_mount so the
+// portal page card uses the Odoo portal-default styling but pulls in
+// the Southbrook accent colour for consistency. Scope the rule
+// directly.
+.o_southbrook_portal_header {
+    background: #fbf7ef;
+    border: 1px solid #d8cfbf;
+    // (tokens not used here because this card lives outside the
+    //  scoping container; Phase 3 polish moves the whole portal page
+    //  under a top-level wrapper and refactors all rules to vars.)
+}
+
+// ----- OWL OrderBuilder root (T2C2 commit's component) ------------
+.o_southbrook_owl_root {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 32px 28px;
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
+    border-radius: 4px;
+    color: var(--sb-ink);
+    line-height: 1.55;
+
+    .o_owl_heading {
+        font-family: var(--sb-font-display);
+        font-variation-settings: "opsz" 36, "wght" 500;
+        font-size: 18px;
+        color: var(--sb-walnut);
+        margin-bottom: 8px;
+        font-weight: 600;
+        letter-spacing: -0.005em;
+    }
+
+    .o_owl_subhead {
+        font-size: 13px;
+        color: var(--sb-ink-dim);
+        margin-bottom: 16px;
+    }
+
+    .o_owl_counter_btn {
+        font-family: var(--sb-font-mono);
+        font-size: 13px;
+        margin-top: 4px;
+        // Custom Bootstrap-outline override to land on Southbrook
+        // sky accent rather than Bootstrap blue.
+        color: var(--sb-sky);
+        border-color: var(--sb-sky);
+        background: transparent;
+
+        &:hover, &:focus {
+            background: var(--sb-sky-l);
+            color: var(--sb-sky);
+            border-color: var(--sb-sky);
+        }
+    }
+
+    .o_owl_status {
+        font-size: 11px;
+        color: var(--sb-ink-dim);
+        margin-top: 18px;
+        padding-top: 12px;
+        border-top: 1px solid var(--sb-rule);
+    }
+
+    code {
+        font-family: var(--sb-font-mono);
+        font-size: 11px;
+        background: var(--sb-paper);
+        border: 1px solid var(--sb-rule);
+        padding: 1px 5px;
+        border-radius: 2px;
+        color: var(--sb-ink);
+    }
+
+    p {
+        font-family: var(--sb-font-sans);
     }
 }
