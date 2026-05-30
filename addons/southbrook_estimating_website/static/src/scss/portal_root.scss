@@ -125,6 +125,138 @@
     //  under a top-level wrapper and refactors all rules to vars.)
 }
 
+// ----- T2C5 reactive-store-probe states ----------------------------
+.o_owl_loading_card,
+.o_owl_error_card,
+.o_owl_empty_card {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 24px 28px;
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
+    border-radius: 4px;
+    color: var(--sb-ink);
+    line-height: 1.55;
+    text-align: center;
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_error_card {
+    border-color: var(--sb-alert);
+    background: rgba(168, 58, 43, 0.06);
+
+    strong {
+        color: var(--sb-alert);
+    }
+    .o_owl_retry_btn {
+        margin-top: 14px;
+        font-family: var(--sb-font-mono);
+        font-size: 12px;
+    }
+}
+
+.o_owl_empty_card {
+    code {
+        font-family: var(--sb-font-mono);
+        font-size: 11px;
+        background: var(--sb-paper);
+        border: 1px solid var(--sb-rule);
+        padding: 1px 5px;
+        border-radius: 2px;
+    }
+}
+
+.o_owl_loaded {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 28px 28px 32px;
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
+    border-radius: 4px;
+    color: var(--sb-ink);
+    line-height: 1.55;
+
+    .o_owl_heading {
+        font-family: var(--sb-font-display);
+        font-variation-settings: "opsz" 36, "wght" 500;
+        font-size: 22px;
+        color: var(--sb-walnut);
+        margin-bottom: 4px;
+        letter-spacing: -0.01em;
+    }
+
+    .o_owl_partner_inline {
+        font-size: 14px;
+        color: var(--sb-ink-dim);
+        font-weight: 400;
+    }
+
+    .o_owl_via {
+        font-size: 12px;
+        color: var(--sb-ink-dim);
+        margin-left: 4px;
+    }
+}
+
+// ----- Channel badge (used in T2C5 + HeaderStrip in T2C6) ----------
+.o_owl_channel_badge {
+    display: inline-block;
+    font-family: var(--sb-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin: 8px 0 18px;
+    color: var(--sb-linen);
+    background: var(--sb-walnut);
+
+    &.o_owl_channel_dealer       { background: var(--sb-walnut); }
+    &.o_owl_channel_tradesperson { background: var(--sb-sky); }
+    &.o_owl_channel_kd           { background: #5e7c8b; }
+    &.o_owl_channel_bigbox       { background: #6b665e; }
+    &.o_owl_channel_refacing     { background: #8a6e3f; }
+    &.o_owl_channel_retail {
+        background: var(--sb-rule-d);
+        color: var(--sb-ink);
+    }
+}
+
+// ----- T2C5 store probe (commit 6 replaces with HeaderStrip) -------
+.o_owl_store_probe {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 6px;
+    column-gap: 24px;
+    padding: 14px 18px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: 3px;
+    margin-bottom: 18px;
+
+    .o_owl_probe_row {
+        display: contents;
+    }
+    .o_owl_probe_label {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--sb-ink-dim);
+        align-self: center;
+    }
+    .o_owl_probe_value {
+        font-size: 14px;
+        color: var(--sb-ink);
+        text-align: right;
+        font-variation-settings: "opsz" 14, "wght" 500;
+        &.mono {
+            font-family: var(--sb-font-mono);
+        }
+        &.o_owl_savings {
+            color: var(--sb-ok);
+        }
+    }
+}
+
 // ----- OWL OrderBuilder root (T2C2 commit's component) ------------
 .o_southbrook_owl_root {
     max-width: 640px;

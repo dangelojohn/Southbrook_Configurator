@@ -2,59 +2,147 @@
 /*
  * SPDX-License-Identifier: LGPL-3.0-only
  *
- * Track 2 commit 2 — empty OWL OrderBuilder mount.
+ * Track 2 commit 5 (2026-05-30) — reactive store wired to JSON-RPC.
  *
- * Bootstraps the OWL component tree on /my/southbrook/order-builder
- * pages. The portal template ships a `<div id="order_builder_root">`
- * with placeholder content (so the page reads correctly without JS).
- * This script:
+ * Replaces the commit-2 click-counter OrderBuilder with a real
+ * reactive store. On mount, fires a JSON-RPC call to
+ * /southbrook/api/order/<id> (T2C4 controller) and exposes the
+ * normalised payload (order header, lines, zones) on state.
  *
- *   1. Finds the mount-point div at DOMContentLoaded.
- *   2. Reads the order id + name from its data attributes.
- *   3. Mounts the <OrderBuilder/> OWL component into it, replacing
- *      the placeholder.
+ * Commit 6 reads state.order to render the HeaderStrip (5 cells).
+ * Commits 7-12 add the remaining components from the mockup. Each
+ * later component will read its slice from the same reactive
+ * state — no extra RPC.
  *
- * <OrderBuilder/> in commit 2 is intentionally minimal — a single
- * heading + a click counter — so we can verify:
- *   • The portal asset bundle loaded OWL successfully.
- *   • Reactivity (useState) works on portal routes the same way it
- *     does in the backend.
- *   • The mount-point div is reachable + props are passed through.
+ * State shape mirrors the T2C4 payload + a couple of UI flags:
  *
- * Commit 3+ replaces this with the real component tree per
- * docs/southbrook_owl_mockup.html.
+ *   state = {
+ *     loading: bool,                 // RPC in flight
+ *     error:   string | null,        // human-readable failure message
+ *     order:   {id, name, channel, ...} | null,
+ *     lines:   [...],
+ *     zones:   [...],
+ *     ui: {
+ *       current_tab: "lines",        // commit 8 wires the tab bar
+ *       selected_line_id: null,      // commit 9 wires selection
+ *     },
+ *   };
  */
-import { Component, mount, useState, xml } from "@odoo/owl";
+import { Component, mount, onMounted, useState, xml } from "@odoo/owl";
 
-// Inline template — Phase 3 polish moves this to an XML asset file
-// alongside additional components.
+// ----------------------------------------------------------------------
+// JSON-RPC fetch helper. Pure fetch — no Odoo service dependency so
+// the script works on the public portal context where the backend
+// service registry isn't available.
+// ----------------------------------------------------------------------
+
+async function rpcJsonCall(url, params = {}) {
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "call",
+            params: params,
+            id: Math.floor(Math.random() * 1e9),
+        }),
+    });
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    }
+    const json = await res.json();
+    if (json.error) {
+        const msg = json.error.data?.message
+            || json.error.message
+            || "RPC error";
+        throw new Error(msg);
+    }
+    return json.result;
+}
+
+// ----------------------------------------------------------------------
+// Inline template. Phase 3 polish splits each section into its own
+// component file under static/src/js/components/.
+// ----------------------------------------------------------------------
+
 const TEMPLATE = xml`
     <div class="o_southbrook_owl_root">
-        <h3 class="o_owl_heading">
-            OWL is alive — Order Builder root mounted.
-        </h3>
-        <p class="o_owl_subhead">
-            Order id: <strong t-esc="props.orderId || 'none'"/>
-            <t t-if="props.orderName">
-                · <strong t-esc="props.orderName"/>
-            </t>
-        </p>
-        <p>
-            Reactivity check — click the button.
-            <br/>
-            <button class="btn btn-outline-primary o_owl_counter_btn"
-                    t-on-click="onClick">
-                Clicks: <t t-esc="state.count"/>
+
+        <!-- Loading -->
+        <div t-if="state.loading" class="o_owl_loading_card">
+            <p class="o_owl_status">Loading order…</p>
+        </div>
+
+        <!-- Error -->
+        <div t-elif="state.error" class="o_owl_error_card">
+            <strong>Couldn't load this order.</strong>
+            <p t-esc="state.error"/>
+            <button class="btn btn-outline-secondary o_owl_retry_btn"
+                    t-on-click="_onRetry">
+                Retry
             </button>
-        </p>
-        <p class="o_owl_status text-muted">
-            Phase 2 Track 2 commit 2 of 14. Next commit adds palette /
-            type tokens; commit 5 wires the reactive store to the
-            JSON-RPC controller; commits 6-13 build out the
-            <code>&lt;HeaderStrip/&gt;</code> →
-            <code>&lt;FooterActions/&gt;</code> component tree per the
-            mockup.
-        </p>
+        </div>
+
+        <!-- Empty / no id -->
+        <div t-elif="!state.order" class="o_owl_empty_card">
+            <strong>No order selected.</strong>
+            <p>
+                Append an order id to the URL — for example
+                <code>/my/southbrook/order-builder/234</code>.
+            </p>
+        </div>
+
+        <!-- Loaded -->
+        <div t-else="" class="o_owl_loaded">
+            <h3 class="o_owl_heading">
+                <t t-esc="state.order.name"/>
+                <span class="o_owl_partner_inline">
+                    · <t t-esc="state.order.partner_name"/>
+                    <span t-if="state.order.via" class="o_owl_via">
+                        (<t t-esc="state.order.via"/>)
+                    </span>
+                </span>
+            </h3>
+
+            <div class="o_owl_channel_badge"
+                 t-att-class="'o_owl_channel_' + state.order.channel_css">
+                <t t-esc="state.order.channel_label"/>
+            </div>
+
+            <!-- Store probe — commit 6 replaces with the proper
+                 HeaderStrip 5-cell component. -->
+            <div class="o_owl_store_probe">
+                <div class="o_owl_probe_row">
+                    <span class="o_owl_probe_label">Retail subtotal</span>
+                    <span class="o_owl_probe_value mono"
+                          t-esc="_fmtUsd(state.order.retail_subtotal)"/>
+                </div>
+                <div class="o_owl_probe_row">
+                    <span class="o_owl_probe_label">Channel total</span>
+                    <span class="o_owl_probe_value mono"
+                          t-esc="_fmtUsd(state.order.channel_total)"/>
+                </div>
+                <div class="o_owl_probe_row">
+                    <span class="o_owl_probe_label">Savings</span>
+                    <span class="o_owl_probe_value mono o_owl_savings"
+                          t-esc="_fmtUsd(state.order.savings)"/>
+                </div>
+                <div class="o_owl_probe_row">
+                    <span class="o_owl_probe_label">Lines · Zones</span>
+                    <span class="o_owl_probe_value mono">
+                        <t t-esc="state.order.line_count"/>
+                        ·
+                        <t t-esc="state.zones.length"/>
+                    </span>
+                </div>
+            </div>
+
+            <p class="o_owl_status">
+                Reactive store wired (T2C5). Commit 6 turns this probe
+                into the proper <code>&lt;HeaderStrip/&gt;</code> 5-cell
+                component reading the same store slice.
+            </p>
+        </div>
     </div>
 `;
 
@@ -66,20 +154,76 @@ class OrderBuilder extends Component {
     };
 
     setup() {
-        this.state = useState({ count: 0 });
+        this.state = useState({
+            loading: false,
+            error: null,
+            order: null,
+            lines: [],
+            zones: [],
+            ui: {
+                current_tab: "lines",
+                selected_line_id: null,
+            },
+        });
+        onMounted(() => this._loadOrder());
     }
 
-    onClick() {
-        this.state.count++;
+    async _loadOrder() {
+        const orderId = this.props.orderId;
+        if (!orderId) {
+            // No id in URL → render the empty-state card. Not an error.
+            this.state.loading = false;
+            return;
+        }
+        this.state.loading = true;
+        this.state.error = null;
+        try {
+            const payload = await rpcJsonCall(
+                `/southbrook/api/order/${encodeURIComponent(orderId)}`,
+            );
+            if (payload && payload.error) {
+                this.state.error = (
+                    payload.error === "forbidden"
+                        ? "Access denied. This order is not visible to your account."
+                        : payload.error === "not_found"
+                        ? "Order not found."
+                        : payload.error
+                );
+                return;
+            }
+            this.state.order = payload.order;
+            this.state.lines = payload.lines || [];
+            this.state.zones = payload.zones || [];
+        } catch (e) {
+            this.state.error = e?.message || String(e);
+        } finally {
+            this.state.loading = false;
+        }
+    }
+
+    async _onRetry() {
+        await this._loadOrder();
+    }
+
+    /**
+     * USD currency formatter used by the probe block. Phase 3 polish
+     * moves currency awareness into the payload (multi-currency support)
+     * — for commit 5 the dollar sign is hardcoded and matches the mockup.
+     */
+    _fmtUsd(value) {
+        if (typeof value !== "number") return "—";
+        return "$" + value.toLocaleString(undefined, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        });
     }
 }
 
-/**
- * Mount the OrderBuilder root into its placeholder div.
- *
- * Idempotent — guards against double-mount if the script runs
- * twice (browser bfcache, hot reload).
- */
+// ----------------------------------------------------------------------
+// Bootstrap — finds the mount-point div on portal pages and mounts
+// the OrderBuilder root. Idempotent against double-mount.
+// ----------------------------------------------------------------------
+
 async function mountOrderBuilder() {
     const root = document.getElementById("order_builder_root");
     if (!root || root.dataset.owlMounted === "1") return;
@@ -111,6 +255,5 @@ async function mountOrderBuilder() {
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", mountOrderBuilder);
 } else {
-    // Module loaded after DOMContentLoaded — mount immediately.
     queueMicrotask(mountOrderBuilder);
 }
