@@ -75,7 +75,7 @@
            tree so lines display as collapsible zone-headed groups with
            auto-aggregated price_subtotal per zone. Mock §3.D faithful:
            zone-headed groups, per-zone subtotals visible at all times. -->
-      <xpath expr="//field[@name='order_line']/tree" position="attributes">
+      <xpath expr="//field[@name='order_line']/list" position="attributes">
         <attribute name="default_group_by">zone</attribute>
         <attribute name="expand">1</attribute>
       </xpath>
