@@ -16,6 +16,53 @@
     padding: 24px;
 }
 
+// T2C2 — minimal styling for the empty OrderBuilder root.
+.o_southbrook_owl_root {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 32px 28px;
+    background: #f4ede2;
+    border: 1px solid #d8cfbf;
+    border-radius: 4px;
+    color: #1a1814;
+    line-height: 1.55;
+
+    .o_owl_heading {
+        font-size: 18px;
+        color: #6b3f2a;
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+
+    .o_owl_subhead {
+        font-size: 13px;
+        color: #6b665e;
+        margin-bottom: 16px;
+    }
+
+    .o_owl_counter_btn {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        margin-top: 4px;
+    }
+
+    .o_owl_status {
+        font-size: 11px;
+        margin-top: 18px;
+        padding-top: 12px;
+        border-top: 1px solid #d8cfbf;
+    }
+
+    code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        background: #fbf7ef;
+        border: 1px solid #d8cfbf;
+        padding: 1px 5px;
+        border-radius: 2px;
+    }
+}
+
 .o_southbrook_owl_placeholder {
     max-width: 640px;
     margin: 0 auto;

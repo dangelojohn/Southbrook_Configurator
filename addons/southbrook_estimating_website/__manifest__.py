@@ -29,9 +29,14 @@
     # Dedicated asset bundle (charter Q4 answer) so the OWL portal
     # components only load on the Order Builder route. Other portal
     # pages (/shop, /my, etc.) stay clean.
+    #
+    # T2C2 adds portal_boot.esm.js — the OWL bootstrap script that
+    # finds the mount-point div on the portal page and mounts the
+    # <OrderBuilder/> component into it.
     "assets": {
         "web.assets_frontend": [
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
+            "southbrook_estimating_website/static/src/js/portal_boot.esm.js",
         ],
     },
     "installable": True,
