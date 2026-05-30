@@ -971,7 +971,8 @@ const TEMPLATE = xml`
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
                  class="o_owl_tab_panel o_owl_panel_kitchen3d">
-                <KitchenViewport orderId="props.orderId"/>
+                <KitchenViewport orderId="props.orderId"
+                                 onLineSelected.bind="_onKitchen3dLineSelected"/>
             </div>
             <div t-elif="state.ui.current_tab === 'bom'"
                  class="o_owl_tab_panel o_owl_panel_bom">
@@ -1265,6 +1266,14 @@ class OrderBuilder extends Component {
         } finally {
             this.state.action_busy = false;
         }
+    };
+
+    // P25C3 — invoked when the user clicks a cabinet in the kitchen
+    // viewport. Switches to Lines tab and selects the line so the
+    // ZoneGroup → ConfigDrawer expansion fires.
+    _onKitchen3dLineSelected = (lineId) => {
+        this.state.ui.current_tab = "lines";
+        this.state.ui.selected_line_id = lineId;
     };
 
     // T2C11 — total BoM items used as the BoM tab badge count.

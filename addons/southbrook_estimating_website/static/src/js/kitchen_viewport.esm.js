@@ -68,6 +68,9 @@ export class KitchenViewport extends Component {
                 </span>
                 <span class="o_owl_kitchen_status text-danger"
                       t-elif="state.error" t-esc="state.error"/>
+                <span class="o_owl_kitchen_hover"
+                      t-elif="state.hoveredLineInfo"
+                      t-esc="state.hoveredLineInfo"/>
                 <span class="o_owl_kitchen_meta" t-elif="state.meta">
                     <t t-esc="state.meta"/>
                 </span>
@@ -89,6 +92,10 @@ export class KitchenViewport extends Component {
     `;
     static props = {
         orderId: { type: String, optional: true },
+        // P25C3 — invoked when the user clicks a cabinet in the
+        // viewport. Parent OrderBuilder switches to the Lines tab
+        // and selects the line (which opens the ConfigDrawer).
+        onLineSelected: { type: Function, optional: true },
     };
 
     setup() {
@@ -100,6 +107,10 @@ export class KitchenViewport extends Component {
             meta: null,
             // P25C2 — solid↔blueline toggle (back-port of Track 1 T1C5).
             mode: "solid",
+            // P25C3 — hover state for tooltip + cabinet highlight
+            // (back-port of Track 1 T1C8).
+            hoveredLineId: null,
+            hoveredLineInfo: null,
         });
 
         // Three.js handles — populated in _init.
@@ -116,6 +127,15 @@ export class KitchenViewport extends Component {
         this._dimensionGroup = null;
         this._dimensionMaterial = null;
         this._spriteResources = [];
+        // P25C3 — hover + click (back-port of T1C8 + T1C9).
+        // _linesIndex caches payload.metadata.lines (keyed by string
+        // line id matching the L{id}_ panel name prefix).
+        this._linesIndex = {};
+        this._hoveredLineId = null;
+        this._raycaster = null;
+        this._mouse = null;
+        this._mouseDownAt = null;
+        this._MAX_CLICK_DELTA_PX = 5;
 
         onMounted(() => this._init());
         onWillUnmount(() => this._dispose());
@@ -212,6 +232,14 @@ export class KitchenViewport extends Component {
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
             }),
+            // P25C3 — hover highlight (sky emissive over carcass base).
+            highlight: new THREE.MeshStandardMaterial({
+                color: 0xc89e85,
+                emissive: 0x2b4f6b,
+                emissiveIntensity: 0.4,
+                roughness: 0.5,
+                metalness: 0.1,
+            }),
         };
 
         // Floor.
@@ -234,6 +262,14 @@ export class KitchenViewport extends Component {
             this._resizeObserver = new ResizeObserver(() => this._fitRendererToCanvas());
             this._resizeObserver.observe(canvas);
         }
+
+        // P25C3 — raycaster + canvas mouse listeners.
+        this._raycaster = new THREE.Raycaster();
+        this._mouse = new THREE.Vector2();
+        canvas.addEventListener("mousemove", (e) => this._onMouseMove(e));
+        canvas.addEventListener("mouseleave", () => this._setHoveredLine(null));
+        canvas.addEventListener("mousedown", (e) => this._onMouseDown(e));
+        canvas.addEventListener("mouseup", (e) => this._onMouseUp(e));
 
         await this._fetchAndBuild();
         this._animate();
@@ -300,6 +336,12 @@ export class KitchenViewport extends Component {
 
         if (!payload || !Array.isArray(payload.panels)) return;
 
+        // P25C3 — refresh line index + clear stale hover state.
+        this._linesIndex = (payload.metadata && payload.metadata.lines) || {};
+        this._hoveredLineId = null;
+        this.state.hoveredLineId = null;
+        this.state.hoveredLineInfo = null;
+
         const blueline = this.state.mode === "blueline";
 
         for (const p of payload.panels) {
@@ -315,6 +357,11 @@ export class KitchenViewport extends Component {
             }
             mesh.castShadow = !blueline;
             mesh.receiveShadow = !blueline;
+            // P25C3 — tag mesh with line id (back-port of T1C8). The
+            // get_kitchen_3d_payload backend prefixes each panel name
+            // with L{id}_ — so /^L(\d+)_/ pulls the id reliably.
+            const m = (p.name || "").match(/^L(\d+)_/);
+            if (m) mesh.userData.lineId = m[1];
             this._cabinetGroup.add(mesh);
         }
 
@@ -343,6 +390,11 @@ export class KitchenViewport extends Component {
     // ------------------------------------------------------------------
 
     onToggleMode() {
+        // P25C3 — clear any hover state first so the highlight
+        // material doesn't get cached as the "original" during the
+        // blueline swap.
+        this._setHoveredLine(null);
+
         this.state.mode = this.state.mode === "solid" ? "blueline" : "solid";
         if (!this._cabinetGroup) return;
         const blueline = this._materials.blueline;
@@ -362,6 +414,126 @@ export class KitchenViewport extends Component {
         });
         if (this._dimensionGroup) {
             this._dimensionGroup.visible = this.state.mode === "blueline";
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // P25C3 — hover + click (back-port of Track 1 T1C8 + T1C9).
+    //
+    // Hover: raycast cabinetGroup, find topmost mesh, look up lineId
+    // from mesh.userData. Swap to highlight material, populate toolbar
+    // tooltip from _linesIndex.
+    //
+    // Click: mousedown/mouseup pair distinguishes a click from an
+    // orbit drag. On a clean click, invoke props.onLineSelected so
+    // the parent OrderBuilder switches to the Lines tab and selects
+    // the line (which opens the ConfigDrawer).
+    //
+    // Both hover + click DISABLED in blueline mode so they don't
+    // fight the dimension-overlay material swap.
+    // ------------------------------------------------------------------
+
+    _onMouseMove(event) {
+        if (this.state.mode === "blueline") return;
+        const canvas = this.canvasRef.el;
+        if (!canvas || !this._raycaster || !this._cabinetGroup || !this._camera) {
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        this._mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this._mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        this._raycaster.setFromCamera(this._mouse, this._camera);
+        const hits = this._raycaster.intersectObjects(
+            this._cabinetGroup.children, false,
+        );
+        if (hits.length > 0) {
+            const mesh = hits[0].object;
+            const lineId = mesh.userData?.lineId || null;
+            this._setHoveredLine(lineId);
+            canvas.style.cursor = lineId ? "pointer" : "default";
+        } else {
+            this._setHoveredLine(null);
+            canvas.style.cursor = "default";
+        }
+    }
+
+    _setHoveredLine(lineId) {
+        if (lineId === this._hoveredLineId) return;
+
+        // Restore previously hovered cabinet's materials.
+        if (this._hoveredLineId !== null && this._cabinetGroup) {
+            this._cabinetGroup.traverse((obj) => {
+                if (obj.isMesh
+                    && obj.userData?.lineId === this._hoveredLineId
+                    && obj.userData?._origMaterialHover) {
+                    obj.material = obj.userData._origMaterialHover;
+                    obj.userData._origMaterialHover = null;
+                }
+            });
+        }
+
+        this._hoveredLineId = lineId;
+        this.state.hoveredLineId = lineId;
+
+        if (lineId !== null && this._cabinetGroup && this._materials.highlight) {
+            const hl = this._materials.highlight;
+            this._cabinetGroup.traverse((obj) => {
+                if (obj.isMesh && obj.userData?.lineId === lineId) {
+                    if (!obj.userData._origMaterialHover) {
+                        obj.userData._origMaterialHover = obj.material;
+                    }
+                    obj.material = hl;
+                }
+            });
+            const info = this._linesIndex[lineId];
+            if (info) {
+                const dims =
+                    `${Math.round(info.width_mm)}×` +
+                    `${Math.round(info.height_mm)}×` +
+                    `${Math.round(info.depth_mm)} mm`;
+                this.state.hoveredLineInfo =
+                    `#${info.sequence} · ${info.family} · ${info.sku || ""} · ${dims}`;
+            } else {
+                this.state.hoveredLineInfo = `Line ${lineId}`;
+            }
+        } else {
+            this.state.hoveredLineInfo = null;
+        }
+    }
+
+    _onMouseDown(event) {
+        this._mouseDownAt = { x: event.clientX, y: event.clientY };
+    }
+
+    _onMouseUp(event) {
+        const down = this._mouseDownAt;
+        this._mouseDownAt = null;
+        if (!down) return;
+        const dx = event.clientX - down.x;
+        const dy = event.clientY - down.y;
+        if (Math.hypot(dx, dy) > this._MAX_CLICK_DELTA_PX) return;
+        // Clean click — dispatch.
+        this._handleCanvasClick(event);
+    }
+
+    _handleCanvasClick(event) {
+        if (this.state.mode === "blueline") return;
+        const canvas = this.canvasRef.el;
+        if (!canvas || !this._raycaster || !this._cabinetGroup || !this._camera) {
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        this._mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this._mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        this._raycaster.setFromCamera(this._mouse, this._camera);
+        const hits = this._raycaster.intersectObjects(
+            this._cabinetGroup.children, false,
+        );
+        if (!hits.length) return;
+        const lineId = hits[0].object.userData?.lineId;
+        if (!lineId) return;
+        if (this.props.onLineSelected) {
+            this.props.onLineSelected(parseInt(lineId, 10));
         }
     }
 

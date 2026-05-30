@@ -431,6 +431,18 @@
     font-style: italic;
 }
 
+// P25C3 — hover tooltip in kitchen toolbar.
+.o_owl_kitchen_hover {
+    font-family: var(--sb-font-mono);
+    font-size: 11px;
+    color: var(--sb-sky);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 // P25C2 — solid↔blueline toggle button
 .o_owl_kitchen_mode_btn {
     font-family: var(--sb-font-mono);
