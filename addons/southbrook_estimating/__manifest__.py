@@ -135,7 +135,27 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "reports/signature_spec_sheet.xml",
         "reports/shop_copy.xml",
         "reports/door_order.xml",
+        # Phase 2 Track 1 — 3D viewport injected into the OCA wizard form.
+        "views/product_configurator_3d_view.xml",
     ],
+    # ------------------------------------------------------------------
+    # Asset bundles — Track 1 (3D cabinet viewport).
+    #
+    # Three.js itself is NOT in this list yet — see
+    # static/lib/three/README.md for the one-time vendoring step. When
+    # the bundle is dropped into static/lib/three/, uncomment the two
+    # commented entries below (above the SCSS line) and restart Odoo.
+    # ------------------------------------------------------------------
+    "assets": {
+        "web.assets_backend": [
+            # When Three.js is vendored, the next two lines become live:
+            # "southbrook_estimating/static/lib/three/three.min.js",
+            # "southbrook_estimating/static/lib/three/OrbitControls.js",
+            "southbrook_estimating/static/src/scss/cabinet_viewport.scss",
+            "southbrook_estimating/static/src/js/cabinet_viewport.esm.js",
+            "southbrook_estimating/static/src/xml/cabinet_viewport.xml",
+        ],
+    },
     # ------------------------------------------------------------------
     # Demo data — loaded only with --demo flag (or per-module demo flag).
     # All files are noupdate="1" so demo modifications during gate
