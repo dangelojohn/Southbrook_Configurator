@@ -378,6 +378,81 @@
     font-weight: 600;
 }
 
+// ----- T2C8 TabBar -------------------------------------------------
+.o_owl_tabs {
+    display: flex;
+    gap: 0;
+    margin-top: 18px;
+    border-bottom: 1px solid var(--sb-rule-d);
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_tab {
+    padding: 10px 18px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sb-ink-dim);
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    position: relative;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-bottom-color 0.15s;
+
+    &:hover:not(.o_owl_tab_active) {
+        color: var(--sb-walnut);
+    }
+}
+
+.o_owl_tab_active {
+    color: var(--sb-ink);
+    border-bottom-color: var(--sb-walnut);
+    font-weight: 600;
+}
+
+.o_owl_tab_count {
+    display: inline-block;
+    font-family: var(--sb-font-mono);
+    background: var(--sb-rule);
+    color: var(--sb-ink);
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    margin-left: 6px;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1.4;
+}
+
+.o_owl_tab_panel {
+    padding: 24px 0 0;
+    min-height: 200px;
+}
+
+.o_owl_panel_placeholder {
+    background: var(--sb-paper);
+    border: 1px dashed var(--sb-rule);
+    border-radius: 3px;
+    padding: 20px 24px;
+    color: var(--sb-ink-dim);
+    line-height: 1.55;
+    font-family: var(--sb-font-sans);
+
+    strong {
+        color: var(--sb-walnut);
+        font-size: 13px;
+        display: inline-block;
+        margin-right: 4px;
+    }
+
+    small {
+        font-family: var(--sb-font-mono);
+        font-size: 11px;
+    }
+}
+
 // ----- T2C6 HeaderStrip — 5-cell row (mockup §HeaderStrip) ---------
 //
 // Grid template proportions match the mockup: customer cell is

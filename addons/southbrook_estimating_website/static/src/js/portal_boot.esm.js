@@ -212,6 +212,42 @@ class StagePipeline extends Component {
 }
 
 // ----------------------------------------------------------------------
+// TabBar — T2C8.
+//
+// 5 tabs from the mockup (Order Lines / BoM Preview / Validation /
+// History / Customer Print) with count badges. State lives on the
+// parent OrderBuilder (state.ui.current_tab) so child panels can
+// switch panels without re-rendering the whole frame.
+//
+// Each tab is `{code, label, count}`. count may be a number, a string
+// ("v1"), or null (no badge for the print tab).
+// ----------------------------------------------------------------------
+
+class TabBar extends Component {
+    static template = xml`
+        <div class="o_owl_tabs">
+            <t t-foreach="props.tabs" t-as="tab" t-key="tab.code">
+                <button class="o_owl_tab"
+                        t-att-class="{
+                            'o_owl_tab_active': tab.code === props.activeTab,
+                        }"
+                        t-on-click.stop="() => props.onTabChange(tab.code)">
+                    <t t-esc="tab.label"/>
+                    <span t-if="tab.count !== null and tab.count !== undefined"
+                          class="o_owl_tab_count"
+                          t-esc="tab.count"/>
+                </button>
+            </t>
+        </div>
+    `;
+    static props = {
+        tabs: Array,
+        activeTab: String,
+        onTabChange: Function,
+    };
+}
+
+// ----------------------------------------------------------------------
 // HeaderStrip — T2C6.
 //
 // The 5-cell row at the top of the OrderBuilder (per mockup §HeaderStrip):
@@ -320,12 +356,62 @@ const TEMPLATE = xml`
             <!-- HeaderStrip (T2C6) — reads order header from state. -->
             <HeaderStrip order="state.order"/>
 
+            <!-- TabBar (T2C8) — client-side panel switch. -->
+            <TabBar tabs="_tabs"
+                    activeTab="state.ui.current_tab"
+                    onTabChange.bind="_setActiveTab"/>
+
+            <!-- Tab panels. T2C9-11 fill these. Today they're
+                 placeholders that confirm tab switching works. -->
+            <div t-if="state.ui.current_tab === 'lines'"
+                 class="o_owl_tab_panel o_owl_panel_lines">
+                <p class="o_owl_panel_placeholder">
+                    <strong>Order Lines panel</strong> — T2C9 wires the
+                    multi-zone grid (ZoneGroup + OrderLine + inline
+                    ConfigDrawer per zone).
+                    <br/>
+                    <small>
+                        <t t-esc="state.lines.length"/> line(s) across
+                        <t t-esc="state.zones.length"/> zone(s) in store.
+                    </small>
+                </p>
+            </div>
+            <div t-elif="state.ui.current_tab === 'bom'"
+                 class="o_owl_tab_panel o_owl_panel_bom">
+                <p class="o_owl_panel_placeholder">
+                    <strong>BoM Preview panel</strong> — T2C11 wires the
+                    panel cut list + hardware summary derived from
+                    each line's effective BoM.
+                </p>
+            </div>
+            <div t-elif="state.ui.current_tab === 'validation'"
+                 class="o_owl_tab_panel o_owl_panel_validation">
+                <p class="o_owl_panel_placeholder">
+                    <strong>Validation panel</strong> — T2C11 wires the
+                    hard-rule + soft-suggestion strip
+                    (e.g. "Width 21″ should be 1-door").
+                </p>
+            </div>
+            <div t-elif="state.ui.current_tab === 'history'"
+                 class="o_owl_tab_panel o_owl_panel_history">
+                <p class="o_owl_panel_placeholder">
+                    <strong>History panel</strong> — Phase 3 polish
+                    surfaces the NF6 parent-order chain
+                    (v1 → v2 → v3 …).
+                </p>
+            </div>
+            <div t-elif="state.ui.current_tab === 'print'"
+                 class="o_owl_tab_panel o_owl_panel_print">
+                <p class="o_owl_panel_placeholder">
+                    <strong>Customer Print panel</strong> — Phase 3
+                    polish embeds the Signature Spec Sheet PDF preview
+                    (already QWeb-rendered by southbrook_estimating).
+                </p>
+            </div>
+
             <p class="o_owl_status">
-                Chrome + HeaderStrip wired (T2C6 + T2C7). Next: TabBar
-                (T2C8) and the multi-zone line grid (T2C9).
-                <br/>
-                Lines loaded: <strong t-esc="state.lines.length"/>
-                across <strong t-esc="state.zones.length"/> zones.
+                TabBar + tab-panel routing wired (T2C8). Next: T2C9
+                fills the Order Lines panel with the zone grid.
             </p>
         </div>
     </div>
@@ -338,6 +424,7 @@ class OrderBuilder extends Component {
         OrderTitlebar,
         StagePipeline,
         HeaderStrip,
+        TabBar,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -395,6 +482,59 @@ class OrderBuilder extends Component {
     async _onRetry() {
         await this._loadOrder();
     }
+
+    // ------------------------------------------------------------------
+    // T2C8 — TabBar
+    // ------------------------------------------------------------------
+
+    /**
+     * Five-tab definition for the TabBar. Counts derive live from the
+     * store so they update as commits 9-11 wire the underlying data.
+     *
+     *   lines     → line_count from the payload header
+     *   bom       → Phase-1 approximation (panels per cabinet × 10).
+     *               T2C11 replaces with the real BoM rollup count.
+     *   validation→ placeholder 0. T2C11 wires the rule-engine output.
+     *   history   → "v<N>" string from order.version.
+     *   print     → null (no badge — print tab is just an action).
+     */
+    get _tabs() {
+        const order = this.state.order || {};
+        return [
+            {
+                code: "lines",
+                label: "Order Lines",
+                count: this.state.lines.length,
+            },
+            {
+                code: "bom",
+                label: "BoM Preview",
+                count: this.state.lines.length * 10,  // Phase-1 approximation
+            },
+            {
+                code: "validation",
+                label: "Validation",
+                count: 0,
+            },
+            {
+                code: "history",
+                label: "History",
+                count: "v" + (order.version || 1),
+            },
+            {
+                code: "print",
+                label: "Customer Print",
+                count: null,
+            },
+        ];
+    }
+
+    // Class-field arrow so `this` binds to the OrderBuilder when the
+    // TabBar invokes the callback. Equivalent to .bind(this) but
+    // declarative.
+    _setActiveTab = (code) => {
+        this.state.ui.current_tab = code;
+    };
 }
 
 // ----------------------------------------------------------------------
