@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Southbrook Order Builder — OWL Architecture Mockup</title>
+<meta name="description" content="Interactive mockup of the OWL-based portal architecture for the Southbrook estimating engine. Simulates reactive component behavior + JSON-RPC interaction model.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --linen:    #f4ede2;
+  --paper:    #fbf7ef;
+  --ink:      #1a1814;
+  --ink-dim:  #6b665e;
+  --walnut:   #6b3f2a;
+  --walnut-d: #4a2b1d;
+  --walnut-l: #c89e85;
+  --sky:      #2b4f6b;
+  --sky-l:    #d8e3ec;
+  --carbon:   #1a1814;
+  --rule:     #d8cfbf;
+  --rule-d:   #b5a890;
+  --ok:       #4a6f3e;
+  --warn:     #b35a1a;
+  --alert:    #a83a2b;
+  --hl:       #f9e9b9;
+  --component-tint: rgba(43, 79, 107, 0.04);  /* very subtle sky for OWL component overlay */
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Roboto Flex', sans-serif;
+  font-variation-settings: "opsz" 14, "wght" 400;
+  background: #e8dfd2;
+  color: var(--ink);
+  line-height: 1.4;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+button { font-family: inherit; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   REVIEW HEADER — explains what the mockup demonstrates
+   ════════════════════════════════════════════════════════════════════════ */
+.review-header {
+  background: var(--carbon);
+  color: var(--linen);
+  padding: 20px 32px;
+  border-bottom: 3px solid var(--walnut);
+}
+.review-header h1 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-variation-settings: "wght" 600;
+  letter-spacing: -0.01em;
+}
+.review-header .desc {
+  font-size: 12px;
+  opacity: 0.75;
+  max-width: 900px;
+}
+.review-header .controls {
+  display: flex; gap: 16px; align-items: center;
+  margin-top: 14px;
+  font-size: 11px;
+}
+.review-header .toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.06);
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+.review-header .toggle:hover { background: rgba(255,255,255,0.12); }
+.review-header .toggle input { margin: 0; cursor: pointer; }
+.review-header .toggle span { letter-spacing: 0.04em; }
+.review-header .legend-inline {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  opacity: 0.75;
+}
+.review-header .legend-inline .swatch {
+  width: 12px; height: 12px; border-radius: 2px;
+  background: var(--sky);
+  border: 1px dashed rgba(255,255,255,0.4);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   PORTAL FRAME — same as previous mockup; pre-rendered by Odoo, surrounds
+   the OWL-mounted root.
+   ════════════════════════════════════════════════════════════════════════ */
+.portal-brandbar {
+  display: flex; align-items: center;
+  height: 56px;
+  background: white;
+  border-bottom: 1px solid var(--rule);
+  padding: 0 28px;
+}
+.portal-brandbar .logo {
+  display: flex; align-items: center; gap: 10px;
+  font-variation-settings: "opsz" 24, "wght" 600;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.portal-brandbar .logo .mark {
+  width: 26px; height: 26px;
+  background: var(--walnut);
+  border-radius: 3px;
+  position: relative;
+}
+.portal-brandbar .logo .mark::after {
+  content: ""; position: absolute;
+  inset: 6px; border: 1.5px solid var(--linen);
+  border-radius: 1px;
+}
+.portal-brandbar .logo .domain {
+  color: var(--ink-dim);
+  font-variation-settings: "wght" 400;
+  font-size: 13px;
+}
+.portal-brandbar .spacer { flex: 1; }
+.portal-brandbar .userbox {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px;
+}
+.portal-brandbar .userbox .role {
+  font-size: 11px;
+  color: var(--ink-dim);
+  background: var(--linen);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.portal-brandbar .avatar {
+  width: 32px; height: 32px;
+  background: var(--sky);
+  color: white;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-variation-settings: "wght" 600;
+  font-size: 12px;
+}
+
+.portal-breadcrumb {
+  background: var(--linen);
+  padding: 12px 28px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--rule);
+}
+.portal-breadcrumb a { color: var(--ink-dim); text-decoration: none; cursor: pointer; }
+.portal-breadcrumb a:hover { color: var(--walnut); text-decoration: underline; }
+.portal-breadcrumb .sep { margin: 0 8px; opacity: 0.5; }
+.portal-breadcrumb .here { color: var(--ink); font-variation-settings: "wght" 500; }
+
+.portal-container {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  background: var(--linen);
+  min-height: calc(100vh - 56px - 41px - 100px);  /* viewport minus brand, breadcrumb, review-header */
+}
+
+.portal-sidebar {
+  background: var(--paper);
+  border-right: 1px solid var(--rule);
+  padding: 24px 0;
+}
+.portal-sidebar h6 {
+  margin: 0 24px 8px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-variation-settings: "wght" 600;
+}
+.portal-sidebar ul { list-style: none; margin: 0 0 18px; padding: 0; }
+.portal-sidebar li a {
+  display: block;
+  padding: 8px 24px;
+  font-size: 13px;
+  color: var(--ink);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.portal-sidebar li a:hover { background: var(--linen); color: var(--walnut); }
+.portal-sidebar li a.active {
+  background: var(--linen);
+  color: var(--walnut);
+  border-left-color: var(--walnut);
+  font-variation-settings: "wght" 600;
+}
+.portal-sidebar li a .count {
+  float: right;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  background: var(--rule);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.portal-content { background: var(--linen); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   OWL COMPONENT OVERLAY — when toggled on, every component region gets
+   a labeled dashed border showing the component tree. This is the visual
+   that demonstrates the OWL architecture.
+   ════════════════════════════════════════════════════════════════════════ */
+body.show-components .owl-component {
+  position: relative;
+  outline: 1px dashed rgba(43, 79, 107, 0.45);
+  outline-offset: -1px;
+  background-image: linear-gradient(var(--component-tint), var(--component-tint));
+  background-blend-mode: multiply;
+}
+body.show-components .owl-component > .owl-label {
+  position: absolute;
+  top: -1px; left: -1px;
+  background: var(--sky);
+  color: white;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-variation-settings: "wght" 600;
+  padding: 2px 6px;
+  border-radius: 0 0 3px 0;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  z-index: 100;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.owl-label { display: none; }
+body.show-components .owl-label { display: inline-block; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   RPC TRACE PANE — fixed bottom-right, shows JSON-RPC calls as they fire
+   ════════════════════════════════════════════════════════════════════════ */
+.rpc-trace {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 380px;
+  max-height: 320px;
+  background: var(--carbon);
+  color: var(--linen);
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  transition: transform 0.2s;
+}
+.rpc-trace.collapsed {
+  transform: translateY(calc(100% - 32px));
+}
+.rpc-trace-head {
+  padding: 8px 12px;
+  background: var(--walnut);
+  border-radius: 4px 4px 0 0;
+  display: flex; align-items: center;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-variation-settings: "wght" 600;
+  text-transform: uppercase;
+}
+.rpc-trace-head .count {
+  background: rgba(255,255,255,0.2);
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 8px;
+  font-variation-settings: "wght" 500;
+}
+.rpc-trace-head .toggle {
+  margin-left: auto;
+  opacity: 0.7;
+  font-size: 12px;
+}
+.rpc-trace-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+.rpc-call {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  animation: rpc-flash 0.4s;
+}
+@keyframes rpc-flash {
+  from { background: rgba(74,111,62,0.4); }
+  to { background: transparent; }
+}
+.rpc-call:last-child { border-bottom: none; }
+.rpc-call .method {
+  color: var(--hl);
+  font-variation-settings: "wght" 500;
+}
+.rpc-call .model {
+  color: var(--walnut-l);
+}
+.rpc-call .args {
+  color: var(--ink-dim);
+  font-size: 9px;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+.rpc-call .timing {
+  float: right;
+  color: var(--ok);
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   ORDER BUILDER BODY — same structural fidelity as previous mockup, now
+   driven by the simulated reactive store.
+   ════════════════════════════════════════════════════════════════════════ */
+.ob-body { padding: 8px 28px 32px; }
+
+.illustrative-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--hl);
+  border: 1px solid #d4b54a;
+  border-radius: 2px;
+  padding: 8px 14px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.illustrative-banner .pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  background: #b08820;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.ob-titlebar {
+  display: flex; align-items: baseline;
+  padding: 18px 0 6px;
+  gap: 14px;
+}
+.ob-titlebar .crumb {
+  font-size: 11px;
+  color: var(--ink-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ob-titlebar h1 {
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 24px;
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+.ob-titlebar .ref {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.ob-titlebar .back-link {
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-decoration: none;
+  cursor: pointer;
+}
+.ob-titlebar .back-link:hover { color: var(--walnut); }
+
+/* Stages */
+.stages {
+  display: flex; gap: 0;
+  padding: 6px 0 16px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.stage {
+  position: relative;
+  padding: 6px 18px 6px 22px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-right: none;
+  color: var(--ink-dim);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+  margin-right: -1px;
+  transition: background 0.2s, color 0.2s;
+}
+.stage:first-child {
+  padding-left: 14px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+}
+.stage:last-child {
+  padding-right: 14px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 10px 50%);
+  border-right: 1px solid var(--rule);
+}
+.stage.done    { background: var(--sky-l); color: var(--ink); }
+.stage.current { background: var(--walnut); color: var(--linen); font-variation-settings: "wght" 600; }
+
+/* Header strip */
+.header-strip {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.hs-cell {
+  padding: 14px 18px;
+  border-right: 1px solid var(--rule);
+}
+.hs-cell:last-child { border-right: none; }
+.hs-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 6px;
+}
+.hs-value {
+  font-variation-settings: "opsz" 28, "wght" 500;
+  font-size: 18px;
+  color: var(--ink);
+}
+.hs-value .sub {
+  font-size: 11px;
+  font-variation-settings: "opsz" 11, "wght" 400;
+  color: var(--ink-dim);
+  margin-left: 4px;
+}
+.hs-cell.customer { background: var(--sky-l); cursor: pointer; }
+.hs-cell.customer:hover { background: #c5d5e0; }
+.hs-cell.savings .hs-value { color: var(--ok); }
+.pricelist-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  background: var(--walnut);
+  color: var(--linen);
+  padding: 2px 8px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+}
+.pricelist-badge.tier3 { background: var(--sky); }
+.pricelist-badge.retail { background: #888; }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 0;
+  margin-top: 18px;
+  border-bottom: 1px solid var(--rule-d);
+}
+.tab {
+  padding: 10px 18px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  margin-bottom: -1px;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+.tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--walnut);
+  font-variation-settings: "wght" 600;
+}
+.tab .count {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--rule);
+  color: var(--ink);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  margin-left: 6px;
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Zone groups */
+.zone {
+  margin-top: 14px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+.zone-header {
+  display: flex; align-items: center;
+  padding: 10px 16px;
+  background: linear-gradient(to bottom, var(--paper) 0%, #f4ecdc 100%);
+  border-bottom: 1px solid var(--rule);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+}
+.zone-header .chevron {
+  margin-right: 8px;
+  color: var(--walnut);
+  font-family: 'JetBrains Mono', monospace;
+  display: inline-block;
+  width: 12px;
+  transition: transform 0.15s;
+}
+.zone.collapsed .zone-header .chevron { transform: rotate(-90deg); }
+.zone.collapsed .lines, .zone.collapsed .add-line { display: none; }
+.zone-header .name {
+  font-variation-settings: "wght" 600;
+  color: var(--ink);
+}
+.zone-header .count { margin-left: 8px; color: var(--ink-dim); }
+.zone-header .subtotal {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink);
+}
+.zone-header .subtotal .retail {
+  text-decoration: line-through;
+  color: var(--ink-dim);
+  margin-right: 10px;
+}
+
+.lines {
+  display: grid;
+  grid-template-columns: 36px 1.6fr 70px 1fr 80px 100px 100px 32px;
+  font-size: 12px;
+}
+.line-head, .line { display: contents; }
+.line-head > div {
+  padding: 8px 10px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--rule);
+  background: #faf4e8;
+}
+.line > div {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center;
+  cursor: pointer;
+}
+.line:hover > div { background: #faf2dd; }
+.line.selected > div { background: var(--hl); }
+.line .lineno {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+.line .tpl { font-variation-settings: "wght" 500; }
+.line .tpl .xmlid {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-dim);
+  margin-left: 6px;
+}
+.line .price {
+  font-family: 'JetBrains Mono', monospace;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.line .price.retail {
+  text-decoration: line-through;
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+.line .qty { font-family: 'JetBrains Mono', monospace; justify-content: center; }
+.line .badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-left: 5px;
+  letter-spacing: 0.04em;
+}
+.badge.maple { background: var(--walnut); color: var(--linen); }
+.badge.rule  { background: var(--sky); color: var(--linen); }
+.line .menu { color: var(--ink-dim); cursor: pointer; }
+
+.add-line {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--walnut);
+  border-top: 1px dashed var(--rule);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.add-line:hover { background: #faf2dd; }
+.add-line .plus {
+  font-family: 'JetBrains Mono', monospace;
+  font-variation-settings: "wght" 600;
+  margin-right: 6px;
+}
+
+/* Inline config drawer — NOW EDITABLE in OWL architecture */
+.drawer {
+  background: #faf4e8;
+  border-bottom: 1px solid var(--rule);
+  padding: 14px 16px 16px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 18px;
+  font-size: 12px;
+  border-left: 3px solid var(--walnut);
+}
+.drawer h4 {
+  grid-column: 1 / -1;
+  margin: 0 0 4px 0;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--walnut);
+  font-variation-settings: "wght" 600;
+  display: flex; align-items: center; gap: 10px;
+}
+.drawer h4 .live-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  background: var(--ok);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-variation-settings: "wght" 500;
+}
+.attr {
+  display: flex; flex-direction: column;
+  gap: 4px;
+}
+.attr label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.attr select, .attr-value-edit {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--rule-d);
+  background: white;
+  border-radius: 2px;
+  color: var(--ink);
+  cursor: pointer;
+  width: 100%;
+}
+.attr select:hover { border-color: var(--walnut); }
+.attr select:focus { outline: 2px solid var(--walnut); outline-offset: -1px; }
+.attr.dim .attr-value-edit {
+  opacity: 0.55;
+  background: #f0e8d8;
+  cursor: not-allowed;
+}
+
+/* Validation strip */
+.validation {
+  display: flex; gap: 14px;
+  padding: 10px 16px;
+  background: #fff8e9;
+  border: 1px solid var(--rule);
+  margin-top: 12px;
+  font-size: 11px;
+  border-left: 3px solid var(--warn);
+  border-radius: 2px;
+}
+.validation .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; vertical-align: middle;
+  margin-right: 6px;
+}
+.dot.ok { background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.alert { background: var(--alert); }
+
+/* Footer */
+.foot {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 24px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--rule);
+}
+.foot .grand {
+  font-variation-settings: "opsz" 48, "wght" 500;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+}
+.foot .grand-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-left: 8px;
+}
+.foot .spacer { flex: 1; }
+.btn {
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 9px 18px;
+  border: 1px solid var(--ink);
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn:hover { background: var(--linen); }
+.btn.primary {
+  background: var(--walnut);
+  color: var(--linen);
+  border-color: var(--walnut-d);
+  font-variation-settings: "wght" 600;
+}
+.btn.primary:hover { background: var(--walnut-d); }
+.btn.ghost { border-color: var(--rule-d); color: var(--ink-dim); }
+.btn.busy { opacity: 0.5; pointer-events: none; }
+.btn.busy::after { content: "  …"; }
+
+/* Customer switcher modal */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(26, 24, 20, 0.5);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 500;
+}
+.modal-backdrop.active { display: flex; }
+.modal {
+  background: var(--paper);
+  border-radius: 4px;
+  width: 440px;
+  max-width: 90vw;
+  box-shadow: 0 16px 64px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+.modal-head {
+  padding: 14px 18px;
+  background: var(--carbon);
+  color: var(--linen);
+  font-variation-settings: "wght" 600;
+  letter-spacing: 0.04em;
+  font-size: 12px;
+  text-transform: uppercase;
+  display: flex; align-items: center;
+}
+.modal-head .close {
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 18px;
+  opacity: 0.7;
+}
+.modal-body { padding: 16px 18px; }
+.modal-body .customer-option {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+}
+.modal-body .customer-option:hover {
+  background: var(--linen);
+  border-color: var(--rule);
+}
+.modal-body .customer-option .name {
+  font-variation-settings: "wght" 500;
+}
+.modal-body .customer-option .badge {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+}
+.modal-body .customer-option .badge.dealer { background: var(--walnut); color: white; }
+.modal-body .customer-option .badge.tradesperson { background: var(--sky); color: white; }
+.modal-body .customer-option .badge.retail { background: #888; color: white; }
+
+/* Toast for action confirmation */
+.toast {
+  position: fixed;
+  top: 20px; right: 20px;
+  background: var(--ok);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 4px;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  transform: translateX(120%);
+  transition: transform 0.3s;
+  z-index: 600;
+  max-width: 360px;
+}
+.toast.show { transform: translateX(0); }
+.toast.error { background: var(--alert); }
+
+/* Note callouts (review annotations) */
+.mock-note {
+  background: #f0e6d4;
+  border: 1px dashed var(--walnut-l);
+  padding: 10px 14px;
+  margin: 16px 0;
+  font-size: 11px;
+  color: var(--walnut-d);
+  border-radius: 2px;
+}
+.mock-note strong { color: var(--walnut); }
+.mock-note code {
+  background: rgba(107, 63, 42, 0.08);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+/* BoM preview tab */
+.bom-preview {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--sky);
+  border-radius: 2px;
+  padding: 14px 18px;
+  margin-top: 14px;
+}
+.bom-preview h3 {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-variation-settings: "wght" 600;
+}
+.bom-preview .panel-section {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--walnut);
+  margin: 12px 0 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.bom-preview .panel-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.bom-preview .bom-line {
+  display: grid;
+  grid-template-columns: 1fr 140px 60px;
+  padding: 4px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  border-bottom: 1px dotted var(--rule);
+}
+.bom-preview .bom-line:last-child { border-bottom: none; }
+.bom-preview .dim { color: var(--ink-dim); text-align: right; }
+.bom-preview .qty { color: var(--walnut); text-align: right; }
+
+</style>
+</head>
+<body class="show-components">
+
+<!-- ════════════════════════════════════════════════════════════════════
+     REVIEW HEADER
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="review-header">
+  <h1>Southbrook Order Builder · OWL Architecture Mockup</h1>
+  <div class="desc">
+    Interactive demonstration of the OWL + JSON-RPC architecture. Click anything &mdash; tabs, lines, the customer cell, action buttons. Every interaction simulates a real JSON-RPC call (shown in the trace pane bottom-right) and re-renders the affected component slice without a page reload. Component boundaries are overlaid in dashed sky-blue when "Show OWL component tree" is on.
+  </div>
+  <div class="controls">
+    <label class="toggle">
+      <input type="checkbox" id="toggleComponents" checked>
+      <span>Show OWL component tree</span>
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="toggleRpcTrace" checked>
+      <span>Show JSON-RPC trace</span>
+    </label>
+    <span class="legend-inline">
+      <span class="swatch"></span>
+      = component boundary
+    </span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PORTAL FRAME — pre-rendered by Odoo (NOT an OWL component)
+     ════════════════════════════════════════════════════════════════════ -->
+<header class="portal-brandbar">
+  <div class="logo">
+    <span class="mark"></span>
+    Southbrook<span class="domain">&nbsp;Cabinetry &middot; Portal</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="userbox">
+    <div>Sarah Kowalski</div>
+    <span class="role">Image Floor &middot; Dealer</span>
+    <div class="avatar">SK</div>
+  </div>
+</header>
+
+<nav class="portal-breadcrumb">
+  <a>Home</a><span class="sep">&rsaquo;</span>
+  <a>My Account</a><span class="sep">&rsaquo;</span>
+  <a>Order Builder</a><span class="sep">&rsaquo;</span>
+  <span class="here" id="breadcrumbOrderName">SO-2026-0001 &middot; Jordan &amp; Liu</span>
+</nav>
+
+<div class="portal-container">
+
+  <aside class="portal-sidebar">
+    <h6>Account</h6>
+    <ul>
+      <li><a>Profile</a></li>
+      <li><a>Preferences</a></li>
+    </ul>
+    <h6>Sales</h6>
+    <ul>
+      <li><a class="active">Order Builder <span class="count">8</span></a></li>
+      <li><a>Quotations <span class="count">3</span></a></li>
+      <li><a>Sales Orders <span class="count">22</span></a></li>
+    </ul>
+    <h6>Documents</h6>
+    <ul>
+      <li><a>Spec Sheets</a></li>
+      <li><a>Door Schedules</a></li>
+    </ul>
+  </aside>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       OWL MOUNT POINT — everything from here down is the OWL component
+       tree. In production: <div id="order_builder_root"></div> + OWL
+       mounts <OrderBuilder/> into it. Here: the simulated equivalent.
+       ════════════════════════════════════════════════════════════════ -->
+  <main class="portal-content owl-component" data-owl="OrderBuilder">
+    <span class="owl-label">&lt;OrderBuilder/&gt; · root</span>
+    <div class="ob-body">
+
+      <div class="illustrative-banner owl-component" data-owl="IllustrativeBanner">
+        <span class="owl-label">&lt;IllustrativeBanner/&gt;</span>
+        <span class="pill">ILLUSTRATIVE SEED</span>
+        Demo numbers &mdash; not production data.
+      </div>
+
+      <!-- Titlebar -->
+      <div class="ob-titlebar owl-component" data-owl="OrderTitlebar">
+        <span class="owl-label">&lt;OrderTitlebar/&gt;</span>
+        <div>
+          <div class="crumb"><a class="back-link">&larr; Back to Order Builder</a></div>
+          <h1 id="orderTitle">Jordan &amp; Liu &middot; New Kitchen Order</h1>
+        </div>
+        <div class="ref" id="orderRef">SO-2026-0001 &middot; v1 &middot; Draft</div>
+      </div>
+
+      <!-- Stages -->
+      <div class="stages owl-component" data-owl="StagePipeline">
+        <span class="owl-label">&lt;StagePipeline/&gt;</span>
+        <div class="stage done">Draft</div>
+        <div class="stage current">Estimating</div>
+        <div class="stage">Approval</div>
+        <div class="stage">Confirmed</div>
+        <div class="stage">In Production</div>
+      </div>
+
+      <!-- Header strip -->
+      <div class="header-strip owl-component" data-owl="HeaderStrip">
+        <span class="owl-label">&lt;HeaderStrip/&gt; · 5 cells</span>
+        <div class="hs-cell customer" id="customerCell">
+          <div class="hs-label">Customer</div>
+          <div class="hs-value" id="customerName">Jordan &amp; Liu <span class="sub">(Image Floor)</span></div>
+          <span class="pricelist-badge dealer" id="pricelistBadge">DEALER &middot; &minus;50%</span>
+        </div>
+        <div class="hs-cell">
+          <div class="hs-label">Retail Subtotal</div>
+          <div class="hs-value mono" id="retailSubtotal">$6,056</div>
+        </div>
+        <div class="hs-cell">
+          <div class="hs-label">Channel Total</div>
+          <div class="hs-value mono" id="channelTotal">$3,028</div>
+        </div>
+        <div class="hs-cell savings">
+          <div class="hs-label">Savings</div>
+          <div class="hs-value mono" id="savings">$3,028</div>
+        </div>
+        <div class="hs-cell">
+          <div class="hs-label">Lead Time</div>
+          <div class="hs-value">8 wks <span class="sub">+2 (maple)</span></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs owl-component" data-owl="TabBar">
+        <span class="owl-label">&lt;TabBar/&gt;</span>
+        <button class="tab active" data-tab="lines">Order Lines <span class="count" id="lineCount">9</span></button>
+        <button class="tab" data-tab="bom">BoM Preview <span class="count">94</span></button>
+        <button class="tab" data-tab="validation">Validation <span class="count">2</span></button>
+        <button class="tab" data-tab="history">History <span class="count">v1</span></button>
+        <button class="tab" data-tab="print">Customer Print</button>
+      </div>
+
+      <!-- Tab panels -->
+      <div class="tab-panel active" data-panel="lines">
+
+        <!-- Zone: Base Run -->
+        <div class="zone owl-component" data-owl="ZoneGroup" data-zone="base_run">
+          <span class="owl-label">&lt;ZoneGroup/&gt; · base_run</span>
+          <div class="zone-header">
+            <span class="chevron">&#9662;</span>
+            <span class="name">Base Run</span>
+            <span class="count">4 lines</span>
+            <span class="subtotal"><span class="retail">$2,049</span>$1,025</span>
+          </div>
+          <div class="lines">
+            <div class="line-head">
+              <div></div>
+              <div>Template</div>
+              <div>Width</div>
+              <div>Spec</div>
+              <div style="text-align:center">Qty</div>
+              <div style="text-align:right">Retail</div>
+              <div style="text-align:right">Channel</div>
+              <div></div>
+            </div>
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="1">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=1</span>
+              <div class="lineno">1</div>
+              <div class="tpl">Base 1-Door <span class="xmlid">base_1dr</span></div>
+              <div class="mono">18&Prime;</div>
+              <div>Contemporary &middot; Maple <span class="badge maple">MAPLE</span></div>
+              <div class="qty">1</div>
+              <div class="price retail">$366</div>
+              <div class="price">$183</div>
+              <div class="menu">&hellip;</div>
+            </div>
+            <div class="line selected owl-component" data-owl="OrderLine" data-line-id="2">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=2 · selected</span>
+              <div class="lineno">2</div>
+              <div class="tpl">Base 2-Door <span class="xmlid">base_2dr</span></div>
+              <div class="mono">24&Prime;</div>
+              <div>Contemporary &middot; Maple &middot; Slab <span class="badge maple">MAPLE</span></div>
+              <div class="qty">1</div>
+              <div class="price retail">$531</div>
+              <div class="price">$266</div>
+              <div class="menu">&hellip;</div>
+            </div>
+
+            <!-- Inline EDITABLE drawer -->
+            <div class="drawer owl-component" data-owl="ConfigDrawer" style="grid-column: 1 / -1;">
+              <span class="owl-label">&lt;ConfigDrawer/&gt; · live edits</span>
+              <h4>
+                Line 2 &middot; Configuration
+                <span class="live-pill">LIVE EDIT &middot; AUTOSAVE</span>
+              </h4>
+              <div class="attr">
+                <label>Family</label>
+                <select disabled>
+                  <option>Base</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Width</label>
+                <select data-attr="width">
+                  <option>9&Prime; (228 mm)</option>
+                  <option>12&Prime; (304 mm)</option>
+                  <option>15&Prime; (381 mm)</option>
+                  <option>18&Prime; (457 mm)</option>
+                  <option>21&Prime; (533 mm)</option>
+                  <option selected>24&Prime; (610 mm)</option>
+                  <option>27&Prime; (686 mm)</option>
+                  <option>30&Prime; (762 mm)</option>
+                  <option>33&Prime; (838 mm)</option>
+                  <option>36&Prime; (914 mm)</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Series</label>
+                <select data-attr="series">
+                  <option>Contractor</option>
+                  <option selected>Contemporary</option>
+                  <option>Elegance</option>
+                  <option>Signature</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Door Style</label>
+                <select data-attr="door_style">
+                  <option selected>Thermofoil Slab</option>
+                  <option>Five-Piece Woodgrain</option>
+                  <option>Shaker</option>
+                  <option>Raised Panel</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Box Material</label>
+                <select data-attr="box_material">
+                  <option>White Melamine</option>
+                  <option selected>Maple (+10%, +2 wks)</option>
+                  <option>Birch</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Finish</label>
+                <select data-attr="finish">
+                  <option selected>White</option>
+                  <option>Almond</option>
+                  <option>Espresso</option>
+                  <option>Custom</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Hinge Side</label>
+                <select data-attr="hinge_side">
+                  <option selected>Left</option>
+                  <option>Right</option>
+                  <option>Reversible</option>
+                </select>
+              </div>
+              <div class="attr dim">
+                <label>Door Count <span class="badge rule">RULE 3</span></label>
+                <select disabled>
+                  <option>2 (auto from width)</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Finished Sides</label>
+                <select data-attr="finished_sides">
+                  <option selected>None</option>
+                  <option>Left</option>
+                  <option>Right</option>
+                  <option>Both</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Gables</label>
+                <select data-attr="gables">
+                  <option selected>Standard</option>
+                  <option>Extended</option>
+                  <option>None</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Handle</label>
+                <select data-attr="handle">
+                  <option>None</option>
+                  <option selected>Satin Nickel 96mm</option>
+                  <option>Brushed Brass 128mm</option>
+                  <option>Black Bar 160mm</option>
+                </select>
+              </div>
+              <div class="attr">
+                <label>Accessories</label>
+                <select data-attr="accessories">
+                  <option>None</option>
+                  <option selected>Soft-Close + Drawer Org.</option>
+                  <option>Soft-Close only</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="3">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=3</span>
+              <div class="lineno">3</div>
+              <div class="tpl">Drawer Bank <span class="xmlid">drawer_bank</span></div>
+              <div class="mono">18&Prime;</div>
+              <div>Contemporary &middot; Maple <span class="badge maple">MAPLE</span></div>
+              <div class="qty">1</div>
+              <div class="price retail">$374</div>
+              <div class="price">$187</div>
+              <div class="menu">&hellip;</div>
+            </div>
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="4">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=4</span>
+              <div class="lineno">4</div>
+              <div class="tpl">Sink Base <span class="xmlid">sink_base</span></div>
+              <div class="mono">33&Prime;</div>
+              <div>Contemporary &middot; Maple &middot; Cutout <span class="badge maple">MAPLE</span></div>
+              <div class="qty">1</div>
+              <div class="price retail">$778</div>
+              <div class="price">$389</div>
+              <div class="menu">&hellip;</div>
+            </div>
+          </div>
+          <div class="add-line" data-action="add-line" data-zone="base_run">
+            <span class="plus">+</span>Add cabinet to Base Run
+          </div>
+        </div>
+
+        <!-- Zone: Wall -->
+        <div class="zone owl-component" data-owl="ZoneGroup" data-zone="wall">
+          <span class="owl-label">&lt;ZoneGroup/&gt; · wall</span>
+          <div class="zone-header">
+            <span class="chevron">&#9662;</span>
+            <span class="name">Wall</span>
+            <span class="count">3 lines</span>
+            <span class="subtotal"><span class="retail">$1,268</span>$634</span>
+          </div>
+          <div class="lines">
+            <div class="line-head">
+              <div></div>
+              <div>Template</div>
+              <div>Width</div>
+              <div>Spec</div>
+              <div style="text-align:center">Qty</div>
+              <div style="text-align:right">Retail</div>
+              <div style="text-align:right">Channel</div>
+              <div></div>
+            </div>
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="5">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=5</span>
+              <div class="lineno">5</div>
+              <div class="tpl">Wall 1-Door <span class="xmlid">wall_1dr</span></div>
+              <div class="mono">15&Prime;</div>
+              <div>Contemporary &middot; Maple <span class="badge maple">MAPLE</span></div>
+              <div class="qty">2</div>
+              <div class="price retail">$572</div>
+              <div class="price">$286</div>
+              <div class="menu">&hellip;</div>
+            </div>
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="6">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=6</span>
+              <div class="lineno">6</div>
+              <div class="tpl">Wall 2-Door <span class="xmlid">wall_2dr</span></div>
+              <div class="mono">30&Prime;</div>
+              <div>Contemporary &middot; Maple <span class="badge maple">MAPLE</span></div>
+              <div class="qty">1</div>
+              <div class="price retail">$696</div>
+              <div class="price">$348</div>
+              <div class="menu">&hellip;</div>
+            </div>
+          </div>
+          <div class="add-line" data-action="add-line" data-zone="wall">
+            <span class="plus">+</span>Add cabinet to Wall
+          </div>
+        </div>
+
+        <!-- Zone: Tall -->
+        <div class="zone collapsed owl-component" data-owl="ZoneGroup" data-zone="tall">
+          <span class="owl-label">&lt;ZoneGroup/&gt; · tall</span>
+          <div class="zone-header">
+            <span class="chevron">&#9662;</span>
+            <span class="name">Tall</span>
+            <span class="count">1 line</span>
+            <span class="subtotal"><span class="retail">$531</span>$266</span>
+          </div>
+          <div class="lines">
+            <div class="line-head">
+              <div></div><div>Template</div><div>Width</div><div>Spec</div>
+              <div style="text-align:center">Qty</div>
+              <div style="text-align:right">Retail</div>
+              <div style="text-align:right">Channel</div><div></div>
+            </div>
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="7">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=7</span>
+              <div class="lineno">7</div>
+              <div class="tpl">Tall Pantry <span class="xmlid">tall_pantry</span></div>
+              <div class="mono">24&Prime;</div>
+              <div>Contemporary &middot; Maple <span class="badge maple">MAPLE</span></div>
+              <div class="qty">1</div>
+              <div class="price retail">$531</div>
+              <div class="price">$266</div>
+              <div class="menu">&hellip;</div>
+            </div>
+          </div>
+          <div class="add-line" data-action="add-line" data-zone="tall">
+            <span class="plus">+</span>Add cabinet to Tall
+          </div>
+        </div>
+
+        <!-- Zone: Accessory (collapsed) -->
+        <div class="zone collapsed owl-component" data-owl="ZoneGroup" data-zone="accessory">
+          <span class="owl-label">&lt;ZoneGroup/&gt; · accessory</span>
+          <div class="zone-header">
+            <span class="chevron">&#9662;</span>
+            <span class="name">Accessory</span>
+            <span class="count">2 lines</span>
+            <span class="subtotal"><span class="retail">$810</span>$405</span>
+          </div>
+          <div class="lines">
+            <div class="line-head">
+              <div></div><div>Template</div><div>Width</div><div>Spec</div>
+              <div style="text-align:center">Qty</div>
+              <div style="text-align:right">Retail</div>
+              <div style="text-align:right">Channel</div><div></div>
+            </div>
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="8">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=8</span>
+              <div class="lineno">8</div>
+              <div class="tpl">End Panel <span class="xmlid">accessory</span></div>
+              <div class="mono">24&Prime; &times; 30&Prime;</div>
+              <div>Maple veneer to match</div>
+              <div class="qty">2</div>
+              <div class="price retail">$420</div>
+              <div class="price">$210</div>
+              <div class="menu">&hellip;</div>
+            </div>
+            <div class="line owl-component" data-owl="OrderLine" data-line-id="9">
+              <span class="owl-label">&lt;OrderLine/&gt; · id=9</span>
+              <div class="lineno">9</div>
+              <div class="tpl">Filler <span class="xmlid">accessory</span></div>
+              <div class="mono">3&Prime; &times; 96&Prime;</div>
+              <div>Maple, paintable</div>
+              <div class="qty">1</div>
+              <div class="price retail">$390</div>
+              <div class="price">$195</div>
+              <div class="menu">&hellip;</div>
+            </div>
+          </div>
+          <div class="add-line" data-action="add-line" data-zone="accessory">
+            <span class="plus">+</span>Add cabinet to Accessory
+          </div>
+        </div>
+
+        <!-- Empty zones -->
+        <div class="zone collapsed owl-component" data-owl="ZoneGroup" data-zone="island" style="opacity: 0.45;">
+          <span class="owl-label">&lt;ZoneGroup/&gt; · island · empty</span>
+          <div class="zone-header">
+            <span class="chevron">&#9662;</span>
+            <span class="name">Island</span>
+            <span class="count">empty</span>
+          </div>
+        </div>
+
+      </div><!-- /lines tab panel -->
+
+      <!-- BoM tab panel -->
+      <div class="tab-panel" data-panel="bom">
+        <div class="bom-preview owl-component" data-owl="BoMPreview">
+          <span class="owl-label">&lt;BoMPreview/&gt; · panel cut list</span>
+          <h3>BoM Preview &mdash; Line 2 (Base 2-Door 24&Prime;, Contemporary, Maple)</h3>
+          <div class="panel-section">Carcass panels</div>
+          <div class="bom-line"><span>Side panel L (Maple)</span><span class="dim">762 &times; 609 &times; 15.875 mm</span><span class="qty">1</span></div>
+          <div class="bom-line"><span>Side panel R (Maple)</span><span class="dim">762 &times; 609 &times; 15.875 mm</span><span class="qty">1</span></div>
+          <div class="bom-line"><span>Top panel (Maple)</span><span class="dim">578 &times; 609 &times; 15.875 mm</span><span class="qty">1</span></div>
+          <div class="bom-line"><span>Bottom panel (Maple)</span><span class="dim">578 &times; 609 &times; 15.875 mm</span><span class="qty">1</span></div>
+          <div class="bom-line"><span>Back panel (Hardboard)</span><span class="dim">591 &times; 743 &times; 6.35 mm</span><span class="qty">1</span></div>
+          <div class="bom-line"><span>Shelf (Maple)</span><span class="dim">577 &times; 590 &times; 15.875 mm</span><span class="qty">2</span></div>
+          <div class="panel-section">Doors</div>
+          <div class="bom-line"><span>Door &middot; Thermofoil Slab White</span><span class="dim">756 &times; 295 &times; 18 mm</span><span class="qty">2</span></div>
+          <div class="panel-section">Hardware</div>
+          <div class="bom-line"><span>Hinge pair (Blum, soft-close)</span><span class="dim">&nbsp;</span><span class="qty">2</span></div>
+          <div class="bom-line"><span>Handle &middot; Satin Nickel 96mm</span><span class="dim">&nbsp;</span><span class="qty">2</span></div>
+          <div class="panel-section">Lead time</div>
+          <div class="bom-line"><span>Effective produce_delay</span><span class="dim">base 8 wks + 2 (maple)</span><span class="qty">10 wks</span></div>
+        </div>
+      </div>
+
+      <!-- Validation tab panel -->
+      <div class="tab-panel" data-panel="validation">
+        <div class="mock-note" style="margin-top: 14px;">
+          Validation tab content; full validation surface lives here. <code>&lt;ValidationStrip/&gt;</code> below also surfaces a summary on all tabs.
+        </div>
+      </div>
+
+      <!-- History tab panel -->
+      <div class="tab-panel" data-panel="history">
+        <div class="mock-note" style="margin-top: 14px;">
+          Order revision history. Walks <code>parent_order_id</code> chain from NF6 (Image Floor iterative-design pattern).
+        </div>
+      </div>
+
+      <!-- Print tab panel -->
+      <div class="tab-panel" data-panel="print">
+        <div class="mock-note" style="margin-top: 14px;">
+          Signature Spec Sheet PDF preview. Live render via QWeb report from commit 10.
+        </div>
+      </div>
+
+      <!-- Validation strip — always visible regardless of tab -->
+      <div class="validation owl-component" data-owl="ValidationStrip">
+        <span class="owl-label">&lt;ValidationStrip/&gt;</span>
+        <div><span class="dot warn"></span><strong>Soft:</strong> Line 5 (15&Prime; Wall 1-Door) typically pairs with finished sides &mdash; current spec has none.</div>
+        <div style="margin-left:auto;"><span class="dot ok"></span><strong>Hard rules:</strong> all 4 passing.</div>
+      </div>
+
+      <!-- Footer -->
+      <div class="foot owl-component" data-owl="FooterActions">
+        <span class="owl-label">&lt;FooterActions/&gt;</span>
+        <div>
+          <span class="grand mono" id="grandTotal">$3,028</span>
+          <span class="grand-label" id="grandLabel">total &middot; 9 lines &middot; Dealer (&minus;50%)</span>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn ghost" data-action="duplicate">Duplicate as Draft</button>
+        <button class="btn ghost" data-action="save">Save</button>
+        <button class="btn" data-action="print">Customer Print</button>
+        <button class="btn primary" data-action="confirm">Confirm Order</button>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     CUSTOMER SWITCHER MODAL — opens when user clicks the Customer cell
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="customerModal">
+  <div class="modal">
+    <div class="modal-head">
+      Switch Customer
+      <span class="close" id="closeModal">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="customer-option" data-customer="jordan_liu">
+        <div>
+          <div class="name">Jordan &amp; Liu</div>
+          <div style="font-size:11px; color:var(--ink-dim)">via Image Floor</div>
+        </div>
+        <span class="badge dealer">DEALER &minus;50%</span>
+      </div>
+      <div class="customer-option" data-customer="tremblay">
+        <div>
+          <div class="name">M. Tremblay (custom)</div>
+          <div style="font-size:11px; color:var(--ink-dim)">via Image Floor</div>
+        </div>
+        <span class="badge dealer">DEALER &minus;50%</span>
+      </div>
+      <div class="customer-option" data-customer="singh">
+        <div>
+          <div class="name">Singh Family</div>
+          <div style="font-size:11px; color:var(--ink-dim)">direct contractor</div>
+        </div>
+        <span class="badge tradesperson">TIER 3 &minus;35%</span>
+      </div>
+      <div class="customer-option" data-customer="walkin">
+        <div>
+          <div class="name">Walk-in Retail</div>
+          <div style="font-size:11px; color:var(--ink-dim)">no discount applied</div>
+        </div>
+        <span class="badge retail">RETAIL</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     RPC TRACE PANE — fixed bottom-right, demonstrates JSON-RPC calls
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="rpc-trace" id="rpcTrace">
+  <div class="rpc-trace-head" id="rpcTraceHead">
+    JSON-RPC Trace
+    <span class="count" id="rpcCount">0</span>
+    <span class="toggle" id="rpcToggle">&minus;</span>
+  </div>
+  <div class="rpc-trace-body" id="rpcTraceBody">
+    <div style="opacity:0.5; padding:10px; text-align:center;">
+      Interact with the page to see JSON-RPC calls&hellip;
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     TOAST
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   SIMULATED OWL + JSON-RPC LAYER
+   
+   In production OWL:
+   - Components are defined with `static template = "..."` referencing OWL XML
+   - State is reactive via `useState()` or stores
+   - RPC calls go through `useService('orm')` -> `.call('model', 'method', args)`
+   
+   Here in vanilla JS:
+   - We simulate the same architectural pattern: a central state object,
+     an orm.call() helper that traces, and DOM updates that mirror what
+     OWL's reactivity would do automatically.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const state = {
+  order: {
+    id: 1,
+    name: 'SO-2026-0001',
+    partner_id: 'jordan_liu',
+    partner_name: 'Jordan & Liu',
+    via: 'Image Floor',
+    channel: 'dealer',
+    pricelist: 'pricelist_dealer',
+    pricelist_label: 'DEALER · −50%',
+    pricelist_class: 'dealer',
+    discount_pct: 50,
+    retail_subtotal: 6056,
+    line_count: 9,
+  },
+  partners: {
+    jordan_liu:  { name: 'Jordan & Liu',     channel: 'dealer',       pricelist_label: 'DEALER · −50%',         pricelist_class: 'dealer',       discount_pct: 50, via: 'Image Floor' },
+    tremblay:    { name: 'M. Tremblay',      channel: 'dealer',       pricelist_label: 'DEALER · −50%',         pricelist_class: 'dealer',       discount_pct: 50, via: 'Image Floor' },
+    singh:       { name: 'Singh Family',     channel: 'tradesperson', pricelist_label: 'TRADESPERSON · −35%',   pricelist_class: 'tier3',        discount_pct: 35, via: 'direct contractor' },
+    walkin:      { name: 'Walk-in Retail',   channel: 'retail',       pricelist_label: 'RETAIL · list price',   pricelist_class: 'retail',       discount_pct: 0,  via: null },
+  },
+  selected_line_id: 2,
+  current_tab: 'lines',
+};
+
+let rpcCallCount = 0;
+
+/* The traced ORM call helper — simulates `orm.call(model, method, args)` */
+function ormCall(model, method, args, kwargs = {}) {
+  rpcCallCount += 1;
+  const start = performance.now();
+  
+  // Trace UI
+  const body = document.getElementById('rpcTraceBody');
+  if (rpcCallCount === 1) body.innerHTML = '';
+  
+  const argsStr = JSON.stringify(args).slice(0, 60);
+  const kwStr = Object.keys(kwargs).length ? ' kw=' + JSON.stringify(kwargs).slice(0, 40) : '';
+  
+  const div = document.createElement('div');
+  div.className = 'rpc-call';
+  div.innerHTML = `
+    <span class="timing">${Math.round(20 + Math.random() * 40)}ms</span>
+    <span class="model">${model}</span>.<span class="method">${method}</span>
+    <div class="args">args=${argsStr}${kwStr}</div>
+  `;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  
+  document.getElementById('rpcCount').textContent = rpcCallCount;
+  
+  // Trim old calls
+  while (body.children.length > 30) body.removeChild(body.firstChild);
+  
+  // Simulate the call returning (in real OWL it's a Promise)
+  return Promise.resolve({ ok: true });
+}
+
+/* Re-render slices that depend on order state (OWL's reactivity would do this automatically) */
+function rerenderHeaderStrip() {
+  document.getElementById('customerName').innerHTML = 
+    `${state.order.partner_name}` + (state.order.via ? ` <span class="sub">(${state.order.via})</span>` : '');
+  
+  const badge = document.getElementById('pricelistBadge');
+  badge.textContent = state.order.pricelist_label;
+  badge.className = `pricelist-badge ${state.order.pricelist_class}`;
+  
+  const channelTotal = Math.round(state.order.retail_subtotal * (1 - state.order.discount_pct / 100));
+  const savings = state.order.retail_subtotal - channelTotal;
+  
+  document.getElementById('retailSubtotal').textContent = '$' + state.order.retail_subtotal.toLocaleString();
+  document.getElementById('channelTotal').textContent = '$' + channelTotal.toLocaleString();
+  document.getElementById('savings').textContent = '$' + savings.toLocaleString();
+  
+  document.getElementById('grandTotal').textContent = '$' + channelTotal.toLocaleString();
+  document.getElementById('grandLabel').textContent = 
+    `total · ${state.order.line_count} lines · ${state.order.pricelist_label}`;
+  
+  // Also rerender breadcrumb + title
+  document.getElementById('breadcrumbOrderName').innerHTML = `${state.order.name} &middot; ${state.order.partner_name}`;
+  document.getElementById('orderTitle').innerHTML = `${state.order.partner_name} &middot; New Kitchen Order`;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   EVENT WIRING
+   ════════════════════════════════════════════════════════════════════════ */
+
+// Toggle: show OWL component tree
+document.getElementById('toggleComponents').addEventListener('change', (e) => {
+  document.body.classList.toggle('show-components', e.target.checked);
+});
+
+// Toggle: show RPC trace
+document.getElementById('toggleRpcTrace').addEventListener('change', (e) => {
+  document.getElementById('rpcTrace').style.display = e.target.checked ? 'flex' : 'none';
+});
+
+// RPC trace collapse toggle
+document.getElementById('rpcTraceHead').addEventListener('click', () => {
+  document.getElementById('rpcTrace').classList.toggle('collapsed');
+  const tog = document.getElementById('rpcToggle');
+  tog.textContent = document.getElementById('rpcTrace').classList.contains('collapsed') ? '+' : '−';
+});
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.tab-panel[data-panel="${target}"]`).classList.add('active');
+    state.current_tab = target;
+    // No RPC needed for tab switch — pure client-side.
+  });
+});
+
+// Zone collapse
+document.querySelectorAll('.zone-header').forEach(h => {
+  h.addEventListener('click', () => {
+    h.parentElement.classList.toggle('collapsed');
+    // No RPC — pure client-side state.
+  });
+});
+
+// Line selection
+document.querySelectorAll('.line').forEach(line => {
+  line.addEventListener('click', (e) => {
+    if (e.target.closest('.menu')) return;
+    document.querySelectorAll('.line').forEach(l => l.classList.remove('selected'));
+    line.classList.add('selected');
+    state.selected_line_id = parseInt(line.dataset.lineId);
+    // In real OWL: would also move the <ConfigDrawer/> to this line.
+    // No backend call needed for selection.
+  });
+});
+
+// Config drawer — editing an attribute fires ORM write
+document.querySelectorAll('.drawer select').forEach(sel => {
+  sel.addEventListener('change', async () => {
+    const attr = sel.dataset.attr;
+    sel.style.borderColor = 'var(--ok)';
+    
+    await ormCall(
+      'sale.order.line',
+      'write',
+      [[state.selected_line_id], { [`attr_${attr}`]: sel.value }],
+    );
+    
+    // Then refetch the affected line + recalc pricing
+    await ormCall(
+      'sale.order.line',
+      'read',
+      [[state.selected_line_id]],
+      { fields: ['price_subtotal', 'price_unit', 'name'] },
+    );
+    
+    // Then refetch header totals
+    await ormCall(
+      'sale.order',
+      'read',
+      [[state.order.id]],
+      { fields: ['amount_untaxed', 'amount_total', 'pricelist_id'] },
+    );
+    
+    showToast(`${attr.replace('_', ' ')} updated · re-priced`);
+    
+    setTimeout(() => sel.style.borderColor = '', 600);
+  });
+});
+
+// Customer switch — click cell opens modal
+document.getElementById('customerCell').addEventListener('click', () => {
+  document.getElementById('customerModal').classList.add('active');
+});
+document.getElementById('closeModal').addEventListener('click', () => {
+  document.getElementById('customerModal').classList.remove('active');
+});
+document.getElementById('customerModal').addEventListener('click', (e) => {
+  if (e.target.id === 'customerModal') {
+    document.getElementById('customerModal').classList.remove('active');
+  }
+});
+
+// Customer option click
+document.querySelectorAll('.customer-option').forEach(opt => {
+  opt.addEventListener('click', async () => {
+    const newPartner = opt.dataset.customer;
+    const partner = state.partners[newPartner];
+    
+    document.getElementById('customerModal').classList.remove('active');
+    
+    // 1. Write the partner_id change
+    await ormCall(
+      'sale.order',
+      'write',
+      [[state.order.id], { partner_id: newPartner }],
+    );
+    
+    // 2. Trigger the channel-pricelist resolution (custom routine #3)
+    await ormCall(
+      'sale.order',
+      'onchange_partner_id_southbrook_pricelist',
+      [[state.order.id]],
+    );
+    
+    // 3. Refetch the order to get the re-resolved pricelist + recomputed totals
+    await ormCall(
+      'sale.order',
+      'read',
+      [[state.order.id]],
+      { fields: ['partner_id', 'pricelist_id', 'amount_untaxed', 'amount_total'] },
+    );
+    
+    // Update local state
+    state.order.partner_id = newPartner;
+    state.order.partner_name = partner.name;
+    state.order.channel = partner.channel;
+    state.order.via = partner.via;
+    state.order.pricelist_label = partner.pricelist_label;
+    state.order.pricelist_class = partner.pricelist_class;
+    state.order.discount_pct = partner.discount_pct;
+    
+    rerenderHeaderStrip();
+    showToast(`Customer switched to ${partner.name} · pricelist re-resolved`);
+  });
+});
+
+// Footer action buttons
+document.querySelectorAll('[data-action]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const action = btn.dataset.action;
+    if (btn.classList.contains('btn')) btn.classList.add('busy');
+    
+    if (action === 'duplicate') {
+      await ormCall('sale.order', 'action_duplicate_as_draft', [[state.order.id]]);
+      await ormCall('sale.order', 'read', [['new_order_id']], { fields: ['name', 'version'] });
+      showToast('Order duplicated as SO-2026-0001-v2 · redirecting to new draft');
+    }
+    else if (action === 'save') {
+      await ormCall('sale.order', 'write', [[state.order.id], { state: 'draft' }]);
+      showToast('Saved');
+    }
+    else if (action === 'print') {
+      await ormCall(
+        'ir.actions.report',
+        '_render_qweb_pdf',
+        [['southbrook_estimating.action_report_signature_spec_sheet'], [state.order.id]],
+      );
+      showToast('Spec Sheet PDF generated · downloading');
+    }
+    else if (action === 'confirm') {
+      await ormCall('sale.order', 'action_confirm', [[state.order.id]]);
+      // action_confirm fires the analytics hook (NF1)
+      await ormCall(
+        'southbrook.order.analytics',
+        'capture',
+        [[state.order.id]],
+      );
+      showToast('Order confirmed · MO created · analytics captured');
+    }
+    else if (action === 'add-line') {
+      // Opens the OCA product_configurator wizard as an embedded OWL component
+      await ormCall(
+        'product.config.session',
+        'create',
+        [{ order_id: state.order.id, zone: btn.dataset.zone }],
+      );
+      showToast(`Configurator wizard opened (embedded · zone=${btn.dataset.zone})`);
+    }
+    
+    setTimeout(() => btn.classList.remove('busy'), 200);
+  });
+});
+
+// Toast helper
+let toastTimer;
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   ON MOUNT — simulate the initial JSON-RPC load that OWL's onMounted()
+   hook would fire when the <OrderBuilder/> component first mounts.
+   ════════════════════════════════════════════════════════════════════════ */
+window.addEventListener('load', async () => {
+  await ormCall(
+    'sale.order',
+    'read',
+    [[1]],
+    { fields: ['name', 'partner_id', 'order_line', 'pricelist_id', 'amount_untaxed', 'state', 'version'] },
+  );
+  await ormCall(
+    'sale.order.line',
+    'read',
+    [[1, 2, 3, 4, 5, 6, 7, 8, 9]],
+    { fields: ['product_id', 'name', 'price_unit', 'price_subtotal', 'zone', 'product_uom_qty'] },
+  );
+  await ormCall(
+    'ir.config_parameter',
+    'get_param',
+    ['southbrook.seed_mode'],
+  );
+});
+
+</script>
+
+</body>
+</html>
