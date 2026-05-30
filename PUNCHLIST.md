@@ -424,6 +424,55 @@ zone_label covers the remainder. No new finding — Q21 stands.
 
 ---
 
+## 2026-05-29 · Phase 1 modeling — NF10, NF11, NF12 surfaced during commits 3-5
+
+### NF10 · #5 Price Master "Maple box uplift" row has columns swapped
+
+Discovered while seeding `data/attributes.xml` in commit 3. The dataset's
+Price Master tab footer row reads:
+
+```
+Maple box uplift | +10% | N/A (white only) | +10% available | +10% available
+                   Contractor   Contemporary    Elegance         Signature
+```
+
+Cross-checked against Mapping §3.4 Rule 2:
+- Contractor: white only (no maple) → row should be "N/A (white only)" not "+10%"
+- Contemporary: maple available → row should be "+10% available" not "N/A"
+- Signature: maple **standard** → row should reflect "maple standard" not "+10% available"
+
+Illustrative-mode artifact per Build Spec §9.3. **Does not block** because
+the real per-series gating is enforced by Rule 2 in `config_rules.xml`
+(commit 5/7), not by per-series `price_extra` on the maple attribute value.
+`value_box_maple` in commit 3 has lead_time_extra=14 but no price_extra —
+correct, because the +10% applies only when maple IS selected (Rule 2
+ensures it can only be selected on Contemporary/Elegance), and the
++10% is applied as a single price_extra value, not as a per-series matrix.
+
+Surface in next #5 regeneration (or in the canonical re-seed when #8 lands).
+
+### NF11 · `lead_time_extra` placed on master (product.attribute.value)
+
+Diverges from Q3 wording ("on product.template.attribute.value"). Rationale
+in commit 3 message + `models/product_attribute_value.py` docstring. Phase-1
+implication: simpler seeding; one master record sets the bump for all
+templates. Phase-2-flag: if real per-template override surfaces, add a
+sibling variant field with computed default from master.
+
+### NF12 · XML lint should be in pre-commit
+
+Surfaced when commit 5's `config_rules.xml` shipped with a malformed
+comment block (`--grep` is illegal inside an XML comment). Test suite
+didn't catch it because the data file failed to parse at install-time,
+not at test-time. Fixed in `fix:` follow-up commit.
+
+**Action item:** when pre-commit is configured (likely commit 11 or start
+of Phase 2), include `xmllint --noout` or `python -c "ET.parse(...)"` on
+every `*.xml` in the data directories. Cost: zero. Benefit: catches every
+class of XML malformation before commit, not at install.
+
+---
+
 ## 2026-05-29 · 11 drafts staged total
 
 Final count for tonight's preparation pass — within the §10 step 7 gate.
