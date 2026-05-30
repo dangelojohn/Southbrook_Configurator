@@ -1,13 +1,28 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <templates id="template" xml:space="preserve">
     <!-- Inherit template to add button on the POS Payment Screen. -->
+    <!--
+        NF21 (caught at live install on QNAP southbrook stack 2026-05-30):
+        Odoo 17/18 web.FormView had two <t t-set-slot="control-panel-create-button">
+        declarations (desktop + mobile / non-mobile breakpoint). Odoo 19
+        collapsed these to one — confirmed by
+        `grep control-panel-create-button .../web/views/form/form_controller.xml`
+        returning a single hit. The [2] index in the original OCA-port
+        xpath therefore never matches, and the browser surfaces the failure
+        as an OWL lifecycle error on first form-view render ("cannot be
+        located in element tree").
+        Fix: drop the [2] — patch the only slot. List + Kanban variants
+        below already index by single match and need no change.
+        UPSTREAM: file against OCA/product-configurator 19.0 branch when
+        it lands; this is a port bug, not a Southbrook-specific patch.
+    -->
     <t
         t-name="product_configurator_mrp.FormView"
         t-inherit="web.FormView"
         t-inherit-mode="extension"
     >
         <xpath
-            expr="//t[@t-set-slot='control-panel-create-button'][2]"
+            expr="//t[@t-set-slot='control-panel-create-button']"
             position="inside"
         >
             <button
