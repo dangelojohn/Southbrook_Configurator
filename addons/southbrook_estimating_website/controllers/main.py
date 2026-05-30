@@ -31,18 +31,18 @@ from odoo.addons.portal.controllers.portal import CustomerPortal
 class SouthbrookOrderBuilderPortal(CustomerPortal):
     """Portal route hosting the OWL Order Builder."""
 
-    # T2C1 followup: dropped website=True. Odoo 19 portal routes
-    # render via portal.portal_layout (which IS website-aware), but
-    # the route itself doesn't need the website-flag — adding it
-    # makes Odoo require a matching website record and skip route
-    # registration when none matches on the current request.
-    # Portal routes are http with auth=user; the layout template
-    # pulls in website chrome on its own.
+    # T2C1 NF: website=True is required after all. The portal layout
+    # template (portal.frontend_layout, called via portal.portal_layout)
+    # references the `website` variable in scope, so without
+    # website=True the render aborts with KeyError: 'website'.
+    # With website=True Odoo injects the current website record (id 1
+    # "My Website" on the southbrook stack) into the template context.
     @http.route(
         ["/my/southbrook/order-builder",
          "/my/southbrook/order-builder/<int:order_id>"],
         type="http",
         auth="user",
+        website=True,
     )
     def southbrook_order_builder(self, order_id=None, **kw):
         """Render the Order Builder portal page.
@@ -72,18 +72,35 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
     # ------------------------------------------------------------------
 
     def _southbrook_resolve_order(self, order_id):
-        """Look up the sale.order and check the portal user has access.
+        """Look up the sale.order and check the user has access.
 
-        Access rule: the logged-in partner must equal the order's
-        partner_id, OR the order's partner_id.parent_id must equal the
-        logged-in partner (covers the dealer-views-customer-order
-        case described in the OWL mockup).
+        Access rule:
+
+          • Internal users (admin, sales reps, anyone whose
+            res.users.share is False) see every order — they're
+            staff with full backend access anyway, the portal page
+            is just an alternate presentation.
+
+          • Portal users (res.users.share=True — customers and
+            dealers logged in via the public portal): the logged-in
+            partner must equal order.partner_id, OR order.partner_id
+            .parent_id must equal the logged-in partner (dealer
+            views customer order), OR the logged-in partner's
+            parent_id must equal order.partner_id (parent partner
+            views child's order).
+
+          • Anything else → AccessError, controller redirects to /my.
         """
         order = request.env["sale.order"].sudo().browse(order_id).exists()
         if not order:
             raise MissingError("Sale order not found.")
 
-        my_partner = request.env.user.partner_id
+        user = request.env.user
+        if not user.share:
+            # Internal user — full access.
+            return order
+
+        my_partner = user.partner_id
         order_partner = order.partner_id
         if my_partner == order_partner:
             return order
@@ -91,7 +108,7 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             return order
         if my_partner.parent_id and my_partner.parent_id == order_partner:
             return order
-        # In the future the dealer-portal page lists orders for the
+        # Phase 3: dealer-portal page lists every order under the
         # dealer's whole partner tree; for commit 1 we keep access
         # tight to the same partner or first-level parent/child.
         raise AccessError("This order is not accessible to your account.")
