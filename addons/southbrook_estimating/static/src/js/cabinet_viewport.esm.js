@@ -58,16 +58,28 @@ export class CabinetViewport extends Component {
         this._materials = {};
         this._frameId = null;
         this._resizeObserver = null;
+
+        // Reactivity state — used by onWillUpdateProps + debounced refresh.
+        // Track 1 commit 2 reactivity contract:
+        //   • _lastSessionId tracks which session we last fetched for.
+        //   • _lastValueIdsKey is a stable join of the current value_ids;
+        //     a change means the user picked / unpicked an attribute and
+        //     we must re-fetch the payload.
+        //   • _refreshTimer debounces rapid picks (the user can step
+        //     through several attributes in <200ms; each onchange would
+        //     otherwise fire an RPC).
         this._lastSessionId = null;
+        this._lastValueIdsKey = null;
+        this._refreshTimer = null;
+        this._refreshDebounceMs = 150;
 
         onMounted(() => this._initThreeScene());
         onWillUpdateProps((nextProps) => {
-            // When the wizard's record changes (attribute pick → onchange),
-            // re-fetch the payload. Cheap if sessionId didn't actually move.
-            const nextSid = this._sessionIdFromRecord(nextProps.record);
-            if (nextSid && nextSid !== this._lastSessionId) {
-                queueMicrotask(() => this._fetchAndRebuild(nextSid));
-            }
+            // The OCA wizard updates the record on every attribute pick:
+            // the onchange handler writes the new value_ids onto the
+            // session and back onto the wizard. fieldDependencies (below
+            // at registry.add) ensures this widget receives those props.
+            this._reactToRecord(nextProps.record);
         });
         onWillUnmount(() => this._dispose());
     }
@@ -157,8 +169,13 @@ export class CabinetViewport extends Component {
             this._resizeObserver.observe(canvas);
         }
 
-        // Initial fetch + animate.
-        await this._fetchAndRebuild(this._sessionIdFromRecord(this.props.record));
+        // Initial fetch + animate. Also prime the reactivity baseline
+        // so the first onWillUpdateProps sees a populated _lastValueIdsKey
+        // and only fires when the user actually picks something.
+        const initialSid = this._sessionIdFromRecord(this.props.record);
+        this._lastSessionId = initialSid;
+        this._lastValueIdsKey = this._valueIdsKey(this.props.record);
+        await this._fetchAndRebuild(initialSid);
         this._animate();
     }
 
@@ -183,6 +200,7 @@ export class CabinetViewport extends Component {
 
     _dispose() {
         if (this._frameId) cancelAnimationFrame(this._frameId);
+        if (this._refreshTimer) clearTimeout(this._refreshTimer);
         if (this._resizeObserver) this._resizeObserver.disconnect();
         if (this._cabinetGroup) {
             this._cabinetGroup.traverse((obj) => {
@@ -205,6 +223,60 @@ export class CabinetViewport extends Component {
         if (!m2o) return null;
         if (Array.isArray(m2o)) return m2o[0] || null;
         return m2o.id || m2o.resId || null;
+    }
+
+    /**
+     * Produce a stable string key from record.data.value_ids that
+     * changes iff the set of selected attribute values changes.
+     *
+     * Odoo 19 exposes x2many record data through several shapes
+     * depending on the source view; we try the documented APIs in
+     * order and fall back to empty-string when nothing matches
+     * (which makes the early "no values yet" state stable).
+     */
+    _valueIdsKey(record) {
+        if (!record || !record.data) return "";
+        const field = record.data.value_ids;
+        if (!field) return "";
+        const ids =
+            field.currentIds ||
+            field.resIds ||
+            field.ids ||
+            (Array.isArray(field) ? field : null);
+        if (!Array.isArray(ids)) return "";
+        return ids.slice().sort((a, b) => a - b).join(",");
+    }
+
+    /**
+     * Decide whether the new record state warrants a re-fetch, and
+     * schedule a debounced refresh if so. Called from onWillUpdateProps
+     * on every record diff.
+     */
+    _reactToRecord(record) {
+        const sid = this._sessionIdFromRecord(record);
+        if (!sid) return;
+        const key = this._valueIdsKey(record);
+        const sidChanged = sid !== this._lastSessionId;
+        const valuesChanged = key !== this._lastValueIdsKey;
+        if (!sidChanged && !valuesChanged) return;
+        this._lastSessionId = sid;
+        this._lastValueIdsKey = key;
+        this._scheduleRefresh(sid);
+    }
+
+    /**
+     * Debounce wrapper around _fetchAndRebuild. The user can step
+     * through several attribute picks in <200ms; without this we'd
+     * fire an RPC per pick.
+     */
+    _scheduleRefresh(sessionId) {
+        if (this._refreshTimer) {
+            clearTimeout(this._refreshTimer);
+        }
+        this._refreshTimer = setTimeout(() => {
+            this._refreshTimer = null;
+            this._fetchAndRebuild(sessionId);
+        }, this._refreshDebounceMs);
     }
 
     // ------------------------------------------------------------------
@@ -303,4 +375,17 @@ export class CabinetViewport extends Component {
 
 registry.category("view_widgets").add("cabinet_viewport", {
     component: CabinetViewport,
+    // fieldDependencies: list every record field the widget reads. Odoo's
+    // form view uses this list to decide WHEN to re-render the widget.
+    // Without value_ids here, the widget would miss attribute picks
+    // (the m2m field updates on the record but the widget's prop diff
+    //  never includes it). Track 1 commit 2 makes the widget reactive.
+    fieldDependencies: [
+        { name: "config_session_id", type: "many2one" },
+        {
+            name: "value_ids",
+            type: "many2many",
+            relation: "product.attribute.value",
+        },
+    ],
 });
