@@ -49,6 +49,13 @@
         # Commit 9 — Order Builder views, user-prefs view, menu
         "views/sale_order_views.xml",
         "views/res_users_views.xml",
+        # Commit 10 — QWeb reports (routine #6 partial)
+        # Styles MUST load before the report templates that reference them
+        # via t-call. If reordered, the templates fail to render.
+        "reports/southbrook_report_styles.xml",
+        "reports/signature_spec_sheet.xml",
+        "reports/shop_copy.xml",
+        "reports/door_order.xml",
     ],
     "installable": True,
     "application": True,

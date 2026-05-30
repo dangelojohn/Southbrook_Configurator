@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Door Order — per-order door schedule, bound to sale.order.
+
+  Per Build Spec section 4 routine #6 + Mapping section 3.7. Replaces the
+  workbook's manual Door Order tab. Aggregates the doors needed for ONE
+  sale.order by series + colour + door style + size.
+
+  Phase-1 simplification: per-SO scope. The original workbook tab
+  aggregated doors across all open orders for batched supplier ordering.
+  Multi-order aggregation lives in a sibling report (or a wizard) when
+  Phase 2 introduces the door-supplier workflow.
+
+  For Signature series doors (custom), each door line includes the door
+  spec verbatim. For Contractor series (single white thermofoil), the
+  report aggregates total square footage at the bottom — matching the
+  format the door supplier already accepts.
+-->
+<odoo>
+
+  <template id="report_door_order_doc" name="Door Order Document">
+    <t t-call="web.html_container">
+      <t t-foreach="docs" t-as="o">
+        <t t-call="web.external_layout">
+          <t t-call="southbrook_estimating.southbrook_report_styles"/>
+          <div class="page southbrook-report">
+
+            <h1>Door Order</h1>
+            <h2>
+              <span t-out="o.name"/>
+              <span class="sb-muted">
+                / <span t-out="o.partner_id.name"/>
+              </span>
+            </h2>
+            <hr class="sb-rule"/>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Cabinet</th>
+                  <th>Series</th>
+                  <th>Door Style</th>
+                  <th>Finish</th>
+                  <th>Qty</th>
+                  <th>Width</th>
+                  <th>Height</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr t-foreach="o.order_line" t-as="line">
+                  <td t-out="line.product_id.display_name or line.name"/>
+                  <td>
+                    <t t-set="series_vals"
+                       t-value="line.product_id.product_template_attribute_value_ids.filtered(
+                          lambda v: v.attribute_id.name == 'Series')"/>
+                    <span t-out="series_vals[:1].name or '—'"/>
+                  </td>
+                  <td>
+                    <t t-set="ds"
+                       t-value="line.product_id.product_template_attribute_value_ids.filtered(
+                          lambda v: v.attribute_id.name == 'Door Style')"/>
+                    <span t-out="ds[:1].name or '—'"/>
+                  </td>
+                  <td>
+                    <t t-set="fn"
+                       t-value="line.product_id.product_template_attribute_value_ids.filtered(
+                          lambda v: v.attribute_id.name == 'Finish')"/>
+                    <span t-out="fn[:1].name or '—'"/>
+                  </td>
+                  <td t-out="line.product_uom_qty"/>
+                  <td>
+                    <t t-set="w"
+                       t-value="line.product_id.product_template_attribute_value_ids.filtered(
+                          lambda v: v.attribute_id.name == 'Width')"/>
+                    <span t-out="w[:1].name or '—'"/>
+                  </td>
+                  <td class="sb-muted">
+                    Variable
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <hr class="sb-rule"/>
+
+            <p class="sb-muted">
+              Door Order data is per-SO in Phase 1. Multi-order aggregation
+              (the original workbook's batched supplier-ordering pattern)
+              becomes a separate report or wizard in Phase 2.
+            </p>
+          </div>
+        </t>
+      </t>
+    </t>
+  </template>
+
+  <record id="action_report_door_order" model="ir.actions.report">
+    <field name="name">Door Order</field>
+    <field name="model">sale.order</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">southbrook_estimating.report_door_order_doc</field>
+    <field name="report_file">southbrook_estimating.report_door_order_doc</field>
+    <field name="print_report_name">'Door Order - %s' % (object.name)</field>
+    <field name="binding_model_id" ref="sale.model_sale_order"/>
+    <field name="binding_type">report</field>
+  </record>
+
+</odoo>

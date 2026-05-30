@@ -9,4 +9,5 @@ from . import test_sale_order_versioning
 from . import test_sale_order_line_zone
 from . import test_res_users_prefs
 from . import test_order_builder_views
+from . import test_qweb_reports
 from . import test_phase1_smoke
