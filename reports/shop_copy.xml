@@ -10,8 +10,15 @@
   legacy spreadsheet Shop Copy tab was 254 cell-level formulas mirroring
   the order form. The Odoo version generates from the MO's BoM rollup
   (which is what manufacturing actually consumes), eliminating the
-  mirror duplication entirely. Order data flows through to the MO via
-  mrp.production.sale_id (Odoo standard).
+  mirror duplication entirely.
+
+  NF25 (caught at live test run 2026-05-30): Odoo 19 dropped the
+  `mrp.production.sale_id` shortcut field. The canonical MO→SO link
+  through `sale_mrp` is now `mo.sale_line_id.order_id` (M2O.M2O chain),
+  with a fallback to the free-text `mo.origin` for MOs that don't have
+  a sale_line_id (manually created MOs, demo fixtures, etc.). The
+  template uses a t-set to resolve the SO once and references the
+  resolved value below.
 
   Phase-1 minimum: MO header + cabinet dimensions + BoM line table
     + originating SO ref.
@@ -30,11 +37,12 @@
             <h2 t-out="mo.name"/>
             <hr class="sb-rule"/>
 
+            <t t-set="so" t-value="mo.sale_line_id.order_id"/>
             <div>
               <strong>Originating Order:</strong>
-              <span t-out="mo.sale_id.name or '—'"/>
-              <span class="sb-muted" t-if="mo.sale_id.partner_id">
-                / <span t-out="mo.sale_id.partner_id.name"/>
+              <span t-out="so.name or mo.origin or '—'"/>
+              <span class="sb-muted" t-if="so and so.partner_id">
+                / <span t-out="so.partner_id.name"/>
               </span><br/>
               <strong>Product:</strong>
               <span t-out="mo.product_id.display_name"/><br/>
