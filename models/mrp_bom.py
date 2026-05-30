@@ -93,20 +93,24 @@ class MrpBom(models.Model):
     )
 
     @api.depends(
-        # NF16 (caught at live install) — produce_delay is defined on
-        # product.template, not product.product. The @depends path must
-        # traverse product_tmpl_id explicitly; product.product accesses
-        # produce_delay at runtime via _inherits, but the dependency
-        # resolver doesn't follow _inherits transitively. The runtime
-        # read in the loop body works either way (Odoo cascades through
-        # _inherits at attribute access time).
-        "product_id.product_tmpl_id.produce_delay",
+        # NF16 (caught at live install, refined 2026-05-30):
+        # produce_delay in Odoo 19 lives directly on mrp.bom — NOT on
+        # product.template or product.product. Confirmed by:
+        #   grep produce_delay /usr/lib/python3/.../odoo/addons/mrp/models/
+        #     → fields declared in mrp_bom.py line 89
+        #   SELECT model FROM ir_model_fields WHERE name='produce_delay'
+        #     → mrp.bom
+        # The original Phase-1 code was wrong on BOTH the @depends path
+        # AND the runtime read (which read bom.product_id.produce_delay
+        # instead of bom.produce_delay). Fixed here.
+        "produce_delay",
         "southbrook_lead_time_extra",
     )
     def _compute_effective_produce_delay(self):
         for bom in self:
-            base = bom.product_id.produce_delay if bom.product_id else 0.0
-            bom.effective_produce_delay = base + bom.southbrook_lead_time_extra
+            bom.effective_produce_delay = (
+                bom.produce_delay + bom.southbrook_lead_time_extra
+            )
 
     # ==================================================================
     # Custom routine #1 — `_compute_panel_dimensions` (Build Spec section 4)
