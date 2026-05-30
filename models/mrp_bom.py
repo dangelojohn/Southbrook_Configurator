@@ -93,7 +93,14 @@ class MrpBom(models.Model):
     )
 
     @api.depends(
-        "product_id.produce_delay",
+        # NF16 (caught at live install) — produce_delay is defined on
+        # product.template, not product.product. The @depends path must
+        # traverse product_tmpl_id explicitly; product.product accesses
+        # produce_delay at runtime via _inherits, but the dependency
+        # resolver doesn't follow _inherits transitively. The runtime
+        # read in the loop body works either way (Odoo cascades through
+        # _inherits at attribute access time).
+        "product_id.product_tmpl_id.produce_delay",
         "southbrook_lead_time_extra",
     )
     def _compute_effective_produce_delay(self):
