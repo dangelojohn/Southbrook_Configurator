@@ -46,6 +46,9 @@ export class CabinetViewport extends Component {
             error: null,
             threeLoaded: !!window.THREE,
             renderedAt: null,
+            // T1C8 — per-line hover state (kitchen view only).
+            hoveredLineId: null,
+            hoveredLineInfo: null,
         });
 
         // Three.js scene handles — populated in _initThreeScene().
@@ -64,6 +67,14 @@ export class CabinetViewport extends Component {
         this._dimensionGroup = null;
         this._dimensionMaterial = null;
         this._spriteResources = [];
+
+        // T1C8 — hover state for per-line highlighting.
+        // _linesIndex caches payload.metadata.lines keyed by string
+        // line id (matching the L{id}_ panel name prefix).
+        this._linesIndex = {};
+        this._hoveredLineId = null;
+        this._raycaster = null;
+        this._mouse = null;
 
         // Reactivity state — used by onWillUpdateProps + debounced refresh.
         // Track 1 commit 2 reactivity contract:
@@ -235,7 +246,28 @@ export class CabinetViewport extends Component {
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
             }),
+            // T1C8 — highlight overlay. Hovered cabinet's panels swap
+            // to this material. Emissive sky tint over a warm carcass
+            // base reads as "this cabinet is selected" without losing
+            // the silhouette of the underlying meshes.
+            highlight: new THREE.MeshStandardMaterial({
+                color: 0xc89e85,
+                emissive: 0x2b4f6b,
+                emissiveIntensity: 0.4,
+                roughness: 0.5,
+                metalness: 0.1,
+            }),
         };
+
+        // T1C8 — raycaster for picking the hovered cabinet.
+        this._raycaster = new THREE.Raycaster();
+        this._mouse = new THREE.Vector2();
+
+        // Bind canvas hover listeners. mouseleave clears the hover
+        // so we never get a "stuck highlighted" cabinet when the
+        // pointer exits the canvas.
+        canvas.addEventListener("mousemove", (e) => this._onCanvasMouseMove(e));
+        canvas.addEventListener("mouseleave", () => this._setHoveredLine(null));
 
         // Resize hook.
         if (typeof ResizeObserver === "function") {
@@ -490,6 +522,15 @@ export class CabinetViewport extends Component {
 
         if (!payload || !Array.isArray(payload.panels)) return;
 
+        // T1C8 — refresh per-line index from payload metadata.
+        // The kitchen-view payload includes a `lines` map keyed by
+        // line id (string); the wizard payload omits it (no hover
+        // tooltip needed when there's only one cabinet).
+        this._linesIndex = (payload.metadata && payload.metadata.lines) || {};
+        this._hoveredLineId = null;
+        this.state.hoveredLineId = null;
+        this.state.hoveredLineInfo = null;
+
         // Build each panel.
         for (const p of payload.panels) {
             const d = p.dims;
@@ -509,6 +550,13 @@ export class CabinetViewport extends Component {
             // mouth; sides darken the shelves on the unlit side).
             mesh.castShadow = true;
             mesh.receiveShadow = true;
+            // T1C8 — extract line id from panel name prefix L{id}_.
+            // Wizard payload panel names lack the prefix; the regex
+            // simply doesn't match and lineId stays null (no hover).
+            const m = (p.name || "").match(/^L(\d+)_/);
+            if (m) {
+                mesh.userData.lineId = m[1];
+            }
             this._cabinetGroup.add(mesh);
         }
 
@@ -556,6 +604,85 @@ export class CabinetViewport extends Component {
     async onRefresh() {
         const dispatch = this._rpcDispatch();
         if (dispatch.recordId) await this._fetchAndRebuild(dispatch.recordId);
+    }
+
+    // ------------------------------------------------------------------
+    // T1C8 — Per-line highlight on hover
+    //
+    // The kitchen viewport prefixes each panel name with `L{id}_` (set
+    // in get_kitchen_3d_payload). On mousemove we raycast the canvas,
+    // extract the line id from the topmost intersected mesh, and swap
+    // every mesh sharing that line id to the highlight material.
+    //
+    // Toolbar shows the hovered line's sequence + family + SKU read
+    // from payload.metadata.lines (built backend-side per line).
+    // ------------------------------------------------------------------
+
+    _onCanvasMouseMove(event) {
+        const canvas = this.canvasRef.el;
+        if (!canvas || !this._raycaster || !this._cabinetGroup || !this._camera) {
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        this._mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this._mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this._raycaster.setFromCamera(this._mouse, this._camera);
+        const intersects = this._raycaster.intersectObjects(
+            this._cabinetGroup.children, false,
+        );
+
+        if (intersects.length > 0) {
+            const mesh = intersects[0].object;
+            const lineId = mesh.userData?.lineId || null;
+            this._setHoveredLine(lineId);
+            canvas.style.cursor = lineId ? "pointer" : "default";
+        } else {
+            this._setHoveredLine(null);
+            canvas.style.cursor = "default";
+        }
+    }
+
+    _setHoveredLine(lineId) {
+        if (lineId === this._hoveredLineId) return;
+
+        // Restore the previously-hovered cabinet's original materials.
+        if (this._hoveredLineId !== null && this._cabinetGroup) {
+            this._cabinetGroup.traverse((obj) => {
+                if (obj.isMesh
+                    && obj.userData?.lineId === this._hoveredLineId
+                    && obj.userData?._origMaterial) {
+                    obj.material = obj.userData._origMaterial;
+                    obj.userData._origMaterial = null;
+                }
+            });
+        }
+
+        this._hoveredLineId = lineId;
+        this.state.hoveredLineId = lineId;
+
+        // Apply highlight + populate the toolbar tooltip text.
+        if (lineId !== null && this._cabinetGroup && this._materials.highlight) {
+            const hl = this._materials.highlight;
+            this._cabinetGroup.traverse((obj) => {
+                if (obj.isMesh && obj.userData?.lineId === lineId) {
+                    if (!obj.userData._origMaterial) {
+                        obj.userData._origMaterial = obj.material;
+                    }
+                    obj.material = hl;
+                }
+            });
+            const info = this._linesIndex[lineId];
+            if (info) {
+                const dims = `${Math.round(info.width_mm)}×${Math.round(info.height_mm)}×${Math.round(info.depth_mm)} mm`;
+                this.state.hoveredLineInfo =
+                    `#${info.sequence} · ${info.family} · ${info.sku || ""} · ${dims}`;
+            } else {
+                this.state.hoveredLineInfo = `Line ${lineId}`;
+            }
+        } else {
+            this.state.hoveredLineInfo = null;
+        }
     }
 
     // ------------------------------------------------------------------

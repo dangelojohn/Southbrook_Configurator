@@ -18,6 +18,9 @@
                 <span class="o_cv_status flex-grow-1" t-if="state.loading">
                     Loading…
                 </span>
+                <span class="o_cv_hover_info flex-grow-1"
+                      t-elif="state.hoveredLineInfo"
+                      t-esc="state.hoveredLineInfo"/>
                 <span class="o_cv_renderedat text-muted flex-grow-1"
                       t-elif="state.renderedAt"
                       t-esc="state.renderedAt"/>
