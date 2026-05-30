@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Portal page templates for the Southbrook Order Builder.
+
+  Track 2 commit 1 — scaffold (2026-05-30). Inherits Odoo's stock
+  portal layout (`portal.portal_layout`) and adds:
+
+    • A sidebar entry "Order Builder" under "My Account" so portal
+      users (dealers + customers) have a discoverable navigation
+      point.
+    • A page that renders the chrome (breadcrumb + page title +
+      sidebar) plus an empty `<div id="order_builder_root">` where
+      the OWL `<OrderBuilder/>` component will mount in commit 2.
+
+  Commit 2 will:
+    • Add the OWL JS / XML / SCSS bundle to the manifest assets.
+    • Replace the placeholder content of the mount-point div with
+      the initial OWL component render output (still mostly empty —
+      the OWL tree fills in across commits 5-13 per the charter
+      lineup).
+-->
+<odoo>
+
+    <!-- =================================================================
+         Sidebar entry: My Account → Order Builder
+         ================================================================= -->
+    <template
+        id="portal_my_home_southbrook_order_builder"
+        name="Portal: Southbrook Order Builder sidebar entry"
+        inherit_id="portal.portal_my_home"
+        customize_show="True">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Order Builder</t>
+                <t t-set="url">/my/southbrook/order-builder</t>
+                <t t-set="placeholder_count" t-value="0"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- =================================================================
+         Order Builder page
+         ================================================================= -->
+    <template
+        id="portal_order_builder"
+        name="Southbrook Order Builder Portal Page">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-set="title">Southbrook Order Builder</t>
+
+            <!-- Breadcrumb -->
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a t-att-href="'/my'">My Account</a>
+                </li>
+                <li class="breadcrumb-item active">
+                    Order Builder
+                </li>
+                <li class="breadcrumb-item active" t-if="order_id">
+                    <span t-esc="order_name"/>
+                </li>
+            </ol>
+
+            <!-- Header card with order info -->
+            <div class="o_southbrook_portal_header card mb-3">
+                <div class="card-body">
+                    <h2 class="card-title h4 mb-1">
+                        <t t-if="order">
+                            <span t-esc="order_name"/>
+                            <small class="text-muted ms-2">
+                                · <t t-esc="order.partner_id.name"/>
+                            </small>
+                        </t>
+                        <t t-else="">
+                            Order Builder
+                        </t>
+                    </h2>
+                    <p class="card-text text-muted mb-0" t-if="not order">
+                        Pick or create an order to configure your kitchen.
+                    </p>
+                    <p class="card-text text-muted mb-0" t-elif="order.state">
+                        Stage: <strong t-esc="dict(order._fields['state'].selection).get(order.state, order.state)"/>
+                    </p>
+                </div>
+            </div>
+
+            <!-- OWL mount point. Commit 2 mounts <OrderBuilder/> here.
+                 The placeholder text appears in commit-1 builds so it's
+                 obvious the route + frame work even before the JS bundle
+                 lands. -->
+            <div t-att-id="owl_mount_id"
+                 class="o_southbrook_owl_mount"
+                 t-att-data-order-id="order_id or ''"
+                 t-att-data-order-name="order_name">
+                <div class="o_southbrook_owl_placeholder">
+                    <strong>Order Builder — Portal scaffold</strong>
+                    <p>
+                        The portal route, auth, and chrome are wired.
+                        The OWL <code>&lt;OrderBuilder/&gt;</code> component
+                        tree mounts here starting in Track 2 commit 2.
+                    </p>
+                    <p t-if="not order">
+                        No order selected. Append an order id to the URL
+                        to view a specific order:
+                        <br/>
+                        <code>/my/southbrook/order-builder/&lt;order_id&gt;</code>
+                    </p>
+                    <p t-else="">
+                        Order id <code t-esc="order_id"/> loaded for
+                        partner <strong t-esc="order.partner_id.name"/>.
+                    </p>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

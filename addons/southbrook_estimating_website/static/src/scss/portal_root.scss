@@ -1,0 +1,51 @@
+// Southbrook portal — minimal styling for Track 2 commit 1 scaffold.
+// Palette tokens follow the OWL mockup. Hard-coded today; move to
+// CSS variables when the canonical Signature-Series palette spec
+// lands (NF15).
+
+.o_southbrook_portal_header {
+    background: #fbf7ef;            // --paper
+    border: 1px solid #d8cfbf;      // --rule
+}
+
+.o_southbrook_owl_mount {
+    min-height: 600px;
+    background: #fbf7ef;
+    border: 1px solid #d8cfbf;
+    border-radius: 2px;
+    padding: 24px;
+}
+
+.o_southbrook_owl_placeholder {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 40px 32px;
+    background: #f4ede2;            // --linen
+    border: 1px solid #d8cfbf;
+    border-radius: 4px;
+    text-align: center;
+    color: #1a1814;                 // --ink
+    line-height: 1.55;
+
+    strong {
+        display: block;
+        font-size: 16px;
+        margin-bottom: 12px;
+        color: #6b3f2a;             // --walnut
+    }
+
+    code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12px;
+        background: #fbf7ef;
+        border: 1px solid #d8cfbf;
+        padding: 1px 6px;
+        border-radius: 2px;
+        color: #1a1814;
+    }
+
+    p {
+        margin: 12px 0;
+        font-size: 13px;
+    }
+}
