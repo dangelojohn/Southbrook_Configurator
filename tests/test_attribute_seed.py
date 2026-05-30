@@ -31,7 +31,12 @@ class TestAttributeSeed(SouthbrookTestCase):
         self._ref("attr_accessory_type")
 
     def test_03_all_attributes_use_dynamic_variant_creation(self):
-        """Q6 — every attribute is create_variant='dynamic'."""
+        """Q6 — every attribute is create_variant='dynamic' EXCEPT the
+        multi-select Accessories attribute, which Odoo's check constraint
+        `product_attribute_check_multi_checkbox_no_variant` forces to
+        no_variant (NF18). Multi-select values are independently chosen
+        price-extras on the configured line — they never materialise as
+        variant axes — so no_variant is semantically correct anyway."""
         # Walk every attribute we seeded (find by external id prefix)
         # and assert create_variant.
         seeded = self.env["ir.model.data"].search([
@@ -39,11 +44,15 @@ class TestAttributeSeed(SouthbrookTestCase):
             ("model", "=", "product.attribute"),
         ])
         self.assertGreater(len(seeded), 0)
+        # NF18 exception: multi-select attrs must be no_variant.
+        multi_exempt = {"Accessories"}
         for data in seeded:
             attr = self.env["product.attribute"].browse(data.res_id)
+            expected = "no_variant" if attr.name in multi_exempt else "dynamic"
             self.assertEqual(
-                attr.create_variant, "dynamic",
-                f"attribute {attr.name} must be dynamic per Q6",
+                attr.create_variant, expected,
+                f"attribute {attr.name} create_variant: expected {expected} "
+                f"(per {'NF18 constraint' if attr.name in multi_exempt else 'Q6'})",
             )
 
     def test_04_width_values_carry_dual_storage(self):
@@ -79,10 +88,22 @@ class TestAttributeSeed(SouthbrookTestCase):
         white = self._ref("value_box_white_melamine")
         self.assertEqual(white.lead_time_extra, 0.0)
 
-    def test_07_door_count_is_hidden(self):
-        """Q22(a) — door_count is display_type='hidden'."""
+    def test_07_door_count_display_type(self):
+        """Q22(a) originally specified door_count display_type='hidden'
+        for headless population by the width→door-count rule. NF18:
+        'hidden' is not in Odoo 19's product.attribute display_type
+        selection ({radio, pills, select, color, multi, image}), so
+        the field was seeded as 'radio'. The Q22(a) intent — door_count
+        not visually picked by the user, populated by rule — is now
+        handled at the VIEW layer (Phase-2 follow-up: invisible attribute
+        in the configurator form). The data-layer constraint here is
+        just that door_count is an enumerable Odoo-valid display_type."""
         attr = self._ref("attr_door_count")
-        self.assertEqual(attr.display_type, "hidden")
+        self.assertIn(
+            attr.display_type,
+            ("radio", "pills", "select"),
+            "door_count must use one of Odoo 19's enumerable display_types",
+        )
 
     def test_08_family_has_nine_values_not_corner_bifold(self):
         """Q23(b) — corner is single family value; bifold is family_subtype."""

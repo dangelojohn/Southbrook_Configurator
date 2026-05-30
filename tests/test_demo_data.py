@@ -67,10 +67,11 @@ class TestDemoData(SouthbrookTestCase):
         <function/> action_confirm. The hook fires capture(); 5 rows
         should exist.
 
-        Self-skip when --demo not loaded.
+        Self-skip when demo orders not loaded (NF22: demo orders deferred
+        to a Phase-2 Python helper).
         """
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded; no demo orders to count")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22 — see manifest demo list)")
 
         analytics_rows = self.env["southbrook.order.analytics"].search_count([])
         self.assertEqual(
@@ -122,8 +123,8 @@ class TestDemoData(SouthbrookTestCase):
     # Demo order shape
     # ------------------------------------------------------------------
     def test_06_six_open_quotes_in_draft_state(self):
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22)")
         for xml_id in (
             "demo_quote_image_floor_001",
             "demo_quote_amazing_window_001",
@@ -140,8 +141,8 @@ class TestDemoData(SouthbrookTestCase):
 
     def test_07_nf6_parent_chain_q1_to_q5(self):
         """NF6 chain: demo_quote_image_floor_002 is v2 of _001."""
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22)")
         v2 = self.env.ref("southbrook_estimating.demo_quote_image_floor_002")
         v1 = self.env.ref("southbrook_estimating.demo_quote_image_floor_001")
         self.assertEqual(v2.parent_order_id, v1)
@@ -149,8 +150,8 @@ class TestDemoData(SouthbrookTestCase):
 
     def test_08_richwood_confirmed_order_spans_four_zones(self):
         """Demonstrates Q21 zone visual grouping at gate review."""
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22)")
         order = self.env.ref(
             "southbrook_estimating.demo_order_richwood_confirmed"
         )

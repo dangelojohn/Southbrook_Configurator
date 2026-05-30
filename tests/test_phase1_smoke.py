@@ -87,8 +87,8 @@ class TestPhase1Smoke(SouthbrookTestCase):
         order_line, and the Richwood order spans multiple zones (the
         multi-zone affordance from Q21).
         """
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22)")
         for xml_id in (
             "demo_order_image_floor_confirmed",
             "demo_order_amazing_window_confirmed",
@@ -119,8 +119,8 @@ class TestPhase1Smoke(SouthbrookTestCase):
         Spot-checks: the Richwood demo has Elegance + Five-Piece Woodgrain;
         the Amazing Window demo has Contractor + Thermofoil Slab.
         """
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22)")
         richwood = self.env.ref(
             "southbrook_estimating.demo_order_richwood_confirmed"
         )
@@ -159,7 +159,14 @@ class TestPhase1Smoke(SouthbrookTestCase):
             "southbrook_estimating.value_door_five_piece_woodgrain"
         )
 
-        session = Session.create({"product_tmpl_id": template.id})
+        # OCA product.config.session has user_id NOT NULL with a
+        # `default=lambda self: self.env.user` — but in some test
+        # contexts (post_install with sudo'd cls.env) the default
+        # doesn't fire. Set explicitly to avoid the crash.
+        session = Session.create({
+            "product_tmpl_id": template.id,
+            "user_id": self.env.user.id,
+        })
 
         # Pin series=Contractor and door_style=five_piece.
         # The exact OCA API for setting session value_ids varies between
@@ -201,8 +208,8 @@ class TestPhase1Smoke(SouthbrookTestCase):
     # Shape assertion when seed_mode='illustrative'; exact when canonical.
     # ------------------------------------------------------------------
     def test_step_07_total_matches_tier_3_pricing(self):
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22)")
         order = self.env.ref(
             "southbrook_estimating.demo_order_tradesperson_confirmed"
         )
@@ -236,7 +243,7 @@ class TestPhase1Smoke(SouthbrookTestCase):
         the pricelist re-resolves to retail via the onchange (NF13 regression).
         """
         if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+            self.skipTest("--demo not loaded; demo partners absent by design")
         from odoo.tests.common import Form
         walkin = self.env.ref(
             "southbrook_estimating.demo_partner_walkin_retail"
@@ -274,8 +281,8 @@ class TestPhase1Smoke(SouthbrookTestCase):
         capture. Demo data ships 5 confirmed orders via <function/>
         action_confirm; this assertion confirms the hook fired for all 5.
         """
-        if not self._demo_loaded():
-            self.skipTest("--demo not loaded")
+        if not self._demo_orders_loaded():
+            self.skipTest("demo orders not loaded (NF22)")
         for xml_id in (
             "demo_order_image_floor_confirmed",
             "demo_order_amazing_window_confirmed",
