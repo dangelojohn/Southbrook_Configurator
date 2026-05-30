@@ -110,6 +110,12 @@ export class CabinetViewport extends Component {
         this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this._renderer.toneMappingExposure = 1.0;
         this._renderer.setPixelRatio(window.devicePixelRatio || 1);
+        // T1C4: shadow grounding — PCFSoftShadowMap blurs shadow edges
+        // for a less harsh, more product-shot look. Cost on a 5k-tri
+        // cabinet scene with one shadow-casting light is negligible
+        // even on integrated GPUs.
+        this._renderer.shadowMap.enabled = true;
+        this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this._fitRendererToCanvas();
 
         // Scene — paper-warm background to match the Southbrook palette.
@@ -127,10 +133,49 @@ export class CabinetViewport extends Component {
         this._scene.add(hemi);
         const dirA = new THREE.DirectionalLight(0xffffff, 0.9);
         dirA.position.set(800, 1200, 600);
+        // T1C4: dirA is the shadow-casting "key" light. Shadow camera
+        // bounds sized to cover any of the 12 Q8-locked templates
+        // (max footprint: corner 900mm × 900mm, max height: tall
+        // pantry 2100mm). Generous frustum = no shadow clipping
+        // for any cabinet; mapSize 2048² = soft edges without
+        // pixelation under default camera zoom.
+        dirA.castShadow = true;
+        dirA.shadow.mapSize.set(2048, 2048);
+        dirA.shadow.camera.near = 100;
+        dirA.shadow.camera.far = 6000;
+        dirA.shadow.camera.left = -2500;
+        dirA.shadow.camera.right = 2500;
+        dirA.shadow.camera.top = 3000;
+        dirA.shadow.camera.bottom = -500;
+        // bias mitigates "shadow acne" — without it the cabinet's
+        // own panels self-shadow with stripey artifacts.
+        dirA.shadow.bias = -0.0005;
         this._scene.add(dirA);
         const dirB = new THREE.DirectionalLight(0xffffff, 0.3);
         dirB.position.set(-500, 500, 800);
         this._scene.add(dirB);
+
+        // T1C4: floor plane — receives the cabinet's shadow.
+        // 20m × 20m so OrbitControls panning never reveals an edge;
+        // colour matches the body background of the OWL portal
+        // mockup (#e8dfd2) so the viewport visually nests into the
+        // surrounding chrome. Roughness near 1 = matte = no specular
+        // hot-spot from the directional light reflecting off the floor.
+        const floorGeom = new THREE.PlaneGeometry(20000, 20000);
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0xe8dfd2,
+            roughness: 0.95,
+            metalness: 0.0,
+        });
+        const floor = new THREE.Mesh(floorGeom, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0;
+        floor.receiveShadow = true;
+        this._scene.add(floor);
+        // Stash for disposal at unmount.
+        this._floor = floor;
+        this._floorMat = floorMat;
+        this._floorGeom = floorGeom;
 
         // OrbitControls — drag-rotate, scroll-zoom.
         if (THREE.OrbitControls) {
@@ -225,6 +270,11 @@ export class CabinetViewport extends Component {
         if (this._materials) {
             for (const m of Object.values(this._materials)) m.dispose?.();
         }
+        // T1C4: floor + floor material need their own dispose; they're
+        // not in this._materials (kept separate so blueline-toggle
+        // material swap doesn't touch the floor).
+        if (this._floorGeom) this._floorGeom.dispose();
+        if (this._floorMat) this._floorMat.dispose();
         if (this._renderer) this._renderer.dispose();
     }
 
@@ -347,6 +397,12 @@ export class CabinetViewport extends Component {
             if (p.rot) {
                 mesh.rotation.set(p.rot.x || 0, p.rot.y || 0, p.rot.z || 0);
             }
+            // T1C4: every panel casts AND receives shadows. Cast =
+            // floor shadow grounding. Receive = inter-panel shadows
+            // (the door darkens the back panel through the cabinet
+            // mouth; sides darken the shelves on the unlit side).
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
             this._cabinetGroup.add(mesh);
         }
 
