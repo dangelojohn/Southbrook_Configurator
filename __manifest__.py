@@ -1,14 +1,71 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 {
     "name": "Southbrook Estimating",
-    "summary": "Engine + sales-rep Order Builder for Southbrook Kitchens "
-               "(Prodboard-class one-page configurator on top of OCA "
-               "product_configurator v19).",
+    "summary": "A Prodboard-class kitchen Order Builder on Odoo 19 CE — "
+               "multi-zone grid, 6-channel pricelist, parametric BoM, "
+               "Signature Spec Sheet PDF.",
+    "description": """
+Southbrook Estimating
+=====================
+
+The sales-rep-facing Order Builder for Southbrook Kitchens on Odoo 19.0
+Community Edition, built on top of the OCA product_configurator suite.
+
+This addon ships:
+
+* The Order Builder backend with multi-zone grid (BASE_RUN / WALL /
+  TALL / ISLAND / ACCESSORY / OTHER) and "Duplicate as Draft" action
+  for iterative-design workflows.
+* 11 declarative configurator attributes (plus 3 derived) seeded with
+  12 cabinet templates and 65 product.config.line rule records covering
+  4 business rules (series-door, box-series, width-doorcount,
+  family-softclose).
+* 6 channel pricelists (Retail / Dealer / Tradesperson / KD / Big-Box /
+  Refacing CTHS) plus 3 tradesperson tier sub-pricelists, dispatched
+  via class-level tables.
+* Parametric panel-cut math via models/mrp_bom.py with NF14-documented
+  geometric conventions (frameless euro construction; named constants
+  swap when canonical specifications land).
+* QWeb reports: Signature Spec Sheet (sale.order-bound, customer PDF),
+  Shop Copy (mrp.production-bound, shop-floor companion), Door Order
+  (sale.order-bound per-SO door schedule).
+* The southbrook.order.analytics companion model captures channel,
+  series, lifecycle timestamps, and BoM-rollup counts on every order
+  confirm — the AI data spine for future forecast / quote / yield work.
+* 95 automated tests including a 10-step Phase-1 smoke gate.
+
+Dependencies
+------------
+
+This addon depends on the OCA product_configurator suite (product_configurator,
+product_configurator_mrp, product_configurator_sale) which is NOT on the
+Odoo Apps Store. Install from https://github.com/OCA/product-configurator
+before installing this addon.
+
+Phase scope
+-----------
+
+This is Phase 1 of a 4-phase build. The customer-facing one-page
+configurator (Phase 2), the Three.js procedural 3D layer (Phase 3),
+and the Accucutt cut-list bridge (Phase 4) ship in subsequent releases.
+
+Documentation
+-------------
+
+See CHANGELOG.md for the release notes, README.md for the canonical
+design-docs index, and PUNCHLIST.md for the locked-decisions trace
+(referenced from every commit body by Q-number and NF-number).
+""",
     "version": "19.0.1.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
+    "maintainers": ["southbrook"],
     "website": "https://southbrookcabinetry.space",
+    "support": "support@southbrookcabinetry.space",
     "category": "Sales/Configurator",
+    "images": [
+        "static/description/banner.png",
+    ],
     #
     # See ../../CLAUDE.md for the operating brief and ../../docs/
     # for the canonical architecture, business rules, and reference

@@ -1,0 +1,153 @@
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Southbrook Estimating</h2>
+    <h3 class="oe_slogan">A Prodboard-class kitchen Order Builder on Odoo 19 Community Edition</h3>
+    <p class="oe_mt32">
+      Sales reps and dealers configure full kitchens line-by-line in a
+      multi-zone Order Builder. Every selection re-prices live through the
+      channel-resolved pricelist; every confirmed order materialises a
+      parametric BoM and an analytics row for downstream forecasting.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">What ships in this addon</h2>
+    <div class="oe_span6">
+      <h4 class="oe_slogan">Order Builder backend</h4>
+      <ul>
+        <li>Multi-zone grid: <code>BASE_RUN</code>, <code>WALL</code>,
+            <code>TALL</code>, <code>ISLAND</code>, <code>ACCESSORY</code>,
+            <code>OTHER</code> with free-text label</li>
+        <li>Channel-driven pricelist resolver: 6 channels (Retail, Dealer,
+            Tradesperson with 3 tiers, KD, Big-Box, Refacing CTHS)</li>
+        <li>"Duplicate as Draft" for iterative-design workflows
+            (Image Floor pattern); parent_order chain + version tracking</li>
+        <li>Live re-pricing on partner switch</li>
+        <li>Illustrative-seed banner makes demo data unmistakable</li>
+      </ul>
+    </div>
+    <div class="oe_span6">
+      <h4 class="oe_slogan">Parametric BoM + Reports</h4>
+      <ul>
+        <li>Cabinet panel-cut math from W × H × D + family + door count
+            via <code>_compute_panel_dimensions</code></li>
+        <li>Maple-box +2-week lead-time bump folds into <code>produce_delay</code>
+            via a dedicated <code>lead_time_extra</code> attribute field</li>
+        <li>Signature Spec Sheet (customer-facing PDF, sale.order-bound)</li>
+        <li>Shop Copy (MO-companion, mrp.production-bound)</li>
+        <li>Door Order (per-SO door schedule)</li>
+        <li>Auto-captured analytics on order confirm: channel, series,
+            cabinet/panel/door counts, lifecycle timestamps</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Declarative configurator rules</h2>
+    <p>
+      Four business rules are encoded as <code>product.config.line</code>
+      records in <code>data/config_rules.xml</code> — never as Python
+      <code>if</code> branches. Adding a tier or a series is a data edit.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Rule</th><th>Behaviour</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Series → door style</td><td>Contractor exposes slab only;
+            Elegance exposes 5-piece only</td></tr>
+        <tr><td>Box material → series</td><td>Maple available only on
+            Contemporary and Elegance; standard on Signature</td></tr>
+        <tr><td>Width → door count</td><td>9–21 in → 1-door;
+            24–36 in → 2-door (cascades into hinge / handle / door
+            BoM lines)</td></tr>
+        <tr><td>Family → soft-close</td><td>Corner bi-fold hides the
+            soft-close option entirely</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Dependencies</h2>
+    <p>
+      This addon depends on the OCA <code>product_configurator</code> suite,
+      which is <strong>not on the Odoo Apps Store</strong>. Install the
+      four OCA modules from
+      <a href="https://github.com/OCA/product-configurator">github.com/OCA/product-configurator</a>
+      before installing this addon:
+    </p>
+    <ul>
+      <li><code>product_configurator</code></li>
+      <li><code>product_configurator_mrp</code></li>
+      <li><code>product_configurator_sale</code></li>
+      <li><code>website_product_configurator</code> (only required by the
+          companion website addon, not this one)</li>
+    </ul>
+    <p>
+      Plus the Odoo Community core: <code>mrp</code>,
+      <code>sale_management</code>, <code>stock</code>,
+      <code>account</code>, <code>contacts</code>, <code>crm</code>.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Scope</h2>
+    <p>
+      This is Phase 1 of a 4-phase build. Phase 2 ships the customer-facing
+      one-page configurator with 2D rendering; Phase 3 adds the Three.js
+      procedural 3D layer; Phase 4 adds the Accucutt cut-list bridge.
+      Phase 1 alone is enough for the sales-rep Order Builder
+      to be operationally useful.
+    </p>
+    <p>
+      The build is open-source under LGPL-3 and authored for Southbrook
+      Cabinetry; the codebase is documented forensically through
+      <code>PUNCHLIST.md</code> (Q-numbered locked decisions + NF-numbered
+      surfacings) and <code>docs/PHASE_1_RETROSPECTIVE.md</code>
+      (process patterns + design discipline).
+    </p>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Installation</h2>
+    <pre>
+# 1. Install OCA product_configurator suite (see Dependencies section)
+# 2. Drop southbrook_estimating into your Odoo addons path
+# 3. Install on a fresh 19.0 CE database:
+odoo-bin -d sb_phase1 -i southbrook_estimating --stop-after-init
+
+# With demo data:
+odoo-bin -d sb_phase1_demo -i southbrook_estimating --demo \
+         --stop-after-init
+
+# Run the test suite:
+odoo-bin -d sb_phase1_test -i southbrook_estimating --demo \
+         --test-enable --stop-after-init --test-tags=southbrook
+    </pre>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Quality</h2>
+    <ul>
+      <li>95 tests across 13 files with a 10-step Phase-1 smoke gate</li>
+      <li>Custom-code surface bounded to 7 routines by Build Spec § 4
+          discipline; data files + OCA <code>_inherit</code> handle the rest</li>
+      <li>Pre-commit XML lint (<code>scripts/lint-xml.sh</code>) catches
+          well-formedness errors before they reach module install</li>
+      <li>Every decision tracked through Q1–Q23 + NF1–NF15 in PUNCHLIST,
+          cited by Q/NF number in every commit message body</li>
+    </ul>
+  </div>
+</section>
