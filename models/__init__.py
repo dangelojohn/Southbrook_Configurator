@@ -12,3 +12,4 @@ from . import product_pricelist
 from . import sale_order
 from . import product_config_line
 from . import mrp_bom
+from . import southbrook_order_analytics

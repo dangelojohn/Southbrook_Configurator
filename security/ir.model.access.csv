@@ -1,1 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_southbrook_order_analytics_user,southbrook.order.analytics user,model_southbrook_order_analytics,base.group_user,1,0,0,0
+access_southbrook_order_analytics_sales,southbrook.order.analytics sales,model_southbrook_order_analytics,sales_team.group_sale_salesman,1,1,1,0
+access_southbrook_order_analytics_manager,southbrook.order.analytics manager,model_southbrook_order_analytics,sales_team.group_sale_manager,1,1,1,1

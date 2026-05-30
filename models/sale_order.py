@@ -94,3 +94,16 @@ class SaleOrder(models.Model):
             resolved = order._resolve_channel_pricelist(order.partner_id)
             if resolved:
                 order.pricelist_id = resolved.id
+
+    # ------------------------------------------------------------------
+    # Analytics capture (NF1 — Build Spec section 8 "AI data spine")
+    # ------------------------------------------------------------------
+    # Fire the southbrook.order.analytics.capture() hook at confirm-time.
+    # Idempotent; safe to re-confirm. NF1 carve-out: this is data capture,
+    # not business logic — does not bump the 7-routine custom register.
+    def action_confirm(self):
+        result = super().action_confirm()
+        Analytics = self.env["southbrook.order.analytics"]
+        for order in self:
+            Analytics.capture(order)
+        return result
