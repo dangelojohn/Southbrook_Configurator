@@ -85,6 +85,20 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "contacts",
         "crm",
     ],
+    # ------------------------------------------------------------------
+    # Python external dependencies.
+    # `mako` is required by product_configurator (declared upstream); we
+    # re-declare here so a fresh Odoo container without the OCA suite
+    # pre-warmed still raises a clear ImportError pointing at this
+    # manifest, not a tracebacks-deep call inside the configurator.
+    # Install via:  pip install --break-system-packages Mako
+    # (or your distro's python3-mako). The dependency does NOT come from
+    # apt on the Odoo 19 official Debian image — confirmed at NF1 (live
+    # install on QNAP southbrook stack 2026-05-30).
+    # ------------------------------------------------------------------
+    "external_dependencies": {
+        "python": ["mako"],
+    },
     "data": [
         "security/ir.model.access.csv",
         # Commit 2 — seed parameters + res.partner view extension
