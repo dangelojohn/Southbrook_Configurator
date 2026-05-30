@@ -789,9 +789,9 @@ class ZoneGroup extends Component {
     _toggle = () => {
         this.state.collapsed = !this.state.collapsed;
     };
-}
 
-fmtUsd; // referenced via class field on OrderLine + ZoneGroup helpers.
+    fmtUsd = fmtUsd;
+}
 
 // ----------------------------------------------------------------------
 // TabBar — T2C8.
