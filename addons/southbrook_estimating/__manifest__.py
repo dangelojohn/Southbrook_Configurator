@@ -80,6 +80,14 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # per Build Spec §0 / §2.1 ("the data spine").
         "mrp",
         "sale_management",
+        # sale_mrp is the BRIDGE addon that wires mrp.production back to
+        # sale.order.line (mo.sale_line_id.order_id). Marked auto_install
+        # upstream but not picked up reliably in QNAP-style stacks where
+        # the install runs against a partially-bootstrapped registry.
+        # NF25 (live test run 2026-05-30): Shop Copy report assumed the
+        # bridge was loaded; without it `mo.sale_line_id` raises
+        # AttributeError. Explicit dep guarantees the install.
+        "sale_mrp",
         "stock",
         "account",
         "contacts",
