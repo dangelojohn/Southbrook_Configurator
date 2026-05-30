@@ -221,40 +221,75 @@
     }
 }
 
-// ----- T2C5 store probe (commit 6 replaces with HeaderStrip) -------
-.o_owl_store_probe {
+// ----- T2C6 HeaderStrip — 5-cell row (mockup §HeaderStrip) ---------
+//
+// Grid template proportions match the mockup: customer cell is
+// slightly wider (1.4fr) so the partner name + via + badge fit
+// without truncation; the four numeric cells share the remainder.
+.o_owl_header_strip {
     display: grid;
-    grid-template-columns: 1fr auto;
-    row-gap: 6px;
-    column-gap: 24px;
-    padding: 14px 18px;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
     background: var(--sb-paper);
     border: 1px solid var(--sb-rule);
-    border-radius: 3px;
+    border-radius: 2px;
+    overflow: hidden;
     margin-bottom: 18px;
+    font-family: var(--sb-font-sans);
+}
 
-    .o_owl_probe_row {
-        display: contents;
+.o_owl_hs_cell {
+    padding: 14px 18px;
+    border-right: 1px solid var(--sb-rule);
+
+    &:last-child {
+        border-right: none;
     }
-    .o_owl_probe_label {
-        font-size: 10px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--sb-ink-dim);
-        align-self: center;
+}
+
+.o_owl_hs_label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sb-ink-dim);
+    margin-bottom: 6px;
+}
+
+.o_owl_hs_value {
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 18px;
+    color: var(--sb-ink);
+    line-height: 1.2;
+    word-break: break-word;
+
+    &.mono {
+        font-family: var(--sb-font-mono);
+        font-variation-settings: normal;
     }
-    .o_owl_probe_value {
-        font-size: 14px;
-        color: var(--sb-ink);
-        text-align: right;
-        font-variation-settings: "opsz" 14, "wght" 500;
-        &.mono {
-            font-family: var(--sb-font-mono);
-        }
-        &.o_owl_savings {
-            color: var(--sb-ok);
-        }
+}
+
+.o_owl_hs_sub {
+    font-size: 11px;
+    font-variation-settings: "opsz" 11, "wght" 400;
+    color: var(--sb-ink-dim);
+    margin-left: 4px;
+    font-weight: 400;
+}
+
+// Customer cell — sky-tinted background per mockup so the
+// channel badge anchors visually below the partner name.
+.o_owl_hs_customer {
+    background: var(--sb-sky-l);
+
+    .o_owl_channel_badge {
+        margin: 6px 0 0;
+        display: inline-block;
     }
+}
+
+// Savings cell — value renders in success-green for the
+// "you saved $X" affordance.
+.o_owl_hs_savings .o_owl_hs_value {
+    color: var(--sb-ok);
 }
 
 // ----- OWL OrderBuilder root (T2C2 commit's component) ------------

@@ -31,6 +31,20 @@
 import { Component, mount, onMounted, useState, xml } from "@odoo/owl";
 
 // ----------------------------------------------------------------------
+// USD currency formatter — shared between OrderBuilder (probe) + the
+// HeaderStrip (T2C6) + subsequent commits. Phase 3 polish moves this
+// to a util module + adds multi-currency awareness based on payload.
+// ----------------------------------------------------------------------
+
+function fmtUsd(value) {
+    if (typeof value !== "number") return "—";
+    return "$" + value.toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    });
+}
+
+// ----------------------------------------------------------------------
 // JSON-RPC fetch helper. Pure fetch — no Odoo service dependency so
 // the script works on the public portal context where the backend
 // service registry isn't available.
@@ -61,8 +75,75 @@ async function rpcJsonCall(url, params = {}) {
 }
 
 // ----------------------------------------------------------------------
-// Inline template. Phase 3 polish splits each section into its own
-// component file under static/src/js/components/.
+// HeaderStrip — T2C6.
+//
+// The 5-cell row at the top of the OrderBuilder (per mockup §HeaderStrip):
+//   1. Customer  — sky-tinted; partner name + via text + pricelist badge
+//   2. Retail Subtotal
+//   3. Channel Total
+//   4. Savings (green accent)
+//   5. Lead Time (weeks + maple offset if applicable)
+//
+// Reads props.order. No state of its own — pure presentation.
+// ----------------------------------------------------------------------
+
+class HeaderStrip extends Component {
+    static template = xml`
+        <div class="o_owl_header_strip">
+            <div class="o_owl_hs_cell o_owl_hs_customer">
+                <div class="o_owl_hs_label">Customer</div>
+                <div class="o_owl_hs_value">
+                    <t t-esc="props.order.partner_name"/>
+                    <span t-if="props.order.via" class="o_owl_hs_sub">
+                        (<t t-esc="props.order.via"/>)
+                    </span>
+                </div>
+                <span class="o_owl_channel_badge"
+                      t-att-class="'o_owl_channel_' + props.order.channel_css">
+                    <t t-esc="props.order.channel_label"/>
+                </span>
+            </div>
+            <div class="o_owl_hs_cell">
+                <div class="o_owl_hs_label">Retail Subtotal</div>
+                <div class="o_owl_hs_value mono"
+                     t-esc="fmtUsd(props.order.retail_subtotal)"/>
+            </div>
+            <div class="o_owl_hs_cell">
+                <div class="o_owl_hs_label">Channel Total</div>
+                <div class="o_owl_hs_value mono"
+                     t-esc="fmtUsd(props.order.channel_total)"/>
+            </div>
+            <div class="o_owl_hs_cell o_owl_hs_savings">
+                <div class="o_owl_hs_label">Savings</div>
+                <div class="o_owl_hs_value mono"
+                     t-esc="fmtUsd(props.order.savings)"/>
+            </div>
+            <div class="o_owl_hs_cell">
+                <div class="o_owl_hs_label">Lead Time</div>
+                <div class="o_owl_hs_value">
+                    <t t-if="props.order.lead_time_days > 0">
+                        <t t-esc="Math.round(props.order.lead_time_days / 7)"/>
+                        wks
+                    </t>
+                    <t t-else="">—</t>
+                </div>
+            </div>
+        </div>
+    `;
+    static props = {
+        order: Object,
+    };
+
+    // Expose the shared formatter on the component instance so the
+    // template can call it via t-esc="fmtUsd(...)". OWL templates
+    // resolve identifiers against `this`, so a named arrow assignment
+    // works without import shenanigans.
+    fmtUsd = fmtUsd;
+}
+
+// ----------------------------------------------------------------------
+// OrderBuilder root template. Phase 3 polish splits each section into
+// its own component file under static/src/js/components/.
 // ----------------------------------------------------------------------
 
 const TEMPLATE = xml`
@@ -109,38 +190,17 @@ const TEMPLATE = xml`
                 <t t-esc="state.order.channel_label"/>
             </div>
 
-            <!-- Store probe — commit 6 replaces with the proper
-                 HeaderStrip 5-cell component. -->
-            <div class="o_owl_store_probe">
-                <div class="o_owl_probe_row">
-                    <span class="o_owl_probe_label">Retail subtotal</span>
-                    <span class="o_owl_probe_value mono"
-                          t-esc="_fmtUsd(state.order.retail_subtotal)"/>
-                </div>
-                <div class="o_owl_probe_row">
-                    <span class="o_owl_probe_label">Channel total</span>
-                    <span class="o_owl_probe_value mono"
-                          t-esc="_fmtUsd(state.order.channel_total)"/>
-                </div>
-                <div class="o_owl_probe_row">
-                    <span class="o_owl_probe_label">Savings</span>
-                    <span class="o_owl_probe_value mono o_owl_savings"
-                          t-esc="_fmtUsd(state.order.savings)"/>
-                </div>
-                <div class="o_owl_probe_row">
-                    <span class="o_owl_probe_label">Lines · Zones</span>
-                    <span class="o_owl_probe_value mono">
-                        <t t-esc="state.order.line_count"/>
-                        ·
-                        <t t-esc="state.zones.length"/>
-                    </span>
-                </div>
-            </div>
+            <!-- HeaderStrip (T2C6) — reads order header from state. -->
+            <HeaderStrip order="state.order"/>
 
             <p class="o_owl_status">
-                Reactive store wired (T2C5). Commit 6 turns this probe
-                into the proper <code>&lt;HeaderStrip/&gt;</code> 5-cell
-                component reading the same store slice.
+                HeaderStrip wired (T2C6). Next: StagePipeline +
+                OrderTitlebar + IllustrativeBanner chrome (T2C7),
+                then the TabBar (T2C8) and the multi-zone line
+                grid (T2C9).
+                <br/>
+                Lines loaded: <strong t-esc="state.lines.length"/>
+                across <strong t-esc="state.zones.length"/> zones.
             </p>
         </div>
     </div>
@@ -148,6 +208,7 @@ const TEMPLATE = xml`
 
 class OrderBuilder extends Component {
     static template = TEMPLATE;
+    static components = { HeaderStrip };
     static props = {
         orderId: { type: String, optional: true },
         orderName: { type: String, optional: true },
@@ -203,19 +264,6 @@ class OrderBuilder extends Component {
 
     async _onRetry() {
         await this._loadOrder();
-    }
-
-    /**
-     * USD currency formatter used by the probe block. Phase 3 polish
-     * moves currency awareness into the payload (multi-currency support)
-     * — for commit 5 the dollar sign is hardcoded and matches the mockup.
-     */
-    _fmtUsd(value) {
-        if (typeof value !== "number") return "—";
-        return "$" + value.toLocaleString(undefined, {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        });
     }
 }
 
