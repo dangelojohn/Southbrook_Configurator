@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ir.config_parameter seeds — OQ2 acked: seed_mode flag introduced in commit 2.
+
+  noupdate="0" so subsequent loads can mutate the value — when canonical
+  #8 data lands and the migration script re-seeds attribute_values + pricelists,
+  it flips this flag to 'canonical' via:
+
+      env['ir.config_parameter'].sudo().set_param(
+          'southbrook.seed_mode', 'canonical')
+
+  Consumers (commit 9 view banner, commit 10 smoke test):
+    - When 'illustrative': the Order Builder header strip shows a discreet
+      "ILLUSTRATIVE SEED" banner; smoke test logs the mode and uses shape
+      assertions (e.g. Tier 3 total between 60-70% of retail) rather than
+      exact-equality assertions on $-values.
+    - When 'canonical': banner hides; smoke test enables exact-equality.
+-->
+<odoo noupdate="0">
+
+  <record id="config_param_seed_mode" model="ir.config_parameter">
+    <field name="key">southbrook.seed_mode</field>
+    <field name="value">illustrative</field>
+  </record>
+
+</odoo>

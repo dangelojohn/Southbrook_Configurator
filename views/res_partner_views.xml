@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--
+    Minimum-to-be-visible view extension for res.partner: surface the
+    channel + tradesperson_tier fields in the Sales tab of the partner
+    form. No other view work in this commit — the Order Builder views
+    arrive in commit 9 per the §10 step 7 plan.
+  -->
+  <record id="view_partner_form_southbrook" model="ir.ui.view">
+    <field name="name">res.partner.form.southbrook</field>
+    <field name="model">res.partner</field>
+    <field name="inherit_id" ref="base.view_partner_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//page[@name='sales_purchases']" position="inside">
+        <group string="Southbrook Channel" name="southbrook_channel">
+          <field name="channel"/>
+          <field name="tradesperson_tier"
+                 invisible="channel != 'tradesperson'"/>
+        </group>
+      </xpath>
+    </field>
+  </record>
+</odoo>
