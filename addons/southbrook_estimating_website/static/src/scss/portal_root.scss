@@ -221,6 +221,163 @@
     }
 }
 
+// ----- T2C7 IllustrativeBanner -------------------------------------
+.o_owl_illus_banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--sb-hl);              // amber highlight
+    border: 1px solid #d4b54a;
+    border-radius: 2px;
+    padding: 8px 14px;
+    margin: 0 0 14px;
+    font-size: 12px;
+    font-family: var(--sb-font-sans);
+    color: var(--sb-ink);
+}
+
+.o_owl_illus_pill {
+    font-family: var(--sb-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    background: #b08820;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+.o_owl_illus_text {
+    flex: 1;
+
+    code {
+        font-family: var(--sb-font-mono);
+        font-size: 11px;
+        background: rgba(0, 0, 0, 0.05);
+        padding: 0 4px;
+        border-radius: 2px;
+    }
+}
+
+// ----- T2C7 OrderTitlebar ------------------------------------------
+.o_owl_titlebar {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 6px 0 14px;
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_titlebar_lhs {
+    flex: 1;
+}
+
+.o_owl_titlebar_crumb {
+    font-size: 11px;
+    color: var(--sb-ink-dim);
+    margin-bottom: 4px;
+}
+
+.o_owl_back_link {
+    color: var(--sb-ink-dim);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--sb-walnut);
+    }
+}
+
+.o_owl_titlebar_heading {
+    font-family: var(--sb-font-display);
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 26px;
+    margin: 0;
+    letter-spacing: -0.015em;
+    color: var(--sb-ink);
+    line-height: 1.15;
+}
+
+.o_owl_titlebar_sub {
+    font-variation-settings: "opsz" 24, "wght" 400;
+    color: var(--sb-ink-dim);
+    margin-left: 6px;
+}
+
+.o_owl_titlebar_ref {
+    font-family: var(--sb-font-mono);
+    font-size: 12px;
+    color: var(--sb-ink-dim);
+    white-space: nowrap;
+}
+
+// ----- T2C7 StagePipeline — 5 chevron stages -----------------------
+.o_owl_stages {
+    display: flex;
+    gap: 0;
+    padding: 4px 0 16px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_stage {
+    position: relative;
+    padding: 6px 18px 6px 22px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-right: none;
+    color: var(--sb-ink-dim);
+    margin-right: -1px;
+    transition: background 0.2s, color 0.2s;
+    clip-path:
+        polygon(
+            0 0,
+            calc(100% - 10px) 0,
+            100% 50%,
+            calc(100% - 10px) 100%,
+            0 100%,
+            10px 50%
+        );
+
+    &:first-child {
+        padding-left: 14px;
+        clip-path:
+            polygon(
+                0 0,
+                calc(100% - 10px) 0,
+                100% 50%,
+                calc(100% - 10px) 100%,
+                0 100%
+            );
+    }
+
+    &:last-child {
+        padding-right: 14px;
+        border-right: 1px solid var(--sb-rule);
+        clip-path:
+            polygon(
+                0 0,
+                100% 0,
+                100% 100%,
+                0 100%,
+                10px 50%
+            );
+    }
+}
+
+.o_owl_stage_done {
+    background: var(--sb-sky-l);
+    color: var(--sb-ink);
+}
+
+.o_owl_stage_current {
+    background: var(--sb-walnut);
+    color: var(--sb-linen);
+    font-weight: 600;
+}
+
 // ----- T2C6 HeaderStrip — 5-cell row (mockup §HeaderStrip) ---------
 //
 // Grid template proportions match the mockup: customer cell is

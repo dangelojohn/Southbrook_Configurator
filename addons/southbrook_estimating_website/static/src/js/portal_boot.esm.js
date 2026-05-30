@@ -75,6 +75,143 @@ async function rpcJsonCall(url, params = {}) {
 }
 
 // ----------------------------------------------------------------------
+// IllustrativeBanner — T2C7.
+//
+// The yellow strip that marks demo / seed numbers as not-production
+// data (per OQ2 acked + commit-9 ask in southbrook_estimating Build
+// Spec §9.3). Renders only when props.show is truthy.
+//
+// Phase 3 polish reads ir.config_parameter southbrook.seed_mode
+// (already declared by southbrook_estimating data/config_parameters.xml)
+// and toggles render. T2C7 hardcodes show=true so the banner is
+// visible during portal scaffold review.
+// ----------------------------------------------------------------------
+
+class IllustrativeBanner extends Component {
+    static template = xml`
+        <div t-if="props.show" class="o_owl_illus_banner">
+            <span class="o_owl_illus_pill">ILLUSTRATIVE SEED</span>
+            <span class="o_owl_illus_text">
+                Demo numbers — not production data. See
+                <code>PUNCHLIST.md</code> OQ2 + Build Spec §9.3.
+            </span>
+        </div>
+    `;
+    static props = {
+        show: { type: Boolean, optional: true },
+    };
+}
+
+// ----------------------------------------------------------------------
+// OrderTitlebar — T2C7.
+//
+// Two-column row above the StagePipeline + HeaderStrip:
+//   • Left:  ← Back link + h1 title (partner name + order purpose).
+//   • Right: SO ref · version · state — mono, dim. The "reference"
+//            block in the mockup that anchors the order's identity.
+//
+// The back link target is "/my/southbrook/order-builder" (the
+// no-id form which Phase 3 commit 4 turns into a dealer-orders
+// list).
+// ----------------------------------------------------------------------
+
+class OrderTitlebar extends Component {
+    static template = xml`
+        <div class="o_owl_titlebar">
+            <div class="o_owl_titlebar_lhs">
+                <div class="o_owl_titlebar_crumb">
+                    <a href="/my/southbrook/order-builder"
+                       class="o_owl_back_link">← Back to Order Builder</a>
+                </div>
+                <h1 class="o_owl_titlebar_heading">
+                    <t t-esc="props.order.partner_name"/>
+                    <span class="o_owl_titlebar_sub">
+                        · Kitchen Order
+                    </span>
+                </h1>
+            </div>
+            <div class="o_owl_titlebar_ref">
+                <t t-esc="props.order.name"/>
+                <t t-if="props.order.version">
+                    · v<t t-esc="props.order.version"/>
+                </t>
+                <t t-if="props.order.state">
+                    · <t t-esc="_stateLabel(props.order.state)"/>
+                </t>
+            </div>
+        </div>
+    `;
+    static props = {
+        order: Object,
+    };
+
+    _stateLabel(state) {
+        const labels = {
+            draft:  "Draft",
+            sent:   "Estimating",
+            sale:   "Confirmed",
+            done:   "In Production",
+            cancel: "Cancelled",
+        };
+        return labels[state] || state;
+    }
+}
+
+// ----------------------------------------------------------------------
+// StagePipeline — T2C7.
+//
+// 5 stages with clip-path arrow shapes, mapping order.state to the
+// "current" position. Stages BEFORE current render as .done; the
+// current stage renders as .current (walnut bg, linen text); stages
+// AFTER current render as default (paper bg, dim text).
+//
+// Stage list lifts from Build Spec §2.2:
+//   Draft → Estimating → Approval → Confirmed → In Production
+//
+// State → stage index mapping is heuristic until Phase 3 wires the
+// real Southbrook stage field (which adds Approval as a distinct
+// state). Today:
+//   draft  → 0 Draft
+//   sent   → 1 Estimating
+//   sale   → 3 Confirmed (skips Approval — Phase 3 closes the gap)
+//   done   → 4 In Production
+//   cancel → -1 (renders all stages dim)
+// ----------------------------------------------------------------------
+
+class StagePipeline extends Component {
+    static template = xml`
+        <div class="o_owl_stages">
+            <t t-foreach="STAGES" t-as="stage" t-key="stage_index">
+                <div class="o_owl_stage"
+                     t-att-class="{
+                         'o_owl_stage_done':    stage_index &lt; currentIdx,
+                         'o_owl_stage_current': stage_index === currentIdx,
+                     }">
+                    <t t-esc="stage"/>
+                </div>
+            </t>
+        </div>
+    `;
+    static props = {
+        order: Object,
+    };
+
+    STAGES = ["Draft", "Estimating", "Approval", "Confirmed", "In Production"];
+
+    get currentIdx() {
+        const map = {
+            draft: 0,
+            sent: 1,
+            sale: 3,
+            done: 4,
+            cancel: -1,
+        };
+        const idx = map[this.props.order?.state];
+        return idx === undefined ? 0 : idx;
+    }
+}
+
+// ----------------------------------------------------------------------
 // HeaderStrip — T2C6.
 //
 // The 5-cell row at the top of the OrderBuilder (per mockup §HeaderStrip):
@@ -175,29 +312,17 @@ const TEMPLATE = xml`
 
         <!-- Loaded -->
         <div t-else="" class="o_owl_loaded">
-            <h3 class="o_owl_heading">
-                <t t-esc="state.order.name"/>
-                <span class="o_owl_partner_inline">
-                    · <t t-esc="state.order.partner_name"/>
-                    <span t-if="state.order.via" class="o_owl_via">
-                        (<t t-esc="state.order.via"/>)
-                    </span>
-                </span>
-            </h3>
-
-            <div class="o_owl_channel_badge"
-                 t-att-class="'o_owl_channel_' + state.order.channel_css">
-                <t t-esc="state.order.channel_label"/>
-            </div>
+            <!-- Chrome (T2C7) — banner + titlebar + stages. -->
+            <IllustrativeBanner show="true"/>
+            <OrderTitlebar order="state.order"/>
+            <StagePipeline order="state.order"/>
 
             <!-- HeaderStrip (T2C6) — reads order header from state. -->
             <HeaderStrip order="state.order"/>
 
             <p class="o_owl_status">
-                HeaderStrip wired (T2C6). Next: StagePipeline +
-                OrderTitlebar + IllustrativeBanner chrome (T2C7),
-                then the TabBar (T2C8) and the multi-zone line
-                grid (T2C9).
+                Chrome + HeaderStrip wired (T2C6 + T2C7). Next: TabBar
+                (T2C8) and the multi-zone line grid (T2C9).
                 <br/>
                 Lines loaded: <strong t-esc="state.lines.length"/>
                 across <strong t-esc="state.zones.length"/> zones.
@@ -208,7 +333,12 @@ const TEMPLATE = xml`
 
 class OrderBuilder extends Component {
     static template = TEMPLATE;
-    static components = { HeaderStrip };
+    static components = {
+        IllustrativeBanner,
+        OrderTitlebar,
+        StagePipeline,
+        HeaderStrip,
+    };
     static props = {
         orderId: { type: String, optional: true },
         orderName: { type: String, optional: true },
