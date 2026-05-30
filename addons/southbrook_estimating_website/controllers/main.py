@@ -366,6 +366,78 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         # the OWL store has a stable key to read.
         lead_time_days = 0
 
+        # T2C11 — BoM rollup across the order's SB cabinets. Computes
+        # panel + hardware + edge-banding totals by calling Phase-1
+        # routine #1 (mrp.bom._compute_panel_dimensions) per line and
+        # summing. Same single-source-of-truth pattern as the 3D
+        # viewport (Track 1) and the kitchen-run view (T1C6) so any
+        # change to BoX_TH / DOOR_TH / etc. propagates everywhere.
+        bom_rollup = {
+            "cabinet_count": 0,
+            "panels": {
+                "side": 0,
+                "top": 0,
+                "bottom": 0,
+                "back": 0,
+                "shelf": 0,
+                "door": 0,
+                "drawer_front": 0,
+            },
+            "hardware": {
+                "hinge_pair_count": 0,
+                "handle_count": 0,
+                "drawer_slide_pair_count": 0,
+            },
+            "edge_banding_mm": 0,
+        }
+        Bom = request.env["mrp.bom"]
+        for line in self.order_line:
+            tmpl = (
+                line.product_id.product_tmpl_id
+                if line.product_id and line.product_id.product_tmpl_id
+                else None
+            )
+            sku = tmpl.default_code if tmpl else None
+            sku_row = (
+                request.env["product.config.session"]._SKU_DEFAULTS.get(sku)
+                if sku else None
+            )
+            if not sku_row:
+                continue
+            fam, doors, drawers, w, h, d = sku_row
+            cut = Bom._compute_panel_dimensions(
+                width_mm=w, height_mm=h, depth_mm=d,
+                family=fam, door_count=doors, drawer_count=drawers,
+                finished_sides="none",
+            )
+            qty = int(line.product_uom_qty or 0)
+            if qty <= 0:
+                continue
+
+            bom_rollup["cabinet_count"] += qty
+            # Each cabinet: 2 sides + 1 top + 1 bottom + 1 back.
+            # Worktop / accessory short-circuit: only 1 panel, no carcass.
+            if fam in ("worktop", "accessory"):
+                bom_rollup["panels"]["side"] += 1 * qty
+            else:
+                bom_rollup["panels"]["side"] += 2 * qty
+                bom_rollup["panels"]["top"] += 1 * qty
+                bom_rollup["panels"]["bottom"] += 1 * qty
+                bom_rollup["panels"]["back"] += 1 * qty
+            bom_rollup["panels"]["shelf"] += cut.get("shelf_count", 0) * qty
+            bom_rollup["panels"]["door"] += cut.get("door_count", 0) * qty
+            bom_rollup["panels"]["drawer_front"] += cut.get("drawer_count", 0) * qty
+            bom_rollup["hardware"]["hinge_pair_count"] += cut.get("hinge_pair_count", 0) * qty
+            bom_rollup["hardware"]["handle_count"] += cut.get("handle_count", 0) * qty
+            bom_rollup["hardware"]["drawer_slide_pair_count"] += cut.get("drawer_slide_pair_count", 0) * qty
+            bom_rollup["edge_banding_mm"] += cut.get("edge_banding_length_mm", 0) * qty
+
+        # T2C11 — validation issue list. Phase 1 ships an empty list;
+        # Phase 3 polish wires the OCA rule engine output here (per-
+        # line hard/soft issues). Keeping the key in place now so
+        # the OWL ValidationStrip doesn't need to widen the contract.
+        validation = []
+
         return {
             "order": {
                 "id":             order.id,
@@ -390,4 +462,6 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             },
             "lines": lines,
             "zones": zones,
+            "bom_rollup": bom_rollup,
+            "validation": validation,
         }

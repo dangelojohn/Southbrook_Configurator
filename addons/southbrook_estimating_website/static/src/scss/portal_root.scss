@@ -378,6 +378,171 @@
     font-weight: 600;
 }
 
+// ----- T2C11 BoMPreview --------------------------------------------
+.o_owl_bom {
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_bom_summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: 2px;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+}
+
+.o_owl_bom_summary_cell {
+    border-right: 1px solid var(--sb-rule);
+    padding-right: 16px;
+
+    &:last-child {
+        border-right: none;
+        padding-right: 0;
+    }
+}
+
+.o_owl_bom_label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sb-ink-dim);
+    margin-bottom: 4px;
+}
+
+.o_owl_bom_value {
+    font-size: 22px;
+    color: var(--sb-ink);
+    font-variation-settings: "opsz" 28, "wght" 500;
+
+    &.mono {
+        font-family: var(--sb-font-mono);
+        font-variation-settings: normal;
+    }
+}
+
+.o_owl_bom_section {
+    font-family: var(--sb-font-display);
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 13px;
+    color: var(--sb-walnut);
+    margin: 14px 0 6px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.o_owl_bom_table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 14px;
+    font-size: 12px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: 2px;
+    overflow: hidden;
+
+    thead {
+        background: #faf4e8;
+    }
+    th, td {
+        text-align: left;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--sb-rule);
+    }
+    th {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--sb-ink-dim);
+        font-weight: 600;
+    }
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .mono {
+        font-family: var(--sb-font-mono);
+    }
+}
+
+.o_owl_bom_foot {
+    font-size: 11px;
+    color: var(--sb-ink-dim);
+    margin-top: 4px;
+    font-style: italic;
+}
+
+// ----- T2C11 ValidationStrip ---------------------------------------
+.o_owl_validation {
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_validation_ok {
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-left: 4px solid var(--sb-ok);
+    border-radius: 2px;
+    padding: 16px 20px;
+
+    strong {
+        color: var(--sb-ok);
+        font-size: 14px;
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .o_owl_validation_foot {
+        font-size: 12px;
+        color: var(--sb-ink-dim);
+        margin: 0;
+    }
+}
+
+.o_owl_validation_list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.o_owl_validation_item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-left-width: 4px;
+    border-radius: 2px;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.o_owl_validation_hard { border-left-color: var(--sb-alert); }
+.o_owl_validation_soft { border-left-color: var(--sb-warn); }
+
+.o_owl_validation_sev {
+    flex: 0 0 60px;
+    font-family: var(--sb-font-mono);
+    font-size: 10px;
+    color: var(--sb-ink);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+
+.o_owl_validation_msg {
+    flex: 1;
+    color: var(--sb-ink);
+}
+
+.o_owl_validation_ref {
+    flex: 0 0 auto;
+    font-family: var(--sb-font-mono);
+    font-size: 11px;
+    color: var(--sb-ink-dim);
+}
+
 // ----- T2C10 ConfigDrawer ------------------------------------------
 .o_owl_drawer {
     // grid-column: 1 / -1 set inline so it spans all 8 grid columns

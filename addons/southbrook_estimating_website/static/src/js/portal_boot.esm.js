@@ -212,6 +212,168 @@ class StagePipeline extends Component {
 }
 
 // ----------------------------------------------------------------------
+// BoMPreview — T2C11.
+//
+// Read-only panel showing the order's BoM rollup: total cabinets,
+// per-panel-type counts (sides / top / bottom / back / shelf / door /
+// drawer_front), hardware counts (hinges / handles / drawer slides),
+// and total edge-banding length.
+//
+// Reads props.rollup (sourced from state.order... no — actually from
+// the top-level payload's bom_rollup). T2C11 OrderBuilder reads
+// state.bom_rollup which we add to the store in this commit.
+// ----------------------------------------------------------------------
+
+class BoMPreview extends Component {
+    static template = xml`
+        <div class="o_owl_bom">
+            <div class="o_owl_bom_summary">
+                <div class="o_owl_bom_summary_cell">
+                    <div class="o_owl_bom_label">Cabinets</div>
+                    <div class="o_owl_bom_value mono"
+                         t-esc="props.rollup.cabinet_count"/>
+                </div>
+                <div class="o_owl_bom_summary_cell">
+                    <div class="o_owl_bom_label">Total Panels</div>
+                    <div class="o_owl_bom_value mono"
+                         t-esc="_totalPanels()"/>
+                </div>
+                <div class="o_owl_bom_summary_cell">
+                    <div class="o_owl_bom_label">Edge Banding</div>
+                    <div class="o_owl_bom_value mono">
+                        <t t-esc="_fmtMeters(props.rollup.edge_banding_mm)"/>
+                        m
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="o_owl_bom_section">Panel Cut List</h4>
+            <table class="o_owl_bom_table">
+                <thead>
+                    <tr>
+                        <th>Panel</th>
+                        <th class="o_owl_th_right">Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-foreach="_panelRows()" t-as="row" t-key="row.key">
+                        <tr t-if="row.qty > 0">
+                            <td t-esc="row.label"/>
+                            <td class="mono o_owl_th_right" t-esc="row.qty"/>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+
+            <h4 class="o_owl_bom_section">Hardware</h4>
+            <table class="o_owl_bom_table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th class="o_owl_th_right">Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Hinge pairs</td>
+                        <td class="mono o_owl_th_right"
+                            t-esc="props.rollup.hardware.hinge_pair_count"/>
+                    </tr>
+                    <tr>
+                        <td>Handles</td>
+                        <td class="mono o_owl_th_right"
+                            t-esc="props.rollup.hardware.handle_count"/>
+                    </tr>
+                    <tr>
+                        <td>Drawer slide pairs</td>
+                        <td class="mono o_owl_th_right"
+                            t-esc="props.rollup.hardware.drawer_slide_pair_count"/>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p class="o_owl_bom_foot">
+                Phase 3 polish adds per-line BoM breakdown (collapsible),
+                cut diagrams, and the Accucutt nest JSON export.
+            </p>
+        </div>
+    `;
+    static props = {
+        rollup: Object,
+    };
+
+    _totalPanels() {
+        const p = this.props.rollup.panels || {};
+        return Object.values(p).reduce((a, b) => a + b, 0);
+    }
+
+    _panelRows() {
+        const p = this.props.rollup.panels || {};
+        return [
+            { key: "side",         label: "Side panels",          qty: p.side || 0 },
+            { key: "top",          label: "Top panels",           qty: p.top || 0 },
+            { key: "bottom",       label: "Bottom panels",        qty: p.bottom || 0 },
+            { key: "back",         label: "Back panels",          qty: p.back || 0 },
+            { key: "shelf",        label: "Shelves",              qty: p.shelf || 0 },
+            { key: "door",         label: "Doors",                qty: p.door || 0 },
+            { key: "drawer_front", label: "Drawer fronts",        qty: p.drawer_front || 0 },
+        ];
+    }
+
+    _fmtMeters(mm) {
+        if (!mm) return "0";
+        return (mm / 1000).toFixed(2);
+    }
+}
+
+// ----------------------------------------------------------------------
+// ValidationStrip — T2C11.
+//
+// Lists hard-rule + soft-suggestion issues from the rule engine.
+// Phase 1 ships an empty-state card; Phase 3 polish backports the
+// real rule output (the OCA validate_configuration runner already
+// produces this shape — needs wiring into the order-level payload).
+// ----------------------------------------------------------------------
+
+class ValidationStrip extends Component {
+    static template = xml`
+        <div class="o_owl_validation">
+            <t t-if="props.issues.length === 0">
+                <div class="o_owl_validation_ok">
+                    <strong>✓ No rule issues.</strong>
+                    <p class="o_owl_validation_foot">
+                        Phase 3 polish wires the OCA rule engine output
+                        per line. Today this panel shows the empty-state
+                        whenever the rules pass (or aren't run).
+                    </p>
+                </div>
+            </t>
+            <t t-else="">
+                <ul class="o_owl_validation_list">
+                    <t t-foreach="props.issues" t-as="issue" t-key="issue_index">
+                        <li class="o_owl_validation_item"
+                            t-att-class="'o_owl_validation_' + issue.severity">
+                            <span class="o_owl_validation_sev mono">
+                                <t t-esc="issue.severity.toUpperCase()"/>
+                            </span>
+                            <span class="o_owl_validation_msg"
+                                  t-esc="issue.message"/>
+                            <span t-if="issue.line_id"
+                                  class="o_owl_validation_ref mono">
+                                Line <t t-esc="issue.line_id"/>
+                            </span>
+                        </li>
+                    </t>
+                </ul>
+            </t>
+        </div>
+    `;
+    static props = {
+        issues: Array,
+    };
+}
+
+// ----------------------------------------------------------------------
 // ConfigDrawer — T2C10.
 //
 // Inline editable drawer that expands below the selected OrderLine,
@@ -704,19 +866,11 @@ const TEMPLATE = xml`
             </div>
             <div t-elif="state.ui.current_tab === 'bom'"
                  class="o_owl_tab_panel o_owl_panel_bom">
-                <p class="o_owl_panel_placeholder">
-                    <strong>BoM Preview panel</strong> — T2C11 wires the
-                    panel cut list + hardware summary derived from
-                    each line's effective BoM.
-                </p>
+                <BoMPreview rollup="state.bom_rollup"/>
             </div>
             <div t-elif="state.ui.current_tab === 'validation'"
                  class="o_owl_tab_panel o_owl_panel_validation">
-                <p class="o_owl_panel_placeholder">
-                    <strong>Validation panel</strong> — T2C11 wires the
-                    hard-rule + soft-suggestion strip
-                    (e.g. "Width 21″ should be 1-door").
-                </p>
+                <ValidationStrip issues="state.validation"/>
             </div>
             <div t-elif="state.ui.current_tab === 'history'"
                  class="o_owl_tab_panel o_owl_panel_history">
@@ -752,6 +906,8 @@ class OrderBuilder extends Component {
         HeaderStrip,
         TabBar,
         ZoneGroup,
+        BoMPreview,
+        ValidationStrip,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -765,6 +921,19 @@ class OrderBuilder extends Component {
             order: null,
             lines: [],
             zones: [],
+            // T2C11 — BoM rollup + validation issues. Both populated
+            // by /api/order/<id>. Default rollup matches the empty
+            // shape so the BoMPreview component never sees undefined
+            // even before the first fetch.
+            bom_rollup: {
+                cabinet_count: 0,
+                panels: { side: 0, top: 0, bottom: 0, back: 0,
+                          shelf: 0, door: 0, drawer_front: 0 },
+                hardware: { hinge_pair_count: 0, handle_count: 0,
+                            drawer_slide_pair_count: 0 },
+                edge_banding_mm: 0,
+            },
+            validation: [],
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
@@ -799,6 +968,12 @@ class OrderBuilder extends Component {
             this.state.order = payload.order;
             this.state.lines = payload.lines || [];
             this.state.zones = payload.zones || [];
+            // T2C11 — keep the default shape when the payload omits
+            // the key (forward-compat with older backend versions).
+            if (payload.bom_rollup) {
+                this.state.bom_rollup = payload.bom_rollup;
+            }
+            this.state.validation = payload.validation || [];
         } catch (e) {
             this.state.error = e?.message || String(e);
         } finally {
@@ -836,12 +1011,13 @@ class OrderBuilder extends Component {
             {
                 code: "bom",
                 label: "BoM Preview",
-                count: this.state.lines.length * 10,  // Phase-1 approximation
+                // T2C11 — total panels + hardware items rolled up.
+                count: this._bomBadgeCount(),
             },
             {
                 code: "validation",
                 label: "Validation",
-                count: 0,
+                count: this.state.validation.length,
             },
             {
                 code: "history",
@@ -893,6 +1069,19 @@ class OrderBuilder extends Component {
     _onLineSaved = async () => {
         await this._loadOrder();
     };
+
+    // T2C11 — total BoM items used as the BoM tab badge count.
+    _bomBadgeCount() {
+        const r = this.state.bom_rollup || {};
+        const p = r.panels || {};
+        const h = r.hardware || {};
+        return (
+            (p.side || 0) + (p.top || 0) + (p.bottom || 0) + (p.back || 0)
+            + (p.shelf || 0) + (p.door || 0) + (p.drawer_front || 0)
+            + (h.hinge_pair_count || 0) + (h.handle_count || 0)
+            + (h.drawer_slide_pair_count || 0)
+        );
+    }
 }
 
 // ----------------------------------------------------------------------
