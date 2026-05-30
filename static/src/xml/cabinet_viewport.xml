@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_estimating.CabinetViewport">
+        <div class="o_cabinet_viewport">
+            <div class="o_cv_toolbar">
+                <span class="o_cv_title">3D Preview</span>
+                <button class="btn btn-sm btn-outline-secondary o_cv_btn"
+                        t-on-click="onToggleMode"
+                        t-att-disabled="!state.threeLoaded">
+                    <t t-if="state.mode === 'solid'">Blueline</t>
+                    <t t-else="">Solid</t>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary o_cv_btn"
+                        title="Refresh"
+                        t-on-click="onRefresh"
+                        t-att-disabled="!state.threeLoaded">↻</button>
+                <span class="o_cv_status flex-grow-1" t-if="state.loading">
+                    Loading…
+                </span>
+                <span class="o_cv_renderedat text-muted flex-grow-1"
+                      t-elif="state.renderedAt"
+                      t-esc="state.renderedAt"/>
+                <span class="o_cv_error text-danger"
+                      t-if="state.error"
+                      t-esc="state.error"/>
+            </div>
+            <div class="o_cv_stage">
+                <canvas t-ref="canvas"
+                        class="o_cv_canvas"
+                        t-att-class="{ 'd-none': !state.threeLoaded }"/>
+                <div t-if="!state.threeLoaded" class="o_cv_placeholder">
+                    <div class="o_cv_placeholder_box">
+                        <strong>3D viewport — Three.js bundle not loaded</strong>
+                        <p>To enable live 3D cabinet preview, drop the
+                            Three.js library files into:</p>
+                        <code>addons/southbrook_estimating/static/lib/three/</code>
+                        <p>Required files (r160 / 0.160.x):</p>
+                        <ul>
+                            <li><code>three.min.js</code> (~600 KB)</li>
+                            <li><code>OrbitControls.js</code> (~25 KB)</li>
+                            <li><code>LICENSE.txt</code> (MIT)</li>
+                        </ul>
+                        <p>Then add the two JS files to the
+                            <code>web.assets_backend</code> entry in
+                            <code>__manifest__.py</code>
+                            (above <code>cabinet_viewport.esm.js</code>),
+                            restart the Odoo workers, and reload this
+                            wizard.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>

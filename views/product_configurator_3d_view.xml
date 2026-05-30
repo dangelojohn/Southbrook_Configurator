@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  3D Cabinet Viewport — Track 1 of Phase 2 charter amendment 1 (2026-05-30).
+
+  Inherits product_configurator.product_configurator_form to add the OWL
+  cabinet_viewport widget at the bottom of the wizard sheet, visible once
+  the user has progressed past the template-select step.
+
+  The widget mounts a Three.js scene that reads from
+  product.config.session.get_3d_payload() — see
+  models/product_config_line.py and static/src/js/cabinet_viewport.esm.js.
+
+  Placement note: Phase 1 puts the viewport BELOW the attribute pickers
+  so the wizard form's existing layout (left: attribute pickers, right:
+  weight/price) stays intact. Phase 3 polish will move the viewport to
+  the right pane in a Prodboard-style 58/394/flex three-pane layout.
+-->
+<odoo>
+
+    <record id="view_product_configurator_form_southbrook_3d"
+            model="ir.ui.view">
+        <field name="name">product.configurator.form.southbrook.3d</field>
+        <field name="model">product.configurator</field>
+        <field name="inherit_id"
+               ref="product_configurator.product_configurator_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Show the viewport once we have a session (i.e., after
+                 template selection). Hidden during the 'select' step. -->
+            <xpath expr="//sheet/group[@col='3']" position="after">
+                <separator string="3D Preview"
+                           invisible="state == 'select' or not config_session_id"/>
+                <div invisible="state == 'select' or not config_session_id"
+                     style="height: 400px; margin: 0 -16px 8px;">
+                    <widget name="cabinet_viewport"/>
+                </div>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
