@@ -31,7 +31,12 @@ class TestOrderBuilderViews(SouthbrookTestCase):
     def test_01_sale_order_form_inherit_installs(self):
         v = self._ref("view_order_form_southbrook")
         self.assertEqual(v.model, "sale.order")
-        self.assertEqual(v.inherit_id.xml_id, "sale.view_order_form")
+        # NF24: ir.ui.view.xml_id was direct-attribute in <=18.0; in
+        # Odoo 19 use get_external_id() which returns a dict.
+        inherit_xml_id = v.inherit_id.get_external_id().get(
+            v.inherit_id.id, "",
+        )
+        self.assertEqual(inherit_xml_id, "sale.view_order_form")
 
     def test_02_res_users_form_inherit_installs(self):
         v = self._ref("view_users_form_southbrook")
@@ -51,10 +56,17 @@ class TestOrderBuilderViews(SouthbrookTestCase):
         # standard Odoo. If a future contributor reparents this menu
         # (e.g. to a new top-level Southbrook menu), this assertion
         # forces an explicit decision.
+        #
+        # NF24: Odoo 19 ir.ui.menu no longer exposes `.xml_id` as a
+        # direct attribute. Use get_external_id() which returns a dict
+        # {record_id: 'module.xml_id'}; we look up our parent's id.
+        parent_external_ids = m.parent_id.get_external_id()
+        parent_xml_id = parent_external_ids.get(m.parent_id.id, "")
         self.assertEqual(
-            m.parent_id.xml_id,
+            parent_xml_id,
             "sale.sale_order_menu",
-            "menu_southbrook_order_builder must live under Sales menu",
+            f"menu_southbrook_order_builder must live under Sales menu "
+            f"(got parent xml_id: {parent_xml_id!r})",
         )
 
     # ------------------------------------------------------------------

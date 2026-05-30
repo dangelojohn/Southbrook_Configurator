@@ -47,9 +47,18 @@ class TestQWebReports(SouthbrookTestCase):
         })
 
     def _render(self, action_xml_id, res_ids):
-        """Render a report to HTML (faster than PDF; doesn't need wkhtmltopdf)."""
-        report = self.env.ref(f"southbrook_estimating.{action_xml_id}")
-        content, _content_type = report._render_qweb_html(res_ids)
+        """Render a report to HTML (faster than PDF; doesn't need wkhtmltopdf).
+
+        NF24 (caught at live test run 2026-05-30): Odoo 19 changed the
+        IrActionsReport._render_qweb_html signature to take report_ref as
+        the first positional arg. The model method now looks the report
+        up internally via _get_report(report_ref) rather than expecting
+        the caller to have resolved the record.
+        """
+        report_ref = f"southbrook_estimating.{action_xml_id}"
+        content, _content_type = self.env["ir.actions.report"]._render_qweb_html(
+            report_ref, res_ids
+        )
         return content.decode() if isinstance(content, bytes) else content
 
     # ------------------------------------------------------------------
