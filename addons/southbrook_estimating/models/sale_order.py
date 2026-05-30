@@ -107,3 +107,60 @@ class SaleOrder(models.Model):
         for order in self:
             Analytics.capture(order)
         return result
+
+    # ------------------------------------------------------------------
+    # NF6 — Image Floor iterative-design pattern (Case Study section 3.A)
+    # ------------------------------------------------------------------
+    # parent_order_id + version + action_duplicate_as_draft give reps
+    # the "Duplicate as Draft" affordance that Image Floor's 3-visit flow
+    # needs: same kitchen revised 3 times, each saved as a new draft with
+    # the prior version linked. Free side-effect: full revision history
+    # walkable via parent_order_id chain.
+    #
+    # Schema only. The view button + action wiring lands in
+    # views/sale_order_views.xml.
+    parent_order_id = fields.Many2one(
+        "sale.order",
+        string="Parent Order (Duplicated From)",
+        ondelete="set null",
+        copy=False,
+        help=(
+            "When this order was created via 'Duplicate as Draft', this "
+            "Many2one points at the prior version. NF6 — Image Floor "
+            "iterative-design pattern."
+        ),
+    )
+    version = fields.Integer(
+        string="Version",
+        default=1,
+        copy=False,
+        help=(
+            "Auto-incremented by action_duplicate_as_draft. The Image "
+            "Floor flow typically reaches v3 before final confirmation."
+        ),
+    )
+
+    def action_duplicate_as_draft(self):
+        """Create a new draft sale.order copied from this one (NF6).
+
+        Copies all order lines (preserving product.config.session refs
+        where applicable), links parent_order_id, increments version,
+        stays in draft state ('draft' / 'sent'). Safe to chain — v3
+        duplicates v2 which duplicates v1.
+
+        Returns the action descriptor that opens the new order's form.
+        """
+        self.ensure_one()
+        new_order = self.copy({
+            "parent_order_id": self.id,
+            "version": self.version + 1,
+            "state": "draft",
+        })
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "sale.order",
+            "res_id": new_order.id,
+            "view_mode": "form",
+            "target": "current",
+            "name": f"{new_order.name} (v{new_order.version})",
+        }

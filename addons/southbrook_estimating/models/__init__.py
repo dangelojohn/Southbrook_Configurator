@@ -7,9 +7,11 @@
 # Commit 5: product_config_line override stub + mrp_bom partial lead_time_extra rollup.
 # Commit 6: southbrook_order_analytics.
 from . import res_partner
+from . import res_users
 from . import product_attribute_value
 from . import product_pricelist
 from . import sale_order
+from . import sale_order_line
 from . import product_config_line
 from . import mrp_bom
 from . import southbrook_order_analytics

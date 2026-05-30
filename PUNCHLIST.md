@@ -595,6 +595,26 @@ bottom panel by toe-kick height; no separate component). Applies to:
 **base, sink_base, tall, vanity** families. Wall and accessory families
 have no toe-kick.
 
+**Toe-kick interpretation (clarified at commit 9 review):** `height_mm`
+is the **total cabinet height including any integrated toe-kick**. For a
+nominal 30" base cabinet, `height_mm=762` already includes the 102mm
+toe-kick section. Side panels are cut at the full height (e.g. 762mm),
+which is 102mm of toe-kick + 660mm of cabinet body; the bottom panel is
+positioned 102mm above the floor of the sides at assembly time.
+
+The `TOEKICK_H` constant + `TOEKICK_FAMILIES` set are therefore
+**informational only** at the panel-cut level — they're used by
+assembly drawings and shop-floor work-orders downstream, not by
+`_compute_panel_dimensions`. If #8 specifies toe-kick as additional to
+nominal cabinet height, swap the formula to:
+
+```python
+side_L = (height_mm + (TOEKICK_H if family in TOEKICK_FAMILIES else 0),
+          depth_mm, BOX_TH)
+```
+
+and update this NF14 entry.
+
 ### Edge banding (Phase-1 scalar; Phase-4 per-edge)
 
 For Phase 1, `edge_banding_length_mm` is computed as a scalar perimeter

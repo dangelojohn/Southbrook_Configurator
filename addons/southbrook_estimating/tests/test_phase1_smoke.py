@@ -52,8 +52,17 @@ class TestPhase1Smoke(TransactionCase):
     # ------------------------------------------------------------------
     # Step 2 — Open Sales > Order Builder, create order, customer=Richwood
     # ------------------------------------------------------------------
+    # PARTIALLY PROMOTED at commit 9: asserts the Order Builder action +
+    # menu exist and resolve to a sale.order form action that filters
+    # to draft/sent orders (the rep's open work). Full demo-partner
+    # exercise waits for commit 11.
     def test_step_02_order_builder_form_creates_order(self):
-        self.skipTest("waiting for commit 9 (Order Builder view) + commit 11")
+        action = self.env.ref("southbrook_estimating.action_order_builder")
+        self.assertEqual(action.res_model, "sale.order")
+        self.assertIn("draft", str(action.domain))
+        menu = self.env.ref("southbrook_estimating.menu_southbrook_order_builder")
+        self.assertEqual(menu.action.id, action.id)
+        # NF6 button + Q21 zone column are asserted in test_order_builder_views.
 
     # ------------------------------------------------------------------
     # Step 3 — Configure 9 lines (base 1dr 18, base 2dr 24, drawer 18,

@@ -46,6 +46,9 @@
         "data/product_templates.xml",
         # Commit 5+7 — 4 rule triggers + 65 per-template config.line records
         "data/config_rules.xml",
+        # Commit 9 — Order Builder views, user-prefs view, menu
+        "views/sale_order_views.xml",
+        "views/res_users_views.xml",
     ],
     "installable": True,
     "application": True,
