@@ -97,7 +97,88 @@ The Phase-2 OWL portal app must:
    ("There must not be two configurators"), this is the same app
    in two visual configurations, not two apps.
 
-## Out of scope for Phase 2
+## Amendment 1 (2026-05-30) — Three.js viewport in backend NOW (Track 1)
+
+Original charter put Three.js + the 18 parametric element types in Phase 3.
+After a second gate review, John elected reading **A**: the OWL portal
+work (Track 2) proceeds as charted, AND a Prodboard-class 3D viewport
+lands in the **backend** Order Builder form view immediately as a
+parallel Track 1.
+
+Two tracks now run in parallel:
+
+| Track | Surface | Deliverable | Status |
+|---|---|---|---|
+| 1 | Backend (sale.order form) | Three.js viewport pane: parametric BufferGeometry from selected line's W/H/D + attrs, solid↔blueline toggle, dimension overlay, ACES Filmic + sRGB. | NEW — open questions below. |
+| 2 | Portal (`/my/southbrook/order-builder/<id>`) | 14-step OWL component-tree app per `docs/southbrook_owl_mockup.html`. 2D-first; the 3D layer back-ports from Track 1 to portal as Phase 2.5. | As charted — 4 open questions still open. |
+
+Discipline for Track 1:
+
+- Three.js viewport mounts INTO the existing backend Order Builder form
+  view (an OWL component embedded via `<field widget="..."/>` or as a
+  notebook tab — choice gated on open question T1Q2 below). The
+  Phase-1 backend form survives as escape hatch UI; the viewport adds
+  to it, doesn't replace it.
+- Parametric carcass per `PRODBOARD_MANIFEST.md` §5: 18 element types
+  emit their own `BufferGeometry`. Phase-1's `mrp.bom._compute_panel_dimensions`
+  (the 7-routine register Item #1) IS the geometry source — the same
+  named constants (BOX_TH, BACK_TH, DOOR_TH, etc.) drive the mesh.
+  Don't fork.
+- Solid↔blueline toggle as per manifest §3: blueline draws auto-dimensioned
+  isometric lines derived programmatically from the bounding box.
+- ACES Filmic tone mapping, sRGB output, KTX2/Basis Universal textures,
+  MeshBVH for picking, scene-diff updater per manifest §10. No
+  re-mount on prop change.
+
+## Open questions for Track 1 (backend 3D)
+
+These need answers before commit 1 of Track 1 lands. (Track 2's own
+four open questions are unchanged from the original charter.)
+
+- **T1Q1 — Three.js delivery.** Vendor into `static/lib/` (offline, repo
+  size +~600KB minified), or load from CDN (zero repo bloat, but offline
+  install / air-gap deploys break). **Recommended:** vendor — Phase 1
+  already cares about clean offline installs (NF1 mako lesson).
+- **T1Q2 — Mount point.** Three.js viewport as (a) a new notebook tab
+  on the sale.order form ("3D Preview" alongside BoM Preview), or (b)
+  a stacked panel ABOVE/BELOW the order_line grid (always visible), or
+  (c) a side panel to the RIGHT of the order_line grid (Prodboard-style
+  but in backend). **Recommended:** (c) — matches Prodboard's flex
+  viewport pattern, lets sales rep see the cabinet update as they edit
+  attributes. (a) is the lowest-friction Odoo-native; (b) wastes
+  vertical space.
+- **T1Q3 — What renders?** The currently-selected line's single cabinet,
+  OR the whole kitchen run (all lines positioned along an X axis with
+  zone separators). **Recommended:** start with single cabinet (Phase
+  3 / Track 2 polish brings the run view). The selected-line approach
+  is the right Track-1 MVP because it proves the parametric BufferGeometry
+  pipeline; the multi-cabinet kitchen view is layout logic on top.
+- **T1Q4 — Element type coverage on day 1.** Manifest §5.2 lists 18
+  element types (hinge_block, drawer, delimiter, etc.). Day-1 coverage
+  options: (a) just `carcass + door + drawer` (3 types — covers wall/
+  base/drawer_bank cabinets, ~70% of templates), or (b) the full 11
+  minimum types from the brief, or (c) all 18. **Recommended:** (a)
+  for Track 1 — get the rendering pipeline working with 3 types, then
+  iteratively add. Phase 3 polish covers the remaining 15.
+
+## Out of scope for Phase 2 (unchanged for Track 2; Track 1 supersedes some)
+
+- **Three.js / WebGL scene in PORTAL** — still Phase 3 for the portal.
+  Track 1 brings it forward in the BACKEND only.
+- **Prodboard 58/394/flex three-pane layout** — still Phase 3 even in
+  backend. Track 1 ships the viewport pane only, not the catalog
+  pane + tool rail rebuild.
+- **Mobile** — unchanged; mobile remains Phase 3 / v2.
+- **Payment** — unchanged; still v2.
+
+## Original Phase 2 / Phase 3 split (preserved for reference)
+
+The previous out-of-scope text below was written before the amendment.
+Marker for the diff:
+
+---
+
+## Out of scope for Phase 2 (PRE-AMENDMENT)
 
 - **Three.js / WebGL scene** — Phase 3. The OWL mockup is intentionally
   2D-first. Phase 2 ships without the 3D viewport, without the 18
