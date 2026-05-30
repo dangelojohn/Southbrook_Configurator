@@ -285,6 +285,29 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
 
         return {"error": "unknown_action", "message": str(action_code)}
 
+    # Phase 2.5 commit 1 — portal kitchen-3d payload.
+    #
+    # Mirrors the backend `sale.order.get_kitchen_3d_payload` (Track 1
+    # T1C6) for portal-auth consumers. Returns the same shape so the
+    # portal-side KitchenViewport can reuse Track 1's rendering logic
+    # without payload translation.
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/kitchen-3d",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_kitchen_3d(self, order_id, **kw):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        # The method itself is on the southbrook_estimating sale.order
+        # extension (Track 1 T1C6). Same env, same source of truth.
+        return order.with_user(request.env.user).get_kitchen_3d_payload()
+
     @http.route(
         "/southbrook/api/order/<int:order_id>",
         type="json",

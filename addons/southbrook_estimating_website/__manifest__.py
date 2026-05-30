@@ -35,7 +35,14 @@
     # <OrderBuilder/> component into it.
     "assets": {
         "web.assets_frontend": [
+            # Phase 2.5 — Three.js library back-ported from
+            # southbrook_estimating Track 1. Same vendored r160 bundle.
+            "southbrook_estimating/static/lib/three/three.min.js",
+            "southbrook_estimating/static/lib/three/OrbitControls.js",
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
+            # Order matters: KitchenViewport class is imported by
+            # portal_boot, so it must load first.
+            "southbrook_estimating_website/static/src/js/kitchen_viewport.esm.js",
             "southbrook_estimating_website/static/src/js/portal_boot.esm.js",
         ],
     },

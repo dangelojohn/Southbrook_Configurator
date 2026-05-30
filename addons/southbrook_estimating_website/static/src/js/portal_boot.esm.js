@@ -29,6 +29,7 @@
  *   };
  */
 import { Component, mount, onMounted, useState, xml } from "@odoo/owl";
+import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 
 // ----------------------------------------------------------------------
 // USD currency formatter — shared between OrderBuilder (probe) + the
@@ -968,6 +969,10 @@ const TEMPLATE = xml`
                                onLineSaved="_onLineSaved"/>
                 </t>
             </div>
+            <div t-elif="state.ui.current_tab === 'kitchen3d'"
+                 class="o_owl_tab_panel o_owl_panel_kitchen3d">
+                <KitchenViewport orderId="props.orderId"/>
+            </div>
             <div t-elif="state.ui.current_tab === 'bom'"
                  class="o_owl_tab_panel o_owl_panel_bom">
                 <BoMPreview rollup="state.bom_rollup"/>
@@ -1023,6 +1028,7 @@ class OrderBuilder extends Component {
         BoMPreview,
         ValidationStrip,
         FooterActions,
+        KitchenViewport,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -1133,6 +1139,12 @@ class OrderBuilder extends Component {
                 label: "Order Lines",
                 count: this.state.lines.length,
             },
+            // Phase 2.5 commit 1 — 3D Kitchen tab.
+            {
+                code: "kitchen3d",
+                label: "3D Kitchen",
+                count: this.state.lines.length || null,
+            },
             {
                 code: "bom",
                 label: "BoM Preview",
@@ -1157,9 +1169,11 @@ class OrderBuilder extends Component {
         ];
         // T2C13 — customer mode shows only the lines view + print.
         // BoM Preview, Validation, and History are dealer-only
-        // surfaces (per Build Spec §2.1/§2.2 + charter Q6).
+        // surfaces (per Build Spec §2.1/§2.2 + charter Q6). Phase 2.5
+        // commit 1 added 3D Kitchen to the customer-visible set —
+        // it's a presentation surface, not a power-user tool.
         if (this.props.mode === "customer") {
-            const customerCodes = new Set(["lines", "print"]);
+            const customerCodes = new Set(["lines", "kitchen3d", "print"]);
             return all.filter((t) => customerCodes.has(t.code));
         }
         return all;
