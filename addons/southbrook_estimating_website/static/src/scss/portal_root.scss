@@ -311,6 +311,20 @@
     white-space: nowrap;
 }
 
+// T2C13 — customer-mode indicator badge in the titlebar ref column.
+.o_owl_mode_badge {
+    display: inline-block;
+    font-family: var(--sb-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    background: var(--sb-sky);
+    color: var(--sb-linen);
+    padding: 2px 7px;
+    border-radius: 2px;
+    margin-right: 8px;
+    vertical-align: 2px;
+}
+
 // ----- T2C7 StagePipeline — 5 chevron stages -----------------------
 .o_owl_stages {
     display: flex;

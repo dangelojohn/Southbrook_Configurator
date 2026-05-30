@@ -131,6 +131,10 @@ class OrderTitlebar extends Component {
                 </h1>
             </div>
             <div class="o_owl_titlebar_ref">
+                <span t-if="props.mode === 'customer'"
+                      class="o_owl_mode_badge">
+                    CUSTOMER VIEW
+                </span>
                 <t t-esc="props.order.name"/>
                 <t t-if="props.order.version">
                     · v<t t-esc="props.order.version"/>
@@ -143,6 +147,7 @@ class OrderTitlebar extends Component {
     `;
     static props = {
         order: Object,
+        mode: { type: String, optional: true },
     };
 
     _stateLabel(state) {
@@ -231,24 +236,47 @@ class FooterActions extends Component {
                 <button class="o_owl_btn o_owl_btn_secondary"
                         t-on-click="() => props.onAction('print')"
                         t-att-disabled="props.busy">
-                    Customer Print (PDF)
+                    <t t-if="props.mode === 'customer'">
+                        Print Spec Sheet (PDF)
+                    </t>
+                    <t t-else="">Customer Print (PDF)</t>
                 </button>
-                <button class="o_owl_btn o_owl_btn_secondary"
+
+                <!-- Dealer-only: Duplicate as Draft. Customers don't
+                     duplicate their own orders — that's a sales-rep
+                     iteration tool (NF6 Image Floor pattern). -->
+                <button t-if="props.mode !== 'customer'"
+                        class="o_owl_btn o_owl_btn_secondary"
                         t-on-click="() => props.onAction('duplicate')"
                         t-att-disabled="props.busy">
                     Duplicate as Draft
                 </button>
+
+                <!-- Confirm vs Request a Price -->
                 <button class="o_owl_btn o_owl_btn_primary"
-                        t-on-click="() => props.onAction('confirm')"
+                        t-on-click="() => props.onAction(_confirmAction())"
                         t-att-disabled="props.busy or !_canConfirm()">
-                    <t t-if="_canConfirm()">Confirm Order</t>
-                    <t t-else="">
-                        Confirmed (<t t-esc="props.order.state"/>)
+                    <t t-if="!_canConfirm()">
+                        <t t-if="props.mode === 'customer'">
+                            Submitted (<t t-esc="props.order.state"/>)
+                        </t>
+                        <t t-else="">
+                            Confirmed (<t t-esc="props.order.state"/>)
+                        </t>
                     </t>
+                    <t t-elif="props.mode === 'customer'">
+                        Request a Price
+                    </t>
+                    <t t-else="">Confirm Order</t>
                 </button>
             </div>
             <div class="o_owl_footer_total">
-                <div class="o_owl_footer_total_label">Grand Total</div>
+                <div class="o_owl_footer_total_label">
+                    <t t-if="props.mode === 'customer'">
+                        Estimated Total
+                    </t>
+                    <t t-else="">Grand Total</t>
+                </div>
                 <div class="o_owl_footer_total_value mono"
                      t-esc="fmtUsd(props.order.channel_total)"/>
                 <div class="o_owl_footer_total_sub">
@@ -265,6 +293,7 @@ class FooterActions extends Component {
         order: Object,
         onAction: Function,
         busy: { type: Boolean, optional: true },
+        mode: { type: String, optional: true },
     };
 
     fmtUsd = fmtUsd;
@@ -272,6 +301,16 @@ class FooterActions extends Component {
     _canConfirm() {
         const s = this.props.order?.state;
         return s === "draft" || s === "sent";
+    }
+
+    /**
+     * T2C13 — the confirm button dispatches to "request_price" in
+     * customer mode (Phase 3 wires a salesperson-approval workflow
+     * behind that code; today the backend treats it the same as
+     * "confirm"). Dealer mode keeps "confirm".
+     */
+    _confirmAction() {
+        return this.props.mode === "customer" ? "request_price" : "confirm";
     }
 }
 
@@ -892,7 +931,8 @@ const TEMPLATE = xml`
         <div t-else="" class="o_owl_loaded">
             <!-- Chrome (T2C7) — banner + titlebar + stages. -->
             <IllustrativeBanner show="true"/>
-            <OrderTitlebar order="state.order"/>
+            <OrderTitlebar order="state.order"
+                           mode="props.mode || 'dealer'"/>
             <StagePipeline order="state.order"/>
 
             <!-- HeaderStrip (T2C6) — reads order header from state. -->
@@ -956,7 +996,8 @@ const TEMPLATE = xml`
             <!-- T2C12 — FooterActions row -->
             <FooterActions order="state.order"
                            onAction.bind="_onFooterAction"
-                           busy="state.action_busy"/>
+                           busy="state.action_busy"
+                           mode="props.mode || 'dealer'"/>
 
             <div t-if="state.action_message" class="o_owl_action_msg"
                  t-esc="state.action_message"/>
@@ -986,6 +1027,12 @@ class OrderBuilder extends Component {
     static props = {
         orderId: { type: String, optional: true },
         orderName: { type: String, optional: true },
+        // T2C13 — view mode. "dealer" (default) shows the full surface;
+        // "customer" hides power-user tabs (BoM Preview, Validation,
+        // History) and the dealer-only actions (Duplicate). Same root,
+        // different visibility — per charter Q6 + Build Spec §2.3
+        // "There must not be two configurators".
+        mode: { type: String, optional: true },
     };
 
     setup() {
@@ -1080,7 +1127,7 @@ class OrderBuilder extends Component {
      */
     get _tabs() {
         const order = this.state.order || {};
-        return [
+        const all = [
             {
                 code: "lines",
                 label: "Order Lines",
@@ -1108,6 +1155,14 @@ class OrderBuilder extends Component {
                 count: null,
             },
         ];
+        // T2C13 — customer mode shows only the lines view + print.
+        // BoM Preview, Validation, and History are dealer-only
+        // surfaces (per Build Spec §2.1/§2.2 + charter Q6).
+        if (this.props.mode === "customer") {
+            const customerCodes = new Set(["lines", "print"]);
+            return all.filter((t) => customerCodes.has(t.code));
+        }
+        return all;
     }
 
     // Class-field arrow so `this` binds to the OrderBuilder when the
@@ -1225,12 +1280,28 @@ async function mountOrderBuilder() {
     const orderId = root.dataset.orderId || "";
     const orderName = root.dataset.orderName || "";
 
+    // T2C13 — view-mode resolution.
+    //   1. Explicit URL param ?mode=customer wins (test path + dealer
+    //      previewing the customer view).
+    //   2. Otherwise the data-mode attribute set by the controller
+    //      (Phase 3 polish — backend reads user.share + a partner
+    //      preference and emits the default).
+    //   3. Fallback "dealer".
+    const params = new URLSearchParams(window.location.search);
+    const urlMode = params.get("mode");
+    const datasetMode = root.dataset.mode || "";
+    const mode = (
+        urlMode === "customer" || datasetMode === "customer"
+            ? "customer"
+            : "dealer"
+    );
+
     // Clear the placeholder so it doesn't flash beneath the OWL render.
     root.innerHTML = "";
 
     try {
         await mount(OrderBuilder, root, {
-            props: { orderId, orderName },
+            props: { orderId, orderName, mode },
         });
     } catch (err) {
         // Surface mount failures in the DOM so they're discoverable

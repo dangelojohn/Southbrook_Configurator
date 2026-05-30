@@ -227,6 +227,29 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             order_su.action_confirm()
             return {"ok": True, "new_state": order.state}
 
+        if action_code == "request_price":
+            # T2C13 customer-mode "Request a Price" path. Phase-1
+            # behaviour: same as confirm. Phase 3 polish:
+            #   - DO NOT confirm immediately; flip to "sent" or a
+            #     new "awaiting_pricing" state.
+            #   - Post a portal message to the assigned salesperson
+            #     so they review + price + send back.
+            #   - Don't allow MO creation until salesperson confirms.
+            # For T2C13 we wire the route + return a distinguishable
+            # ok payload so the frontend can render the right success
+            # message; behaviour parity with confirm for now.
+            if order.state not in ("draft", "sent"):
+                return {
+                    "error": "wrong_state",
+                    "message": "Order already past pricing review.",
+                }
+            order_su.action_confirm()
+            return {
+                "ok": True,
+                "new_state": order.state,
+                "submitted_for_pricing": True,
+            }
+
         if action_code == "duplicate":
             # action_duplicate_as_draft is the NF6 method on
             # southbrook_estimating.sale_order. Returns an
