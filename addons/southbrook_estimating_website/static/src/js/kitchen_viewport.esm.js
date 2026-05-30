@@ -28,6 +28,7 @@ import {
     Component,
     onMounted,
     onWillUnmount,
+    onWillUpdateProps,
     useRef,
     useState,
     xml,
@@ -96,6 +97,12 @@ export class KitchenViewport extends Component {
         // viewport. Parent OrderBuilder switches to the Lines tab
         // and selects the line (which opens the ConfigDrawer).
         onLineSelected: { type: Function, optional: true },
+        // P25C4 — parent's payload_version counter. Bumped by
+        // OrderBuilder._loadOrder after every successful fetch. The
+        // viewport watches this number via onWillUpdateProps; a
+        // change triggers a refetch so the kitchen stays in sync
+        // with the rest of the SPA after autosaves / state changes.
+        payloadVersion: { type: Number, optional: true },
     };
 
     setup() {
@@ -136,8 +143,25 @@ export class KitchenViewport extends Component {
         this._mouse = null;
         this._mouseDownAt = null;
         this._MAX_CLICK_DELTA_PX = 5;
+        // P25C4 — track the most recent payloadVersion we have
+        // honoured. Onmount: starts as whatever the parent passed.
+        // onWillUpdateProps: compares against incoming; refetch on
+        // change.
+        this._lastPayloadVersion = this.props.payloadVersion || 0;
 
         onMounted(() => this._init());
+        onWillUpdateProps((nextProps) => {
+            const next = nextProps.payloadVersion || 0;
+            if (next !== this._lastPayloadVersion) {
+                this._lastPayloadVersion = next;
+                // Re-fetch only when the Three.js scene is built;
+                // otherwise the initial _init's fetch will pick up
+                // the latest version on its own.
+                if (this._renderer && this._cabinetGroup) {
+                    queueMicrotask(() => this._fetchAndBuild());
+                }
+            }
+        });
         onWillUnmount(() => this._dispose());
     }
 

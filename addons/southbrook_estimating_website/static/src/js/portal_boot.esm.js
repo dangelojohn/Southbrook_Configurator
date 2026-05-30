@@ -972,6 +972,7 @@ const TEMPLATE = xml`
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
                  class="o_owl_tab_panel o_owl_panel_kitchen3d">
                 <KitchenViewport orderId="props.orderId"
+                                 payloadVersion="state.payload_version"
                                  onLineSelected.bind="_onKitchen3dLineSelected"/>
             </div>
             <div t-elif="state.ui.current_tab === 'bom'"
@@ -1066,6 +1067,13 @@ class OrderBuilder extends Component {
             // shows a brief inline message while an RPC is in flight.
             action_busy: false,
             action_message: null,
+            // P25C4 — monotonically increasing counter bumped on every
+            // successful _loadOrder. KitchenViewport watches this to
+            // refetch its 3D payload when the order changes underneath
+            // (drawer autosave, footer action, etc.). Phase 3 polish:
+            // generalise to a publish/subscribe pattern for any
+            // component that needs to refresh on order change.
+            payload_version: 0,
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
@@ -1106,6 +1114,9 @@ class OrderBuilder extends Component {
                 this.state.bom_rollup = payload.bom_rollup;
             }
             this.state.validation = payload.validation || [];
+            // P25C4 — bump the version counter so subscribed components
+            // (KitchenViewport) re-fetch their slice.
+            this.state.payload_version = (this.state.payload_version || 0) + 1;
         } catch (e) {
             this.state.error = e?.message || String(e);
         } finally {
