@@ -109,15 +109,49 @@ class ProductConfigSession(models.Model):
 
     # ---- helpers ----------------------------------------------------
 
-    def _extract_cabinet_inputs(self):
-        """Walk session.value_ids → cabinet input dict.
+    # ------------------------------------------------------------------
+    # SKU → family/dim defaults table.
+    #
+    # T1C3 (caught at live RPC verification 2026-05-30): a freshly-created
+    # session has NO value_ids — the OCA wizard creates the session FIRST
+    # and only writes value_ids as the user picks attributes. That left
+    # every template defaulting to family="base" in the viewport (since
+    # _extract_cabinet_inputs only consulted value_ids).
+    #
+    # The 12 cabinet template SKUs are locked per Q8 — so a static lookup
+    # table is the cheapest way to get correct first-render geometry the
+    # moment the user opens the wizard. When a value pick lands, it
+    # overrides whatever this table seeded.
+    # ------------------------------------------------------------------
+    _SKU_DEFAULTS = {
+        # SKU prefix         family       door  drawer  W    H     D
+        "SB-BASE-1DR":      ("base",      1,    0,      609, 762,  609),
+        "SB-BASE-2DR":      ("base",      2,    0,      762, 762,  609),
+        "SB-WALL-1DR":      ("wall",      1,    0,      457, 762,  350),
+        "SB-WALL-2DR":      ("wall",      2,    0,      762, 762,  350),
+        "SB-DRAWER":        ("drawer",    0,    3,      609, 762,  609),
+        "SB-SINK-BASE":     ("sink",      2,    0,      762, 762,  609),
+        "SB-TALL-PANTRY":   ("tall",      2,    0,      600, 2100, 609),
+        "SB-TALL-OVEN":     ("tall",      1,    0,      762, 2100, 609),
+        "SB-CORNER":        ("corner",    1,    0,      900, 762,  900),
+        "SB-VANITY":        ("vanity",    2,    0,      762, 800,  533),
+        "SB-ACCESSORY":     ("accessory", 0,    0,      600, 762,   18),
+        "SB-WORKTOP":       ("worktop",   0,    0,     1200,  25,  600),
+    }
 
-        When the user hasn't picked an attribute yet, falls back to a
-        reasonable demo cabinet so the viewport renders something at
-        first wizard open instead of an empty scene.
+    def _extract_cabinet_inputs(self):
+        """Walk product_tmpl_id default_code + session.value_ids → cabinet inputs.
+
+        Order of precedence (lowest first):
+          1. Hard defaults (covers the rare "no template yet" edge).
+          2. SKU lookup from product_tmpl_id.default_code — seeds the
+             initial wizard render with the correct family + door/drawer
+             count + plausible dimensions for the locked Q8 templates.
+          3. Per-attribute picks on session.value_ids — these override
+             whatever the SKU seeded as the user makes choices.
         """
         ref = self.env.ref
-        # Defaults — demo base 1-door 24" wide, 30" tall, 24" deep.
+        # 1. Hard defaults.
         out = {
             "width_mm": 609,
             "height_mm": 762,
@@ -127,6 +161,17 @@ class ProductConfigSession(models.Model):
             "drawer_count": 0,
             "finished_sides": "none",
         }
+        # 2. SKU lookup.
+        sku = (self.product_tmpl_id and self.product_tmpl_id.default_code) or ""
+        sku_row = self._SKU_DEFAULTS.get(sku)
+        if sku_row:
+            fam, doors, drawers, w, h, d = sku_row
+            out["family"] = fam
+            out["door_count"] = doors
+            out["drawer_count"] = drawers
+            out["width_mm"] = w
+            out["height_mm"] = h
+            out["depth_mm"] = d
 
         def attr_xml(name):
             return ref(f"southbrook_estimating.{name}", raise_if_not_found=False)
