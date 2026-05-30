@@ -699,11 +699,65 @@ reference docs:
 
 - `RULE_ENCODING_NOTES.md` — OCA syntax reconnaissance (stays)
 - `PHASE_1_FIRST_5_COMMITS.md` — early commit plan (now superseded by
-  reality of 12 commits 0a → 10, kept for forensic comparison of plan
-  vs execution)
+  reality of 16 commits 0a → 11b, kept for forensic comparison of plan
+  vs execution; see `docs/PHASE_1_RETROSPECTIVE.md` §3 for the analysis)
 
 All promote-target drafts have promoted to `addons/southbrook_estimating/`
 and been removed from `docs/drafts/`.
+
+---
+
+## 2026-05-30 · Phase 2+ deferred items inventory
+
+Consolidated list of everything Phase 1 deferred, with reason and target
+phase. Phase 2 planning starts from this inventory rather than
+re-deriving from scratch.
+
+| # | Item | Origin | Reason for deferral | Target phase |
+|---|---|---|---|---|
+| 1 | Drawer-bank split into `drawer_bank_3` / `drawer_bank_4` | NF14 drawer simplification | Real-world drawer banks have fixed 3/4 drawer count, not Rule-3 width-derived. Phase 1 reuses door_count via Rule 3 as a simplification | Phase 2 (template split + attribute_line refactor) |
+| 2 | Per-template `lead_time_extra` variant field | NF11 escape hatch | Q3 wording said variant; Phase 1 used master for simplicity. Trigger: Phase 4 Accucutt surfaces template-specific lead-time variation (e.g. sink_base maple = +3wks not +2) | Phase 2/4 trigger-based |
+| 3 | Edge banding per-edge mapping | NF14 + Mapping §3.5 | Phase 1 emits scalar perimeter sum; per-edge mapping needs Accucutt nest spec | Phase 4 (Accucutt routine #7) |
+| 4 | Multi-order door batched-supplier aggregation | Build Spec §4 routine #6 + Mapping §3.7 | Phase 1 ships per-SO door order; original workbook batched across all open orders | Phase 2 (sibling report or wizard) |
+| 5 | Per-panel cut diagrams in Shop Copy | Build Spec §4 routine #6 | Needs SVG tooling for the diagram emission | Phase 2 (SVG tooling) |
+| 6 | Signature Series visual register (cover page, typography) | NF15 | Gated on #7 (Signature Series spec book PDF) for canonical tokens | Phase 2 (gated on #7) |
+| 7 | `_compute_panel_dimensions` Phase-4 lead-time variation | NF11 + NF14 | If Accucutt surfaces template-specific lead-time | Trigger-based, Phase 4 |
+| 8 | `parametric_carcass.esm.js` (routine #5) | Build Spec §4 | Three.js procedural BufferGeometry — the planner-layer custom routine | Phase 3 |
+| 9 | `accucutt_bridge.py` (routine #7) | Build Spec §4 | External-system integration; nest envelope confirmation needed | Phase 4 |
+| 10 | 25 `__cat_kitchen-cabinets` modules from Prodboard manifest | Manifest §13 Q7 (skipped in Phase 1) | Role of the 25 unclear; deferred per Q14 acked decision | Phase 3 re-evaluation when 3D catalog import is concrete |
+| 11 | NF8 width-first toggle UI implementation | NF8 (schema shipped commit 9) | Case Study §3.C says "user preference flag + view conditional"; the conditional isn't wired yet | Phase 2 polish |
+| 12 | Toe-kick "additional to height" interpretation | NF14 (commit 9 clarification) | Phase 1 uses "height includes toe-kick"; #8 may specify otherwise | Triggered by #8 |
+
+### Companion: items NOT in this list
+
+The following surfaces were considered for deferral but explicitly
+stayed in Phase 1 scope and shipped complete:
+
+- The four declarative configurator rules (Mapping §3.4 / commit 5+7) — all 65 records
+- The 12 cabinet template `xml_id`s + their 132 attribute lines (commit 7)
+- The 6 channel pricelists (commit 4) + 3 tradesperson sub-tiers
+- The 11 (+3) configurator attributes (commit 3)
+- Custom routines 1, 2, 3, 4, 6 (partial)
+- Q21 zone visual grouping (commit 9.5 closed it)
+- The smoke-test stub framework (commit 7) + all 10 step promotions (commit 11b)
+
+---
+
+## 2026-05-30 · Loaded but cold — Phase 1 surfaces awaiting Phase 2 activation
+
+Surfaces with schema + code + tests but no demo data or UI exercise
+at the gate review. Phase 2 picks them up rather than re-inventing them.
+See `docs/PHASE_1_RETROSPECTIVE.md` §5 for the rationale and the
+activation paths.
+
+| Surface | What's loaded | Activation path |
+|---|---|---|
+| Refacing channel margin-target (routine #2) | `pricelist_refacing` + `_compute_refacing_price` + tests | Add a CTHS refacing demo partner + small refacing order |
+| NF7 `res.users.southbrook_default_series` | Field + default `contractor` + tests | Wire configurator wizard `default_get` to read it |
+| NF8 `res.users.southbrook_order_entry_mode` | Field + default `family_first` + tests | Wire inline-drawer xpath conditional |
+| Big-box channel pricelist | `pricelist_bigbox` ($98 fixed) + tests | Add Home Depot / Lowe's demo partner |
+| NF6 parent_order_id chain UI | Schema + action + button + test_09 placement assertion | Add chain-visualisation widget on form |
+| KD channel pricelist | `pricelist_kd` (54% off) + tests | Add KD demo partner with component-only line shape |
 
 ---
 
