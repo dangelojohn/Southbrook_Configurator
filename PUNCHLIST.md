@@ -871,3 +871,117 @@ their wording is **implicitly consistent** with my draft assumptions:
   sub-attribute — preserves Q2 and matches my draft.
 - **Draft assumption holds.** Re-surface Q23 explicitly in next batch so the
   Build Spec §5 shorthand can be amended to `family = corner` + `family_subtype = bifold`.
+
+---
+
+## 2026-05-30 · Phase-1 demo-seed polish (surfaced during Track 2 gate prep)
+
+While prepping order S00235 for the Track 2 gate review walk, four
+demo-data gaps surfaced. None of them block Track 2 sign-off — Track 2 is a UI
+gate, not a content gate — but they leave the walk showing zeros and empty
+strings where real cabinet metadata should be. All four trace to the same root
+cause: the demo `product.product` variants were created bare (RPC
+`product.product.create`) rather than through the OCA configurator session
+flow. The configurator session is what populates the `_SKU_DEFAULTS` table
+(width/height/depth/spec/maple flag/etc.) on `product.config.session`, and
+without a session there is no metadata to project into the order line.
+
+The four items below are filed for John's amendment after the gate walk. Phase
+order: they should land **before** Phase 1 closes (the SAMI smoke-test gate
+needs the BoM rollup populated to verify the maple `+10%` price + `+2 weeks`
+lead time flow per Q7). Reasonable target: 1 week of work to seed configurator
+sessions for the 12 cabinet templates + assign pricelist to the Demo
+Tradesperson Tier 3 partner.
+
+### PT-P1-01 · Seed configurator sessions for the 12 cabinet templates
+
+**Symptom (in gate walk):** D4 spec column empty, D6 drawer Spec field empty,
+no MAPLE badge ever appears.
+**Symptom (RPC):** `sale.order.line.spec_summary = ""` for all demo lines;
+`is_maple = false` always.
+**Root cause:** `_SKU_DEFAULTS` table on `product.config.session` is the
+single source of truth for per-SKU metadata (per [[project_southbrook_estimating_v19cr]]
+co-development brief §4.1). Bare variants bypass this table; the controller's
+`_build_southbrook_order_payload` reads from it via the line's
+`config_session_id`, which is `null` on bare variants.
+**Fix:** Replace the in-session-created variants (var ids 58-62) with a
+demo-data XML record that:
+1. Creates a `product.config.session` per cabinet family the gate exercises
+   (base 1-door, base 2-door, drawer bank, wall 1-door, tall pantry —
+   minimum 5; ideally all 12 per Q8 for full coverage).
+2. Runs each session through to `state='done'` with realistic attribute
+   choices (Contemporary series + maple box on at least one to exercise the
+   MAPLE badge + `+10%` price uplift).
+3. The session materialises a `product.product` variant; that variant goes
+   into S00235's order lines instead of var-id-58…62.
+
+**File target:** `addons/southbrook_estimating/demo/demo_orders.xml` (new
+file referenced from `__manifest__.py` demo list). Existing
+`demo/southbrook_demo.xml` covers partners + pricelists already.
+
+**Acceptance:** S00235's payload at `/southbrook/api/order/235` returns
+non-empty `spec_summary` and `width_mm > 0` for every line; at least one
+line has `is_maple = true` so the MAPLE badge renders in D4.
+
+### PT-P1-02 · Populate BoM rollup from configurator session
+
+**Symptom (in gate walk):** E1 BoM Preview tab summary cells show
+`Cabinets 0 / Total Panels 0 / Edge Banding 0.00 m`; both tables (panels +
+hardware) render with all zeros.
+**Symptom (RPC):** `result.bom_rollup.cabinet_count = 0`,
+`panels.{side,top,bottom,back,shelf,door,drawer_front} = 0`,
+`hardware.* = 0`, `edge_banding_mm = 0`.
+**Root cause:** Same as PT-P1-01 — BoM rollup is computed by traversing each
+line's config session → `mrp.bom._compute_panel_dimensions` (Track 1 routine
+#1) → projects into payload. No session ⇒ rollup loop sees zero cabinets.
+**Fix:** Resolved automatically when PT-P1-01 lands; no separate code change.
+**Acceptance:** S00235's BoM rollup returns `cabinet_count = 6` (matching
+`lines.length`), `panels.side ≥ 12` (2 sides × 6 cabinets), `panels.shelf ≥ 6`,
+non-zero `edge_banding_mm`; hardware counts non-zero (hinge pairs scale with
+door count per Q24 width→door rule).
+
+### PT-P1-03 · Assign pricelist to Demo Tradesperson Tier 3 partner
+
+**Symptom (in gate walk):** B4 customer cell pricelist badge renders empty
+between the partner-name row and the channel badge row.
+**Symptom (RPC):** `order.pricelist_id = null`, `pricelist_name = ""` despite
+`channel = tradesperson` and the channel discount resolving correctly to 35%.
+**Root cause:** `res.partner` id=19 (Demo Tradesperson Tier 3) was seeded
+without `property_product_pricelist`. The channel resolution path
+(`res.partner.channel` → `discount_pct`) is independent of pricelist and works,
+but the HeaderStrip's pricelist-badge cell renders empty.
+**Fix:** In `addons/southbrook_estimating/demo/southbrook_demo.xml`, add
+`property_product_pricelist` ref to the Tradesperson Tier 3 partner pointing
+at the seeded `southbrook_estimating.pricelist_tradesperson_tier3` record (per
+Q1 the 6 pricelists are already seeded). Same change for the 4 dealer
+partners (Image Floor, Amazing Window, Pro Finish, Richwood) so they all
+get their channel pricelist resolved consistently.
+**Acceptance:** B4 cell shows a pricelist badge with the pricelist's display
+name; `order.pricelist_name` returns non-empty.
+
+### PT-P1-04 · Width-attribute resolution into `width_mm`
+
+**Symptom (in gate walk):** D4 width column shows `0″` for every line; D6
+drawer Width field reads `0`.
+**Symptom (RPC):** `line.width_mm = 0`, `line.width_inches = 0`.
+**Root cause:** Width is one of the 11 attributes (per Q2) stored on the
+configurator session's `value_ids`. Without a session, the projection logic
+in `_build_southbrook_order_payload._line_width` returns 0.
+**Fix:** Same root cause as PT-P1-01/02 — resolved automatically when configurator
+sessions seed real attribute values. No separate work.
+**Acceptance:** S00235's lines all return `width_mm > 0` (typical demo
+spread: 305, 457, 610, 762 mm matching Q23 enumeration); `width_inches`
+shows the matching imperial values (12, 18, 24, 30) per Q4 dual-unit storage.
+
+### Cross-cutting note: this is the Phase-1 §10 step 2 work
+
+CLAUDE.md root §10 step 2 already commits to "seed the 12 cabinet templates
+through the OCA configurator session flow … so the 9-line smoke-test order
+against Demo Tradesperson Tier 3 returns the maple `+10%` price and `+2 weeks`
+lead time correctly applied" — this is the Phase-1 gate, not a Phase-2 add.
+PT-P1-01..04 are the concrete tickets for that step; closing all four
+unblocks the Phase 1 sign-off gate.
+
+**Suggested order of work:** PT-P1-03 first (smallest — 1 partner edit ×5);
+PT-P1-01 second (the substantive change); PT-P1-02 and PT-P1-04 fall out
+automatically once PT-P1-01 lands.
