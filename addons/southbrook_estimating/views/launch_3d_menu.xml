@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Direct "Launch 3D Configurator" menu shortcut — NF27 (2026-05-30).
+
+  The user reported the form-view Configure / Configure 3D buttons
+  aren't rendering despite being in the form arch (likely browser
+  localStorage view cache). This menu provides a zero-form-button
+  path to the wizard:
+
+    Southbrook Estimating → Launch 3D Configurator
+       ↓
+    ir.actions.server (this file)
+       ↓
+    SB-BASE-1DR template found by default_code
+       ↓
+    .action_southbrook_launch_3d_configurator()
+       ↓
+    Returns the wizard's ir.actions.act_window dict
+       ↓
+    Wizard opens with the 3D viewport embedded.
+
+  When the OCA upstream Configure button is debugged or NF27 menu is
+  expanded to a template picker, this stays as a "first taste" entry
+  pointing at a sensible default cabinet.
+-->
+<odoo>
+
+    <!-- The server action — looks up SB-BASE-1DR and calls the
+         Southbrook launcher method. Fallback: if SB-BASE-1DR isn't
+         present (someone wiped the seed), opens the Configurable
+         Templates kanban instead. -->
+    <record id="action_launch_3d_configurator" model="ir.actions.server">
+        <field name="name">Launch 3D Configurator</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="state">code</field>
+        <field name="code">
+tmpl = env['product.template'].search(
+    [('default_code', '=', 'SB-BASE-1DR')], limit=1
+)
+if tmpl:
+    action = tmpl.action_southbrook_launch_3d_configurator()
+else:
+    # Fallback — open the Configurable Templates kanban so the user
+    # can pick another cabinet. Avoid hardcoding action id 1018.
+    action = env.ref(
+        'product_configurator.action_product_template_view'
+    ).read()[0] if env.ref(
+        'product_configurator.action_product_template_view',
+        raise_if_not_found=False,
+    ) else {
+        'type': 'ir.actions.act_window',
+        'res_model': 'product.template',
+        'view_mode': 'kanban,list,form',
+        'domain': [('config_ok', '=', True)],
+        'name': 'Configurable Templates',
+    }
+        </field>
+    </record>
+
+    <!-- Menu — sits under the top-level Southbrook Estimating root
+         (menu_southbrook_root from NF23), above the Order Builder
+         link, so it's the first thing the user sees when opening
+         the Southbrook app. -->
+    <menuitem id="menu_southbrook_launch_3d"
+              name="Launch 3D Configurator"
+              parent="menu_southbrook_root"
+              action="action_launch_3d_configurator"
+              sequence="5"/>
+
+</odoo>
