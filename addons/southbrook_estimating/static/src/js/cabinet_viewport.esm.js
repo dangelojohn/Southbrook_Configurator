@@ -246,10 +246,12 @@ export class CabinetViewport extends Component {
         // Initial fetch + animate. Also prime the reactivity baseline
         // so the first onWillUpdateProps sees a populated _lastValueIdsKey
         // and only fires when the user actually picks something.
-        const initialSid = this._sessionIdFromRecord(this.props.record);
-        this._lastSessionId = initialSid;
-        this._lastValueIdsKey = this._valueIdsKey(this.props.record);
-        await this._fetchAndRebuild(initialSid);
+        // T1C6: dispatch by record model so both wizard + sale.order
+        // mount points work from the same code path.
+        const initialDispatch = this._rpcDispatch();
+        this._lastSessionId = initialDispatch.recordId;
+        this._lastValueIdsKey = this._recordKey(this.props.record);
+        await this._fetchAndRebuild(initialDispatch.recordId);
         this._animate();
     }
 
@@ -308,6 +310,36 @@ export class CabinetViewport extends Component {
     }
 
     /**
+     * T1C6 — RPC dispatch by record model.
+     *
+     * The same component now renders TWO surfaces:
+     *   • product.configurator → single-cabinet wizard preview
+     *   • sale.order           → multi-cabinet kitchen-run preview
+     *
+     * Returning the right (model, method, recordId) tuple per record
+     * keeps both surfaces sharing one Three.js scene + lighting +
+     * shadow + dimension-overlay code path. The payload shape is
+     * identical for both methods — just panel counts differ.
+     */
+    _rpcDispatch() {
+        const rec = this.props.record;
+        const model = rec?.resModel;
+        if (model === "sale.order") {
+            return {
+                rpcModel: "sale.order",
+                rpcMethod: "get_kitchen_3d_payload",
+                recordId: rec?.resId || null,
+            };
+        }
+        // Default — OCA product.configurator wizard.
+        return {
+            rpcModel: "product.config.session",
+            rpcMethod: "get_3d_payload",
+            recordId: this._sessionIdFromRecord(rec),
+        };
+    }
+
+    /**
      * Produce a stable string key from record.data.value_ids that
      * changes iff the set of selected attribute values changes.
      *
@@ -330,20 +362,74 @@ export class CabinetViewport extends Component {
     }
 
     /**
+     * T1C6 — analogous key for the sale.order kitchen-run view.
+     * Tracks the set of order_line ids; a change means a line was
+     * added/removed or its product changed.
+     */
+    _orderLinesKey(record) {
+        if (!record || !record.data) return "";
+        const field = record.data.order_line;
+        if (!field) return "";
+        const ids =
+            field.currentIds ||
+            field.resIds ||
+            field.ids ||
+            (Array.isArray(field) ? field : null);
+        if (!Array.isArray(ids)) return "";
+        return ids.slice().sort((a, b) => a - b).join(",");
+    }
+
+    /**
+     * T1C6 — dispatch the "reactivity key" by record model so the
+     * change detector tracks the right field set per surface.
+     */
+    _recordKey(record) {
+        if (!record) return "";
+        if (record.resModel === "sale.order") return this._orderLinesKey(record);
+        return this._valueIdsKey(record);
+    }
+
+    /**
      * Decide whether the new record state warrants a re-fetch, and
      * schedule a debounced refresh if so. Called from onWillUpdateProps
      * on every record diff.
+     *
+     * T1C6: now dispatches by model. For product.configurator the
+     * record id source is config_session_id; for sale.order it's
+     * the record's own resId.
      */
     _reactToRecord(record) {
-        const sid = this._sessionIdFromRecord(record);
-        if (!sid) return;
-        const key = this._valueIdsKey(record);
-        const sidChanged = sid !== this._lastSessionId;
-        const valuesChanged = key !== this._lastValueIdsKey;
-        if (!sidChanged && !valuesChanged) return;
-        this._lastSessionId = sid;
+        const dispatch = this._rpcDispatchForRecord(record);
+        const rid = dispatch.recordId;
+        if (!rid) return;
+        const key = this._recordKey(record);
+        const ridChanged = rid !== this._lastSessionId;
+        const keyChanged = key !== this._lastValueIdsKey;
+        if (!ridChanged && !keyChanged) return;
+        this._lastSessionId = rid;
         this._lastValueIdsKey = key;
-        this._scheduleRefresh(sid);
+        this._scheduleRefresh(rid);
+    }
+
+    /**
+     * Same as _rpcDispatch() but parametrised by a record argument so
+     * onWillUpdateProps can dispatch on the INCOMING record (not the
+     * stale this.props.record).
+     */
+    _rpcDispatchForRecord(record) {
+        const model = record?.resModel;
+        if (model === "sale.order") {
+            return {
+                rpcModel: "sale.order",
+                rpcMethod: "get_kitchen_3d_payload",
+                recordId: record?.resId || null,
+            };
+        }
+        return {
+            rpcModel: "product.config.session",
+            rpcMethod: "get_3d_payload",
+            recordId: this._sessionIdFromRecord(record),
+        };
     }
 
     /**
@@ -365,19 +451,22 @@ export class CabinetViewport extends Component {
     // Fetch + rebuild
     // ------------------------------------------------------------------
 
-    async _fetchAndRebuild(sessionId) {
-        if (!sessionId) {
+    async _fetchAndRebuild(recordId) {
+        if (!recordId) {
             this._buildScene(null);
             return;
         }
-        this._lastSessionId = sessionId;
+        this._lastSessionId = recordId;
         this.state.loading = true;
         this.state.error = null;
         try {
+            const dispatch = this._rpcDispatch();
+            // Re-derive recordId in case props changed under us.
+            const effectiveId = dispatch.recordId || recordId;
             const payload = await this.orm.call(
-                "product.config.session",
-                "get_3d_payload",
-                [[sessionId]],
+                dispatch.rpcModel,
+                dispatch.rpcMethod,
+                [[effectiveId]],
             );
             this._buildScene(payload);
             this.state.renderedAt = new Date().toLocaleTimeString();
@@ -465,8 +554,8 @@ export class CabinetViewport extends Component {
     }
 
     async onRefresh() {
-        const sid = this._sessionIdFromRecord(this.props.record);
-        if (sid) await this._fetchAndRebuild(sid);
+        const dispatch = this._rpcDispatch();
+        if (dispatch.recordId) await this._fetchAndRebuild(dispatch.recordId);
     }
 
     // ------------------------------------------------------------------
@@ -699,6 +788,22 @@ registry.category("view_widgets").add("cabinet_viewport", {
             name: "value_ids",
             type: "many2many",
             relation: "product.attribute.value",
+        },
+    ],
+});
+
+// T1C6 — second registration for the sale.order kitchen-run view.
+// Same component class; different field deps (order_line one2many
+// instead of value_ids many2many). The component dispatches by
+// record.resModel internally so all the rendering / shadow /
+// dimension code is shared.
+registry.category("view_widgets").add("kitchen_viewport", {
+    component: CabinetViewport,
+    fieldDependencies: [
+        {
+            name: "order_line",
+            type: "one2many",
+            relation: "sale.order.line",
         },
     ],
 });

@@ -88,6 +88,22 @@
         <attribute name="sum">Zone Subtotal</attribute>
       </xpath>
 
+      <!-- (5) 3D Kitchen Preview tab — Track 1 commit 6.
+           Mounts the kitchen_viewport widget. Reads order_line from
+           the record and calls sale.order.get_kitchen_3d_payload to
+           layout every line's cabinet along the X axis with zone-
+           specific Y floor (wall cabinets float at 1400mm, base/
+           tall/etc. at floor level). Same OWL component as the
+           configurator wizard's cabinet_viewport — dispatches by
+           record.resModel internally. -->
+      <xpath expr="//notebook" position="inside">
+        <page name="kitchen_3d_preview" string="3D Kitchen Preview">
+          <div style="height: 520px; margin: -8px 0;">
+            <widget name="kitchen_viewport"/>
+          </div>
+        </page>
+      </xpath>
+
     </field>
   </record>
 
