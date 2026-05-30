@@ -529,6 +529,112 @@ trust. Applies going forward.
 
 ---
 
+## 2026-05-30 · NF14 — Geometric conventions for `_compute_panel_dimensions`
+
+Surfaced before writing routine #1 (commit 8). Mapping section 3.5 lists
+the 11-component quantity table but the per-panel L×W×T formulas are NOT
+in any canonical artifact. The numbers below are assumed from
+cabinetmaking convention; canonical #8 workbook (Peter Tuschak's actual
+panel-cutting formulas) is the truth source when it lands.
+
+Following the same data-shape-vs-data-fidelity discipline as the
+`southbrook.seed_mode='illustrative'` flag: assumptions are explicit so
+the divergences become focused PRs when #8 is parseable.
+
+### Construction style
+
+**Frameless / euro-style** (ASSUMED — awaiting #8 confirmation). Top + bottom
+panels capture **between** the L and R sides (cabinet width = sides_width × 2
++ inside_width). Sides run the full cabinet height. This matches
+mid-market Canadian cabinetry convention and is what the Image Floor
+case-study supports anecdotally, but the workbook is the canonical source.
+
+Alternative (face-frame) would push top/bottom over the sides, change
+inside_width calculation, and add face-frame components. If #8 specifies
+face-frame, NF14 entry gets rewritten and routine #1 formulas swap.
+
+### Material thicknesses (ASSUMED)
+
+| Material | Thickness | Used by |
+|---|---|---|
+| Box (carcass) | 15.875 mm (5/8") | side, top, bottom, shelf panels |
+| Back | 6.35 mm (1/4") | back panel |
+| Door | 18.0 mm (3/4") | door, drawer-front cuts |
+
+If #8 specifies different thicknesses (e.g. 18mm box per metric standard),
+update the BOX_TH / BACK_TH / DOOR_TH constants in `models/mrp_bom.py`
+and re-run tests. Tests use re-derivation pattern so they tolerate constant
+changes without expected-value updates.
+
+### Back panel mounting (ASSUMED)
+
+Captured into a **6.35 mm rabbet groove** routed on the inside back edge
+of side / top / bottom panels. Back panel sizes:
+- `back_length_mm = (cabinet_width - 2*BOX_TH) + 2*RABBET`
+- `back_height_mm = (cabinet_height - 2*BOX_TH) + 2*RABBET`
+
+Where `RABBET = 6.35 mm`.
+
+### Shelf
+
+- **Quantity**: 1 if `cabinet_height_mm <= 600`, 2 if `<= 900`, else 3.
+- **Tolerance**: 1.5 mm subtracted from inside_width for hand placement.
+- **Ventilation gap**: 12.7 mm (1/2") subtracted from depth at the back.
+- Material: same as box.
+
+### Door reveal
+
+**3 mm uniform gap** on all four edges (ASSUMED). Single-door:
+`door_width = cabinet_width - 2*REVEAL`. Two-door:
+`door_width = (cabinet_width - 3*REVEAL) / 2` (centre reveal between doors).
+
+### Toe-kick
+
+**101.6 mm (4")** integrated into the side panels (sides extend below the
+bottom panel by toe-kick height; no separate component). Applies to:
+**base, sink_base, tall, vanity** families. Wall and accessory families
+have no toe-kick.
+
+### Edge banding (Phase-1 scalar; Phase-4 per-edge)
+
+For Phase 1, `edge_banding_length_mm` is computed as a scalar perimeter
+sum based on the `finished_sides` attribute. The precise per-edge
+mapping (which edges of which panels get which banding colour) is
+**deferred to Phase 4** when the Accucutt nest hand-off needs per-edge
+specification. Phase 1 BoM emits banding as a single line item with the
+total length.
+
+### Hardware quantities (per Mapping section 3.5)
+
+| Component | Quantity rule |
+|---|---|
+| Hinge pair | 1 per door |
+| Handle | 1 per door (or per drawer front) |
+| Drawer slide pair | 1 per drawer |
+
+### Drawer bank Phase-1 simplification (ASSUMED)
+
+Real-world drawer banks typically have a **fixed count** (3-drawer or
+4-drawer per family), not a width-derived count. Phase 1 treats
+drawer_bank's `door_count` as the drawer-front count using Rule 3
+(width → 1 or 2). This is a Phase-1 simplification; the canonical #8
+workbook will likely require splitting drawer_bank into `drawer_bank_3`
+and `drawer_bank_4` template variants. Flagged for Phase 2.
+
+### What's NOT in NF14 (will surface as NF15+ when needed)
+
+- Hinge-cup drilling spec (depth, X/Y offsets) — Phase 2 hardware spec
+- Shelf-pin hole spacing — Phase 2
+- Drawer-box construction details (slides, dovetails, etc.) — Phase 2
+- Face-frame conversion if #8 says we're not frameless — would invalidate the construction-style assumption above
+
+When #8 lands and any of these assumptions is wrong, the fix path is
+mechanical: update the named constant + formula in `_compute_panel_dimensions`,
+update this NF14 entry with the canonical value, re-run tests
+(re-derivation-style, so they tolerate constant changes).
+
+---
+
 ## 2026-05-29 · 11 drafts staged total
 
 Final count for tonight's preparation pass — within the §10 step 7 gate.
