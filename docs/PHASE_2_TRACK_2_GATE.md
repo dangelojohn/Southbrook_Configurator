@@ -13,19 +13,59 @@ Three.js viewport back-port from Track 1 into the portal).
 ## What to test against
 
 Live host: `https://www.southbrookcabinetry.local:9443`
-Branch: `main` at commit `58f3681` or later (`git log --oneline -1`)
+Branch: `main` at commit `e5ab768` or later (Phase 2.5 commits 1-4
+landed on top of Track 2 — gate scope is unchanged; see the
+**Phase 2.5 scope-expansion note** below.)
 Forgejo tip: `http://192.168.68.108:9080/git/qnap/southbrook-v19cr`
 
-You'll need an order with **at least 4 cabinet lines spanning ≥ 2
-zones** to exercise the multi-zone grid. Suggested setup:
+### Canonical demo order: **S00235** (`id=235`)
 
-1. Backend → `Southbrook Estimating` → `Launch 3D Configurator`
-2. Configure 4 cabinets: 2 in `base_run`, 1 in `wall`, 1 in `tall`
-3. Note the sale.order id from the URL once attached to an order
-4. Open the portal route with that id:
-   `https://www.southbrookcabinetry.local:9443/my/southbrook/order-builder/<id>`
+Seeded `2026-05-30` for this gate review. Six lines spanning three zones:
+
+| # | Zone | Product | Qty | Retail | Channel |
+|---:|---|---|---:|---:|---:|
+| 1 | base_run | Base 1-Door | 1 | $320 | $208 |
+| 2 | base_run | Base 2-Door | 2 | $790 | $513.50 |
+| 3 | base_run | Drawer Bank | 1 | $485 | $315.25 |
+| 4 | wall | Wall 1-Door | 2 | $570 | $370.50 |
+| 5 | wall | Wall 1-Door | 1 | $285 | $185.25 |
+| 6 | tall | Tall Pantry | 1 | $825 | $536.25 |
+| | | **Totals** | | **$3,275** | **$2,128.75** |
+
+Partner: **Demo Tradesperson (Tier 3)** · Channel: **CONTRACTOR · TIER 3 · −35%**
+State: **draft** (good for F3 Duplicate + F4 Confirm path).
+
+Walk URL: `https://www.southbrookcabinetry.local:9443/my/southbrook/order-builder/235`
 
 Hard refresh (⌘-⇧-R) before each section so the asset bundle reloads.
+
+### Demo data limitations to expect
+
+These are **known Phase-1 demo-seed gaps**, not Track 2 defects. They
+do not block gate sign-off (Track 2 is a UI gate, not a content gate),
+but the values below render as zeros / empty in the walk:
+
+| Limitation | Where it shows | Why |
+|---|---|---|
+| BoM rollup = all zeros | E1 panel/hardware tables | Demo variants created bare (not through configurator session); cabinet metadata (panel counts, edge banding) lives on `product.config.session._SKU_DEFAULTS` table which only populates on real configurator runs. **Verify layout renders; values are Phase-1 polish.** |
+| Spec text = empty | D4 spec column, D6 drawer Spec field | Same root cause — no config session → no spec summary. **MAPLE badge will not appear** on these demo lines (the rule only fires for `is_maple=True` lines). |
+| Width = 0″ | D4 width column, D6 drawer Width field | Same root cause. |
+| Pricelist badge = empty | B4 customer cell pricelist badge | Demo Tradesperson Tier 3 partner has no `property_product_pricelist` assigned in seed; channel discount still resolves correctly. **Channel badge below it works.** |
+
+The channel-discount math, savings rollup, zone subtotals, line
+retail-vs-channel display, and qty-autosave round-trip ARE all live
+against this demo order. Those are the Track 2 deliverables.
+
+### Phase 2.5 scope-expansion note
+
+The portal SPA has gained a **6th tab — `3D Kitchen`** — added by
+Phase 2.5 commits 1-4 (`259f194` … `e5ab768`). That tab is **OUT of
+scope for this Track 2 gate review**. If you want to review it
+separately, the four Phase 2.5 commit messages document the
+implementation. Track 2 sign-off proceeds against the original
+5-tab spec (`Order Lines · BoM Preview · Validation · History ·
+Customer Print`); the kitchen3d tab's presence does not constitute
+a regression.
 
 ---
 
