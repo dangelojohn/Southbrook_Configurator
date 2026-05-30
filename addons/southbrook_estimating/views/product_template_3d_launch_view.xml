@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Southbrook 3D Configure stat button on product.template — Track 1
+  NF26 mitigation. Adds a reliably-visible launch point for the OCA
+  configurator wizard with the embedded southbrook 3D viewport.
+
+  Why a stat button instead of a header button:
+    The OCA "Configure Product" header button gates on a group and
+    depends on its own <header/> xpath landing first. On the QNAP
+    southbrook stack the user reported "no Configure button on the
+    product" even with admin in the gating group — likely a view-
+    inherit ordering issue. Stat buttons live in <div name='button_box'>
+    which exists on every product.template form, so this entry point
+    has no header-or-group dependency.
+
+  Why class oe_highlight + fa-cube:
+    oe_highlight gives the button the primary-action visual register
+    (Southbrook walnut accent). fa-cube reads as "open the 3D" without
+    needing copy in the icon.
+-->
+<odoo>
+
+    <record id="view_product_template_form_southbrook_3d_launch"
+            model="ir.ui.view">
+        <field name="name">product.template.form.southbrook.3d.launch</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id"
+               ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_southbrook_launch_3d_configurator"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-cube"
+                        invisible="not config_ok">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Configure 3D</span>
+                        <span class="o_stat_text">Southbrook</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
