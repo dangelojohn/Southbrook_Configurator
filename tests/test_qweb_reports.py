@@ -16,11 +16,13 @@ Per Build Spec section 4 routine #6, three reports:
   - Shop Copy (mrp.production — MO-driven per John's commit-10 ask)
   - Door Order (sale.order)
 """
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook", "qweb")
-class TestQWebReports(TransactionCase):
+class TestQWebReports(SouthbrookTestCase):
 
     @classmethod
     def setUpClass(cls):

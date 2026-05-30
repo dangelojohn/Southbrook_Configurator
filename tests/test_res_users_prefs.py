@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Tests for NF7 + NF8 res.users Order Builder preferences."""
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook", "nf7", "nf8")
-class TestResUsersPrefs(TransactionCase):
+class TestResUsersPrefs(SouthbrookTestCase):
 
     def test_01_default_series_is_contractor(self):
         """NF7 — Amazing Window default: every new user starts on Contractor."""

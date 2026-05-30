@@ -1,18 +1,14 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Tests for the NF1 southbrook.order.analytics companion model + the
 sale.order.action_confirm capture hook."""
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook")
-class TestAnalyticsCapture(TransactionCase):
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.Partner = cls.env["res.partner"]
-        cls.Order = cls.env["sale.order"]
-        cls.Analytics = cls.env["southbrook.order.analytics"]
+class TestAnalyticsCapture(SouthbrookTestCase):
+    # Partner / Order / Analytics class-attrs provided by SouthbrookTestCase.
 
     def test_01_capture_creates_companion_row(self):
         partner = self.Partner.create({"name": "Test Dealer", "channel": "dealer"})

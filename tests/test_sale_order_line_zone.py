@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Tests for the Q21 + NF9 zone field on sale.order.line."""
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook", "q21")
-class TestSaleOrderLineZone(TransactionCase):
+class TestSaleOrderLineZone(SouthbrookTestCase):
 
     @classmethod
     def setUpClass(cls):

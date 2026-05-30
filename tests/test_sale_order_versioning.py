@@ -2,11 +2,13 @@
 """Tests for the NF6 Image Floor iterative-design pattern:
 sale.order.parent_order_id + version + action_duplicate_as_draft.
 """
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook", "nf6")
-class TestSaleOrderVersioning(TransactionCase):
+class TestSaleOrderVersioning(SouthbrookTestCase):
 
     @classmethod
     def setUpClass(cls):
