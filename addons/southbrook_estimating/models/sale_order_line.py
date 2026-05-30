@@ -49,3 +49,36 @@ class SaleOrderLine(models.Model):
         for line in self:
             if line.zone != "other":
                 line.zone_label = False
+
+    # ------------------------------------------------------------------
+    # T1C8 — Click-to-edit entry point for the OWL kitchen viewport.
+    #
+    # When the sales rep clicks a cabinet in the 3D Kitchen Preview
+    # canvas, the OWL component raycasts the mesh to find the line id,
+    # then calls this method via JSON-RPC. The returned action dict is
+    # dispatched by the OWL action service — typically opening the OCA
+    # configurator wizard for the line's product so the rep can
+    # reconfigure the cabinet (width, family, door style, etc.).
+    # ------------------------------------------------------------------
+    def action_reconfigure(self):
+        """Launch the OCA configurator wizard for this line.
+
+        Returns the action dict produced by
+        product.template.action_southbrook_launch_3d_configurator()
+        — which itself wraps OCA's configure_product(). The wizard
+        opens with the line's product pre-selected and any existing
+        config_session_id reused.
+
+        If the line has no product or no template (free-text line,
+        comment, etc.), returns False so the OWL component shows a
+        gentle no-op rather than crashing.
+        """
+        self.ensure_one()
+        tmpl = (
+            self.product_id.product_tmpl_id
+            if self.product_id and self.product_id.product_tmpl_id
+            else None
+        )
+        if not tmpl:
+            return False
+        return tmpl.action_southbrook_launch_3d_configurator()
