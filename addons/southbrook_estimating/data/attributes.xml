@@ -224,13 +224,41 @@
   </record>
 
   <!-- ============================================================== -->
-  <!-- 6 · finish (values seed from #5 Price Master Finish tab later) -->
+  <!-- 6 · finish                                                     -->
+  <!-- NF19 (caught at live install): every product.template.attribute.line -->
+  <!-- in Odoo 19 must reference at least one value_id, OR the install -->
+  <!-- aborts with "must have at least one value". The 12 cabinet     -->
+  <!-- templates each carry an attr_finish line, so the install fails -->
+  <!-- before reaching seed_mode runtime. Seeded a Phase-1 placeholder -->
+  <!-- set of 5 values here; the canonical Price-Master Finish catalog -->
+  <!-- still lands in Phase-2 (see PUNCHLIST NF19 — replace these on -->
+  <!-- Price-Master import without xml_id churn since we hold the IDs). -->
   <!-- ============================================================== -->
   <record id="attr_finish" model="product.attribute">
     <field name="name">Finish</field>
     <field name="display_type">color</field>
     <field name="create_variant">dynamic</field>
     <field name="sequence">50</field>
+  </record>
+  <record id="value_finish_white" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finish"/>
+    <field name="name">White</field><field name="sequence">1</field>
+  </record>
+  <record id="value_finish_maple_stain" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finish"/>
+    <field name="name">Maple Stain</field><field name="sequence">2</field>
+  </record>
+  <record id="value_finish_cherry_stain" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finish"/>
+    <field name="name">Cherry Stain</field><field name="sequence">3</field>
+  </record>
+  <record id="value_finish_walnut_stain" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finish"/>
+    <field name="name">Walnut Stain</field><field name="sequence">4</field>
+  </record>
+  <record id="value_finish_custom" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finish"/>
+    <field name="name">Custom</field><field name="sequence">5</field>
   </record>
 
   <!-- ============================================================== -->
@@ -304,13 +332,33 @@
   </record>
 
   <!-- ============================================================== -->
-  <!-- 10 · handle (catalog values seed from #5 later)                -->
+  <!-- 10 · handle — NF19 seeded same as attr_finish (see above).     -->
   <!-- ============================================================== -->
   <record id="attr_handle" model="product.attribute">
     <field name="name">Handle</field>
     <field name="display_type">select</field>
     <field name="create_variant">dynamic</field>
     <field name="sequence">90</field>
+  </record>
+  <record id="value_handle_bar_pull" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_handle"/>
+    <field name="name">Bar Pull</field><field name="sequence">1</field>
+  </record>
+  <record id="value_handle_knob" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_handle"/>
+    <field name="name">Knob</field><field name="sequence">2</field>
+  </record>
+  <record id="value_handle_cup_pull" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_handle"/>
+    <field name="name">Cup Pull</field><field name="sequence">3</field>
+  </record>
+  <record id="value_handle_integrated" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_handle"/>
+    <field name="name">Integrated</field><field name="sequence">4</field>
+  </record>
+  <record id="value_handle_none" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_handle"/>
+    <field name="name">None</field><field name="sequence">5</field>
   </record>
 
   <!-- ============================================================== -->
