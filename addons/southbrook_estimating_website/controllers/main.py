@@ -248,6 +248,18 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             line_retail = line.price_subtotal
             line_channel = line_retail * (1 - discount_pct / 100.0)
 
+            # T2C9 — width fields for the line-row display. Width
+            # comes from the SKU defaults table (commit 4 wired the
+            # family lookup; same row carries the width). Phase 3
+            # polish reads the configured width from the line's
+            # variant attributes once dynamic-variant materialisation
+            # lands; for now the SKU default is the natural fallback.
+            width_mm = sku_row[3] if sku_row else 0
+            # Round to 0.25" granularity (cabinet-industry standard).
+            width_inches = (
+                round((width_mm / 25.4) * 4) / 4 if width_mm else 0
+            )
+
             line_payload = {
                 "id": line.id,
                 "sequence": idx,
@@ -262,6 +274,8 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "price_subtotal": line.price_subtotal,
                 "retail_price": line_retail,
                 "channel_price": line_channel,
+                "width_mm": width_mm,
+                "width_inches": width_inches,
                 "config_session_id": (
                     line.config_session_id.id
                     if hasattr(line, "config_session_id")

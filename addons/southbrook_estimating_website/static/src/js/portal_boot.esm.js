@@ -212,6 +212,130 @@ class StagePipeline extends Component {
 }
 
 // ----------------------------------------------------------------------
+// OrderLine — T2C9.
+//
+// One row in the zone grid. 8-column layout matching the mockup:
+//   [#] [Template + SKU] [Width] [Spec + badges] [Qty]
+//   [Retail strike] [Channel] [⋯ menu]
+//
+// Click anywhere on the row → parent OrderBuilder's selected_line_id
+// updates and the row gets .o_owl_line_selected (yellow highlight).
+// ----------------------------------------------------------------------
+
+class OrderLine extends Component {
+    static template = xml`
+        <div class="o_owl_line"
+             t-att-class="{ 'o_owl_line_selected': props.isSelected }"
+             t-on-click="() => props.onSelect(props.line.id)">
+            <div class="o_owl_lineno" t-esc="props.line.sequence"/>
+            <div class="o_owl_line_tpl">
+                <t t-esc="props.line.product_name"/>
+                <span t-if="props.line.product_sku"
+                      class="o_owl_line_xmlid"
+                      t-esc="props.line.product_sku"/>
+            </div>
+            <div class="o_owl_line_dim mono">
+                <t t-if="props.line.width_inches">
+                    <t t-esc="props.line.width_inches"/>″
+                </t>
+                <t t-else="">—</t>
+            </div>
+            <div class="o_owl_line_spec">
+                <t t-esc="props.line.spec_summary"/>
+                <span t-if="props.line.is_maple"
+                      class="o_owl_badge o_owl_badge_maple">
+                    MAPLE
+                </span>
+                <span t-if="props.line.rule_blocked"
+                      class="o_owl_badge o_owl_badge_rule">
+                    RULE
+                </span>
+            </div>
+            <div class="o_owl_line_qty mono" t-esc="props.line.qty"/>
+            <div class="o_owl_line_price o_owl_line_retail mono"
+                 t-esc="fmtUsd(props.line.retail_price)"/>
+            <div class="o_owl_line_price mono"
+                 t-esc="fmtUsd(props.line.channel_price)"/>
+            <div class="o_owl_line_menu">⋯</div>
+        </div>
+    `;
+    static props = {
+        line: Object,
+        isSelected: { type: Boolean, optional: true },
+        onSelect: Function,
+    };
+    fmtUsd = fmtUsd;
+}
+
+// ----------------------------------------------------------------------
+// ZoneGroup — T2C9.
+//
+// Collapsible group of OrderLine rows under a zone header. Header
+// shows chevron + name + line count + (retail strike) channel subtotal.
+// Click the header → toggles collapsed state (lives on the
+// ZoneGroup, not the parent OrderBuilder — each zone collapses
+// independently).
+// ----------------------------------------------------------------------
+
+class ZoneGroup extends Component {
+    static template = xml`
+        <div class="o_owl_zone"
+             t-att-class="{ 'o_owl_zone_collapsed': state.collapsed }">
+            <div class="o_owl_zone_header" t-on-click="_toggle">
+                <span class="o_owl_zone_chevron">▾</span>
+                <span class="o_owl_zone_name" t-esc="props.zone.label"/>
+                <span class="o_owl_zone_count">
+                    <t t-esc="props.zone.line_count"/>
+                    <t t-if="props.zone.line_count === 1">line</t>
+                    <t t-else="">lines</t>
+                </span>
+                <span class="o_owl_zone_subtotal">
+                    <span class="o_owl_zone_retail mono"
+                          t-esc="fmtUsd(props.zone.subtotal)"/>
+                    <span class="o_owl_zone_channel mono"
+                          t-esc="fmtUsd(props.zone.channel_subtotal)"/>
+                </span>
+            </div>
+            <div class="o_owl_lines" t-if="!state.collapsed">
+                <div class="o_owl_line_head">
+                    <div/>
+                    <div>Template</div>
+                    <div>Width</div>
+                    <div>Spec</div>
+                    <div class="o_owl_th_center">Qty</div>
+                    <div class="o_owl_th_right">Retail</div>
+                    <div class="o_owl_th_right">Channel</div>
+                    <div/>
+                </div>
+                <OrderLine t-foreach="props.lines"
+                           t-as="line"
+                           t-key="line.id"
+                           line="line"
+                           isSelected="line.id === props.selectedLineId"
+                           onSelect="props.onSelectLine"/>
+            </div>
+        </div>
+    `;
+    static components = { OrderLine };
+    static props = {
+        zone: Object,
+        lines: Array,
+        selectedLineId: { type: [Number, { value: null }], optional: true },
+        onSelectLine: Function,
+    };
+
+    setup() {
+        this.state = useState({ collapsed: false });
+    }
+
+    _toggle = () => {
+        this.state.collapsed = !this.state.collapsed;
+    };
+}
+
+fmtUsd; // referenced via class field on OrderLine + ZoneGroup helpers.
+
+// ----------------------------------------------------------------------
 // TabBar — T2C8.
 //
 // 5 tabs from the mockup (Order Lines / BoM Preview / Validation /
@@ -361,20 +485,29 @@ const TEMPLATE = xml`
                     activeTab="state.ui.current_tab"
                     onTabChange.bind="_setActiveTab"/>
 
-            <!-- Tab panels. T2C9-11 fill these. Today they're
-                 placeholders that confirm tab switching works. -->
+            <!-- Tab panels. T2C9 fills Lines. T2C10-11 fill the rest. -->
             <div t-if="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines">
-                <p class="o_owl_panel_placeholder">
-                    <strong>Order Lines panel</strong> — T2C9 wires the
-                    multi-zone grid (ZoneGroup + OrderLine + inline
-                    ConfigDrawer per zone).
-                    <br/>
-                    <small>
-                        <t t-esc="state.lines.length"/> line(s) across
-                        <t t-esc="state.zones.length"/> zone(s) in store.
-                    </small>
-                </p>
+                <!-- T2C9 — multi-zone line grid. -->
+                <t t-if="state.zones.length === 0">
+                    <p class="o_owl_panel_placeholder o_owl_lines_empty">
+                        <strong>No cabinet lines on this order yet.</strong>
+                        <br/>
+                        Add lines via the backend Order Builder OR
+                        click <em>New</em> below to start the
+                        configurator (Phase 3 wires the inline add-line
+                        flow into the portal).
+                    </p>
+                </t>
+                <t t-else="">
+                    <ZoneGroup t-foreach="state.zones"
+                               t-as="zone"
+                               t-key="zone.code"
+                               zone="zone"
+                               lines="_linesForZone(zone.code)"
+                               selectedLineId="state.ui.selected_line_id"
+                               onSelectLine="_setSelectedLine"/>
+                </t>
             </div>
             <div t-elif="state.ui.current_tab === 'bom'"
                  class="o_owl_tab_panel o_owl_panel_bom">
@@ -425,6 +558,7 @@ class OrderBuilder extends Component {
         StagePipeline,
         HeaderStrip,
         TabBar,
+        ZoneGroup,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -534,6 +668,29 @@ class OrderBuilder extends Component {
     // declarative.
     _setActiveTab = (code) => {
         this.state.ui.current_tab = code;
+    };
+
+    // ------------------------------------------------------------------
+    // T2C9 — line grouping + selection
+    // ------------------------------------------------------------------
+
+    /**
+     * Filter the store's lines down to the ones belonging to a zone.
+     * Called by the template's t-foreach over zones. Pure derived data
+     * — no caching, but OWL only re-renders the affected ZoneGroup
+     * when the array reference changes (and ours changes per render
+     * call), so this stays correct without memoisation. Phase 3 polish
+     * memoises if the list grows past ~50.
+     */
+    _linesForZone(zoneCode) {
+        return this.state.lines.filter((l) => l.zone === zoneCode);
+    }
+
+    _setSelectedLine = (lineId) => {
+        // Toggle: clicking the already-selected line clears the
+        // selection. Matches the mockup's "click to deselect" UX.
+        this.state.ui.selected_line_id =
+            this.state.ui.selected_line_id === lineId ? null : lineId;
     };
 }
 

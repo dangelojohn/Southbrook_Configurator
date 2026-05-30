@@ -378,6 +378,206 @@
     font-weight: 600;
 }
 
+// ----- T2C9 ZoneGroup + OrderLine ----------------------------------
+.o_owl_zone {
+    margin-top: 14px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: 2px;
+    overflow: hidden;
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_zone_header {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    background: linear-gradient(
+        to bottom,
+        var(--sb-paper) 0%,
+        #f4ecdc 100%
+    );
+    border-bottom: 1px solid var(--sb-rule);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+}
+
+.o_owl_zone_chevron {
+    margin-right: 8px;
+    color: var(--sb-walnut);
+    font-family: var(--sb-font-mono);
+    display: inline-block;
+    width: 12px;
+    transition: transform 0.15s;
+}
+
+.o_owl_zone_collapsed .o_owl_zone_chevron {
+    transform: rotate(-90deg);
+}
+
+.o_owl_zone_collapsed .o_owl_zone_header {
+    border-bottom-color: transparent;
+}
+
+.o_owl_zone_name {
+    font-weight: 600;
+    color: var(--sb-ink);
+}
+
+.o_owl_zone_count {
+    margin-left: 8px;
+    color: var(--sb-ink-dim);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.o_owl_zone_subtotal {
+    margin-left: auto;
+    font-family: var(--sb-font-mono);
+    font-size: 12px;
+    color: var(--sb-ink);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.o_owl_zone_retail {
+    text-decoration: line-through;
+    color: var(--sb-ink-dim);
+    margin-right: 10px;
+}
+
+.o_owl_zone_channel {
+    font-weight: 600;
+}
+
+// 8-column grid driving both header + each line row.
+.o_owl_lines {
+    display: grid;
+    grid-template-columns: 36px 1.6fr 70px 1fr 80px 100px 100px 32px;
+    font-size: 12px;
+}
+
+.o_owl_line_head,
+.o_owl_line {
+    display: contents;
+}
+
+.o_owl_line_head > div {
+    padding: 8px 10px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sb-ink-dim);
+    border-bottom: 1px solid var(--sb-rule);
+    background: #faf4e8;
+    align-self: center;
+}
+
+.o_owl_th_center { text-align: center; }
+.o_owl_th_right  { text-align: right; }
+
+.o_owl_line > div {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--sb-rule);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.o_owl_line:hover > div {
+    background: #faf2dd;
+}
+
+.o_owl_line_selected > div {
+    background: var(--sb-hl);
+}
+
+.o_owl_lineno {
+    font-family: var(--sb-font-mono);
+    color: var(--sb-ink-dim);
+    font-size: 11px;
+    justify-content: center;
+}
+
+.o_owl_line_tpl {
+    font-weight: 500;
+    color: var(--sb-ink);
+}
+
+.o_owl_line_xmlid {
+    font-family: var(--sb-font-mono);
+    font-size: 10px;
+    color: var(--sb-ink-dim);
+    margin-left: 6px;
+}
+
+.o_owl_line_dim {
+    font-family: var(--sb-font-mono);
+    color: var(--sb-ink);
+}
+
+.o_owl_line_spec {
+    color: var(--sb-ink);
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.o_owl_line_qty {
+    font-family: var(--sb-font-mono);
+    justify-content: center;
+}
+
+.o_owl_line_price {
+    font-family: var(--sb-font-mono);
+    justify-content: flex-end;
+    white-space: nowrap;
+}
+
+.o_owl_line_retail {
+    text-decoration: line-through;
+    color: var(--sb-ink-dim);
+    font-size: 11px;
+}
+
+.o_owl_line_menu {
+    color: var(--sb-ink-dim);
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover { color: var(--sb-walnut); }
+}
+
+// Per-line badges (MAPLE, RULE, etc.)
+.o_owl_badge {
+    display: inline-block;
+    font-family: var(--sb-font-mono);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-left: 5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.o_owl_badge_maple {
+    background: var(--sb-walnut);
+    color: var(--sb-linen);
+}
+
+.o_owl_badge_rule {
+    background: var(--sb-sky);
+    color: var(--sb-linen);
+}
+
+.o_owl_lines_empty {
+    em { font-style: italic; color: var(--sb-ink-dim); }
+}
+
 // ----- T2C8 TabBar -------------------------------------------------
 .o_owl_tabs {
     display: flex;
