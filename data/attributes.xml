@@ -319,7 +319,13 @@
   <record id="attr_accessories" model="product.attribute">
     <field name="name">Accessories</field>
     <field name="display_type">multi</field>
-    <field name="create_variant">dynamic</field>
+    <!-- NF18 (caught at live install): Odoo's product_attribute_check_multi_checkbox_no_variant
+         constraint requires create_variant='no_variant' when display_type='multi'.
+         Multi-select attributes (soft_close + drawer_organisers + pull_outs)
+         are independently chosen options that don't materialise as variants —
+         they're price-extras on the configured line, not variant axes.
+         Q6 dynamic-variant policy still applies to the OTHER 10 attributes. -->
+    <field name="create_variant">no_variant</field>
     <field name="sequence">100</field>
   </record>
   <record id="value_accessory_soft_close" model="product.attribute.value">
@@ -374,7 +380,13 @@
   <!-- ============================================================== -->
   <record id="attr_door_count" model="product.attribute">
     <field name="name">Door Count</field>
-    <field name="display_type">hidden</field>
+    <!-- NF18 (caught at live install): Odoo 19's product.attribute.display_type
+         selection is {radio, pills, select, color, multi, image} — there is
+         no 'hidden' value. Phase-1 fix: render as radio (visible in UI but
+         restricted by Rule 3 to a single value). Phase-2 fix: view-level
+         conditional that hides the attribute_line when family is set, since
+         the user shouldn't see door_count manually selectable. -->
+    <field name="display_type">radio</field>
     <field name="create_variant">dynamic</field>
     <field name="sequence">110</field>
   </record>
