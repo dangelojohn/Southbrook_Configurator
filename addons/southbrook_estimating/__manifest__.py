@@ -141,16 +141,16 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).
     #
-    # Three.js itself is NOT in this list yet — see
-    # static/lib/three/README.md for the one-time vendoring step. When
-    # the bundle is dropped into static/lib/three/, uncomment the two
-    # commented entries below (above the SCSS line) and restart Odoo.
+    # Three.js vendored on 2026-05-30 (r160 / 0.160.0 UMD build, MIT-
+    # licensed; LICENSE.txt rides along per static/lib/three/README.md).
+    # The two lib entries MUST load before cabinet_viewport.esm.js —
+    # the OWL component does a runtime `window.THREE` check and falls
+    # back to a "Three.js not loaded" placeholder if absent.
     # ------------------------------------------------------------------
     "assets": {
         "web.assets_backend": [
-            # When Three.js is vendored, the next two lines become live:
-            # "southbrook_estimating/static/lib/three/three.min.js",
-            # "southbrook_estimating/static/lib/three/OrbitControls.js",
+            "southbrook_estimating/static/lib/three/three.min.js",
+            "southbrook_estimating/static/lib/three/OrbitControls.js",
             "southbrook_estimating/static/src/scss/cabinet_viewport.scss",
             "southbrook_estimating/static/src/js/cabinet_viewport.esm.js",
             "southbrook_estimating/static/src/xml/cabinet_viewport.xml",
