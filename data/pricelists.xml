@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  6 channel pricelists per Q1 + 3 tradesperson sub-tiers per Q5/NF5.
+
+  Mechanics from Build Spec Section 6 (pseudocode) and Mapping Section 3.2:
+    - Retail: list price ×1.00 (base; the others inherit price flow from this)
+    - Dealer: list × 0.50
+    - Tradesperson: cost × 1.05 floor → tier 1/2/3 multiplier (0.75/0.70/0.65)
+    - KD: ≈46% of retail (price_discount = 54)
+    - Big-box: fixed $98.00 per SKU
+    - Refacing: computed via _compute_refacing_price (custom routine #2)
+
+  noupdate="0" so the post-#8-canonical re-seed can update prices in place.
+
+  Currency: CAD per #5 README (Southbrook is Canadian — Vaughan/Concord, ON).
+-->
+<odoo noupdate="0">
+
+  <!-- ============================================================== -->
+  <!-- 1 · Retail (base list price) -->
+  <!-- ============================================================== -->
+  <record id="pricelist_retail" model="product.pricelist">
+    <field name="name">Retail (List Price)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 2 · Dealer -50% -->
+  <!-- ============================================================== -->
+  <record id="pricelist_dealer" model="product.pricelist">
+    <field name="name">Dealer (-50%)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_dealer_item_global" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_dealer"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">formula</field>
+    <field name="base">list_price</field>
+    <field name="price_discount">50</field>
+    <field name="price_round">0.01</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 3 · Tradesperson base (cost × 1.05 floor) — reachable per NF5 -->
+  <!-- UI label "Contractor (Tiered)" preserves workbook vocabulary -->
+  <!-- ============================================================== -->
+  <record id="pricelist_tradesperson" model="product.pricelist">
+    <field name="name">Contractor (Tiered)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_tradesperson_floor" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_tradesperson"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">formula</field>
+    <field name="base">standard_price</field>
+    <field name="price_markup">5</field>
+    <field name="price_round">0.01</field>
+    <field name="name">Cost x 1.05 floor</field>
+  </record>
+
+  <!-- Tier 1: -25% off the cost+5% floor (effective ×0.75) -->
+  <record id="pricelist_tradesperson_tier_1" model="product.pricelist">
+    <field name="name">Contractor Tier 1 (-25%)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_tradesperson_tier_1_discount" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_tradesperson_tier_1"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">formula</field>
+    <field name="base">pricelist</field>
+    <field name="base_pricelist_id" ref="pricelist_tradesperson"/>
+    <field name="price_discount">25</field>
+    <field name="price_round">0.01</field>
+  </record>
+
+  <!-- Tier 2: -30% (effective ×0.70) -->
+  <record id="pricelist_tradesperson_tier_2" model="product.pricelist">
+    <field name="name">Contractor Tier 2 (-30%)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_tradesperson_tier_2_discount" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_tradesperson_tier_2"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">formula</field>
+    <field name="base">pricelist</field>
+    <field name="base_pricelist_id" ref="pricelist_tradesperson"/>
+    <field name="price_discount">30</field>
+    <field name="price_round">0.01</field>
+  </record>
+
+  <!-- Tier 3: -35% (effective ×0.65) — the smoke-test target per Q7 -->
+  <record id="pricelist_tradesperson_tier_3" model="product.pricelist">
+    <field name="name">Contractor Tier 3 (-35%)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_tradesperson_tier_3_discount" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_tradesperson_tier_3"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">formula</field>
+    <field name="base">pricelist</field>
+    <field name="base_pricelist_id" ref="pricelist_tradesperson"/>
+    <field name="price_discount">35</field>
+    <field name="price_round">0.01</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 4 · Central KD (~46% of retail; price_discount = 54) -->
+  <!-- ============================================================== -->
+  <record id="pricelist_kd" model="product.pricelist">
+    <field name="name">Central KD (Knock-Down Components)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_kd_item_global" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_kd"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">formula</field>
+    <field name="base">list_price</field>
+    <field name="price_discount">54</field>
+    <field name="price_round">0.01</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 5 · Big-box ($98 fixed per SKU) -->
+  <!-- ============================================================== -->
+  <record id="pricelist_bigbox" model="product.pricelist">
+    <field name="name">Big-Box Wholesale</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+  <record id="pricelist_bigbox_item_global" model="product.pricelist.item">
+    <field name="pricelist_id" ref="pricelist_bigbox"/>
+    <field name="applied_on">3_global</field>
+    <field name="compute_price">fixed</field>
+    <field name="fixed_price">98.00</field>
+    <field name="price_round">0.01</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 6 · Refacing (per-SF, 35% margin target — computed routine #2) -->
+  <!-- Items intentionally empty; _compute_refacing_price returns the -->
+  <!-- live-cost-targeting price via the computed pricelist.item.     -->
+  <!-- ============================================================== -->
+  <record id="pricelist_refacing" model="product.pricelist">
+    <field name="name">Refacing (CTHS)</field>
+    <field name="currency_id" ref="base.CAD"/>
+  </record>
+
+</odoo>

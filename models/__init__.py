@@ -8,3 +8,5 @@
 # Commit 6: southbrook_order_analytics.
 from . import res_partner
 from . import product_attribute_value
+from . import product_pricelist
+from . import sale_order

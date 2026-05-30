@@ -35,6 +35,8 @@
         "views/res_partner_views.xml",
         # Commit 3 — configurator attribute vocabulary
         "data/attributes.xml",
+        # Commit 4 — 6 channel pricelists + 3 tradesperson sub-tiers
+        "data/pricelists.xml",
     ],
     "installable": True,
     "application": True,
