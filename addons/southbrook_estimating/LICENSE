@@ -1,0 +1,21 @@
+Southbrook Estimating — Odoo 19 CE addon
+Copyright (C) 2026 Southbrook Cabinetry
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, version 3 of the License (LGPL-3.0-only).
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+License for more details.
+
+The full text of the LGPL-3.0 license is available at:
+
+    https://www.gnu.org/licenses/lgpl-3.0.html
+    https://www.gnu.org/licenses/lgpl-3.0.txt
+
+Every source file in this addon carries an SPDX-License-Identifier
+header for machine-readable license discovery:
+
+    # SPDX-License-Identifier: LGPL-3.0-only
