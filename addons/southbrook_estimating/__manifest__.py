@@ -129,15 +129,35 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "reports/door_order.xml",
     ],
     # ------------------------------------------------------------------
-    # Demo data — loaded only with --demo flag.
+    # Demo data — loaded only with --demo flag (or per-module demo flag).
     # All files are noupdate="1" so demo modifications during gate
     # review survive subsequent -u southbrook_estimating runs.
+    #
+    # NF22 (caught at live install on QNAP southbrook stack 2026-05-30):
+    # demo/southbrook_demo_orders.xml references `product.product_product_4`
+    # (an Odoo core demo product) and was originally written assuming the
+    # gate-review DB would be initialised WITH base Odoo demo data. On a
+    # `--without-demo` DB (which is the QNAP demo stack default) those
+    # core xml_ids don't exist → ParseError on install. Additionally, the
+    # 12 southbrook cabinet templates use `create_variant='dynamic'`
+    # (per Q6) so they have NO concrete `product.product` xml_ids at
+    # install time either — variants only materialise when a config
+    # session commits. So the demo orders cannot reference real
+    # southbrook cabinet variants by xml_id either.
+    #
+    # Phase-2 fix: replace southbrook_demo_orders.xml with a Python-side
+    # helper that programmatically configures each cabinet via the
+    # `product.config.session` flow (the same code path a real user
+    # exercises) and binds the resulting variants to the demo orders.
+    # That gives a faithful demo trace and exercises the engine end-to-end.
+    #
+    # Until then: demo ships partners ONLY. The empty Order Builder
+    # list is a valid Phase-1 starting state — the user clicks New,
+    # picks Demo Tradesperson (Tier 3), and builds the smoke order
+    # themselves from the loaded cabinet templates.
     # ------------------------------------------------------------------
     "demo": [
         "demo/southbrook_demo_partners.xml",
-        # Orders MUST load after partners (FK refs); the function/
-        # action_confirm call at the bottom fires the analytics hook.
-        "demo/southbrook_demo_orders.xml",
     ],
     "installable": True,
     "application": True,
