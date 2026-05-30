@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The four declarative configurator rules from Mapping section 3.4.
+  All encoded as product.config.line records keyed by trigger domain.
+
+  Q22(a) — door_count is a hidden 12th attribute; Rule 3 restricts it to
+           {1} for narrow widths and {2} for wide widths.
+  Q23(b) — family_subtype is scoped to the corner template; Rule 4 hides
+           soft_close when family_subtype=bifold.
+
+  Per-template multiplication:
+    Rule 1: 20 records (10 templates with door_style x 2 series restrictions)
+    Rule 2: 24 records (12 templates with box_material x 2 series restrictions)
+    Rule 3: 20 records (10 templates with door_count x 2 width bands)
+    Rule 4: 1 record (corner template, accessories restriction)
+
+  Templates referenced here come from data/product_templates.xml in commit 7.
+  This file MUST load AFTER product_templates.xml in the manifest data list.
+
+  Until commit 7 lands, this file is INSTALLABLE-BUT-INCOMPLETE: the
+  product.config.line records reference templates that don't exist yet,
+  causing install to fail with "external id not found". The fix is the
+  load-order in __manifest__.py: this file is NOT yet listed in 'data:'
+  in commit 5. It joins the data list in commit 7 when templates arrive.
+
+  Generation note: hand-authored XML chosen over Python emission script
+  for grep-friendliness — git log --grep=Rule\ 1 lands here cleanly.
+-->
+<odoo noupdate="0">
+
+  <!-- ============================================================== -->
+  <!-- DOMAINS — the named triggers (Q5 series keys, Q22 width bands) -->
+  <!-- ============================================================== -->
+
+  <record id="domain_series_is_contractor" model="product.config.domain">
+    <field name="name">Series is Contractor</field>
+  </record>
+  <record id="domain_series_is_contractor_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_series_contractor')])]"/>
+  </record>
+
+  <record id="domain_series_is_elegance" model="product.config.domain">
+    <field name="name">Series is Elegance</field>
+  </record>
+  <record id="domain_series_is_elegance_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_series_is_elegance"/>
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_series_elegance')])]"/>
+  </record>
+
+  <record id="domain_series_is_signature" model="product.config.domain">
+    <field name="name">Series is Signature</field>
+  </record>
+  <record id="domain_series_is_signature_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_series_is_signature"/>
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_series_signature')])]"/>
+  </record>
+
+  <!-- Rule 3 width-band triggers (Q22(a)) -->
+  <record id="domain_width_narrow" model="product.config.domain">
+    <field name="name">Width is Narrow (9-21 in)</field>
+  </record>
+  <record id="domain_width_narrow_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_width_narrow"/>
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_width_9'), ref('value_width_12'), ref('value_width_15'),
+      ref('value_width_18'), ref('value_width_21')
+    ])]"/>
+  </record>
+
+  <record id="domain_width_wide" model="product.config.domain">
+    <field name="name">Width is Wide (24-36 in)</field>
+  </record>
+  <record id="domain_width_wide_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_width_wide"/>
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_width_24'), ref('value_width_27'), ref('value_width_30'),
+      ref('value_width_33'), ref('value_width_36')
+    ])]"/>
+  </record>
+
+  <!-- Rule 4 trigger (Q23(b)) -->
+  <record id="domain_family_subtype_bifold" model="product.config.domain">
+    <field name="name">Family Subtype is Bi-fold</field>
+  </record>
+  <record id="domain_family_subtype_bifold_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_family_subtype_bifold"/>
+    <field name="attribute_id" ref="attr_family_subtype"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_family_subtype_bifold')])]"/>
+  </record>
+
+  <!--
+    NOTE: product.config.line records (the per-template restrictions) are
+    INTENTIONALLY OMITTED from commit 5. They reference attribute_line_ids
+    that materialise in commit 7 when product_templates.xml lands.
+
+    The domains above ARE installable now — they reference only attributes
+    and attribute_values, which both exist as of commit 3.
+
+    When commit 7 lands product_templates.xml, this file is amended (in the
+    same commit) to add:
+      Rule 1: 20 product.config.line records (Series -> door_style)
+      Rule 2: 24 product.config.line records (Box material -> series)
+      Rule 3: 20 product.config.line records (Width -> door_count)
+      Rule 4: 1 product.config.line record (corner_bifold -> no soft_close)
+
+    Total at commit 7: ~65 product.config.line records + the 6 domains above.
+  -->
+
+</odoo>

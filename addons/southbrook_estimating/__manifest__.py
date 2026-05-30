@@ -37,6 +37,9 @@
         "data/attributes.xml",
         # Commit 4 — 6 channel pricelists + 3 tradesperson sub-tiers
         "data/pricelists.xml",
+        # Commit 5 — 4 rule triggers (domains only; per-template config.line
+        # records arrive in commit 7 alongside product_templates.xml)
+        "data/config_rules.xml",
     ],
     "installable": True,
     "application": True,
