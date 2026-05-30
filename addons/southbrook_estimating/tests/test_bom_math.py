@@ -18,7 +18,9 @@ Plus targeted assertions:
   - Drawer-bank hardware count divergence (Phase-1 simplification)
   - Shelf-count height-band heuristic boundaries
 """
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 # Re-import the same constants so tests assert against the SAME source
 # of truth as the production code. Update one, test re-derivation flows.
@@ -29,7 +31,7 @@ from odoo.addons.southbrook_estimating.models.mrp_bom import (
 
 
 @tagged("post_install", "-at_install", "southbrook", "bom_math")
-class TestComputePanelDimensions(TransactionCase):
+class TestComputePanelDimensions(SouthbrookTestCase):
 
     @classmethod
     def setUpClass(cls):

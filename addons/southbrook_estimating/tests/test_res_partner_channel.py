@@ -1,16 +1,13 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Tests for the res.partner channel + tradesperson_tier extension."""
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook")
-class TestResPartnerChannel(TransactionCase):
+class TestResPartnerChannel(SouthbrookTestCase):
     """Q1 + Q5 + NF5: the channel field + tier-defaulting behaviour."""
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.Partner = cls.env["res.partner"]
 
     def test_01_default_channel_is_retail(self):
         """New partners default to channel=retail per the field default."""

@@ -26,6 +26,19 @@ _logger = logging.getLogger(__name__)
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
+    # Channel → pricelist xml_id mapping (Q1). Centralised alongside the
+    # _TRADESPERSON_TIER_PRICELISTS table below for symmetry. Tradesperson
+    # is the one channel that needs a sub-dispatcher (NF5 tier resolution);
+    # the others are flat direct lookups.
+    _CHANNEL_PRICELISTS = {
+        "retail":   "southbrook_estimating.pricelist_retail",
+        "dealer":   "southbrook_estimating.pricelist_dealer",
+        "kd":       "southbrook_estimating.pricelist_kd",
+        "bigbox":   "southbrook_estimating.pricelist_bigbox",
+        "refacing": "southbrook_estimating.pricelist_refacing",
+    }
+    _FALLBACK_PRICELIST_XML_ID = "southbrook_estimating.pricelist_retail"
+
     @api.model
     def _resolve_channel_pricelist(self, partner):
         """Return the product.pricelist matching the partner's channel.
@@ -41,22 +54,15 @@ class SaleOrder(models.Model):
             partner is supplied or the channel is unrecognised.
         """
         if not partner:
-            return self.env.ref("southbrook_estimating.pricelist_retail")
+            return self.env.ref(self._FALLBACK_PRICELIST_XML_ID)
 
         channel = partner.channel or "retail"
-        mapping = {
-            "retail": "southbrook_estimating.pricelist_retail",
-            "dealer": "southbrook_estimating.pricelist_dealer",
-            "kd": "southbrook_estimating.pricelist_kd",
-            "bigbox": "southbrook_estimating.pricelist_bigbox",
-            "refacing": "southbrook_estimating.pricelist_refacing",
-        }
 
         if channel == "tradesperson":
             return self._resolve_tradesperson_pricelist(partner)
 
         return self.env.ref(
-            mapping.get(channel, "southbrook_estimating.pricelist_retail")
+            self._CHANNEL_PRICELISTS.get(channel, self._FALLBACK_PRICELIST_XML_ID)
         )
 
     # Tier → pricelist xml_id mapping (NF5). Adding a tier 4 means one
