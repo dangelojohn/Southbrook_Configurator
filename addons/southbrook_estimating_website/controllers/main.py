@@ -193,6 +193,75 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
 
         return {"ok": True, "line_id": line.id}
 
+    # T2C12 — FooterActions dispatcher.
+    #
+    # Single endpoint that the OWL FooterActions component calls with
+    # action_code in {confirm, duplicate, print}. Returns {ok, ...}
+    # or {error, ...}. The dispatch keeps the API surface small and
+    # avoids one route per button.
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/action",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_action(self, order_id, action_code=None, **kw):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        order_su = order.with_user(request.env.user)
+
+        if action_code == "confirm":
+            if order.state not in ("draft", "sent"):
+                return {
+                    "error": "wrong_state",
+                    "message": (
+                        "Order must be in draft/sent state — current "
+                        + str(order.state)
+                    ),
+                }
+            order_su.action_confirm()
+            return {"ok": True, "new_state": order.state}
+
+        if action_code == "duplicate":
+            # action_duplicate_as_draft is the NF6 method on
+            # southbrook_estimating.sale_order. Returns an
+            # ir.actions.act_window dict pointing at the new draft.
+            if not hasattr(order_su, "action_duplicate_as_draft"):
+                return {"error": "feature_missing"}
+            try:
+                action = order_su.action_duplicate_as_draft()
+            except Exception as exc:                            # noqa: BLE001
+                return {"error": "dup_failed", "message": str(exc)}
+            new_id = action.get("res_id") if isinstance(action, dict) else None
+            if not new_id:
+                return {"error": "dup_failed",
+                        "message": "No new_id returned"}
+            return {
+                "ok": True,
+                "new_order_id": new_id,
+                "redirect_url": f"/my/southbrook/order-builder/{new_id}",
+            }
+
+        if action_code == "print":
+            # Signature Spec Sheet QWeb PDF — the customer-print
+            # report from southbrook_estimating Track 1. We hand the
+            # URL back; the OWL component opens it in a new tab so
+            # the SPA stays mounted.
+            report_xml_id = (
+                "southbrook_estimating.action_report_signature_spec_sheet"
+            )
+            return {
+                "ok": True,
+                "redirect_url": f"/report/pdf/{report_xml_id}/{order_id}",
+            }
+
+        return {"error": "unknown_action", "message": str(action_code)}
+
     @http.route(
         "/southbrook/api/order/<int:order_id>",
         type="json",

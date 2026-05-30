@@ -378,6 +378,118 @@
     font-weight: 600;
 }
 
+// ----- T2C12 FooterActions -----------------------------------------
+.o_owl_footer {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 28px;
+    padding: 18px 22px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-top: 2px solid var(--sb-walnut);
+    border-radius: 2px;
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_footer_actions {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.o_owl_btn {
+    font-family: var(--sb-font-sans);
+    font-size: 13px;
+    padding: 8px 18px;
+    border-radius: 2px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    line-height: 1.4;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.o_owl_btn_primary {
+    background: var(--sb-walnut);
+    color: var(--sb-linen);
+    border-color: var(--sb-walnut);
+
+    &:hover:not(:disabled) {
+        background: var(--sb-walnut-d);
+        border-color: var(--sb-walnut-d);
+    }
+}
+
+.o_owl_btn_secondary {
+    background: white;
+    color: var(--sb-ink);
+    border-color: var(--sb-rule);
+
+    &:hover:not(:disabled) {
+        background: var(--sb-linen);
+        border-color: var(--sb-rule-d);
+    }
+}
+
+.o_owl_footer_total {
+    text-align: right;
+    border-left: 1px solid var(--sb-rule);
+    padding-left: 24px;
+    min-width: 240px;
+}
+
+.o_owl_footer_total_label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sb-ink-dim);
+    margin-bottom: 4px;
+}
+
+.o_owl_footer_total_value {
+    font-size: 28px;
+    color: var(--sb-walnut);
+    font-variation-settings: "opsz" 36, "wght" 600;
+    letter-spacing: -0.01em;
+
+    &.mono {
+        font-family: var(--sb-font-mono);
+        font-variation-settings: normal;
+    }
+}
+
+.o_owl_footer_total_sub {
+    font-size: 11px;
+    color: var(--sb-ink-dim);
+    margin-top: 4px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+
+    .o_owl_channel_badge {
+        margin: 0;
+    }
+}
+
+.o_owl_action_msg {
+    margin-top: 10px;
+    padding: 8px 14px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-left: 4px solid var(--sb-sky);
+    border-radius: 2px;
+    font-size: 12px;
+    color: var(--sb-ink);
+    font-family: var(--sb-font-mono);
+}
+
 // ----- T2C11 BoMPreview --------------------------------------------
 .o_owl_bom {
     font-family: var(--sb-font-sans);

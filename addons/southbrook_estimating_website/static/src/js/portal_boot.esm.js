@@ -212,6 +212,70 @@ class StagePipeline extends Component {
 }
 
 // ----------------------------------------------------------------------
+// FooterActions — T2C12.
+//
+// Bottom action row with the four primary actions (Customer Print /
+// Duplicate / Confirm) and the grand total summary. Each button
+// invokes props.onAction(code); the parent OrderBuilder handles the
+// async RPC + post-action navigation/refresh.
+//
+// Confirm is disabled when order.state is outside (draft, sent).
+// Print + Duplicate are always enabled (Phase 3 may gate based on
+// order state — e.g. only allow Print after pricing has settled).
+// ----------------------------------------------------------------------
+
+class FooterActions extends Component {
+    static template = xml`
+        <div class="o_owl_footer">
+            <div class="o_owl_footer_actions">
+                <button class="o_owl_btn o_owl_btn_secondary"
+                        t-on-click="() => props.onAction('print')"
+                        t-att-disabled="props.busy">
+                    Customer Print (PDF)
+                </button>
+                <button class="o_owl_btn o_owl_btn_secondary"
+                        t-on-click="() => props.onAction('duplicate')"
+                        t-att-disabled="props.busy">
+                    Duplicate as Draft
+                </button>
+                <button class="o_owl_btn o_owl_btn_primary"
+                        t-on-click="() => props.onAction('confirm')"
+                        t-att-disabled="props.busy or !_canConfirm()">
+                    <t t-if="_canConfirm()">Confirm Order</t>
+                    <t t-else="">
+                        Confirmed (<t t-esc="props.order.state"/>)
+                    </t>
+                </button>
+            </div>
+            <div class="o_owl_footer_total">
+                <div class="o_owl_footer_total_label">Grand Total</div>
+                <div class="o_owl_footer_total_value mono"
+                     t-esc="fmtUsd(props.order.channel_total)"/>
+                <div class="o_owl_footer_total_sub">
+                    <t t-esc="props.order.line_count"/> lines ·
+                    <span t-att-class="'o_owl_channel_badge o_owl_channel_'
+                                       + props.order.channel_css">
+                        <t t-esc="props.order.channel_label"/>
+                    </span>
+                </div>
+            </div>
+        </div>
+    `;
+    static props = {
+        order: Object,
+        onAction: Function,
+        busy: { type: Boolean, optional: true },
+    };
+
+    fmtUsd = fmtUsd;
+
+    _canConfirm() {
+        const s = this.props.order?.state;
+        return s === "draft" || s === "sent";
+    }
+}
+
+// ----------------------------------------------------------------------
 // BoMPreview — T2C11.
 //
 // Read-only panel showing the order's BoM rollup: total cabinets,
@@ -889,9 +953,18 @@ const TEMPLATE = xml`
                 </p>
             </div>
 
+            <!-- T2C12 — FooterActions row -->
+            <FooterActions order="state.order"
+                           onAction.bind="_onFooterAction"
+                           busy="state.action_busy"/>
+
+            <div t-if="state.action_message" class="o_owl_action_msg"
+                 t-esc="state.action_message"/>
+
             <p class="o_owl_status">
-                TabBar + tab-panel routing wired (T2C8). Next: T2C9
-                fills the Order Lines panel with the zone grid.
+                Phase 2 Track 2 — 12 of 14 commits live.
+                Commit 13 lands the customer-mode toggle; commit 14
+                is the gate review with John.
             </p>
         </div>
     </div>
@@ -908,6 +981,7 @@ class OrderBuilder extends Component {
         ZoneGroup,
         BoMPreview,
         ValidationStrip,
+        FooterActions,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -934,6 +1008,10 @@ class OrderBuilder extends Component {
                 edge_banding_mm: 0,
             },
             validation: [],
+            // T2C12 — footer-action progress flag. Disables buttons +
+            // shows a brief inline message while an RPC is in flight.
+            action_busy: false,
+            action_message: null,
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
@@ -1068,6 +1146,56 @@ class OrderBuilder extends Component {
     // backend state.
     _onLineSaved = async () => {
         await this._loadOrder();
+    };
+
+    // ------------------------------------------------------------------
+    // T2C12 — FooterActions handler
+    // ------------------------------------------------------------------
+
+    /**
+     * Dispatch a footer action via the backend then post-process the
+     * result: confirm → re-fetch order to update state; duplicate →
+     * navigate to the new order; print → open the PDF URL in a new tab.
+     */
+    _onFooterAction = async (actionCode) => {
+        const orderId = this.props.orderId;
+        if (!orderId) return;
+        this.state.action_busy = true;
+        this.state.action_message = null;
+        try {
+            const res = await rpcJsonCall(
+                `/southbrook/api/order/${encodeURIComponent(orderId)}/action`,
+                { action_code: actionCode },
+            );
+            if (res && res.error) {
+                this.state.action_message = (
+                    res.message || res.error
+                );
+                return;
+            }
+            switch (actionCode) {
+                case "confirm":
+                    await this._loadOrder();
+                    this.state.action_message = "Order confirmed.";
+                    break;
+                case "duplicate":
+                    if (res.redirect_url) {
+                        // Full page nav — destination is the same SPA
+                        // mount point with a new order id.
+                        window.location.href = res.redirect_url;
+                    }
+                    break;
+                case "print":
+                    if (res.redirect_url) {
+                        window.open(res.redirect_url, "_blank");
+                    }
+                    break;
+            }
+        } catch (e) {
+            this.state.action_message = e?.message || String(e);
+        } finally {
+            this.state.action_busy = false;
+        }
     };
 
     // T2C11 — total BoM items used as the BoM tab badge count.
