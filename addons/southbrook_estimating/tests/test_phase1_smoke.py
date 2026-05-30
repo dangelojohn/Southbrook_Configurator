@@ -20,11 +20,13 @@ directly (not against view-level rendering). Per John's commit-11
 guidance: testing rule enforcement at the engine level decouples the
 test from UI rendering choices.
 """
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook", "phase1_smoke")
-class TestPhase1Smoke(TransactionCase):
+class TestPhase1Smoke(SouthbrookTestCase):
     """The 10-step Phase 1 gate test from Mapping section 6.
 
     Promotion status (end of commit 11b):
@@ -45,14 +47,7 @@ class TestPhase1Smoke(TransactionCase):
             "southbrook.seed_mode", default="illustrative"
         )
 
-    def _demo_loaded(self):
-        """True only when --demo loaded the demo partners file."""
-        return bool(
-            self.env.ref(
-                "southbrook_estimating.demo_partner_image_floor",
-                raise_if_not_found=False,
-            )
-        )
+    # _demo_loaded() is provided by SouthbrookTestCase.
 
     # ------------------------------------------------------------------
     # Step 1 — Demo partners exist (Richwood + Demo Tradesperson)

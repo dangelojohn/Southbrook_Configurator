@@ -1,19 +1,18 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Tests for the configurator attribute seed (Q2/Q3/Q4/Q6/Q22(a)/Q23(b))."""
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook")
-class TestAttributeSeed(TransactionCase):
+class TestAttributeSeed(SouthbrookTestCase):
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.Attr = cls.env["product.attribute"]
         cls.Val = cls.env["product.attribute.value"]
-
-    def _ref(self, xml_id):
-        return self.env.ref(f"southbrook_estimating.{xml_id}")
 
     def test_01_eleven_user_facing_attributes_present(self):
         """Q2 — the 11 canonical attributes from Mapping §3.3."""

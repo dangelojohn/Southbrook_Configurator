@@ -16,14 +16,13 @@ These tests assert that:
 This is the "view installs and renders the right things" check.
 End-to-end "rendering looks right visually" is John's live-instance review.
 """
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook", "views")
-class TestOrderBuilderViews(TransactionCase):
-
-    def _ref(self, xml_id):
-        return self.env.ref(f"southbrook_estimating.{xml_id}")
+class TestOrderBuilderViews(SouthbrookTestCase):
 
     # ------------------------------------------------------------------
     # View install + xml_id resolution

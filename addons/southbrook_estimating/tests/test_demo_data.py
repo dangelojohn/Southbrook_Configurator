@@ -20,22 +20,15 @@ Three load-bearing checks per John's commit-11 ask:
 
 These tests run only when demo data has loaded. When --demo is NOT
 passed at install, the demo partners don't exist and these tests
-self-skip via the demo_partners_loaded() check.
+self-skip via the _demo_loaded() guard inherited from SouthbrookTestCase.
 """
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook", "demo")
-class TestDemoData(TransactionCase):
-
-    def _demo_partners_loaded(self):
-        """Returns True only when --demo loaded the partners file."""
-        return bool(
-            self.env.ref(
-                "southbrook_estimating.demo_partner_image_floor",
-                raise_if_not_found=False,
-            )
-        )
+class TestDemoData(SouthbrookTestCase):
 
     # ------------------------------------------------------------------
     # Q6 — variant explosion check
@@ -76,7 +69,7 @@ class TestDemoData(TransactionCase):
 
         Self-skip when --demo not loaded.
         """
-        if not self._demo_partners_loaded():
+        if not self._demo_loaded():
             self.skipTest("--demo not loaded; no demo orders to count")
 
         analytics_rows = self.env["southbrook.order.analytics"].search_count([])
@@ -92,7 +85,7 @@ class TestDemoData(TransactionCase):
     # Demo partner correctness — channel + tier resolution
     # ------------------------------------------------------------------
     def test_03_demo_dealer_partners_have_dealer_channel(self):
-        if not self._demo_partners_loaded():
+        if not self._demo_loaded():
             self.skipTest("--demo not loaded")
         for xml_id in (
             "demo_partner_image_floor",
@@ -105,7 +98,7 @@ class TestDemoData(TransactionCase):
                              f"{xml_id}: channel must be 'dealer'")
 
     def test_04_demo_tradesperson_is_tier_3(self):
-        if not self._demo_partners_loaded():
+        if not self._demo_loaded():
             self.skipTest("--demo not loaded")
         partner = self.env.ref(
             "southbrook_estimating.demo_partner_tradesperson"
@@ -118,7 +111,7 @@ class TestDemoData(TransactionCase):
         )
 
     def test_05_demo_walkin_retail_is_retail_channel(self):
-        if not self._demo_partners_loaded():
+        if not self._demo_loaded():
             self.skipTest("--demo not loaded")
         partner = self.env.ref(
             "southbrook_estimating.demo_partner_walkin_retail"
@@ -129,7 +122,7 @@ class TestDemoData(TransactionCase):
     # Demo order shape
     # ------------------------------------------------------------------
     def test_06_six_open_quotes_in_draft_state(self):
-        if not self._demo_partners_loaded():
+        if not self._demo_loaded():
             self.skipTest("--demo not loaded")
         for xml_id in (
             "demo_quote_image_floor_001",
@@ -147,7 +140,7 @@ class TestDemoData(TransactionCase):
 
     def test_07_nf6_parent_chain_q1_to_q5(self):
         """NF6 chain: demo_quote_image_floor_002 is v2 of _001."""
-        if not self._demo_partners_loaded():
+        if not self._demo_loaded():
             self.skipTest("--demo not loaded")
         v2 = self.env.ref("southbrook_estimating.demo_quote_image_floor_002")
         v1 = self.env.ref("southbrook_estimating.demo_quote_image_floor_001")
@@ -156,7 +149,7 @@ class TestDemoData(TransactionCase):
 
     def test_08_richwood_confirmed_order_spans_four_zones(self):
         """Demonstrates Q21 zone visual grouping at gate review."""
-        if not self._demo_partners_loaded():
+        if not self._demo_loaded():
             self.skipTest("--demo not loaded")
         order = self.env.ref(
             "southbrook_estimating.demo_order_richwood_confirmed"
