@@ -710,9 +710,41 @@ export class CabinetViewport extends Component {
                 "action_reconfigure",
                 [[parseInt(lineId, 10)]],
             );
-            if (action && action.type) {
-                this.action.doAction(action);
-            }
+            if (!action || !action.type) return;
+
+            // T1C10 — onClose hook. When the wizard modal closes
+            // (Save, Cancel, X), refetch the kitchen payload so the
+            // viewport reflects whatever the rep just changed. Also
+            // reload the form's record so the sibling widgets
+            // (order_line list, total, BoM preview tab) see the
+            // updated product / variant / pricing.
+            //
+            // onClose fires on EVERY close path (Save AND Cancel).
+            // The wasted refetch on Cancel is cheap and avoids the
+            // race where a Save dialog isn't truly "committed" until
+            // the modal teardown completes.
+            const refreshAfter = async () => {
+                try {
+                    // 1) Form record reload — picks up new product +
+                    //    config_session_id on the modified line. Lets
+                    //    other widgets see the change without a manual
+                    //    refresh.
+                    if (this.props.record?.load) {
+                        await this.props.record.load();
+                    }
+                    // 2) Kitchen payload refetch — new geometry +
+                    //    line metadata. Hover tooltip will reflect
+                    //    the new family / SKU / dims immediately.
+                    const dispatch = this._rpcDispatch();
+                    if (dispatch.recordId) {
+                        await this._fetchAndRebuild(dispatch.recordId);
+                    }
+                } catch (e) {
+                    this.state.error =
+                        e?.data?.message || e?.message || String(e);
+                }
+            };
+            this.action.doAction(action, { onClose: refreshAfter });
         } catch (e) {
             this.state.error = e?.data?.message || e?.message || String(e);
         }
