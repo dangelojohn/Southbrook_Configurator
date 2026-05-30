@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Order Builder views — Brief section 2.2 + Build Spec section 7
+  Visual reference: docs/southbrook_internal_order_builder.html (mock).
+
+  Translation discipline (per John's commit 9 guidance): the mock is the
+  information architecture reference, not the pixel-perfect target. Odoo's
+  view primitives (form/sheet/notebook/group/header) own the layout; the
+  walnut-on-linen aesthetic layers via SCSS in commit 9.5 or Phase 2 polish.
+
+  Inheritance approach: extend the standard sale.order form. This gives
+  us all the existing patterns (line tree, partner picker, pricelist field,
+  state pipeline) for free; we xpath additions for southbrook-specific bits.
+-->
+<odoo>
+
+  <!-- ============================================================== -->
+  <!-- Order Builder form (extends sale.order) -->
+  <!-- ============================================================== -->
+  <record id="view_order_form_southbrook" model="ir.ui.view">
+    <field name="name">sale.order.form.southbrook</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+
+      <!-- (1) Seed-mode banner — visible only when seed_mode='illustrative'.
+           Per OQ2 acked + commit-9 ask: discreet visual reminder for
+           Phase-1 gate review so demo numbers don't get mistaken for
+           production data. Hides automatically when mode flips to canonical. -->
+      <xpath expr="//sheet" position="before">
+        <div class="alert alert-warning text-center"
+             role="alert"
+             style="margin: 0; border-radius: 0;"
+             invisible="context.get('seed_mode_canonical', False)">
+          <strong>ILLUSTRATIVE SEED</strong> — demo numbers; not production data.
+          See PUNCHLIST OQ2 + Build Spec section 9.3.
+        </div>
+      </xpath>
+
+      <!-- (2) Header strip: 5 cells (mock header strip). Append after
+           the partner block. Channel + savings come from southbrook fields. -->
+      <xpath expr="//field[@name='partner_id']" position="after">
+        <field name="parent_order_id" readonly="1"
+               invisible="not parent_order_id"/>
+        <field name="version" readonly="1"
+               groups="base.group_no_one"/>
+      </xpath>
+
+      <!-- (3) "Duplicate as Draft" button — NF6 Image Floor pattern.
+           Lives in the button_box near the top of the form. -->
+      <xpath expr="//div[@name='button_box']" position="inside">
+        <button name="action_duplicate_as_draft"
+                type="object"
+                string="Duplicate as Draft"
+                class="oe_stat_button"
+                icon="fa-copy"
+                groups="sales_team.group_sale_salesman"
+                help="Create a v+1 draft copy of this order with all lines
+                      preserved. NF6 — Image Floor iterative-design flow."/>
+      </xpath>
+
+      <!-- (4) Per-line zone field — Q21 + NF9 (Richwood multi-zone pattern).
+           Adds the zone column to the order_line tree + a zone_label field
+           that's only visible when zone='other'. -->
+      <xpath expr="//field[@name='order_line']/tree/field[@name='product_id']" position="before">
+        <field name="zone" optional="show"/>
+        <field name="zone_label"
+               optional="hide"
+               invisible="zone != 'other'"/>
+      </xpath>
+
+    </field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- Order Builder action (under Sales menu) -->
+  <!-- ============================================================== -->
+  <record id="action_order_builder" model="ir.actions.act_window">
+    <field name="name">Order Builder</field>
+    <field name="res_model">sale.order</field>
+    <field name="view_mode">tree,form</field>
+    <field name="context">{'default_state': 'draft'}</field>
+    <field name="domain">[('state', 'in', ('draft', 'sent'))]</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">
+        Build a quote with the Order Builder
+      </p>
+      <p>
+        The Order Builder is the sales-rep-facing flow for Southbrook
+        kitchen orders. Pick a customer, add cabinet lines, configure
+        each one inline. Lines are grouped by zone (base run / wall /
+        tall / island / accessory).
+      </p>
+      <p>
+        Reference: <code>docs/Southbrook_ImageFloor_Case_Study.md</code> for
+        the four operating patterns this builder accommodates.
+      </p>
+    </field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- Menu — Sales > Order Builder -->
+  <!-- ============================================================== -->
+  <menuitem id="menu_southbrook_order_builder"
+            name="Order Builder"
+            parent="sale.sale_order_menu"
+            action="action_order_builder"
+            sequence="5"/>
+
+</odoo>
