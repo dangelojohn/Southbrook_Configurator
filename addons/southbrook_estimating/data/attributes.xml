@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The 11 user-facing attributes (Mapping §3.3 / Q2 locked list) + the 2 derived
+  attributes from Q22(a) [door_count hidden] and Q23(b) [family_subtype scoped
+  to corner template] + the 1 sub-attribute from Q8 [accessory_type].
+
+  Per Q6: all create_variant='dynamic'. Per Q4: width values carry both
+  value_inches (display) and value_mm (canonical, from #5 Price Master tab).
+  Per Q3: maple box carries lead_time_extra=14 days (+2 weeks).
+-->
+<odoo noupdate="0">
+
+  <!-- ============================================================== -->
+  <!-- 1 · family                                                     -->
+  <!-- ============================================================== -->
+  <record id="attr_family" model="product.attribute">
+    <field name="name">Family</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">1</field>
+  </record>
+  <record id="value_family_wall" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Wall</field><field name="sequence">1</field>
+  </record>
+  <record id="value_family_base" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Base</field><field name="sequence">2</field>
+  </record>
+  <record id="value_family_drawer" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Drawer Bank</field><field name="sequence">3</field>
+  </record>
+  <record id="value_family_sink" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Sink</field><field name="sequence">4</field>
+  </record>
+  <record id="value_family_tall" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Tall</field><field name="sequence">5</field>
+  </record>
+  <record id="value_family_corner" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Corner</field><field name="sequence">6</field>
+  </record>
+  <record id="value_family_vanity" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Vanity</field><field name="sequence">7</field>
+  </record>
+  <record id="value_family_worktop" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Worktop</field><field name="sequence">8</field>
+  </record>
+  <record id="value_family_accessory" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="name">Accessory</field><field name="sequence">9</field>
+  </record>
+
+  <!-- Q23(b) — family_subtype scoped via attribute_line to corner only -->
+  <record id="attr_family_subtype" model="product.attribute">
+    <field name="name">Family Subtype</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">2</field>
+  </record>
+  <record id="value_family_subtype_standard" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family_subtype"/>
+    <field name="name">Standard</field><field name="sequence">1</field>
+  </record>
+  <record id="value_family_subtype_bifold" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_family_subtype"/>
+    <field name="name">Bi-fold</field><field name="sequence">2</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 2 · width — Q4 dual storage (value_inches + value_mm canonical) -->
+  <!-- Canonical mm values from #5 Price Master tab. DO NOT compute    -->
+  <!-- one from the other — spec rounds differently than literal       -->
+  <!-- conversion (e.g. 9″ = 228mm not 228.6mm).                       -->
+  <!-- ============================================================== -->
+  <record id="attr_width" model="product.attribute">
+    <field name="name">Width</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">10</field>
+  </record>
+  <record id="value_width_9" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">9 in</field>
+    <field name="value_inches">9</field>
+    <field name="value_mm">228</field>
+    <field name="sequence">1</field>
+  </record>
+  <record id="value_width_12" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">12 in</field>
+    <field name="value_inches">12</field>
+    <field name="value_mm">304</field>
+    <field name="sequence">2</field>
+  </record>
+  <record id="value_width_15" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">15 in</field>
+    <field name="value_inches">15</field>
+    <field name="value_mm">381</field>
+    <field name="sequence">3</field>
+  </record>
+  <record id="value_width_18" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">18 in</field>
+    <field name="value_inches">18</field>
+    <field name="value_mm">457</field>
+    <field name="sequence">4</field>
+  </record>
+  <record id="value_width_21" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">21 in</field>
+    <field name="value_inches">21</field>
+    <field name="value_mm">533</field>
+    <field name="sequence">5</field>
+  </record>
+  <record id="value_width_24" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">24 in</field>
+    <field name="value_inches">24</field>
+    <field name="value_mm">609</field>
+    <field name="sequence">6</field>
+  </record>
+  <record id="value_width_27" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">27 in</field>
+    <field name="value_inches">27</field>
+    <field name="value_mm">685</field>
+    <field name="sequence">7</field>
+  </record>
+  <record id="value_width_30" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">30 in</field>
+    <field name="value_inches">30</field>
+    <field name="value_mm">762</field>
+    <field name="sequence">8</field>
+  </record>
+  <record id="value_width_33" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">33 in</field>
+    <field name="value_inches">33</field>
+    <field name="value_mm">838</field>
+    <field name="sequence">9</field>
+  </record>
+  <record id="value_width_36" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_width"/>
+    <field name="name">36 in</field>
+    <field name="value_inches">36</field>
+    <field name="value_mm">914</field>
+    <field name="sequence">10</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 3 · series (the most discriminating attribute)                 -->
+  <!-- ============================================================== -->
+  <record id="attr_series" model="product.attribute">
+    <field name="name">Series</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">20</field>
+  </record>
+  <record id="value_series_contractor" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="name">Contractor Series</field><field name="sequence">1</field>
+  </record>
+  <record id="value_series_contemporary" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="name">Contemporary</field><field name="sequence">2</field>
+  </record>
+  <record id="value_series_elegance" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="name">Elegance</field><field name="sequence">3</field>
+  </record>
+  <record id="value_series_signature" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="name">Signature</field><field name="sequence">4</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 4 · box_material — maple carries lead_time_extra=14 (Q3)       -->
+  <!-- ============================================================== -->
+  <record id="attr_box_material" model="product.attribute">
+    <field name="name">Box Material</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">30</field>
+  </record>
+  <record id="value_box_white_melamine" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_box_material"/>
+    <field name="name">White Melamine</field><field name="sequence">1</field>
+  </record>
+  <record id="value_box_maple" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_box_material"/>
+    <field name="name">Maple</field>
+    <field name="lead_time_extra">14.0</field>
+    <field name="sequence">2</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 5 · door_style                                                 -->
+  <!-- ============================================================== -->
+  <record id="attr_door_style" model="product.attribute">
+    <field name="name">Door Style</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">40</field>
+  </record>
+  <record id="value_door_thermofoil_slab_white" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Thermofoil Slab — White</field><field name="sequence">1</field>
+  </record>
+  <record id="value_door_five_piece_woodgrain" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Five-Piece Woodgrain</field><field name="sequence">2</field>
+  </record>
+  <record id="value_door_custom" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Custom (Signature)</field><field name="sequence">3</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 6 · finish (values seed from #5 Price Master Finish tab later) -->
+  <!-- ============================================================== -->
+  <record id="attr_finish" model="product.attribute">
+    <field name="name">Finish</field>
+    <field name="display_type">color</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">50</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 7 · hinge_side                                                 -->
+  <!-- ============================================================== -->
+  <record id="attr_hinge_side" model="product.attribute">
+    <field name="name">Hinge Side</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">60</field>
+  </record>
+  <record id="value_hinge_left" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_hinge_side"/>
+    <field name="name">Left</field><field name="sequence">1</field>
+  </record>
+  <record id="value_hinge_right" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_hinge_side"/>
+    <field name="name">Right</field><field name="sequence">2</field>
+  </record>
+  <record id="value_hinge_na" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_hinge_side"/>
+    <field name="name">N/A</field><field name="sequence">3</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 8 · finished_sides (drives edge-banding BoM)                   -->
+  <!-- ============================================================== -->
+  <record id="attr_finished_sides" model="product.attribute">
+    <field name="name">Finished Sides</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">70</field>
+  </record>
+  <record id="value_finished_none" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finished_sides"/>
+    <field name="name">None</field><field name="sequence">1</field>
+  </record>
+  <record id="value_finished_left" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finished_sides"/>
+    <field name="name">Left</field><field name="sequence">2</field>
+  </record>
+  <record id="value_finished_right" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finished_sides"/>
+    <field name="name">Right</field><field name="sequence">3</field>
+  </record>
+  <record id="value_finished_both" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_finished_sides"/>
+    <field name="name">Both</field><field name="sequence">4</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 9 · gables                                                     -->
+  <!-- ============================================================== -->
+  <record id="attr_gables" model="product.attribute">
+    <field name="name">Gables</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">80</field>
+  </record>
+  <record id="value_gables_standard" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_gables"/>
+    <field name="name">Standard</field><field name="sequence">1</field>
+  </record>
+  <record id="value_gables_finished" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_gables"/>
+    <field name="name">Finished</field><field name="sequence">2</field>
+  </record>
+  <record id="value_gables_decorative" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_gables"/>
+    <field name="name">Decorative</field><field name="sequence">3</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 10 · handle (catalog values seed from #5 later)                -->
+  <!-- ============================================================== -->
+  <record id="attr_handle" model="product.attribute">
+    <field name="name">Handle</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">90</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 11 · accessories (MULTI-SELECT) — soft_close subject to Rule 4 -->
+  <!-- ============================================================== -->
+  <record id="attr_accessories" model="product.attribute">
+    <field name="name">Accessories</field>
+    <field name="display_type">multi</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">100</field>
+  </record>
+  <record id="value_accessory_soft_close" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessories"/>
+    <field name="name">Soft-Close</field><field name="sequence">1</field>
+  </record>
+  <record id="value_accessory_drawer_organisers" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessories"/>
+    <field name="name">Drawer Organisers</field><field name="sequence">2</field>
+  </record>
+  <record id="value_accessory_pull_outs" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessories"/>
+    <field name="name">Pull-Outs</field><field name="sequence">3</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- Q8 · accessory_type (scoped to accessory template only)        -->
+  <!-- 5 values: end_panel / filler / cornice / pelmet / plinth       -->
+  <!-- ============================================================== -->
+  <record id="attr_accessory_type" model="product.attribute">
+    <field name="name">Accessory Type</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">5</field>
+  </record>
+  <record id="value_accessory_type_end_panel" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessory_type"/>
+    <field name="name">End Panel</field><field name="sequence">1</field>
+  </record>
+  <record id="value_accessory_type_filler" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessory_type"/>
+    <field name="name">Filler</field><field name="sequence">2</field>
+  </record>
+  <record id="value_accessory_type_cornice" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessory_type"/>
+    <field name="name">Cornice</field><field name="sequence">3</field>
+  </record>
+  <record id="value_accessory_type_pelmet" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessory_type"/>
+    <field name="name">Pelmet</field><field name="sequence">4</field>
+  </record>
+  <record id="value_accessory_type_plinth" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_accessory_type"/>
+    <field name="name">Plinth</field><field name="sequence">5</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 12 · door_count (HIDDEN per Q22(a))                            -->
+  <!-- Rule 3 in config_rules.xml restricts this to {1} for narrow    -->
+  <!-- widths and {2} for wide widths. Hidden from customer UI;       -->
+  <!-- visible in BoM preview per Brief §2.2.                          -->
+  <!-- ============================================================== -->
+  <record id="attr_door_count" model="product.attribute">
+    <field name="name">Door Count</field>
+    <field name="display_type">hidden</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">110</field>
+  </record>
+  <record id="value_door_count_1" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_count"/>
+    <field name="name">1</field><field name="sequence">1</field>
+  </record>
+  <record id="value_door_count_2" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_count"/>
+    <field name="name">2</field><field name="sequence">2</field>
+  </record>
+
+</odoo>
