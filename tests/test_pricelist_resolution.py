@@ -143,10 +143,30 @@ class TestPricelistResolution(SouthbrookTestCase):
         )
 
     def test_11_onchange_no_partner_no_op(self):
-        """NF13 companion: onchange with null partner does not crash."""
-        from odoo.tests.common import Form
-        with Form(self.Order) as f:
-            # No partner_id set.
-            pass
-        # If we got here without exception, the no-partner branch is well-formed.
-        self.assertTrue(True)
+        """NF13 companion: onchange logic with null partner must not crash.
+
+        NF24 (caught at live test run 2026-05-30): the original Form-based
+        approach tried to exit the `with` block without ever assigning
+        partner_id — but Form auto-saves on exit, and sale.order.partner_id
+        is required, so the save aborts before our onchange logic runs.
+        That defeats the purpose: we want to exercise the no-partner
+        branch of _onchange_partner_id_resolve_pricelist, not test that
+        sale.order requires partner_id.
+
+        Fix: instantiate an in-memory order (new() — no save) and call
+        the onchange method directly (sale_order.py:_onchange_partner_id_southbrook_pricelist).
+        assertRaises-no-exception is the contract.
+        """
+        # NewId record — exists in memory only; never saved, so the
+        # required-partner_id check never triggers.
+        new_order = self.Order.new({})
+        self.assertFalse(new_order.partner_id, "fixture: no partner set")
+        # If our resolver has an unguarded `partner.channel` access, this
+        # call raises AttributeError. The test passes only when the
+        # no-partner branch returns cleanly.
+        try:
+            new_order._onchange_partner_id_southbrook_pricelist()
+        except AttributeError as exc:
+            self.fail(
+                f"NF13 regression: onchange with null partner crashed: {exc}"
+            )

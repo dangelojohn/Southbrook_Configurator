@@ -169,25 +169,34 @@ class TestPhase1Smoke(SouthbrookTestCase):
         })
 
         # Pin series=Contractor and door_style=five_piece.
-        # The exact OCA API for setting session value_ids varies between
-        # versions; below uses the documented validate_configuration entry
-        # path with explicit value_ids.
-        result = session.validate_configuration(
-            product_tmpl_id=template.id,
-            value_ids=[val_contractor.id, val_five_piece.id],
-            final=True,
-        )
-        # Rule 1 should produce a failure dict.
-        self.assertIsNotNone(result)
-        # Result shape per OCA validate_configuration: dict with 'value' key
-        # (False on rule failure) and 'reason' key (the failed rule's reason).
-        # On the no-op stub from commit 5, the upstream contract is preserved.
-        if isinstance(result, dict) and "value" in result:
-            self.assertFalse(
-                result["value"],
-                "Rule 1 (Contractor + 5-piece door) must be blocked. "
-                f"validate_configuration returned: {result}",
+        #
+        # NF24 (caught at live test run 2026-05-30): OCA's 19.0 port
+        # raises ValidationError when validate_configuration encounters
+        # an unavailable value combination — it does NOT return a {value:
+        # False} dict as the earlier OCA versions did. The original test
+        # was written against the dict-return API; the exception API is
+        # equally valid (and more idiomatic Odoo). assertRaises is the
+        # right shape now.
+        from odoo.exceptions import ValidationError
+        with self.assertRaises(
+            ValidationError,
+            msg="Rule 1 (Contractor + 5-piece door) must be blocked — "
+                "OCA validate_configuration should raise ValidationError",
+        ) as ctx:
+            session.validate_configuration(
+                product_tmpl_id=template.id,
+                value_ids=[val_contractor.id, val_five_piece.id],
+                final=True,
             )
+        # And the error must name the rule-blocked attribute so the user
+        # can fix the configuration. Loose-match on "Door Style" or
+        # "Five-Piece" so the test survives wording tweaks upstream.
+        msg = str(ctx.exception)
+        self.assertTrue(
+            "Door Style" in msg or "Five-Piece" in msg,
+            f"ValidationError must reference the blocked door choice "
+            f"so the user knows why; got: {msg!r}",
+        )
 
     # ------------------------------------------------------------------
     # Step 6 — Panel math (live since commit 8)
@@ -325,10 +334,12 @@ class TestPhase1Smoke(SouthbrookTestCase):
             "product_qty": 1.0,
             "product_uom_id": product.uom_id.id,
         })
-        report = self.env.ref(
-            "southbrook_estimating.action_report_shop_copy"
+        # NF24: Odoo 19 _render_qweb_html signature added report_ref
+        # as the first positional arg. Pass the report's full xml_id.
+        report_ref = "southbrook_estimating.action_report_shop_copy"
+        content, _ = self.env["ir.actions.report"]._render_qweb_html(
+            report_ref, [mo.id]
         )
-        content, _ = report._render_qweb_html([mo.id])
         html = content.decode() if isinstance(content, bytes) else content
         self.assertIn("Shop Copy", html)
         self.assertIn(product.name, html)
