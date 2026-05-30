@@ -145,6 +145,9 @@ export class CabinetViewport extends Component {
         this._scene.add(this._cabinetGroup);
 
         // Material registry — referenced by panel.material name.
+        // Track 1 commit 3 added `toekick` + `worktop` for the family-
+        // dispatched payloads (drawer_bank, base/sink/tall/vanity,
+        // worktop slabs).
         this._materials = {
             carcass: new THREE.MeshStandardMaterial({
                 color: 0xc89e85, roughness: 0.85, metalness: 0.0,
@@ -157,6 +160,18 @@ export class CabinetViewport extends Component {
             }),
             shelf: new THREE.MeshStandardMaterial({
                 color: 0xc89e85, roughness: 0.85, metalness: 0.0,
+            }),
+            // Toe-kick — typically painted matte black or recessed in
+            // shadow. We use near-black with high roughness to read
+            // visually as "the dark gap below the cabinet".
+            toekick: new THREE.MeshStandardMaterial({
+                color: 0x2a2520, roughness: 0.95, metalness: 0.0,
+            }),
+            // Worktop — light grey quartz/Caesarstone stand-in. When
+            // the canonical worktop catalog lands (Caesarstone vs
+            // butcher-block vs marble), this becomes attribute-driven.
+            worktop: new THREE.MeshStandardMaterial({
+                color: 0xb5b0a8, roughness: 0.4, metalness: 0.05,
             }),
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
