@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <record id="manager_product_configuration_settings" model="ir.config_parameter">
+        <field
+            name="key"
+        >product_configurator.manager_product_configuration_settings</field>
+        <field name="value">True</field>
+    </record>
+    <!--
+        Retention threshold (in days) for draft product.config.session
+        rows. Sessions in 'draft' state with write_date older than this
+        are deleted by the daily GC cron (see data/cron.xml). Sessions
+        referenced by a sale.order.line are NEVER collected, even drafts.
+        Default 7 days; tighten to 1-3 on high-traffic sites, loosen to
+        14-30 if you need a longer abandoned-cart recovery window.
+    -->
+    <record id="session_gc_days_param" model="ir.config_parameter">
+        <field name="key">product_configurator.session_gc_days</field>
+        <field name="value">7</field>
+    </record>
+    <!--
+        Stock visibility (see get_config_stock_info on product.config.session).
+        Threshold below which a component is considered "low stock" — the
+        wizard surfaces a yellow badge instead of a green one. Zero or
+        negative qty_available always reads as out_of_stock regardless of
+        this threshold. Default 5 units; tune per business policy.
+    -->
+    <record id="low_stock_threshold_param" model="ir.config_parameter">
+        <field name="key">product_configurator.low_stock_threshold</field>
+        <field name="value">5</field>
+    </record>
+</odoo>

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    [REF] (f) — Portal templates for saved configurations.
+
+    Two templates here:
+      1. portal_my_home_menu_configurator — extends /my (the portal
+         homepage) to render a "My Configurations" card alongside
+         Addresses, Connection & Security, etc. The card shows a
+         placeholder count that lazy-loads via the standard portal
+         counter mechanism (request.session['portal_counters']).
+      2. portal_my_configurations — the full /my/configurations list
+         view. Rendered by CustomerPortalConfigurator.portal_my_
+         configurations in controllers/portal.py.
+
+    Pattern alignment: structurally mirrors how website_sale extends
+    the portal for sale.order — same xpath target
+    (portal_common_category), same portal_docs_entry call shape, same
+    portal_table wrapper for the list view. Keeps the buyer-facing
+    UX consistent with Odoo's stock portal so the configurator's
+    bookmark surface doesn't read as bolted-on.
+-->
+<odoo>
+
+    <!-- 1. "My Configurations" card on portal homepage -->
+    <template
+        id="portal_my_home_menu_configurator"
+        name="Portal layout: My Configurations menu entry"
+        inherit_id="portal.portal_my_home"
+        priority="40"
+    >
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <div
+                t-if="configuration_count is not None"
+                class="o_portal_category row g-2 mt-3"
+                id="portal_configurator_category"
+            >
+                <t t-call="portal.portal_docs_entry">
+                    <t
+                        t-set="icon"
+                        t-value="'/website_product_configurator/static/src/img/portal_configurations.svg'"
+                    />
+                    <t t-set="title">My Configurations</t>
+                    <t t-set="text">Saved product configurations you can return to</t>
+                    <t t-set="url" t-value="'/my/configurations'"/>
+                    <t t-set="placeholder_count" t-value="'configuration_count'"/>
+                </t>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- 2. /my/configurations list view -->
+    <template
+        id="portal_my_configurations"
+        name="My Saved Configurations"
+    >
+        <t t-call="portal.portal_layout">
+            <t t-set="title">My Configurations</t>
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Saved Configurations</t>
+            </t>
+            <t t-if="not configurations">
+                <p class="alert alert-warning">
+                    You don't have any saved configurations yet.
+                    Visit the
+                    <a href="/shop">shop</a>
+                    , configure a product, and save it to return to it here.
+                </p>
+            </t>
+            <t t-if="configurations" t-call="portal.portal_table">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Product</th>
+                        <th class="text-end">Price</th>
+                        <th>Last viewed</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!--
+                        FEATURE 2 — iterating product.config.bookmark
+                        records (the dedicated model), not the legacy
+                        product.config.session. ``bookmark`` is the
+                        iteration var; bookmark.session_id is the
+                        underlying configuration if any template
+                        needs values_ids / price-from-session.
+                    -->
+                    <tr t-foreach="configurations" t-as="bookmark">
+                        <td>
+                            <span t-out="bookmark.name"/>
+                        </td>
+                        <td>
+                            <span t-out="bookmark.product_tmpl_id.name"/>
+                        </td>
+                        <td class="text-end">
+                            <span
+                                t-out="bookmark.session_id.price"
+                                t-options='{"widget": "monetary", "display_currency": bookmark.session_id.currency_id}'
+                            />
+                        </td>
+                        <td>
+                            <span
+                                t-out="bookmark.last_viewed"
+                                t-options='{"widget": "datetime"}'
+                            />
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a
+                                    t-att-href="'/my/configurations/%s/resume' % bookmark.id"
+                                    class="btn btn-primary"
+                                >
+                                    Continue
+                                </a>
+                                <!--
+                                    Rename: collapsible form per row.
+                                    Bootstrap collapse keeps the list
+                                    compact; clicking the pencil icon
+                                    expands an inline name input.
+                                -->
+                                <button
+                                    class="btn btn-outline-secondary"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    t-att-data-bs-target="'#rename-%s' % bookmark.id"
+                                    title="Rename"
+                                >
+                                    <i class="fa fa-pencil"/>
+                                </button>
+                                <form
+                                    t-att-action="'/my/configurations/%s/delete' % bookmark.id"
+                                    method="post"
+                                    style="display:inline"
+                                    onsubmit="return confirm('Remove this saved configuration?');"
+                                >
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        t-att-value="request.csrf_token()"
+                                    />
+                                    <button
+                                        type="submit"
+                                        class="btn btn-outline-danger"
+                                        title="Remove"
+                                    >
+                                        <i class="fa fa-trash-o"/>
+                                    </button>
+                                </form>
+                            </div>
+                            <div
+                                t-att-id="'rename-%s' % bookmark.id"
+                                class="collapse mt-2"
+                            >
+                                <form
+                                    t-att-action="'/my/configurations/%s/rename' % bookmark.id"
+                                    method="post"
+                                    class="d-flex gap-2"
+                                >
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        t-att-value="request.csrf_token()"
+                                    />
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        class="form-control form-control-sm"
+                                        t-att-value="bookmark.name"
+                                        maxlength="128"
+                                        required="required"
+                                        placeholder="New name"
+                                    />
+                                    <button
+                                        type="submit"
+                                        class="btn btn-sm btn-primary"
+                                    >
+                                        Save
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+</odoo>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <!--
+        Garbage-collect stale draft product.config.session rows.
+
+        Every wizard visit (anonymous OR authenticated) creates a
+        session row. Without periodic cleanup the table grows
+        unbounded — modest-traffic sites accumulate 100k+ rows per
+        month, slowing the configurator and bloating the DB.
+
+        The GC method (_gc_draft_sessions on product.config.session)
+        deletes draft sessions whose write_date is older than the
+        configured threshold (default 7 days, settable via the
+        ir.config_parameter product_configurator.session_gc_days).
+        Sessions referenced by a sale.order.line via config_session_id
+        are NEVER collected — even drafts — to avoid orphaning cart
+        lines.
+
+        Daily cadence is conservative; high-traffic sites can tighten
+        the schedule via the standard ir.cron UI.
+    -->
+    <record id="ir_cron_gc_draft_sessions" model="ir.cron">
+        <field name="name">Product Configurator: GC stale draft sessions</field>
+        <field name="model_id" ref="model_product_config_session" />
+        <field name="state">code</field>
+        <field name="code">model._gc_draft_sessions()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True" />
+    </record>
+</odoo>
