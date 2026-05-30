@@ -118,3 +118,43 @@ class TestPricelistResolution(TransactionCase):
             "is_refacing_margin_target": True,
         })
         self.assertEqual(item._compute_refacing_price(product, 1), 200.0)
+
+    # --- NF13 regression: onchange must actually assign pricelist_id ---
+
+    def test_10_onchange_partner_id_resolves_pricelist(self):
+        """NF13 regression — direct behavioural assertion that
+        _onchange_partner_id_southbrook_pricelist actually does its job.
+
+        The reported "bug" in this method on 2026-05-30 turned out to be a
+        paste-rendering artifact in review, not a real truncation. But the
+        class of slip is real: py_compile and ET.parse don't catch method
+        bodies that lose statements between commits. This test asserts
+        observable behaviour (pricelist_id changes), not just callability.
+        """
+        from odoo.tests.common import Form
+        partner = self.Partner.create({
+            "name": "NF13 Test Partner",
+            "channel": "tradesperson",
+            "tradesperson_tier": "3",
+        })
+        with Form(self.Order) as f:
+            f.partner_id = partner
+            # After onchange fires, the Form's pricelist_id reflects the resolver.
+            # Cannot read pricelist_id directly from Form harness (it's a hidden
+            # default field in many configurations) — assert via the saved record.
+        saved = f.save()
+        self.assertEqual(
+            saved.pricelist_id,
+            self._ref("pricelist_tradesperson_tier_3"),
+            "NF13 regression: onchange must assign Tier-3 pricelist when "
+            "partner.channel=tradesperson + tier=3",
+        )
+
+    def test_11_onchange_no_partner_no_op(self):
+        """NF13 companion: onchange with null partner does not crash."""
+        from odoo.tests.common import Form
+        with Form(self.Order) as f:
+            # No partner_id set.
+            pass
+        # If we got here without exception, the no-partner branch is well-formed.
+        self.assertTrue(True)

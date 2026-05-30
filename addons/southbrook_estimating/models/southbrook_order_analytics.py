@@ -125,6 +125,10 @@ class SouthbrookOrderAnalytics(models.Model):
                 lambda v: v.attribute_id.name == "Series"
             )
             if series_val:
+                # [:1] slice is defensive against a future case where a
+                # variant might carry multiple Series attribute values.
+                # Q2 locks Series as single-value per cabinet, so today
+                # this slice picks the only element. Belt-and-suspenders.
                 series_counts[series_val[:1].name] += 1
             cabinet_count += int(line.product_uom_qty)
             # Panel + door counts pull from the BoM rollup. Stub for commit

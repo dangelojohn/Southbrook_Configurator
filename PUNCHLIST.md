@@ -456,8 +456,24 @@ Surface in next #5 regeneration (or in the canonical re-seed when #8 lands).
 Diverges from Q3 wording ("on product.template.attribute.value"). Rationale
 in commit 3 message + `models/product_attribute_value.py` docstring. Phase-1
 implication: simpler seeding; one master record sets the bump for all
-templates. Phase-2-flag: if real per-template override surfaces, add a
-sibling variant field with computed default from master.
+templates.
+
+**Phase-2/4 escape hatch (acked 2026-05-29):** if Phase 4's Accucutt
+integration surfaces template-specific lead-time variation (e.g. a
+maple sink_base finishing in +3 weeks not +2 because of the cutout work),
+the fix path is:
+
+1. Add a sibling `lead_time_extra` field on `product.template.attribute.value`
+   (the variant) with a computed default that reads from the master
+   `product.attribute.value.lead_time_extra` as fallback.
+2. Update the `mrp.bom._compute_southbrook_lead_time_extra` rollup to
+   prefer the variant value when set, falling back to master otherwise.
+3. Migration: zero data movement — existing master records continue to
+   work, variant records only need creating for the per-template overrides.
+
+Total cost ~30 LoC. Trigger: any time a real per-template variation
+surfaces in the field, in a customer support call, or in Phase-4
+manufacturing data. Until then, master-only is the right call.
 
 ### NF12 · XML lint should be in pre-commit
 
@@ -470,6 +486,46 @@ not at test-time. Fixed in `fix:` follow-up commit.
 of Phase 2), include `xmllint --noout` or `python -c "ET.parse(...)"` on
 every `*.xml` in the data directories. Cost: zero. Benefit: catches every
 class of XML malformation before commit, not at install.
+
+**Resolution (commit 7):** `scripts/lint-xml.sh` shipped — walks
+`addons/southbrook_estimating*` and parses every `*.xml` with
+`xml.etree.ElementTree`. Manual invocation today (`./scripts/lint-xml.sh`
+before XML-touching commits); wires into a real pre-commit framework
+in Phase 2 without behaviour change.
+
+### NF13 · Method-body truncation is a class of slip py_compile can't catch
+
+Surfaced 2026-05-30 as a **false alarm** during the modeling-layer review:
+review of pasted code suggested `_onchange_partner_id_southbrook_pricelist`
+had lost its body between commits 4 and 6. Disk read + Python AST inspection
+proved the method was intact. The actual cause was likely a paste-rendering
+artifact (markdown collapsing contiguous indented lines under the for-loop).
+
+**But the class of slip is real.** Python `compile()` accepts a method with
+`for x in self:` + a single `if guard: continue` body as syntactically valid
+even if the rest of the intended body got truncated. The method returns None
+and has a valid empty body after the guard; no exception. `py_compile` is
+satisfied, but the semantic intent is gone.
+
+**Mitigation (process):** every new model method introduced in a commit
+SHOULD have at least one direct unit test asserting it does something
+**observable**, not just that it can be called. The test is the proof
+of behaviour; the compile-check is only the proof of syntax. When commit
+N adds method M2 to a class that already has M1, commit N's test plan
+includes a behavioural regression assertion on M1.
+
+**Mitigation (this build, commit 7):** added
+`test_pricelist_resolution.test_10_onchange_partner_id_resolves_pricelist`
+that exercises the onchange via the `Form` harness and asserts the
+resulting `order.pricelist_id` matches the resolver output. Even though
+the bug it tests for didn't exist, the test catches the class.
+
+**Discipline-D (Claude-side):** when I report a bug in code I haven't run,
+the report shape is "I see X in the paste, that looks wrong, can you
+confirm on disk?" — not "this is a real bug, fix it." Disk wins over
+rendered paste. Cost of asking before asserting: one round-trip. Cost
+of asserting broken-when-fine: a wild-goose-chase commit + a tax on
+trust. Applies going forward.
 
 ---
 

@@ -106,22 +106,547 @@
     <field name="value_ids" eval="[(6, 0, [ref('value_family_subtype_bifold')])]"/>
   </record>
 
-  <!--
-    NOTE: product.config.line records (the per-template restrictions) are
-    INTENTIONALLY OMITTED from commit 5. They reference attribute_line_ids
-    that materialise in commit 7 when product_templates.xml lands.
 
-    The domains above ARE installable now — they reference only attributes
-    and attribute_values, which both exist as of commit 3.
+  <!-- ============================================================== -->
+  <!-- RULE 1 — Series → Door Style                                   -->
+  <!-- Contractor: thermofoil_slab_white only                         -->
+  <!-- Elegance:   five_piece_woodgrain only                          -->
+  <!-- ============================================================== -->
+<record id="rule1_series_is_contractor_door_style_wall_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_1dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10</field>
+</record>
 
-    When commit 7 lands product_templates.xml, this file is amended (in the
-    same commit) to add:
-      Rule 1: 20 product.config.line records (Series -> door_style)
-      Rule 2: 24 product.config.line records (Box material -> series)
-      Rule 3: 20 product.config.line records (Width -> door_count)
-      Rule 4: 1 product.config.line record (corner_bifold -> no soft_close)
+<record id="rule1_series_is_contractor_door_style_wall_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_2dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">20</field>
+</record>
 
-    Total at commit 7: ~65 product.config.line records + the 6 domains above.
-  -->
+<record id="rule1_series_is_contractor_door_style_base_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_1dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">30</field>
+</record>
+
+<record id="rule1_series_is_contractor_door_style_base_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_2dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">40</field>
+</record>
+
+<record id="rule1_series_is_contractor_door_style_drawer_bank" model="product.config.line">
+  <field name="product_tmpl_id" ref="drawer_bank"/>
+  <field name="attribute_line_id" ref="attr_line_drawer_bank_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">50</field>
+</record>
+
+<record id="rule1_series_is_contractor_door_style_sink_base" model="product.config.line">
+  <field name="product_tmpl_id" ref="sink_base"/>
+  <field name="attribute_line_id" ref="attr_line_sink_base_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">60</field>
+</record>
+
+<record id="rule1_series_is_contractor_door_style_tall_pantry" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_pantry"/>
+  <field name="attribute_line_id" ref="attr_line_tall_pantry_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">70</field>
+</record>
+
+<record id="rule1_series_is_contractor_door_style_tall_oven" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_oven"/>
+  <field name="attribute_line_id" ref="attr_line_tall_oven_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">80</field>
+</record>
+
+<record id="rule1_series_is_contractor_door_style_corner" model="product.config.line">
+  <field name="product_tmpl_id" ref="corner"/>
+  <field name="attribute_line_id" ref="attr_line_corner_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">90</field>
+</record>
+
+<record id="rule1_series_is_contractor_door_style_vanity" model="product.config.line">
+  <field name="product_tmpl_id" ref="vanity"/>
+  <field name="attribute_line_id" ref="attr_line_vanity_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">100</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_wall_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_1dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">110</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_wall_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_2dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">120</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_base_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_1dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">130</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_base_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_2dr_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">140</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_drawer_bank" model="product.config.line">
+  <field name="product_tmpl_id" ref="drawer_bank"/>
+  <field name="attribute_line_id" ref="attr_line_drawer_bank_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">150</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_sink_base" model="product.config.line">
+  <field name="product_tmpl_id" ref="sink_base"/>
+  <field name="attribute_line_id" ref="attr_line_sink_base_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">160</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_tall_pantry" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_pantry"/>
+  <field name="attribute_line_id" ref="attr_line_tall_pantry_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">170</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_tall_oven" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_oven"/>
+  <field name="attribute_line_id" ref="attr_line_tall_oven_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">180</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_corner" model="product.config.line">
+  <field name="product_tmpl_id" ref="corner"/>
+  <field name="attribute_line_id" ref="attr_line_corner_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">190</field>
+</record>
+
+<record id="rule1_series_is_elegance_door_style_vanity" model="product.config.line">
+  <field name="product_tmpl_id" ref="vanity"/>
+  <field name="attribute_line_id" ref="attr_line_vanity_door_style"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_five_piece_woodgrain')])]"/>
+  <field name="domain_id" ref="domain_series_is_elegance"/>
+  <field name="sequence">200</field>
+</record>
+
+  <!-- ============================================================== -->
+  <!-- RULE 2 — Box Material → Series                                 -->
+  <!-- Contractor: white_melamine only                                -->
+  <!-- Signature:  maple only                                         -->
+  <!-- (Contemporary + Elegance: no restriction, both options shown)  -->
+  <!-- ============================================================== -->
+<record id="rule2_series_is_contractor_box_material_wall_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_1dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10000</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_wall_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_2dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10010</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_base_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_1dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10020</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_base_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_2dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10030</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_drawer_bank" model="product.config.line">
+  <field name="product_tmpl_id" ref="drawer_bank"/>
+  <field name="attribute_line_id" ref="attr_line_drawer_bank_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10040</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_sink_base" model="product.config.line">
+  <field name="product_tmpl_id" ref="sink_base"/>
+  <field name="attribute_line_id" ref="attr_line_sink_base_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10050</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_tall_pantry" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_pantry"/>
+  <field name="attribute_line_id" ref="attr_line_tall_pantry_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10060</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_tall_oven" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_oven"/>
+  <field name="attribute_line_id" ref="attr_line_tall_oven_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10070</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_corner" model="product.config.line">
+  <field name="product_tmpl_id" ref="corner"/>
+  <field name="attribute_line_id" ref="attr_line_corner_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10080</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_vanity" model="product.config.line">
+  <field name="product_tmpl_id" ref="vanity"/>
+  <field name="attribute_line_id" ref="attr_line_vanity_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10090</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_accessory" model="product.config.line">
+  <field name="product_tmpl_id" ref="accessory"/>
+  <field name="attribute_line_id" ref="attr_line_accessory_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10100</field>
+</record>
+
+<record id="rule2_series_is_contractor_box_material_worktop" model="product.config.line">
+  <field name="product_tmpl_id" ref="worktop"/>
+  <field name="attribute_line_id" ref="attr_line_worktop_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
+  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="sequence">10110</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_wall_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_1dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10120</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_wall_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_2dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10130</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_base_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_1dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10140</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_base_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_2dr_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10150</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_drawer_bank" model="product.config.line">
+  <field name="product_tmpl_id" ref="drawer_bank"/>
+  <field name="attribute_line_id" ref="attr_line_drawer_bank_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10160</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_sink_base" model="product.config.line">
+  <field name="product_tmpl_id" ref="sink_base"/>
+  <field name="attribute_line_id" ref="attr_line_sink_base_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10170</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_tall_pantry" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_pantry"/>
+  <field name="attribute_line_id" ref="attr_line_tall_pantry_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10180</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_tall_oven" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_oven"/>
+  <field name="attribute_line_id" ref="attr_line_tall_oven_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10190</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_corner" model="product.config.line">
+  <field name="product_tmpl_id" ref="corner"/>
+  <field name="attribute_line_id" ref="attr_line_corner_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10200</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_vanity" model="product.config.line">
+  <field name="product_tmpl_id" ref="vanity"/>
+  <field name="attribute_line_id" ref="attr_line_vanity_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10210</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_accessory" model="product.config.line">
+  <field name="product_tmpl_id" ref="accessory"/>
+  <field name="attribute_line_id" ref="attr_line_accessory_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10220</field>
+</record>
+
+<record id="rule2_series_is_signature_box_material_worktop" model="product.config.line">
+  <field name="product_tmpl_id" ref="worktop"/>
+  <field name="attribute_line_id" ref="attr_line_worktop_box_material"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
+  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="sequence">10230</field>
+</record>
+
+  <!-- ============================================================== -->
+  <!-- RULE 3 — Width → Door Count (Q22(a))                           -->
+  <!-- Narrow (9-21 in) → door_count=1                                -->
+  <!-- Wide (24-36 in)  → door_count=2                                -->
+  <!-- ============================================================== -->
+<record id="rule3_width_narrow_door_count_wall_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_1dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20000</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_wall_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_2dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20010</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_base_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_1dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20020</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_base_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_2dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20030</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_drawer_bank" model="product.config.line">
+  <field name="product_tmpl_id" ref="drawer_bank"/>
+  <field name="attribute_line_id" ref="attr_line_drawer_bank_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20040</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_sink_base" model="product.config.line">
+  <field name="product_tmpl_id" ref="sink_base"/>
+  <field name="attribute_line_id" ref="attr_line_sink_base_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20050</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_tall_pantry" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_pantry"/>
+  <field name="attribute_line_id" ref="attr_line_tall_pantry_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20060</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_tall_oven" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_oven"/>
+  <field name="attribute_line_id" ref="attr_line_tall_oven_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20070</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_corner" model="product.config.line">
+  <field name="product_tmpl_id" ref="corner"/>
+  <field name="attribute_line_id" ref="attr_line_corner_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20080</field>
+</record>
+
+<record id="rule3_width_narrow_door_count_vanity" model="product.config.line">
+  <field name="product_tmpl_id" ref="vanity"/>
+  <field name="attribute_line_id" ref="attr_line_vanity_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_1')])]"/>
+  <field name="domain_id" ref="domain_width_narrow"/>
+  <field name="sequence">20090</field>
+</record>
+
+<record id="rule3_width_wide_door_count_wall_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_1dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20100</field>
+</record>
+
+<record id="rule3_width_wide_door_count_wall_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="wall_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_wall_2dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20110</field>
+</record>
+
+<record id="rule3_width_wide_door_count_base_1dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_1dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20120</field>
+</record>
+
+<record id="rule3_width_wide_door_count_base_2dr" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_2dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_2dr_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20130</field>
+</record>
+
+<record id="rule3_width_wide_door_count_drawer_bank" model="product.config.line">
+  <field name="product_tmpl_id" ref="drawer_bank"/>
+  <field name="attribute_line_id" ref="attr_line_drawer_bank_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20140</field>
+</record>
+
+<record id="rule3_width_wide_door_count_sink_base" model="product.config.line">
+  <field name="product_tmpl_id" ref="sink_base"/>
+  <field name="attribute_line_id" ref="attr_line_sink_base_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20150</field>
+</record>
+
+<record id="rule3_width_wide_door_count_tall_pantry" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_pantry"/>
+  <field name="attribute_line_id" ref="attr_line_tall_pantry_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20160</field>
+</record>
+
+<record id="rule3_width_wide_door_count_tall_oven" model="product.config.line">
+  <field name="product_tmpl_id" ref="tall_oven"/>
+  <field name="attribute_line_id" ref="attr_line_tall_oven_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20170</field>
+</record>
+
+<record id="rule3_width_wide_door_count_corner" model="product.config.line">
+  <field name="product_tmpl_id" ref="corner"/>
+  <field name="attribute_line_id" ref="attr_line_corner_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20180</field>
+</record>
+
+<record id="rule3_width_wide_door_count_vanity" model="product.config.line">
+  <field name="product_tmpl_id" ref="vanity"/>
+  <field name="attribute_line_id" ref="attr_line_vanity_door_count"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_door_count_2')])]"/>
+  <field name="domain_id" ref="domain_width_wide"/>
+  <field name="sequence">20190</field>
+</record>
+
+  <!-- ============================================================== -->
+  <!-- RULE 4 — Family Subtype → Soft-Close (Q23(b))                  -->
+  <!-- When family_subtype=bifold on corner: restrict accessories     -->
+  <!-- to {drawer_organisers, pull_outs} — omits soft_close (hides). -->
+  <!-- ============================================================== -->
+<record id="rule4_family_subtype_bifold_accessories_corner" model="product.config.line">
+  <field name="product_tmpl_id" ref="corner"/>
+  <field name="attribute_line_id" ref="attr_line_corner_accessories"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_accessory_drawer_organisers'), ref('value_accessory_pull_outs')])]"/>
+  <field name="domain_id" ref="domain_family_subtype_bifold"/>
+  <field name="sequence">30000</field>
+</record>
+
 
 </odoo>
