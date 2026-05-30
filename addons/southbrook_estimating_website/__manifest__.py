@@ -18,11 +18,22 @@
     #
     "depends": [
         "southbrook_estimating",
-        "website_product_configurator",   # OCA — the /kitchen-planner route base
-        "portal",                          # for /my/estimates per CLAUDE.md §2.1
+        "website_product_configurator",   # OCA — public-facing wizard base
+        "portal",                          # /my/... portal layout + auth
     ],
-    "data": [],
-    "assets": {},
+    "data": [
+        # Track 2 commit 1 — portal-route view templates.
+        "security/ir.model.access.csv",
+        "views/portal_template.xml",
+    ],
+    # Dedicated asset bundle (charter Q4 answer) so the OWL portal
+    # components only load on the Order Builder route. Other portal
+    # pages (/shop, /my, etc.) stay clean.
+    "assets": {
+        "web.assets_frontend": [
+            "southbrook_estimating_website/static/src/scss/portal_root.scss",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,
