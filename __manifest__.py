@@ -33,6 +33,8 @@
         # Commit 2 — seed parameters + res.partner view extension
         "data/config_parameters.xml",
         "views/res_partner_views.xml",
+        # Commit 3 — configurator attribute vocabulary
+        "data/attributes.xml",
     ],
     "installable": True,
     "application": True,
