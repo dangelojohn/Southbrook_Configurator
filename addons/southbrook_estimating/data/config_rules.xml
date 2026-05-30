@@ -24,7 +24,7 @@
   in commit 5. It joins the data list in commit 7 when templates arrive.
 
   Generation note: hand-authored XML chosen over Python emission script
-  for grep-friendliness — git log --grep=Rule\ 1 lands here cleanly.
+  for grep-friendliness. `git log` with a Rule keyword filter lands here.
 -->
 <odoo noupdate="0">
 
