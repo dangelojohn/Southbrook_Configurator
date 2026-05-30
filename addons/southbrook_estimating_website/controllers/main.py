@@ -150,6 +150,49 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
     }
     _TRADESPERSON_TIER_DISCOUNT = {"1": 25, "2": 30, "3": 35}
 
+    # T2C10 — ConfigDrawer autosave endpoint.
+    #
+    # The OWL drawer fires this when the user edits Qty (the only
+    # editable field in commit 10 — Phase 3 polish extends to
+    # attribute pickers + custom-spec text). Returns {ok: true} on
+    # success; the frontend then re-fetches /api/order/<id> to
+    # refresh prices, line subtotals, zone subtotals, header totals.
+    #
+    # Auth: same partner-chain resolver as the read endpoint. Reuses
+    # the order's resolver via line.order_id.
+    @http.route(
+        "/southbrook/api/line/<int:line_id>/update",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_line_update(self, line_id, qty=None, **kw):
+        """Apply a partial edit to a sale.order.line.
+
+        Phase 2 commit 10 surface: qty only. The frontend may send
+        other keys (e.g. zone, spec text) — they're ignored without
+        error so commit-11+ doesn't need a separate version field.
+        """
+        line = request.env["sale.order.line"].sudo().browse(line_id).exists()
+        if not line:
+            return {"error": "not_found"}
+        try:
+            self._southbrook_resolve_order(line.order_id.id)
+        except (AccessError, MissingError):
+            return {"error": "forbidden"}
+
+        # Apply qty update if present.
+        if qty is not None:
+            try:
+                qty_f = float(qty)
+            except (TypeError, ValueError):
+                return {"error": "invalid_qty"}
+            if qty_f <= 0:
+                return {"error": "invalid_qty"}
+            line.with_user(request.env.user).product_uom_qty = qty_f
+
+        return {"ok": True, "line_id": line.id}
+
     @http.route(
         "/southbrook/api/order/<int:order_id>",
         type="json",

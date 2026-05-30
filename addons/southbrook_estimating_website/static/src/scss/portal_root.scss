@@ -378,6 +378,120 @@
     font-weight: 600;
 }
 
+// ----- T2C10 ConfigDrawer ------------------------------------------
+.o_owl_drawer {
+    // grid-column: 1 / -1 set inline so it spans all 8 grid columns
+    // of the parent ZoneGroup .o_owl_lines container.
+    background: var(--sb-paper);
+    border-top: 2px solid var(--sb-walnut);
+    border-bottom: 1px solid var(--sb-rule);
+    padding: 18px 24px 20px;
+    font-family: var(--sb-font-sans);
+}
+
+.o_owl_drawer_head {
+    display: flex;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.o_owl_drawer_title {
+    font-family: var(--sb-font-display);
+    font-variation-settings: "opsz" 24, "wght" 600;
+    font-size: 14px;
+    color: var(--sb-walnut);
+    letter-spacing: -0.005em;
+}
+
+.o_owl_drawer_pill {
+    margin-left: auto;
+    font-family: var(--sb-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    background: var(--sb-sky);
+    color: var(--sb-linen);
+    padding: 3px 8px;
+    border-radius: 2px;
+    transition: background 0.15s;
+
+    &.o_owl_drawer_pill_saving { background: var(--sb-warn); }
+    &.o_owl_drawer_pill_error  { background: var(--sb-alert); }
+}
+
+.o_owl_drawer_grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px 24px;
+    align-items: start;
+}
+
+.o_owl_attr {
+    label {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--sb-ink-dim);
+        margin-bottom: 4px;
+    }
+}
+
+.o_owl_attr_wide {
+    grid-column: span 4;       // full row for the Spec text
+}
+
+.o_owl_attr_value {
+    font-size: 13px;
+    color: var(--sb-ink);
+    word-break: break-word;
+
+    &.mono {
+        font-family: var(--sb-font-mono);
+    }
+}
+
+.o_owl_attr_sku {
+    font-family: var(--sb-font-mono);
+    font-size: 11px;
+    color: var(--sb-ink-dim);
+    margin-left: 6px;
+}
+
+.o_owl_qty_input {
+    width: 80px;
+    padding: 5px 8px;
+    font-family: var(--sb-font-mono);
+    font-size: 13px;
+    color: var(--sb-ink);
+    background: white;
+    border: 1px solid var(--sb-rule);
+    border-radius: 2px;
+    transition: border-color 0.15s;
+
+    &:focus {
+        outline: none;
+        border-color: var(--sb-walnut);
+    }
+    &:disabled {
+        background: var(--sb-linen);
+        color: var(--sb-ink-dim);
+    }
+}
+
+.o_owl_drawer_retail {
+    text-decoration: line-through;
+    color: var(--sb-ink-dim);
+}
+
+.o_owl_drawer_foot {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--sb-rule);
+    font-size: 11px;
+    color: var(--sb-ink-dim);
+    line-height: 1.5;
+}
+
 // ----- T2C9 ZoneGroup + OrderLine ----------------------------------
 .o_owl_zone {
     margin-top: 14px;

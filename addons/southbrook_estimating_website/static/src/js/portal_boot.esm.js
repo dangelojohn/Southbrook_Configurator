@@ -212,6 +212,193 @@ class StagePipeline extends Component {
 }
 
 // ----------------------------------------------------------------------
+// ConfigDrawer — T2C10.
+//
+// Inline editable drawer that expands below the selected OrderLine,
+// spanning all 8 columns of the zone grid. Shows the line's read-
+// only spec + an editable Qty field with autosave.
+//
+// Autosave: on each Qty change (debounced 300ms), POSTs to
+// /southbrook/api/line/<id>/update. On success calls props.onSaved
+// which the parent OrderBuilder uses to refetch the order payload
+// (so prices, line subtotals, zone subtotals, and header totals
+// all refresh from the same source of truth).
+//
+// Phase 3 polish extends the editable surface to attribute pickers
+// (Family, Width, Series, Door Style, Finish, Hinge Side, Finished
+// Sides, Accessories) — the full mockup ConfigDrawer. Commit 10's
+// Qty-only surface proves the autosave pattern end-to-end so the
+// later attribute-picker additions are mechanical.
+// ----------------------------------------------------------------------
+
+class ConfigDrawer extends Component {
+    static template = xml`
+        <div class="o_owl_drawer" style="grid-column: 1 / -1;">
+            <div class="o_owl_drawer_head">
+                <span class="o_owl_drawer_title">
+                    Line <t t-esc="props.line.sequence"/> · Configuration
+                </span>
+                <span class="o_owl_drawer_pill"
+                      t-att-class="{
+                          'o_owl_drawer_pill_saving': state.saving,
+                          'o_owl_drawer_pill_error':  state.error,
+                      }">
+                    <t t-if="state.saving">SAVING…</t>
+                    <t t-elif="state.error">ERROR · <t t-esc="state.error"/></t>
+                    <t t-elif="state.savedAt">SAVED · <t t-esc="state.savedAt"/></t>
+                    <t t-else="">LIVE EDIT · AUTOSAVE</t>
+                </span>
+            </div>
+
+            <div class="o_owl_drawer_grid">
+
+                <!-- Read-only spec block. -->
+                <div class="o_owl_attr">
+                    <label>Template</label>
+                    <div class="o_owl_attr_value">
+                        <t t-esc="props.line.product_name"/>
+                        <span class="o_owl_attr_sku mono"
+                              t-if="props.line.product_sku"
+                              t-esc="props.line.product_sku"/>
+                    </div>
+                </div>
+                <div class="o_owl_attr">
+                    <label>Family</label>
+                    <div class="o_owl_attr_value mono"
+                         t-esc="props.line.family || '—'"/>
+                </div>
+                <div class="o_owl_attr">
+                    <label>Zone</label>
+                    <div class="o_owl_attr_value">
+                        <t t-esc="_zoneLabel(props.line.zone)"/>
+                    </div>
+                </div>
+                <div class="o_owl_attr">
+                    <label>Width</label>
+                    <div class="o_owl_attr_value mono">
+                        <t t-if="props.line.width_inches">
+                            <t t-esc="props.line.width_inches"/>″
+                            (<t t-esc="props.line.width_mm"/> mm)
+                        </t>
+                        <t t-else="">—</t>
+                    </div>
+                </div>
+
+                <!-- Spec text — what the user picked in the wizard. -->
+                <div class="o_owl_attr o_owl_attr_wide">
+                    <label>Spec</label>
+                    <div class="o_owl_attr_value">
+                        <t t-esc="props.line.spec_summary || '—'"/>
+                        <span t-if="props.line.is_maple"
+                              class="o_owl_badge o_owl_badge_maple">
+                            MAPLE
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Editable: Qty + autosave. -->
+                <div class="o_owl_attr">
+                    <label for="qty_field">Quantity</label>
+                    <input id="qty_field"
+                           type="number"
+                           min="1"
+                           step="1"
+                           class="o_owl_qty_input mono"
+                           t-att-value="state.qtyDraft"
+                           t-on-input="_onQtyInput"
+                           t-att-disabled="state.saving"/>
+                </div>
+
+                <!-- Read-only prices. -->
+                <div class="o_owl_attr">
+                    <label>Retail</label>
+                    <div class="o_owl_attr_value mono o_owl_drawer_retail"
+                         t-esc="fmtUsd(props.line.retail_price)"/>
+                </div>
+                <div class="o_owl_attr">
+                    <label>Channel</label>
+                    <div class="o_owl_attr_value mono"
+                         t-esc="fmtUsd(props.line.channel_price)"/>
+                </div>
+            </div>
+
+            <p class="o_owl_drawer_foot">
+                Phase 3 polish opens the full attribute picker (Family /
+                Width / Series / Door Style / Finish / Hinge / Finished
+                Sides / Accessories). The autosave path proven here
+                carries through unchanged — only the editable surface
+                widens.
+            </p>
+        </div>
+    `;
+    static props = {
+        line: Object,
+        onSaved: Function,
+    };
+
+    setup() {
+        this.state = useState({
+            qtyDraft: this.props.line.qty,
+            saving: false,
+            error: null,
+            savedAt: null,
+        });
+        this._debounceTimer = null;
+    }
+
+    fmtUsd = fmtUsd;
+
+    _zoneLabel(zone) {
+        const labels = {
+            base_run: "Base Run",
+            wall: "Wall",
+            tall: "Tall",
+            island: "Island",
+            accessory: "Accessory",
+            other: "Other",
+        };
+        return labels[zone] || zone;
+    }
+
+    _onQtyInput = (event) => {
+        const newVal = event.target.value;
+        this.state.qtyDraft = newVal;
+        if (this._debounceTimer) clearTimeout(this._debounceTimer);
+        // 300ms debounce so rapid arrow-key / typing doesn't fire 10
+        // RPCs. The pill flashes SAVING then SAVED after the burst.
+        this._debounceTimer = setTimeout(() => this._save(newVal), 300);
+    };
+
+    async _save(qty) {
+        const qtyNum = parseFloat(qty);
+        if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+            this.state.error = "Qty must be > 0";
+            return;
+        }
+        this.state.saving = true;
+        this.state.error = null;
+        try {
+            const res = await rpcJsonCall(
+                `/southbrook/api/line/${this.props.line.id}/update`,
+                { qty: qtyNum },
+            );
+            if (res && res.error) {
+                this.state.error = res.error;
+                return;
+            }
+            this.state.savedAt = new Date().toLocaleTimeString();
+            // Tell parent to refresh — order subtotals + savings depend
+            // on this line's price, which is qty-dependent in Odoo.
+            await this.props.onSaved();
+        } catch (e) {
+            this.state.error = e?.message || String(e);
+        } finally {
+            this.state.saving = false;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
 // OrderLine — T2C9.
 //
 // One row in the zone grid. 8-column layout matching the mockup:
@@ -307,21 +494,26 @@ class ZoneGroup extends Component {
                     <div class="o_owl_th_right">Channel</div>
                     <div/>
                 </div>
-                <OrderLine t-foreach="props.lines"
-                           t-as="line"
-                           t-key="line.id"
-                           line="line"
-                           isSelected="line.id === props.selectedLineId"
-                           onSelect="props.onSelectLine"/>
+                <t t-foreach="props.lines" t-as="line" t-key="line.id">
+                    <OrderLine line="line"
+                               isSelected="line.id === props.selectedLineId"
+                               onSelect="props.onSelectLine"/>
+                    <!-- T2C10 — ConfigDrawer expands below the selected line,
+                         spanning all 8 columns of the parent grid. -->
+                    <ConfigDrawer t-if="line.id === props.selectedLineId"
+                                  line="line"
+                                  onSaved="props.onLineSaved"/>
+                </t>
             </div>
         </div>
     `;
-    static components = { OrderLine };
+    static components = { OrderLine, ConfigDrawer };
     static props = {
         zone: Object,
         lines: Array,
         selectedLineId: { type: [Number, { value: null }], optional: true },
         onSelectLine: Function,
+        onLineSaved: Function,
     };
 
     setup() {
@@ -506,7 +698,8 @@ const TEMPLATE = xml`
                                zone="zone"
                                lines="_linesForZone(zone.code)"
                                selectedLineId="state.ui.selected_line_id"
-                               onSelectLine="_setSelectedLine"/>
+                               onSelectLine="_setSelectedLine"
+                               onLineSaved="_onLineSaved"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'bom'"
@@ -691,6 +884,14 @@ class OrderBuilder extends Component {
         // selection. Matches the mockup's "click to deselect" UX.
         this.state.ui.selected_line_id =
             this.state.ui.selected_line_id === lineId ? null : lineId;
+    };
+
+    // T2C10 — invoked by ConfigDrawer after a successful autosave.
+    // Re-fetches the order payload so prices everywhere (line cell,
+    // zone subtotal, header strip) refresh from the canonical
+    // backend state.
+    _onLineSaved = async () => {
+        await this._loadOrder();
     };
 }
 
