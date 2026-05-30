@@ -40,6 +40,11 @@ export class CabinetViewport extends Component {
     setup() {
         this.canvasRef = useRef("canvas");
         this.orm = useService("orm");
+        // T1C9 — action dispatcher for click-to-edit. doAction(...)
+        // takes the action dict returned by sale.order.line.action_reconfigure
+        // and routes it through Odoo's web client (typically opens a
+        // modal wizard).
+        this.action = useService("action");
         this.state = useState({
             mode: "solid",
             loading: false,
@@ -75,6 +80,12 @@ export class CabinetViewport extends Component {
         this._hoveredLineId = null;
         this._raycaster = null;
         this._mouse = null;
+        // T1C9 — click discrimination. OrbitControls owns mousedown +
+        // drag; a click is "mousedown then mouseup within MAX_CLICK_DELTA
+        // pixels with no significant movement between". This guards
+        // against accidental clicks during orbit drags.
+        this._mouseDownAt = null;
+        this._MAX_CLICK_DELTA_PX = 5;
 
         // Reactivity state — used by onWillUpdateProps + debounced refresh.
         // Track 1 commit 2 reactivity contract:
@@ -268,6 +279,11 @@ export class CabinetViewport extends Component {
         // pointer exits the canvas.
         canvas.addEventListener("mousemove", (e) => this._onCanvasMouseMove(e));
         canvas.addEventListener("mouseleave", () => this._setHoveredLine(null));
+        // T1C9 — click-to-edit. mousedown stores the position; mouseup
+        // checks whether the cursor moved more than _MAX_CLICK_DELTA_PX.
+        // If not, it's a click (not a drag) → raycast + open reconfigure.
+        canvas.addEventListener("mousedown", (e) => this._onCanvasMouseDown(e));
+        canvas.addEventListener("mouseup", (e) => this._onCanvasMouseUp(e));
 
         // Resize hook.
         if (typeof ResizeObserver === "function") {
@@ -640,6 +656,65 @@ export class CabinetViewport extends Component {
         } else {
             this._setHoveredLine(null);
             canvas.style.cursor = "default";
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // T1C9 — Click-to-edit
+    //
+    // mousedown / mouseup pair distinguish a click from a drag (which
+    // OrbitControls consumes for orbit/pan). When a clean click lands
+    // on a cabinet, the OWL component calls
+    // sale.order.line.action_reconfigure to launch the wizard for that
+    // line's product.
+    // ------------------------------------------------------------------
+
+    _onCanvasMouseDown(event) {
+        this._mouseDownAt = { x: event.clientX, y: event.clientY };
+    }
+
+    _onCanvasMouseUp(event) {
+        const down = this._mouseDownAt;
+        this._mouseDownAt = null;
+        if (!down) return;
+        const dx = event.clientX - down.x;
+        const dy = event.clientY - down.y;
+        if (Math.hypot(dx, dy) > this._MAX_CLICK_DELTA_PX) return;
+        // Clean click — raycast the same canvas-relative position.
+        this._handleCanvasClick(event);
+    }
+
+    async _handleCanvasClick(event) {
+        const canvas = this.canvasRef.el;
+        if (!canvas || !this._raycaster || !this._cabinetGroup || !this._camera) {
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        this._mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this._mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        this._raycaster.setFromCamera(this._mouse, this._camera);
+        const hits = this._raycaster.intersectObjects(
+            this._cabinetGroup.children, false,
+        );
+        if (!hits.length) return;
+        const lineId = hits[0].object.userData?.lineId;
+        if (!lineId) return;
+
+        await this._launchReconfigureForLine(lineId);
+    }
+
+    async _launchReconfigureForLine(lineId) {
+        try {
+            const action = await this.orm.call(
+                "sale.order.line",
+                "action_reconfigure",
+                [[parseInt(lineId, 10)]],
+            );
+            if (action && action.type) {
+                this.action.doAction(action);
+            }
+        } catch (e) {
+            this.state.error = e?.data?.message || e?.message || String(e);
         }
     }
 
