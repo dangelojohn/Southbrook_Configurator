@@ -83,8 +83,32 @@ class TestPhase1Smoke(TransactionCase):
     # Step 6 — BoM preview shows parametric BoM per line; maple lines
     #          carry +2 weeks lead time
     # ------------------------------------------------------------------
+    # PARTIALLY PROMOTED at commit 8: asserts the panel-dim function is
+    # reachable and returns the expected key set for the smoke-test
+    # canonical cabinet (18in base 1-door, Contemporary, maple box).
+    # End-to-end SO -> MO -> BoM materialisation still waits for
+    # commit 11 (demo data + full lifecycle exercise).
     def test_step_06_bom_preview_with_maple_lead_time(self):
-        self.skipTest("waiting for commit 8 (parametric BoM rollup)")
+        # The smoke test's canonical 18" base 1-door entry: line 1 of the
+        # 9-line Mapping section 6 step 3.
+        result = self.env["mrp.bom"]._compute_panel_dimensions(
+            width_mm=457, height_mm=762, depth_mm=609,  # 18 x 30 x 24 in
+            family="base", door_count=1,
+        )
+        # The smoke test asserts the BoM has panel + door + hardware lines.
+        # At the function level: all panel slots populated, door populated,
+        # hardware counts > 0.
+        for required_panel in ("side_L", "side_R", "top", "bottom", "back"):
+            self.assertIsNotNone(result[required_panel],
+                                 f"smoke step 6: {required_panel} must be in BoM")
+        self.assertIsNotNone(result["door"], "smoke step 6: door must be in BoM")
+        self.assertEqual(result["hinge_pair_count"], 1)
+        self.assertEqual(result["handle_count"], 1)
+
+        # Note: the maple +2wk lead-time bump is exercised at the
+        # variant-level rollup (mrp.bom._compute_southbrook_lead_time_extra,
+        # commit 5). End-to-end maple→BoM lead-time materialisation lives
+        # in the full lifecycle test (commit 11).
 
     # ------------------------------------------------------------------
     # Step 7 — Total at footer matches Richwood -35% Contractor pricelist

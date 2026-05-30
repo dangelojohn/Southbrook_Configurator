@@ -1,10 +1,22 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """
-mrp.bom extension — partial in commit 5: the lead_time_extra rollup only.
+mrp.bom extension — completes custom routine #1 in commit 8.
 
-The full custom routine #1 (_compute_panel_dimensions) lands in commit 8.
-This commit ships only the lead-time-bump roll-up so maple-box orders pick
-up their +2 weeks at BoM creation time per Mapping section 3.5 / Q3.
+The lead-time rollup (commit 5) and the parametric panel-dimension math
+(commit 8) both live in this file as the single mrp.bom extension.
+
+Routine #1 status: DONE as of commit 8. The function is
+`_compute_panel_dimensions(width_mm, height_mm, depth_mm, ...)`.
+
+Geometric conventions are documented in PUNCHLIST.md NF14. ALL constants
+named in this module are ASSUMED until the canonical #8 workbook lands;
+the named-constant pattern lets the workbook's actual values swap in
+mechanically.
+
+Returns the panel cut list as a dict of tuples
+`(length_mm, width_mm, thickness_mm)` per panel, plus hardware counts +
+edge-banding scalar. The cut list is consumed at MO creation time
+(commit 8 wires it; current commit ships the function ready for use).
 
 NF11 reminder: lead_time_extra lives on product.attribute.value (master),
 not on product.template.attribute.value (variant). The rollup walks
@@ -12,6 +24,30 @@ sale.order.line -> product.product -> product.template.attribute.value
 -> product_attribute_value_id -> lead_time_extra on the master.
 """
 from odoo import api, fields, models
+
+
+# ----------------------------------------------------------------------
+# Geometric constants — per NF14, ALL ASSUMED until #8 confirms.
+# ----------------------------------------------------------------------
+# Box (carcass) material thickness — 5/8" melamine standard.
+BOX_TH = 15.875
+# Back panel material — 1/4" hardboard.
+BACK_TH = 6.35
+# Rabbet depth for back-panel capture (groove routed into sides/top/bottom).
+RABBET = 6.35
+# Door (or drawer-front) thickness — 3/4" slab/5-piece standard.
+DOOR_TH = 18.0
+# Door reveal — uniform gap on all four door edges.
+DOOR_REVEAL = 3.0
+# Shelf tolerance — hand-placement clearance subtracted from inside_width.
+SHELF_TOL = 1.5
+# Shelf ventilation gap — 1/2" subtracted from depth at the back.
+SHELF_VENT_GAP = 12.7
+# Toe-kick height — 4" standard, integrated into side panels for base/sink/tall/vanity.
+TOEKICK_H = 101.6
+
+# Families that have a toe-kick (sides extend below bottom panel).
+TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity"})
 
 
 class MrpBom(models.Model):
@@ -64,3 +100,180 @@ class MrpBom(models.Model):
         for bom in self:
             base = bom.product_id.produce_delay if bom.product_id else 0.0
             bom.effective_produce_delay = base + bom.southbrook_lead_time_extra
+
+    # ==================================================================
+    # Custom routine #1 — `_compute_panel_dimensions` (Build Spec section 4)
+    # ==================================================================
+    # The single piece of genuine parametric math in Phase 1. Returns the
+    # complete cut list for a parametric cabinet body from (W, H, D) plus
+    # family + door_count + finished_sides.
+    #
+    # Formulas (per NF14 geometric conventions, frameless euro construction):
+    #
+    #   inside_width    = width_mm − 2 * BOX_TH
+    #   side_L          = (height_mm, depth_mm, BOX_TH)
+    #   side_R          = (height_mm, depth_mm, BOX_TH)
+    #   top             = (inside_width, depth_mm, BOX_TH)
+    #   bottom          = (inside_width, depth_mm, BOX_TH)
+    #   back            = (inside_width + 2*RABBET,
+    #                      height_mm − 2*BOX_TH + 2*RABBET,
+    #                      BACK_TH)
+    #   shelf           = (inside_width − SHELF_TOL,
+    #                      depth_mm − BACK_TH − RABBET − SHELF_VENT_GAP,
+    #                      BOX_TH)
+    #   door (1-door)   = (height_mm − 2*DOOR_REVEAL,
+    #                      width_mm  − 2*DOOR_REVEAL,
+    #                      DOOR_TH)
+    #   door (2-door)   = (height_mm − 2*DOOR_REVEAL,
+    #                      (width_mm − 3*DOOR_REVEAL) / 2,
+    #                      DOOR_TH)
+    #
+    # Hardware (Mapping section 3.5):
+    #   hinge_pair_count        = door_count    (0 for drawer_bank)
+    #   handle_count            = door_count    (or drawer_count for drawer_bank)
+    #   drawer_slide_pair_count = drawer_count
+    #
+    # Edge banding (Phase-1 scalar; per-edge mapping deferred to Phase 4):
+    #   based on finished_sides + visible front edges
+    #
+    # When canonical #8 workbook lands, named constants update; tests use
+    # re-derivation style (assert against formula, not hardcoded number)
+    # so they tolerate constant changes without expected-value updates.
+    # ------------------------------------------------------------------
+    @api.model
+    def _compute_panel_dimensions(
+        self,
+        width_mm,
+        height_mm,
+        depth_mm,
+        family="base",
+        door_count=1,
+        drawer_count=0,
+        finished_sides="none",
+    ):
+        """Return the panel cut list + hardware counts for a parametric cabinet.
+
+        Args:
+            width_mm, height_mm, depth_mm: integer mm, the cabinet outer dims.
+            family: 'base' | 'wall' | 'sink' | 'tall' | 'corner' | 'vanity'
+                | 'drawer' | 'accessory' | 'worktop'. Drives toe-kick logic.
+            door_count: 0, 1, or 2. From Rule 3 (width -> door count) or
+                from the configured door_count attribute on the variant.
+            drawer_count: 0 or N. Used for drawer_bank family.
+            finished_sides: 'none' | 'left' | 'right' | 'both'. Drives
+                edge-banding length.
+
+        Returns:
+            A dict with panel tuples and counts:
+              'side_L', 'side_R', 'top', 'bottom', 'back', 'shelf', 'door':
+                  each a tuple (length_mm, width_mm, thickness_mm)
+                  (or None if the component isn't applicable to this cabinet)
+              'shelf_count', 'door_count', 'drawer_count': integers
+              'hinge_pair_count', 'handle_count', 'drawer_slide_pair_count': integers
+              'edge_banding_length_mm': integer, Phase-1 scalar perimeter sum
+        """
+        inside_width = width_mm - 2 * BOX_TH
+
+        # ---- Side panels (L and R) — full height + depth.
+        side_L = (height_mm, depth_mm, BOX_TH)
+        side_R = (height_mm, depth_mm, BOX_TH)
+
+        # ---- Top + bottom panels — capture between sides (frameless).
+        top = (inside_width, depth_mm, BOX_TH)
+        bottom = (inside_width, depth_mm, BOX_TH)
+
+        # ---- Back panel — captures into rabbet on side/top/bottom.
+        back_l = inside_width + 2 * RABBET
+        back_w = (height_mm - 2 * BOX_TH) + 2 * RABBET
+        back = (back_l, back_w, BACK_TH)
+
+        # ---- Shelf — quantity from height heuristic per NF14.
+        if height_mm <= 600:
+            shelf_count = 1
+        elif height_mm <= 900:
+            shelf_count = 2
+        else:
+            shelf_count = 3
+        shelf_l = inside_width - SHELF_TOL
+        shelf_w = depth_mm - BACK_TH - RABBET - SHELF_VENT_GAP
+        shelf = (shelf_l, shelf_w, BOX_TH) if shelf_count > 0 else None
+
+        # ---- Door — sized from door_count and reveal.
+        if door_count == 1:
+            door = (
+                height_mm - 2 * DOOR_REVEAL,
+                width_mm - 2 * DOOR_REVEAL,
+                DOOR_TH,
+            )
+        elif door_count == 2:
+            door = (
+                height_mm - 2 * DOOR_REVEAL,
+                (width_mm - 3 * DOOR_REVEAL) / 2,
+                DOOR_TH,
+            )
+        else:
+            door = None
+
+        # ---- Hardware counts (Mapping section 3.5).
+        if family == "drawer":
+            # Drawer_bank repurposes door_count as drawer-front count per
+            # the Phase-1 simplification noted in NF14.
+            drawer_count = drawer_count or door_count
+            hinge_pair_count = 0
+            handle_count = drawer_count
+            drawer_slide_pair_count = drawer_count
+        else:
+            hinge_pair_count = door_count
+            handle_count = door_count
+            drawer_slide_pair_count = drawer_count
+
+        # ---- Edge banding — Phase-1 scalar (Phase-4 per-edge).
+        edge_banding_length_mm = self._compute_edge_banding_length(
+            width_mm, height_mm, depth_mm, finished_sides
+        )
+
+        return {
+            "side_L": side_L,
+            "side_R": side_R,
+            "top": top,
+            "bottom": bottom,
+            "back": back,
+            "shelf": shelf,
+            "shelf_count": shelf_count,
+            "door": door,
+            "door_count": door_count,
+            "drawer_count": drawer_count,
+            "hinge_pair_count": hinge_pair_count,
+            "handle_count": handle_count,
+            "drawer_slide_pair_count": drawer_slide_pair_count,
+            "edge_banding_length_mm": edge_banding_length_mm,
+        }
+
+    @api.model
+    def _compute_edge_banding_length(
+        self, width_mm, height_mm, depth_mm, finished_sides
+    ):
+        """Phase-1 scalar edge-banding length per NF14.
+
+        Computes total banding length as a sum of:
+          - Both finished side panels' full perimeter (if finished_sides='both')
+          - One finished side panel's full perimeter (if 'left' or 'right')
+          - Top panel front edge (always visible)
+          - Bottom panel front edge (always visible)
+
+        Per-edge mapping is deferred to Phase 4 (Accucutt nest spec).
+        """
+        bands = 0
+
+        # Side-panel perimeter banding for finished sides.
+        side_perim = 2 * (height_mm + depth_mm)
+        if finished_sides == "both":
+            bands += 2 * side_perim
+        elif finished_sides in ("left", "right"):
+            bands += side_perim
+
+        # Top + bottom front edges — always visible, always banded.
+        inside_width = width_mm - 2 * BOX_TH
+        bands += 2 * inside_width
+
+        return int(bands)

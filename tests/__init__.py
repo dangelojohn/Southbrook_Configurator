@@ -4,4 +4,5 @@ from . import test_attribute_seed
 from . import test_pricelist_resolution
 from . import test_config_rule_domains
 from . import test_analytics_capture
+from . import test_bom_math
 from . import test_phase1_smoke
