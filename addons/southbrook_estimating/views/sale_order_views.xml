@@ -118,8 +118,37 @@
   </record>
 
   <!-- ============================================================== -->
-  <!-- Menu — Sales > Order Builder -->
+  <!-- Menus                                                          -->
+  <!--                                                                -->
+  <!-- NF23 (caught at live install on QNAP southbrook stack          -->
+  <!-- 2026-05-30): User reported "no southbrook_estimating pulldown  -->
+  <!-- in the main pulldown menu". Root cause: the original Phase-1   -->
+  <!-- menu lived ONLY under Sales → Orders → Order Builder (per      -->
+  <!-- Build Spec §2.2 placement) — Odoo never rendered a top-level   -->
+  <!-- entry for the addon in the main app drawer.                    -->
+  <!-- Fix: add menu_southbrook_root as a TOP-LEVEL menuitem (no      -->
+  <!-- parent attribute) carrying web_icon. With no parent + web_icon -->
+  <!-- set, Odoo treats it as an installable application root and     -->
+  <!-- renders the tile in the main app drawer alongside Sales/etc.   -->
+  <!-- The Order Builder action now appears under BOTH the new        -->
+  <!-- top-level root AND the existing Sales → Orders sub-entry —     -->
+  <!-- discoverability without losing the Build-Spec placement.       -->
   <!-- ============================================================== -->
+
+  <!-- Top-level entry in the main app drawer. -->
+  <menuitem id="menu_southbrook_root"
+            name="Southbrook Estimating"
+            web_icon="southbrook_estimating,static/description/icon.png"
+            sequence="20"/>
+
+  <!-- Order Builder as the default landing item under the top-level root. -->
+  <menuitem id="menu_southbrook_order_builder_top"
+            name="Order Builder"
+            parent="menu_southbrook_root"
+            action="action_order_builder"
+            sequence="10"/>
+
+  <!-- Legacy placement under Sales → Orders — preserved per Build Spec §2.2. -->
   <menuitem id="menu_southbrook_order_builder"
             name="Order Builder"
             parent="sale.sale_order_menu"
