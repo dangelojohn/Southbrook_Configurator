@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 #
-# Controllers populate in Phase 2 (commit ~13). Empty in Phase 1.
-# Phase 2 adds:
-#   - main.py: extends WebsiteSale, route /kitchen-planner
-#   - portal.py: /my/estimates landing page
+# T2C1 (2026-05-30) — replaces the old Phase-1 stub. The controller
+# is now real: main.SouthbrookOrderBuilderPortal hosts the
+# /my/southbrook/order-builder portal route.
+from . import main
