@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Shop Copy — MO-companion document, bound to mrp.production.
+
+  Per Build Spec section 4 routine #6. The shop floor's work-order companion:
+  panel cut list, hardware list, edge banding, originating SO reference.
+
+  CRITICAL DATA BINDING (per John's commit-10 ask):
+  The Shop Copy reads from mrp.production — NOT from sale.order. The
+  legacy spreadsheet Shop Copy tab was 254 cell-level formulas mirroring
+  the order form. The Odoo version generates from the MO's BoM rollup
+  (which is what manufacturing actually consumes), eliminating the
+  mirror duplication entirely. Order data flows through to the MO via
+  mrp.production.sale_id (Odoo standard).
+
+  Phase-1 minimum: MO header + cabinet dimensions + BoM line table
+    + originating SO ref.
+  Phase-2 polish: per-panel cut diagrams (when SVG tooling lands).
+-->
+<odoo>
+
+  <template id="report_shop_copy_doc" name="Shop Copy Document">
+    <t t-call="web.html_container">
+      <t t-foreach="docs" t-as="mo">
+        <t t-call="web.external_layout">
+          <t t-call="southbrook_estimating.southbrook_report_styles"/>
+          <div class="page southbrook-report">
+
+            <h1>Shop Copy</h1>
+            <h2 t-out="mo.name"/>
+            <hr class="sb-rule"/>
+
+            <div>
+              <strong>Originating Order:</strong>
+              <span t-out="mo.sale_id.name or '—'"/>
+              <span class="sb-muted" t-if="mo.sale_id.partner_id">
+                / <span t-out="mo.sale_id.partner_id.name"/>
+              </span><br/>
+              <strong>Product:</strong>
+              <span t-out="mo.product_id.display_name"/><br/>
+              <strong>Quantity:</strong>
+              <span t-out="mo.product_qty"/>
+              <span t-out="mo.product_uom_id.name"/><br/>
+              <strong>Effective Lead Time:</strong>
+              <span t-out="mo.bom_id.effective_produce_delay if mo.bom_id else 0"/>
+              <span class="sb-muted">days</span>
+              <span class="sb-muted"
+                    t-if="mo.bom_id and mo.bom_id.southbrook_lead_time_extra">
+                (includes
+                <span t-out="mo.bom_id.southbrook_lead_time_extra"/>
+                day bump from selected attributes)
+              </span>
+            </div>
+
+            <hr class="sb-rule"/>
+
+            <h2>BoM — Cut List + Hardware</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Quantity</th>
+                  <th>UoM</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr t-foreach="mo.bom_id.bom_line_ids" t-as="bl">
+                  <td t-out="bl.product_id.display_name"/>
+                  <td t-out="bl.product_qty"/>
+                  <td t-out="bl.product_uom_id.name"/>
+                </tr>
+                <tr t-if="not mo.bom_id or not mo.bom_id.bom_line_ids">
+                  <td colspan="3" class="sb-muted">
+                    No BoM lines materialised. The parametric BoM rollup
+                    fires at MO creation; if this row is empty, check the
+                    cabinet's recipe wiring.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p class="sb-muted">
+              Shop Copy data is MO-driven (mrp.production). All panel
+              dimensions and hardware counts derive from
+              _compute_panel_dimensions (custom routine #1, commit 8)
+              applied to the variant's W x H x D + attribute values.
+              No mirror duplication of the order form.
+            </p>
+          </div>
+        </t>
+      </t>
+    </t>
+  </template>
+
+  <record id="action_report_shop_copy" model="ir.actions.report">
+    <field name="name">Shop Copy</field>
+    <field name="model">mrp.production</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">southbrook_estimating.report_shop_copy_doc</field>
+    <field name="report_file">southbrook_estimating.report_shop_copy_doc</field>
+    <field name="print_report_name">'Shop Copy - %s' % (object.name)</field>
+    <field name="binding_model_id" ref="mrp.model_mrp_production"/>
+    <field name="binding_type">report</field>
+  </record>
+
+</odoo>

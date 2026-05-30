@@ -655,6 +655,58 @@ update this NF14 entry with the canonical value, re-run tests
 
 ---
 
+## 2026-05-30 · NF15 — QWeb report styling pre-#7-spec-book
+
+Surfaced at commit 10. The three QWeb reports (`signature_spec_sheet`,
+`shop_copy`, `door_order`) need styling matching the Signature Series
+visual register, but `SIGNATURE_SERIES_TOKENS.md` is gated on John's
+local file drop of #7 (the Signature Series spec book PDF). Canonical
+hex values, fonts, and typographic measure can't land yet.
+
+**Mitigation (commit 10):** named CSS variables with TBD-marked
+placeholder values in `reports/southbrook_report_styles.xml`. Same
+discipline as NF14's named-constants pattern for the panel-math
+formulas. When `SIGNATURE_SERIES_TOKENS.md` is authored, the swap is a
+single-file variable update:
+
+```
+:root {
+  --southbrook-walnut:       #5C4033;   /* TBD - update from #7 */
+  --southbrook-sky:          #C8D9E0;   /* TBD - update from #7 */
+  --southbrook-linen:        #F8F4EC;   /* TBD - update from #7 */
+  --southbrook-display-font: "Cardo", "Times New Roman", serif;  /* TBD */
+  --southbrook-body-font:    "Source Sans Pro", ... ;  /* TBD */
+  /* ... */
+}
+```
+
+The Sky / Walnut / Linen palette names are stable (locked at Q9). Only
+the hex values + font stacks need confirmation. Until #7 lands, the
+reports render with the TBD values (which were chosen as a reasonable
+warm-cabinetry aesthetic but are explicitly not the canonical brand
+colours).
+
+**No PUNCHLIST blocker.** Phase-1 gate review can proceed with
+TBD-styled reports — the data binding is correct, the templates render,
+the discipline is honest about what's canonical and what's placeholder.
+
+---
+
+## 2026-05-30 · 2 drafts still in `docs/drafts/` (reference only)
+
+After commit 10 promotions, the drafts directory holds only the two
+reference docs:
+
+- `RULE_ENCODING_NOTES.md` — OCA syntax reconnaissance (stays)
+- `PHASE_1_FIRST_5_COMMITS.md` — early commit plan (now superseded by
+  reality of 12 commits 0a → 10, kept for forensic comparison of plan
+  vs execution)
+
+All promote-target drafts have promoted to `addons/southbrook_estimating/`
+and been removed from `docs/drafts/`.
+
+---
+
 ## 2026-05-29 · 11 drafts staged total
 
 Final count for tonight's preparation pass — within the §10 step 7 gate.

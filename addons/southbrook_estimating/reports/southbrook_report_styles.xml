@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Named CSS variables shared by all 3 QWeb reports.
+
+  Per NF15 (commit 10): SIGNATURE_SERIES_TOKENS.md is gated on #7 (the
+  Signature Series spec book PDF), so the canonical hex values can't
+  land yet. We ship named CSS variables with TBD-marked placeholders so
+  the swap, when #7 lands, is a single-file variable update — same
+  discipline as NF14's named-constants pattern in mrp_bom.py.
+
+  Naming follows the Sky / Walnut / Linen palette from the prior intranet
+  design language (Brief section 2.1). When SIGNATURE_SERIES_TOKENS.md is
+  authored, replace each TBD with the canonical hex and update this
+  comment block to remove the TBD markers.
+-->
+<odoo>
+
+  <template id="southbrook_report_styles" name="Southbrook Report Styles">
+    <style>
+      :root {
+        /* === Sky / Walnut / Linen — TBD until #7 lands === */
+        --southbrook-display-font: "Cardo", "Times New Roman", serif;  /* TBD */
+        --southbrook-body-font:    "Source Sans Pro", "Helvetica", sans-serif;  /* TBD */
+        --southbrook-walnut:       #5C4033;   /* TBD — warm walnut accent */
+        --southbrook-sky:          #C8D9E0;   /* TBD — cool sky background */
+        --southbrook-linen:        #F8F4EC;   /* TBD — paper-warm body bg */
+        --southbrook-ink:          #2A2A2A;   /* TBD — ink-and-paper body text */
+        --southbrook-rule-color:   #D6CFC1;   /* TBD — table rule, page divider */
+        --southbrook-muted:        #8A8478;   /* TBD — secondary text */
+      }
+
+      .southbrook-report {
+        font-family: var(--southbrook-body-font);
+        color: var(--southbrook-ink);
+        background: var(--southbrook-linen);
+        padding: 1.5cm;
+      }
+      .southbrook-report h1, .southbrook-report h2 {
+        font-family: var(--southbrook-display-font);
+        color: var(--southbrook-walnut);
+        margin: 0 0 0.4em 0;
+      }
+      .southbrook-report .sb-rule {
+        border: 0;
+        border-top: 1px solid var(--southbrook-rule-color);
+        margin: 1em 0;
+      }
+      .southbrook-report table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .southbrook-report th {
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid var(--southbrook-walnut);
+        padding: 0.4em 0.6em;
+      }
+      .southbrook-report td {
+        border-bottom: 1px solid var(--southbrook-rule-color);
+        padding: 0.3em 0.6em;
+      }
+      .southbrook-report .sb-zone-header {
+        background: var(--southbrook-sky);
+        color: var(--southbrook-ink);
+        font-weight: 600;
+      }
+      .southbrook-report .sb-muted {
+        color: var(--southbrook-muted);
+        font-size: 0.9em;
+      }
+      .southbrook-report .sb-total-row td {
+        font-weight: 700;
+        border-top: 2px solid var(--southbrook-walnut);
+      }
+      .southbrook-report .sb-illustrative-banner {
+        background: #FFF3CD;
+        color: #856404;
+        padding: 0.4em 0.8em;
+        margin-bottom: 1em;
+        border: 1px solid #FFEBA7;
+        font-size: 0.85em;
+        text-align: center;
+      }
+    </style>
+  </template>
+
+</odoo>
