@@ -37,8 +37,14 @@
         "data/attributes.xml",
         # Commit 4 — 6 channel pricelists + 3 tradesperson sub-tiers
         "data/pricelists.xml",
-        # Commit 5 — 4 rule triggers (domains only; per-template config.line
-        # records arrive in commit 7 alongside product_templates.xml)
+        # Commit 7 — 12 cabinet templates + 132 attribute_lines
+        # LOAD ORDER MATTERS: templates BEFORE config_rules. The
+        # product.config.line records in config_rules.xml use ref()
+        # on attribute_line_ids defined in product_templates.xml. If
+        # this list gets alphabetised by a future contributor, install
+        # fails with "external id not found" on the rule records.
+        "data/product_templates.xml",
+        # Commit 5+7 — 4 rule triggers + 65 per-template config.line records
         "data/config_rules.xml",
     ],
     "installable": True,
