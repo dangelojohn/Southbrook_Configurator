@@ -69,6 +69,25 @@
                invisible="zone != 'other'"/>
       </xpath>
 
+      <!-- (5) Multi-zone visual grouping — Q21 + NF9 (Richwood).
+           Per Q21 acked deliverable: <group expand="1" string="Zone"> pattern.
+           Implemented via default_group_by="zone" on the embedded order_line
+           tree so lines display as collapsible zone-headed groups with
+           auto-aggregated price_subtotal per zone. Mock §3.D faithful:
+           zone-headed groups, per-zone subtotals visible at all times. -->
+      <xpath expr="//field[@name='order_line']/tree" position="attributes">
+        <attribute name="default_group_by">zone</attribute>
+        <attribute name="expand">1</attribute>
+      </xpath>
+
+      <!-- (6) Ensure price_subtotal is aggregable (sum) for the zone group
+           headers. Odoo auto-aggregates monetary fields when a group_by is
+           active, but flagging sum explicitly defends against a future Odoo
+           upgrade that tightens aggregation defaults. -->
+      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="attributes">
+        <attribute name="sum">Zone Subtotal</attribute>
+      </xpath>
+
     </field>
   </record>
 
