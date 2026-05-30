@@ -391,7 +391,11 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             "edge_banding_mm": 0,
         }
         Bom = request.env["mrp.bom"]
-        for line in self.order_line:
+        # T2C11 fix: walk THIS order's lines, not self.order_line. `self`
+        # is the CustomerPortal controller, not the sale.order — the
+        # original copy-paste from sale_order.get_kitchen_3d_payload
+        # missed the rebind.
+        for line in order.order_line:
             tmpl = (
                 line.product_id.product_tmpl_id
                 if line.product_id and line.product_id.product_tmpl_id
