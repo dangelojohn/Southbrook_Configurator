@@ -36,13 +36,34 @@ class SouthbrookTestCase(TransactionCase):
         return self.env.ref(f"southbrook_estimating.{xml_id}")
 
     # ------------------------------------------------------------------
-    # Demo-data guard
+    # Demo-data guards
+    #
+    # NF22 (2026-05-30): demo/southbrook_demo_orders.xml was removed
+    # from the manifest demo list (it referenced Odoo core demo product
+    # `product_product_4` which doesn't exist on a --without-demo DB,
+    # AND southbrook templates use dynamic variants so cabinet
+    # product.product records don't have xml_ids at install time).
+    # Demo PARTNERS still load; demo ORDERS now require a Phase-2
+    # Python helper that exercises product.config.session.
+    # Two guards now needed:
+    #   _demo_loaded()         — demo partners present
+    #   _demo_orders_loaded()  — demo orders present (Phase-2 capable)
+    # Order-dependent tests must use the second guard.
     # ------------------------------------------------------------------
     def _demo_loaded(self):
-        """True only when the demo flag loaded the demo partners file."""
+        """True when the demo flag loaded the demo partners file."""
         return bool(
             self.env.ref(
                 "southbrook_estimating.demo_partner_image_floor",
+                raise_if_not_found=False,
+            )
+        )
+
+    def _demo_orders_loaded(self):
+        """True when demo ORDERS are present (Phase-2 helper run)."""
+        return bool(
+            self.env.ref(
+                "southbrook_estimating.demo_order_image_floor_confirmed",
                 raise_if_not_found=False,
             )
         )

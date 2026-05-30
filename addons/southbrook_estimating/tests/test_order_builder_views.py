@@ -70,10 +70,11 @@ class TestOrderBuilderViews(SouthbrookTestCase):
         the rendered arch.
         """
         form_view = self.env.ref("sale.view_order_form")
-        # arch_db contains the inherited arch after computation.
-        arch = self.env["sale.order"].fields_view_get(
-            view_id=form_view.id, view_type="form"
-        )["arch"]
+        # NF24 (caught at live test run 2026-05-30): Odoo 17+ renamed
+        # fields_view_get → get_view; the model method now returns a
+        # dict with 'arch' (string) and 'models' (mapping). Same data,
+        # new signature.
+        arch = self.env["sale.order"].get_view(form_view.id, "form")["arch"]
         self.assertIn("action_duplicate_as_draft", arch,
                       "NF6 button not in rendered arch — xpath likely missed")
         self.assertIn("ILLUSTRATIVE SEED", arch,
@@ -82,9 +83,7 @@ class TestOrderBuilderViews(SouthbrookTestCase):
     def test_06_sale_order_line_tree_contains_zone(self):
         """The zone field must appear in the order_line tree."""
         form_view = self.env.ref("sale.view_order_form")
-        arch = self.env["sale.order"].fields_view_get(
-            view_id=form_view.id, view_type="form"
-        )["arch"]
+        arch = self.env["sale.order"].get_view(form_view.id, "form")["arch"]
         # The zone field is added before product_id in the order_line tree.
         self.assertIn('name="zone"', arch,
                       "Q21 zone column not in rendered arch")
@@ -94,9 +93,7 @@ class TestOrderBuilderViews(SouthbrookTestCase):
     def test_07_res_users_form_contains_prefs(self):
         """The Order Builder preferences group must appear in res.users form."""
         users_view = self.env.ref("base.view_users_form")
-        arch = self.env["res.users"].fields_view_get(
-            view_id=users_view.id, view_type="form"
-        )["arch"]
+        arch = self.env["res.users"].get_view(users_view.id, "form")["arch"]
         self.assertIn("southbrook_default_series", arch,
                       "NF7 user pref field not in rendered arch")
         self.assertIn("southbrook_order_entry_mode", arch,
@@ -112,9 +109,7 @@ class TestOrderBuilderViews(SouthbrookTestCase):
         lines grouped under zone headers.
         """
         form_view = self.env.ref("sale.view_order_form")
-        arch = self.env["sale.order"].fields_view_get(
-            view_id=form_view.id, view_type="form"
-        )["arch"]
+        arch = self.env["sale.order"].get_view(form_view.id, "form")["arch"]
         # Search for the attribute in the order_line tree. If a future xpath
         # refactor accidentally drops the grouping, this assertion fails
         # before install reaches a live instance.
@@ -131,9 +126,7 @@ class TestOrderBuilderViews(SouthbrookTestCase):
         """
         import re
         form_view = self.env.ref("sale.view_order_form")
-        arch = self.env["sale.order"].fields_view_get(
-            view_id=form_view.id, view_type="form"
-        )["arch"]
+        arch = self.env["sale.order"].get_view(form_view.id, "form")["arch"]
 
         # Find the button_box div span in the arch (greedy across newlines).
         # The button name must appear between the opening div tag with
