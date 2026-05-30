@@ -940,24 +940,48 @@ line's config session → `mrp.bom._compute_panel_dimensions` (Track 1 routine
 non-zero `edge_banding_mm`; hardware counts non-zero (hinge pairs scale with
 door count per Q24 width→door rule).
 
-### PT-P1-03 · Assign pricelist to Demo Tradesperson Tier 3 partner
+### PT-P1-03 · Assign pricelist to demo partners — **partially executed 2026-05-30**
 
 **Symptom (in gate walk):** B4 customer cell pricelist badge renders empty
 between the partner-name row and the channel badge row.
 **Symptom (RPC):** `order.pricelist_id = null`, `pricelist_name = ""` despite
 `channel = tradesperson` and the channel discount resolving correctly to 35%.
 **Root cause:** `res.partner` id=19 (Demo Tradesperson Tier 3) was seeded
-without `property_product_pricelist`. The channel resolution path
-(`res.partner.channel` → `discount_pct`) is independent of pricelist and works,
-but the HeaderStrip's pricelist-badge cell renders empty.
-**Fix:** In `addons/southbrook_estimating/demo/southbrook_demo.xml`, add
-`property_product_pricelist` ref to the Tradesperson Tier 3 partner pointing
-at the seeded `southbrook_estimating.pricelist_tradesperson_tier3` record (per
-Q1 the 6 pricelists are already seeded). Same change for the 4 dealer
-partners (Image Floor, Amazing Window, Pro Finish, Richwood) so they all
-get their channel pricelist resolved consistently.
-**Acceptance:** B4 cell shows a pricelist badge with the pricelist's display
-name; `order.pricelist_name` returns non-empty.
+without a pricelist. The channel resolution path (`res.partner.channel` →
+`discount_pct`) is independent of pricelist and works, but the HeaderStrip's
+pricelist-badge cell renders empty.
+
+**Odoo 19 field rename — important gotcha:** The writable field is
+`specific_property_product_pricelist` (store=True, company_dependent=True);
+`property_product_pricelist` is now a computed/read-only mirror. Writing
+to the latter silently fails (returns True but doesn't persist). All XML
+seed records + RPC writes need to use the `specific_` prefix in Odoo 19.
+
+**Executed during gate walk (2026-05-30):**
+- Admin partner → Retail (List Price) pricelist id=37
+- Demo Tradesperson Tier 3 partner → Contractor Tier 3 (-35%) id=42
+- Image Floor / Amazing Window / Pro Finish / Richwood → Dealer (-50%) id=38
+- Order S00235 `pricelist_id` backfilled to 42 (was null because order was
+  created before the partner had a pricelist assigned — sale.order.pricelist_id
+  is sticky once set, doesn't auto-refresh when partner changes)
+
+**Remaining for full ticket closure:**
+- Move these assignments into `addons/southbrook_estimating/demo/southbrook_demo.xml`
+  so they re-apply on fresh installs (currently they're DB-only writes that
+  would be lost on a module reinstall + DB rebuild).
+- Use `specific_property_product_pricelist` as the field name in the XML.
+- Verify the existing 6 pricelists per Q1 have the expected xml_ids
+  (`southbrook_estimating.pricelist_retail`, `pricelist_dealer`,
+  `pricelist_tradesperson_tier1/2/3`, `pricelist_kd`, `pricelist_bigbox`,
+  `pricelist_refacing`) — note that 9 pricelists are seeded today, not 6;
+  the 3 Contractor tiers split out from the general Contractor list.
+- Decide whether to backfill all existing draft sale.orders' pricelist_id
+  on demo data refresh, or leave that as user-action (re-resolve via
+  `partner.action_open_sale_order` flow).
+
+**Acceptance (live-verified 2026-05-30):** B4 cell shows
+`Contractor Tier 3 (-35%)` badge; `/southbrook/api/order/235` returns
+`pricelist_id=42, pricelist_name='Contractor Tier 3 (-35%)'`.
 
 ### PT-P1-04 · Width-attribute resolution into `width_mm`
 
@@ -985,3 +1009,64 @@ unblocks the Phase 1 sign-off gate.
 **Suggested order of work:** PT-P1-03 first (smallest — 1 partner edit ×5);
 PT-P1-01 second (the substantive change); PT-P1-02 and PT-P1-04 fall out
 automatically once PT-P1-01 lands.
+
+### PT-P1-05 · Decide policy on `/shop/<slug>` route
+
+**Symptom (in gate walk):** Visiting
+`/shop/sb-base-1dr-demo-base-1-door-38` 500s with
+`Expected singleton: res.currency()` from the OCA template
+`website_product_configurator.product_configurator`. The failing
+expression: `website._get_and_cache_current_pricelist().currency_id`.
+
+**Root cause:** The `/shop/` route is Odoo's built-in
+`website_sale` product page, which the OCA `website_product_configurator`
+module extends. Its template assumes `_get_and_cache_current_pricelist()`
+returns a non-empty pricelist for every visitor. In the current site
+config, anonymous/admin visitors who don't match any selectable pricelist
+get an empty recordset back, then `.currency_id` walks empty → singleton
+error.
+
+**Why this isn't a Southbrook bug:** CLAUDE.md §2.1 + §2.2 specify the
+customer-facing surface is `/kitchen-planner` (Phase 2 §8 work, not
+yet built). The internal surface is `/my/southbrook/order-builder/<id>`
+(Track 2, gated 2026-05-30). The `/shop/` route is a legacy
+Odoo-built-in surface that came along for the ride from the
+`website_sale` dependency — not a Southbrook-supported route.
+
+**Three options:**
+
+1. **Skip — disable `/shop/` navigation entirely.** Phase 2 §8 will
+   replace it with `/kitchen-planner`. Until then, the route can
+   remain accessible by URL but isn't linked from anywhere. Risk:
+   anyone who pastes a /shop/ URL hits the 500. Mitigation: add a
+   `website.menu` cleanup pass that removes the auto-generated
+   "Shop" menu item from the website navigation. **Recommended.**
+
+2. **Patch OCA upstream.** Add a defensive `t-if="currency_id"` on
+   the `<span class="config_product_price"/>` template. CLAUDE.md §3
+   says: leave OCA modules at 19.0.1.0.0 as delivered; file upstream
+   if you find a real bug. This IS a real upstream bug (the template
+   should handle the empty-pricelist case). File it at the OCA repo
+   for `product_configurator/website_product_configurator/views/`.
+   Risk: 2-4 weeks for upstream merge + release.
+
+3. **Make a CAD pricelist `selectable=True` to force resolution.**
+   `_get_and_cache_current_pricelist()` walks `website.pricelist_ids`
+   filtered by `selectable=True` + country match. If at least one
+   country-less selectable pricelist exists, anonymous visitors get
+   it. Set `pricelist_retail` (id=37) selectable=True. Risk: changes
+   the website_sale resolution semantics for anyone hitting /shop/
+   to always show retail prices, which may not be what a logged-in
+   tradesperson expects.
+
+**Suggested decision:** option 1 + file an OCA issue per option 2
+(defensive `t-if` in the template is correct upstream behaviour).
+Document the deferred /shop/ disablement as Phase 3 navigation cleanup.
+
+**File targets if option 1 is picked:**
+- `addons/southbrook_estimating_website/data/menu.xml` — already
+  scaffolded per CLAUDE.md §3 file tree; add a menu-cleanup record
+  to deactivate `website_sale.menu_shop` for this website.
+
+**Acceptance:** `/shop/` either 404s cleanly or redirects to a
+Southbrook-branded "Browse our kitchens" landing page (Phase 2 §8).
