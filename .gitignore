@@ -1,0 +1,44 @@
+# --- Python / Odoo runtime ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# --- Editor & OS noise ---
+.DS_Store
+*.swp
+*.swo
+*.swn
+*.idea/
+*.vscode/
+.vscode/
+*.sublime-*
+
+# --- Odoo config + logs ---
+.odoorc
+odoo.conf
+*.log
+
+# --- docs/ exclusions ---
+# Archive of superseded canonical docs — kept on disk for diff-reconstruction
+# of design history, not committed because the live version is what matters.
+docs/archive/
+
+# Working scratchpads — drafts get promoted into addons/ progressively, then
+# deleted from drafts/. The two below are reference docs, not promote-targets,
+# so they stay in git.
+docs/drafts/*
+!docs/drafts/RULE_ENCODING_NOTES.md
+!docs/drafts/PHASE_1_FIRST_5_COMMITS.md
+
+# --- Build / dist (future) ---
+build/
+dist/
+*.tar.gz
+
+# --- Virtualenvs (in case anyone makes one locally) ---
+.venv/
+venv/
+env/

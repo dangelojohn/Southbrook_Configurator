@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Southbrook Order Builder — Mock</title>
+<meta name="description" content="Layout target for views/order_builder_views.xml. The sales-rep backend Order Builder, multi-zone grid, inline config drawer, BoM preview, channel pricelist header. Not deployed; for review against the brief.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── tokens ───────────────────────────────────────────────────────── */
+:root {
+  /* Sky / Walnut / Linen palette — TBD canonical hex pending #7 spec book */
+  --linen:    #f4ede2;   /* page background — warm off-white */
+  --paper:    #fbf7ef;   /* card / panel background */
+  --ink:      #1a1814;   /* primary text — near-black with warmth */
+  --ink-dim:  #6b665e;   /* secondary text */
+  --walnut:   #6b3f2a;   /* primary brand accent */
+  --walnut-d: #4a2b1d;
+  --sky:      #2b4f6b;   /* secondary accent — dimension lines, action buttons */
+  --sky-l:    #d8e3ec;   /* sky tint backgrounds */
+  --carbon:   #1a1814;
+  --rule:     #d8cfbf;   /* divider rule color */
+  --rule-d:   #b5a890;
+  --ok:       #4a6f3e;
+  --warn:     #b35a1a;
+  --alert:    #a83a2b;
+  --hl:       #f9e9b9;   /* highlight — selected row */
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Roboto Flex', sans-serif;
+  font-variation-settings: "opsz" 14, "wght" 400;
+  background: var(--linen);
+  color: var(--ink);
+  line-height: 1.4;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+/* ── top app bar ──────────────────────────────────────────────────── */
+.appbar {
+  display: flex; align-items: center;
+  height: 48px;
+  background: var(--carbon);
+  color: var(--linen);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--walnut-d);
+}
+.appbar .brand {
+  font-variation-settings: "opsz" 24, "wght" 600;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.appbar .brand-mark {
+  display: inline-block;
+  width: 22px; height: 22px;
+  background: var(--walnut);
+  border-radius: 2px;
+  margin-right: 10px;
+  vertical-align: middle;
+  position: relative;
+}
+.appbar .brand-mark::after {
+  content: ""; position: absolute;
+  inset: 5px; border: 1.5px solid var(--linen);
+  border-radius: 1px;
+}
+.appbar nav {
+  display: flex; gap: 22px;
+  margin-left: 36px;
+  font-size: 12px;
+  color: var(--linen);
+  opacity: 0.7;
+}
+.appbar nav a {
+  color: inherit; text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 1px solid transparent;
+}
+.appbar nav a.active {
+  opacity: 1;
+  border-bottom-color: var(--walnut);
+}
+.appbar .spacer { flex: 1; }
+.appbar .user {
+  font-size: 11px;
+  opacity: 0.7;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── breadcrumb / title row ───────────────────────────────────────── */
+.titlebar {
+  display: flex; align-items: baseline;
+  padding: 18px 32px 4px;
+  gap: 14px;
+}
+.titlebar .crumb {
+  font-size: 11px;
+  color: var(--ink-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.titlebar h1 {
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 24px;
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+.titlebar .ref {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+/* ── stage pipeline ───────────────────────────────────────────────── */
+.stages {
+  display: flex; gap: 0;
+  padding: 8px 32px 16px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.stage {
+  position: relative;
+  padding: 6px 18px 6px 22px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-right: none;
+  color: var(--ink-dim);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+  margin-right: -1px;
+}
+.stage:first-child { padding-left: 14px; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); }
+.stage:last-child  { padding-right: 14px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 10px 50%); border-right: 1px solid var(--rule); }
+.stage.done    { background: var(--sky-l); color: var(--ink); }
+.stage.current { background: var(--walnut); color: var(--linen); font-variation-settings: "wght" 600; }
+
+/* ── header strip: the channel + price summary ────────────────────── */
+.header-strip {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  margin: 0 32px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.hs-cell {
+  padding: 14px 18px;
+  border-right: 1px solid var(--rule);
+}
+.hs-cell:last-child { border-right: none; }
+.hs-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 6px;
+}
+.hs-value {
+  font-variation-settings: "opsz" 28, "wght" 500;
+  font-size: 18px;
+  color: var(--ink);
+}
+.hs-value .sub {
+  font-size: 11px;
+  font-variation-settings: "opsz" 11, "wght" 400;
+  color: var(--ink-dim);
+  margin-left: 4px;
+}
+.hs-cell.customer { background: var(--sky-l); }
+.hs-cell.savings .hs-value { color: var(--ok); }
+.pricelist-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  background: var(--walnut);
+  color: var(--linen);
+  padding: 2px 8px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+}
+
+/* ── tabs ─────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex; gap: 0;
+  margin: 18px 32px 0;
+  border-bottom: 1px solid var(--rule-d);
+}
+.tab {
+  padding: 10px 18px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  margin-bottom: -1px;
+}
+.tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--walnut);
+  font-variation-settings: "wght" 600;
+}
+.tab .count {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--rule);
+  color: var(--ink);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  margin-left: 6px;
+}
+
+/* ── main content area ────────────────────────────────────────────── */
+main {
+  padding: 0 32px 32px;
+}
+
+/* ── zone groups ──────────────────────────────────────────────────── */
+.zone {
+  margin-top: 16px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+.zone-header {
+  display: flex; align-items: center;
+  padding: 10px 16px;
+  background: linear-gradient(to bottom, var(--paper) 0%, #f4ecdc 100%);
+  border-bottom: 1px solid var(--rule);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.zone-header .chevron {
+  margin-right: 8px;
+  color: var(--walnut);
+  font-family: 'JetBrains Mono', monospace;
+}
+.zone-header .name {
+  font-variation-settings: "wght" 600;
+  color: var(--ink);
+}
+.zone-header .count {
+  margin-left: 8px; color: var(--ink-dim);
+}
+.zone-header .subtotal {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink);
+}
+.zone-header .subtotal .retail {
+  text-decoration: line-through;
+  color: var(--ink-dim);
+  margin-right: 10px;
+}
+
+/* ── line item rows ───────────────────────────────────────────────── */
+.lines {
+  display: grid;
+  grid-template-columns: 36px 1.6fr 70px 1fr 80px 100px 100px 32px;
+  font-size: 12px;
+}
+.line-head, .line {
+  display: contents;
+}
+.line-head > div {
+  padding: 8px 10px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--rule);
+  background: #faf4e8;
+}
+.line > div {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center;
+}
+.line:hover > div { background: #faf2dd; }
+.line.selected > div { background: var(--hl); }
+.line .lineno {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+.line .tpl { font-variation-settings: "wght" 500; }
+.line .tpl .xmlid {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-dim);
+  margin-left: 6px;
+}
+.line .price {
+  font-family: 'JetBrains Mono', monospace;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.line .price.retail {
+  text-decoration: line-through;
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+.line .qty { font-family: 'JetBrains Mono', monospace; justify-content: center; }
+.line .badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-left: 5px;
+  letter-spacing: 0.04em;
+}
+.badge.maple { background: var(--walnut); color: var(--linen); }
+.badge.lead  { background: var(--warn); color: var(--linen); }
+.badge.rule  { background: var(--sky); color: var(--linen); }
+.line .menu { color: var(--ink-dim); cursor: pointer; }
+
+/* ── add-line button row ──────────────────────────────────────────── */
+.add-line {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  border-top: 1px dashed var(--rule);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.add-line:hover { color: var(--walnut); background: #faf2dd; }
+.add-line .plus {
+  font-family: 'JetBrains Mono', monospace;
+  font-variation-settings: "wght" 600;
+  color: var(--walnut);
+  margin-right: 6px;
+}
+
+/* ── inline config drawer (expanded for the selected line) ────────── */
+.drawer {
+  background: #faf4e8;
+  border-bottom: 1px solid var(--rule);
+  padding: 14px 16px 16px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 18px;
+  font-size: 12px;
+  border-left: 3px solid var(--walnut);
+}
+.drawer h4 {
+  grid-column: 1 / -1;
+  margin: 0 0 4px 0;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--walnut);
+  font-variation-settings: "wght" 600;
+}
+.attr {
+  display: flex; flex-direction: column;
+  gap: 4px;
+}
+.attr label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.attr select, .attr input {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--rule-d);
+  background: white;
+  border-radius: 2px;
+}
+.attr .disabled-reason {
+  font-size: 10px;
+  color: var(--alert);
+  font-style: italic;
+  margin-top: 2px;
+}
+.attr.dim {
+  opacity: 0.55;
+}
+.attr.dim select { background: #f0e8d8; }
+
+/* ── bom preview tab (collapsed shown) ───────────────────────────── */
+.bom-preview {
+  display: none;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  margin-top: 12px;
+  padding: 12px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+/* ── validation bar ───────────────────────────────────────────────── */
+.validation {
+  display: flex; gap: 14px;
+  padding: 10px 16px;
+  background: #fff8e9;
+  border: 1px solid var(--rule);
+  margin-top: 12px;
+  font-size: 11px;
+  border-left: 3px solid var(--warn);
+}
+.validation .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; vertical-align: middle;
+  margin-right: 6px;
+}
+.dot.ok { background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.alert { background: var(--alert); }
+
+/* ── footer ───────────────────────────────────────────────────────── */
+.foot {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 24px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--rule);
+}
+.foot .grand {
+  font-variation-settings: "opsz" 48, "wght" 500;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+}
+.foot .grand-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-left: 8px;
+}
+.foot .spacer { flex: 1; }
+.btn {
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 9px 18px;
+  border: 1px solid var(--ink);
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn:hover { background: var(--linen); }
+.btn.primary {
+  background: var(--walnut);
+  color: var(--linen);
+  border-color: var(--walnut-d);
+  font-variation-settings: "wght" 600;
+}
+.btn.primary:hover { background: var(--walnut-d); }
+.btn.ghost { border-color: var(--rule-d); color: var(--ink-dim); }
+
+/* ── overlay legend (top-right, like architectural drawing legend) ─ */
+.legend {
+  position: fixed; top: 64px; right: 16px;
+  background: var(--paper);
+  border: 1px solid var(--rule-d);
+  border-radius: 2px;
+  padding: 10px 12px;
+  font-size: 10px;
+  color: var(--ink-dim);
+  max-width: 220px;
+  z-index: 10;
+  font-variation-settings: "wght" 400;
+  box-shadow: 2px 2px 0 var(--rule);
+}
+.legend h5 {
+  margin: 0 0 4px 0;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--walnut);
+}
+.legend p { margin: 0; line-height: 1.45; }
+.legend .ref {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  margin-top: 6px;
+  color: var(--ink);
+  padding-top: 6px;
+  border-top: 1px dashed var(--rule);
+}
+
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <span class="brand"><span class="brand-mark"></span>Southbrook</span>
+  <nav>
+    <a>Discuss</a>
+    <a>Contacts</a>
+    <a class="active">Sales</a>
+    <a>Configurator</a>
+    <a>Manufacturing</a>
+    <a>Inventory</a>
+    <a>Settings</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="user">Sarah K. · Sales</div>
+</header>
+
+<div class="titlebar">
+  <div>
+    <div class="crumb">Sales → Order Builder</div>
+    <h1>New Kitchen Order</h1>
+  </div>
+  <div class="ref">SO-2026-0001 · Draft</div>
+</div>
+
+<div class="stages">
+  <div class="stage done">Draft</div>
+  <div class="stage current">Estimating</div>
+  <div class="stage">Approval</div>
+  <div class="stage">Confirmed</div>
+  <div class="stage">In Production</div>
+</div>
+
+<div class="header-strip">
+  <div class="hs-cell customer">
+    <div class="hs-label">Customer</div>
+    <div class="hs-value">Demo Tradesperson <span class="sub">(Tier 3)</span></div>
+    <span class="pricelist-badge">CONTRACTOR (TIERED) · −35%</span>
+  </div>
+  <div class="hs-cell">
+    <div class="hs-label">Retail Subtotal</div>
+    <div class="hs-value mono">$4,658</div>
+  </div>
+  <div class="hs-cell">
+    <div class="hs-label">Channel Total</div>
+    <div class="hs-value mono">$3,028</div>
+  </div>
+  <div class="hs-cell savings">
+    <div class="hs-label">Savings</div>
+    <div class="hs-value mono">$1,630</div>
+  </div>
+  <div class="hs-cell">
+    <div class="hs-label">Lead Time</div>
+    <div class="hs-value">8 wks <span class="sub">+2 (maple)</span></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active">Order Lines <span class="count">9</span></div>
+  <div class="tab">BoM Preview <span class="count">94</span></div>
+  <div class="tab">Validation <span class="count">2</span></div>
+  <div class="tab">History</div>
+  <div class="tab">Customer Print</div>
+</div>
+
+<main>
+
+<!-- ─── ZONE: BASE_RUN ─────────────────────────────────────────────── -->
+<div class="zone">
+  <div class="zone-header">
+    <span class="chevron">▾</span>
+    <span class="name">Base Run</span>
+    <span class="count">4 lines</span>
+    <span class="subtotal"><span class="retail">$2,049</span>$1,332</span>
+  </div>
+
+  <div class="lines">
+    <div class="line-head">
+      <div></div>
+      <div>Template</div>
+      <div>Width</div>
+      <div>Spec</div>
+      <div style="text-align:center">Qty</div>
+      <div style="text-align:right">Retail</div>
+      <div style="text-align:right">Tier-3</div>
+      <div></div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">1</div>
+      <div class="tpl">Base 1-Door <span class="xmlid">southbrook.base_1dr</span></div>
+      <div class="mono">18″</div>
+      <div>Contemporary · Maple <span class="badge maple">MAPLE</span></div>
+      <div class="qty">1</div>
+      <div class="price retail">$366</div>
+      <div class="price">$262</div>
+      <div class="menu">⋯</div>
+    </div>
+
+    <div class="line selected">
+      <div class="lineno">2</div>
+      <div class="tpl">Base 2-Door <span class="xmlid">southbrook.base_2dr</span></div>
+      <div class="mono">24″</div>
+      <div>Contemporary · Maple · Slab · White <span class="badge maple">MAPLE</span></div>
+      <div class="qty">1</div>
+      <div class="price retail">$531</div>
+      <div class="price">$380</div>
+      <div class="menu">⋯</div>
+    </div>
+
+    <!-- inline drawer for selected line -->
+    <div class="drawer" style="grid-column: 1 / -1;">
+      <h4>Line 2 · Configuration</h4>
+      <div class="attr">
+        <label>Family</label>
+        <select><option>Base</option></select>
+      </div>
+      <div class="attr">
+        <label>Width</label>
+        <select><option>24″ (610 mm)</option></select>
+      </div>
+      <div class="attr">
+        <label>Series</label>
+        <select><option>Contemporary</option><option>Contractor</option><option>Elegance</option><option>Signature</option></select>
+      </div>
+      <div class="attr">
+        <label>Door Style <span class="badge rule">RULE 1</span></label>
+        <select><option>Thermofoil Slab</option><option>5-Piece Woodgrain</option><option>Custom</option></select>
+      </div>
+      <div class="attr">
+        <label>Box Material <span class="badge rule">RULE 2</span></label>
+        <select><option>Maple (+10%, +2 wks)</option><option>White Melamine</option></select>
+      </div>
+      <div class="attr">
+        <label>Finish</label>
+        <select><option>White</option></select>
+      </div>
+      <div class="attr">
+        <label>Hinge Side</label>
+        <select><option>Left</option><option>Right</option><option>N/A</option></select>
+      </div>
+      <div class="attr">
+        <label>Door Count <span class="badge rule">RULE 3</span></label>
+        <select disabled><option>2 (auto, width ≥ 24″)</option></select>
+      </div>
+      <div class="attr">
+        <label>Finished Sides</label>
+        <select><option>None</option></select>
+      </div>
+      <div class="attr">
+        <label>Gables</label>
+        <select><option>Standard</option></select>
+      </div>
+      <div class="attr">
+        <label>Handle</label>
+        <select><option>Satin Nickel 96 mm</option></select>
+      </div>
+      <div class="attr">
+        <label>Accessories</label>
+        <select><option>Soft-Close · Drawer Org.</option></select>
+      </div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">3</div>
+      <div class="tpl">Drawer Bank <span class="xmlid">southbrook.drawer_bank</span></div>
+      <div class="mono">18″</div>
+      <div>Contemporary · Maple · 3-drawer <span class="badge maple">MAPLE</span></div>
+      <div class="qty">1</div>
+      <div class="price retail">$374</div>
+      <div class="price">$267</div>
+      <div class="menu">⋯</div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">4</div>
+      <div class="tpl">Sink Base <span class="xmlid">southbrook.sink_base</span></div>
+      <div class="mono">33″</div>
+      <div>Contemporary · Maple · Cutout <span class="badge maple">MAPLE</span></div>
+      <div class="qty">1</div>
+      <div class="price retail">$778</div>
+      <div class="price">$556</div>
+      <div class="menu">⋯</div>
+    </div>
+  </div>
+
+  <div class="add-line"><span class="plus">+</span>Add cabinet to Base Run</div>
+</div>
+
+<!-- ─── ZONE: WALL ─────────────────────────────────────────────────── -->
+<div class="zone">
+  <div class="zone-header">
+    <span class="chevron">▾</span>
+    <span class="name">Wall</span>
+    <span class="count">3 lines</span>
+    <span class="subtotal"><span class="retail">$1,268</span>$824</span>
+  </div>
+
+  <div class="lines">
+    <div class="line-head">
+      <div></div>
+      <div>Template</div>
+      <div>Width</div>
+      <div>Spec</div>
+      <div style="text-align:center">Qty</div>
+      <div style="text-align:right">Retail</div>
+      <div style="text-align:right">Tier-3</div>
+      <div></div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">5</div>
+      <div class="tpl">Wall 1-Door <span class="xmlid">southbrook.wall_1dr</span></div>
+      <div class="mono">15″</div>
+      <div>Contemporary · Maple <span class="badge maple">MAPLE</span></div>
+      <div class="qty">2</div>
+      <div class="price retail">$572</div>
+      <div class="price">$409</div>
+      <div class="menu">⋯</div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">6</div>
+      <div class="tpl">Wall 2-Door <span class="xmlid">southbrook.wall_2dr</span></div>
+      <div class="mono">30″</div>
+      <div>Contemporary · Maple <span class="badge maple">MAPLE</span></div>
+      <div class="qty">1</div>
+      <div class="price retail">$696</div>
+      <div class="price">$497</div>
+      <div class="menu">⋯</div>
+    </div>
+  </div>
+
+  <div class="add-line"><span class="plus">+</span>Add cabinet to Wall</div>
+</div>
+
+<!-- ─── ZONE: TALL ─────────────────────────────────────────────────── -->
+<div class="zone">
+  <div class="zone-header">
+    <span class="chevron">▾</span>
+    <span class="name">Tall</span>
+    <span class="count">1 line</span>
+    <span class="subtotal"><span class="retail">$531</span>$345</span>
+  </div>
+
+  <div class="lines">
+    <div class="line-head">
+      <div></div>
+      <div>Template</div>
+      <div>Width</div>
+      <div>Spec</div>
+      <div style="text-align:center">Qty</div>
+      <div style="text-align:right">Retail</div>
+      <div style="text-align:right">Tier-3</div>
+      <div></div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">7</div>
+      <div class="tpl">Tall Pantry <span class="xmlid">southbrook.tall_pantry</span></div>
+      <div class="mono">24″</div>
+      <div>Contemporary · Maple · 84″ H <span class="badge maple">MAPLE</span></div>
+      <div class="qty">1</div>
+      <div class="price retail">$531</div>
+      <div class="price">$345</div>
+      <div class="menu">⋯</div>
+    </div>
+  </div>
+
+  <div class="add-line"><span class="plus">+</span>Add cabinet to Tall</div>
+</div>
+
+<!-- ─── ZONE: ACCESSORY ────────────────────────────────────────────── -->
+<div class="zone">
+  <div class="zone-header">
+    <span class="chevron">▾</span>
+    <span class="name">Accessory</span>
+    <span class="count">2 lines</span>
+    <span class="subtotal"><span class="retail">$810</span>$527</span>
+  </div>
+
+  <div class="lines">
+    <div class="line-head">
+      <div></div>
+      <div>Template</div>
+      <div>Type</div>
+      <div>Spec</div>
+      <div style="text-align:center">Qty</div>
+      <div style="text-align:right">Retail</div>
+      <div style="text-align:right">Tier-3</div>
+      <div></div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">8</div>
+      <div class="tpl">Accessory <span class="xmlid">southbrook.accessory</span></div>
+      <div class="mono">end_panel</div>
+      <div>Contemporary · White Melamine</div>
+      <div class="qty">2</div>
+      <div class="price retail">$190</div>
+      <div class="price">$124</div>
+      <div class="menu">⋯</div>
+    </div>
+
+    <div class="line">
+      <div class="lineno">9</div>
+      <div class="tpl">Worktop <span class="xmlid">southbrook.worktop</span></div>
+      <div class="mono">96″</div>
+      <div>Contemporary · Laminate</div>
+      <div class="qty">1</div>
+      <div class="price retail">$620</div>
+      <div class="price">$403</div>
+      <div class="menu">⋯</div>
+    </div>
+  </div>
+
+  <div class="add-line"><span class="plus">+</span>Add accessory</div>
+</div>
+
+<!-- ─── empty zones ────────────────────────────────────────────────── -->
+<div class="zone" style="opacity: 0.45;">
+  <div class="zone-header">
+    <span class="chevron">▸</span>
+    <span class="name">Island</span>
+    <span class="count">empty</span>
+  </div>
+</div>
+
+<div class="zone" style="opacity: 0.45;">
+  <div class="zone-header">
+    <span class="chevron">▸</span>
+    <span class="name">Other</span>
+    <span class="count">empty · custom zone_label hidden</span>
+  </div>
+</div>
+
+<!-- ─── validation strip ───────────────────────────────────────────── -->
+<div class="validation">
+  <div><span class="dot warn"></span><b>Soft:</b> Lines 5 (15″ Wall 1-Door) typically pair with finished sides — current spec has none.</div>
+  <div style="margin-left:auto;"><span class="dot ok"></span><b>Hard rules:</b> all passing.</div>
+</div>
+
+<!-- ─── footer ─────────────────────────────────────────────────────── -->
+<div class="foot">
+  <div>
+    <div class="grand mono">$3,028</div>
+    <div class="grand-label">total · 9 lines · Tier-3 Contractor Pricing</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn ghost">Duplicate as Draft</button>
+  <button class="btn ghost">Save Draft</button>
+  <button class="btn">Send for Approval</button>
+  <button class="btn primary">Confirm Order</button>
+</div>
+
+</main>
+
+<aside class="legend">
+  <h5>Layout Target</h5>
+  <p>This mock is a visual reference for <code>views/order_builder_views.xml</code>. The OWL component should render this structure: top bar → titlebar → stages → header strip → tabs → zone groups → footer.</p>
+  <div class="ref">
+    Brief §2.2<br>
+    Build Spec §7 (Phase 1 gate)<br>
+    PUNCHLIST Q21 (zones)
+  </div>
+</aside>
+
+</body>
+</html>
