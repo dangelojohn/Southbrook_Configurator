@@ -57,6 +57,12 @@ export class KitchenViewport extends Component {
         <div class="o_owl_kitchen">
             <div class="o_owl_kitchen_toolbar">
                 <span class="o_owl_kitchen_title">3D Kitchen Preview</span>
+                <button class="btn btn-sm o_owl_kitchen_mode_btn"
+                        t-on-click="onToggleMode"
+                        t-att-disabled="!state.threeLoaded">
+                    <t t-if="state.mode === 'solid'">Blueline</t>
+                    <t t-else="">Solid</t>
+                </button>
                 <span class="o_owl_kitchen_status" t-if="state.loading">
                     Loading…
                 </span>
@@ -92,6 +98,8 @@ export class KitchenViewport extends Component {
             error: null,
             threeLoaded: !!window.THREE,
             meta: null,
+            // P25C2 — solid↔blueline toggle (back-port of Track 1 T1C5).
+            mode: "solid",
         });
 
         // Three.js handles — populated in _init.
@@ -104,6 +112,10 @@ export class KitchenViewport extends Component {
         this._materials = {};
         this._frameId = null;
         this._resizeObserver = null;
+        // P25C2 — dimension overlay group (lifted from T1C5).
+        this._dimensionGroup = null;
+        this._dimensionMaterial = null;
+        this._spriteResources = [];
 
         onMounted(() => this._init());
         onWillUnmount(() => this._dispose());
@@ -169,6 +181,12 @@ export class KitchenViewport extends Component {
         this._cabinetGroup = new THREE.Group();
         this._scene.add(this._cabinetGroup);
 
+        // P25C2 — dimension overlay group. Lives outside cabinetGroup
+        // so the blueline material swap doesn't touch it.
+        this._dimensionGroup = new THREE.Group();
+        this._dimensionGroup.visible = this.state.mode === "blueline";
+        this._scene.add(this._dimensionGroup);
+
         // Materials — simple palette. Phase 3 polish adds per-panel
         // distinctions (back / shelf / hardware finish).
         this._materials = {
@@ -189,6 +207,10 @@ export class KitchenViewport extends Component {
             }),
             worktop: new THREE.MeshStandardMaterial({
                 color: 0xb5b0a8, roughness: 0.4, metalness: 0.05,
+            }),
+            // P25C2 — blueline wireframe overlay.
+            blueline: new THREE.MeshBasicMaterial({
+                color: 0x2b4f6b, wireframe: true,
             }),
         };
 
@@ -278,21 +300,26 @@ export class KitchenViewport extends Component {
 
         if (!payload || !Array.isArray(payload.panels)) return;
 
+        const blueline = this.state.mode === "blueline";
+
         for (const p of payload.panels) {
             const d = p.dims;
             if (!d || d.width <= 0 || d.height <= 0 || d.depth <= 0) continue;
             const geom = new THREE.BoxGeometry(d.width, d.height, d.depth);
-            const mat = this._materials[p.material || "carcass"]
-                || this._materials.carcass;
+            const matName = blueline ? "blueline" : (p.material || "carcass");
+            const mat = this._materials[matName] || this._materials.carcass;
             const mesh = new THREE.Mesh(geom, mat);
             mesh.position.set(p.pos.x, p.pos.y, p.pos.z);
             if (p.rot) {
                 mesh.rotation.set(p.rot.x || 0, p.rot.y || 0, p.rot.z || 0);
             }
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
+            mesh.castShadow = !blueline;
+            mesh.receiveShadow = !blueline;
             this._cabinetGroup.add(mesh);
         }
+
+        // P25C2 — rebuild dimension chains for the new bounds.
+        this._buildDimensionLines(payload);
 
         // Camera fit.
         if (payload.camera) {
@@ -305,6 +332,230 @@ export class KitchenViewport extends Component {
                 this._camera.lookAt(new THREE.Vector3(...tgt));
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // P25C2 — blueline mode toggle + auto-dim lines.
+    //
+    // Lift of Track 1 T1C5 logic adapted for the kitchen-scale viewport
+    // (multi-cabinet, payload.bounds spans the whole kitchen). Same
+    // sky-on-paper visual language, same _formatMm 0.25" rounding.
+    // ------------------------------------------------------------------
+
+    onToggleMode() {
+        this.state.mode = this.state.mode === "solid" ? "blueline" : "solid";
+        if (!this._cabinetGroup) return;
+        const blueline = this._materials.blueline;
+        this._cabinetGroup.traverse((obj) => {
+            if (!obj.isMesh) return;
+            if (this.state.mode === "blueline") {
+                obj.userData._origMaterial = obj.material;
+                obj.material = blueline;
+                obj.castShadow = false;
+                obj.receiveShadow = false;
+            } else if (obj.userData._origMaterial) {
+                obj.material = obj.userData._origMaterial;
+                obj.userData._origMaterial = null;
+                obj.castShadow = true;
+                obj.receiveShadow = true;
+            }
+        });
+        if (this._dimensionGroup) {
+            this._dimensionGroup.visible = this.state.mode === "blueline";
+        }
+    }
+
+    _buildDimensionLines(payload) {
+        const THREE = this._THREE;
+        const group = this._dimensionGroup;
+        if (!THREE || !group) return;
+
+        this._clearDimensionGroup();
+
+        if (!payload || !payload.bounds) return;
+
+        const b = payload.bounds;
+        const W = b.max[0] - b.min[0];
+        const H = b.max[1] - b.min[1];
+        const D = b.max[2] - b.min[2];
+
+        const lineMat = new THREE.LineBasicMaterial({
+            color: 0x2b4f6b,
+            transparent: true,
+            opacity: 0.85,
+        });
+        this._dimensionMaterial = lineMat;
+
+        const TICK = 60;          // tick-mark half-length (mm). Larger
+                                  // than T1C5's 25 since kitchen scale
+                                  // dwarfs single-cabinet scale.
+        const OFFSET_W = 400;     // dim-line offsets from cabinet face.
+        const OFFSET_H = 600;
+        const OFFSET_D = 600;
+        const LABEL_GAP = 280;    // label distance from dim line.
+
+        // ---- WIDTH — across X, in front of the kitchen, below the floor.
+        const wYbar = -OFFSET_W;
+        const wZbar = b.max[2] + 100;
+        const xL = b.min[0];
+        const xR = b.max[0];
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xL, wYbar, wZbar),
+            new THREE.Vector3(xR, wYbar, wZbar));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xL, 0, b.max[2]),
+            new THREE.Vector3(xL, wYbar - 40, wZbar));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xR, 0, b.max[2]),
+            new THREE.Vector3(xR, wYbar - 40, wZbar));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xL, wYbar - TICK, wZbar),
+            new THREE.Vector3(xL, wYbar + TICK, wZbar));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xR, wYbar - TICK, wZbar),
+            new THREE.Vector3(xR, wYbar + TICK, wZbar));
+        this._addLabelSprite(group,
+            this._formatMm(W), (xL + xR) / 2, wYbar - LABEL_GAP, wZbar);
+
+        // ---- HEIGHT — vertical, on the right side of the kitchen.
+        const hX = b.max[0] + OFFSET_H;
+        const hZmid = (b.min[2] + b.max[2]) / 2;
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(hX, 0, hZmid),
+            new THREE.Vector3(hX, H, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.max[0], 0, hZmid),
+            new THREE.Vector3(hX + 40, 0, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.max[0], H, hZmid),
+            new THREE.Vector3(hX + 40, H, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(hX - TICK, 0, hZmid),
+            new THREE.Vector3(hX + TICK, 0, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(hX - TICK, H, hZmid),
+            new THREE.Vector3(hX + TICK, H, hZmid));
+        this._addLabelSprite(group,
+            this._formatMm(H), hX + LABEL_GAP, H / 2, hZmid);
+
+        // ---- DEPTH — along Z, on the floor to the left.
+        const dX = b.min[0] - OFFSET_D;
+        const dY = 5;
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(dX, dY, b.min[2]),
+            new THREE.Vector3(dX, dY, b.max[2]));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.min[0], dY, b.min[2]),
+            new THREE.Vector3(dX + 40, dY, b.min[2]));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.min[0], dY, b.max[2]),
+            new THREE.Vector3(dX + 40, dY, b.max[2]));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(dX, dY, b.min[2] - TICK),
+            new THREE.Vector3(dX, dY, b.min[2] + TICK));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(dX, dY, b.max[2] - TICK),
+            new THREE.Vector3(dX, dY, b.max[2] + TICK));
+        this._addLabelSprite(group,
+            this._formatMm(D), dX - LABEL_GAP, dY, (b.min[2] + b.max[2]) / 2);
+    }
+
+    _addLineSegment(group, mat, a, b) {
+        const THREE = this._THREE;
+        const geom = new THREE.BufferGeometry().setFromPoints([a, b]);
+        const line = new THREE.Line(geom, mat);
+        line.castShadow = false;
+        line.receiveShadow = false;
+        line.renderOrder = 999;
+        group.add(line);
+        return line;
+    }
+
+    _addLabelSprite(group, text, x, y, z) {
+        const THREE = this._THREE;
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+
+        const W_PX = 320;
+        const H_PX = 110;
+        const canvas = document.createElement("canvas");
+        canvas.width = W_PX * dpr;
+        canvas.height = H_PX * dpr;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+
+        ctx.font =
+            "600 28px 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace";
+        const padX = 16;
+        const pillH = 56;
+        const tw = ctx.measureText(text).width;
+        const pillW = tw + padX * 2;
+        const px = (W_PX - pillW) / 2;
+        const py = (H_PX - pillH) / 2;
+        ctx.fillStyle = "rgba(251, 247, 239, 0.92)";       // --sb-paper
+        const r = 6;
+        ctx.beginPath();
+        ctx.moveTo(px + r, py);
+        ctx.arcTo(px + pillW, py, px + pillW, py + pillH, r);
+        ctx.arcTo(px + pillW, py + pillH, px, py + pillH, r);
+        ctx.arcTo(px, py + pillH, px, py, r);
+        ctx.arcTo(px, py, px + pillW, py, r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(43, 79, 107, 0.4)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "#2b4f6b";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, W_PX / 2, H_PX / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            depthTest: false,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.position.set(x, y, z);
+        // Larger world-scale than T1C5 because the kitchen spans
+        // 2-5 m; labels need to be ~250-300 mm tall to read at the
+        // default camera zoom.
+        sprite.scale.set(700, 700 * (H_PX / W_PX), 1);
+        sprite.renderOrder = 1000;
+        group.add(sprite);
+
+        this._spriteResources.push({ texture, material });
+    }
+
+    _clearDimensionGroup() {
+        const group = this._dimensionGroup;
+        if (!group) return;
+        while (group.children.length) {
+            const child = group.children[0];
+            group.remove(child);
+            if (child.geometry) child.geometry.dispose();
+        }
+        for (const r of this._spriteResources) {
+            if (r.texture) r.texture.dispose();
+            if (r.material) r.material.dispose();
+        }
+        this._spriteResources = [];
+        if (this._dimensionMaterial) {
+            this._dimensionMaterial.dispose();
+            this._dimensionMaterial = null;
+        }
+    }
+
+    _formatMm(mm) {
+        const inches = mm / 25.4;
+        const inchesRounded = Math.round(inches * 4) / 4;
+        const inchesDisplay =
+            Math.abs(inchesRounded) > 0.001
+                ? `${inchesRounded.toFixed(2).replace(/\.?0+$/, "")}"`
+                : "";
+        return `${Math.round(mm)} mm${inchesDisplay ? ` · ${inchesDisplay}` : ""}`;
     }
 
     _dispose() {
@@ -320,6 +571,8 @@ export class KitchenViewport extends Component {
         }
         if (this._floorGeom) this._floorGeom.dispose();
         if (this._floorMat) this._floorMat.dispose();
+        // P25C2 — dimension overlay disposal.
+        this._clearDimensionGroup();
         if (this._renderer) this._renderer.dispose();
     }
 }

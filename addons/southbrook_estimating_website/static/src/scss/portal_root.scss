@@ -431,6 +431,27 @@
     font-style: italic;
 }
 
+// P25C2 — solid↔blueline toggle button
+.o_owl_kitchen_mode_btn {
+    font-family: var(--sb-font-mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    background: white;
+    color: var(--sb-sky);
+    border: 1px solid var(--sb-sky);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 0.15s;
+
+    &:hover:not(:disabled) {
+        background: var(--sb-sky-l);
+    }
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
 .o_owl_kitchen_meta {
     margin-left: auto;
     font-family: var(--sb-font-mono);
