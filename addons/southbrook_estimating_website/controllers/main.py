@@ -31,12 +31,18 @@ from odoo.addons.portal.controllers.portal import CustomerPortal
 class SouthbrookOrderBuilderPortal(CustomerPortal):
     """Portal route hosting the OWL Order Builder."""
 
+    # T2C1 followup: dropped website=True. Odoo 19 portal routes
+    # render via portal.portal_layout (which IS website-aware), but
+    # the route itself doesn't need the website-flag — adding it
+    # makes Odoo require a matching website record and skip route
+    # registration when none matches on the current request.
+    # Portal routes are http with auth=user; the layout template
+    # pulls in website chrome on its own.
     @http.route(
         ["/my/southbrook/order-builder",
          "/my/southbrook/order-builder/<int:order_id>"],
         type="http",
         auth="user",
-        website=True,
     )
     def southbrook_order_builder(self, order_id=None, **kw):
         """Render the Order Builder portal page.
