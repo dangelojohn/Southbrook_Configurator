@@ -235,6 +235,12 @@ class SaleOrder(models.Model):
         max_d = 0             # deepest cabinet, for camera framing
         max_z_back = 0        # most negative Z reached (for camera + bounds)
         all_panels = []
+        # T1C8 — per-line index for hover tooltip in the OWL component.
+        # The frontend reads this map by line.id (extracted from panel
+        # name prefix "L{id}_") to display "Line N · Family · SKU"
+        # in the toolbar while the mouse is over a cabinet.
+        lines_index = {}
+        sequence = 0
 
         for line in self.order_line:
             tmpl = line.product_id.product_tmpl_id if line.product_id else None
@@ -296,6 +302,22 @@ class SaleOrder(models.Model):
             if cabinet_back_z < max_z_back:
                 max_z_back = cabinet_back_z
 
+            # T1C8 — line index entry.
+            sequence += 1
+            lines_index[str(line.id)] = {
+                "id": line.id,
+                "sequence": sequence,
+                "sku": sku or "",
+                "family": fam,
+                "zone": line.zone or "base_run",
+                "width_mm": w,
+                "height_mm": h,
+                "depth_mm": d,
+                "product_name": (
+                    tmpl.display_name if tmpl else ""
+                ),
+            }
+
         # Widest cursor determines the camera framing width.
         widest = max(cursors.values())
         cumulative_x = widest
@@ -350,6 +372,7 @@ class SaleOrder(models.Model):
                 "kitchen_height_mm": max_h,
                 "kitchen_depth_mm":  max_d,
                 "cursors": dict(cursors),  # diagnostic: per-zone X totals
+                "lines": lines_index,      # T1C8 — per-line lookup for hover
             },
             "camera": {"target": cam_target, "position": cam_position},
             "bounds": {
