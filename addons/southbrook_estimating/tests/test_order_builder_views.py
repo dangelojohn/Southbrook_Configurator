@@ -102,3 +102,56 @@ class TestOrderBuilderViews(TransactionCase):
                       "NF7 user pref field not in rendered arch")
         self.assertIn("southbrook_order_entry_mode", arch,
                       "NF8 user pref field not in rendered arch")
+
+    # ------------------------------------------------------------------
+    # Commit 9.5 — zone grouping + stat-button placement
+    # ------------------------------------------------------------------
+
+    def test_08_order_line_tree_is_grouped_by_zone(self):
+        """Q21 visual grouping: the embedded order_line tree must carry
+        default_group_by='zone' so the Richwood multi-zone pattern shows
+        lines grouped under zone headers.
+        """
+        form_view = self.env.ref("sale.view_order_form")
+        arch = self.env["sale.order"].fields_view_get(
+            view_id=form_view.id, view_type="form"
+        )["arch"]
+        # Search for the attribute in the order_line tree. If a future xpath
+        # refactor accidentally drops the grouping, this assertion fails
+        # before install reaches a live instance.
+        self.assertIn('default_group_by="zone"', arch,
+                      "Q21 zone grouping missing from compiled arch")
+
+    def test_09_duplicate_button_is_in_button_box(self):
+        """Discipline-A placement assertion (per John's commit-9 review):
+        the Duplicate-as-Draft button must live inside the standard
+        button_box (stat-button container), not in <header> or <footer>.
+
+        Pins the placement so a future refactor doesn't silently move the
+        button into a different region.
+        """
+        import re
+        form_view = self.env.ref("sale.view_order_form")
+        arch = self.env["sale.order"].fields_view_get(
+            view_id=form_view.id, view_type="form"
+        )["arch"]
+
+        # Find the button_box div span in the arch (greedy across newlines).
+        # The button name must appear between the opening div tag with
+        # name='button_box' and its closing </div>. If it lands in <header>
+        # or <footer> instead, this regex misses.
+        button_box_match = re.search(
+            r'<div[^>]*\bname=["\']button_box["\'][^>]*>(.*?)</div>',
+            arch, re.DOTALL,
+        )
+        self.assertTrue(
+            button_box_match,
+            "button_box div not present in compiled arch",
+        )
+        button_box_content = button_box_match.group(1)
+        self.assertIn(
+            "action_duplicate_as_draft",
+            button_box_content,
+            "NF6 button is NOT inside button_box — placement drifted "
+            "(expected stat-button container, found elsewhere)",
+        )
