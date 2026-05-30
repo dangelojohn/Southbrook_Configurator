@@ -140,6 +140,10 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # NF26 — reliable Southbrook 3D Configure stat button so users
         # always have a launch point regardless of OCA header inherit order.
         "views/product_template_3d_launch_view.xml",
+        # NF27 — one-click "Launch 3D Configurator" menu item under
+        # Southbrook Estimating. Bypasses the product form button entirely.
+        # MUST load AFTER sale_order_views.xml (which defines menu_southbrook_root).
+        "views/launch_3d_menu.xml",
     ],
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).
