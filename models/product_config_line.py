@@ -163,11 +163,19 @@ class ProductConfigSession(models.Model):
     def _cut_list_to_3d_payload(self, cab, cut):
         """Translate Phase-1 cut list into 3D panel placements.
 
-        Geometric constants (BOX_TH, BACK_TH, RABBET, DOOR_TH, DOOR_REVEAL)
-        intentionally re-imported from mrp_bom module so the same named
-        constants drive both cut list and 3D placement. If a future workbook
-        update changes BOX_TH from 15.875mm to something else, both layers
-        update without divergence.
+        Geometric constants (BOX_TH, BACK_TH, RABBET, DOOR_TH, DOOR_REVEAL,
+        TOEKICK_H, TOEKICK_FAMILIES) intentionally re-imported from mrp_bom
+        module so the same named constants drive both cut list and 3D
+        placement. If a future workbook update changes BOX_TH from 15.875mm
+        to something else, both layers update without divergence.
+
+        Track 1 commit 3 family dispatch:
+          • worktop   — short-circuit slab (no carcass)
+          • accessory — short-circuit end panel (no carcass)
+          • drawer    — carcass + N drawer fronts instead of doors
+          • toekick families (base/sink/tall/vanity) — carcass elevated
+            by TOEKICK_H + toe-kick face panel at the floor
+          • everything else — carcass + doors (Phase-1 behaviour)
         """
         from . import mrp_bom as _mb
 
@@ -176,37 +184,59 @@ class ProductConfigSession(models.Model):
         RABBET = _mb.RABBET
         DOOR_TH = _mb.DOOR_TH
         DOOR_REVEAL = _mb.DOOR_REVEAL
+        TOEKICK_H = _mb.TOEKICK_H
+        TOEKICK_FAMILIES = _mb.TOEKICK_FAMILIES
 
         W = cab["width_mm"]
         H = cab["height_mm"]
         D = cab["depth_mm"]
         door_count = cab["door_count"]
+        family = cab["family"]
+
+        # ------------------------------------------------------------------
+        # Short-circuit families: no carcass, just a single slab.
+        # ------------------------------------------------------------------
+        if family == "worktop":
+            return self._3d_payload_worktop(W, H, D)
+        if family == "accessory":
+            return self._3d_payload_accessory(W, H, D, BOX_TH)
+
+        # ------------------------------------------------------------------
+        # Carcass families (base / wall / sink / tall / vanity / drawer / corner).
+        # Toe-kick families lift the carcass off the floor and add a recessed
+        # face panel at the front-bottom. Wall + corner sit on the cabinet's
+        # own bottom — no toe-kick.
+        # ------------------------------------------------------------------
+        has_toekick = family in TOEKICK_FAMILIES
+        y0 = TOEKICK_H if has_toekick else 0   # carcass bottom y-offset
         inside_w = W - 2 * BOX_TH
 
         panels = []
 
-        # ---- Sides: vertical, full height, full depth, BOX_TH thick.
+        # ---- Sides: vertical, BOX_TH thick. For toekick families the
+        #      side panels extend the full visible height (door + toekick);
+        #      we approximate by keeping sides at H tall and lifting them.
         panels.append({
             "name": "side_L",
             "dims": {"width": BOX_TH, "height": H, "depth": D},
-            "pos":  {"x": -(W - BOX_TH) / 2, "y": H / 2, "z": -D / 2},
+            "pos":  {"x": -(W - BOX_TH) / 2, "y": y0 + H / 2, "z": -D / 2},
         })
         panels.append({
             "name": "side_R",
             "dims": {"width": BOX_TH, "height": H, "depth": D},
-            "pos":  {"x": (W - BOX_TH) / 2, "y": H / 2, "z": -D / 2},
+            "pos":  {"x": (W - BOX_TH) / 2, "y": y0 + H / 2, "z": -D / 2},
         })
 
         # ---- Top + bottom: horizontal, captured between sides.
         panels.append({
             "name": "top",
             "dims": {"width": inside_w, "height": BOX_TH, "depth": D},
-            "pos":  {"x": 0, "y": H - BOX_TH / 2, "z": -D / 2},
+            "pos":  {"x": 0, "y": y0 + H - BOX_TH / 2, "z": -D / 2},
         })
         panels.append({
             "name": "bottom",
             "dims": {"width": inside_w, "height": BOX_TH, "depth": D},
-            "pos":  {"x": 0, "y": BOX_TH / 2, "z": -D / 2},
+            "pos":  {"x": 0, "y": y0 + BOX_TH / 2, "z": -D / 2},
         })
 
         # ---- Back panel: rabbet-captured.
@@ -215,53 +245,53 @@ class ProductConfigSession(models.Model):
         panels.append({
             "name": "back",
             "dims": {"width": back_w, "height": back_h, "depth": BACK_TH},
-            "pos":  {"x": 0, "y": H / 2, "z": -D + BACK_TH / 2},
+            "pos":  {"x": 0, "y": y0 + H / 2, "z": -D + BACK_TH / 2},
             "material": "back",
         })
 
-        # ---- Shelf (optional).
+        # ---- Shelves (1, 2, or 3) — evenly spaced inside the cavity.
         shelf = cut.get("shelf")
-        if shelf is not None:
-            shelf_y = H / 2  # mid-height for Phase 1; height-aware in Phase 3.
-            panels.append({
-                "name": "shelf",
-                "dims": {"width": shelf[0], "height": BOX_TH, "depth": shelf[1]},
-                "pos":  {"x": 0, "y": shelf_y, "z": -(D + BACK_TH) / 2 + 6},
-                "material": "shelf",
-            })
-
-        # ---- Doors.
-        if door_count == 1:
-            door_w = W - 2 * DOOR_REVEAL
-            door_h = H - 2 * DOOR_REVEAL
-            panels.append({
-                "name": "door",
-                "dims": {"width": door_w, "height": door_h, "depth": DOOR_TH},
-                "pos":  {
-                    "x": 0,
-                    "y": H / 2,
-                    "z": DOOR_TH / 2 + DOOR_REVEAL,
-                },
-                "material": "door",
-            })
-        elif door_count == 2:
-            half_w = (W - 3 * DOOR_REVEAL) / 2
-            door_h = H - 2 * DOOR_REVEAL
-            for sign in (-1, 1):
+        shelf_count = cut.get("shelf_count", 0)
+        if shelf is not None and shelf_count > 0:
+            interior_h = H - 2 * BOX_TH
+            spacing = interior_h / (shelf_count + 1)
+            for i in range(shelf_count):
+                shelf_y = y0 + BOX_TH + spacing * (i + 1)
                 panels.append({
-                    "name": f"door_{1 if sign < 0 else 2}",
-                    "dims": {"width": half_w, "height": door_h, "depth": DOOR_TH},
-                    "pos":  {
-                        "x": sign * (half_w / 2 + DOOR_REVEAL / 2),
-                        "y": H / 2,
-                        "z": DOOR_TH / 2 + DOOR_REVEAL,
+                    "name": f"shelf_{i + 1}",
+                    "dims": {
+                        "width": shelf[0],
+                        "height": BOX_TH,
+                        "depth": shelf[1],
                     },
-                    "material": "door",
+                    "pos":  {"x": 0, "y": shelf_y, "z": -(D + BACK_TH) / 2 + 6},
+                    "material": "shelf",
                 })
 
-        # ---- Camera framing — 3/4 view, slightly elevated.
-        cam_position = [W * 1.4, H * 1.25, D * 1.8]
-        cam_target = [0, H / 2, -D / 2]
+        # ---- Toe-kick face panel: recessed ~30mm from the door plane,
+        #      sits between the floor and the carcass bottom.
+        if has_toekick:
+            panels.append({
+                "name": "toekick",
+                "dims": {"width": inside_w, "height": TOEKICK_H, "depth": 18},
+                "pos":  {"x": 0, "y": TOEKICK_H / 2, "z": DOOR_TH - 30},
+                "material": "toekick",
+            })
+
+        # ---- Door OR drawer-front stack, depending on family.
+        if family == "drawer":
+            self._emit_drawer_fronts(
+                panels, W, H, y0, DOOR_TH, DOOR_REVEAL,
+                drawer_count=cab["drawer_count"] or door_count or 3,
+            )
+        else:
+            self._emit_doors(panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count)
+
+        # ---- Camera framing — 3/4 view, slightly elevated; include the
+        #      toe-kick in the framing height for base/tall/sink/vanity.
+        total_h = H + y0
+        cam_position = [W * 1.4, total_h * 1.25, D * 1.8]
+        cam_target = [0, total_h / 2, -D / 2]
 
         return {
             "panels": panels,
@@ -275,6 +305,141 @@ class ProductConfigSession(models.Model):
             "camera": {"target": cam_target, "position": cam_position},
             "bounds": {
                 "min": [-W / 2, 0, -D],
-                "max": [W / 2, H, DOOR_TH + DOOR_REVEAL],
+                "max": [W / 2, total_h, DOOR_TH + DOOR_REVEAL],
             },
         }
+
+    # ------------------------------------------------------------------
+    # _3d_payload helpers — family-specific geometry emitters (commit 3).
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _3d_payload_worktop(self, W, H, D):
+        """Short-circuit payload for the worktop family: a single slab.
+
+        Worktops are countertop slabs, not carcasses. Phase-1 simplified
+        worktop_thickness to 25mm — when the canonical workbook lands and
+        Caesarstone / quartz / butcher-block thicknesses diverge, this
+        becomes attribute-driven.
+        """
+        worktop_th = 25
+        return {
+            "panels": [{
+                "name": "worktop_slab",
+                "dims": {"width": W, "height": worktop_th, "depth": D},
+                "pos":  {"x": 0, "y": worktop_th / 2, "z": -D / 2},
+                "material": "worktop",
+            }],
+            "metadata": {
+                "family": "worktop",
+                "door_count": 0,
+                "width_mm": W,
+                "height_mm": worktop_th,
+                "depth_mm": D,
+            },
+            "camera": {
+                "target":   [0, worktop_th / 2, -D / 2],
+                "position": [W * 0.8, W * 0.5, D * 1.5],
+            },
+            "bounds": {
+                "min": [-W / 2, 0, -D],
+                "max": [W / 2, worktop_th, 0],
+            },
+        }
+
+    @api.model
+    def _3d_payload_accessory(self, W, H, D, BOX_TH):
+        """Short-circuit payload for accessory family: a single flat panel.
+
+        Accessory_type sub-attribute (end_panel / filler / cornice / pelmet
+        / plinth, per Q8 spec) tells us which shape to emit. Phase 1 ships
+        the end_panel variant only — the others land in Phase 3 polish.
+        """
+        return {
+            "panels": [{
+                "name": "end_panel",
+                "dims": {"width": BOX_TH, "height": H, "depth": D},
+                "pos":  {"x": 0, "y": H / 2, "z": -D / 2},
+                "material": "carcass",
+            }],
+            "metadata": {
+                "family": "accessory",
+                "door_count": 0,
+                "width_mm": W,
+                "height_mm": H,
+                "depth_mm": D,
+            },
+            "camera": {
+                "target":   [0, H / 2, -D / 2],
+                "position": [W * 2, H * 1.2, D * 1.8],
+            },
+            "bounds": {
+                "min": [-BOX_TH / 2, 0, -D],
+                "max": [BOX_TH / 2, H, 0],
+            },
+        }
+
+    @api.model
+    def _emit_doors(self, panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count):
+        """Append the door panel(s) for a non-drawer carcass.
+
+        Phase-1 NF14 conventions:
+          • 1-door: door spans (W − 2*DOOR_REVEAL) × (H − 2*DOOR_REVEAL).
+          • 2-door: each leaf spans ((W − 3*DOOR_REVEAL)/2) × (H − 2*DOOR_REVEAL),
+            with a centre reveal of DOOR_REVEAL between them.
+        """
+        if door_count == 1:
+            panels.append({
+                "name": "door",
+                "dims": {
+                    "width": W - 2 * DOOR_REVEAL,
+                    "height": H - 2 * DOOR_REVEAL,
+                    "depth": DOOR_TH,
+                },
+                "pos":  {"x": 0, "y": y0 + H / 2, "z": DOOR_TH / 2 + DOOR_REVEAL},
+                "material": "door",
+            })
+        elif door_count == 2:
+            half_w = (W - 3 * DOOR_REVEAL) / 2
+            for idx, sign in enumerate((-1, 1), start=1):
+                panels.append({
+                    "name": f"door_{idx}",
+                    "dims": {
+                        "width": half_w,
+                        "height": H - 2 * DOOR_REVEAL,
+                        "depth": DOOR_TH,
+                    },
+                    "pos":  {
+                        "x": sign * (half_w / 2 + DOOR_REVEAL / 2),
+                        "y": y0 + H / 2,
+                        "z": DOOR_TH / 2 + DOOR_REVEAL,
+                    },
+                    "material": "door",
+                })
+
+    @api.model
+    def _emit_drawer_fronts(self, panels, W, H, y0, DOOR_TH, DOOR_REVEAL,
+                            drawer_count):
+        """Append `drawer_count` evenly-divided drawer fronts.
+
+        Algorithm (Phase-1 simplification: all fronts the same height):
+            total_face_h = H − 2*DOOR_REVEAL             (top + bottom reveals)
+            front_h      = (total_face_h − (n−1)*DOOR_REVEAL) / n
+            Front i (0-indexed from bottom) sits at:
+              y_centre = y0 + DOOR_REVEAL + front_h/2 + i*(front_h + DOOR_REVEAL)
+
+        Phase-3 polish: graduated front heights (deeper drawers at bottom
+        per real cabinetry practice) — pulled from the BoM workbook when
+        it lands.
+        """
+        n = max(1, int(drawer_count))
+        face_w = W - 2 * DOOR_REVEAL
+        front_h = (H - 2 * DOOR_REVEAL - (n - 1) * DOOR_REVEAL) / n
+        for i in range(n):
+            y_centre = y0 + DOOR_REVEAL + front_h / 2 + i * (front_h + DOOR_REVEAL)
+            panels.append({
+                "name": f"drawer_front_{i + 1}",
+                "dims": {"width": face_w, "height": front_h, "depth": DOOR_TH},
+                "pos":  {"x": 0, "y": y_centre, "z": DOOR_TH / 2 + DOOR_REVEAL},
+                "material": "door",
+            })
