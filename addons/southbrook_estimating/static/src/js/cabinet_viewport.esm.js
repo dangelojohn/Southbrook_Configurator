@@ -58,6 +58,12 @@ export class CabinetViewport extends Component {
         this._materials = {};
         this._frameId = null;
         this._resizeObserver = null;
+        // T1C5: dimension-line overlay (auto-dimensioning per
+        // PRODBOARD_MANIFEST §3 — derived programmatically from the
+        // cabinet bounding box, snapped to the run).
+        this._dimensionGroup = null;
+        this._dimensionMaterial = null;
+        this._spriteResources = [];
 
         // Reactivity state — used by onWillUpdateProps + debounced refresh.
         // Track 1 commit 2 reactivity contract:
@@ -189,6 +195,14 @@ export class CabinetViewport extends Component {
         this._cabinetGroup = new THREE.Group();
         this._scene.add(this._cabinetGroup);
 
+        // T1C5: dimension-line group — populated by _buildDimensionLines
+        // on every payload. Visibility tracks state.mode (only shown in
+        // blueline mode). The group is OUTSIDE _cabinetGroup so it never
+        // gets the wireframe-material swap during toggle.
+        this._dimensionGroup = new THREE.Group();
+        this._dimensionGroup.visible = this.state.mode === "blueline";
+        this._scene.add(this._dimensionGroup);
+
         // Material registry — referenced by panel.material name.
         // Track 1 commit 3 added `toekick` + `worktop` for the family-
         // dispatched payloads (drawer_bank, base/sink/tall/vanity,
@@ -275,6 +289,9 @@ export class CabinetViewport extends Component {
         // material swap doesn't touch the floor).
         if (this._floorGeom) this._floorGeom.dispose();
         if (this._floorMat) this._floorMat.dispose();
+        // T1C5: dimension overlay — clears all line geometries, sprite
+        // textures, sprite materials, and the shared line material.
+        this._clearDimensionGroup();
         if (this._renderer) this._renderer.dispose();
     }
 
@@ -406,6 +423,9 @@ export class CabinetViewport extends Component {
             this._cabinetGroup.add(mesh);
         }
 
+        // T1C5: rebuild dimension overlay for the new bounds.
+        this._buildDimensionLines(payload);
+
         // Camera framing.
         if (payload.camera) {
             this._camera.position.set(...payload.camera.position);
@@ -436,11 +456,233 @@ export class CabinetViewport extends Component {
                 obj.material = obj._solidMaterial;
             }
         });
+        // T1C5: show dimension lines only in blueline mode. The group
+        // is rebuilt by _buildDimensionLines on every payload, so the
+        // toggle is just a visibility flip — no rebuild needed.
+        if (this._dimensionGroup) {
+            this._dimensionGroup.visible = this.state.mode === "blueline";
+        }
     }
 
     async onRefresh() {
         const sid = this._sessionIdFromRecord(this.props.record);
         if (sid) await this._fetchAndRebuild(sid);
+    }
+
+    // ------------------------------------------------------------------
+    // T1C5 — Auto-dimension lines for blueline mode
+    //
+    // Per PRODBOARD_MANIFEST §3, the blueline overlay derives its
+    // dimension lines PROGRAMMATICALLY from the cabinet's bounding box.
+    // No hand-placed measurements. When the user picks a wider cabinet,
+    // the dimension lines stretch + the label updates automatically.
+    //
+    // Phase 1 ships W / H / D outside dimensions only. Phase 3 polish
+    // adds per-shelf-interval, per-door, per-toekick, and the snap-to-
+    // run multi-cabinet horizontal/vertical dim chains.
+    // ------------------------------------------------------------------
+
+    _buildDimensionLines(payload) {
+        const THREE = this._THREE;
+        const group = this._dimensionGroup;
+        if (!THREE || !group) return;
+
+        // Clear previous dim geometry + sprites.
+        this._clearDimensionGroup();
+
+        if (!payload || !payload.bounds) return;
+
+        const b = payload.bounds;
+        const W = b.max[0] - b.min[0];
+        const H = b.max[1] - b.min[1];
+        const D = b.max[2] - b.min[2];
+
+        const lineMat = new THREE.LineBasicMaterial({
+            color: 0x2b4f6b,           // --sky from the palette
+            transparent: true,
+            opacity: 0.85,
+        });
+        this._dimensionMaterial = lineMat;
+
+        const TICK = 25;               // tick-mark half-length, mm
+        const OFFSET_W = 130;          // dim line offset from cabinet face, mm
+        const OFFSET_H = 200;
+        const OFFSET_D = 200;
+        const LABEL_GAP = 90;          // label distance from dim line
+
+        // ---- WIDTH — across X, in front of the cabinet (above floor),
+        //      so it doesn't fight the shadow on the ground plane.
+        const wYbar = -OFFSET_W;       // below the floor by OFFSET_W
+        const wZbar = b.max[2] + 60;   // just in front of door plane
+        const xL = b.min[0];
+        const xR = b.max[0];
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xL, wYbar, wZbar),
+            new THREE.Vector3(xR, wYbar, wZbar));
+        // Extension lines from cabinet corner to dim line.
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xL, 0, b.max[2]),
+            new THREE.Vector3(xL, wYbar - 15, wZbar));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xR, 0, b.max[2]),
+            new THREE.Vector3(xR, wYbar - 15, wZbar));
+        // Tick marks at endpoints.
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xL, wYbar - TICK, wZbar),
+            new THREE.Vector3(xL, wYbar + TICK, wZbar));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(xR, wYbar - TICK, wZbar),
+            new THREE.Vector3(xR, wYbar + TICK, wZbar));
+        this._addLabelSprite(group,
+            this._formatMm(W), 0, wYbar - LABEL_GAP, wZbar);
+
+        // ---- HEIGHT — vertical, on the right side of the cabinet.
+        const hX = b.max[0] + OFFSET_H;
+        const hZmid = (b.min[2] + b.max[2]) / 2;
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(hX, 0, hZmid),
+            new THREE.Vector3(hX, H, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.max[0], 0, hZmid),
+            new THREE.Vector3(hX + 15, 0, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.max[0], H, hZmid),
+            new THREE.Vector3(hX + 15, H, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(hX - TICK, 0, hZmid),
+            new THREE.Vector3(hX + TICK, 0, hZmid));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(hX - TICK, H, hZmid),
+            new THREE.Vector3(hX + TICK, H, hZmid));
+        this._addLabelSprite(group,
+            this._formatMm(H), hX + LABEL_GAP, H / 2, hZmid);
+
+        // ---- DEPTH — along Z, on the floor to the left of the cabinet.
+        const dX = b.min[0] - OFFSET_D;
+        const dY = 5;                  // just above floor so it isn't hidden
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(dX, dY, b.min[2]),
+            new THREE.Vector3(dX, dY, b.max[2]));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.min[0], dY, b.min[2]),
+            new THREE.Vector3(dX + 15, dY, b.min[2]));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(b.min[0], dY, b.max[2]),
+            new THREE.Vector3(dX + 15, dY, b.max[2]));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(dX, dY, b.min[2] - TICK),
+            new THREE.Vector3(dX, dY, b.min[2] + TICK));
+        this._addLineSegment(group, lineMat,
+            new THREE.Vector3(dX, dY, b.max[2] - TICK),
+            new THREE.Vector3(dX, dY, b.max[2] + TICK));
+        this._addLabelSprite(group,
+            this._formatMm(D), dX - LABEL_GAP, dY, (b.min[2] + b.max[2]) / 2);
+    }
+
+    _addLineSegment(group, mat, a, b) {
+        const THREE = this._THREE;
+        const geom = new THREE.BufferGeometry().setFromPoints([a, b]);
+        const line = new THREE.Line(geom, mat);
+        // Dimension lines should never cast/receive shadows.
+        line.castShadow = false;
+        line.receiveShadow = false;
+        // Always draw on top so labels aren't occluded by the cabinet.
+        line.renderOrder = 999;
+        group.add(line);
+        return line;
+    }
+
+    _addLabelSprite(group, text, x, y, z) {
+        const THREE = this._THREE;
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+
+        const W_PX = 320;
+        const H_PX = 110;
+        const canvas = document.createElement("canvas");
+        canvas.width = W_PX * dpr;
+        canvas.height = H_PX * dpr;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+
+        // Background pill — translucent paper so the label reads on
+        // both the warm floor AND the cool cabinet behind it.
+        ctx.font =
+            "600 28px 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace";
+        const padX = 16;
+        const pillH = 56;
+        const tw = ctx.measureText(text).width;
+        const pillW = tw + padX * 2;
+        const px = (W_PX - pillW) / 2;
+        const py = (H_PX - pillH) / 2;
+        ctx.fillStyle = "rgba(251, 247, 239, 0.92)";       // --paper
+        const r = 6;
+        ctx.beginPath();
+        ctx.moveTo(px + r, py);
+        ctx.arcTo(px + pillW, py, px + pillW, py + pillH, r);
+        ctx.arcTo(px + pillW, py + pillH, px, py + pillH, r);
+        ctx.arcTo(px, py + pillH, px, py, r);
+        ctx.arcTo(px, py, px + pillW, py, r);
+        ctx.closePath();
+        ctx.fill();
+
+        // Pill border — thin sky line.
+        ctx.strokeStyle = "rgba(43, 79, 107, 0.4)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Text — sky on paper.
+        ctx.fillStyle = "#2b4f6b";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, W_PX / 2, H_PX / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            depthTest: false,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.position.set(x, y, z);
+        // Scale in world mm. Aspect-ratio matches the canvas
+        // (320:110 → 2.91:1). Adjust 280 to taste — bigger = more
+        // readable, smaller = less obtrusive.
+        sprite.scale.set(280, 280 * (H_PX / W_PX), 1);
+        sprite.renderOrder = 1000;
+        group.add(sprite);
+
+        this._spriteResources.push({ texture, material });
+    }
+
+    _clearDimensionGroup() {
+        const group = this._dimensionGroup;
+        if (!group) return;
+        while (group.children.length) {
+            const child = group.children[0];
+            group.remove(child);
+            if (child.geometry) child.geometry.dispose();
+        }
+        for (const r of this._spriteResources) {
+            if (r.texture) r.texture.dispose();
+            if (r.material) r.material.dispose();
+        }
+        this._spriteResources = [];
+        if (this._dimensionMaterial) {
+            this._dimensionMaterial.dispose();
+            this._dimensionMaterial = null;
+        }
+    }
+
+    _formatMm(mm) {
+        const inches = mm / 25.4;
+        // Round to nearest 0.25" — matches cabinet-industry granularity.
+        const inchesRounded = Math.round(inches * 4) / 4;
+        const inchesDisplay =
+            Math.abs(inchesRounded) > 0.001
+                ? `${inchesRounded.toFixed(2).replace(/\.?0+$/, "")}"`
+                : "";
+        return `${Math.round(mm)} mm${inchesDisplay ? ` · ${inchesDisplay}` : ""}`;
     }
 }
 
