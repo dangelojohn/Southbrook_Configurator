@@ -137,6 +137,9 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "reports/door_order.xml",
         # Phase 2 Track 1 — 3D viewport injected into the OCA wizard form.
         "views/product_configurator_3d_view.xml",
+        # NF26 — reliable Southbrook 3D Configure stat button so users
+        # always have a launch point regardless of OCA header inherit order.
+        "views/product_template_3d_launch_view.xml",
     ],
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).
