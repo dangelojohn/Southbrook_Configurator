@@ -57,6 +57,17 @@
         "reports/shop_copy.xml",
         "reports/door_order.xml",
     ],
+    # ------------------------------------------------------------------
+    # Demo data — loaded only with --demo flag.
+    # All files are noupdate="1" so demo modifications during gate
+    # review survive subsequent -u southbrook_estimating runs.
+    # ------------------------------------------------------------------
+    "demo": [
+        "demo/southbrook_demo_partners.xml",
+        # Orders MUST load after partners (FK refs); the function/
+        # action_confirm call at the bottom fires the analytics hook.
+        "demo/southbrook_demo_orders.xml",
+    ],
     "installable": True,
     "application": True,
     "auto_install": False,

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Demo orders — 6 open quotes (draft state) + 5 confirmed orders per
+  Case Study section 5 / Quote Log + Orders Summary seeds.
+
+  The 9-line Mapping section 6 smoke-test order is NOT in this file.
+  That order is created LIVE by the rep during the Phase-1 gate review
+  using the Order Builder — exercising the configurator end-to-end.
+  The demo data here is the realistic "workbench in use" backdrop.
+
+  Each sale.order references the cabinet templates from commit 7 via
+  the template's default product variant (dynamic mode — Q6).
+  Attribute values are conveyed via the line's name override + price_unit
+  rather than via the configurator wizard (the smoke test exercises the
+  wizard separately). Real workflow lines would carry product.config.session
+  references; demo lines are the simplified shape.
+
+  Pricing is ILLUSTRATIVE per #5 — see PUNCHLIST OQ2 + Build Spec
+  section 9.3. The amount_total values below are believable but not
+  canonical. The smoke test uses shape assertions (60-75% of retail
+  for Tier 3) so demo $-values don't constrain the test contract.
+
+  Confirmation: the 5 confirmed orders are confirmed via <function/>
+  calls at end of file, which fires the action_confirm hook on
+  sale.order. That cascades into:
+    - mrp.production creation (Odoo standard)
+    - southbrook.order.analytics.capture (commit 6 — NF1)
+  So install with the demo flag populates 5 analytics rows automatically.
+
+  noupdate="1" so demo modifications during gate review survive
+  subsequent upgrade runs of southbrook_estimating.
+-->
+<odoo noupdate="1">
+
+  <!-- ============================================================== -->
+  <!-- 6 OPEN QUOTES (draft state)                                    -->
+  <!-- ============================================================== -->
+
+  <!-- Q1: Image Floor / Contemporary base run kitchen, mid-design -->
+  <record id="demo_quote_image_floor_001" model="sale.order">
+    <field name="partner_id" ref="demo_partner_image_floor"/>
+    <field name="state">draft</field>
+    <field name="note">Pattern A iterative-design — v2 expected after
+      Image Floor visit 2 next week.</field>
+  </record>
+
+  <!-- Q2: Amazing Window / Contractor entry kitchen, ready to close -->
+  <record id="demo_quote_amazing_window_001" model="sale.order">
+    <field name="partner_id" ref="demo_partner_amazing_window"/>
+    <field name="state">draft</field>
+    <field name="note">Pattern B fast-conversion — tied to a window
+      installation order on AW's CRM.</field>
+  </record>
+
+  <!-- Q3: Pro Finish / Contractor spec-driven, dimensioned drawing source -->
+  <record id="demo_quote_pro_finish_001" model="sale.order">
+    <field name="partner_id" ref="demo_partner_pro_finish"/>
+    <field name="state">draft</field>
+    <field name="note">Pattern C width-first — contractor drawing
+      attached. Series=Contractor (slab door only per Rule 1).</field>
+  </record>
+
+  <!-- Q4: Richwood / Elegance whole-renovation, multi-zone -->
+  <record id="demo_quote_richwood_001" model="sale.order">
+    <field name="partner_id" ref="demo_partner_richwood"/>
+    <field name="state">draft</field>
+    <field name="note">Pattern D bundle + zone-aware — Elegance series,
+      5 zones (BASE_RUN + WALL + TALL + ISLAND + ACCESSORY).</field>
+  </record>
+
+  <!-- Q5: Image Floor v2 — duplicated from Q1 (NF6 reference shape) -->
+  <record id="demo_quote_image_floor_002" model="sale.order">
+    <field name="partner_id" ref="demo_partner_image_floor"/>
+    <field name="state">draft</field>
+    <field name="parent_order_id" ref="demo_quote_image_floor_001"/>
+    <field name="version">2</field>
+    <field name="note">NF6 v2 of Q1 — Image Floor revisions after
+      visit 2. parent_order_id walks the version chain.</field>
+  </record>
+
+  <!-- Q6: Demo Tradesperson Tier 3 / small drawer-only order -->
+  <record id="demo_quote_tradesperson_001" model="sale.order">
+    <field name="partner_id" ref="demo_partner_tradesperson"/>
+    <field name="state">draft</field>
+    <field name="note">Tier 3 (-35%) auto-resolved. Drawer bank only
+      — tests drawer-bank Phase-1 simplification (NF14).</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 5 CONFIRMED ORDERS                                             -->
+  <!-- Each gets at least one sale.order.line so action_confirm() can -->
+  <!-- materialise its mrp.production + analytics row.                 -->
+  <!-- ============================================================== -->
+
+  <!-- O1: Image Floor confirmed kitchen, Contemporary -->
+  <record id="demo_order_image_floor_confirmed" model="sale.order">
+    <field name="partner_id" ref="demo_partner_image_floor"/>
+    <field name="state">draft</field>
+  </record>
+  <record id="demo_line_o1_1" model="sale.order.line">
+    <field name="order_id" ref="demo_order_image_floor_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Base 1-Door 18" / Contemporary / White Melamine / Thermofoil Slab</field>
+    <field name="product_uom_qty">2</field>
+    <field name="price_unit">183.13</field>
+    <field name="zone">base_run</field>
+  </record>
+  <record id="demo_line_o1_2" model="sale.order.line">
+    <field name="order_id" ref="demo_order_image_floor_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Wall 2-Door 30" / Contemporary / White Melamine / Thermofoil Slab</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">348.13</field>
+    <field name="zone">wall</field>
+  </record>
+
+  <!-- O2: Amazing Window confirmed entry kitchen, Contractor + slab + white -->
+  <record id="demo_order_amazing_window_confirmed" model="sale.order">
+    <field name="partner_id" ref="demo_partner_amazing_window"/>
+    <field name="state">draft</field>
+  </record>
+  <record id="demo_line_o2_1" model="sale.order.line">
+    <field name="order_id" ref="demo_order_amazing_window_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Base 2-Door 24" / Contractor / White Melamine / Thermofoil Slab</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">212.50</field>
+    <field name="zone">base_run</field>
+  </record>
+
+  <!-- O3: Pro Finish confirmed mid-size kitchen, Contractor -->
+  <record id="demo_order_pro_finish_confirmed" model="sale.order">
+    <field name="partner_id" ref="demo_partner_pro_finish"/>
+    <field name="state">draft</field>
+  </record>
+  <record id="demo_line_o3_1" model="sale.order.line">
+    <field name="order_id" ref="demo_order_pro_finish_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Base 1-Door 15" / Contractor / White Melamine / Thermofoil Slab</field>
+    <field name="product_uom_qty">3</field>
+    <field name="price_unit">113.50</field>
+    <field name="zone">base_run</field>
+  </record>
+  <record id="demo_line_o3_2" model="sale.order.line">
+    <field name="order_id" ref="demo_order_pro_finish_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Wall 1-Door 18" / Contractor / White Melamine / Thermofoil Slab</field>
+    <field name="product_uom_qty">2</field>
+    <field name="price_unit">146.50</field>
+    <field name="zone">wall</field>
+  </record>
+
+  <!-- O4: Richwood confirmed whole-renovation, Elegance, multi-zone.
+       Demonstrates Q21 zone visual grouping at gate review. -->
+  <record id="demo_order_richwood_confirmed" model="sale.order">
+    <field name="partner_id" ref="demo_partner_richwood"/>
+    <field name="state">draft</field>
+  </record>
+  <record id="demo_line_o4_1" model="sale.order.line">
+    <field name="order_id" ref="demo_order_richwood_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Base 2-Door 33" / Elegance / White Melamine / Five-Piece Woodgrain</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">934.50</field>
+    <field name="zone">base_run</field>
+  </record>
+  <record id="demo_line_o4_2" model="sale.order.line">
+    <field name="order_id" ref="demo_order_richwood_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Wall 2-Door 30" / Elegance / White Melamine / Five-Piece Woodgrain</field>
+    <field name="product_uom_qty">2</field>
+    <field name="price_unit">835.50</field>
+    <field name="zone">wall</field>
+  </record>
+  <record id="demo_line_o4_3" model="sale.order.line">
+    <field name="order_id" ref="demo_order_richwood_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Tall Pantry 24" / Elegance / White Melamine / Five-Piece Woodgrain</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">637.50</field>
+    <field name="zone">tall</field>
+  </record>
+  <record id="demo_line_o4_4" model="sale.order.line">
+    <field name="order_id" ref="demo_order_richwood_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Accessory: End Panel / Elegance / Five-Piece Woodgrain</field>
+    <field name="product_uom_qty">2</field>
+    <field name="price_unit">95.00</field>
+    <field name="zone">accessory</field>
+  </record>
+
+  <!-- O5: Demo Tradesperson Tier 3 confirmed order — exercises the
+       Q7 smoke-test target's pricing pathway end-to-end. -->
+  <record id="demo_order_tradesperson_confirmed" model="sale.order">
+    <field name="partner_id" ref="demo_partner_tradesperson"/>
+    <field name="state">draft</field>
+  </record>
+  <record id="demo_line_o5_1" model="sale.order.line">
+    <field name="order_id" ref="demo_order_tradesperson_confirmed"/>
+    <field name="product_id" ref="product.product_product_4"/>
+    <field name="name">Drawer Bank 18" / Contractor / White Melamine / Thermofoil Slab</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">190.45</field>
+    <field name="zone">base_run</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- Confirm the 5 orders → fires action_confirm → analytics capture -->
+  <!-- ============================================================== -->
+  <function model="sale.order" name="action_confirm">
+    <value model="sale.order" eval="[
+      ref('demo_order_image_floor_confirmed'),
+      ref('demo_order_amazing_window_confirmed'),
+      ref('demo_order_pro_finish_confirmed'),
+      ref('demo_order_richwood_confirmed'),
+      ref('demo_order_tradesperson_confirmed'),
+    ]"/>
+  </function>
+
+  <!-- ============================================================== -->
+  <!-- 6 crm.lead records linked to the 6 open quotes                 -->
+  <!-- Per Build Spec section 8 data spine: confirmed orders carry    -->
+  <!-- analytic tags; open quotes carry CRM provenance.               -->
+  <!-- ============================================================== -->
+  <record id="demo_lead_q1" model="crm.lead">
+    <field name="name">Image Floor — Contemporary mid-renovation</field>
+    <field name="partner_id" ref="demo_partner_image_floor"/>
+    <field name="type">opportunity</field>
+  </record>
+  <record id="demo_lead_q2" model="crm.lead">
+    <field name="name">Amazing Window — Contractor entry kitchen</field>
+    <field name="partner_id" ref="demo_partner_amazing_window"/>
+    <field name="type">opportunity</field>
+  </record>
+  <record id="demo_lead_q3" model="crm.lead">
+    <field name="name">Pro Finish — spec-driven contractor job</field>
+    <field name="partner_id" ref="demo_partner_pro_finish"/>
+    <field name="type">opportunity</field>
+  </record>
+  <record id="demo_lead_q4" model="crm.lead">
+    <field name="name">Richwood — Elegance whole-renovation</field>
+    <field name="partner_id" ref="demo_partner_richwood"/>
+    <field name="type">opportunity</field>
+  </record>
+  <record id="demo_lead_q5" model="crm.lead">
+    <field name="name">Image Floor — v2 revision (NF6 chain)</field>
+    <field name="partner_id" ref="demo_partner_image_floor"/>
+    <field name="type">opportunity</field>
+  </record>
+  <record id="demo_lead_q6" model="crm.lead">
+    <field name="name">Demo Tradesperson — drawer bank quote</field>
+    <field name="partner_id" ref="demo_partner_tradesperson"/>
+    <field name="type">opportunity</field>
+  </record>
+
+</odoo>

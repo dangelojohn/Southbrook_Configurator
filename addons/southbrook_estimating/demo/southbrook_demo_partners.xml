@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Demo partners — 4 dealer archetypes (Image Floor / Amazing Window /
+  Pro Finish / Richwood) per Case Study section 1 + Demo Tradesperson Tier 3
+  (the smoke-test target) + Walk-in Retail (for the smoke-step-8
+  customer-switch re-price exercise).
+
+  PII discipline (per John's commit-11 ask): names are from the case
+  study (publicly used in the document). Contact details are
+  placeholder-shaped — @example.com emails, fictional addresses.
+  No real phone numbers, no real street addresses.
+
+  noupdate="1" so demo modifications during gate review survive
+  subsequent -u southbrook_estimating runs.
+-->
+<odoo noupdate="1">
+
+  <!-- Image Floor — Pattern A iterative-design dealer -->
+  <record id="demo_partner_image_floor" model="res.partner">
+    <field name="name">Image Floor</field>
+    <field name="channel">dealer</field>
+    <field name="is_company" eval="True"/>
+    <field name="email">orders@image-floor.example.com</field>
+    <field name="street">123 Vaughan Pl, Suite 1</field>
+    <field name="city">Vaughan</field>
+    <field name="state_id" ref="base.state_ca_on"/>
+    <field name="country_id" ref="base.ca"/>
+    <field name="comment">Pattern A — iterative-design studio.
+      ~25 jobs/yr, ~3 design iterations before order.
+      Heavy user of the Duplicate-as-Draft action (NF6).</field>
+  </record>
+
+  <!-- Amazing Window — Pattern B fast-conversion dealer -->
+  <record id="demo_partner_amazing_window" model="res.partner">
+    <field name="name">Amazing Window</field>
+    <field name="channel">dealer</field>
+    <field name="is_company" eval="True"/>
+    <field name="email">kitchens@amazing-window.example.com</field>
+    <field name="street">456 Concord Rd</field>
+    <field name="city">Concord</field>
+    <field name="state_id" ref="base.state_ca_on"/>
+    <field name="country_id" ref="base.ca"/>
+    <field name="comment">Pattern B — fast-conversion add-on.
+      ~14 jobs/yr, single-iteration; tied to window orders.
+      Uses keyboard-first defaults (NF7).</field>
+  </record>
+
+  <!-- Pro Finish — Pattern C spec-driven trade dealer -->
+  <record id="demo_partner_pro_finish" model="res.partner">
+    <field name="name">Pro Finish</field>
+    <field name="channel">dealer</field>
+    <field name="is_company" eval="True"/>
+    <field name="email">orders@pro-finish.example.com</field>
+    <field name="street">789 Mississauga Rd</field>
+    <field name="city">Mississauga</field>
+    <field name="state_id" ref="base.state_ca_on"/>
+    <field name="country_id" ref="base.ca"/>
+    <field name="comment">Pattern C — spec-driven entry.
+      ~12 jobs/yr, contractor-supplied drawings; reps key
+      dimensions first (NF8 width-first toggle).</field>
+  </record>
+
+  <!-- Richwood Renovations — Pattern D bundle-aware dealer -->
+  <record id="demo_partner_richwood" model="res.partner">
+    <field name="name">Richwood Renovations</field>
+    <field name="channel">dealer</field>
+    <field name="is_company" eval="True"/>
+    <field name="email">supply@richwood.example.com</field>
+    <field name="street">321 Major Mackenzie Dr W</field>
+    <field name="city">Vaughan</field>
+    <field name="state_id" ref="base.state_ca_on"/>
+    <field name="country_id" ref="base.ca"/>
+    <field name="comment">Pattern D — bundle + zone-aware.
+      ~35 jobs/yr, multi-zone kitchens (Q21 zone grouping).
+      Highest-volume dealer in the program.</field>
+  </record>
+
+  <!-- Demo Tradesperson (Tier 3) — Q7 smoke-test target.
+       Tier 3 (-35%) auto-resolves to pricelist_tradesperson_tier_3 via
+       _resolve_channel_pricelist (custom routine #3). -->
+  <record id="demo_partner_tradesperson" model="res.partner">
+    <field name="name">Demo Tradesperson (Tier 3)</field>
+    <field name="channel">tradesperson</field>
+    <field name="tradesperson_tier">3</field>
+    <field name="is_company" eval="True"/>
+    <field name="email">demo@tradesperson.example.com</field>
+    <field name="comment">Q7 smoke-test target.
+      channel=tradesperson + tradesperson_tier=3 auto-resolves
+      to the -35% tier sub-pricelist on order creation.</field>
+  </record>
+
+  <!-- Walk-in Retail — for the smoke-step-8 customer-switch re-price.
+       channel=retail auto-resolves to pricelist_retail (list ×1.00). -->
+  <record id="demo_partner_walkin_retail" model="res.partner">
+    <field name="name">Walk-in Retail</field>
+    <field name="channel">retail</field>
+    <field name="is_company" eval="False"/>
+    <field name="email">walkin@example.com</field>
+    <field name="comment">Smoke step 8 reference — switch a saved
+      sale.order's customer to this partner; all lines re-price
+      to retail without re-configuration. Tests
+      _onchange_partner_id_southbrook_pricelist (commit 4 + NF13 test).</field>
+  </record>
+
+</odoo>
