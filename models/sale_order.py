@@ -59,30 +59,35 @@ class SaleOrder(models.Model):
             mapping.get(channel, "southbrook_estimating.pricelist_retail")
         )
 
+    # Tier → pricelist xml_id mapping (NF5). Adding a tier 4 means one
+    # row here, one row in res.partner.tradesperson_tier selection, one
+    # new pricelist record. Centralising the table makes the contract obvious.
+    _TRADESPERSON_TIER_PRICELISTS = {
+        "1": "southbrook_estimating.pricelist_tradesperson_tier_1",
+        "2": "southbrook_estimating.pricelist_tradesperson_tier_2",
+        "3": "southbrook_estimating.pricelist_tradesperson_tier_3",
+    }
+
     def _resolve_tradesperson_pricelist(self, partner):
-        """Pick the right tradesperson tier sub-pricelist (NF5)."""
-        tier = partner.tradesperson_tier
-        if tier == "1":
-            return self.env.ref(
-                "southbrook_estimating.pricelist_tradesperson_tier_1"
-            )
-        if tier == "2":
-            return self.env.ref(
-                "southbrook_estimating.pricelist_tradesperson_tier_2"
-            )
-        if tier == "3":
-            return self.env.ref(
-                "southbrook_estimating.pricelist_tradesperson_tier_3"
-            )
+        """Pick the right tradesperson tier sub-pricelist (NF5).
+
+        Returns the tier-specific pricelist when the partner has a
+        tradesperson_tier set; falls back to the base (cost+5% floor,
+        no tier discount) with a soft warning otherwise.
+        """
+        tier_xml_id = self._TRADESPERSON_TIER_PRICELISTS.get(
+            partner.tradesperson_tier
+        )
+        if tier_xml_id:
+            return self.env.ref(tier_xml_id)
+
         _logger.warning(
             "southbrook: partner %s has channel=tradesperson but no "
             "tradesperson_tier set; falling back to base pricelist "
             "(cost+5%% floor, no tier discount).",
             partner.display_name,
         )
-        return self.env.ref(
-            "southbrook_estimating.pricelist_tradesperson"
-        )
+        return self.env.ref("southbrook_estimating.pricelist_tradesperson")
 
     # Default-getter — on new sale.order, auto-resolve from partner
     # without preventing the user from overriding pricelist_id manually.

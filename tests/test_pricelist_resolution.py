@@ -1,21 +1,13 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Tests for channel -> pricelist resolution (custom routine #3) and the
 refacing margin-target computation (custom routine #2)."""
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook")
-class TestPricelistResolution(TransactionCase):
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.Partner = cls.env["res.partner"]
-        cls.Order = cls.env["sale.order"]
-        cls.Product = cls.env["product.product"]
-
-    def _ref(self, xml_id):
-        return self.env.ref(f"southbrook_estimating.{xml_id}")
+class TestPricelistResolution(SouthbrookTestCase):
 
     # --- Channel resolution ---------------------------------------
 

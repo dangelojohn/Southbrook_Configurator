@@ -6,14 +6,13 @@ restrictions land in commit 7 (when templates exist). Here we verify
 that the 6 domain triggers (Series=Contractor/Elegance/Signature,
 Width=Narrow/Wide, Family_subtype=Bifold) are present and well-formed.
 """
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
+
+from .common import SouthbrookTestCase
 
 
 @tagged("post_install", "-at_install", "southbrook")
-class TestConfigRuleDomains(TransactionCase):
-
-    def _ref(self, xml_id):
-        return self.env.ref(f"southbrook_estimating.{xml_id}")
+class TestConfigRuleDomains(SouthbrookTestCase):
 
     def test_01_six_domains_present(self):
         for xml_id in (
