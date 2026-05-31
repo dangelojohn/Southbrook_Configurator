@@ -167,6 +167,21 @@ class SouthbrookKitchenPlanner(http.Controller):
             "session": None,
         }
 
+    # Channel discount tables — same shape as SouthbrookOrderBuilderPortal's
+    # version. Duplicated rather than shared via a mixin because the two
+    # controllers ship in the same module + the dict is 6 entries; a
+    # base mixin would obscure more than it would save. Phase-3 polish
+    # consolidates if a third controller needs them.
+    _CHANNEL_META = {
+        "dealer":       {"label": "DEALER · -50%",            "discount_pct": 50, "css": "dealer"},
+        "tradesperson": {"label": "CONTRACTOR · Tiered",      "discount_pct": 0,  "css": "tradesperson"},
+        "kd":           {"label": "CENTRAL KD",               "discount_pct": 54, "css": "kd"},
+        "bigbox":       {"label": "BIG-BOX WHOLESALE",        "discount_pct": 33, "css": "bigbox"},
+        "refacing":     {"label": "REFACING · CTHS",          "discount_pct": 35, "css": "refacing"},
+        "retail":       {"label": "RETAIL · list price",      "discount_pct": 0,  "css": "retail"},
+    }
+    _TRADESPERSON_TIER_DISCOUNT = {"1": 25, "2": 30, "3": 35}
+
     # Helper — derive family code from SKU. Mirrors the Q8 family
     # taxonomy without re-deriving the full _SKU_DEFAULTS table
     # (which lives on product.config.line in southbrook_estimating).
@@ -302,6 +317,120 @@ class SouthbrookKitchenPlanner(http.Controller):
             return {"error": "forbidden"}
         session.write({"state": "cancel"})
         return {"ok": True}
+
+    # ==================================================================
+    # Phase 2 commit 5 — set / add / remove a value + live pricing.
+    #
+    # Three actions (one endpoint) — driven by the OWL drawer:
+    #
+    #   action='set'    Default. For radio / select / color attributes.
+    #                   Replaces any existing value for that attribute,
+    #                   then adds the new one. Idempotent: clicking the
+    #                   same selected chip "deselects" by removing
+    #                   without re-adding.
+    #
+    #   action='add'    For multi attributes (e.g. Accessories). Adds
+    #                   the value without touching other values on the
+    #                   same attribute.
+    #
+    #   action='remove' For multi attributes. Removes the value.
+    #
+    # Response shape mirrors session_create but with:
+    #
+    #   selected_values: [value_id, ...] — current session.value_ids
+    #   price:           OCA's session.price (the live total, base
+    #                    list_price + sum of selected value
+    #                    price_extras + rule-driven uplifts)
+    #   channel_total:   price × (1 - discount_pct/100) — same
+    #                    controller-side discount as Track 2 uses
+    #
+    # Rule-violation handling: any UserError raised by OCA's
+    # _onchange or write hooks is caught and returned as
+    # {ok: False, error: rule_blocked, message: <text>} so the
+    # frontend can surface it in the drawer without losing state.
+    # ==================================================================
+    @http.route(
+        "/southbrook/api/kitchen-planner/session/<int:session_id>/set-value",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def kitchen_planner_session_set_value(
+        self, session_id, attribute_id=None, value_id=None,
+        action="set", **kw,
+    ):
+        if not attribute_id or not value_id:
+            return {"error": "missing_args"}
+
+        session = request.env["product.config.session"].sudo().browse(
+            session_id).exists()
+        if not session:
+            return {"error": "not_found"}
+        if session.user_id != request.env.user:
+            return {"error": "forbidden"}
+
+        attribute_id = int(attribute_id)
+        value_id = int(value_id)
+
+        # Same-attribute values currently on the session.
+        same_attr = session.value_ids.filtered(
+            lambda v: v.attribute_id.id == attribute_id
+        )
+
+        # Build the value_ids command list per action.
+        if action == "remove":
+            commands = [(3, value_id)]
+        elif action == "add":
+            commands = [(4, value_id)]
+        elif action == "set":
+            # If user re-clicks the only selected value, treat as
+            # deselect (matches the UX in T2C9 row-toggle pattern).
+            if (
+                len(same_attr) == 1
+                and same_attr.ids == [value_id]
+            ):
+                commands = [(3, value_id)]
+            else:
+                commands = [(3, v.id) for v in same_attr] + [(4, value_id)]
+        else:
+            return {"error": "unknown_action"}
+
+        try:
+            session.write({"value_ids": commands})
+        except Exception as exc:                    # noqa: BLE001
+            # OCA's config-rule hooks raise UserError when a value
+            # picks an excluded combo. Surface the message inline.
+            return {
+                "ok": False,
+                "error": "rule_blocked",
+                "message": getattr(exc, "args", [str(exc)])[0],
+            }
+
+        # Read-back: refresh session-level fields after the write.
+        session = session.exists()
+        price = getattr(session, "price", 0.0) or 0.0
+
+        # Channel discount — same path Track 2 uses. Customer-mode
+        # planner users default to channel='retail' (discount 0%).
+        partner = request.env.user.partner_id
+        channel = getattr(partner, "channel", None) or "retail"
+        if channel == "tradesperson":
+            tier = (getattr(partner, "tradesperson_tier", "1") or "1")
+            discount = self._TRADESPERSON_TIER_DISCOUNT.get(tier, 0)
+        else:
+            discount = (self._CHANNEL_META.get(channel) or {}).get(
+                "discount_pct", 0
+            )
+        channel_total = price * (1 - discount / 100.0)
+
+        return {
+            "ok": True,
+            "session_id": session.id,
+            "selected_values": session.value_ids.ids,
+            "price": price,
+            "channel_total": channel_total,
+            "discount_pct": discount,
+        }
 
 
 class SouthbrookOrderBuilderPortal(CustomerPortal):

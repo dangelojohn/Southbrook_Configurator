@@ -705,4 +705,104 @@
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+// ---------------------------------------------------------------------
+// Phase 2 commit 5 — value-pick interactivity + live total.
+// ---------------------------------------------------------------------
+
+// Selected value chip — walnut bg, linen text, bold.
+.o_kp_drawer_attr_value_selected {
+  background: var(--sb-walnut, #4a3c2e) !important;
+  border-color: var(--sb-walnut, #4a3c2e) !important;
+  color: var(--sb-linen, #f5efe6) !important;
+  font-weight: 600;
+
+  .o_kp_drawer_attr_value_extra {
+    color: var(--sb-linen, #f5efe6);
+    opacity: 0.85;
+  }
+}
+
+// Live total in the drawer header — grid-aligned to the right.
+.o_kp_drawer_head_body {
+  grid-template-columns: 64px 1fr max-content;
+}
+
+.o_kp_drawer_total {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+}
+
+.o_kp_drawer_total_label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+  color: var(--sb-walnut, #4a3c2e);
+}
+
+.o_kp_drawer_total_value {
+  display: block;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--sb-walnut, #4a3c2e);
+  margin-top: 2px;
+}
+
+.o_kp_drawer_total_channel {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--sb-rule, #d8d2c4);
+
+  .o_kp_drawer_total_value {
+    color: var(--sb-sky, #2b4f6b);
+  }
+}
+
+// Rule-block banner — surfaced above the attribute list when
+// the OCA config-rule engine rejects a value pick.
+.o_kp_drawer_rule_alert {
+  margin: 0 32px 12px;
+  padding: 10px 14px;
+  background: rgba(181, 75, 59, 0.08);
+  border: 1px solid var(--sb-alert, #b54b3b);
+  border-radius: 3px;
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  color: var(--sb-alert, #b54b3b);
+  letter-spacing: 0.02em;
+
+  strong {
+    font-weight: 700;
+    margin-right: 4px;
+  }
+}
+
+// "Saving…" pill in the drawer foot — fades in while a
+// set-value RPC is in flight (typically 80-150ms over LAN).
+.o_kp_drawer_saving {
+  margin-right: auto;
+  padding: 4px 10px;
+  border-radius: 3px;
+  background: var(--sb-warn, #c8881e);
+  color: #fff;
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+// Attribute card head shows "X picked" summary instead of
+// "N options" count after at least one value is selected.
+.o_kp_drawer_attr_count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--sb-walnut, #4a3c2e);
+  opacity: 0.7;
 }

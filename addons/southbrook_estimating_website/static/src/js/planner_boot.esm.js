@@ -223,13 +223,37 @@ class KitchenPlanner extends Component {
                                 <div class="o_kp_drawer_head_name"
                                      t-esc="state.session.template.name"/>
                                 <div class="o_kp_drawer_head_sku">
-                                    <t t-esc="state.session.template.sku"/> ·
-                                    Retail
-                                    <t t-esc="_fmt(state.session.template.list_price)"/>
+                                    <t t-esc="state.session.template.sku"/>
+                                </div>
+                            </div>
+                            <!-- P2C5 — live total. Updated after every
+                                 set-value RPC. -->
+                            <div class="o_kp_drawer_total">
+                                <div class="o_kp_drawer_total_retail">
+                                    <span class="o_kp_drawer_total_label">Retail</span>
+                                    <span class="o_kp_drawer_total_value mono"
+                                          t-esc="_fmt(currentPrice)"/>
+                                </div>
+                                <div class="o_kp_drawer_total_channel"
+                                     t-if="state.session.discount_pct">
+                                    <span class="o_kp_drawer_total_label">
+                                        Your price
+                                        (<t t-esc="state.session.discount_pct"/>%)
+                                    </span>
+                                    <span class="o_kp_drawer_total_value mono"
+                                          t-esc="_fmt(state.session.channel_total)"/>
                                 </div>
                             </div>
                         </div>
                     </header>
+
+                    <!-- P2C5 — rule-block banner if last write was
+                         rejected by the OCA config rule engine. -->
+                    <div t-if="state.session.rule_message"
+                         class="o_kp_drawer_rule_alert">
+                        <strong>Cannot pick that combination:</strong>
+                        <span t-esc="state.session.rule_message"/>
+                    </div>
 
                     <ul class="o_kp_drawer_attrs">
                         <li t-foreach="state.session.attributes" t-as="attr"
@@ -239,15 +263,19 @@ class KitchenPlanner extends Component {
                                 <h3 class="o_kp_drawer_attr_name"
                                     t-esc="attr.name"/>
                                 <span class="o_kp_drawer_attr_count">
-                                    <t t-esc="attr.values.length"/>
-                                    options
+                                    <t t-esc="_attrSelectedSummary(attr)"/>
                                 </span>
                             </header>
                             <ul class="o_kp_drawer_attr_values">
                                 <li t-foreach="attr.values" t-as="v"
                                     t-key="v.value_id"
-                                    class="o_kp_drawer_attr_value"
-                                    t-att-title="v.name">
+                                    t-att-class="{
+                                        'o_kp_drawer_attr_value': true,
+                                        'o_kp_drawer_attr_value_selected':
+                                            _isSelected(v.value_id),
+                                    }"
+                                    t-att-title="v.name"
+                                    t-on-click="() => this._onValueClick(attr, v)">
                                     <span class="o_kp_drawer_attr_value_dot"
                                           t-if="v.html_color"
                                           t-att-style="'background:' + v.html_color"/>
@@ -271,13 +299,15 @@ class KitchenPlanner extends Component {
                     </ul>
 
                     <footer class="o_kp_drawer_foot">
+                        <span t-if="state.session.value_busy"
+                              class="o_kp_drawer_saving">Saving…</span>
                         <button class="o_kp_btn o_kp_btn_secondary"
                                 t-on-click="_cancelSession">
                             Cancel
                         </button>
                         <button class="o_kp_btn o_kp_btn_primary"
                                 disabled="disabled"
-                                title="Value selection + Add lands in P2C5–P2C6">
+                                title="Add to Kitchen lands in P2C6">
                             Add to Kitchen
                         </button>
                     </footer>
@@ -387,13 +417,83 @@ class KitchenPlanner extends Component {
                 this.state.session_loading = false;
                 return;
             }
-            this.state.session = result;
+            // P2C5 — initial session state. Pricing fields default
+            // to the template's list_price + retail discount via
+            // the user's channel.
+            this.state.session = {
+                ...result,
+                selected_values: [],
+                value_busy: false,
+                rule_message: null,
+                price: result.template.list_price,
+                channel_total: result.template.list_price,
+                discount_pct: 0,
+            };
             this.state.session_loading = false;
         } catch (err) {
             this.state.session_error = err.message || String(err);
             this.state.session_loading = false;
         }
     };
+
+    // P2C5 — invoked when the user clicks a value chip in the
+    // drawer. action is 'set' for radio/select/color, toggles
+    // add/remove for multi.
+    _onValueClick = async (attr, value) => {
+        if (!this.state.session || this.state.session.value_busy) return;
+        const isSelected = this._isSelected(value.value_id);
+        let action = "set";
+        if (attr.display_type === "multi") {
+            action = isSelected ? "remove" : "add";
+        }
+        this.state.session.value_busy = true;
+        this.state.session.rule_message = null;
+        try {
+            const result = await rpcCall(
+                `/southbrook/api/kitchen-planner/session/${this.state.session.session_id}/set-value`,
+                {
+                    attribute_id: attr.attribute_id,
+                    value_id: value.value_id,
+                    action,
+                },
+            );
+            if (result.error === "rule_blocked") {
+                this.state.session.rule_message =
+                    result.message || "Rule violation";
+            } else if (result.ok) {
+                this.state.session.selected_values =
+                    result.selected_values || [];
+                this.state.session.price = result.price;
+                this.state.session.channel_total = result.channel_total;
+                this.state.session.discount_pct = result.discount_pct;
+            }
+        } catch (err) {
+            this.state.session.rule_message = err.message || String(err);
+        }
+        this.state.session.value_busy = false;
+    };
+
+    _isSelected(value_id) {
+        return (this.state.session?.selected_values || []).includes(value_id);
+    }
+
+    _attrSelectedSummary(attr) {
+        const sel = (this.state.session?.selected_values || []);
+        const picked = attr.values.filter((v) => sel.includes(v.value_id));
+        if (picked.length === 0) {
+            return `${attr.values.length} options`;
+        }
+        if (attr.display_type === "multi") {
+            return `${picked.length} of ${attr.values.length} picked`;
+        }
+        return picked.map((v) => v.name).join(", ");
+    }
+
+    get currentPrice() {
+        return this.state.session?.price
+            ?? this.state.session?.template?.list_price
+            ?? 0;
+    }
 
     _cancelSession = async () => {
         const sid = this.state.session?.session_id;
