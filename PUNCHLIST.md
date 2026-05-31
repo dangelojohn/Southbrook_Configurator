@@ -874,6 +874,107 @@ their wording is **implicitly consistent** with my draft assumptions:
 
 ---
 
+## 2026-05-31 · OCA session.write filters value_ids silently (P2C5 partial)
+
+While shipping Phase 2 commit 5 (value-pick + live pricing), the
+`/southbrook/api/kitchen-planner/session/<id>/set-value` endpoint
+worked for the FIRST attribute pick but subsequent picks were
+silently dropped. Live-traced root cause:
+
+OCA's `product.config.session.write()` override
+(`product_configurator/models/product_config.py:845`) runs
+`values_available()` after every write and SILENTLY filters
+out values not in the "available" set:
+
+```python
+def write(self, vals):
+    res = super().write(vals)
+    if not self.product_tmpl_id:
+        return res
+    value_ids = self.value_ids.ids
+    avail_val_ids = self.values_available(value_ids)
+    if set(value_ids) - set(avail_val_ids):
+        self.value_ids = [(6, 0, avail_val_ids)]   # ← silent drop
+    ...
+```
+
+`values_available()` walks the template's `product.config.line`
+(rule) records to determine which values are "currently
+allowed" given the existing value_ids selection. For our Phase-1
+demo data, the four rules from CLAUDE.md §5 (series-door,
+box-series, width-doorcount, family-softclose) are seeded in
+`data/config_rules.xml` but the cross-rule dependency math isn't
+producing the expected "available" set for our use case:
+
+**Live trace 2026-05-31:**
+- Fresh session for Base 1-Door (template 38)
+- Pick Series=Contemporary (val 404): persists, value_ids=[404] ✓
+- Pick Box Material=Maple (val 408): silently dropped,
+  value_ids stays [404] ✗
+
+This is because the SPA flow lets users pick attributes in any
+order, but OCA's wizard architecture assumes sequential step-by-
+step picking. After picking Series, the "available" set is
+recomputed from `product.config.line` rules — and Maple isn't
+in the "available" set despite §5 Rule 2 saying it should be
+allowed on Contemporary.
+
+**Why doesn't Rule 2 make Maple available?**
+Rule 2 is *restrictive* ("Maple is only allowed when Series ∈
+{Contemporary, Elegance}") — it tells OCA which combinations to
+BLOCK, not which to ENABLE. The `values_available()` logic looks
+for values explicitly listed as available via `product.config.line`
+records. If no `product.config.line` record says "Maple is
+available when Series=Contemporary", OCA defaults to NOT
+available.
+
+**Three paths forward (P2C5 polish):**
+
+1. **Add positive `product.config.line` records.** For each
+   attribute that should be freely pickable (i.e. not subject to
+   a §5 restrictive rule), add a wide-open
+   `product.config.line` saying "this value is always available."
+   The existing restrictive rules then constrain on top. ~15-20
+   new records in `data/config_rules.xml`.
+
+2. **Use a SPA-friendly session subclass that overrides the
+   write filter.** Subclass `product.config.session` with a
+   `write` method that skips `values_available()` filtering for
+   API-driven (non-wizard) writes via a context flag like
+   `skip_availability_check`. The UI then does its own
+   client-side rule enforcement (or defers all rule enforcement
+   to commit/Add-to-Kitchen). ~50 lines in
+   `southbrook_estimating/models/product_config_session.py`.
+
+3. **Pre-build the full attribute_line ↔ value matrix in the
+   /session/create response.** Compute available values per
+   attribute on the server, send the WHOLE availability matrix
+   to the frontend, frontend disables blocked values client-side
+   BEFORE the user clicks. Avoids the silent-drop entirely by
+   never letting the user pick a value that would be dropped.
+   ~80 lines + a Phase-3 polish concern (multi-pick edge cases).
+
+**Recommendation:** Path 1 first (smallest data fix, high
+leverage). If path 1 has limits with multi-value attributes, path
+2 as the more architecturally clean option.
+
+**Current P2C5 state (shipped 2026-05-31, commits f7aff92 +
+aec4c27):**
+- The set-value endpoint + drawer UI ship in their full P2C5 form
+- First-pick values persist correctly
+- Second+ picks silently drop in the demo configuration (no
+  visible error; UI updates with returned `selected_values`
+  which doesn't include the dropped pick)
+- Rule-block alerts work (`{ok: False, error: rule_blocked}`)
+  but only when OCA raises ValidationError — silent-drop doesn't
+  raise, so this surface isn't hit
+
+P2C6 onward can proceed with these limitations documented;
+multi-attribute kitchen configurations will need at least
+path 1 before Phase 2 ships externally.
+
+---
+
 ## 2026-05-30 · Phase-1 demo-seed polish (surfaced during Track 2 gate prep)
 
 While prepping order S00235 for the Track 2 gate review walk, four
