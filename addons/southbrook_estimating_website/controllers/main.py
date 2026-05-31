@@ -188,6 +188,121 @@ class SouthbrookKitchenPlanner(http.Controller):
                 return family
         return ""
 
+    # ==================================================================
+    # Phase 2 commit 4 — session create + attribute discovery.
+    #
+    # User clicks a catalog tile → frontend posts to .../session/create
+    # with the template id → backend creates a product.config.session
+    # (the OCA configurator's per-user-config record) and returns:
+    #
+    #   { ok, session_id, template: {id, sku, name, family, list_price},
+    #     attributes: [ {attribute_id, name, display_type,
+    #                    values: [{value_id, name, price_extra,
+    #                              html_color}, ...]}, ... ] }
+    #
+    # Attributes ARE the configurator decisions: series / box_material /
+    # door_style / colour / hinge / etc. — the 11-attribute set per Q2.
+    # Each value carries the OCA price_extra so P2C5 can sum them into
+    # the live total.
+    #
+    # P2C4 does NOT yet:
+    #   - Write a value selection to session.value_ids (P2C5)
+    #   - Compute price from value_ids (P2C5)
+    #   - Commit session → materialise variant → add to sale.order (P2C6)
+    # ==================================================================
+    @http.route(
+        "/southbrook/api/kitchen-planner/session/create",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def kitchen_planner_session_create(self, template_id=None, **kw):
+        if not template_id:
+            return {"error": "missing_template_id"}
+        template = request.env["product.template"].sudo().browse(
+            int(template_id)).exists()
+        if not template:
+            return {"error": "template_not_found"}
+        if not template.config_ok:
+            return {"error": "not_configurable"}
+
+        session = request.env["product.config.session"].sudo().create({
+            "product_tmpl_id": template.id,
+            "user_id": request.env.user.id,
+        })
+
+        return {
+            "ok": True,
+            "session_id": session.id,
+            "template": {
+                "id": template.id,
+                "sku": template.default_code or "",
+                "name": template.name,
+                "family": self._family_from_sku(template.default_code or ""),
+                "list_price": template.list_price,
+            },
+            "attributes": self._serialize_template_attributes(template),
+        }
+
+    def _serialize_template_attributes(self, template):
+        """Walk template.attribute_line_ids → drawer-ready shape.
+
+        Each attribute line carries:
+          - the product.attribute (name, display_type)
+          - the subset of product.attribute.value records exposed for
+            this template (the line's value_ids)
+          - per-value price_extra (default_extra_price on the value
+            unless the line carries an override — OCA stores per-line
+            overrides on product.template.attribute.value).
+        """
+        out = []
+        for line in template.attribute_line_ids:
+            attribute = line.attribute_id
+            values = []
+            for tav in line.product_template_value_ids:
+                values.append({
+                    "value_id": tav.product_attribute_value_id.id,
+                    "name": tav.name,
+                    "price_extra": tav.price_extra or 0.0,
+                    "html_color": (
+                        tav.product_attribute_value_id.html_color or ""
+                    ),
+                    "default_extra": (
+                        tav.product_attribute_value_id.default_extra_price
+                        or 0.0
+                    ),
+                })
+            out.append({
+                "attribute_id": attribute.id,
+                "name": attribute.name,
+                "display_type": attribute.display_type or "radio",
+                "values": values,
+            })
+        return out
+
+    @http.route(
+        "/southbrook/api/kitchen-planner/session/<int:session_id>/cancel",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def kitchen_planner_session_cancel(self, session_id, **kw):
+        """Tear down a session when the user abandons the drawer.
+
+        OCA's product.config.session uses state='cancel' as the
+        terminal-abandoned state. We mark + leave for the Phase-3
+        cleanup job; the session row stays for analytics
+        (configurations attempted but not completed).
+        """
+        session = request.env["product.config.session"].sudo().browse(
+            session_id).exists()
+        if not session:
+            return {"error": "not_found"}
+        if session.user_id != request.env.user:
+            return {"error": "forbidden"}
+        session.write({"state": "cancel"})
+        return {"ok": True}
+
 
 class SouthbrookOrderBuilderPortal(CustomerPortal):
     """Portal route hosting the OWL Order Builder."""

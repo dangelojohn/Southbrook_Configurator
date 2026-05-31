@@ -1,5 +1,13 @@
 /** @odoo-module **/
 //
+// Phase 2 commit 4 (2026-05-31) — session create + attribute drawer.
+//
+// P2C3 ended at tile-click-shows-details. P2C4 adds a Configure CTA
+// in the selection panel that creates a product.config.session and
+// opens the attribute drawer, replacing the selection panel with a
+// scrollable list of attributes + their available values. Value-pick
+// + live pricing land in P2C5; this commit ships discovery only.
+//
 // Phase 2 commit 3 (2026-05-31) — /kitchen-planner OWL three-pane shell.
 //
 // P2C2 mounted a tiny placeholder inside the viewport pane. P2C3
@@ -185,6 +193,96 @@ class KitchenPlanner extends Component {
                      class="o_kp_placeholder">
                     <h1 class="o_kp_placeholder_title">Design Your Kitchen</h1>
                 </div>
+
+                <!-- Drawer (session-active view) — P2C4 -->
+                <div t-elif="state.session_loading"
+                     class="o_kp_drawer">
+                    <div class="o_kp_drawer_loading">Configuring…</div>
+                </div>
+                <div t-elif="state.session_error"
+                     class="o_kp_drawer">
+                    <div class="o_kp_state o_kp_error">
+                        <strong>Could not configure cabinet.</strong>
+                        <div class="o_kp_error_msg" t-esc="state.session_error"/>
+                        <button class="o_kp_retry" t-on-click="_cancelSession">
+                            Back to catalog
+                        </button>
+                    </div>
+                </div>
+                <div t-elif="state.session"
+                     class="o_kp_drawer">
+                    <header class="o_kp_drawer_head">
+                        <button class="o_kp_drawer_back"
+                                t-on-click="_cancelSession">
+                            ← Back
+                        </button>
+                        <div class="o_kp_drawer_head_body">
+                            <div class="o_kp_drawer_thumb"
+                                 t-att-data-family="state.session.template.family"/>
+                            <div class="o_kp_drawer_head_meta">
+                                <div class="o_kp_drawer_head_name"
+                                     t-esc="state.session.template.name"/>
+                                <div class="o_kp_drawer_head_sku">
+                                    <t t-esc="state.session.template.sku"/> ·
+                                    Retail
+                                    <t t-esc="_fmt(state.session.template.list_price)"/>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <ul class="o_kp_drawer_attrs">
+                        <li t-foreach="state.session.attributes" t-as="attr"
+                            t-key="attr.attribute_id"
+                            class="o_kp_drawer_attr">
+                            <header class="o_kp_drawer_attr_head">
+                                <h3 class="o_kp_drawer_attr_name"
+                                    t-esc="attr.name"/>
+                                <span class="o_kp_drawer_attr_count">
+                                    <t t-esc="attr.values.length"/>
+                                    options
+                                </span>
+                            </header>
+                            <ul class="o_kp_drawer_attr_values">
+                                <li t-foreach="attr.values" t-as="v"
+                                    t-key="v.value_id"
+                                    class="o_kp_drawer_attr_value"
+                                    t-att-title="v.name">
+                                    <span class="o_kp_drawer_attr_value_dot"
+                                          t-if="v.html_color"
+                                          t-att-style="'background:' + v.html_color"/>
+                                    <span class="o_kp_drawer_attr_value_name"
+                                          t-esc="v.name"/>
+                                    <span class="o_kp_drawer_attr_value_extra"
+                                          t-if="v.price_extra">
+                                        + <t t-esc="_fmt(v.price_extra)"/>
+                                    </span>
+                                </li>
+                                <li t-if="attr.values.length === 0"
+                                    class="o_kp_drawer_attr_value_none">
+                                    No options exposed on this attribute.
+                                </li>
+                            </ul>
+                        </li>
+                        <li t-if="state.session.attributes.length === 0"
+                            class="o_kp_drawer_attrs_none">
+                            This cabinet has no configurable attributes.
+                        </li>
+                    </ul>
+
+                    <footer class="o_kp_drawer_foot">
+                        <button class="o_kp_btn o_kp_btn_secondary"
+                                t-on-click="_cancelSession">
+                            Cancel
+                        </button>
+                        <button class="o_kp_btn o_kp_btn_primary"
+                                disabled="disabled"
+                                title="Value selection + Add lands in P2C5–P2C6">
+                            Add to Kitchen
+                        </button>
+                    </footer>
+                </div>
+
                 <div t-elif="selectedCabinet"
                      class="o_kp_selection">
                     <div class="o_kp_selection_thumb"
@@ -197,9 +295,13 @@ class KitchenPlanner extends Component {
                         <dt>Retail</dt>
                         <dd t-esc="_fmt(selectedCabinet.list_price)"/>
                     </dl>
+                    <button class="o_kp_btn o_kp_btn_primary o_kp_btn_configure"
+                            t-on-click="_configureSelected">
+                        Configure ▸
+                    </button>
                     <p class="o_kp_selection_foot">
-                        Attribute picker + add-to-kitchen lands in
-                        Phase 2 commit 4.
+                        Live pricing + add-to-kitchen lands in Phase 2
+                        commits 5–6.
                     </p>
                 </div>
                 <div t-else="" class="o_kp_placeholder">
@@ -230,6 +332,13 @@ class KitchenPlanner extends Component {
                 search: "",
                 selected_id: null,
             },
+            // P2C4 — session state.
+            // null when no session is active; populated by
+            // /southbrook/api/kitchen-planner/session/create with
+            // { session_id, template: {...}, attributes: [...] }
+            session: null,
+            session_loading: false,
+            session_error: null,
         });
         onMounted(() => this._load());
     }
@@ -257,6 +366,51 @@ class KitchenPlanner extends Component {
             this.state.ui.selected_id = null;
         } else {
             this.state.ui.selected_id = id;
+        }
+    };
+
+    // P2C4 — invoked from the "Configure ▸" CTA in the selection
+    // panel. Creates a product.config.session on the server and
+    // opens the attribute drawer with the discovered attributes.
+    _configureSelected = async () => {
+        const cab = this.selectedCabinet;
+        if (!cab) return;
+        this.state.session_loading = true;
+        this.state.session_error = null;
+        try {
+            const result = await rpcCall(
+                "/southbrook/api/kitchen-planner/session/create",
+                { template_id: cab.id },
+            );
+            if (result.error) {
+                this.state.session_error = result.error;
+                this.state.session_loading = false;
+                return;
+            }
+            this.state.session = result;
+            this.state.session_loading = false;
+        } catch (err) {
+            this.state.session_error = err.message || String(err);
+            this.state.session_loading = false;
+        }
+    };
+
+    _cancelSession = async () => {
+        const sid = this.state.session?.session_id;
+        // Optimistic teardown — close the drawer immediately;
+        // fire-and-forget the cancel RPC so the user never waits.
+        this.state.session = null;
+        this.state.session_loading = false;
+        this.state.session_error = null;
+        if (sid) {
+            rpcCall(
+                `/southbrook/api/kitchen-planner/session/${sid}/cancel`,
+                {},
+            ).catch(() => {
+                // Server-side cancel failure is non-blocking; the
+                // session row sits in 'draft' state and the Phase-3
+                // housekeeping job sweeps it.
+            });
         }
     };
 
