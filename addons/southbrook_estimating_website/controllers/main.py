@@ -372,31 +372,36 @@ class SouthbrookKitchenPlanner(http.Controller):
         attribute_id = int(attribute_id)
         value_id = int(value_id)
 
-        # Same-attribute values currently on the session.
-        same_attr = session.value_ids.filtered(
-            lambda v: v.attribute_id.id == attribute_id
+        # OCA's session has a custom write path — direct
+        # session.write({'value_ids': [...]}) does NOT persist due to
+        # its _check_value_ids constraint AND the wizard-state coupling.
+        # The documented OCA API is session.update_config(attr_val_dict)
+        # which uses (6,0,[full_list]) replacement and handles
+        # duplicate filtering internally.
+        #
+        # Build the NEW list of value_ids for this attribute based on
+        # the action + current selection.
+        same_attr_ids = set(
+            session.value_ids.filtered(
+                lambda v: v.attribute_id.id == attribute_id
+            ).ids
         )
 
-        # Build the value_ids command list per action.
         if action == "remove":
-            commands = [(3, value_id)]
+            new_attr_vals = list(same_attr_ids - {value_id})
         elif action == "add":
-            commands = [(4, value_id)]
+            new_attr_vals = list(same_attr_ids | {value_id})
         elif action == "set":
-            # If user re-clicks the only selected value, treat as
-            # deselect (matches the UX in T2C9 row-toggle pattern).
-            if (
-                len(same_attr) == 1
-                and same_attr.ids == [value_id]
-            ):
-                commands = [(3, value_id)]
+            # Re-clicking the only selected value deselects.
+            if same_attr_ids == {value_id}:
+                new_attr_vals = []
             else:
-                commands = [(3, v.id) for v in same_attr] + [(4, value_id)]
+                new_attr_vals = [value_id]
         else:
             return {"error": "unknown_action"}
 
         try:
-            session.write({"value_ids": commands})
+            session.update_config({attribute_id: new_attr_vals})
         except Exception as exc:                    # noqa: BLE001
             # OCA's config-rule hooks raise UserError when a value
             # picks an excluded combo. Surface the message inline.
