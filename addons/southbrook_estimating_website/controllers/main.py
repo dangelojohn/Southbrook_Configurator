@@ -28,6 +28,66 @@ from odoo.http import request
 from odoo.addons.portal.controllers.portal import CustomerPortal
 
 
+# ======================================================================
+# Phase 2 commit 1 (2026-05-31) — /kitchen-planner scaffold
+#
+# The CUSTOMER-facing one-page configurator per CLAUDE.md §2.1.
+# Three-pane layout per PRODBOARD_MANIFEST §8.1:
+#   left  58 px tool rail
+#   centre 394 px catalog pane (296×94 tile grid)
+#   right flex viewport (Phase 3 mounts Three.js parametric carcass here;
+#         Phase 2 ships the 2D-isometric SVG fallback at Tier 3 per the
+#         four-tier image cascade per CLAUDE.md §4.5)
+#
+# This commit scaffolds:
+#   - The /kitchen-planner route (portal-authed, website=True so the
+#     site frame, theme, and breadcrumbs apply).
+#   - The mount-point template with `id="kitchen_planner_root"` (mirrors
+#     T2C1's pattern for the Order Builder — commit 2 here would mount
+#     <KitchenPlanner/> OWL component into it).
+#   - The three-pane SCSS layout grid + Southbrook token import.
+#
+# This commit does NOT yet ship:
+#   - The OWL component tree (Phase 2 commit 2+).
+#   - Catalog tile renderer (Phase 2 commit 3+).
+#   - The 2D-isometric SVG layer (Phase 2 commit 4+).
+#   - Live attribute → price wiring (Phase 2 commit 5+).
+#   - "Request a Price" → sale.order.draft + portal email (Phase 2
+#     commit 6+).
+#   - The Three.js procedural 3D layer (Phase 3).
+#
+# Auth model: same `auth="user"` as the Order Builder route. The
+# customer logs in as an Odoo portal user (light auth — name + email).
+# No SSO yet; Phase 4 polish.
+# ======================================================================
+class SouthbrookKitchenPlanner(http.Controller):
+    """Customer-facing /kitchen-planner one-page configurator route."""
+
+    @http.route(
+        "/kitchen-planner",
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def kitchen_planner(self, **kw):
+        """Render the customer kitchen planner.
+
+        Phase 2 commit 1 surface: empty three-pane shell with the
+        mount-point div in the viewport pane. Commit 2 adds the OWL
+        bundle to the asset list and switches this template to mount
+        the planner component.
+        """
+        values = {
+            "page_name": "southbrook_kitchen_planner",
+            "owl_mount_id": "kitchen_planner_root",
+            "user_partner": request.env.user.partner_id,
+        }
+        return request.render(
+            "southbrook_estimating_website.kitchen_planner_template",
+            values,
+        )
+
+
 class SouthbrookOrderBuilderPortal(CustomerPortal):
     """Portal route hosting the OWL Order Builder."""
 

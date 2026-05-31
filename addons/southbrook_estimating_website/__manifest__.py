@@ -25,6 +25,8 @@
         # Track 2 commit 1 — portal-route view templates.
         "security/ir.model.access.csv",
         "views/portal_template.xml",
+        # Phase 2 commit 1 — /kitchen-planner customer route + template.
+        "views/kitchen_planner_template.xml",
     ],
     # Dedicated asset bundle (charter Q4 answer) so the OWL portal
     # components only load on the Order Builder route. Other portal
@@ -40,6 +42,10 @@
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
+            # Phase 2 commit 1 — kitchen-planner three-pane SCSS.
+            # Loads AFTER portal_root.scss so the :root tokens defined
+            # there are available to .o_kp_* selectors.
+            "southbrook_estimating_website/static/src/scss/planner.scss",
             # Order matters: KitchenViewport class is imported by
             # portal_boot, so it must load first.
             "southbrook_estimating_website/static/src/js/kitchen_viewport.esm.js",

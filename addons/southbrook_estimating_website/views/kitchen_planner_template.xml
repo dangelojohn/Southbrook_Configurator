@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 2 commit 1 (2026-05-31) — /kitchen-planner scaffold template.
+
+  The CUSTOMER-facing one-page configurator per CLAUDE.md §2.1.
+  Three-pane layout per PRODBOARD_MANIFEST §8.1:
+    .o_kp_rail     — left  58 px tool rail
+    .o_kp_catalog  — centre 394 px catalog pane (296×94 tile grid)
+    .o_kp_viewport — right flex viewport (mount point for the
+                     OWL <KitchenPlanner/> component in commit 2+)
+
+  Inherits website.layout so the site theme, navigation, and CSS
+  variables (Sky/Walnut/Linen tokens from portal_root.scss) apply.
+
+  Commit 1 ships the visual skeleton + the mount-point div. Commit 2
+  adds the OWL bundle to the asset list and mounts <KitchenPlanner/>
+  into #kitchen_planner_root. Until then, the scaffold text appears
+  so it's obvious the route + frame work even before the JS lands.
+-->
+<odoo>
+
+  <template id="kitchen_planner_template" name="Southbrook Kitchen Planner">
+    <t t-call="website.layout">
+      <t t-set="additional_title">Design Your Kitchen</t>
+
+      <div class="o_kp_root">
+
+        <!-- LEFT TOOL RAIL — 58 px per manifest §8.1 -->
+        <aside class="o_kp_rail">
+          <div class="o_kp_rail_logo" aria-label="Southbrook">SB</div>
+          <ul class="o_kp_rail_actions">
+            <li class="o_kp_rail_action" data-tool="select" title="Select / Pan">
+              <span class="o_kp_rail_glyph">▤</span>
+            </li>
+            <li class="o_kp_rail_action" data-tool="add" title="Add cabinet">
+              <span class="o_kp_rail_glyph">＋</span>
+            </li>
+            <li class="o_kp_rail_action" data-tool="dim" title="Dimensions">
+              <span class="o_kp_rail_glyph">↕</span>
+            </li>
+            <li class="o_kp_rail_action" data-tool="mode" title="Solid / Blueline">
+              <span class="o_kp_rail_glyph">▦</span>
+            </li>
+          </ul>
+        </aside>
+
+        <!-- CENTRE CATALOG PANE — 394 px per manifest §8.1.
+             Tile grid is 296×94 per cabinet entry (manifest §8 tokens).
+             Commit 3 renders real tiles from product.template; this
+             scaffold ships a placeholder grid of 6 stand-ins. -->
+        <section class="o_kp_catalog">
+          <header class="o_kp_catalog_header">
+            <h2 class="o_kp_catalog_title">Cabinets</h2>
+            <input class="o_kp_catalog_search"
+                   type="search" placeholder="Search cabinets…"
+                   aria-label="Search cabinets"/>
+          </header>
+          <ul class="o_kp_catalog_tiles">
+            <li class="o_kp_tile o_kp_tile_placeholder">
+              <div class="o_kp_tile_thumb"/>
+              <div class="o_kp_tile_body">
+                <div class="o_kp_tile_name">Base 1-Door</div>
+                <div class="o_kp_tile_meta">12–21″ · $—</div>
+              </div>
+            </li>
+            <li class="o_kp_tile o_kp_tile_placeholder">
+              <div class="o_kp_tile_thumb"/>
+              <div class="o_kp_tile_body">
+                <div class="o_kp_tile_name">Base 2-Door</div>
+                <div class="o_kp_tile_meta">24–36″ · $—</div>
+              </div>
+            </li>
+            <li class="o_kp_tile o_kp_tile_placeholder">
+              <div class="o_kp_tile_thumb"/>
+              <div class="o_kp_tile_body">
+                <div class="o_kp_tile_name">Wall 1-Door</div>
+                <div class="o_kp_tile_meta">12–21″ · $—</div>
+              </div>
+            </li>
+            <li class="o_kp_tile o_kp_tile_placeholder">
+              <div class="o_kp_tile_thumb"/>
+              <div class="o_kp_tile_body">
+                <div class="o_kp_tile_name">Wall 2-Door</div>
+                <div class="o_kp_tile_meta">24–36″ · $—</div>
+              </div>
+            </li>
+            <li class="o_kp_tile o_kp_tile_placeholder">
+              <div class="o_kp_tile_thumb"/>
+              <div class="o_kp_tile_body">
+                <div class="o_kp_tile_name">Drawer Bank</div>
+                <div class="o_kp_tile_meta">15–36″ · $—</div>
+              </div>
+            </li>
+            <li class="o_kp_tile o_kp_tile_placeholder">
+              <div class="o_kp_tile_thumb"/>
+              <div class="o_kp_tile_body">
+                <div class="o_kp_tile_name">Tall Pantry</div>
+                <div class="o_kp_tile_meta">18–36″ · $—</div>
+              </div>
+            </li>
+          </ul>
+          <footer class="o_kp_catalog_foot">
+            Phase 2 commit 1 scaffold — real tiles render in commit 3+.
+          </footer>
+        </section>
+
+        <!-- RIGHT VIEWPORT — flex per manifest §8.1.
+             Mount point for the OWL <KitchenPlanner/> component
+             (Phase 2 commit 2+). Phase 3 mounts the Three.js
+             parametric carcass scene here. -->
+        <main class="o_kp_viewport">
+          <div t-att-id="owl_mount_id"
+               class="o_kp_owl_mount"
+               t-att-data-user-partner-id="user_partner.id"
+               t-att-data-user-partner-name="user_partner.name">
+            <div class="o_kp_placeholder">
+              <h1 class="o_kp_placeholder_title">Design Your Kitchen</h1>
+              <p class="o_kp_placeholder_body">
+                The Southbrook customer kitchen planner mounts here in
+                Phase 2 commit 2+. Visit
+                <code>/my/southbrook/order-builder/&lt;id&gt;</code>
+                for the sales-rep Order Builder (Track 2 — live).
+              </p>
+              <p class="o_kp_placeholder_meta">
+                Phase 2 commit 1 · scaffold · 2026-05-31
+              </p>
+            </div>
+          </div>
+        </main>
+
+      </div>
+    </t>
+  </template>
+
+</odoo>

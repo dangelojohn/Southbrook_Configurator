@@ -1,0 +1,253 @@
+// =====================================================================
+// Phase 2 commit 1 (2026-05-31) — /kitchen-planner SCSS scaffold.
+//
+// Three-pane layout per PRODBOARD_MANIFEST §8.1:
+//   .o_kp_rail     left  58 px tool rail
+//   .o_kp_catalog  centre 394 px catalog pane
+//   .o_kp_viewport right flex viewport
+//
+// Tokens (Sky / Walnut / Linen / Ink) re-imported from portal_root.scss
+// via the bundle order in __manifest__.py — portal_root loads first
+// so its `:root` scope is in effect when planner.scss applies.
+//
+// Phase 2 commit 2+ refines tile layout, attribute drawer, footer CTA.
+// Phase 3 commits add the Three.js viewport overlay UI.
+// =====================================================================
+
+.o_kp_root {
+  display: grid;
+  grid-template-columns: 58px 394px 1fr;
+  grid-template-rows: 100vh;
+  height: calc(100vh - var(--sb-website-header-h, 0px));
+  background: var(--sb-paper, #f5f4ee);
+  font-family: var(--sb-font-sans, system-ui, sans-serif);
+  color: var(--sb-ink, #1a1815);
+  overflow: hidden;
+}
+
+// ---------------------------------------------------------------------
+// LEFT TOOL RAIL
+// ---------------------------------------------------------------------
+.o_kp_rail {
+  background: var(--sb-walnut, #4a3c2e);
+  color: var(--sb-linen, #f5efe6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  border-right: 1px solid rgba(0,0,0,0.1);
+
+  .o_kp_rail_logo {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--sb-linen, #f5efe6);
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    margin-bottom: 24px;
+  }
+
+  .o_kp_rail_actions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .o_kp_rail_action {
+    width: 100%;
+    display: grid;
+    place-items: center;
+    padding: 10px 0;
+    cursor: pointer;
+    transition: background 120ms ease;
+
+    &:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .o_kp_rail_glyph {
+      font-size: 18px;
+      line-height: 1;
+      opacity: 0.85;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// CENTRE CATALOG PANE
+// ---------------------------------------------------------------------
+.o_kp_catalog {
+  background: var(--sb-linen, #f5efe6);
+  border-right: 1px solid var(--sb-rule, #d8d2c4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .o_kp_catalog_header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--sb-rule, #d8d2c4);
+  }
+
+  .o_kp_catalog_title {
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sb-walnut, #4a3c2e);
+    margin: 0 0 10px;
+  }
+
+  .o_kp_catalog_search {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--sb-rule, #d8d2c4);
+    border-radius: 4px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--sb-ink, #1a1815);
+  }
+
+  .o_kp_catalog_tiles {
+    list-style: none;
+    margin: 0;
+    padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  // Tile dims per manifest §8.1: 296 × 94, 80×80 thumbnail
+  .o_kp_tile {
+    width: 296px;
+    height: 94px;
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 7px;
+    background: #fff;
+    border: 1px solid var(--sb-rule, #d8d2c4);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+
+    &:hover {
+      border-color: var(--sb-sky, #5a83a8);
+      box-shadow: 0 1px 4px rgba(90,131,168,0.15);
+    }
+  }
+
+  .o_kp_tile_placeholder .o_kp_tile_thumb {
+    background: var(--sb-paper, #f5f4ee);
+    background-image:
+      linear-gradient(45deg, transparent 49%, var(--sb-rule, #d8d2c4) 49% 51%, transparent 51%),
+      linear-gradient(-45deg, transparent 49%, var(--sb-rule, #d8d2c4) 49% 51%, transparent 51%);
+  }
+
+  .o_kp_tile_thumb {
+    width: 80px;
+    height: 80px;
+    border: 1px solid var(--sb-rule, #d8d2c4);
+    border-radius: 3px;
+  }
+
+  .o_kp_tile_body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .o_kp_tile_name {
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--sb-ink, #1a1815);
+  }
+
+  .o_kp_tile_meta {
+    font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+    font-size: 11px;
+    color: var(--sb-walnut, #4a3c2e);
+    opacity: 0.7;
+  }
+
+  .o_kp_catalog_foot {
+    padding: 8px 20px;
+    font-size: 11px;
+    font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+    color: var(--sb-walnut, #4a3c2e);
+    opacity: 0.5;
+    border-top: 1px solid var(--sb-rule, #d8d2c4);
+  }
+}
+
+// ---------------------------------------------------------------------
+// RIGHT VIEWPORT
+// ---------------------------------------------------------------------
+.o_kp_viewport {
+  background: var(--sb-paper, #f5f4ee);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.o_kp_owl_mount {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.o_kp_placeholder {
+  max-width: 480px;
+  text-align: center;
+  color: var(--sb-walnut, #4a3c2e);
+}
+
+.o_kp_placeholder_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-weight: 500;
+  font-size: 32px;
+  margin: 0 0 16px;
+  color: var(--sb-walnut, #4a3c2e);
+}
+
+.o_kp_placeholder_body {
+  font-family: var(--sb-font-sans, system-ui, sans-serif);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0 0 24px;
+  opacity: 0.85;
+
+  code {
+    font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+    background: var(--sb-linen, #f5efe6);
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--sb-rule, #d8d2c4);
+    font-size: 12px;
+  }
+}
+
+.o_kp_placeholder_meta {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
