@@ -137,8 +137,12 @@ class SouthbrookKitchenPlanner(http.Controller):
         ]
 
         # Website currency (CAD on the southbrook stack per #5).
-        website = request.website
-        currency = website.currency_id if website else request.env.company.currency_id
+        # JSON-RPC routes don't get `request.website` injected (that
+        # requires `website=True` on the route, which is only valid
+        # for `type='http'`). Use get_current_website() instead.
+        Website = request.env["website"].sudo()
+        website = Website.get_current_website() if hasattr(Website, "get_current_website") else Website
+        currency = (website and website.currency_id) or request.env.company.currency_id
 
         # Partner channel resolution — informs the planner's
         # "your tier / dealer" badge in the viewport corner. Customer
