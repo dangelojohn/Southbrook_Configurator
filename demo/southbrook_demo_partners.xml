@@ -25,6 +25,7 @@
     <field name="city">Vaughan</field>
     <field name="state_id" ref="base.state_ca_on"/>
     <field name="country_id" ref="base.ca"/>
+    <field name="specific_property_product_pricelist" ref="pricelist_retail"/>
     <field name="comment">Pattern A — iterative-design studio.
       ~25 jobs/yr, ~3 design iterations before order.
       Heavy user of the Duplicate-as-Draft action (NF6).</field>
@@ -40,6 +41,7 @@
     <field name="city">Concord</field>
     <field name="state_id" ref="base.state_ca_on"/>
     <field name="country_id" ref="base.ca"/>
+    <field name="specific_property_product_pricelist" ref="pricelist_retail"/>
     <field name="comment">Pattern B — fast-conversion add-on.
       ~14 jobs/yr, single-iteration; tied to window orders.
       Uses keyboard-first defaults (NF7).</field>
@@ -55,6 +57,7 @@
     <field name="city">Mississauga</field>
     <field name="state_id" ref="base.state_ca_on"/>
     <field name="country_id" ref="base.ca"/>
+    <field name="specific_property_product_pricelist" ref="pricelist_retail"/>
     <field name="comment">Pattern C — spec-driven entry.
       ~12 jobs/yr, contractor-supplied drawings; reps key
       dimensions first (NF8 width-first toggle).</field>
@@ -70,6 +73,7 @@
     <field name="city">Vaughan</field>
     <field name="state_id" ref="base.state_ca_on"/>
     <field name="country_id" ref="base.ca"/>
+    <field name="specific_property_product_pricelist" ref="pricelist_retail"/>
     <field name="comment">Pattern D — bundle + zone-aware.
       ~35 jobs/yr, multi-zone kitchens (Q21 zone grouping).
       Highest-volume dealer in the program.</field>
@@ -84,9 +88,14 @@
     <field name="tradesperson_tier">3</field>
     <field name="is_company" eval="True"/>
     <field name="email">demo@tradesperson.example.com</field>
+    <field name="specific_property_product_pricelist" ref="pricelist_retail"/>
     <field name="comment">Q7 smoke-test target.
       channel=tradesperson + tradesperson_tier=3 auto-resolves
-      to the -35% tier sub-pricelist on order creation.</field>
+      to the -35% tier sub-pricelist on order creation.
+      property_product_pricelist is RETAIL per corrected PT-P1-03:
+      controller-side channel discount + Retail pricelist avoids the
+      double-discount that pricing through the channel pricelist
+      directly would produce.</field>
   </record>
 
   <!-- Walk-in Retail — for the smoke-step-8 customer-switch re-price.
@@ -96,6 +105,7 @@
     <field name="channel">retail</field>
     <field name="is_company" eval="False"/>
     <field name="email">walkin@example.com</field>
+    <field name="specific_property_product_pricelist" ref="pricelist_retail"/>
     <field name="comment">Smoke step 8 reference — switch a saved
       sale.order's customer to this partner; all lines re-price
       to retail without re-configuration. Tests
