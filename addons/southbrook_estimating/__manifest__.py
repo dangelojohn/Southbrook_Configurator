@@ -168,31 +168,36 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
     # All files are noupdate="1" so demo modifications during gate
     # review survive subsequent -u southbrook_estimating runs.
     #
-    # NF22 (caught at live install on QNAP southbrook stack 2026-05-30):
-    # demo/southbrook_demo_orders.xml references `product.product_product_4`
-    # (an Odoo core demo product) and was originally written assuming the
-    # gate-review DB would be initialised WITH base Odoo demo data. On a
-    # `--without-demo` DB (which is the QNAP demo stack default) those
-    # core xml_ids don't exist → ParseError on install. Additionally, the
-    # 12 southbrook cabinet templates use `create_variant='dynamic'`
-    # (per Q6) so they have NO concrete `product.product` xml_ids at
-    # install time either — variants only materialise when a config
-    # session commits. So the demo orders cannot reference real
-    # southbrook cabinet variants by xml_id either.
+    # LOAD ORDER MATTERS:
+    #   1. demo_partners.xml — partners + their property_product_pricelist
+    #      (all 6 point at pricelist_retail per the corrected PT-P1-03).
+    #   2. demo_variants.xml — one product.product per cabinet template
+    #      (the 12 templates use create_variant='dynamic' per Q6, so
+    #      variants don't materialise automatically; demo_variants seeds
+    #      a representative "default config" variant per template
+    #      bypassing the Q6 dynamic-variant rule for demo purposes).
+    #   3. demo_orders.xml — 6 quotes + 5 confirmed orders + the
+    #      gate-walk-canonical PT-P1-01-reproducibility order, all
+    #      referencing demo_variant_* xml_ids from #2.
     #
-    # Phase-2 fix: replace southbrook_demo_orders.xml with a Python-side
-    # helper that programmatically configures each cabinet via the
-    # `product.config.session` flow (the same code path a real user
-    # exercises) and binds the resulting variants to the demo orders.
-    # That gives a faithful demo trace and exercises the engine end-to-end.
+    # NF22 (caught 2026-05-30) RESOLVED by PT-P1-01 demo XML
+    # reproducibility (2026-05-31): the original `product.product_product_4`
+    # references in demo_orders.xml were the blocker. Replaced with
+    # demo_variant_* references from southbrook_demo_variants.xml.
+    # Demo orders now install on a --without-demo DB without dependency
+    # on Odoo core demo records.
     #
-    # Until then: demo ships partners ONLY. The empty Order Builder
-    # list is a valid Phase-1 starting state — the user clicks New,
-    # picks Demo Tradesperson (Tier 3), and builds the smoke order
-    # themselves from the loaded cabinet templates.
+    # Phase 3 follow-up: replace demo_variants.xml with a Python-side
+    # helper that walks the OCA product.config.session flow per cabinet,
+    # materialises the variant with value_ids populated, and binds those
+    # session-attached variants to the demo orders. That gives the BoM
+    # rollup truly attribute-driven values (instead of _SKU_DEFAULTS
+    # fallbacks). See PT-P1-01 layer 3 in PUNCHLIST.md.
     # ------------------------------------------------------------------
     "demo": [
         "demo/southbrook_demo_partners.xml",
+        "demo/southbrook_demo_variants.xml",
+        "demo/southbrook_demo_orders.xml",
     ],
     "installable": True,
     "application": True,

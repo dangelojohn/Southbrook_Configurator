@@ -99,7 +99,7 @@
   </record>
   <record id="demo_line_o1_1" model="sale.order.line">
     <field name="order_id" ref="demo_order_image_floor_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_base_1dr"/>
     <field name="name">Base 1-Door 18" / Contemporary / White Melamine / Thermofoil Slab</field>
     <field name="product_uom_qty">2</field>
     <field name="price_unit">183.13</field>
@@ -107,7 +107,7 @@
   </record>
   <record id="demo_line_o1_2" model="sale.order.line">
     <field name="order_id" ref="demo_order_image_floor_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_wall_2dr"/>
     <field name="name">Wall 2-Door 30" / Contemporary / White Melamine / Thermofoil Slab</field>
     <field name="product_uom_qty">1</field>
     <field name="price_unit">348.13</field>
@@ -121,7 +121,7 @@
   </record>
   <record id="demo_line_o2_1" model="sale.order.line">
     <field name="order_id" ref="demo_order_amazing_window_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_base_2dr"/>
     <field name="name">Base 2-Door 24" / Contractor / White Melamine / Thermofoil Slab</field>
     <field name="product_uom_qty">1</field>
     <field name="price_unit">212.50</field>
@@ -135,7 +135,7 @@
   </record>
   <record id="demo_line_o3_1" model="sale.order.line">
     <field name="order_id" ref="demo_order_pro_finish_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_base_1dr"/>
     <field name="name">Base 1-Door 15" / Contractor / White Melamine / Thermofoil Slab</field>
     <field name="product_uom_qty">3</field>
     <field name="price_unit">113.50</field>
@@ -143,7 +143,7 @@
   </record>
   <record id="demo_line_o3_2" model="sale.order.line">
     <field name="order_id" ref="demo_order_pro_finish_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_wall_1dr"/>
     <field name="name">Wall 1-Door 18" / Contractor / White Melamine / Thermofoil Slab</field>
     <field name="product_uom_qty">2</field>
     <field name="price_unit">146.50</field>
@@ -158,7 +158,7 @@
   </record>
   <record id="demo_line_o4_1" model="sale.order.line">
     <field name="order_id" ref="demo_order_richwood_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_base_2dr"/>
     <field name="name">Base 2-Door 33" / Elegance / White Melamine / Five-Piece Woodgrain</field>
     <field name="product_uom_qty">1</field>
     <field name="price_unit">934.50</field>
@@ -166,7 +166,7 @@
   </record>
   <record id="demo_line_o4_2" model="sale.order.line">
     <field name="order_id" ref="demo_order_richwood_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_wall_2dr"/>
     <field name="name">Wall 2-Door 30" / Elegance / White Melamine / Five-Piece Woodgrain</field>
     <field name="product_uom_qty">2</field>
     <field name="price_unit">835.50</field>
@@ -174,7 +174,7 @@
   </record>
   <record id="demo_line_o4_3" model="sale.order.line">
     <field name="order_id" ref="demo_order_richwood_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_tall_pantry"/>
     <field name="name">Tall Pantry 24" / Elegance / White Melamine / Five-Piece Woodgrain</field>
     <field name="product_uom_qty">1</field>
     <field name="price_unit">637.50</field>
@@ -182,7 +182,7 @@
   </record>
   <record id="demo_line_o4_4" model="sale.order.line">
     <field name="order_id" ref="demo_order_richwood_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_accessory"/>
     <field name="name">Accessory: End Panel / Elegance / Five-Piece Woodgrain</field>
     <field name="product_uom_qty">2</field>
     <field name="price_unit">95.00</field>
@@ -197,11 +197,100 @@
   </record>
   <record id="demo_line_o5_1" model="sale.order.line">
     <field name="order_id" ref="demo_order_tradesperson_confirmed"/>
-    <field name="product_id" ref="product.product_product_4"/>
+    <field name="product_id" ref="demo_variant_drawer_bank"/>
     <field name="name">Drawer Bank 18" / Contractor / White Melamine / Thermofoil Slab</field>
     <field name="product_uom_qty">1</field>
     <field name="price_unit">190.45</field>
     <field name="zone">base_run</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- GATE-WALK ORDER (PT-P1-01 reproducibility, 2026-05-31)         -->
+  <!--                                                                 -->
+  <!-- The canonical 6-line / 3-zone Demo Tradesperson Tier 3 order   -->
+  <!-- the Track 2 portal gate review walks. Reproduces the live      -->
+  <!-- state of S00235 that was hand-seeded via RPC during the        -->
+  <!-- 2026-05-30 walk so fresh `-i southbrook_estimating` with the demo flag -->
+  <!-- installs land directly on the gate-walk-ready state.           -->
+  <!--                                                                 -->
+  <!-- Architecture per the corrected PT-P1-03:                       -->
+  <!--   - order.pricelist_id resolves to Retail (List Price) via     -->
+  <!--     the partner's specific_property_product_pricelist (set in  -->
+  <!--     southbrook_demo_partners.xml).                              -->
+  <!--   - Channel discount (-35% for Tier 3) is controller-side via  -->
+  <!--     _build_southbrook_order_payload — NOT pricelist-derived.   -->
+  <!--                                                                 -->
+  <!-- Two lines (#1 + #4) flag Maple in their line.name so the       -->
+  <!-- MAPLE badge fires in D4 of the gate walk.                       -->
+  <!--                                                                 -->
+  <!-- Stays in draft so F4 (Confirm) + F3 (Duplicate as Draft) are   -->
+  <!-- both exercisable during the walk. Not added to the             -->
+  <!-- action_confirm() block below.                                   -->
+  <!-- ============================================================== -->
+
+  <record id="demo_gate_walk_order" model="sale.order">
+    <field name="partner_id" ref="demo_partner_tradesperson"/>
+    <field name="pricelist_id" ref="pricelist_retail"/>
+    <field name="state">draft</field>
+    <field name="note">Gate-walk canonical order — 6 lines, 3 zones,
+      Demo Tradesperson Tier 3 (-35% channel discount). Retail $3,275 →
+      channel $2,128.75 (save $1,146.25). Two Maple lines exercise the
+      MAPLE badge. See docs/PHASE_2_TRACK_2_GATE.md.</field>
+  </record>
+
+  <!-- Zone 1: BASE_RUN (3 lines) -->
+  <record id="demo_gate_walk_line_1" model="sale.order.line">
+    <field name="order_id" ref="demo_gate_walk_order"/>
+    <field name="product_id" ref="demo_variant_base_1dr"/>
+    <field name="name">Base 1-Door · Contemporary · Maple · 24" · Soft-close hinge L</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">320.00</field>
+    <field name="zone">base_run</field>
+  </record>
+  <record id="demo_gate_walk_line_2" model="sale.order.line">
+    <field name="order_id" ref="demo_gate_walk_order"/>
+    <field name="product_id" ref="demo_variant_base_2dr"/>
+    <field name="name">Base 2-Door · Contemporary · White Thermofoil · 30" · Soft-close</field>
+    <field name="product_uom_qty">2</field>
+    <field name="price_unit">395.00</field>
+    <field name="zone">base_run</field>
+  </record>
+  <record id="demo_gate_walk_line_3" model="sale.order.line">
+    <field name="order_id" ref="demo_gate_walk_order"/>
+    <field name="product_id" ref="demo_variant_drawer_bank"/>
+    <field name="name">Drawer Bank · Contemporary · White Thermofoil · 24" · 3-drawer</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">485.00</field>
+    <field name="zone">base_run</field>
+  </record>
+
+  <!-- Zone 2: WALL (2 lines, both wall_1dr — exercises duplicate-product
+       lines in the same zone) -->
+  <record id="demo_gate_walk_line_4" model="sale.order.line">
+    <field name="order_id" ref="demo_gate_walk_order"/>
+    <field name="product_id" ref="demo_variant_wall_1dr"/>
+    <field name="name">Wall 1-Door · Contemporary · Maple · 18" · Soft-close hinge R</field>
+    <field name="product_uom_qty">2</field>
+    <field name="price_unit">285.00</field>
+    <field name="zone">wall</field>
+  </record>
+  <record id="demo_gate_walk_line_5" model="sale.order.line">
+    <field name="order_id" ref="demo_gate_walk_order"/>
+    <field name="product_id" ref="demo_variant_wall_1dr"/>
+    <field name="name">Wall 1-Door · Contemporary · White Thermofoil · 18" · Soft-close hinge L</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">285.00</field>
+    <field name="zone">wall</field>
+  </record>
+
+  <!-- Zone 3: TALL (1 line) -->
+  <record id="demo_gate_walk_line_6" model="sale.order.line">
+    <field name="order_id" ref="demo_gate_walk_order"/>
+    <field name="product_id" ref="demo_variant_tall_pantry"/>
+    <field name="name">Tall Pantry · Elegance · Walnut · 24" · 5-shelf · Soft-close</field>
+    <field name="product_uom_qty">1</field>
+    <field name="price_unit">825.00</field>
+    <field name="zone">tall</field>
   </record>
 
   <!-- ============================================================== -->
