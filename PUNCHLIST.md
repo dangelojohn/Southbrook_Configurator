@@ -1099,7 +1099,7 @@ Document the deferred /shop/ disablement as Phase 3 navigation cleanup.
 **Acceptance:** `/shop/` either 404s cleanly or redirects to a
 Southbrook-branded "Browse our kitchens" landing page (Phase 2 §8).
 
-### PT-P1-06 · Pricelist rules — `compute_price="formula"` with no formula
+### PT-P1-06 · Channel pricelists return $0 due to missing cost data — **path C selected 2026-05-31**
 
 **Symptom (in gate walk):** Editing qty on any line of order 235
 caused that line's `price_unit` to drop to $0, scrambling the
@@ -1107,67 +1107,73 @@ HeaderStrip totals.
 **Symptom (RPC):** After `sale.order.line.write({product_uom_qty: 3})`,
 the line's `price_unit` recomputed via the pricelist and returned $0.
 
-**Root cause:** Contractor Tier 3 (id=42) has exactly one rule
-(id=33):
-```
-name: "All Products"
-compute_price: "formula"
-base: "pricelist"          ← no base pricelist specified
-fixed_price: 0
-percent_price: 0
-applied_on: "3_global"
-```
+**Root cause (re-diagnosed 2026-05-31):** The XML seed in
+`data/pricelists.xml` is architecturally correct per CLAUDE.md §6,
+NOT broken. The Contractor (Tiered) base pricelist (id=39, rule
+id=30) uses `compute=formula, base=standard_price, markup=5` →
+`cost × 1.05`. The three Tier pricelists (Tier 1/2/3, rules
+id=31/32/33) inherit from it via `compute=formula, base=pricelist,
+base_pl=Contractor (Tiered), price_discount=25/30/35` → effective
+`(cost × 1.05) × 0.75/0.70/0.65`.
 
-This is a broken seed: `compute_price="formula"` requires a base
-pricelist + a formula, neither of which is set. The pricelist
-returns $0 for every product → triggers `price_unit = 0` on every
-line recompute. All 9 seeded pricelists need to be audited; the
-Phase-2 demo data only exercises Contractor Tier 3 + Retail, so the
-other 7 may have the same broken-formula seed.
+The chain works as designed. It returns $0 ONLY because the demo
+variants (58-62) have `standard_price = $0` (I created them bare
+via RPC during the gate-walk seed without cost data). Real cabinets
+sourced from supplier catalogs would have standard_price set; the
+chain would then produce sensible values.
 
-**Fix executed during gate walk (2026-05-31):**
-```sql
--- Equivalent RPC: product.pricelist.item.write(
---   {compute_price:'percentage', percent_price:35, base:'list_price'})
-UPDATE product_pricelist_item
-   SET compute_price='percentage', percent_price=35, base='list_price'
- WHERE id=33;
-```
+**Architecture clash documented:**
 
-But the right Phase-1 fix is in the seed XML, not a one-shot DB
-write. The 9 pricelists need their rule shapes audited and
-corrected to use Odoo 19's `compute_price="percentage"` (or
-`fixed`) with a `base` of `list_price` (not `pricelist`).
+| Surface | Math used |
+|---|---|
+| CLAUDE.md §6 (Contractor pricing) | `cost × 1.05 × (1 - tier_discount/100)` |
+| Phase 2 controller + gate spec | `retail × (1 - tier_discount/100)` |
 
-**Suggested rule shapes (per the Q1 channel math):**
+These are DIFFERENT pricing models. §6 protects against zero/low
+cost items via the cost-floor. The controller assumes the order's
+pricelist is Retail and layers the channel discount on top.
 
-| Pricelist | compute_price | percent_price / fixed | base |
-|---|---|---|---|
-| Retail | (no rule — falls through to product.list_price) | — | — |
-| Dealer (-50%) | percentage | 50 | list_price |
-| Contractor general | (deprecate — use the 3 tier rules below) | — | — |
-| Contractor Tier 1 (-25%) | percentage | 25 | list_price |
-| Contractor Tier 2 (-30%) | percentage | 30 | list_price |
-| Contractor Tier 3 (-35%) | percentage | 35 | list_price |
-| Central KD | percentage | 54 | list_price |
-| Big-Box Wholesale | fixed | 65.00 (per CLAUDE.md §6) | — |
-| Refacing | formula (per-SF, computed) | — | list_price |
+The corrected PT-P1-03 reconciles them by always pointing
+`order.pricelist_id` at Retail — which is what the controller's
+math requires. The Contractor pricelist chain is then never
+queried in Phase 1/2.
 
-But note PT-P1-03's corrected guidance: in Phase 1/2 the order's
-pricelist is always Retail; the channel discount is controller-side.
-So the channel-specific pricelists are only exercised when:
-- A backend user wants to PREVIEW the customer-facing price (rarely)
-- Phase 3 customer-mode pricing surfaces (where the customer's
-  effective price comes from the channel pricelist, not the
-  controller-side layered discount)
+**Path C selected (2026-05-31, user choice).** Both models coexist:
 
-So this ticket is **lower priority than it looks** — Phase 1/2 don't
-exercise the channel pricelists, so a broken rule doesn't surface.
-But the moment Phase 3 surfaces customer-facing prices through the
-channel pricelists, this becomes a blocker.
+- Phase 1/2 always uses Retail pricelist on orders (per corrected
+  PT-P1-03).
+- The 9 channel pricelists remain seeded per §6 but are never
+  queried by `order.pricelist_id`. They exist for:
+  - Phase 3 customer-mode pricing surfaces (when those land)
+  - Manual "what would the customer pay" sanity checks
+  - Future Phase 4 supplier-cost integration
 
-**File target:** `addons/southbrook_estimating/data/pricelists.xml`.
+No code or XML change required for Track 2 sign-off. The seed XML
+stays §6-aligned; the controller stays gate-spec-aligned; the
+corrected PT-P1-03 prevents them from colliding.
 
-**Acceptance:** Each of the 9 pricelists' rules return a sensible
-non-zero price for the 12 cabinet templates. Verifiable via
-`product.pricelist._get_product_price(product, qty, partner)` RPC.
+**Live patch reverted 2026-05-31:** during diagnosis I patched rule
+id=33 to `compute=percentage, percent_price=35, base=list_price` in
+the DB. That made the Tier 3 pricelist return $208 (= $320 × 0.65)
+for the demo variant — but broke the §6 architecture. Reverted via
+RPC to match the XML shape (`compute=formula, base=pricelist,
+base_pl=Contractor (Tiered), price_discount=35`). DB now matches
+XML; both are §6-aligned. Order 235 still returns the canonical
+$3,275 / $2,128.75 / $1,146.25 because it uses Retail pricelist.
+
+**When this ticket actually needs work:**
+- Phase 3 §8.1 customer-mode surfaces will start querying the
+  channel pricelists for display. At that point cost data needs
+  to exist or the pricelists need to be rewritten to use
+  `list_price` as the base (drop the cost-floor architecture).
+- Phase 4 supplier-cost integration: real `standard_price` values
+  arrive via product cost field. The Contractor chain then
+  returns sensible values automatically; no rule change needed.
+
+**No file changes.** No work scheduled until Phase 3 or Phase 4
+forces the choice.
+
+**Cross-ref:** PT-P1-03 (corrected — partners always point at
+Retail pricelist); CLAUDE.md §6 (architecture spec to amend in
+Phase 3 if cost-floor architecture is dropped); Build Spec §6
+pseudocode (matches §6).
