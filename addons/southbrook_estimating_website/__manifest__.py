@@ -50,6 +50,12 @@
             # portal_boot, so it must load first.
             "southbrook_estimating_website/static/src/js/kitchen_viewport.esm.js",
             "southbrook_estimating_website/static/src/js/portal_boot.esm.js",
+            # Phase 2 commit 2 — OWL <KitchenPlanner/> boot for
+            # /kitchen-planner customer route. Independent of
+            # portal_boot.esm.js (each bootstrap finds its own
+            # mount-point div and returns early if absent on the
+            # current page).
+            "southbrook_estimating_website/static/src/js/planner_boot.esm.js",
         ],
     },
     "installable": True,

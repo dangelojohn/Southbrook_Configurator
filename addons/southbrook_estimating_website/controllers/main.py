@@ -73,9 +73,8 @@ class SouthbrookKitchenPlanner(http.Controller):
         """Render the customer kitchen planner.
 
         Phase 2 commit 1 surface: empty three-pane shell with the
-        mount-point div in the viewport pane. Commit 2 adds the OWL
-        bundle to the asset list and switches this template to mount
-        the planner component.
+        mount-point div in the viewport pane. Commit 2 mounts the OWL
+        <KitchenPlanner/> component into that div via planner_boot.esm.js.
         """
         values = {
             "page_name": "southbrook_kitchen_planner",
@@ -86,6 +85,104 @@ class SouthbrookKitchenPlanner(http.Controller):
             "southbrook_estimating_website.kitchen_planner_template",
             values,
         )
+
+    # ==================================================================
+    # Phase 2 commit 2 — initial state JSON-RPC endpoint.
+    #
+    # The OWL <KitchenPlanner/> component calls this on mount to seed
+    # its reactive store. Shape mirrors the planned state.session +
+    # state.catalog objects the customer SPA needs:
+    #
+    #   { user: {partner_id, partner_name, channel}
+    #     catalog: [{xml_id, sku, name, family, list_price, ...}, ...]
+    #     currency: {symbol, position, decimal_places}
+    #     session: null  # commit 3+ surfaces an active config session
+    #   }
+    #
+    # Auth=user keeps the planner behind portal-light auth per
+    # CLAUDE.md §2.1 ("behind light auth"). Public anonymous browsing
+    # is a Phase-3-polish ask separate from this scope.
+    # ==================================================================
+    @http.route(
+        "/southbrook/api/kitchen-planner/state",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def kitchen_planner_state(self, **kw):
+        """Return the initial state payload the OWL planner mounts with.
+
+        Phase 2 commit 2 surface: read-only — catalog + user. Subsequent
+        commits add session create/update/commit endpoints.
+        """
+        user = request.env.user
+        partner = user.partner_id
+
+        # Catalog: the 12 Q8 cabinet templates. Filtered to config_ok
+        # so only configurable cabinets appear (excludes any future
+        # demo / utility templates).
+        templates = request.env["product.template"].sudo().search([
+            ("config_ok", "=", True),
+            ("default_code", "like", "SB-"),
+        ])
+        catalog = [
+            {
+                "id": t.id,
+                "sku": t.default_code or "",
+                "name": t.name,
+                "list_price": t.list_price,
+                "family": self._family_from_sku(t.default_code or ""),
+            }
+            for t in templates
+        ]
+
+        # Website currency (CAD on the southbrook stack per #5).
+        website = request.website
+        currency = website.currency_id if website else request.env.company.currency_id
+
+        # Partner channel resolution — informs the planner's
+        # "your tier / dealer" badge in the viewport corner. Customer
+        # users default to channel='retail' if their partner has no
+        # channel set.
+        channel = getattr(partner, "channel", None) or "retail"
+
+        return {
+            "ok": True,
+            "user": {
+                "partner_id": partner.id,
+                "partner_name": partner.name,
+                "channel": channel,
+            },
+            "catalog": catalog,
+            "currency": {
+                "symbol": currency.symbol or "$",
+                "position": currency.position or "before",
+                "decimal_places": currency.decimal_places or 2,
+                "name": currency.name or "USD",
+            },
+            "session": None,
+        }
+
+    # Helper — derive family code from SKU. Mirrors the Q8 family
+    # taxonomy without re-deriving the full _SKU_DEFAULTS table
+    # (which lives on product.config.line in southbrook_estimating).
+    _FAMILY_BY_PREFIX = {
+        "SB-WALL":     "wall",
+        "SB-BASE":     "base",
+        "SB-DRAWER":   "drawer",
+        "SB-SINK":     "sink",
+        "SB-TALL":     "tall",
+        "SB-CORNER":   "corner",
+        "SB-VANITY":   "vanity",
+        "SB-ACCESSORY": "accessory",
+        "SB-WORKTOP":  "worktop",
+    }
+
+    def _family_from_sku(self, sku):
+        for prefix, family in self._FAMILY_BY_PREFIX.items():
+            if sku.startswith(prefix):
+                return family
+        return ""
 
 
 class SouthbrookOrderBuilderPortal(CustomerPortal):
