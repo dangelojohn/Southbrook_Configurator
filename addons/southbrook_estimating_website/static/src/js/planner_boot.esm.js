@@ -1,32 +1,41 @@
 /** @odoo-module **/
 //
-// Phase 2 commit 2 (2026-05-31) — /kitchen-planner OWL bootstrap.
+// Phase 2 commit 3 (2026-05-31) — /kitchen-planner OWL three-pane shell.
 //
-// Mounts the <KitchenPlanner/> component into the
-// `#kitchen_planner_root` div emitted by P2C1's template. Mirrors the
-// pattern in portal_boot.esm.js (T2C2 for the Order Builder).
+// P2C2 mounted a tiny placeholder inside the viewport pane. P2C3
+// expands the OWL component to own the entire three-pane layout
+// (rail + catalog + viewport), renders real catalog tiles from the
+// /southbrook/api/kitchen-planner/state payload, and wires tile-click
+// to a selection state.
 //
 // What this commit ships:
-//   - rpcCall(url, params) — pure fetch + JSON-RPC envelope (same
-//     helper as the Order Builder uses; duplicated to keep the two
-//     bundles independent and avoid cross-imports between SPAs).
-//   - <KitchenPlanner/> component — loading / error / loaded states.
-//     Loaded state shows partner name + catalog item count + currency.
-//     Real catalog tile rendering is P2C3; this commit proves the
-//     boot loop end-to-end (mount → fetch state → render).
-//   - mountKitchenPlanner() — finds the mount-point div, mounts the
-//     component, sets data-owl-mounted="1" so the mount is idempotent
-//     (DOMContentLoaded + queueMicrotask both fire in some Odoo
-//     navigation paths).
+//   - <KitchenPlanner/> renders the full three-pane layout from state.
+//   - Catalog pane: 12 real tiles from state.payload.catalog
+//     (sorted by family then SKU for predictable order), each with
+//     SKU + name + family + retail price + 80x80 placeholder thumb.
+//   - Tile click → state.ui.selected_id (highlighted via
+//     .o_kp_tile_selected class). Viewport pane shows the selected
+//     cabinet's details (name, family, price). Click same tile to
+//     deselect; click another to switch.
+//   - Search input filters tiles by name/SKU/family substring.
+//   - Loading / error states styled consistently with the rest.
 //
-// What this commit does NOT ship:
-//   - Catalog tile click → add to current session (P2C3+)
-//   - Attribute drawer (P2C4+)
-//   - Live pricing (P2C5)
-//   - "Request a Price" CTA (P2C6)
-//
+// What this commit does NOT yet ship:
+//   - Tile click → create product.config.session (P2C4 — wires the
+//     OCA configurator session flow).
+//   - Attribute drawer below the viewport for picking series / door /
+//     hinge / etc. — P2C4.
+//   - Live pricing as attributes change — P2C5.
+//   - 2D-isometric SVG cabinet renders in the viewport — P2C4 or P2C5.
+//   - 'Request a Price' CTA → sale.order.draft — P2C6.
 
-import { Component, mount, onMounted, useState, xml } from "@odoo/owl";
+import {
+    Component,
+    mount,
+    onMounted,
+    useState,
+    xml,
+} from "@odoo/owl";
 
 // ---------------------------------------------------------------------
 // rpcCall — pure fetch + JSON-RPC envelope.
@@ -56,42 +65,157 @@ async function rpcCall(url, params = {}) {
 }
 
 // ---------------------------------------------------------------------
-// KitchenPlanner — root OWL component.
+// Currency formatter — derived from payload.currency.
+// ---------------------------------------------------------------------
+function fmtCurrency(value, currency) {
+    if (value === null || value === undefined) return "—";
+    const sym = (currency && currency.symbol) || "$";
+    const dp = (currency && currency.decimal_places) ?? 2;
+    const formatted = Number(value).toLocaleString("en-US", {
+        minimumFractionDigits: dp,
+        maximumFractionDigits: dp,
+    });
+    return (currency && currency.position === "after")
+        ? `${formatted} ${sym}`
+        : `${sym}${formatted}`;
+}
+
+// ---------------------------------------------------------------------
+// Stable family display order — base, drawer, wall, tall, sink, corner,
+// vanity, accessory, worktop. Matches Q21 zone order for first 4.
+// ---------------------------------------------------------------------
+const FAMILY_ORDER = [
+    "base", "drawer", "wall", "tall",
+    "sink", "corner", "vanity", "accessory", "worktop",
+];
+
+function sortCatalog(catalog) {
+    return [...catalog].sort((a, b) => {
+        const fa = FAMILY_ORDER.indexOf(a.family);
+        const fb = FAMILY_ORDER.indexOf(b.family);
+        if (fa !== fb) {
+            return (fa === -1 ? 99 : fa) - (fb === -1 ? 99 : fb);
+        }
+        return (a.sku || "").localeCompare(b.sku || "");
+    });
+}
+
+// ---------------------------------------------------------------------
+// KitchenPlanner — root OWL component (P2C3: owns the 3-pane layout).
 // ---------------------------------------------------------------------
 class KitchenPlanner extends Component {
     static template = xml`
-        <div class="o_kp_planner">
-            <div t-if="state.loading" class="o_kp_state o_kp_loading">
-                Loading planner…
-            </div>
-            <div t-elif="state.error" class="o_kp_state o_kp_error">
-                <strong>Could not load planner.</strong>
-                <div class="o_kp_error_msg" t-esc="state.error"/>
-                <button class="o_kp_retry" t-on-click="_retry">Retry</button>
-            </div>
-            <div t-else="" class="o_kp_state o_kp_loaded">
-                <h1 class="o_kp_loaded_title">
-                    Hello, <t t-esc="state.payload.user.partner_name"/>.
-                </h1>
-                <p class="o_kp_loaded_sub">
-                    Your kitchen planner is ready.
-                </p>
-                <dl class="o_kp_loaded_meta">
-                    <dt>Cabinets in catalog</dt>
-                    <dd><t t-esc="state.payload.catalog.length"/></dd>
-                    <dt>Channel</dt>
-                    <dd t-esc="state.payload.user.channel"/>
-                    <dt>Currency</dt>
-                    <dd>
+        <div class="o_kp_root">
+
+            <!-- LEFT TOOL RAIL -->
+            <aside class="o_kp_rail">
+                <div class="o_kp_rail_logo">SB</div>
+                <ul class="o_kp_rail_actions">
+                    <li class="o_kp_rail_action" title="Select / Pan">
+                        <span class="o_kp_rail_glyph">▤</span>
+                    </li>
+                    <li class="o_kp_rail_action" title="Add cabinet">
+                        <span class="o_kp_rail_glyph">＋</span>
+                    </li>
+                    <li class="o_kp_rail_action" title="Dimensions">
+                        <span class="o_kp_rail_glyph">↕</span>
+                    </li>
+                    <li class="o_kp_rail_action" title="Solid / Blueline">
+                        <span class="o_kp_rail_glyph">▦</span>
+                    </li>
+                </ul>
+            </aside>
+
+            <!-- CENTRE CATALOG PANE -->
+            <section class="o_kp_catalog">
+                <header class="o_kp_catalog_header">
+                    <h2 class="o_kp_catalog_title">Cabinets</h2>
+                    <input class="o_kp_catalog_search"
+                           type="search"
+                           placeholder="Search cabinets…"
+                           t-att-value="state.ui.search"
+                           t-on-input="(ev) => state.ui.search = ev.target.value.toLowerCase()"/>
+                </header>
+
+                <div t-if="state.loading"
+                     class="o_kp_state o_kp_loading">
+                    Loading planner…
+                </div>
+                <div t-elif="state.error"
+                     class="o_kp_state o_kp_error">
+                    <strong>Could not load planner.</strong>
+                    <div class="o_kp_error_msg" t-esc="state.error"/>
+                    <button class="o_kp_retry" t-on-click="_retry">Retry</button>
+                </div>
+                <ul t-else=""
+                    class="o_kp_catalog_tiles">
+                    <li t-foreach="filteredCatalog" t-as="cab" t-key="cab.id"
+                        t-att-class="{
+                            'o_kp_tile': true,
+                            'o_kp_tile_selected': cab.id === state.ui.selected_id,
+                        }"
+                        t-on-click="() => this._onTileClick(cab.id)">
+                        <div class="o_kp_tile_thumb"
+                             t-att-data-family="cab.family"/>
+                        <div class="o_kp_tile_body">
+                            <div class="o_kp_tile_name" t-esc="cab.name"/>
+                            <div class="o_kp_tile_meta">
+                                <t t-esc="cab.sku"/> ·
+                                <t t-esc="_fmt(cab.list_price)"/>
+                            </div>
+                        </div>
+                    </li>
+                    <li t-if="filteredCatalog.length === 0"
+                        class="o_kp_tile_none">
+                        No cabinets match "<t t-esc="state.ui.search"/>".
+                    </li>
+                </ul>
+
+                <footer class="o_kp_catalog_foot"
+                        t-if="!state.loading and !state.error">
+                    <t t-esc="filteredCatalog.length"/> of
+                    <t t-esc="state.payload.catalog.length"/> cabinets ·
+                    Phase 2 commit 3
+                </footer>
+            </section>
+
+            <!-- RIGHT VIEWPORT -->
+            <main class="o_kp_viewport">
+                <div t-if="state.loading or state.error"
+                     class="o_kp_placeholder">
+                    <h1 class="o_kp_placeholder_title">Design Your Kitchen</h1>
+                </div>
+                <div t-elif="selectedCabinet"
+                     class="o_kp_selection">
+                    <div class="o_kp_selection_thumb"
+                         t-att-data-family="selectedCabinet.family"/>
+                    <h1 class="o_kp_selection_name"
+                        t-esc="selectedCabinet.name"/>
+                    <dl class="o_kp_selection_meta">
+                        <dt>SKU</dt><dd t-esc="selectedCabinet.sku"/>
+                        <dt>Family</dt><dd t-esc="selectedCabinet.family"/>
+                        <dt>Retail</dt>
+                        <dd t-esc="_fmt(selectedCabinet.list_price)"/>
+                    </dl>
+                    <p class="o_kp_selection_foot">
+                        Attribute picker + add-to-kitchen lands in
+                        Phase 2 commit 4.
+                    </p>
+                </div>
+                <div t-else="" class="o_kp_placeholder">
+                    <h1 class="o_kp_placeholder_title">Design Your Kitchen</h1>
+                    <p class="o_kp_placeholder_body">
+                        Hello,
+                        <t t-esc="state.payload.user.partner_name"/>. Pick
+                        a cabinet from the catalog on the left to start.
+                    </p>
+                    <p class="o_kp_placeholder_meta">
+                        <t t-esc="state.payload.catalog.length"/> cabinets ·
+                        <t t-esc="state.payload.user.channel"/> ·
                         <t t-esc="state.payload.currency.name"/>
-                        (<t t-esc="state.payload.currency.symbol"/>)
-                    </dd>
-                </dl>
-                <p class="o_kp_loaded_foot">
-                    Phase 2 commit 2 · OWL mount confirmed · 2026-05-31.
-                    Tile interaction lands in commit 3+.
-                </p>
-            </div>
+                    </p>
+                </div>
+            </main>
         </div>
     `;
 
@@ -102,6 +226,10 @@ class KitchenPlanner extends Component {
             loading: true,
             error: null,
             payload: null,
+            ui: {
+                search: "",
+                selected_id: null,
+            },
         });
         onMounted(() => this._load());
     }
@@ -122,9 +250,40 @@ class KitchenPlanner extends Component {
         }
     }
 
-    _retry = () => {
-        this._load();
+    _retry = () => { this._load(); };
+
+    _onTileClick = (id) => {
+        if (this.state.ui.selected_id === id) {
+            this.state.ui.selected_id = null;
+        } else {
+            this.state.ui.selected_id = id;
+        }
     };
+
+    _fmt(value) {
+        return fmtCurrency(value, this.state.payload?.currency);
+    }
+
+    get filteredCatalog() {
+        if (!this.state.payload) return [];
+        const sorted = sortCatalog(this.state.payload.catalog);
+        const q = (this.state.ui.search || "").trim();
+        if (!q) return sorted;
+        return sorted.filter((c) =>
+            (c.name || "").toLowerCase().includes(q)
+            || (c.sku || "").toLowerCase().includes(q)
+            || (c.family || "").toLowerCase().includes(q)
+        );
+    }
+
+    get selectedCabinet() {
+        if (!this.state.payload || this.state.ui.selected_id === null) {
+            return null;
+        }
+        return this.state.payload.catalog.find(
+            (c) => c.id === this.state.ui.selected_id
+        ) || null;
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -135,7 +294,8 @@ async function mountKitchenPlanner() {
     if (!root || root.dataset.owlMounted === "1") return;
     root.dataset.owlMounted = "1";
 
-    // Clear the P2C1 placeholder before mounting.
+    // Clear the P2C1 placeholder (rail + catalog + viewport
+    // skeletons) before mounting.
     root.innerHTML = "";
 
     try {
@@ -144,8 +304,6 @@ async function mountKitchenPlanner() {
             dev: false,
         });
     } catch (err) {
-        // Reveal mount errors to the user — silent failure on an
-        // empty white screen is worse than a visible error block.
         root.innerHTML =
             '<div class="o_kp_state o_kp_error">' +
             '<strong>Planner failed to mount.</strong>' +

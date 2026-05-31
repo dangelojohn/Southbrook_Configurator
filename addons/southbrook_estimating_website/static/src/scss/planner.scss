@@ -356,3 +356,115 @@
     margin: 0;
   }
 }
+
+// ---------------------------------------------------------------------
+// Phase 2 commit 3 — tile selection + viewport selection panel.
+// ---------------------------------------------------------------------
+.o_kp_tile_selected {
+  border-color: var(--sb-walnut, #4a3c2e) !important;
+  box-shadow: 0 0 0 2px var(--sb-walnut, #4a3c2e),
+              0 1px 4px rgba(74,60,46,0.18) !important;
+
+  .o_kp_tile_name {
+    color: var(--sb-walnut, #4a3c2e);
+    font-weight: 700;
+  }
+}
+
+.o_kp_tile_none {
+  list-style: none;
+  padding: 16px;
+  text-align: center;
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  color: var(--sb-walnut, #4a3c2e);
+  opacity: 0.5;
+  letter-spacing: 0.04em;
+}
+
+// Family-coded thumb backgrounds — gives each cabinet family
+// a distinct placeholder colour while real Tier-3 SVG renders
+// are still missing (those land in P2C5+). Subtle so the thumb
+// area still reads as "thumbnail goes here" not "decorative tile".
+.o_kp_tile_thumb[data-family="base"]      { background-color: #e8e2d2; }
+.o_kp_tile_thumb[data-family="wall"]      { background-color: #d8e3ec; }
+.o_kp_tile_thumb[data-family="drawer"]    { background-color: #e3d8d0; }
+.o_kp_tile_thumb[data-family="tall"]      { background-color: #d4d8ce; }
+.o_kp_tile_thumb[data-family="sink"]      { background-color: #cce0e3; }
+.o_kp_tile_thumb[data-family="corner"]    { background-color: #e4d4c4; }
+.o_kp_tile_thumb[data-family="vanity"]    { background-color: #e0d6e0; }
+.o_kp_tile_thumb[data-family="accessory"] { background-color: #ede8dc; }
+.o_kp_tile_thumb[data-family="worktop"]   { background-color: #d8cebf; }
+
+// Viewport selection panel — shown when a tile is selected.
+.o_kp_selection {
+  max-width: 520px;
+  text-align: center;
+  color: var(--sb-walnut, #4a3c2e);
+  font-family: var(--sb-font-sans, system-ui, sans-serif);
+  padding: 32px;
+}
+
+.o_kp_selection_thumb {
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 24px;
+  border: 1px solid var(--sb-rule, #d8d2c4);
+  border-radius: 4px;
+  background-color: var(--sb-paper, #f5f4ee);
+  background-image:
+    linear-gradient(45deg, transparent 49%, var(--sb-rule, #d8d2c4) 49% 51%, transparent 51%),
+    linear-gradient(-45deg, transparent 49%, var(--sb-rule, #d8d2c4) 49% 51%, transparent 51%);
+}
+
+.o_kp_selection_name {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-weight: 500;
+  font-size: 32px;
+  margin: 0 0 24px;
+}
+
+.o_kp_selection_meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 18px;
+  text-align: left;
+  margin: 0 auto 32px;
+  max-width: 280px;
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 12px;
+
+  dt {
+    font-weight: 400;
+    opacity: 0.5;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--sb-walnut, #4a3c2e);
+  }
+}
+
+.o_kp_selection_foot {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.4;
+  margin: 0;
+}
+
+// Boot placeholder — server-rendered shell shown until OWL mounts.
+// Matches the live three-pane structure so there's no layout shift
+// when OWL replaces it.
+.o_kp_boot_placeholder {
+  .o_kp_rail {
+    background: var(--sb-walnut, #4a3c2e);
+  }
+  .o_kp_state {
+    padding: 32px;
+    text-align: center;
+  }
+}
