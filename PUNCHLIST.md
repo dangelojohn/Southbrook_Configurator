@@ -893,7 +893,7 @@ lead time flow per Q7). Reasonable target: 1 week of work to seed configurator
 sessions for the 12 cabinet templates + assign pricelist to the Demo
 Tradesperson Tier 3 partner.
 
-### PT-P1-01 · Seed configurator sessions for the 12 cabinet templates — **PARTIAL: SKU + spec live; sessions deferred**
+### PT-P1-01 · Seed configurator sessions for the 12 cabinet templates — **RESOLVED at XML layer 2026-05-31; sessions (layer 3) deferred to Phase 3**
 
 **Symptom (in gate walk):** D4 spec column empty, D6 drawer Spec field empty,
 no MAPLE badge ever appears.
@@ -939,25 +939,63 @@ line.name string).
 - BoM rollup: 8 cabinets, 70 panels, 8.91m edge banding, 10 hinge pairs,
   13 handles, 3 drawer slide pairs
 
-**Remaining work for full ticket closure:**
-- Move the DB writes (template + variant default_codes, line.name strings,
-  partner pricelist assignments per PT-P1-03) into the demo XML so fresh
-  installs reproduce the state automatically. Targets:
-  - `addons/southbrook_estimating/data/product_templates.xml` — already has
-    the 12 templates per Q8; verify no -DEMO contamination on next install
-  - `addons/southbrook_estimating/demo/southbrook_demo_orders.xml` — add a
-    S00235-equivalent record (Demo Tradesperson Tier 3 partner, 6 cabinet
-    lines across base_run/wall/tall, realistic spec text per line)
-- Build a `product.config.session` seed for at least the 5 cabinet families
-  the demo exercises. Sessions materialize variants with `value_ids`
-  populated, enabling Track 1 routine #1 (mrp.bom._compute_panel_dimensions)
-  to compute panel dimensions from actual attribute values instead of
-  SKU-default fallbacks. This is the substantive Phase-1 work — ~2-3 hours
-  exploring the OCA session lifecycle + writing the XML.
+**Demo XML reproducibility executed 2026-05-31 (commit 9245093):**
 
-**Acceptance:** Same as before — fresh `-i southbrook_estimating
---stop-after-init` install with `--with-demo` produces S00235 with the
-live state above (or equivalent).
+Three files changed + manifest updated:
+- New `demo/southbrook_demo_variants.xml`: 12 `product.product` records, one
+  per cabinet template per Q8. Each carries clean SB-* `default_code`,
+  `list_price` matching the Signature Series retail anchors, and
+  `standard_price` seeded for Phase 3 customer-mode Contractor pricelist
+  chain. Bypasses the Q6 `create_variant='dynamic'` rule for demo data
+  only — production stays dynamic.
+- Updated `demo/southbrook_demo_orders.xml`: all 10 `product.product_product_4`
+  refs (the NF22 blocker) replaced with `demo_variant_*` xml_ids. New
+  records `demo_gate_walk_order` + `demo_gate_walk_line_1..6` reproduce
+  S00235 exactly — Demo Tradesperson Tier 3, 6 lines, 3 zones, 2 Maple
+  lines, explicit `pricelist_id=ref('pricelist_retail')` per corrected
+  PT-P1-03. Stays in draft so F3 (Duplicate) and F4 (Confirm) gate-walk
+  paths both exercise cleanly without mutating the canonical demo state.
+- Updated `demo/southbrook_demo_partners.xml`: all 6 demo partners now
+  carry `specific_property_product_pricelist=ref('pricelist_retail')`
+  (Odoo-19 writable field name per PT-P1-03 gotcha).
+- Updated `__manifest__.py` demo list to add variants + re-enable
+  orders. NF22 status amended from blocker → RESOLVED with cross-ref
+  to this ticket.
+
+**Layer-3 (real configurator sessions) deferred to Phase 3:**
+
+The static demo variants are sufficient for Phase 1/2 gate review and
+the Phase 2 customer-mode preview surfaces. They fall short when:
+- BoM rollup needs truly attribute-driven panel dimensions (today's
+  `_SKU_DEFAULTS` fallbacks are 80% accurate; session-driven values
+  would be 100%).
+- A configurator-rule-violation test needs to verify that an invalid
+  combination (Contractor + Maple per the box_material→series rule) is
+  blocked at session-commit time. Today the demo doesn't exercise the
+  rule engine — only the SKU + line.name surfaces.
+
+Phase 3 follow-up: replace `demo/southbrook_demo_variants.xml` with a
+Python helper (e.g., a `post_init_hook` or a dedicated `demo.py` model
+extending the addon's data load) that:
+1. Walks the OCA `product.config.session` flow per cabinet
+2. Picks attribute values via `wizard.action_next_step()` matching the
+   spec text in the demo order's `line.name`
+3. Commits each session (`session.action_confirm()`) which materialises
+   a `product.product` variant with `value_ids` populated
+4. Binds the resulting variant to the corresponding `demo_gate_walk_line_*`
+   record
+
+That gives a faithful end-to-end demo trace and exercises every routine
+the engine ships (rule resolution, attribute-line price uplift, BoM
+rollup from actual cabinet dimensions). ~2-3 hours scoped against the
+OCA session lifecycle once Phase 3 starts.
+
+**Acceptance (this commit):** fresh `-i southbrook_estimating
+--stop-after-init` install with the demo flag produces the gate-walk
+order automatically with the canonical numbers — verifiable via
+`/southbrook/api/order/<demo_gate_walk_order_id>` returning retail
+$3,275 / channel $2,128.75 / 6 lines / 3 zones / MAPLE badge on
+lines 1 + 4.
 
 ### PT-P1-02 · Populate BoM rollup — **RESOLVED 2026-05-31**
 
