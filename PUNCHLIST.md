@@ -893,52 +893,101 @@ lead time flow per Q7). Reasonable target: 1 week of work to seed configurator
 sessions for the 12 cabinet templates + assign pricelist to the Demo
 Tradesperson Tier 3 partner.
 
-### PT-P1-01 · Seed configurator sessions for the 12 cabinet templates
+### PT-P1-01 · Seed configurator sessions for the 12 cabinet templates — **PARTIAL: SKU + spec live; sessions deferred**
 
 **Symptom (in gate walk):** D4 spec column empty, D6 drawer Spec field empty,
 no MAPLE badge ever appears.
-**Symptom (RPC):** `sale.order.line.spec_summary = ""` for all demo lines;
-`is_maple = false` always.
-**Root cause:** `_SKU_DEFAULTS` table on `product.config.session` is the
-single source of truth for per-SKU metadata (per [[project_southbrook_estimating_v19cr]]
-co-development brief §4.1). Bare variants bypass this table; the controller's
-`_build_southbrook_order_payload` reads from it via the line's
-`config_session_id`, which is `null` on bare variants.
-**Fix:** Replace the in-session-created variants (var ids 58-62) with a
-demo-data XML record that:
-1. Creates a `product.config.session` per cabinet family the gate exercises
-   (base 1-door, base 2-door, drawer bank, wall 1-door, tall pantry —
-   minimum 5; ideally all 12 per Q8 for full coverage).
-2. Runs each session through to `state='done'` with realistic attribute
-   choices (Contemporary series + maple box on at least one to exercise the
-   MAPLE badge + `+10%` price uplift).
-3. The session materialises a `product.product` variant; that variant goes
-   into S00235's order lines instead of var-id-58…62.
 
-**File target:** `addons/southbrook_estimating/demo/demo_orders.xml` (new
-file referenced from `__manifest__.py` demo list). Existing
-`demo/southbrook_demo.xml` covers partners + pricelists already.
+**Root-cause split (re-diagnosed 2026-05-31):** What looked like one ticket
+turned out to be three independent layers stacked on each other:
 
-**Acceptance:** S00235's payload at `/southbrook/api/order/235` returns
-non-empty `spec_summary` and `width_mm > 0` for every line; at least one
-line has `is_maple = true` so the MAPLE badge renders in D4.
+1. **SKU lookup layer.** Controller reads `product_tmpl_id.default_code` and
+   queries `_SKU_DEFAULTS` for family + W/H/D defaults. The 5 templates I
+   touched during demo seed (ids 36/38/39/40/42) had their default_code
+   contaminated by Odoo's single-variant code-sync (variant write → template
+   code mirror). My `-DEMO` suffix on the variant default_code propagated up
+   to the template, breaking `_SKU_DEFAULTS` lookups. **Fixed in DB
+   2026-05-31** by resetting templates 36/38/39/40/42 + variants 58/59/60/61/62
+   back to their clean Q8 SKUs (no -DEMO).
 
-### PT-P1-02 · Populate BoM rollup from configurator session
+2. **Spec-text layer.** Controller derives `spec_summary` from
+   `line.name`. Demo lines were created with the bare product
+   display name (`[SB-BASE-1DR] Base 1-Door`), no spec. **Fixed in DB
+   2026-05-31** by writing realistic spec strings to the 6 lines of S00235
+   (Contemporary + Maple + width + soft-close, mixing in 2 Maple lines so
+   the MAPLE badge fires).
+
+3. **Configurator-session layer.** A real session attaches the variant's
+   attribute values to `value_ids`, which is the canonical source for
+   `mrp.bom._compute_panel_dimensions` (Track 1 routine #1) BoM math.
+   **Not done.** Phase 1 polish — see "Remaining work" below.
+
+**Layers 1 + 2 resolved PT-P1-02, PT-P1-04, and the MAPLE badge surface for
+the gate walk** — all without configurator sessions. The decontaminated SKU
+strings make `_SKU_DEFAULTS` fire, which produces family + W/H/D + door/drawer
+counts; the BoM rollup walks those defaults and returns sensible per-line
+panel/hardware counts. PT-P1-01's "session" work is now only required to
+get fully cabinet-attribute-driven spec text + dynamic prices (which the
+controller would compute from the session's value_ids instead of the
+line.name string).
+
+**Live verification 2026-05-31:** S00235 payload now returns:
+- 6 lines with `family ∈ {base, drawer, wall, tall}`
+- `width_mm` ∈ {457, 600, 609, 762}, `width_inches` ∈ {18, 23.5, 24, 30}
+- `is_maple = True` on L89 + L92 (the two Contemporary Maple lines)
+- `spec_summary` like "Base 1-Door · Contemporary · Maple · 24″ · Soft-close hinge L"
+- BoM rollup: 8 cabinets, 70 panels, 8.91m edge banding, 10 hinge pairs,
+  13 handles, 3 drawer slide pairs
+
+**Remaining work for full ticket closure:**
+- Move the DB writes (template + variant default_codes, line.name strings,
+  partner pricelist assignments per PT-P1-03) into the demo XML so fresh
+  installs reproduce the state automatically. Targets:
+  - `addons/southbrook_estimating/data/product_templates.xml` — already has
+    the 12 templates per Q8; verify no -DEMO contamination on next install
+  - `addons/southbrook_estimating/demo/southbrook_demo_orders.xml` — add a
+    S00235-equivalent record (Demo Tradesperson Tier 3 partner, 6 cabinet
+    lines across base_run/wall/tall, realistic spec text per line)
+- Build a `product.config.session` seed for at least the 5 cabinet families
+  the demo exercises. Sessions materialize variants with `value_ids`
+  populated, enabling Track 1 routine #1 (mrp.bom._compute_panel_dimensions)
+  to compute panel dimensions from actual attribute values instead of
+  SKU-default fallbacks. This is the substantive Phase-1 work — ~2-3 hours
+  exploring the OCA session lifecycle + writing the XML.
+
+**Acceptance:** Same as before — fresh `-i southbrook_estimating
+--stop-after-init` install with `--with-demo` produces S00235 with the
+live state above (or equivalent).
+
+### PT-P1-02 · Populate BoM rollup — **RESOLVED 2026-05-31**
 
 **Symptom (in gate walk):** E1 BoM Preview tab summary cells show
 `Cabinets 0 / Total Panels 0 / Edge Banding 0.00 m`; both tables (panels +
 hardware) render with all zeros.
-**Symptom (RPC):** `result.bom_rollup.cabinet_count = 0`,
-`panels.{side,top,bottom,back,shelf,door,drawer_front} = 0`,
-`hardware.* = 0`, `edge_banding_mm = 0`.
-**Root cause:** Same as PT-P1-01 — BoM rollup is computed by traversing each
-line's config session → `mrp.bom._compute_panel_dimensions` (Track 1 routine
-#1) → projects into payload. No session ⇒ rollup loop sees zero cabinets.
-**Fix:** Resolved automatically when PT-P1-01 lands; no separate code change.
-**Acceptance:** S00235's BoM rollup returns `cabinet_count = 6` (matching
-`lines.length`), `panels.side ≥ 12` (2 sides × 6 cabinets), `panels.shelf ≥ 6`,
-non-zero `edge_banding_mm`; hardware counts non-zero (hinge pairs scale with
-door count per Q24 width→door rule).
+
+**Root cause (corrected):** Not "missing configurator sessions" as
+originally filed. The real cause was the contaminated template
+default_codes (per PT-P1-01 layer 1) breaking `_SKU_DEFAULTS` lookups,
+which cascaded into the BoM rollup loop seeing 0 cabinets, 0 panels,
+0 hardware.
+
+**Fix:** Resolved by PT-P1-01 layer 1 (template default_code
+decontamination). No additional work needed.
+
+**Acceptance (live-verified 2026-05-31):** S00235's BoM rollup returns:
+```
+cabinet_count: 8 (= sum(line.qty))
+panels: side=16, top=8, bottom=8, back=8, shelf=17, door=10, drawer_front=3
+hardware: hinge_pair=10, handle=13, drawer_slide_pair=3
+edge_banding_mm: 8914 (= 8.91 m)
+```
+All non-zero. Cabinet count (8) reflects qty rollup; panel counts scale
+with door/drawer count per Q24 width→door rule; hardware tracks doors +
+drawers per cabinet.
+
+**Remaining for fresh-install reproducibility:** Same as PT-P1-01 — the
+demo XML needs the populated order so a fresh install with --with-demo
+produces these numbers.
 
 ### PT-P1-03 · Assign pricelist to demo partners — **partially executed 2026-05-30**
 
@@ -1011,16 +1060,29 @@ order S00235 pricelist_id → 37):
 `Contractor Tier 3 (-35%)` badge; `/southbrook/api/order/235` returns
 `pricelist_id=42, pricelist_name='Contractor Tier 3 (-35%)'`.
 
-### PT-P1-04 · Width-attribute resolution into `width_mm`
+### PT-P1-04 · Width-attribute resolution — **RESOLVED 2026-05-31**
 
 **Symptom (in gate walk):** D4 width column shows `0″` for every line; D6
 drawer Width field reads `0`.
-**Symptom (RPC):** `line.width_mm = 0`, `line.width_inches = 0`.
-**Root cause:** Width is one of the 11 attributes (per Q2) stored on the
-configurator session's `value_ids`. Without a session, the projection logic
-in `_build_southbrook_order_payload._line_width` returns 0.
-**Fix:** Same root cause as PT-P1-01/02 — resolved automatically when configurator
-sessions seed real attribute values. No separate work.
+
+**Root cause (corrected):** Not "missing configurator sessions" as
+originally filed. Same as PT-P1-02 — contaminated template default_codes
+broke `_SKU_DEFAULTS` lookups, which had the W field for each template
+SKU. Without the lookup hit, width_mm fell through to 0.
+
+**Fix:** Resolved by PT-P1-01 layer 1 (template default_code
+decontamination). The `_SKU_DEFAULTS` table provides per-SKU W/H/D
+defaults that satisfy the gate walk; full configurator-session-driven
+width per Q2 attribute is Phase-3 work (when individual cabinet variants
+have their own custom width).
+
+**Acceptance (live-verified 2026-05-31):** S00235 width values:
+- L89 (base 1-door) → 609 mm / 24″
+- L90 (base 2-door) → 762 mm / 30″
+- L91 (drawer bank) → 609 mm / 24″
+- L92 (wall 1-door) → 457 mm / 18″
+- L93 (wall 1-door) → 457 mm / 18″
+- L94 (tall pantry) → 600 mm / 23.5″ (per Q23 enum value)
 **Acceptance:** S00235's lines all return `width_mm > 0` (typical demo
 spread: 305, 457, 610, 762 mm matching Q23 enumeration); `width_inches`
 shows the matching imperial values (12, 18, 24, 30) per Q4 dual-unit storage.
