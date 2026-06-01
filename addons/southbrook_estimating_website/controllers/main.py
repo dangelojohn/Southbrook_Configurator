@@ -25,7 +25,55 @@ the logged-in partner OR the partner's parent (dealer org).
 from odoo import http
 from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
+from odoo.addons.auth_signup.controllers.main import AuthSignupHome
 from odoo.addons.portal.controllers.portal import CustomerPortal
+
+
+# ======================================================================
+# G5 + G4 + G8 (customer-flow JTBD gap analysis 2026-06-01) — capture
+# the visitor's project name at signup so we can label their first
+# auto-created sale.order without forcing a second prompt.
+#
+# Pre-fix: signup asked only Name / Email / Password, the post-signup
+# redirect went straight to /my, the user landed at a generic portal
+# dashboard with a CTA card (G10) and no project label.
+#
+# Mechanism:
+#   1. views/auth_template.xml adds a 'Project Name' input to
+#      auth_signup.signup right after the Name field (G5).
+#   2. SouthbrookAuthSignup below stashes that value into
+#      request.session at the same point the stock signup controller
+#      validates the form (so it survives the auth flip + redirect).
+#   3. SouthbrookOrderBuilder.southbrook_order_builder_new pops the
+#      session value and writes it to sale.order.client_order_ref —
+#      Odoo's existing 'Customer Reference' field, perfect for free-
+#      text project labels like 'Smith Kitchen Renovation'.
+# ======================================================================
+class SouthbrookAuthSignup(AuthSignupHome):
+
+    _SESSION_KEY = "southbrook_project_name"
+
+    def get_auth_signup_qcontext(self):
+        # Echo project_name back into the qcontext so the form re-
+        # populates after a validation error (password mismatch etc.).
+        # Otherwise the stock controller drops every unknown POST key.
+        qcontext = super().get_auth_signup_qcontext()
+        if "project_name" in request.params:
+            qcontext["project_name"] = request.params["project_name"]
+        return qcontext
+
+    def _prepare_signup_values(self, qcontext):
+        # Stash the project name in the session before delegating to
+        # the stock validator. Stash BEFORE the super call so even if
+        # password validation fails (UserError) we don't drop a name
+        # the user already typed — the next POST will overwrite it.
+        # The stash happens on every signup-form POST attempt; the
+        # /my/southbrook/order-builder/new route pops it on first read
+        # so a stale value cannot leak into a future user's session.
+        project_name = (qcontext.get("project_name") or "").strip()
+        if project_name:
+            request.session[self._SESSION_KEY] = project_name[:128]
+        return super()._prepare_signup_values(qcontext)
 
 
 # ======================================================================
@@ -474,11 +522,25 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         Sudo because portal users typically lack direct sale.order
         write rights; the partner_id binding makes the order accessible
         through the existing _southbrook_resolve_order auth check.
+
+        G4 + G5 + G8 (2026-06-01): accept a project name from either
+        a `?name=` query param OR a session key stashed by the signup
+        controller, and apply it to client_order_ref so the customer's
+        first quote is labelled the way they asked. The query-param
+        path lets the homepage CTA optionally pre-label without a
+        signup flow; the session path is the registration handoff.
         """
         partner = request.env.user.partner_id
-        order = request.env["sale.order"].sudo().create({
-            "partner_id": partner.id,
-        })
+        project_name = (
+            (kw.get("name") or "").strip()
+            or request.session.pop(
+                SouthbrookAuthSignup._SESSION_KEY, ""
+            ).strip()
+        )
+        vals = {"partner_id": partner.id}
+        if project_name:
+            vals["client_order_ref"] = project_name[:128]
+        order = request.env["sale.order"].sudo().create(vals)
         return request.redirect(
             "/my/southbrook/order-builder/%s" % order.id
         )

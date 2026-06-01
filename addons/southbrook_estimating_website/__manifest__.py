@@ -29,6 +29,9 @@
         "views/kitchen_planner_template.xml",
         # G1 + G2 (2026-06-01) — public Southbrook homepage at /.
         "views/homepage_template.xml",
+        # G4 + G5 + G6 + G8 (2026-06-01) — branded auth pages
+        # (login/signup chrome) + project-name field on signup.
+        "views/auth_template.xml",
     ],
     # Dedicated asset bundle (charter Q4 answer) so the OWL portal
     # components only load on the Order Builder route. Other portal

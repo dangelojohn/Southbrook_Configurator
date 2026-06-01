@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  G4 + G5 + G6 + G8 (customer-flow JTBD gap analysis 2026-06-01) —
+  branded auth pages and project-name capture at signup.
+
+  Pre-fix:
+    G6  /web/login and /web/signup rendered Odoo's default narrow
+        card with the database-manager + Powered-by-Odoo footer.
+        Zero Southbrook branding, jarring transition from the
+        homepage hero.
+    G5  Signup form asked Name / Email / Password only — no chance
+        for the user to tell us what project they are starting.
+    G4+G8 After registration the user landed at /my with no guided
+        onboarding. The /my CTA card (G10) helped, but the user had
+        no way to label their project.
+
+  Approach: extend two stock auth templates.
+    1. web.login_layout — shared chrome for login + signup +
+       reset-password. Replace its narrow 300 px card with a
+       two-column layout: left walnut brand panel, right form
+       column. Single inherit covers all three auth flows.
+    2. auth_signup.signup — add an optional 'Project Name' field
+       right after the 'Name' field. The signup controller
+       (in controllers/main.py) stashes the value in
+       request.session['southbrook_project_name'] so the post-
+       signup redirect to /my/southbrook/order-builder/new can
+       write it to the auto-created sale.order.client_order_ref.
+
+  All styling uses the shared design tokens (sb-walnut, sb-linen,
+  sb-sky on :root). See static/src/scss/homepage.scss for the
+  .o_sb_auth_* rules.
+-->
+<odoo>
+
+  <!-- ================================================================
+       G6 — Brand the shared login/signup/reset-password chrome.
+       ================================================================ -->
+  <template
+      id="login_layout_southbrook"
+      name="Southbrook Auth Layout"
+      inherit_id="web.login_layout"
+      priority="30">
+
+    <!-- The website module collapses web.login_layout down to just
+         <div class="oe_website_login_container" t-out="0"/>. We
+         REPLACE that wrapper with our two-column layout, putting the
+         original t-out="0" hook inside our right-hand form card. -->
+    <xpath expr="//div[hasclass('oe_website_login_container')]"
+           position="replace">
+      <div class="container o_sb_auth">
+        <div class="row g-0 mx-auto o_sb_auth_row">
+
+          <!-- LEFT: walnut brand panel (hidden under lg) -->
+          <div class="col-lg-6 o_sb_auth_brand d-none d-lg-flex">
+            <div class="o_sb_auth_brand_inner">
+              <div class="o_sb_auth_mark">SOUTHBROOK</div>
+              <h1 class="o_sb_auth_brand_title">
+                Welcome to<br/>
+                <span class="o_sb_auth_brand_accent">Southbrook Cabinetry</span>
+              </h1>
+              <p class="o_sb_auth_brand_sub">
+                Custom kitchen cabinets, designed online. Sign in or
+                create a free account to start your project.
+              </p>
+              <p class="o_sb_auth_brand_meta">
+                FREE TO START · NO CREDIT CARD · QUOTE IN MINUTES
+              </p>
+            </div>
+          </div>
+
+          <!-- RIGHT: form panel -->
+          <div class="col-lg-6 o_sb_auth_form_col">
+            <div class="o_sb_auth_card">
+              <!-- mobile-only brand mark above the form -->
+              <div class="o_sb_auth_mobile_mark d-lg-none">
+                <a href="/" class="o_sb_auth_mark_link">SOUTHBROOK</a>
+              </div>
+
+              <!-- the stock login / signup / reset-password form -->
+              <t t-out="0"/>
+
+              <div class="o_sb_auth_footer">
+                <a href="/" class="o_sb_auth_back">← Back to home</a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </xpath>
+  </template>
+
+  <!-- ================================================================
+       G5 — 'Project Name' field on signup, between Name and Email.
+       The signup controller (SouthbrookAuthSignup in main.py)
+       picks the value out of qcontext and stashes it in
+       request.session for the post-signup order-create step.
+       ================================================================ -->
+  <template
+      id="signup_southbrook_project_name"
+      name="Southbrook signup — project name field"
+      inherit_id="auth_signup.signup">
+
+    <xpath expr="//div[hasclass('field-name')]" position="after">
+      <div class="mb-3 field-project_name">
+        <label for="project_name" class="form-label">
+          What should we call your project?
+        </label>
+        <input type="text" name="project_name"
+               t-att-value="project_name or ''"
+               id="project_name"
+               class="form-control"
+               placeholder="e.g. Smith Family Kitchen"/>
+        <small class="form-text text-muted">
+          Optional — helps us label your design later. You can change it any time.
+        </small>
+      </div>
+    </xpath>
+  </template>
+
+</odoo>
