@@ -29,29 +29,36 @@
 
 // ---------------------------------------------------------------------
 // 1 · Palette
+//
+// Values aligned 2026-06-01 to match the portal's
+// .o_southbrook_owl_mount scope tokens, which were the actual
+// shipping values across Track 2's 14 commits. portal_root.scss
+// drops its duplicate declarations in the same commit. The
+// design doc (CUSTOMER_TO_MANUFACTURING_FLOW.md §5.1) is
+// amended to reflect these canonical values.
 // ---------------------------------------------------------------------
 :root {
-  // Core 4 — Sky / Walnut / Linen / Ink
-  --sb-sky:        #5a83a8;
+  // Core 4 — Sky / Walnut / Linen / Ink (portal-authoritative)
+  --sb-sky:        #2b4f6b;
   --sb-sky-l:      #d8e3ec;
-  --sb-sky-d:      #2b4f6b;
 
-  --sb-walnut:     #4a3c2e;
-  --sb-walnut-l:   #6b5b48;
-  --sb-walnut-d:   #382c20;
+  --sb-walnut:     #6b3f2a;
+  --sb-walnut-d:   #4a2b1d;
+  --sb-walnut-l:   #c89e85;
 
-  --sb-linen:      #f5efe6;
-  --sb-linen-l:    #fbf7ef;
-  --sb-paper:      #f5f4ee;
+  --sb-linen:      #f4ede2;
+  --sb-paper:      #fbf7ef;
 
-  --sb-ink:        #1a1815;
-  --sb-rule:       #d8d2c4;
+  --sb-ink:        #1a1814;
+  --sb-ink-dim:    #6b665e;
+  --sb-rule:       #d8cfbf;
+  --sb-rule-d:     #b5a890;
 
-  // Semantic
-  --sb-ok:         #2f8a4f;
-  --sb-warn:       #c8881e;
-  --sb-alert:      #b54b3b;
-  --sb-hl:         #f3d98c;   // selection amber (T2C9 highlight)
+  // Semantic (portal-authoritative)
+  --sb-ok:         #4a6f3e;
+  --sb-warn:       #b35a1a;
+  --sb-alert:      #a83a2b;
+  --sb-hl:         #f9e9b9;   // selection amber (T2C9 highlight)
 
   // ---------------------------------------------------------------
   // 2 · Typography
