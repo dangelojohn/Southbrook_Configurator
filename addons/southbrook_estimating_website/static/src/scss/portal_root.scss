@@ -1253,8 +1253,17 @@
 }
 
 // ----- OWL OrderBuilder root (T2C2 commit's component) ------------
+//
+// 2026-06-01: removed the 640px cap. The mount container
+// (.o_southbrook_owl_mount) is typically ~690px wide on portal pages;
+// the 640px cap forced inner grid columns + the titlebar heading to
+// wrap text ("Demo Tradesperson (Tier 3)" split across two lines,
+// dollar values clipped to "$3,27" / "5"). Letting the frame fill
+// its parent gives the inner content the full ~634px of usable
+// width after the 28px×2 padding.
 .o_southbrook_owl_root {
-    max-width: 640px;
+    width: 100%;
+    max-width: 100%;
     margin: 0 auto;
     padding: 32px 28px;
     background: var(--sb-linen);
