@@ -1,4 +1,6 @@
 /** @odoo-module **/
+// Bundle hash bump 2026-06-01T07:20Z — forces b35cf24 → new hash so
+// any browser holding a cached old bundle URL refetches the fixed code.
 /*
  * SPDX-License-Identifier: LGPL-3.0-only
  *
@@ -1250,11 +1252,20 @@ const TEMPLATE = xml`
                  be preceded by a t-if or t-elif directive' when a
                  sibling sits in the middle. See bug 2026-06-01.)
                  Visibility is driven by state.ui.catalog_open. -->
+            <!-- onClose.bind / onPick.bind: OWL passes method props as
+                 plain function references; without the `.bind` suffix
+                 they execute with this === undefined inside the parent
+                 handler, and this.state.* throws TypeError on the
+                 first access. Matches the existing pattern used by
+                 FooterActions (onAction.bind), TabBar (onTabChange.bind),
+                 and KitchenViewport (onLineSelected.bind) in this
+                 same file. Bug found 2026-06-01 by user devtools
+                 inspection. -->
             <CatalogPicker catalog="state.catalog"
                            open="state.ui.catalog_open"
                            busy="state.catalog_busy"
-                           onClose="_closeCatalog"
-                           onPick="_onPickCabinet"/>
+                           onClose.bind="_closeCatalog"
+                           onPick.bind="_onPickCabinet"/>
 
             <!-- Chrome (T2C7) — banner + titlebar + stages. -->
             <IllustrativeBanner show="true"/>
@@ -1304,14 +1315,20 @@ const TEMPLATE = xml`
                             on this order
                         </span>
                     </div>
+                    <!-- .bind on the method props for the same reason
+                         CatalogPicker needs it: OWL doesn't auto-bind
+                         this for function-typed props, so without .bind
+                         _setSelectedLine() and _onLineSaved() crash
+                         with TypeError on this.state.* access. Bug
+                         pattern caught 2026-06-01 by user devtools. -->
                     <ZoneGroup t-foreach="state.zones"
                                t-as="zone"
                                t-key="zone.code"
                                zone="zone"
                                lines="_linesForZone(zone.code)"
                                selectedLineId="state.ui.selected_line_id"
-                               onSelectLine="_setSelectedLine"
-                               onLineSaved="_onLineSaved"/>
+                               onSelectLine.bind="_setSelectedLine"
+                               onLineSaved.bind="_onLineSaved"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
