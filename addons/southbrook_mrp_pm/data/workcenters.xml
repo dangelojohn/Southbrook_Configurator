@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M8 (Manufacturing PM JTBD 2026-06-01) — seed 8 Southbrook work
+  centers in mrp.workcenter.
+
+  Per the gap analysis, the Manufacturing PM currently sees zero
+  workcenter records (mrp.workcenter table empty), which blocks
+  every downstream PM screen: no floor load (M1), no KPI panel
+  (M10), no routing target (M6), no Send-to-Production
+  destination (M3). Seeding these 8 stations unblocks the entire
+  Layer 1 → Layer 2 sequence.
+
+  Each station carries:
+    name             human label shown in the dropdown
+    code             stable identifier (SB-* prefix matches the
+                     SB-* cabinet SKU pattern in southbrook_estimating)
+    oee_target       85.0 across the board — the JTBD's
+                     recommendation. Tuning per-station is a Phase-2
+                     polish task once real run data lands.
+    time_efficiency  100.0 (target = expected; no fudge factor yet)
+
+  Note on calendar + cost: deliberately omitted from this seed.
+  resource_calendar_id has a sensible Odoo default (8/5 from
+  base.resource_calendar_std), and costs_hour requires a real
+  hourly rate that Operations sets per local labour cost — left
+  empty here rather than guessing.
+
+  Cycle times per cabinet × station are stored on
+  mrp.routing.workcenter records (Layer 1 commit 2 — M6/M9), not
+  here. This file is the station catalogue; routings reference it.
+-->
+<odoo>
+  <data noupdate="0">
+
+    <record id="workcenter_saw" model="mrp.workcenter">
+      <field name="name">Panel Saw / CNC Nesting</field>
+      <field name="code">SB-SAW</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+    <record id="workcenter_edge" model="mrp.workcenter">
+      <field name="name">Edge Bander</field>
+      <field name="code">SB-EDGE</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+    <record id="workcenter_cnc_bore" model="mrp.workcenter">
+      <field name="name">CNC Boring</field>
+      <field name="code">SB-CNC-BORE</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+    <record id="workcenter_assy" model="mrp.workcenter">
+      <field name="name">Carcass Assembly</field>
+      <field name="code">SB-ASSY</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+    <record id="workcenter_door" model="mrp.workcenter">
+      <field name="name">Door Hanging</field>
+      <field name="code">SB-DOOR</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+    <record id="workcenter_hw" model="mrp.workcenter">
+      <field name="name">Hardware Fitting</field>
+      <field name="code">SB-HW</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+    <record id="workcenter_qc" model="mrp.workcenter">
+      <field name="name">Quality Control</field>
+      <field name="code">SB-QC</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+    <record id="workcenter_pack" model="mrp.workcenter">
+      <field name="name">Pack &amp; Label</field>
+      <field name="code">SB-PACK</field>
+      <field name="oee_target">85.0</field>
+      <field name="time_efficiency">100.0</field>
+    </record>
+
+  </data>
+</odoo>

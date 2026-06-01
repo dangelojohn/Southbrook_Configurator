@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M6 + M9 (Manufacturing PM JTBD 2026-06-01) — canonical BoM +
+  8-station routing for SB-BASE-1DR.
+
+  Pre-fix: mrp.routing.workcenter table empty for every SB-* SKU.
+  Send-to-Production would create an MO with no work orders, so
+  there's nothing for the Floor Manager to scan/start/finish, no
+  cycle-time benchmark, no station load.
+
+  This file seeds:
+
+    1. A canonical, identifiable BoM for SB-BASE-1DR
+       (xml_id southbrook_mrp_pm.bom_base_1dr) so the Send-to-
+       Production action (Layer 1 commit 3 — M3) can find a stable
+       target. SB-BASE-1DR already has 4 empty cruft BoMs from
+       earlier demo runs; sequence=0 here so Odoo prefers ours.
+
+    2. 8 mrp.routing.workcenter rows = the 8-station sequence per
+       the JTBD analysis. Cycle times from the recommended target
+       state diagram:
+
+          1. Cut Panel       SB-SAW       12 min
+          2. Edge Band       SB-EDGE       8 min
+          3. CNC Bore        SB-CNC-BORE   6 min
+          4. Assemble        SB-ASSY      25 min
+          5. Hang Door       SB-DOOR      10 min
+          6. Fit Hardware    SB-HW         8 min
+          7. QC Inspect      SB-QC         5 min
+          8. Pack & Label    SB-PACK       4 min
+
+       Total expected production time: 78 minutes.
+
+  Phase 2 polish (out of scope for this commit):
+
+    - The other 11 SB-* cabinets need parallel routings. Skeleton
+      identical, cycle times differ per cabinet complexity.
+    - Per-attribute cycle adjustments (e.g. Maple box +20% on
+      SB-EDGE, Custom finish +30% on SB-QC).
+    - Resource calendars per work center, capacity constraints
+      for parallel-run scheduling.
+-->
+<odoo>
+  <data noupdate="0">
+
+    <!-- ============================================================
+         Canonical BoM for SB-BASE-1DR. Sequence=0 wins the tie-
+         break against the 4 cruft BoMs (sequence=1 each). When
+         Send-to-Production looks up a BoM for the variant, ours
+         is picked first.
+         ============================================================ -->
+    <record id="bom_base_1dr" model="mrp.bom">
+      <field name="product_tmpl_id"
+             ref="southbrook_estimating.base_1dr"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-BASE-1DR Canonical</field>
+    </record>
+
+    <!-- ============================================================
+         8 routing operations, in production sequence order.
+         time_cycle_manual = expected minutes per unit.
+         sequence enforces the linear order in Floor Manager views.
+         ============================================================ -->
+
+    <record id="route_base_1dr_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">Cut Panels</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">10</field>
+    </record>
+
+    <record id="route_base_1dr_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">8.0</field>
+      <field name="sequence">20</field>
+    </record>
+
+    <record id="route_base_1dr_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">30</field>
+    </record>
+
+    <record id="route_base_1dr_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">25.0</field>
+      <field name="sequence">40</field>
+    </record>
+
+    <record id="route_base_1dr_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">Hang Door + Adjust Hinges</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">10.0</field>
+      <field name="sequence">50</field>
+    </record>
+
+    <record id="route_base_1dr_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">Fit Hardware (Handles + Slides)</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">8.0</field>
+      <field name="sequence">60</field>
+    </record>
+
+    <record id="route_base_1dr_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">5.0</field>
+      <field name="sequence">70</field>
+    </record>
+
+    <record id="route_base_1dr_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_1dr"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">4.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+  </data>
+</odoo>

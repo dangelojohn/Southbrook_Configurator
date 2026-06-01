@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+{
+    "name": "Southbrook Manufacturing PM",
+    "summary": (
+        "Manufacturing PM toolkit: work centers + routing templates "
+        "for the 12 Q8 cabinets, Send-to-Production wiring, PM "
+        "dashboard, KPI surface, Floor Manager portal."
+    ),
+    "description": """
+Southbrook Manufacturing PM
+===========================
+
+Bridges the customer-facing Order Builder (southbrook_estimating +
+southbrook_estimating_website) into Odoo's mrp + maintenance stack
+so a Manufacturing PM (Marcus Chen persona) can convert confirmed
+orders into manufacturing orders + work orders with real cycle
+times, monitor floor load + equipment condition, and hand off to
+Floor Managers.
+
+Closes M1-M20 from the 2026-06-01 Manufacturing PM JTBD gap
+analysis. Layered build:
+
+  Layer 1 — Foundation (this addon's data + plumbing)
+      M8  8 mrp.workcenter records for Southbrook stations
+      M6  Standard routing template per cabinet family
+      M9  Cycle-time defaults per (cabinet × station)
+      M3  Send-to-Production action wired to mrp.production create
+      M7  Order Builder → Work Order generation per line
+
+  Layer 2 — PM surface (follow-up commits)
+      M4  Ready-for-Production queue (Confirmed MOs by deadline)
+      M1  PM dashboard (queue + load + alerts + late)
+      M10 Cross-station KPI panel
+      M19 Lead-time-extra surfaced on Order Builder
+
+  Layer 3 — Floor Manager + edges (follow-up commits)
+      M13 maintenance.equipment.condition selection field
+      M14 Equipment → MO impact chain
+      M16 Floor Manager portal route + tablet layout
+      M17 Floor Manager access group
+      M20 ECO → in-flight MO notification rule
+""",
+    "version": "19.0.1.0.0",
+    "license": "LGPL-3",
+    "author": "Southbrook Cabinetry",
+    "website": "https://southbrookcabinetry.space",
+    "category": "Manufacturing/PM",
+    "depends": [
+        "southbrook_estimating",         # the 12 cabinet templates + BoMs
+        "southbrook_estimating_website", # the Order Builder action endpoint
+        "mrp",                           # workcenter + production + routing
+        "maintenance",                   # equipment + condition
+    ],
+    "data": [
+        # Layer 1 commit 1 — 8 Southbrook stations as mrp.workcenter.
+        "data/workcenters.xml",
+        # Layer 1 commit 2 — canonical BoM + 8-station routing for
+        # SB-BASE-1DR. Other 11 SKUs follow the same skeleton in a
+        # later commit (per-cabinet cycle times differ).
+        "data/routing_base_1dr.xml",
+    ],
+    "installable": True,
+    "application": False,
+    "auto_install": False,
+}
