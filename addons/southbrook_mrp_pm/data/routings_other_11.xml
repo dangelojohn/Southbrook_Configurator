@@ -1,0 +1,718 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Closes the Layer 1 debt — canonical BoMs + 8-station routings
+  for the 11 SB-* cabinets that the SB-BASE-1DR baseline didn't
+  cover. Before this commit, Send-to-Production returned
+  {error: 'no_bom_lines'} for any order whose only cabinet was
+  not SB-BASE-1DR.
+
+  Cycle-time methodology:
+
+  Times scale from SB-BASE-1DR (12+8+6+25+10+8+5+4=78 min) by a
+  complexity multiplier per cabinet. Per-station numbers are
+  rounded so floor managers see clean integer minutes:
+
+     Cabinet           Mult  Total min  Notes
+     SB-WALL-1DR       0.75      60     small, single door
+     SB-WALL-2DR       0.85      66     small, two doors
+     SB-BASE-2DR       1.15      91     larger, two doors
+     SB-DRAWER         —         98     no Hang Door step
+     SB-SINK-BASE      1.15      91     sink cutout
+     SB-TALL-PANTRY    1.50     118     large carcass
+     SB-TALL-OVEN      1.50     118     appliance cutout
+     SB-CORNER         1.60     125     bi-fold + corner geometry
+     SB-VANITY         1.10      87     shallower depth than base
+     SB-ACCESSORY      —          9     Cut/Edge/QC/Pack only
+                                         (end panels, fillers,
+                                          cornice — no carcass/door/HW)
+     SB-WORKTOP        —         33     Cut/Edge/QC/Pack only
+                                         (flat slab — no carcass)
+
+  These are Phase-1 baselines. The PM tunes per actual run data
+  once the work-order start/stop scanning lands in Layer 3.
+
+  BoM sequence=0 on every record so the canonical BoM wins the
+  tie-break against any cruft BoMs hanging around from earlier
+  demo runs (same pattern as bom_base_1dr in routing_base_1dr.xml).
+-->
+<odoo>
+  <data noupdate="0">
+
+    <!-- ============================================================
+         SB-WALL-1DR — Wall 1-Door (0.75x, 60 min)
+         ============================================================ -->
+    <record id="bom_wall_1dr" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.wall_1dr"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-WALL-1DR Canonical</field>
+    </record>
+    <record id="route_wall_1dr_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">Cut Panels</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_wall_1dr_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_wall_1dr_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">5.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_wall_1dr_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">19.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_wall_1dr_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">Hang Door</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">8.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_wall_1dr_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">Fit Hardware</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_wall_1dr_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">4.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_wall_1dr_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_1dr"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">3.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-WALL-2DR — Wall 2-Door (0.85x, 66 min)
+         ============================================================ -->
+    <record id="bom_wall_2dr" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.wall_2dr"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-WALL-2DR Canonical</field>
+    </record>
+    <record id="route_wall_2dr_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">Cut Panels</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">10.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_wall_2dr_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">7.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_wall_2dr_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">5.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_wall_2dr_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">21.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_wall_2dr_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">Hang Doors (2)</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_wall_2dr_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">Fit Hardware</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">7.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_wall_2dr_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">4.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_wall_2dr_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_wall_2dr"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">3.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-BASE-2DR — Base 2-Door (1.15x, 91 min)
+         ============================================================ -->
+    <record id="bom_base_2dr" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.base_2dr"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-BASE-2DR Canonical</field>
+    </record>
+    <record id="route_base_2dr_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">Cut Panels</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">14.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_base_2dr_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_base_2dr_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">7.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_base_2dr_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">29.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_base_2dr_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">Hang Doors (2)</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_base_2dr_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">Fit Hardware</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_base_2dr_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_base_2dr_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_base_2dr"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">5.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-DRAWER — Drawer Bank (no Hang Door step, 98 min)
+         ============================================================ -->
+    <record id="bom_drawer" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.drawer_bank"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-DRAWER Canonical</field>
+    </record>
+    <record id="route_drawer_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_drawer"/>
+      <field name="name">Cut Panels + Drawer Boxes</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">17.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_drawer_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_drawer"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">11.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_drawer_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_drawer"/>
+      <field name="name">CNC Bore Slide Mounts</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">8.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_drawer_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_drawer"/>
+      <field name="name">Assemble Carcass + Drawer Boxes</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">35.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_drawer_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_drawer"/>
+      <field name="name">Fit Slides + Drawer Fronts</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">14.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_drawer_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_drawer"/>
+      <field name="name">QC Inspect (Slide Travel + Alignment)</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">7.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_drawer_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_drawer"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-SINK-BASE — Sink Base (1.15x, 91 min)
+         ============================================================ -->
+    <record id="bom_sink_base" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.sink_base"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-SINK-BASE Canonical</field>
+    </record>
+    <record id="route_sink_base_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">Cut Panels + Sink Cutout</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">14.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_sink_base_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_sink_base_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">7.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_sink_base_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">29.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_sink_base_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">Hang Doors (2)</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_sink_base_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">Fit Hardware</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_sink_base_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_sink_base_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_sink_base"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">5.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-TALL-PANTRY — Tall Pantry (1.5x, 118 min)
+         ============================================================ -->
+    <record id="bom_tall_pantry" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.tall_pantry"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-TALL-PANTRY Canonical</field>
+    </record>
+    <record id="route_tall_pantry_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">Cut Panels</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">18.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_tall_pantry_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_tall_pantry_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_tall_pantry_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">38.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_tall_pantry_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">Hang Doors</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">15.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_tall_pantry_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">Fit Hardware</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_tall_pantry_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">8.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_tall_pantry_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_pantry"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-TALL-OVEN — Tall Oven Housing (1.5x, 118 min)
+         ============================================================ -->
+    <record id="bom_tall_oven" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.tall_oven"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-TALL-OVEN Canonical</field>
+    </record>
+    <record id="route_tall_oven_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">Cut Panels + Appliance Cutout</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">18.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_tall_oven_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_tall_oven_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_tall_oven_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">38.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_tall_oven_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">Hang Doors</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">15.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_tall_oven_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">Fit Hardware</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_tall_oven_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">8.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_tall_oven_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_tall_oven"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-CORNER — Corner Cabinet (1.6x, 125 min)
+         ============================================================ -->
+    <record id="bom_corner" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.corner"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-CORNER Canonical</field>
+    </record>
+    <record id="route_corner_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">Cut Panels (Corner Geometry)</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">19.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_corner_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">13.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_corner_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">10.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_corner_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">Assemble Corner Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">40.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_corner_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">Hang Bi-fold Doors</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">16.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_corner_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">Fit Hardware (Lazy Susan)</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">13.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_corner_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">8.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_corner_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_corner"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-VANITY — Vanity (1.1x, 87 min)
+         ============================================================ -->
+    <record id="bom_vanity" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.vanity"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-VANITY Canonical</field>
+    </record>
+    <record id="route_vanity_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">Cut Panels</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">13.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_vanity_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">Edge Band Panels</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_vanity_bore" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">CNC Bore Holes</field>
+      <field name="workcenter_id" ref="workcenter_cnc_bore"/>
+      <field name="time_cycle_manual">7.0</field>
+      <field name="sequence">30</field>
+    </record>
+    <record id="route_vanity_assy" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">Assemble Carcass</field>
+      <field name="workcenter_id" ref="workcenter_assy"/>
+      <field name="time_cycle_manual">28.0</field>
+      <field name="sequence">40</field>
+    </record>
+    <record id="route_vanity_door" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">Hang Doors</field>
+      <field name="workcenter_id" ref="workcenter_door"/>
+      <field name="time_cycle_manual">11.0</field>
+      <field name="sequence">50</field>
+    </record>
+    <record id="route_vanity_hw" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">Fit Hardware</field>
+      <field name="workcenter_id" ref="workcenter_hw"/>
+      <field name="time_cycle_manual">9.0</field>
+      <field name="sequence">60</field>
+    </record>
+    <record id="route_vanity_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">6.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_vanity_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_vanity"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">4.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-ACCESSORY — End panels / fillers / cornice (9 min)
+         No carcass, no door, no hardware-fitting step.
+         ============================================================ -->
+    <record id="bom_accessory" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.accessory"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-ACCESSORY Canonical</field>
+    </record>
+    <record id="route_accessory_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_accessory"/>
+      <field name="name">Cut to Size</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">4.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_accessory_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_accessory"/>
+      <field name="name">Edge Band Exposed Edges</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">2.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_accessory_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_accessory"/>
+      <field name="name">QC Inspect</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">2.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_accessory_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_accessory"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">1.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <!-- ============================================================
+         SB-WORKTOP — Flat slab (33 min)
+         No carcass, no door, no hardware. Heavier Cut + Edge stages.
+         ============================================================ -->
+    <record id="bom_worktop" model="mrp.bom">
+      <field name="product_tmpl_id" ref="southbrook_estimating.worktop"/>
+      <field name="product_qty">1.0</field>
+      <field name="type">normal</field>
+      <field name="sequence">0</field>
+      <field name="code">SB-WORKTOP Canonical</field>
+    </record>
+    <record id="route_worktop_cut" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_worktop"/>
+      <field name="name">Cut to Length</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
+      <field name="time_cycle_manual">15.0</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="route_worktop_edge" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_worktop"/>
+      <field name="name">Edge Band Long Edges</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
+      <field name="time_cycle_manual">12.0</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="route_worktop_qc" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_worktop"/>
+      <field name="name">QC Inspect (Surface + Edges)</field>
+      <field name="workcenter_id" ref="workcenter_qc"/>
+      <field name="time_cycle_manual">3.0</field>
+      <field name="sequence">70</field>
+    </record>
+    <record id="route_worktop_pack" model="mrp.routing.workcenter">
+      <field name="bom_id" ref="bom_worktop"/>
+      <field name="name">Pack &amp; Label</field>
+      <field name="workcenter_id" ref="workcenter_pack"/>
+      <field name="time_cycle_manual">3.0</field>
+      <field name="sequence">80</field>
+    </record>
+
+  </data>
+</odoo>

@@ -58,6 +58,10 @@ analysis. Layered build:
         # SB-BASE-1DR. Other 11 SKUs follow the same skeleton in a
         # later commit (per-cabinet cycle times differ).
         "data/routing_base_1dr.xml",
+        # 11 remaining SB-* cabinets backfilled — closes the
+        # 'no_bom_lines' debt where Send-to-Production skipped
+        # every non-SB-BASE-1DR line.
+        "data/routings_other_11.xml",
         # 2026-06-01 user CSV import — full cabinet shop catalogue.
         # 10 extended work centers (CNC, EB, DOOR, SAND, PAINT,
         # CURE, ASM, HW, QC, PACK) coexist with the 8 SB-* records.
