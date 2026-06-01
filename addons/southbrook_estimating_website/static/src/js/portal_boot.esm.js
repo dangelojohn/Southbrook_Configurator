@@ -1252,18 +1252,17 @@ const TEMPLATE = xml`
                  be preceded by a t-if or t-elif directive' when a
                  sibling sits in the middle. See bug 2026-06-01.)
                  Visibility is driven by state.ui.catalog_open. -->
-            <!-- Method props wrapped in arrow functions to capture
-                 'this'. The OWL .bind directive (onX.bind="_method")
-                 emits xml(...).bind(component) at template-compile
-                 time in this Odoo's OWL version, which fails at
-                 module load with "xml(...).bind is not a function".
-                 Arrow wrappers are the safer idiom — same effect,
-                 no compiler directive needed. -->
+            <!-- Method props are pre-bound to 'this' in setup() so
+                 they can be passed by plain reference without losing
+                 context. Neither OWL's .bind directive nor arrow
+                 wrappers carry 'this' correctly in this Odoo's OWL
+                 version (verified by user devtools 2026-06-01).
+                 setup() bind is the working pattern. -->
             <CatalogPicker catalog="state.catalog"
                            open="state.ui.catalog_open"
                            busy="state.catalog_busy"
-                           onClose="() => _closeCatalog()"
-                           onPick="(id) => _onPickCabinet(id)"/>
+                           onClose="_closeCatalog"
+                           onPick="_onPickCabinet"/>
 
             <!-- Chrome (T2C7) — banner + titlebar + stages. -->
             <IllustrativeBanner show="true"/>
@@ -1313,17 +1312,17 @@ const TEMPLATE = xml`
                             on this order
                         </span>
                     </div>
-                    <!-- Arrow-function wrappers (see CatalogPicker
-                         note above) — the OWL .bind directive
-                         miscompiles in this version. -->
+                    <!-- onSelectLine / onLineSaved are pre-bound in
+                         setup() so plain-reference props carry 'this'
+                         correctly. -->
                     <ZoneGroup t-foreach="state.zones"
                                t-as="zone"
                                t-key="zone.code"
                                zone="zone"
                                lines="_linesForZone(zone.code)"
                                selectedLineId="state.ui.selected_line_id"
-                               onSelectLine="(id) => _setSelectedLine(id)"
-                               onLineSaved="() => _onLineSaved()"/>
+                               onSelectLine="_setSelectedLine"
+                               onLineSaved="_onLineSaved"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
@@ -1444,6 +1443,21 @@ class OrderBuilder extends Component {
                 catalog_open: false,
             },
         });
+        // Pre-bind handler methods to this. OWL's template compiler
+        // doesn't preserve 'this' when methods are referenced as
+        // props or via arrow wrappers in this Odoo version — the
+        // first this.state.* access inside the handler then throws
+        // 'Cannot read properties of undefined (reading state)'.
+        // Binding here makes the bound functions safe to pass as
+        // plain props without losing context. Verified safe pattern
+        // by user devtools 2026-06-01 (3 prior fix attempts —
+        // .bind directive miscompiled, arrow wrappers didn't carry
+        // this — both failed).
+        this._closeCatalog = this._closeCatalog.bind(this);
+        this._onPickCabinet = this._onPickCabinet.bind(this);
+        this._setSelectedLine = this._setSelectedLine.bind(this);
+        this._onLineSaved = this._onLineSaved.bind(this);
+
         onMounted(() => {
             this._loadOrder();
             this._loadCatalog();
