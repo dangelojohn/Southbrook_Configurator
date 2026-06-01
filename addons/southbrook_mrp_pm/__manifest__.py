@@ -72,6 +72,9 @@ analysis. Layered build:
         # with Ready Queue / In Production / Late / Floor Load /
         # Equipment actions.
         "views/pm_menus.xml",
+        # Layer 2 commit 2 — M13 — equipment condition field
+        # surfaced on the maintenance.equipment form + list views.
+        "views/equipment_views.xml",
     ],
     "installable": True,
     "application": False,

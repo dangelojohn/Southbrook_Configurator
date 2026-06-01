@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M13 (Manufacturing PM JTBD 2026-06-01) — surface the new
+  southbrook_condition field on maintenance.equipment.
+
+  Two extensions:
+
+    1. Form view inherit — add a 'Condition' panel near the top
+       of the equipment form with the new fields. Shows the
+       audit metadata (who / when) read-only beside the editable
+       fields.
+
+    2. List view inherit — add a coloured Condition column so
+       the maintenance.equipment list view (and the PM
+       'Equipment' menu action wired in pm_menus.xml) tells the
+       at-a-glance story without opening each record.
+-->
+<odoo>
+  <data>
+
+    <record id="view_equipment_form_southbrook_condition"
+            model="ir.ui.view">
+      <field name="name">maintenance.equipment.form.southbrook.condition</field>
+      <field name="model">maintenance.equipment</field>
+      <field name="inherit_id" ref="maintenance.hr_equipment_view_form"/>
+      <field name="arch" type="xml">
+        <!--
+          Anchor: insert a Condition panel right after the form's
+          header (or sheet h1). We use the highest-level XPath
+          that's stable across Odoo 19 maintenance form versions.
+        -->
+        <xpath expr="//sheet" position="inside">
+          <group string="Condition (Southbrook PM)"
+                 name="southbrook_condition">
+            <group>
+              <field name="southbrook_condition" widget="badge"
+                     decoration-success="southbrook_condition == 'good'"
+                     decoration-info="southbrook_condition == 'fair'"
+                     decoration-warning="southbrook_condition == 'watch'"
+                     decoration-danger="southbrook_condition in ('critical','offline')"/>
+              <field name="southbrook_condition_note"
+                     placeholder="Brief note — e.g. 'hot-melt blocked'"/>
+            </group>
+            <group>
+              <field name="southbrook_condition_last_updated"/>
+              <field name="southbrook_condition_updated_by"/>
+            </group>
+          </group>
+        </xpath>
+      </field>
+    </record>
+
+    <record id="view_equipment_list_southbrook_condition"
+            model="ir.ui.view">
+      <field name="name">maintenance.equipment.list.southbrook.condition</field>
+      <field name="model">maintenance.equipment</field>
+      <field name="inherit_id" ref="maintenance.hr_equipment_view_tree"/>
+      <field name="arch" type="xml">
+        <!--
+          Add the Condition column at the end. decoration-* turns
+          the row red/orange/green depending on state, so the PM's
+          Equipment list reads like a status board.
+        -->
+        <xpath expr="//list" position="attributes">
+          <attribute name="decoration-success">southbrook_condition == 'good'</attribute>
+          <attribute name="decoration-info">southbrook_condition == 'fair'</attribute>
+          <attribute name="decoration-warning">southbrook_condition == 'watch'</attribute>
+          <attribute name="decoration-danger">southbrook_condition in ('critical','offline')</attribute>
+        </xpath>
+        <xpath expr="//list/field[@name='name']" position="after">
+          <field name="southbrook_condition"/>
+        </xpath>
+      </field>
+    </record>
+
+  </data>
+</odoo>

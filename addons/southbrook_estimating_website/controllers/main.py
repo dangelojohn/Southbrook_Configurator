@@ -1292,12 +1292,39 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             if z in zone_buckets
         ]
 
-        # Lead-time rollup: sum the line lead-time extras (NF11) on top
-        # of the base BoM produce_delay. Phase 3 polish: read from
-        # mrp.bom.effective_produce_delay once BoMs are auto-materialised
-        # per configured variant. For now expose a placeholder of 0 so
-        # the OWL store has a stable key to read.
-        lead_time_days = 0
+        # M19 (Manufacturing PM JTBD 2026-06-01) — lead-time rollup.
+        # Base 14 days (2-week shop default for any in-flight order)
+        # plus the MAX southbrook_lead_time_extra across order lines
+        # (lines run in parallel, so total order time is governed by
+        # the slowest cabinet — typically the Maple-box +14 day add).
+        # Reading southbrook_lead_time_extra from the line's BoM if
+        # one exists; orders with no BoM-resolved lines fall back to
+        # the base 14.
+        Bom = request.env["mrp.bom"].sudo()
+        lead_time_days = 14
+        max_extra = 0
+        for line in order.order_line:
+            if not line.product_id:
+                continue
+            bom = Bom.search(
+                [
+                    "|",
+                    ("product_id", "=", line.product_id.id),
+                    "&",
+                    ("product_id", "=", False),
+                    (
+                        "product_tmpl_id",
+                        "=",
+                        line.product_id.product_tmpl_id.id,
+                    ),
+                    ("type", "=", "normal"),
+                ],
+                order="sequence, id",
+                limit=1,
+            )
+            if bom and hasattr(bom, "southbrook_lead_time_extra"):
+                max_extra = max(max_extra, bom.southbrook_lead_time_extra or 0)
+        lead_time_days += int(max_extra)
 
         # T2C11 — BoM rollup across the order's SB cabinets. Computes
         # panel + hardware + edge-banding totals by calling Phase-1
