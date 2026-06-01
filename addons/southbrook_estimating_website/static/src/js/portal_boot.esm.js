@@ -253,9 +253,14 @@ class FooterActions extends Component {
                     Duplicate as Draft
                 </button>
 
-                <!-- Confirm vs Request a Price -->
+                <!-- Confirm vs Request a Price.
+                     Step 5 (2026-06-01): dealer mode now opens a
+                     confirmation modal before firing the irreversible
+                     action_confirm. Customer mode still single-clicks
+                     (the customer just asks for a price; nothing
+                     manufacturing-ish has happened yet). -->
                 <button class="o_owl_btn o_owl_btn_primary"
-                        t-on-click="() => props.onAction(_confirmAction())"
+                        t-on-click="_onConfirmClick"
                         t-att-disabled="props.busy or !_canConfirm()">
                     <t t-if="!_canConfirm()">
                         <t t-if="props.mode === 'customer'">
@@ -268,7 +273,7 @@ class FooterActions extends Component {
                     <t t-elif="props.mode === 'customer'">
                         Request a Price
                     </t>
-                    <t t-else="">Confirm Order</t>
+                    <t t-else="">Send to Production</t>
                 </button>
             </div>
             <div class="o_owl_footer_total">
@@ -288,6 +293,61 @@ class FooterActions extends Component {
                     </span>
                 </div>
             </div>
+
+            <!-- Step 5 (2026-06-01): Send-to-Production confirmation
+                 modal. Renders inline as an overlay; closed via
+                 state.confirming = false. Once PR #1 merges the PLM
+                 variant-BoM snapshot fields, this modal will also
+                 show the cut spec + BoM versions per line. For now
+                 it shows what's already in the payload. -->
+            <div t-if="state.confirming" class="o_owl_modal_backdrop"
+                 t-on-click="_onCancelConfirm">
+                <div class="o_owl_modal"
+                     t-on-click="(ev) => ev.stopPropagation()">
+                    <header class="o_owl_modal_head">
+                        <h2 class="o_owl_modal_title">Send to Production?</h2>
+                        <p class="o_owl_modal_sub">
+                            This commits the order to manufacturing.
+                            Once sent, the panel cut list locks
+                            against the current cut spec. To change
+                            anything after this point, an Engineering
+                            Change Order (ECO) is required.
+                        </p>
+                    </header>
+                    <dl class="o_owl_modal_review">
+                        <dt>Order</dt>
+                        <dd t-esc="props.order.name"/>
+                        <dt>Customer</dt>
+                        <dd t-esc="props.order.partner_name"/>
+                        <dt>Channel</dt>
+                        <dd>
+                            <span t-att-class="'o_owl_channel_badge o_owl_channel_'
+                                               + props.order.channel_css"
+                                  t-esc="props.order.channel_label"/>
+                        </dd>
+                        <dt>Lines</dt>
+                        <dd><t t-esc="props.order.line_count"/> cabinets</dd>
+                        <dt>Retail</dt>
+                        <dd class="mono"
+                            t-esc="fmtUsd(props.order.retail_subtotal)"/>
+                        <dt>Channel total</dt>
+                        <dd class="mono o_owl_modal_grand"
+                            t-esc="fmtUsd(props.order.channel_total)"/>
+                    </dl>
+                    <footer class="o_owl_modal_foot">
+                        <button class="o_owl_btn o_owl_btn_secondary"
+                                t-on-click="_onCancelConfirm"
+                                t-att-disabled="props.busy">
+                            Cancel
+                        </button>
+                        <button class="o_owl_btn o_owl_btn_primary"
+                                t-on-click="_onApproveConfirm"
+                                t-att-disabled="props.busy">
+                            Send to Production
+                        </button>
+                    </footer>
+                </div>
+            </div>
         </div>
     `;
     static props = {
@@ -297,6 +357,16 @@ class FooterActions extends Component {
         mode: { type: String, optional: true },
     };
 
+    setup() {
+        this.state = useState({
+            // Step 5 — Send-to-Production confirmation modal.
+            // Toggled true when dealer clicks the primary action;
+            // toggled false on Cancel, on Confirm-Send, or on
+            // backdrop click. Customer mode never opens this modal.
+            confirming: false,
+        });
+    }
+
     fmtUsd = fmtUsd;
 
     _canConfirm() {
@@ -304,15 +374,31 @@ class FooterActions extends Component {
         return s === "draft" || s === "sent";
     }
 
-    /**
-     * T2C13 — the confirm button dispatches to "request_price" in
-     * customer mode (Phase 3 wires a salesperson-approval workflow
-     * behind that code; today the backend treats it the same as
-     * "confirm"). Dealer mode keeps "confirm".
-     */
     _confirmAction() {
         return this.props.mode === "customer" ? "request_price" : "confirm";
     }
+
+    /** Dealer click → open modal. Customer click → fire immediately. */
+    _onConfirmClick = () => {
+        if (!this._canConfirm()) return;
+        if (this.props.mode === "customer") {
+            // Customer Request-a-Price is a soft commit — no
+            // manufacturing-irreversible action. Send directly.
+            this.props.onAction(this._confirmAction());
+            return;
+        }
+        // Dealer Send-to-Production → confirm first.
+        this.state.confirming = true;
+    };
+
+    _onCancelConfirm = () => {
+        this.state.confirming = false;
+    };
+
+    _onApproveConfirm = () => {
+        this.state.confirming = false;
+        this.props.onAction(this._confirmAction());
+    };
 }
 
 // ----------------------------------------------------------------------
