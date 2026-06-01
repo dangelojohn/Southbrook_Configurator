@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Equipment seed — imported 2026-06-01 from import pack section 1.2.
+
+  4 maintenance.equipment.category records create the categories
+  the CSV referenced by name; 5 maintenance.equipment records carry
+  the actual machines, each linked back to its work center via the
+  workcenter xml_ids from data/workcenters_extended.xml.
+
+  Phase 2 will add maintenance.equipment.condition (M13 from the
+  PM JTBD), MTBF / MTTR fields populated from real run data, and
+  the equipment → MO impact chain (M14).
+-->
+<odoo>
+  <data noupdate="0">
+
+    <!-- Categories -->
+    <record id="eq_cat_cnc_router" model="maintenance.equipment.category">
+      <field name="name">CNC Router</field>
+    </record>
+    <record id="eq_cat_edge_bander" model="maintenance.equipment.category">
+      <field name="name">Edge Bander</field>
+    </record>
+    <record id="eq_cat_paint_booth" model="maintenance.equipment.category">
+      <field name="name">Paint Booth</field>
+    </record>
+    <record id="eq_cat_utility" model="maintenance.equipment.category">
+      <field name="name">Utility</field>
+    </record>
+
+    <!-- Equipment -->
+    <record id="eq_cnc_1" model="maintenance.equipment">
+      <field name="name">Biesse Rover K FT</field>
+      <field name="category_id" ref="eq_cat_cnc_router"/>
+      <field name="serial_no">CNC-001</field>
+    </record>
+
+    <record id="eq_cnc_2" model="maintenance.equipment">
+      <field name="name">ShopSabre IS510</field>
+      <field name="category_id" ref="eq_cat_cnc_router"/>
+      <field name="serial_no">CNC-002</field>
+    </record>
+
+    <record id="eq_edge_1" model="maintenance.equipment">
+      <field name="name">HOMAG Edge Bander</field>
+      <field name="category_id" ref="eq_cat_edge_bander"/>
+      <field name="serial_no">EB-001</field>
+    </record>
+
+    <record id="eq_paint_1" model="maintenance.equipment">
+      <field name="name">Spray Booth A</field>
+      <field name="category_id" ref="eq_cat_paint_booth"/>
+      <field name="serial_no">PB-001</field>
+    </record>
+
+    <record id="eq_compressor" model="maintenance.equipment">
+      <field name="name">Air Compressor</field>
+      <field name="category_id" ref="eq_cat_utility"/>
+      <field name="serial_no">AC-001</field>
+    </record>
+
+  </data>
+</odoo>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Workcenters_extended — imported 2026-06-01 from user CSV pack
+  section 1.1.
+
+  The pack lists 10 work centers (CNC, EB, DOOR, SAND, PAINT, CURE,
+  ASM, HW, QC, PACK). Six of those overlap by name/purpose with the
+  8 SB-* stations seeded in data/workcenters.xml:
+
+      CSV  →  Existing SB-*
+      CNC  →  SB-SAW         (Panel Saw / CNC Nesting)
+      EB   →  SB-EDGE
+      ASM  →  SB-ASSY
+      HW   →  SB-HW
+      QC   →  SB-QC
+      PACK →  SB-PACK
+
+  For those six, the costs_hour rate has been folded into the
+  existing SB-* records in workcenters.xml instead of creating
+  duplicates (mrp.workcenter.name has a unique constraint).
+
+  Four stations from the CSV have NO equivalent in the SB-* seed —
+  these get fresh records here:
+
+      DOOR  Door Shop      $55/hr   (separate from SB-DOOR which is
+                                     'Door Hanging' — DOOR Shop is
+                                     where doors are made, not hung)
+      SAND  Sanding Prep   $45/hr
+      PAINT Paint Booth    $95/hr   (highest rate; spray operation)
+      CURE  Cure/Dry Room  $40/hr
+
+  These extend the production flow with the paint shop pipeline
+  the SB-* baseline didn't cover.
+-->
+<odoo>
+  <data noupdate="0">
+
+    <record id="wc_door_shop" model="mrp.workcenter">
+      <field name="name">Door Shop</field>
+      <field name="code">DOOR-SHOP</field>
+      <field name="time_efficiency">100.0</field>
+      <field name="costs_hour">55</field>
+    </record>
+
+    <record id="wc_sand" model="mrp.workcenter">
+      <field name="name">Sanding Prep</field>
+      <field name="code">SAND</field>
+      <field name="time_efficiency">100.0</field>
+      <field name="costs_hour">45</field>
+    </record>
+
+    <record id="wc_paint" model="mrp.workcenter">
+      <field name="name">Paint Booth</field>
+      <field name="code">PAINT</field>
+      <field name="time_efficiency">100.0</field>
+      <field name="costs_hour">95</field>
+    </record>
+
+    <record id="wc_cure" model="mrp.workcenter">
+      <field name="name">Cure/Dry Room</field>
+      <field name="code">CURE</field>
+      <field name="time_efficiency">100.0</field>
+      <field name="costs_hour">40</field>
+    </record>
+
+  </data>
+</odoo>

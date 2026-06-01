@@ -58,6 +58,16 @@ analysis. Layered build:
         # SB-BASE-1DR. Other 11 SKUs follow the same skeleton in a
         # later commit (per-cabinet cycle times differ).
         "data/routing_base_1dr.xml",
+        # 2026-06-01 user CSV import — full cabinet shop catalogue.
+        # 10 extended work centers (CNC, EB, DOOR, SAND, PAINT,
+        # CURE, ASM, HW, QC, PACK) coexist with the 8 SB-* records.
+        "data/workcenters_extended.xml",
+        # 5 maintenance.equipment + 4 categories (CNC Router,
+        # Edge Bander, Paint Booth, Utility).
+        "data/equipment.xml",
+        # 15 product.product across 5 categories (Fasteners,
+        # Adhesives, Abrasives, Finishing, CNC Tools).
+        "data/products_mfg.xml",
     ],
     "installable": True,
     "application": False,

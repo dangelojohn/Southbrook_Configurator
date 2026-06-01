@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manufacturing products seed — imported 2026-06-01 from import
+  pack sections 1.3 + 1.4 + 1.5.
+
+  15 product.product records grouped into 5 product.category
+  buckets so Manufacturing / Inventory views file them cleanly:
+
+      Fasteners            5 products  (Confirmat, Dowel, Cam, Handle, Slide)
+      Adhesives            2 products  (EVA, PUR)
+      Abrasives            1 product   (120 grit sandpaper)
+      Finishing            3 products  (filter, paint, plus PUR also)
+      CNC Tools            4 products  (bits, drill block, collet)
+
+  list_price values come from the CSV where provided ($0.01-$0.12
+  on the fasteners); consumables + tools leave list_price unset
+  (per-purchase from supplier price lists, not retail).
+-->
+<odoo>
+  <data noupdate="0">
+
+    <!-- Categories -->
+    <record id="cat_fasteners" model="product.category">
+      <field name="name">Fasteners</field>
+    </record>
+    <record id="cat_adhesives" model="product.category">
+      <field name="name">Adhesives</field>
+    </record>
+    <record id="cat_abrasives" model="product.category">
+      <field name="name">Abrasives</field>
+    </record>
+    <record id="cat_finishing" model="product.category">
+      <field name="name">Finishing</field>
+    </record>
+    <record id="cat_cnc_tools" model="product.category">
+      <field name="name">CNC Tools</field>
+    </record>
+
+    <!-- Fasteners (1.3) -->
+    <record id="fast_confirmat_50" model="product.product">
+      <field name="name">Confirmat Screw 7x50</field>
+      <field name="categ_id" ref="cat_fasteners"/>
+      <field name="list_price">0.05</field>
+      <field name="type">consu</field>
+    </record>
+    <record id="fast_dowel_8mm" model="product.product">
+      <field name="name">8mm Wood Dowel</field>
+      <field name="categ_id" ref="cat_fasteners"/>
+      <field name="list_price">0.03</field>
+      <field name="type">consu</field>
+    </record>
+    <record id="fast_cam" model="product.product">
+      <field name="name">Minifix Cam Lock</field>
+      <field name="categ_id" ref="cat_fasteners"/>
+      <field name="list_price">0.12</field>
+      <field name="type">consu</field>
+    </record>
+    <record id="fast_handle_screw" model="product.product">
+      <field name="name">Handle Screw M4</field>
+      <field name="categ_id" ref="cat_fasteners"/>
+      <field name="list_price">0.02</field>
+      <field name="type">consu</field>
+    </record>
+    <record id="fast_slide_screw" model="product.product">
+      <field name="name">Drawer Slide Screw</field>
+      <field name="categ_id" ref="cat_fasteners"/>
+      <field name="list_price">0.01</field>
+      <field name="type">consu</field>
+    </record>
+
+    <!-- Consumables (1.4) -->
+    <record id="cons_eva" model="product.product">
+      <field name="name">EVA Glue Cartridge</field>
+      <field name="categ_id" ref="cat_adhesives"/>
+      <field name="type">consu</field>
+    </record>
+    <record id="cons_pur" model="product.product">
+      <field name="name">PUR Glue</field>
+      <field name="categ_id" ref="cat_adhesives"/>
+      <field name="type">consu</field>
+    </record>
+    <record id="cons_sand_120" model="product.product">
+      <field name="name">120 Grit Sandpaper</field>
+      <field name="categ_id" ref="cat_abrasives"/>
+      <field name="type">consu</field>
+    </record>
+    <record id="cons_spray_filter" model="product.product">
+      <field name="name">Spray Booth Filter</field>
+      <field name="categ_id" ref="cat_finishing"/>
+      <field name="type">consu</field>
+    </record>
+    <record id="cons_paint_white" model="product.product">
+      <field name="name">Cabinet Paint White</field>
+      <field name="categ_id" ref="cat_finishing"/>
+      <field name="type">consu</field>
+    </record>
+
+    <!-- CNC Tooling (1.5) -->
+    <record id="tool_bit_12" model="product.product">
+      <field name="name">1/2" Compression Bit</field>
+      <field name="categ_id" ref="cat_cnc_tools"/>
+      <field name="type">consu</field>
+    </record>
+    <record id="tool_bit_38" model="product.product">
+      <field name="name">3/8" Downcut Bit</field>
+      <field name="categ_id" ref="cat_cnc_tools"/>
+      <field name="type">consu</field>
+    </record>
+    <record id="tool_drill_block" model="product.product">
+      <field name="name">CNC Drill Block Tool</field>
+      <field name="categ_id" ref="cat_cnc_tools"/>
+      <field name="type">consu</field>
+    </record>
+    <record id="tool_collet" model="product.product">
+      <field name="name">ER32 Collet Set</field>
+      <field name="categ_id" ref="cat_cnc_tools"/>
+      <field name="type">consu</field>
+    </record>
+
+  </data>
+</odoo>
