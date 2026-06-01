@@ -1,0 +1,254 @@
+// =====================================================================
+// _southbrook_design_tokens.scss
+//
+// The shared Signature Series design register — single source of truth
+// for palette, typography, layout grid, and component vocabulary
+// across:
+//
+//   - southbrook_estimating         (backend: cabinet_viewport)
+//   - southbrook_estimating_website (frontend: portal Order Builder +
+//                                     customer SPA)
+//   - southbrook_plm                (backend: PLM Kanban + form)
+//
+// This file is loaded FIRST in every Southbrook asset bundle so the
+// custom properties and component classes are available to every
+// consuming SCSS file.
+//
+// See docs/CUSTOMER_TO_MANUFACTURING_FLOW.md §5 for the design
+// rationale + acceptance criteria. The token values track Signature
+// Series book aesthetics (Sky / Walnut / Linen / Ink) and the
+// Prodboard manifest §8.1 layout grid (58 / 394 / flex three-pane,
+// 296×94 catalog tiles, 80×80 thumbnails).
+//
+// Note: the leading underscore in the filename makes this a SCSS
+// "partial" — but Odoo's asset bundle treats all .scss files as
+// equal, so the underscore is informational. The partial-by-name
+// convention signals "do not link directly; this exists to be
+// loaded before other SCSS files."
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// 1 · Palette
+// ---------------------------------------------------------------------
+:root {
+  // Core 4 — Sky / Walnut / Linen / Ink
+  --sb-sky:        #5a83a8;
+  --sb-sky-l:      #d8e3ec;
+  --sb-sky-d:      #2b4f6b;
+
+  --sb-walnut:     #4a3c2e;
+  --sb-walnut-l:   #6b5b48;
+  --sb-walnut-d:   #382c20;
+
+  --sb-linen:      #f5efe6;
+  --sb-linen-l:    #fbf7ef;
+  --sb-paper:      #f5f4ee;
+
+  --sb-ink:        #1a1815;
+  --sb-rule:       #d8d2c4;
+
+  // Semantic
+  --sb-ok:         #2f8a4f;
+  --sb-warn:       #c8881e;
+  --sb-alert:      #b54b3b;
+  --sb-hl:         #f3d98c;   // selection amber (T2C9 highlight)
+
+  // ---------------------------------------------------------------
+  // 2 · Typography
+  // ---------------------------------------------------------------
+  --sb-font-display: 'Roboto Flex', 'Inter', system-ui, sans-serif;
+  --sb-font-sans:    'Roboto Flex', 'Inter', system-ui, sans-serif;
+  --sb-font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  // Roboto Flex variation axes (consistent across all surfaces):
+  --sb-axes-heading: "opsz" 36, "wght" 500;
+  --sb-axes-body:    "opsz" 14, "wght" 400;
+  --sb-axes-strong:  "opsz" 14, "wght" 600;
+
+  // ---------------------------------------------------------------
+  // 3 · Layout grid (per Prodboard manifest §8.1 + Signature Series)
+  // ---------------------------------------------------------------
+  --sb-rail-w:     58px;
+  --sb-catalog-w:  394px;
+  --sb-tile-w:     296px;
+  --sb-tile-h:     94px;
+  --sb-tile-thumb: 80px;
+
+  // Page-level container width (T2C2 portal + customer SPA + PLM card)
+  --sb-card-max-w: 100%;
+
+  // ---------------------------------------------------------------
+  // 4 · Motion + interaction tokens
+  // ---------------------------------------------------------------
+  --sb-radius:     4px;
+  --sb-radius-sm:  3px;
+  --sb-shadow-sm:  0 1px 4px rgba(74, 60, 46, 0.12);
+  --sb-shadow-md:  0 4px 16px rgba(74, 60, 46, 0.18);
+
+  --sb-easing:     cubic-bezier(0.4, 0.0, 0.2, 1);
+  --sb-dur-fast:   120ms;
+  --sb-dur:        200ms;
+}
+
+
+// =====================================================================
+// 5 · Component vocabulary — utility classes shared across all
+//     three surfaces. Defined once here, used everywhere.
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// 5.1 · Buttons
+// ---------------------------------------------------------------------
+.sb-btn {
+  display: inline-block;
+  padding: 10px 22px;
+  border-radius: var(--sb-radius-sm);
+  font-family: var(--sb-font-display);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--sb-dur-fast) var(--sb-easing),
+              color var(--sb-dur-fast) var(--sb-easing),
+              border-color var(--sb-dur-fast) var(--sb-easing);
+  text-decoration: none;
+  user-select: none;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+}
+
+.sb-btn-primary {
+  @extend .sb-btn;
+  background: var(--sb-walnut);
+  color: var(--sb-linen);
+
+  &:not(:disabled):hover {
+    background: var(--sb-walnut-d);
+  }
+}
+
+.sb-btn-secondary {
+  @extend .sb-btn;
+  background: transparent;
+  color: var(--sb-walnut);
+  border-color: var(--sb-walnut);
+
+  &:not(:disabled):hover {
+    background: var(--sb-walnut);
+    color: var(--sb-linen);
+  }
+}
+
+.sb-btn-ghost {
+  @extend .sb-btn;
+  background: transparent;
+  color: var(--sb-walnut);
+  border-color: transparent;
+
+  &:not(:disabled):hover {
+    background: var(--sb-linen);
+  }
+}
+
+// ---------------------------------------------------------------------
+// 5.2 · Cards
+// ---------------------------------------------------------------------
+.sb-card {
+  background: var(--sb-linen);
+  border: 1px solid var(--sb-rule);
+  border-radius: var(--sb-radius);
+  color: var(--sb-ink);
+  padding: 24px 28px;
+  line-height: 1.55;
+}
+
+.sb-card-tight {
+  @extend .sb-card;
+  padding: 16px 18px;
+}
+
+// ---------------------------------------------------------------------
+// 5.3 · Pills (state badges, channel tags, tier markers)
+// ---------------------------------------------------------------------
+.sb-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: var(--sb-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--sb-rule);
+  background: var(--sb-paper);
+  color: var(--sb-walnut);
+  white-space: nowrap;
+}
+
+.sb-pill-ok       { background: var(--sb-ok);     color: white; border-color: var(--sb-ok); }
+.sb-pill-warn     { background: var(--sb-warn);   color: white; border-color: var(--sb-warn); }
+.sb-pill-alert    { background: var(--sb-alert);  color: white; border-color: var(--sb-alert); }
+.sb-pill-sky      { background: var(--sb-sky-l);  color: var(--sb-sky-d); border-color: var(--sb-sky); }
+.sb-pill-walnut   { background: var(--sb-walnut); color: var(--sb-linen); border-color: var(--sb-walnut); }
+.sb-pill-amber    { background: var(--sb-hl);     color: var(--sb-walnut-d); border-color: var(--sb-warn); }
+
+// ---------------------------------------------------------------------
+// 5.4 · Rule-divided stack — for sections inside a card
+// ---------------------------------------------------------------------
+.sb-rule-stack > * + * {
+  border-top: 1px solid var(--sb-rule);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+// ---------------------------------------------------------------------
+// 5.5 · Display typography helpers — consistent axes everywhere
+// ---------------------------------------------------------------------
+.sb-display-1 {
+  font-family: var(--sb-font-display);
+  font-variation-settings: var(--sb-axes-heading);
+  font-size: 28px;
+  line-height: 1.2;
+  color: var(--sb-walnut);
+}
+
+.sb-display-2 {
+  font-family: var(--sb-font-display);
+  font-variation-settings: var(--sb-axes-heading);
+  font-size: 20px;
+  line-height: 1.25;
+  color: var(--sb-walnut);
+}
+
+.sb-mono-label {
+  font-family: var(--sb-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sb-walnut);
+  opacity: 0.7;
+}
+
+.sb-mono-value {
+  font-family: var(--sb-font-mono);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--sb-walnut);
+}
+
+// ---------------------------------------------------------------------
+// 5.6 · Channel badges (re-export of the dealer-channel colour map
+//       — was duplicated across portal_root.scss + future PLM views;
+//       now defined once here.)
+// ---------------------------------------------------------------------
+.sb-channel-dealer       { background: var(--sb-walnut);  color: var(--sb-linen); }
+.sb-channel-tradesperson { background: var(--sb-sky);     color: white; }
+.sb-channel-kd           { background: #6b6b6b;            color: white; }
+.sb-channel-bigbox       { background: #999;               color: white; }
+.sb-channel-refacing     { background: #a08868;            color: white; }
+.sb-channel-retail       { background: var(--sb-paper);    color: var(--sb-ink); border: 1px solid var(--sb-rule); }
