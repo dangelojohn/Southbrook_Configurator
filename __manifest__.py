@@ -156,6 +156,11 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
     # ------------------------------------------------------------------
     "assets": {
         "web.assets_backend": [
+            # Step 2 (2026-06-01) — shared Signature Series design
+            # tokens, loaded FIRST so CSS custom properties + utility
+            # classes are available to every downstream Southbrook
+            # SCSS file. See docs/CUSTOMER_TO_MANUFACTURING_FLOW.md §5.
+            "southbrook_estimating/static/src/scss/_southbrook_design_tokens.scss",
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
             "southbrook_estimating/static/src/scss/cabinet_viewport.scss",
