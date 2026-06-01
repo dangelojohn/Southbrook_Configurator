@@ -1,0 +1,237 @@
+// =====================================================================
+// G1 + G2 — Southbrook homepage SCSS.
+// Uses the shared design tokens partial (--sb-walnut, --sb-linen,
+// --sb-sky, --sb-font-display, etc.).
+// =====================================================================
+
+.o_sb_home {
+  background: var(--sb-paper, #fbf7ef);
+  font-family: var(--sb-font-sans, system-ui, sans-serif);
+  color: var(--sb-ink, #1a1814);
+  line-height: 1.55;
+}
+
+// ---------------------------------------------------------------------
+// HERO
+// ---------------------------------------------------------------------
+.o_sb_hero {
+  padding: 80px 0 64px;
+  background:
+    linear-gradient(180deg,
+      var(--sb-linen, #f4ede2) 0%,
+      var(--sb-paper, #fbf7ef) 100%);
+  border-bottom: 1px solid var(--sb-rule, #d8cfbf);
+}
+
+.o_sb_hero_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 56px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--sb-walnut, #6b3f2a);
+  margin: 0 0 24px;
+
+  @media (max-width: 768px) {
+    font-size: 38px;
+  }
+}
+
+.o_sb_hero_accent {
+  font-style: italic;
+  font-variation-settings: "opsz" 36, "wght" 400;
+  color: var(--sb-sky, #2b4f6b);
+}
+
+.o_sb_hero_sub {
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--sb-ink-dim, #6b665e);
+  max-width: 540px;
+  margin: 0 0 32px;
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+  }
+}
+
+.o_sb_hero_cta_row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin: 0 0 16px;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.o_sb_hero_meta {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sb-ink-dim, #6b665e);
+  margin: 8px 0 0;
+}
+
+// ---------------------------------------------------------------------
+// Hero aside — featured-series card
+// ---------------------------------------------------------------------
+.o_sb_hero_aside {
+  display: flex;
+  align-items: center;
+
+  @media (max-width: 991px) {
+    margin-top: 32px;
+  }
+}
+
+.o_sb_hero_card {
+  background: var(--sb-walnut, #6b3f2a);
+  color: var(--sb-linen, #f4ede2);
+  border-radius: 4px;
+  padding: 32px 28px;
+  width: 100%;
+  box-shadow: 0 12px 28px rgba(74, 60, 46, 0.18);
+}
+
+.o_sb_hero_card_label {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sb-walnut-l, #c89e85);
+  margin-bottom: 12px;
+}
+
+.o_sb_hero_card_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 28px;
+  line-height: 1.1;
+  margin: 0 0 12px;
+}
+
+.o_sb_hero_card_body {
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0;
+  opacity: 0.9;
+}
+
+// ---------------------------------------------------------------------
+// THREE-UP FEATURES
+// ---------------------------------------------------------------------
+.o_sb_features {
+  padding: 72px 0;
+  background: var(--sb-paper, #fbf7ef);
+}
+
+.o_sb_feature {
+  text-align: center;
+  padding: 20px 12px;
+}
+
+.o_sb_feature_icon {
+  display: inline-block;
+  width: 56px;
+  height: 56px;
+  line-height: 56px;
+  font-size: 24px;
+  border-radius: 50%;
+  background: var(--sb-sky-l, #d8e3ec);
+  color: var(--sb-sky, #2b4f6b);
+  margin-bottom: 18px;
+}
+
+.o_sb_feature_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 14, "wght" 600;
+  font-size: 20px;
+  color: var(--sb-walnut, #6b3f2a);
+  margin: 0 0 12px;
+}
+
+.o_sb_feature_body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--sb-ink, #1a1814);
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+// ---------------------------------------------------------------------
+// SECONDARY CTA STRIP
+// ---------------------------------------------------------------------
+.o_sb_cta_strip {
+  padding: 56px 0;
+  background: var(--sb-linen, #f4ede2);
+  border-top: 1px solid var(--sb-rule, #d8cfbf);
+}
+
+.o_sb_cta_strip_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 28px;
+  color: var(--sb-walnut, #6b3f2a);
+  margin: 0 0 8px;
+}
+
+.o_sb_cta_strip_sub {
+  font-size: 15px;
+  color: var(--sb-ink-dim, #6b665e);
+  margin: 0;
+}
+
+// ---------------------------------------------------------------------
+// BUTTONS — homepage-specific so they don't conflict with Odoo's
+// .btn-primary defaults. Map to the shared sb-btn pattern.
+// ---------------------------------------------------------------------
+.o_sb_btn {
+  display: inline-block;
+  padding: 14px 28px;
+  border-radius: 4px;
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 150ms ease, color 150ms ease,
+              border-color 150ms ease, transform 100ms ease;
+  text-transform: none;
+
+  &:hover {
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+}
+
+.o_sb_btn_primary {
+  background: var(--sb-walnut, #6b3f2a);
+  color: var(--sb-linen, #f4ede2);
+
+  &:hover {
+    background: var(--sb-walnut-d, #4a2b1d);
+    color: var(--sb-linen, #f4ede2);
+  }
+}
+
+.o_sb_btn_ghost {
+  background: transparent;
+  color: var(--sb-walnut, #6b3f2a);
+  border-color: var(--sb-walnut, #6b3f2a);
+
+  &:hover {
+    background: var(--sb-walnut, #6b3f2a);
+    color: var(--sb-linen, #f4ede2);
+  }
+}
+
+.o_sb_btn_lg {
+  padding: 16px 32px;
+  font-size: 16px;
+}
