@@ -1385,4 +1385,157 @@
     p {
         font-family: var(--sb-font-sans);
     }
+
+    // ==================================================================
+    // G11 + G12 + G13 (2026-06-01) — CatalogPicker modal + Add Cabinet
+    // CTAs in the empty state and inline above the zone grid.
+    // ==================================================================
+
+    .o_owl_lines_empty {
+        text-align: center;
+        padding: 48px 32px;
+
+        strong {
+            display: block;
+            font-family: var(--sb-font-display);
+            font-size: 22px;
+            color: var(--sb-walnut);
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: var(--sb-ink-dim);
+            max-width: 480px;
+            margin: 0 auto 24px;
+            line-height: 1.5;
+        }
+    }
+
+    .o_owl_add_cabinet_btn {
+        display: inline-block;
+        padding: 10px 20px;
+        border: 1px solid var(--sb-walnut);
+        background: var(--sb-walnut);
+        color: var(--sb-linen);
+        border-radius: 4px;
+        font-family: var(--sb-font-display);
+        font-weight: 500;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        transition: background 150ms ease;
+
+        &:hover, &:focus {
+            background: var(--sb-walnut-d, #4a2b1d);
+            border-color: var(--sb-walnut-d, #4a2b1d);
+            color: var(--sb-linen);
+        }
+    }
+
+    .o_owl_add_cabinet_lg {
+        padding: 16px 32px;
+        font-size: 16px;
+    }
+
+    .o_owl_lines_topbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 16px;
+        background: var(--sb-linen);
+        border: 1px solid var(--sb-rule);
+        border-radius: 4px;
+        margin-bottom: 16px;
+    }
+
+    .o_owl_lines_count {
+        font-family: var(--sb-font-mono);
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: var(--sb-ink-dim);
+    }
+
+    // Catalog modal ----------------------------------------------------
+
+    .o_owl_catalog_panel {
+        max-width: 760px;
+        width: 100%;
+    }
+
+    .o_owl_catalog_body {
+        max-height: 70vh;
+        overflow-y: auto;
+        padding: 24px 28px;
+    }
+
+    .o_owl_catalog_hint {
+        font-size: 14px;
+        color: var(--sb-ink-dim);
+        line-height: 1.5;
+        margin: 0 0 20px;
+    }
+
+    .o_owl_catalog_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+    }
+
+    .o_owl_catalog_tile {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 16px;
+        background: var(--sb-paper);
+        border: 1px solid var(--sb-rule);
+        border-radius: 4px;
+        cursor: pointer;
+        text-align: left;
+        transition: all 150ms ease;
+
+        &:hover:not(:disabled) {
+            background: white;
+            border-color: var(--sb-walnut);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 60, 46, 0.08);
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
+    .o_owl_catalog_tile_sku {
+        font-family: var(--sb-font-mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: var(--sb-ink-dim);
+    }
+
+    .o_owl_catalog_tile_name {
+        font-family: var(--sb-font-display);
+        font-weight: 500;
+        font-size: 15px;
+        color: var(--sb-walnut);
+        line-height: 1.2;
+    }
+
+    .o_owl_catalog_tile_price {
+        font-family: var(--sb-font-mono);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--sb-sky);
+        margin-top: 4px;
+    }
+
+    .o_owl_catalog_busy {
+        text-align: center;
+        font-family: var(--sb-font-mono);
+        font-size: 12px;
+        color: var(--sb-walnut);
+        margin: 20px 0 0;
+        letter-spacing: 0.04em;
+    }
 }

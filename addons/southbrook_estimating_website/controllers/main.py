@@ -701,6 +701,81 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
 
         return {"ok": True, "line_id": line.id}
 
+    # G11 + G12 + G13 (customer-flow JTBD gap 2026-06-01) — add-line
+    # endpoint backing the customer-facing CatalogPicker.
+    #
+    # Pre-fix: portal customers could not add cabinets to their own
+    # orders. The Order Builder's empty-state placeholder told them
+    # to "Add lines via the backend Order Builder" — an admin-only
+    # path that defeats the whole self-service flow.
+    #
+    # POST {order_id, product_tmpl_id} → {ok, line_id} OR
+    #   {error: 'forbidden'|'not_found'|'no_variant'|...}.
+    #
+    # Variant resolution: most of the 12 Q8 templates have
+    # create_variant='dynamic' (per Q6), so product_variant_ids is
+    # empty until a configurator session materialises a variant.
+    # For the customer entry flow we materialise a base variant on
+    # demand — they pick a cabinet today, refine attributes (G15-G17)
+    # later. The default variant carries the template's list_price;
+    # the channel pricelist + attribute price_extras apply when the
+    # user steps into the configurator.
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/add-line",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_add_line(
+        self, order_id, product_tmpl_id=None, **kw,
+    ):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        if not product_tmpl_id:
+            return {"error": "missing_product_tmpl_id"}
+
+        Template = request.env["product.template"].sudo()
+        tmpl = Template.browse(int(product_tmpl_id)).exists()
+        if not tmpl:
+            return {"error": "template_not_found"}
+
+        # Materialise the base variant if the template has none yet.
+        # product_variant_ids is empty for the dynamic-variant cabinets
+        # until a configurator session produces one.
+        variant = tmpl.product_variant_ids[:1]
+        if not variant:
+            variant = (
+                request.env["product.product"]
+                .sudo()
+                .create({"product_tmpl_id": tmpl.id})
+            )
+
+        # Block adding lines on confirmed / cancelled orders — keeps
+        # the customer from accidentally editing a quote that's
+        # already in production.
+        if order.state not in ("draft", "sent"):
+            return {"error": "order_locked", "state": order.state}
+
+        line = (
+            request.env["sale.order.line"]
+            .sudo()
+            .create({
+                "order_id": order.id,
+                "product_id": variant.id,
+                "product_uom_qty": 1,
+            })
+        )
+        # Trigger Odoo's onchange-equivalent so price_unit /
+        # product_uom / name get populated from the variant.
+        line.product_id_change() if hasattr(line, "product_id_change") else None
+
+        return {"ok": True, "line_id": line.id}
+
     # T2C12 — FooterActions dispatcher.
     #
     # Single endpoint that the OWL FooterActions component calls with

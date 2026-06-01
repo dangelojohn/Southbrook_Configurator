@@ -125,6 +125,11 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "data/product_templates.xml",
         # Commit 5+7 — 4 rule triggers + 65 per-template config.line records
         "data/config_rules.xml",
+        # G13 (2026-06-01) — retail list_price seed for the 12 Q8
+        # cabinet templates so price transparency in the customer
+        # Order Builder has real numbers to show. Must load AFTER
+        # product_templates.xml (overrides list_price=0.0 set there).
+        "data/cabinet_prices.xml",
         # Commit 9 — Order Builder views, user-prefs view, menu
         "views/sale_order_views.xml",
         "views/res_users_views.xml",

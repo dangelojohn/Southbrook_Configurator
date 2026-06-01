@@ -983,6 +983,89 @@ class HeaderStrip extends Component {
 }
 
 // ----------------------------------------------------------------------
+// CatalogPicker (G11 + G12 + G13, 2026-06-01).
+//
+// Modal that lists the 12 Q8 cabinet templates as tiles. Clicking a
+// tile fires /southbrook/api/order/<id>/add-line and signals success
+// back to the parent so it can refresh state.
+//
+// Props:
+//   catalog  — array of {id, sku, name, list_price, family}
+//             (sourced from /api/kitchen-planner/state on parent
+//             mount; passed in instead of re-fetched here)
+//   open     — boolean — whether the modal is shown
+//   busy     — boolean — true while the add-line RPC is in flight
+//   onClose  — fired when user clicks the backdrop or the X button
+//   onPick   — fired with the chosen template id when a tile is clicked
+// ----------------------------------------------------------------------
+
+class CatalogPicker extends Component {
+    static template = xml`
+        <div t-if="props.open" class="o_owl_modal_backdrop"
+             t-on-click="_onBackdropClick">
+            <div class="o_owl_modal_panel o_owl_catalog_panel"
+                 t-on-click.stop="">
+                <div class="o_owl_modal_header">
+                    <h3 class="o_owl_modal_title">
+                        Add a cabinet to your order
+                    </h3>
+                    <button class="o_owl_modal_close"
+                            t-on-click="props.onClose"
+                            aria-label="Close">×</button>
+                </div>
+                <div class="o_owl_modal_body o_owl_catalog_body">
+                    <p class="o_owl_catalog_hint">
+                        Pick a cabinet family to add to your project.
+                        You can refine dimensions, finish, and door
+                        style after adding.
+                    </p>
+                    <div class="o_owl_catalog_grid">
+                        <button t-foreach="props.catalog"
+                                t-as="item"
+                                t-key="item.id"
+                                class="o_owl_catalog_tile"
+                                t-att-disabled="props.busy"
+                                t-on-click="() => this._onPick(item.id)">
+                            <div class="o_owl_catalog_tile_sku"
+                                 t-esc="item.sku"/>
+                            <div class="o_owl_catalog_tile_name"
+                                 t-esc="item.name"/>
+                            <div class="o_owl_catalog_tile_price"
+                                 t-esc="fmtUsd(item.list_price)"/>
+                        </button>
+                    </div>
+                    <p t-if="props.busy"
+                       class="o_owl_catalog_busy">
+                        Adding cabinet to your order…
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+    static props = {
+        catalog: Array,
+        open: Boolean,
+        busy: Boolean,
+        onClose: Function,
+        onPick: Function,
+    };
+
+    fmtUsd = fmtUsd;
+
+    _onBackdropClick() {
+        if (!this.props.busy) {
+            this.props.onClose();
+        }
+    }
+
+    _onPick(templateId) {
+        if (!this.props.busy) {
+            this.props.onPick(templateId);
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
 // OrderBuilder root template. Phase 3 polish splits each section into
 // its own component file under static/src/js/components/.
 // ----------------------------------------------------------------------
@@ -1014,6 +1097,15 @@ const TEMPLATE = xml`
             </p>
         </div>
 
+        <!-- G11 + G12 + G13 — CatalogPicker modal. Rendered
+             unconditionally inside the root; visibility is driven by
+             state.ui.catalog_open. -->
+        <CatalogPicker catalog="state.catalog"
+                       open="state.ui.catalog_open"
+                       busy="state.catalog_busy"
+                       onClose="_closeCatalog"
+                       onPick="_onPickCabinet"/>
+
         <!-- Loaded -->
         <div t-else="" class="o_owl_loaded">
             <!-- Chrome (T2C7) — banner + titlebar + stages. -->
@@ -1033,18 +1125,36 @@ const TEMPLATE = xml`
             <!-- Tab panels. T2C9 fills Lines. T2C10-11 fill the rest. -->
             <div t-if="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines">
-                <!-- T2C9 — multi-zone line grid. -->
-                <t t-if="state.zones.length === 0">
-                    <p class="o_owl_panel_placeholder o_owl_lines_empty">
-                        <strong>No cabinet lines on this order yet.</strong>
-                        <br/>
-                        Add lines via the backend Order Builder OR
-                        click <em>New</em> below to start the
-                        configurator (Phase 3 wires the inline add-line
-                        flow into the portal).
-                    </p>
+                <!-- T2C9 — multi-zone line grid. G11 empty-state CTA. -->
+                <t t-if="state.lines.length === 0">
+                    <div class="o_owl_panel_placeholder o_owl_lines_empty">
+                        <strong>Your project is empty.</strong>
+                        <p>
+                            Add cabinets from the catalog to start
+                            configuring your kitchen. Pick a family
+                            (base, wall, tall, drawer bank…), then
+                            refine dimensions, finish, and door style
+                            line by line.
+                        </p>
+                        <button class="o_owl_add_cabinet_btn o_owl_add_cabinet_lg"
+                                t-on-click="_openCatalog">
+                            + Add Your First Cabinet
+                        </button>
+                    </div>
                 </t>
                 <t t-else="">
+                    <div class="o_owl_lines_topbar">
+                        <button class="o_owl_add_cabinet_btn"
+                                t-on-click="_openCatalog">
+                            + Add Another Cabinet
+                        </button>
+                        <span class="o_owl_lines_count">
+                            <t t-esc="state.lines.length"/>
+                            <t t-if="state.lines.length === 1"> cabinet</t>
+                            <t t-else=""> cabinets</t>
+                            on this order
+                        </span>
+                    </div>
                     <ZoneGroup t-foreach="state.zones"
                                t-as="zone"
                                t-key="zone.code"
@@ -1117,6 +1227,7 @@ class OrderBuilder extends Component {
         ValidationStrip,
         FooterActions,
         KitchenViewport,
+        CatalogPicker,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -1160,12 +1271,83 @@ class OrderBuilder extends Component {
             // generalise to a publish/subscribe pattern for any
             // component that needs to refresh on order change.
             payload_version: 0,
+            // G11+G12 — catalog list (the 12 Q8 cabinets, fetched on
+            // mount from the existing kitchen-planner state endpoint
+            // so the CatalogPicker has tiles to render).
+            catalog: [],
+            catalog_busy: false,
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
+                // G11 — modal visibility.
+                catalog_open: false,
             },
         });
-        onMounted(() => this._loadOrder());
+        onMounted(() => {
+            this._loadOrder();
+            this._loadCatalog();
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // G11 + G12 — catalog management.
+    // ------------------------------------------------------------------
+
+    async _loadCatalog() {
+        try {
+            const payload = await rpcJsonCall(
+                "/southbrook/api/kitchen-planner/state",
+                {},
+            );
+            // The kitchen-planner endpoint returns {catalog: [...], ...}.
+            // If the route is missing or the user isn't authed, fall
+            // back to an empty array — the UI will show 'No catalog
+            // available' inside the picker.
+            this.state.catalog = (payload && payload.catalog) || [];
+        } catch (e) {
+            // Quiet failure — the catalog button will still render
+            // but the modal will be empty. Phase-2 polish surfaces
+            // the error inline.
+            this.state.catalog = [];
+        }
+    }
+
+    _openCatalog() {
+        this.state.ui.catalog_open = true;
+    }
+
+    _closeCatalog() {
+        if (!this.state.catalog_busy) {
+            this.state.ui.catalog_open = false;
+        }
+    }
+
+    async _onPickCabinet(productTmplId) {
+        if (!this.state.order) return;
+        this.state.catalog_busy = true;
+        try {
+            const result = await rpcJsonCall(
+                `/southbrook/api/order/${encodeURIComponent(this.state.order.id)}/add-line`,
+                { product_tmpl_id: productTmplId },
+            );
+            if (result && result.ok) {
+                // Refresh the order so the new line appears + totals
+                // re-compute. Bumps payload_version, which makes the
+                // KitchenViewport refetch its 3D payload as a bonus.
+                this.state.ui.catalog_open = false;
+                await this._loadOrder();
+            } else {
+                this.state.error = (
+                    result?.error === "order_locked"
+                    ? `Cannot add cabinets — this order is ${result.state}.`
+                    : result?.error || "Could not add the cabinet."
+                );
+            }
+        } catch (e) {
+            this.state.error = e?.message || String(e);
+        } finally {
+            this.state.catalog_busy = false;
+        }
     }
 
     async _loadOrder() {
