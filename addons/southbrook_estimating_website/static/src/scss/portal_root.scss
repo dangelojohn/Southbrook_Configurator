@@ -12,62 +12,17 @@
 // hex literals.
 
 .o_southbrook_owl_mount {
-    // ----- Palette tokens (Sky / Walnut / Linen — mockup canonical) ---
-    --sb-linen:    #f4ede2;                  // page-warm off-white
-    --sb-paper:    #fbf7ef;                  // card / panel
-    --sb-ink:      #1a1814;                  // primary text
-    --sb-ink-dim:  #6b665e;                  // secondary text
-    --sb-walnut:   #6b3f2a;                  // primary brand accent
-    --sb-walnut-d: #4a2b1d;                  // walnut darker (hover)
-    --sb-walnut-l: #c89e85;                  // walnut lighter (panel tint)
-    --sb-sky:      #2b4f6b;                  // secondary accent
-    --sb-sky-l:    #d8e3ec;                  // sky tint background
-    --sb-carbon:   #1a1814;                  // pure black-ish
-    --sb-rule:     #d8cfbf;                  // divider rule
-    --sb-rule-d:   #b5a890;                  // divider darker
-    --sb-ok:       #4a6f3e;                  // success
-    --sb-warn:     #b35a1a;                  // warning
-    --sb-alert:    #a83a2b;                  // alert / error
-    --sb-hl:       #f9e9b9;                  // highlight (selected row)
-    --sb-component-tint: rgba(43, 79, 107, 0.04);  // for OWL boundaries overlay
+    // 2026-06-01: dropped the duplicate token declarations from
+    // this scope. Canonical tokens now live in
+    // addons/southbrook_estimating/static/src/scss/_southbrook_design_tokens.scss
+    // at :root, applied globally. Single source of truth — see
+    // docs/CUSTOMER_TO_MANUFACTURING_FLOW.md §5. This scope keeps
+    // only per-mount layout properties (font-family inheritance,
+    // padding, border) + the --sb-component-tint var which is
+    // OWL-boundary specific and not promoted to :root.
 
-    // ----- Font stacks ---------------------------------------------
-    // Roboto Flex is the canonical UI font (variable-axes opsz +
-    // wght). It's not bundled in this commit (Phase 3 polish vendors
-    // it locally — see PRODBOARD_MANIFEST §8.1 + NF15) — so the
-    // stack falls back to widely-installed sans-serifs that render
-    // closely enough to keep the visual register consistent.
-    //
-    // JetBrains Mono is used for prices, codes, and monospace
-    // numerics. Same fallback story.
-    --sb-font-sans:
-        'Roboto Flex',
-        'Inter',
-        'Helvetica Neue',
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        'Segoe UI',
-        sans-serif;
-    --sb-font-mono:
-        'JetBrains Mono',
-        ui-monospace,
-        SFMono-Regular,
-        'SF Mono',
-        Menlo,
-        Consolas,
-        'Liberation Mono',
-        monospace;
-    --sb-font-display:
-        'Roboto Flex',
-        'Inter',
-        sans-serif;
+    --sb-component-tint: rgba(43, 79, 107, 0.04);
 
-    // ----- Scoped baseline ---------------------------------------
-    // Apply the design font to everything inside the OWL mount so
-    // the components inherit cleanly. body / portal chrome stays
-    // on Odoo's default font (intentional — we want the SPA to
-    // visually stand apart from the standard portal furniture).
     font-family: var(--sb-font-sans);
     color: var(--sb-ink);
     background: var(--sb-paper);
