@@ -1252,20 +1252,18 @@ const TEMPLATE = xml`
                  be preceded by a t-if or t-elif directive' when a
                  sibling sits in the middle. See bug 2026-06-01.)
                  Visibility is driven by state.ui.catalog_open. -->
-            <!-- onClose.bind / onPick.bind: OWL passes method props as
-                 plain function references; without the `.bind` suffix
-                 they execute with this === undefined inside the parent
-                 handler, and this.state.* throws TypeError on the
-                 first access. Matches the existing pattern used by
-                 FooterActions (onAction.bind), TabBar (onTabChange.bind),
-                 and KitchenViewport (onLineSelected.bind) in this
-                 same file. Bug found 2026-06-01 by user devtools
-                 inspection. -->
+            <!-- Method props wrapped in arrow functions to capture
+                 'this'. The OWL .bind directive (onX.bind="_method")
+                 emits xml(...).bind(component) at template-compile
+                 time in this Odoo's OWL version, which fails at
+                 module load with "xml(...).bind is not a function".
+                 Arrow wrappers are the safer idiom — same effect,
+                 no compiler directive needed. -->
             <CatalogPicker catalog="state.catalog"
                            open="state.ui.catalog_open"
                            busy="state.catalog_busy"
-                           onClose.bind="_closeCatalog"
-                           onPick.bind="_onPickCabinet"/>
+                           onClose="() => _closeCatalog()"
+                           onPick="(id) => _onPickCabinet(id)"/>
 
             <!-- Chrome (T2C7) — banner + titlebar + stages. -->
             <IllustrativeBanner show="true"/>
@@ -1315,20 +1313,17 @@ const TEMPLATE = xml`
                             on this order
                         </span>
                     </div>
-                    <!-- .bind on the method props for the same reason
-                         CatalogPicker needs it: OWL doesn't auto-bind
-                         this for function-typed props, so without .bind
-                         _setSelectedLine() and _onLineSaved() crash
-                         with TypeError on this.state.* access. Bug
-                         pattern caught 2026-06-01 by user devtools. -->
+                    <!-- Arrow-function wrappers (see CatalogPicker
+                         note above) — the OWL .bind directive
+                         miscompiles in this version. -->
                     <ZoneGroup t-foreach="state.zones"
                                t-as="zone"
                                t-key="zone.code"
                                zone="zone"
                                lines="_linesForZone(zone.code)"
                                selectedLineId="state.ui.selected_line_id"
-                               onSelectLine.bind="_setSelectedLine"
-                               onLineSaved.bind="_onLineSaved"/>
+                               onSelectLine="(id) => _setSelectedLine(id)"
+                               onLineSaved="() => _onLineSaved()"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
