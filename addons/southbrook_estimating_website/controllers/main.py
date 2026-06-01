@@ -60,53 +60,6 @@ from odoo.addons.portal.controllers.portal import CustomerPortal
 # customer logs in as an Odoo portal user (light auth — name + email).
 # No SSO yet; Phase 4 polish.
 # ======================================================================
-class SouthbrookHomepage(http.Controller):
-    """Public landing page for southbrookcabinetry.local.
-
-    Closes G1 + G2 from the customer-flow JTBD gap analysis 2026-06-01:
-    pre-fix, the website root rendered blank — no hero, no CTA, no
-    branding, no path to the configurator. A visitor arriving at the
-    site had no idea what Southbrook does or how to begin.
-
-    The route is anonymous (auth='public') so visitors who haven't
-    registered see the page and get a clear 'Design Your Kitchen' CTA;
-    the CTA links to /web/login?redirect=/my/southbrook/order-builder/new
-    for unauthenticated users, and directly to the order-builder/new
-    route for logged-in users.
-    """
-
-    @http.route(
-        "/",
-        type="http",
-        auth="public",
-        website=True,
-        sitemap=True,
-    )
-    def southbrook_homepage(self, **kw):
-        # Only intercept '/' for the southbrook website. Other Odoo
-        # multi-site installs that happen to share this codebase fall
-        # through to the standard website-home handler.
-        website = request.website
-        if not website or "southbrookcabinetry" not in (
-            (website.domain or "") + " " + (website.name or "")
-        ).lower():
-            return request.render("website.homepage")
-
-        user = request.env.user
-        is_public = user._is_public() if hasattr(user, "_is_public") else (
-            user.id == request.env.ref("base.public_user").id
-        )
-        cta_href = (
-            "/web/login?redirect=%2Fmy%2Fsouthbrook%2Forder-builder%2Fnew"
-            if is_public
-            else "/my/southbrook/order-builder/new"
-        )
-        return request.render(
-            "southbrook_estimating_website.southbrook_homepage",
-            {"cta_href": cta_href, "is_public": is_public},
-        )
-
-
 class SouthbrookKitchenPlanner(http.Controller):
     """Customer-facing /kitchen-planner one-page configurator route."""
 

@@ -27,6 +27,8 @@
         "views/portal_template.xml",
         # Phase 2 commit 1 — /kitchen-planner customer route + template.
         "views/kitchen_planner_template.xml",
+        # G1 + G2 (2026-06-01) — public Southbrook homepage at /.
+        "views/homepage_template.xml",
     ],
     # Dedicated asset bundle (charter Q4 answer) so the OWL portal
     # components only load on the Order Builder route. Other portal
@@ -48,6 +50,8 @@
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
+            # G1 + G2 (2026-06-01) — homepage hero + features SCSS.
+            "southbrook_estimating_website/static/src/scss/homepage.scss",
             # Phase 2 commit 1 — kitchen-planner three-pane SCSS.
             # Loads AFTER portal_root.scss so the :root tokens defined
             # there are available to .o_kp_* selectors.
