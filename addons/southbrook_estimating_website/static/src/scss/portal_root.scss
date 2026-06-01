@@ -1538,4 +1538,103 @@
         margin: 20px 0 0;
         letter-spacing: 0.04em;
     }
+
+    // ==================================================================
+    // G15 (2026-06-01) — inline attribute picker inside the
+    // ConfigDrawer. Visible when a line is selected in the lines tab.
+    // ==================================================================
+
+    .o_owl_attr_picker {
+        margin-top: 16px;
+        padding: 16px;
+        background: var(--sb-paper);
+        border: 1px solid var(--sb-rule);
+        border-radius: 4px;
+    }
+
+    .o_owl_attr_picker_head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--sb-rule);
+    }
+
+    .o_owl_attr_picker_title {
+        font-family: var(--sb-font-display);
+        font-weight: 500;
+        font-size: 14px;
+        color: var(--sb-walnut);
+        letter-spacing: 0.02em;
+    }
+
+    .o_owl_attr_picker_pill {
+        font-family: var(--sb-font-mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        padding: 3px 8px;
+        border-radius: 2px;
+        background: var(--sb-sky-l, #d8e3ec);
+        color: var(--sb-sky);
+        text-transform: uppercase;
+    }
+
+    .o_owl_attr_picker_saving {
+        background: var(--sb-walnut, #6b3f2a);
+        color: var(--sb-linen);
+    }
+
+    .o_owl_attr_picker_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+    }
+
+    .o_owl_attr_picker_field {
+        label {
+            display: block;
+            font-family: var(--sb-font-sans);
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--sb-ink-dim);
+            margin-bottom: 4px;
+        }
+    }
+
+    .o_owl_attr_select {
+        width: 100%;
+        padding: 8px 10px;
+        background: white;
+        border: 1px solid var(--sb-rule);
+        border-radius: 3px;
+        font-family: var(--sb-font-sans);
+        font-size: 13px;
+        color: var(--sb-ink);
+        cursor: pointer;
+        transition: border-color 150ms ease;
+
+        &:focus {
+            outline: none;
+            border-color: var(--sb-walnut);
+            box-shadow: 0 0 0 2px rgba(107, 63, 42, 0.12);
+        }
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    }
+
+    .o_owl_attr_picker_error {
+        margin: 12px 0 0;
+        padding: 8px 10px;
+        background: rgba(180, 60, 40, 0.08);
+        border: 1px solid rgba(180, 60, 40, 0.3);
+        border-radius: 3px;
+        font-size: 12px;
+        color: rgb(140, 40, 30);
+    }
 }

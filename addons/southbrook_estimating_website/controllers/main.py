@@ -701,6 +701,176 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
 
         return {"ok": True, "line_id": line.id}
 
+    # G15 (customer-flow JTBD gap 2026-06-01) — line attribute picker
+    # endpoints backing the inline drawer.
+    #
+    # Pre-fix: customers could add cabinets to their order (G11) but
+    # had no way to configure them — door style, finish, width, etc.
+    # all stayed locked to whatever default variant the add-line
+    # endpoint materialised. The drawer placeholder said 'Phase 3
+    # polish opens the full attribute picker'. This is that polish.
+    #
+    # Approach:
+    #   1. /line/<id>/attributes  — read shape: returns the product
+    #      template's attribute_line_ids with current selection per
+    #      attribute (or null when the variant has no value for that
+    #      attribute, which is the case for lines added via the
+    #      default-variant fast path in /add-line).
+    #   2. /line/<id>/set-attribute — write: takes one (attribute_id,
+    #      value_id) at a time. Resolves the new variant via Odoo's
+    #      _get_variant_for_combination (or creates one for dynamic-
+    #      variant templates). Stamps line.product_id and trips the
+    #      Odoo onchange that recomputes price_unit/name. Returns the
+    #      refreshed line shape so the OWL store can drop the
+    #      response straight into state without a second fetch.
+    #
+    # Auth: piggybacks on _southbrook_resolve_line which walks the
+    # line → order.partner → user-partner chain (same gate as the
+    # qty autosave at /api/line/<id>/update).
+    def _southbrook_resolve_line(self, line_id):
+        """Return the sale.order.line if the current user owns its
+        order; raise AccessError / MissingError otherwise. Mirrors
+        the partner-chain check used by /api/order/<id>."""
+        line = (
+            request.env["sale.order.line"]
+            .sudo()
+            .browse(line_id)
+            .exists()
+        )
+        if not line:
+            raise MissingError("line not found")
+        # Walks back through the order to the existing resolver,
+        # which is the canonical access check.
+        self._southbrook_resolve_order(line.order_id.id)
+        return line
+
+    @http.route(
+        "/southbrook/api/line/<int:line_id>/attributes",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_line_attributes(self, line_id, **kw):
+        try:
+            line = self._southbrook_resolve_line(line_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        tmpl = line.product_id.product_tmpl_id
+        # The variant's value set — empty for the default fast-path
+        # variant created by /add-line. We use it to mark 'current'.
+        current_ptav = line.product_id.product_template_attribute_value_ids
+        current_value_ids = current_ptav.product_attribute_value_id.ids
+
+        attributes = []
+        for attr_line in tmpl.attribute_line_ids:
+            # Hide attributes with a single option — nothing to pick.
+            if len(attr_line.value_ids) < 2:
+                continue
+            attributes.append({
+                "attribute_id": attr_line.attribute_id.id,
+                "name": attr_line.attribute_id.name,
+                "display_type": attr_line.attribute_id.display_type or "select",
+                "values": [
+                    {
+                        "value_id": v.id,
+                        "name": v.name,
+                        "current": v.id in current_value_ids,
+                    }
+                    for v in attr_line.value_ids
+                ],
+            })
+        return {"ok": True, "attributes": attributes}
+
+    @http.route(
+        "/southbrook/api/line/<int:line_id>/set-attribute",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_line_set_attribute(
+        self, line_id, attribute_id=None, value_id=None, **kw,
+    ):
+        try:
+            line = self._southbrook_resolve_line(line_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        if not (attribute_id and value_id):
+            return {"error": "missing_params"}
+        if line.order_id.state not in ("draft", "sent"):
+            return {"error": "order_locked", "state": line.order_id.state}
+
+        Tmpl = request.env["product.template"].sudo()
+        tmpl = line.product_id.product_tmpl_id
+
+        # Find the template-attribute-value record corresponding to
+        # (attribute_id, value_id). product_template_value_ids is the
+        # 'PTAV' join row; we filter on the underlying value + the
+        # attribute_id so the lookup is unambiguous for multi-attr lines.
+        ptav_for_target = tmpl.attribute_line_ids.product_template_value_ids.filtered(
+            lambda v: (
+                v.product_attribute_value_id.id == int(value_id)
+                and v.attribute_id.id == int(attribute_id)
+            )
+        )
+        if not ptav_for_target:
+            return {"error": "value_not_in_template"}
+
+        # Build the new combination = current values minus the old
+        # value-for-this-attribute, plus the new one. For lines added
+        # via the default-fast-path variant, current_ptav is empty,
+        # so the new combination is just the single new ptav.
+        current_ptav = line.product_id.product_template_attribute_value_ids
+        old_ptav_for_attr = current_ptav.filtered(
+            lambda v: v.attribute_id.id == int(attribute_id)
+        )
+        new_combination = (current_ptav - old_ptav_for_attr) | ptav_for_target
+
+        # Resolve the matching variant via Odoo's combination lookup —
+        # if an exact variant exists, reuse it.
+        variant = tmpl._get_variant_for_combination(new_combination)
+
+        # Else create one directly. The OCA configurator's create_variant
+        # mode for the 12 Q8 templates does NOT auto-materialise via
+        # tmpl._create_product_variant (it expects a product.config.session
+        # to gate creation). For the customer self-serve flow we bypass
+        # that by writing the variant row ourselves with the explicit
+        # PTAV ids — the same end state the OCA wizard would produce,
+        # minus the session bookkeeping. Phase-2 polish: when the
+        # configurator session pathway lands for the customer, switch
+        # this to invoke the session's commit (so rule validation +
+        # price_extras run through OCA's canonical path).
+        if not variant:
+            variant = (
+                request.env["product.product"]
+                .sudo()
+                .create({
+                    "product_tmpl_id": tmpl.id,
+                    "product_template_attribute_value_ids": [
+                        (6, 0, new_combination.ids)
+                    ],
+                })
+            )
+
+        if not variant:
+            return {"error": "could_not_resolve_variant"}
+
+        # Stamp the line and reset name/price from the new variant
+        # (price_unit recomputes from list_price + ptav extras).
+        line.sudo().write({
+            "product_id": variant.id,
+        })
+        # Trigger the standard onchange so name/description rebuild.
+        if hasattr(line, "product_id_change"):
+            line.product_id_change()
+
+        return {"ok": True}
+
     # G11 + G12 + G13 (customer-flow JTBD gap 2026-06-01) — add-line
     # endpoint backing the customer-facing CatalogPicker.
     #

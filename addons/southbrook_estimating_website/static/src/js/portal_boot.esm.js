@@ -674,6 +674,52 @@ class ConfigDrawer extends Component {
                 </div>
             </div>
 
+            <!-- G15 — attribute picker grid. Loads on drawer open from
+                 /api/line/<id>/attributes; each attribute renders as a
+                 select. Changing a value fires /set-attribute which
+                 swaps the line's product variant and re-prices. -->
+            <div class="o_owl_attr_picker"
+                 t-if="state.attributes.length || state.attrsLoading">
+                <div class="o_owl_attr_picker_head">
+                    <span class="o_owl_attr_picker_title">
+                        Configure this cabinet
+                    </span>
+                    <span t-if="state.attrsLoading"
+                          class="o_owl_attr_picker_pill">
+                        Loading options…
+                    </span>
+                    <span t-elif="state.attrSaving"
+                          class="o_owl_attr_picker_pill o_owl_attr_picker_saving">
+                        Updating…
+                    </span>
+                </div>
+                <div class="o_owl_attr_picker_grid">
+                    <div t-foreach="state.attributes"
+                         t-as="attr"
+                         t-key="attr.attribute_id"
+                         class="o_owl_attr o_owl_attr_picker_field">
+                        <label t-attf-for="attr_field_{{attr.attribute_id}}">
+                            <t t-esc="attr.name"/>
+                        </label>
+                        <select t-attf-id="attr_field_{{attr.attribute_id}}"
+                                class="o_owl_attr_select"
+                                t-att-disabled="state.attrSaving"
+                                t-on-change="(ev) => this._onAttrChange(attr.attribute_id, ev.target.value)">
+                            <option value="">— pick —</option>
+                            <option t-foreach="attr.values"
+                                    t-as="v"
+                                    t-key="v.value_id"
+                                    t-att-value="v.value_id"
+                                    t-att-selected="v.current ? 'selected' : null"
+                                    t-esc="v.name"/>
+                        </select>
+                    </div>
+                </div>
+                <p t-if="state.attrError"
+                   class="o_owl_attr_picker_error"
+                   t-esc="state.attrError"/>
+            </div>
+
             <p class="o_owl_drawer_foot">
                 Phase 3 polish opens the full attribute picker (Family /
                 Width / Series / Door Style / Finish / Hinge / Finished
@@ -694,11 +740,75 @@ class ConfigDrawer extends Component {
             saving: false,
             error: null,
             savedAt: null,
+            // G15 — attribute picker state.
+            attributes: [],
+            attrsLoading: false,
+            attrSaving: false,
+            attrError: null,
         });
         this._debounceTimer = null;
+        onMounted(() => this._loadAttributes());
     }
 
     fmtUsd = fmtUsd;
+
+    // ------------------------------------------------------------------
+    // G15 — attribute picker.
+    // ------------------------------------------------------------------
+
+    async _loadAttributes() {
+        this.state.attrsLoading = true;
+        this.state.attrError = null;
+        try {
+            const r = await rpcJsonCall(
+                `/southbrook/api/line/${this.props.line.id}/attributes`,
+                {},
+            );
+            if (r && r.ok) {
+                this.state.attributes = r.attributes || [];
+            } else {
+                this.state.attrError = r?.error || "Could not load options.";
+            }
+        } catch (e) {
+            this.state.attrError = e?.message || String(e);
+        } finally {
+            this.state.attrsLoading = false;
+        }
+    }
+
+    async _onAttrChange(attributeId, valueId) {
+        if (!valueId) return;
+        this.state.attrSaving = true;
+        this.state.attrError = null;
+        try {
+            const r = await rpcJsonCall(
+                `/southbrook/api/line/${this.props.line.id}/set-attribute`,
+                {
+                    attribute_id: parseInt(attributeId, 10),
+                    value_id: parseInt(valueId, 10),
+                },
+            );
+            if (r && r.ok) {
+                // Re-fetch attributes (current selection updates) AND
+                // trigger the parent to refresh the order so the line
+                // tile re-renders with the new price/spec.
+                await Promise.all([
+                    this._loadAttributes(),
+                    this.props.onSaved(),
+                ]);
+            } else {
+                this.state.attrError = (
+                    r?.error === "order_locked"
+                    ? `Cannot edit — order is ${r.state}.`
+                    : r?.error || "Could not update the cabinet."
+                );
+            }
+        } catch (e) {
+            this.state.attrError = e?.message || String(e);
+        } finally {
+            this.state.attrSaving = false;
+        }
+    }
 
     _zoneLabel(zone) {
         const labels = {
