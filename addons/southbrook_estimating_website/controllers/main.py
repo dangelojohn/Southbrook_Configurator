@@ -22,7 +22,7 @@ Auth model: portal user; `partner_id.parent_id` chain identifies
 the dealer. The controller verifies the order belongs to either
 the logged-in partner OR the partner's parent (dealer org).
 """
-from odoo import http
+from odoo import fields, http
 from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome
@@ -624,6 +624,14 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
     def _prepare_southbrook_portal_values(self, order):
         """Common template context (sidebar, breadcrumb, palette tokens)."""
         values = self._prepare_portal_layout_values()
+        # G14 (2026-06-01) — auto-select customer mode for portal users
+        # (res.users.share=True). Internal users still get dealer mode
+        # by default so the dealer/sales-rep workflow is unchanged.
+        # Override at any time via ?mode=customer or ?mode=dealer on
+        # the URL (the OWL bootstrap reads URL param first).
+        user = request.env.user
+        is_portal_user = bool(user.share)
+        order_mode = "customer" if is_portal_user else "dealer"
         values.update({
             "page_name": "southbrook_order_builder",
             "order": order,
@@ -633,6 +641,9 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             # Track 2 commits 2+ will add an "owl_mount_id" used by the
             # OWL bootstrap to find its mount point on the page.
             "owl_mount_id": "order_builder_root",
+            # G14 — written to data-mode on the mount div; the OWL
+            # bootstrap reads it and propagates as props.mode.
+            "order_mode": order_mode,
         })
         return values
 
@@ -981,26 +992,80 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             return {"ok": True, "new_state": order.state}
 
         if action_code == "request_price":
-            # T2C13 customer-mode "Request a Price" path. Phase-1
-            # behaviour: same as confirm. Phase 3 polish:
-            #   - DO NOT confirm immediately; flip to "sent" or a
-            #     new "awaiting_pricing" state.
-            #   - Post a portal message to the assigned salesperson
-            #     so they review + price + send back.
-            #   - Don't allow MO creation until salesperson confirms.
-            # For T2C13 we wire the route + return a distinguishable
-            # ok payload so the frontend can render the right success
-            # message; behaviour parity with confirm for now.
+            # G14 + G16 + G17 (2026-06-01): real customer-side submit
+            # path. Previously this just called action_confirm() —
+            # which jumped the order straight to 'sale', skipping the
+            # natural review-and-quote loop. Now it:
+            #   1. Flips draft → sent (Submitted for Review). The
+            #      sales-rep still has to action_confirm later, after
+            #      reviewing the customer's spec + pricing.
+            #   2. Stamps southbrook_submitted_date for the timeline.
+            #   3. Sends the standard 'Sales: Send Quotation' mail
+            #      template to the customer (auto-acknowledgement of
+            #      receipt).
+            #   4. Posts a chatter message to the order so the
+            #      assigned salesperson (and anyone subscribed) sees
+            #      the submission in their inbox.
             if order.state not in ("draft", "sent"):
                 return {
                     "error": "wrong_state",
                     "message": "Order already past pricing review.",
                 }
-            order_su.action_confirm()
+            # Idempotent: if the customer hits Request a Price twice,
+            # don't move state backwards and don't overwrite the
+            # original submitted_date.
+            already_submitted = order.state == "sent"
+            if not already_submitted:
+                order_su.sudo().write({
+                    "state": "sent",
+                    "southbrook_submitted_date": fields.Datetime.now(),
+                })
+
+            # Mail: send the standard Odoo 'Sales: Send Quotation'
+            # template to the customer. Wrap in a try so a missing
+            # template (custom DB) doesn't fail the action.
+            try:
+                template = request.env.ref(
+                    "sale.email_template_edi_sale", raise_if_not_found=False,
+                )
+                if template:
+                    template.sudo().send_mail(
+                        order.id,
+                        force_send=False,  # queue mail for asynchronous send
+                        email_layout_xmlid="mail.mail_notification_layout",
+                    )
+            except Exception:  # noqa: BLE001
+                # Phase-3 polish: surface mail failures back to the
+                # caller as a soft warning rather than swallowing.
+                # For now we keep the action successful and log only.
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Mail send failed on submit for order %s", order.id,
+                    exc_info=True,
+                )
+
+            # Chatter post — visible to the salesperson + all order
+            # followers. Distinct from the customer acknowledgement
+            # email above.
+            try:
+                order.sudo().message_post(
+                    body=(
+                        "<strong>Submitted for pricing review</strong>"
+                        " by <em>{}</em> via the customer portal."
+                        .format(request.env.user.name or "customer")
+                    ),
+                    subject="Quote submitted for review",
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                )
+            except Exception:  # noqa: BLE001
+                pass  # never fail the action on chatter error
+
             return {
                 "ok": True,
                 "new_state": order.state,
                 "submitted_for_pricing": True,
+                "already_submitted": already_submitted,
             }
 
         if action_code == "duplicate":
@@ -1331,6 +1396,22 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "savings":        savings,
                 "lead_time_days": lead_time_days,
                 "line_count":     len(lines),
+                # G14 + G17 (2026-06-01) — timeline timestamps for the
+                # customer-visible StagePipeline. None when the order
+                # hasn't reached that stage yet.
+                "created_date": (
+                    order.create_date.isoformat() if order.create_date else None
+                ),
+                "submitted_date": (
+                    order.southbrook_submitted_date.isoformat()
+                    if getattr(order, "southbrook_submitted_date", False)
+                    else None
+                ),
+                "confirmed_date": (
+                    order.date_order.isoformat()
+                    if order.state in ("sale", "done") and order.date_order
+                    else None
+                ),
             },
             "lines": lines,
             "zones": zones,

@@ -355,6 +355,22 @@
     font-weight: 600;
 }
 
+// G17 (2026-06-01) — date sub-label under each stage chip. Shows
+// when the order reached the stage (or empty for future stages).
+.o_owl_stage_label {
+    display: block;
+}
+
+.o_owl_stage_date {
+    display: block;
+    margin-top: 1px;
+    font-family: var(--sb-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    opacity: 0.7;
+}
+
 // ----- Phase 2.5 commit 1 — KitchenViewport ------------------------
 .o_owl_kitchen {
     display: flex;

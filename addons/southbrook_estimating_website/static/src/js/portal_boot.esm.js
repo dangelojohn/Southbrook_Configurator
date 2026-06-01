@@ -187,22 +187,45 @@ class OrderTitlebar extends Component {
 class StagePipeline extends Component {
     static template = xml`
         <div class="o_owl_stages">
-            <t t-foreach="STAGES" t-as="stage" t-key="stage_index">
+            <t t-foreach="_stages" t-as="stage" t-key="stage_index">
                 <div class="o_owl_stage"
                      t-att-class="{
                          'o_owl_stage_done':    stage_index &lt; currentIdx,
                          'o_owl_stage_current': stage_index === currentIdx,
                      }">
-                    <t t-esc="stage"/>
+                    <span class="o_owl_stage_label" t-esc="stage.label"/>
+                    <span t-if="stage.date"
+                          class="o_owl_stage_date"
+                          t-esc="_fmtDate(stage.date)"/>
                 </div>
             </t>
         </div>
     `;
     static props = {
         order: Object,
+        // G14 — mode='customer' tweaks labels to customer-friendly copy
+        // (Designing / Submitted / Quoted / Confirmed / In Production)
+        // instead of the dealer-side names (Draft / Estimating /
+        // Approval / Confirmed / In Production).
+        mode: { type: String, optional: true },
     };
 
-    STAGES = ["Draft", "Estimating", "Approval", "Confirmed", "In Production"];
+    // G17 — labels per mode, plus the date field on order payload
+    // (when populated by the backend). Indexes match currentIdx.
+    get _stages() {
+        const o = this.props.order || {};
+        const dealer = ["Draft", "Estimating", "Approval", "Confirmed", "In Production"];
+        const customer = ["Designing", "Submitted", "Quoted", "Confirmed", "In Production"];
+        const labels = this.props.mode === "customer" ? customer : dealer;
+        const dates = [
+            o.created_date,      // 0 Draft / Designing
+            o.submitted_date,    // 1 Estimating / Submitted
+            null,                // 2 Approval / Quoted (Phase-3 polish stamps this)
+            o.confirmed_date,    // 3 Confirmed
+            null,                // 4 In Production (Phase-3 polish: MO create date)
+        ];
+        return labels.map((label, i) => ({ label, date: dates[i] || null }));
+    }
 
     get currentIdx() {
         const map = {
@@ -214,6 +237,16 @@ class StagePipeline extends Component {
         };
         const idx = map[this.props.order?.state];
         return idx === undefined ? 0 : idx;
+    }
+
+    _fmtDate(isoStr) {
+        if (!isoStr) return "";
+        const d = new Date(isoStr);
+        if (Number.isNaN(d.getTime())) return "";
+        // Compact display: "Jun 1" — short month + day, no year unless
+        // it differs from today.
+        const opts = { month: "short", day: "numeric" };
+        return d.toLocaleDateString(undefined, opts);
     }
 }
 
@@ -1222,7 +1255,8 @@ const TEMPLATE = xml`
             <IllustrativeBanner show="true"/>
             <OrderTitlebar order="state.order"
                            mode="props.mode || 'dealer'"/>
-            <StagePipeline order="state.order"/>
+            <StagePipeline order="state.order"
+                           mode="props.mode || 'dealer'"/>
 
             <!-- HeaderStrip (T2C6) — reads order header from state. -->
             <HeaderStrip order="state.order"/>

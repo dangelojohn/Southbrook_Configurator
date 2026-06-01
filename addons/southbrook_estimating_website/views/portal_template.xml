@@ -125,7 +125,8 @@
             <div t-att-id="owl_mount_id"
                  class="o_southbrook_owl_mount"
                  t-att-data-order-id="order_id or ''"
-                 t-att-data-order-name="order_name">
+                 t-att-data-order-name="order_name"
+                 t-att-data-mode="order_mode or 'dealer'">
                 <div class="o_southbrook_owl_placeholder">
                     <t t-if="not order">
                         <!-- G9 fix (2026-06-01): self-service entry
