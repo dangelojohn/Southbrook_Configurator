@@ -37,6 +37,12 @@
     # <OrderBuilder/> component into it.
     "assets": {
         "web.assets_frontend": [
+            # Step 2 (2026-06-01) — shared Signature Series design
+            # tokens, loaded FIRST. Cross-addon path because the
+            # website depends on the estimating addon (which owns
+            # the design spine). See
+            # docs/CUSTOMER_TO_MANUFACTURING_FLOW.md §5.
+            "southbrook_estimating/static/src/scss/_southbrook_design_tokens.scss",
             # Phase 2.5 — Three.js library back-ported from
             # southbrook_estimating Track 1. Same vendored r160 bundle.
             "southbrook_estimating/static/lib/three/three.min.js",
