@@ -68,6 +68,10 @@ analysis. Layered build:
         # 15 product.product across 5 categories (Fasteners,
         # Adhesives, Abrasives, Finishing, CNC Tools).
         "data/products_mfg.xml",
+        # Layer 2 commit 1 — M1 v0 + M4 — Southbrook PM menu root
+        # with Ready Queue / In Production / Late / Floor Load /
+        # Equipment actions.
+        "views/pm_menus.xml",
     ],
     "installable": True,
     "application": False,
