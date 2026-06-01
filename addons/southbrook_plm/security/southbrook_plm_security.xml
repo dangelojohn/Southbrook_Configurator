@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- NF: Odoo 19 removed res.groups.category_id (and the ir.module.category
+         grouping pattern for it). Groups are declared without a category field;
+         the module name groups them in the Users & Companies settings UI. -->
+
+    <record id="group_southbrook_plm_user" model="res.groups">
+        <field name="name">PLM User</field>
+        <field name="comment">Raise and edit Engineering Change Orders; cannot approve or apply.</field>
+    </record>
+
+    <record id="group_southbrook_plm_approver" model="res.groups">
+        <field name="name">PLM Approver</field>
+        <field name="implied_ids" eval="[(4, ref('group_southbrook_plm_user'))]"/>
+        <field name="comment">Approve, apply, and reject ECOs; manage stages, types and cut specs.</field>
+    </record>
+
+</odoo>
