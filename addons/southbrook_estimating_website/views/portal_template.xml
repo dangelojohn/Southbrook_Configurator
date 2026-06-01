@@ -29,6 +29,40 @@
         name="Portal: Southbrook Order Builder sidebar entry"
         inherit_id="portal.portal_my_home"
         customize_show="True">
+        <!-- G10 fix (2026-06-01): the previous portal_docs_entry call
+             rendered as a single small list row in the docs section,
+             effectively invisible. Replaced with a prominent card-
+             style entry at the TOP of the My Account page so a new
+             portal user (Sarah Johnson per the JTBD walkthrough)
+             sees "Start a new kitchen order" as the first thing on
+             her dashboard. -->
+        <xpath expr="//div[hasclass('o_portal_my_home')]" position="inside">
+            <div class="row g-2 mb-3 o_southbrook_portal_quick_start">
+                <div class="col-12">
+                    <a href="/my/southbrook/order-builder/new"
+                       class="card text-decoration-none o_southbrook_portal_cta">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <span class="fa fa-cube fa-2x text-muted"/>
+                            <div class="flex-grow-1">
+                                <h5 class="card-title mb-1">
+                                    Design Your Kitchen
+                                </h5>
+                                <p class="card-text small text-muted mb-0">
+                                    Pick cabinets, configure dimensions,
+                                    request a quote.
+                                </p>
+                            </div>
+                            <span class="btn btn-primary">
+                                Start New Quote →
+                            </span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </xpath>
+        <!-- Keep the original docs entry too so power users with many
+             orders can still see the standard "Your Orders" / "Your
+             Quotations" rows below the prominent CTA. -->
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <t t-call="portal.portal_docs_entry">
                 <t t-set="title">Order Builder</t>
@@ -93,22 +127,33 @@
                  t-att-data-order-id="order_id or ''"
                  t-att-data-order-name="order_name">
                 <div class="o_southbrook_owl_placeholder">
-                    <strong>Order Builder — Portal scaffold</strong>
-                    <p>
-                        The portal route, auth, and chrome are wired.
-                        The OWL <code>&lt;OrderBuilder/&gt;</code> component
-                        tree mounts here starting in Track 2 commit 2.
-                    </p>
-                    <p t-if="not order">
-                        No order selected. Append an order id to the URL
-                        to view a specific order:
-                        <br/>
-                        <code>/my/southbrook/order-builder/&lt;order_id&gt;</code>
-                    </p>
-                    <p t-else="">
-                        Order id <code t-esc="order_id"/> loaded for
-                        partner <strong t-esc="order.partner_id.name"/>.
-                    </p>
+                    <t t-if="not order">
+                        <!-- G9 fix (2026-06-01): self-service entry
+                             point — no more dead end on the no-id
+                             page. The button creates a draft order
+                             bound to the current portal user and
+                             redirects into the Order Builder. -->
+                        <strong>Start a new kitchen order</strong>
+                        <p>
+                            Configure your cabinets, see live pricing,
+                            and request a formal quote — all in one
+                            place.
+                        </p>
+                        <p>
+                            <a href="/my/southbrook/order-builder/new"
+                               class="btn btn-primary">
+                                Start New Quote →
+                            </a>
+                        </p>
+                    </t>
+                    <t t-else="">
+                        <strong>Order Builder — loading…</strong>
+                        <p>
+                            Order id <code t-esc="order_id"/> loaded for
+                            partner <strong t-esc="order.partner_id.name"/>.
+                            The OWL configurator mounts here.
+                        </p>
+                    </t>
                 </div>
             </div>
         </t>

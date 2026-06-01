@@ -447,6 +447,42 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
     # website=True the render aborts with KeyError: 'website'.
     # With website=True Odoo injects the current website record (id 1
     # "My Website" on the southbrook stack) into the template context.
+    # ==================================================================
+    # G9 (customer-flow JTBD gap analysis, 2026-06-01) — self-service
+    # order creation.
+    #
+    # Pre-fix: portal customers had no way to start a new quote — the
+    # Order Builder required an order_id in the URL, but only admins
+    # could create that order in the backend. Dead-end Priority-1
+    # blocker.
+    #
+    # This route creates a draft sale.order for the logged-in user
+    # then redirects to the Order Builder with the new id, closing
+    # the self-service loop. Phase-3 polish will add a project_name
+    # prompt before creation; today we let Odoo auto-name (S0XXXX).
+    # ==================================================================
+    @http.route(
+        "/my/southbrook/order-builder/new",
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def southbrook_order_builder_new(self, **kw):
+        """Create a draft sale.order bound to the current user's partner,
+        then redirect to the Order Builder for it.
+
+        Sudo because portal users typically lack direct sale.order
+        write rights; the partner_id binding makes the order accessible
+        through the existing _southbrook_resolve_order auth check.
+        """
+        partner = request.env.user.partner_id
+        order = request.env["sale.order"].sudo().create({
+            "partner_id": partner.id,
+        })
+        return request.redirect(
+            "/my/southbrook/order-builder/%s" % order.id
+        )
+
     @http.route(
         ["/my/southbrook/order-builder",
          "/my/southbrook/order-builder/<int:order_id>"],
