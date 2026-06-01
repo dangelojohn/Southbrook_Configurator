@@ -167,7 +167,15 @@
 }
 
 .o_owl_loaded {
-    max-width: 640px;
+    // 2026-06-01: same fix as .o_southbrook_owl_root (ebc46b4) —
+    // the inner .o_owl_loaded wrapper carried its OWN 640px cap.
+    // Even after the outer frame was flexed, this inner cap was
+    // still constraining the HeaderStrip grid + titlebar to ~524px
+    // of usable width and forcing 'Demo Tradesperson (Tier 3)' onto
+    // two lines + dollar values to wrap. Removing both caps so the
+    // inner content gets the full parent width.
+    width: 100%;
+    max-width: 100%;
     margin: 0 auto;
     padding: 28px 28px 32px;
     background: var(--sb-linen);
