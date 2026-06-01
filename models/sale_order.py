@@ -26,6 +26,23 @@ _logger = logging.getLogger(__name__)
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
+    # G14 + G17 (customer-flow JTBD gap 2026-06-01) — customer-visible
+    # progress timeline. Stamped by the portal 'Request a Price' action
+    # so the StagePipeline can show 'Submitted on <date>' instead of
+    # an undated chip. Phase 3 polish adds southbrook_in_production_date
+    # populated by the MO-creation hook.
+    southbrook_submitted_date = fields.Datetime(
+        string="Submitted for Pricing",
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help=(
+            "Set automatically the first time the customer (or sales "
+            "rep on the customer's behalf) submits a draft order for "
+            "pricing review via the portal 'Request a Price' action."
+        ),
+    )
+
     # Channel → pricelist xml_id mapping (Q1). Centralised alongside the
     # _TRADESPERSON_TIER_PRICELISTS table below for symmetry. Tradesperson
     # is the one channel that needs a sub-dispatcher (NF5 tier resolution);
