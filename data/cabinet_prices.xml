@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  G13 (customer-flow JTBD gap analysis 2026-06-01) — seed retail
+  list_price on the 12 Q8 cabinet templates so the customer Order
+  Builder has something real to display.
+
+  Without these prices, every catalog tile shows '$0' and the
+  HeaderStrip's Retail Subtotal / Channel Total / Savings columns
+  show '$0' for every order line — defeating the entire G13 'price
+  transparency' gap.
+
+  Prices below are interim retail figures derived from the Southbrook
+  Consolidated Dataset Price Master tab (#5 in the brief) approximated
+  to round numbers for the demo. Phase 2 polish (PT-P1-08) replaces
+  these with the full pricelist driven by attribute combinations
+  (carcass material, door style, finish) — at which point list_price
+  becomes the carcass-only base and the rest comes from the
+  product_configurator attribute price_extra contributions.
+
+  Currency is CAD per the southbrook stack default; figures stay
+  unitless here so the channel pricelists (Dealer -50%, Tradesperson
+  Tier 1/2/3 -25/-30/-35%, KD ~46%, Big-Box fixed, Refacing per-SF)
+  can multiply through unchanged.
+-->
+<odoo>
+  <data noupdate="0">
+
+    <record id="wall_1dr" model="product.template">
+      <field name="list_price">245.00</field>
+    </record>
+    <record id="wall_2dr" model="product.template">
+      <field name="list_price">325.00</field>
+    </record>
+    <record id="base_1dr" model="product.template">
+      <field name="list_price">295.00</field>
+    </record>
+    <record id="base_2dr" model="product.template">
+      <field name="list_price">395.00</field>
+    </record>
+    <record id="drawer_bank" model="product.template">
+      <field name="list_price">475.00</field>
+    </record>
+    <record id="sink_base" model="product.template">
+      <field name="list_price">385.00</field>
+    </record>
+    <record id="tall_pantry" model="product.template">
+      <field name="list_price">895.00</field>
+    </record>
+    <record id="tall_oven" model="product.template">
+      <field name="list_price">750.00</field>
+    </record>
+    <record id="corner" model="product.template">
+      <field name="list_price">625.00</field>
+    </record>
+    <record id="vanity" model="product.template">
+      <field name="list_price">475.00</field>
+    </record>
+    <record id="accessory" model="product.template">
+      <field name="list_price">85.00</field>
+    </record>
+    <record id="worktop" model="product.template">
+      <field name="list_price">325.00</field>
+    </record>
+
+  </data>
+</odoo>
