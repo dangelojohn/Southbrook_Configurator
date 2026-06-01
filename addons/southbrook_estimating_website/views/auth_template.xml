@@ -91,6 +91,43 @@
   </template>
 
   <!-- ================================================================
+       G6 hotfix 2026-06-01 — make the stock /web/login form actually
+       visible. Stock template renders:
+
+           <owl-component name="web.user_switch"/>
+           <form class="oe_login_form #{'' if login else 'd-none'}"...>
+
+       The owl-component is supposed to mount an interactive
+       account-picker UI; the form starts hidden (d-none) and only
+       reveals when login is pre-populated. For Southbrook's single-
+       tenant customer portal we don't need multi-account picking,
+       and the picker fails to render visibly inside our chrome —
+       leaving an empty card with just the brand mark + 'Back to
+       home' link. User report 2026-06-01.
+
+       Fix: strip the user_switch component and drop the d-none
+       toggle so the form is always shown directly.
+       ================================================================ -->
+  <template
+      id="login_form_always_visible"
+      name="Southbrook — always show login form"
+      inherit_id="web.login">
+
+    <!-- Remove the user_switch placeholder; we don't multi-login. -->
+    <xpath expr="//owl-component[@name='web.user_switch']"
+           position="replace"/>
+
+    <!-- Force the form's class so d-none never applies. The form in
+         web.login uses t-attf-class (dynamic) not a static class
+         attribute, so hasclass() can't see it — match by t-attf-action
+         which is unique to this form. -->
+    <xpath expr="//form[@t-attf-action]"
+           position="attributes">
+      <attribute name="t-attf-class">oe_login_form</attribute>
+    </xpath>
+  </template>
+
+  <!-- ================================================================
        G5 — 'Project Name' field on signup, between Name and Email.
        The signup controller (SouthbrookAuthSignup in main.py)
        picks the value out of qcontext and stashes it in
