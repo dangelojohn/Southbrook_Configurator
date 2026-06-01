@@ -1240,17 +1240,22 @@ const TEMPLATE = xml`
             </p>
         </div>
 
-        <!-- G11 + G12 + G13 — CatalogPicker modal. Rendered
-             unconditionally inside the root; visibility is driven by
-             state.ui.catalog_open. -->
-        <CatalogPicker catalog="state.catalog"
-                       open="state.ui.catalog_open"
-                       busy="state.catalog_busy"
-                       onClose="_closeCatalog"
-                       onPick="_onPickCabinet"/>
-
         <!-- Loaded -->
         <div t-else="" class="o_owl_loaded">
+            <!-- G11 + G12 + G13 — CatalogPicker modal. Rendered inside
+                 the loaded branch because the catalog action targets
+                 state.order. (Originally placed between t-elif and
+                 t-else, which broke the QWeb chain — OWL 2 reports
+                 'OWL mount failed: t-elif and t-else directives must
+                 be preceded by a t-if or t-elif directive' when a
+                 sibling sits in the middle. See bug 2026-06-01.)
+                 Visibility is driven by state.ui.catalog_open. -->
+            <CatalogPicker catalog="state.catalog"
+                           open="state.ui.catalog_open"
+                           busy="state.catalog_busy"
+                           onClose="_closeCatalog"
+                           onPick="_onPickCabinet"/>
+
             <!-- Chrome (T2C7) — banner + titlebar + stages. -->
             <IllustrativeBanner show="true"/>
             <OrderTitlebar order="state.order"
