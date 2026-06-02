@@ -35,6 +35,12 @@ Phase 2 polish (out of scope for this commit):
 from odoo import _, api, fields, models
 
 
+# In-flight MO states for the M14 impacted-MO lookup. Drops 'done'
+# (already shipped) and 'cancel' (terminated). 'draft' and 'confirmed'
+# both surface so the PM sees both queued + currently-running orders.
+IN_FLIGHT_STATES = ("draft", "confirmed", "progress", "to_close")
+
+
 CONDITION_SELECTION = [
     ("good", "Good"),
     ("fair", "Fair"),
@@ -88,3 +94,81 @@ class MaintenanceEquipment(models.Model):
             vals["southbrook_condition_last_updated"] = fields.Datetime.now()
             vals["southbrook_condition_updated_by"] = self.env.user.id
         return super().write(vals)
+
+    # ==================================================================
+    # M14 — Equipment → impacted MO chain
+    # ==================================================================
+    #
+    # Pre-fix: if the CNC Boring machine goes down, the PM has no way
+    # to see which orders are about to slip. The cascade
+    #     equipment → workcenter → routing.workcenter → bom → MO
+    # exists in the data but no view stitches it.
+    #
+    # This commit adds:
+    #   workcenter_id  Many2one link from equipment to its station
+    #   southbrook_impacted_production_ids  computed Many2many of
+    #     in-flight MOs whose work orders use this equipment's
+    #     workcenter
+    #   southbrook_impacted_production_count  integer for the
+    #     stat-button badge
+    #   action_view_impacted_productions  smart-button handler that
+    #     opens the filtered MO list
+
+    workcenter_id = fields.Many2one(
+        "mrp.workcenter",
+        string="Work Center",
+        help=(
+            "The shop-floor station this equipment sits at. "
+            "Used to derive impacted manufacturing orders via the "
+            "equipment → workcenter → routing → MO chain."
+        ),
+    )
+
+    southbrook_impacted_production_ids = fields.Many2many(
+        "mrp.production",
+        string="Impacted MOs",
+        compute="_compute_southbrook_impacted_productions",
+        help=(
+            "In-flight manufacturing orders whose routing operations "
+            "use this equipment's work center. Computed live — no "
+            "stored cache."
+        ),
+    )
+
+    southbrook_impacted_production_count = fields.Integer(
+        string="Impacted MO Count",
+        compute="_compute_southbrook_impacted_productions",
+    )
+
+    @api.depends("workcenter_id")
+    def _compute_southbrook_impacted_productions(self):
+        MO = self.env["mrp.production"].sudo()
+        for eq in self:
+            if not eq.workcenter_id:
+                eq.southbrook_impacted_production_ids = MO
+                eq.southbrook_impacted_production_count = 0
+                continue
+            prods = MO.search([
+                ("state", "in", list(IN_FLIGHT_STATES)),
+                ("workorder_ids.workcenter_id", "=", eq.workcenter_id.id),
+            ])
+            eq.southbrook_impacted_production_ids = prods
+            eq.southbrook_impacted_production_count = len(prods)
+
+    def action_view_impacted_productions(self):
+        """Open the mrp.production list filtered to in-flight MOs that
+        use this equipment's workcenter. Same lookup the smart-button
+        badge counts, but as a real list view the PM can drill into.
+        """
+        self.ensure_one()
+        ids = self.southbrook_impacted_production_ids.ids
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("MOs Impacted by %s") % self.name,
+            "res_model": "mrp.production",
+            "view_mode": "list,form,kanban",
+            "domain": [("id", "in", ids)],
+            "context": {
+                "search_default_group_by_state": 1,
+            },
+        }

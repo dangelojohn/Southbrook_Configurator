@@ -29,34 +29,46 @@
     </record>
 
     <!-- Equipment -->
+    <!--
+      Equipment → workcenter mapping for M14 impacted-MO chain.
+      Both CNCs sit at the panel-saw station (SB-SAW) which does
+      all the CNC cutting in the SB-* routings. The HOMAG bander
+      sits at SB-EDGE. Spray booth + compressor at the new PAINT
+      station (wc_paint, code PAINT from workcenters_extended).
+    -->
     <record id="eq_cnc_1" model="maintenance.equipment">
       <field name="name">Biesse Rover K FT</field>
       <field name="category_id" ref="eq_cat_cnc_router"/>
       <field name="serial_no">CNC-001</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
     </record>
 
     <record id="eq_cnc_2" model="maintenance.equipment">
       <field name="name">ShopSabre IS510</field>
       <field name="category_id" ref="eq_cat_cnc_router"/>
       <field name="serial_no">CNC-002</field>
+      <field name="workcenter_id" ref="workcenter_saw"/>
     </record>
 
     <record id="eq_edge_1" model="maintenance.equipment">
       <field name="name">HOMAG Edge Bander</field>
       <field name="category_id" ref="eq_cat_edge_bander"/>
       <field name="serial_no">EB-001</field>
+      <field name="workcenter_id" ref="workcenter_edge"/>
     </record>
 
     <record id="eq_paint_1" model="maintenance.equipment">
       <field name="name">Spray Booth A</field>
       <field name="category_id" ref="eq_cat_paint_booth"/>
       <field name="serial_no">PB-001</field>
+      <field name="workcenter_id" ref="wc_paint"/>
     </record>
 
     <record id="eq_compressor" model="maintenance.equipment">
       <field name="name">Air Compressor</field>
       <field name="category_id" ref="eq_cat_utility"/>
       <field name="serial_no">AC-001</field>
+      <field name="workcenter_id" ref="wc_paint"/>
     </record>
 
   </data>

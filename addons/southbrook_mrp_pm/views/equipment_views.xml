@@ -29,6 +29,33 @@
           header (or sheet h1). We use the highest-level XPath
           that's stable across Odoo 19 maintenance form versions.
         -->
+        <!--
+          M14 — Workcenter link + impacted-MO smart button.
+          Smart-button container sits at the top of the form
+          (Odoo convention). The standard maintenance form has
+          an <div name="button_box"> wrapper.
+        -->
+        <xpath expr="//div[@name='button_box']" position="inside">
+          <button name="action_view_impacted_productions"
+                  type="object"
+                  class="oe_stat_button"
+                  icon="fa-cogs"
+                  invisible="not workcenter_id">
+            <field name="southbrook_impacted_production_count"
+                   widget="statinfo"
+                   string="Impacted MOs"/>
+          </button>
+        </xpath>
+
+        <!-- Add the Work Center field early in the sheet so the PM
+             sees the link prominently. -->
+        <xpath expr="//sheet" position="inside">
+          <group string="Floor (Southbrook PM)" name="southbrook_floor">
+            <field name="workcenter_id"
+                   options="{'no_create': True, 'no_create_edit': True}"/>
+          </group>
+        </xpath>
+
         <xpath expr="//sheet" position="inside">
           <group string="Condition (Southbrook PM)"
                  name="southbrook_condition">
