@@ -21,11 +21,87 @@ session creation, same wizard action — so picking either entry point
 lands the user on the same wizard form with the southbrook 3D viewport
 embedded (per Track 1 commits 1-5).
 """
-from odoo import models
+from odoo import fields, models
 
 
 class ProductTemplate(models.Model):
     _inherit = "product.template"
+
+    # ------------------------------------------------------------------
+    # 2026-06-02 catalog-picker redesign — display metadata.
+    #
+    # Four fields exposed on every product.template so the redesigned
+    # customer Order Builder catalog picker can render category badges,
+    # one-sentence descriptions, reference dimensions, and an icon
+    # thumbnail directly from authoritative ORM state (rather than from
+    # a controller-side hardcoded lookup table).
+    #
+    # All four are prefixed `southbrook_` because the unprefixed names
+    # collide with Odoo core (product.template.description is a stock
+    # field; categ_id is the standard category) and because the
+    # codebase convention prefixes Southbrook extensions on shared core
+    # models — see e.g. southbrook_submitted_date on sale.order,
+    # southbrook_condition on maintenance.equipment.
+    #
+    # Seed data for the 12 Q8 cabinets lives in
+    # data/cabinet_catalog_metadata.xml. Existing-DB upgrades are
+    # covered by migrations/19.0.1.1.0/post-migrate.py which backfills
+    # the four fields on the 12 cabinets by default_code.
+    # ------------------------------------------------------------------
+    southbrook_category = fields.Selection(
+        selection=[
+            ("Wall", "Wall"),
+            ("Base", "Base"),
+            ("Drawer", "Drawer"),
+            ("Tall", "Tall"),
+            ("Vanity", "Vanity"),
+            ("Extras", "Extras"),
+        ],
+        string="Southbrook Catalog Category",
+        help=(
+            "Display category used by the customer Order Builder "
+            "catalog picker to group / filter cabinets. Distinct from "
+            "categ_id (the Odoo internal category) and from the "
+            "product_configurator family attribute (the operational "
+            "9-family taxonomy). Six values mirror the catalog picker's "
+            "filter pills: Wall, Base, Drawer, Tall, Vanity, Extras."
+        ),
+    )
+
+    southbrook_description = fields.Char(
+        string="Southbrook Catalog Description",
+        translate=True,
+        help=(
+            "One-sentence customer-facing description rendered on the "
+            "catalog picker card. Translatable so non-English Southbrook "
+            "deployments can localise without re-seeding. Distinct from "
+            "the inherited product.template.description (which is "
+            "internal / sales-rep notes)."
+        ),
+    )
+
+    southbrook_dimensions = fields.Char(
+        string="Southbrook Catalog Dimensions",
+        help=(
+            "Canonical reference dimensions displayed next to the "
+            "ruler icon on the catalog picker card "
+            "(e.g. '18\"W x 34 1/2\"H x 24\"D' or 'Varies' / "
+            "'Per linear ft' for non-cabinet entries like accessories "
+            "and worktops). Free-form Char so we can carry both "
+            "imperial and metric without a unit-conversion layer."
+        ),
+    )
+
+    southbrook_icon_key = fields.Char(
+        string="Southbrook Catalog Icon Key",
+        help=(
+            "Key matching one of the inline-SVG icons in "
+            "static/src/js/portal_boot.esm.js (CABINET_ICONS map): "
+            "wall1, wall2, base1, base2, drawer, sink, pantry, oven, "
+            "corner, vanity, extra, worktop. Unknown keys fall back "
+            "to 'extra' at render time via cabinetIcon()."
+        ),
+    )
 
     def action_southbrook_launch_3d_configurator(self):
         """Launch the OCA configurator wizard for this template.

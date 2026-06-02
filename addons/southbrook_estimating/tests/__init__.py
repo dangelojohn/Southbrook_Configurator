@@ -12,3 +12,4 @@ from . import test_order_builder_views
 from . import test_qweb_reports
 from . import test_demo_data
 from . import test_phase1_smoke
+from . import test_catalog_metadata_seed
