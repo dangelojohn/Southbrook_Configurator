@@ -166,23 +166,74 @@ class SouthbrookKitchenPlanner(http.Controller):
         user = request.env.user
         partner = user.partner_id
 
-        # Catalog: the 12 Q8 cabinet templates. Filtered to config_ok
-        # so only configurable cabinets appear (excludes any future
-        # demo / utility templates).
-        templates = request.env["product.template"].sudo().search([
-            ("config_ok", "=", True),
-            ("default_code", "like", "SB-"),
-        ])
-        catalog = [
-            {
-                "id": t.id,
-                "sku": t.default_code or "",
-                "name": t.name,
-                "list_price": t.list_price,
-                "family": self._family_from_sku(t.default_code or ""),
-            }
-            for t in templates
-        ]
+        # Catalog: the 12 Q8 cabinet templates resolved by stable
+        # xml_id rather than default_code matching.
+        #
+        # Background: filtering by template.default_code LIKE 'SB-%'
+        # silently drops templates whose default_code field has
+        # blanked out — and that happens routinely for dynamic-
+        # variant templates once they accumulate >1 variant (Odoo
+        # populates template.default_code only when the template has
+        # exactly one variant, otherwise it goes to NULL).
+        #
+        # Searching via product.product variants instead drops
+        # templates that have ZERO variants yet (e.g. cabinets a
+        # customer hasn't configured at all — the OCA dynamic-
+        # variant model defers variant creation until configuration).
+        #
+        # xml_ids are stable across both edge cases: they're set at
+        # install time, never blank, never depend on variant count.
+        # The 12 cabinet xml_ids are locked per Q8 (see CLAUDE.md
+        # §3 + data/product_templates.xml).
+        Tmpl = request.env["product.template"].sudo()
+        CABINET_XML_IDS = (
+            "southbrook_estimating.wall_1dr",
+            "southbrook_estimating.wall_2dr",
+            "southbrook_estimating.base_1dr",
+            "southbrook_estimating.base_2dr",
+            "southbrook_estimating.drawer_bank",
+            "southbrook_estimating.sink_base",
+            "southbrook_estimating.tall_pantry",
+            "southbrook_estimating.tall_oven",
+            "southbrook_estimating.corner",
+            "southbrook_estimating.vanity",
+            "southbrook_estimating.accessory",
+            "southbrook_estimating.worktop",
+        )
+        # ir.model.data is itself sudo'd here so portal users can
+        # resolve the xml_ids without triggering product.template
+        # access checks.
+        ImD = request.env["ir.model.data"].sudo()
+        catalog = []
+        for xml_id in CABINET_XML_IDS:
+            module, name = xml_id.split(".", 1)
+            tmpl_id = ImD._xmlid_to_res_id(xml_id, raise_if_not_found=False)
+            if not tmpl_id:
+                continue
+            tmpl = Tmpl.browse(tmpl_id)  # already sudo'd above
+            if not tmpl.exists():
+                continue
+            # SKU resolution priority:
+            #   1. Lowest-id variant with non-empty default_code
+            #      (the canonical product.product SKU)
+            #   2. template.default_code if still set (single-variant
+            #      case)
+            #   3. Empty string — frontend falls back to displaying
+            #      just the name
+            sku = ""
+            for variant in tmpl.product_variant_ids.sorted("id"):
+                if variant.default_code:
+                    sku = variant.default_code
+                    break
+            if not sku and tmpl.default_code:
+                sku = tmpl.default_code
+            catalog.append({
+                "id": tmpl.id,
+                "sku": sku,
+                "name": tmpl.name,
+                "list_price": tmpl.list_price,
+                "family": self._family_from_sku(sku),
+            })
 
         # Website currency (CAD on the southbrook stack per #5).
         # JSON-RPC routes don't get `request.website` injected (that
