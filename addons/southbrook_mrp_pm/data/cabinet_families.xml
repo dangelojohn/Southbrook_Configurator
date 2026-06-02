@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M11 — seed 9 cabinet families for the throughput KPI dashboard.
+  Sequence order is the visual layout on the kanban: base (biggest
+  family) first, then sized down by typical shop volume.
+-->
+<odoo>
+  <data noupdate="0">
+
+    <record id="family_base" model="southbrook.cabinet.family">
+      <field name="name">Base</field>
+      <field name="code">base</field>
+      <field name="sequence">10</field>
+    </record>
+
+    <record id="family_wall" model="southbrook.cabinet.family">
+      <field name="name">Wall</field>
+      <field name="code">wall</field>
+      <field name="sequence">20</field>
+    </record>
+
+    <record id="family_tall" model="southbrook.cabinet.family">
+      <field name="name">Tall</field>
+      <field name="code">tall</field>
+      <field name="sequence">30</field>
+    </record>
+
+    <record id="family_drawer" model="southbrook.cabinet.family">
+      <field name="name">Drawer</field>
+      <field name="code">drawer</field>
+      <field name="sequence">40</field>
+    </record>
+
+    <record id="family_sink" model="southbrook.cabinet.family">
+      <field name="name">Sink Base</field>
+      <field name="code">sink</field>
+      <field name="sequence">50</field>
+    </record>
+
+    <record id="family_corner" model="southbrook.cabinet.family">
+      <field name="name">Corner</field>
+      <field name="code">corner</field>
+      <field name="sequence">60</field>
+    </record>
+
+    <record id="family_vanity" model="southbrook.cabinet.family">
+      <field name="name">Vanity</field>
+      <field name="code">vanity</field>
+      <field name="sequence">70</field>
+    </record>
+
+    <record id="family_accessory" model="southbrook.cabinet.family">
+      <field name="name">Accessory</field>
+      <field name="code">accessory</field>
+      <field name="sequence">80</field>
+    </record>
+
+    <record id="family_worktop" model="southbrook.cabinet.family">
+      <field name="name">Worktop</field>
+      <field name="code">worktop</field>
+      <field name="sequence">90</field>
+    </record>
+
+  </data>
+</odoo>

@@ -88,8 +88,10 @@ analysis. Layered build:
         # Layer 3 commit 1 — M16 — Floor Manager portal templates
         # (/my/southbrook/floor and /my/southbrook/floor/<wc_id>).
         "views/floor_template.xml",
-        # M10 — PM KPI dashboard kanban + 'Dashboard' menu entry
-        # under Southbrook PM.
+        # M11 — 9 cabinet families seeded for the throughput KPI.
+        "data/cabinet_families.xml",
+        # M10 + M11 — PM KPI dashboards (Dashboard + Family
+        # Throughput entries under Southbrook PM).
         "views/pm_dashboard.xml",
     ],
     "assets": {

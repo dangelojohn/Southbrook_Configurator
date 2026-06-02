@@ -4,3 +4,5 @@ access_fm_workorder,Floor Manager workorder rw,mrp.model_mrp_workorder,group_flo
 access_fm_production,Floor Manager production read,mrp.model_mrp_production,group_floor_manager,1,0,0,0
 access_fm_equipment,Floor Manager equipment rw,maintenance.model_maintenance_equipment,group_floor_manager,1,1,0,0
 access_fm_routing,Floor Manager routing read,mrp.model_mrp_routing_workcenter,group_floor_manager,1,0,0,0
+access_family_user,Cabinet family read for all users,model_southbrook_cabinet_family,base.group_user,1,0,0,0
+access_family_admin,Cabinet family rw for system admins,model_southbrook_cabinet_family,base.group_system,1,1,1,1

@@ -100,5 +100,82 @@
         action="action_pm_dashboard"
         sequence="5"/>
 
+    <!-- ================================================================
+         M11 — Cabinet-family throughput KPI.
+         ================================================================ -->
+    <record id="view_southbrook_cabinet_family_kanban"
+            model="ir.ui.view">
+      <field name="name">southbrook.cabinet.family.kanban</field>
+      <field name="model">southbrook.cabinet.family</field>
+      <field name="arch" type="xml">
+        <kanban class="o_sb_pm_dash">
+          <field name="id"/>
+          <field name="code"/>
+          <field name="name"/>
+          <field name="inflight_count"/>
+          <field name="throughput_today"/>
+          <field name="late_count"/>
+          <templates>
+            <t t-name="card">
+              <div class="o_sb_pm_dash_card oe_kanban_global_click">
+                <header class="o_sb_pm_dash_card_h">
+                  <span class="o_sb_pm_dash_code">
+                    <field name="code"/>
+                  </span>
+                  <span class="o_sb_pm_dash_name">
+                    <field name="name"/>
+                  </span>
+                </header>
+                <div class="o_sb_pm_dash_metrics">
+                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_inflight">
+                    <div class="o_sb_pm_dash_label">In Flight</div>
+                    <div class="o_sb_pm_dash_value">
+                      <field name="inflight_count"/>
+                    </div>
+                  </div>
+                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_done">
+                    <div class="o_sb_pm_dash_label">Done Today</div>
+                    <div class="o_sb_pm_dash_value">
+                      <field name="throughput_today"/>
+                    </div>
+                  </div>
+                </div>
+                <footer class="o_sb_pm_dash_card_f">
+                  <span>Late</span>
+                  <strong><field name="late_count"/></strong>
+                </footer>
+              </div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+
+    <record id="action_pm_family_throughput"
+            model="ir.actions.act_window">
+      <field name="name">Family Throughput</field>
+      <field name="res_model">southbrook.cabinet.family</field>
+      <field name="view_mode">kanban,list,form</field>
+      <field name="view_id"
+             ref="view_southbrook_cabinet_family_kanban"/>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+          No cabinet families configured.
+        </p>
+        <p>
+          Family throughput counts MOs whose product SKU matches each
+          family's prefix (SB-WALL → wall, SB-BASE → base, etc.).
+          A complement to the station-level KPI dashboard.
+        </p>
+      </field>
+    </record>
+
+    <menuitem
+        id="menu_pm_family_throughput"
+        parent="menu_southbrook_pm_root"
+        name="Family Throughput"
+        action="action_pm_family_throughput"
+        sequence="6"/>
+
   </data>
 </odoo>
