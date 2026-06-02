@@ -88,12 +88,20 @@ analysis. Layered build:
         # Layer 3 commit 1 — M16 — Floor Manager portal templates
         # (/my/southbrook/floor and /my/southbrook/floor/<wc_id>).
         "views/floor_template.xml",
+        # M10 — PM KPI dashboard kanban + 'Dashboard' menu entry
+        # under Southbrook PM.
+        "views/pm_dashboard.xml",
     ],
     "assets": {
         "web.assets_frontend": [
             # M16 — Floor Manager portal styling. Touch-friendly
             # tablet layout using shared Signature Series tokens.
             "southbrook_mrp_pm/static/src/scss/floor.scss",
+        ],
+        "web.assets_backend": [
+            # M10 — PM KPI dashboard kanban styling. Backend bundle
+            # because the dashboard is an internal-user view.
+            "southbrook_mrp_pm/static/src/scss/dashboard.scss",
         ],
     },
     "installable": True,

@@ -1,0 +1,125 @@
+// =====================================================================
+// M10 — PM KPI dashboard kanban styling. Loaded into web.assets_backend
+// so the kanban renders in the Odoo backend (PM is internal, not
+// portal).
+// Tokens — falls back to the canonical values defined in
+// southbrook_estimating's _southbrook_design_tokens partial. Backend
+// assets don't re-import that partial; redeclaring fallbacks inline.
+// =====================================================================
+
+$sb_walnut: #6b3f2a;
+$sb_walnut_d: #4a2b1d;
+$sb_walnut_l: #c89e85;
+$sb_linen: #f4ede2;
+$sb_paper: #fbf7ef;
+$sb_sky: #2b4f6b;
+$sb_sky_l: #d8e3ec;
+$sb_ink: #1a1814;
+$sb_ink_dim: #6b665e;
+$sb_rule: #d8cfbf;
+
+.o_sb_pm_dash_card {
+  background: white;
+  border: 1px solid $sb_rule;
+  border-radius: 4px;
+  padding: 14px;
+  margin: 6px;
+  min-width: 220px;
+  transition: border-color 150ms ease, transform 100ms ease;
+
+  &:hover {
+    border-color: $sb_walnut;
+    transform: translateY(-1px);
+  }
+}
+
+.o_sb_pm_dash_card_h {
+  border-bottom: 1px solid $sb_rule;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.o_sb_pm_dash_code {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: $sb_ink_dim;
+}
+
+.o_sb_pm_dash_name {
+  display: block;
+  font-family: 'Roboto Flex', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  color: $sb_walnut;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.o_sb_pm_dash_metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.o_sb_pm_dash_metric {
+  text-align: center;
+  padding: 8px 4px;
+  background: $sb_paper;
+  border-radius: 3px;
+}
+
+.o_sb_pm_dash_label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $sb_ink_dim;
+}
+
+.o_sb_pm_dash_value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px;
+  font-weight: 600;
+  color: $sb_walnut;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+// Colour-code per metric so the PM eye locks onto the meaningful
+// ones immediately.
+.o_sb_pm_dash_inflight .o_sb_pm_dash_value {
+  color: $sb_sky;
+}
+.o_sb_pm_dash_done .o_sb_pm_dash_value {
+  color: rgb(46, 125, 50);  // green
+}
+.o_sb_pm_dash_late .o_sb_pm_dash_value {
+  color: rgb(198, 40, 40);  // red
+}
+.o_sb_pm_dash_alerts .o_sb_pm_dash_value {
+  color: rgb(230, 81, 0);   // orange
+}
+
+// Suppress the redness for late=0; only highlight when there IS a
+// problem. The kanban renderer doesn't pass conditional class
+// support without an OWL component, so we leave the colour
+// permanent and let 0 read as 'green-ish nothing'.
+
+.o_sb_pm_dash_card_f {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid $sb_rule;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: $sb_ink_dim;
+  display: flex;
+  justify-content: space-between;
+
+  strong {
+    color: $sb_walnut;
+  }
+}

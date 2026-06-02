@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M10 — Southbrook PM KPI dashboard.
+
+  A kanban view scoped to active mrp.workcenter records, rendering
+  one card per station with the four KPI computed fields
+  (in-flight, done today, late MOs, equipment alerts).
+
+  The view + action are reachable via Southbrook PM > Dashboard
+  (sequence 5 — surfaces at the top, above Ready Queue).
+-->
+<odoo>
+  <data>
+
+    <record id="view_southbrook_pm_kanban"
+            model="ir.ui.view">
+      <field name="name">mrp.workcenter.kanban.southbrook_pm</field>
+      <field name="model">mrp.workcenter</field>
+      <field name="arch" type="xml">
+        <kanban class="o_sb_pm_dash" default_group_by="active">
+          <field name="id"/>
+          <field name="code"/>
+          <field name="name"/>
+          <field name="oee_target"/>
+          <field name="southbrook_pm_inflight_count"/>
+          <field name="southbrook_pm_throughput_today"/>
+          <field name="southbrook_pm_late_count"/>
+          <field name="southbrook_pm_equipment_alerts"/>
+          <templates>
+            <t t-name="card">
+              <div class="o_sb_pm_dash_card oe_kanban_global_click">
+                <header class="o_sb_pm_dash_card_h">
+                  <span class="o_sb_pm_dash_code">
+                    <field name="code"/>
+                  </span>
+                  <span class="o_sb_pm_dash_name">
+                    <field name="name"/>
+                  </span>
+                </header>
+                <div class="o_sb_pm_dash_metrics">
+                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_inflight">
+                    <div class="o_sb_pm_dash_label">In Queue</div>
+                    <div class="o_sb_pm_dash_value">
+                      <field name="southbrook_pm_inflight_count"/>
+                    </div>
+                  </div>
+                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_done">
+                    <div class="o_sb_pm_dash_label">Done Today</div>
+                    <div class="o_sb_pm_dash_value">
+                      <field name="southbrook_pm_throughput_today"/>
+                    </div>
+                  </div>
+                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_late">
+                    <div class="o_sb_pm_dash_label">Late</div>
+                    <div class="o_sb_pm_dash_value">
+                      <field name="southbrook_pm_late_count"/>
+                    </div>
+                  </div>
+                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_alerts">
+                    <div class="o_sb_pm_dash_label">Equipment</div>
+                    <div class="o_sb_pm_dash_value">
+                      <field name="southbrook_pm_equipment_alerts"/>
+                    </div>
+                  </div>
+                </div>
+                <footer class="o_sb_pm_dash_card_f">
+                  <span>OEE Target</span>
+                  <strong><field name="oee_target"/>%</strong>
+                </footer>
+              </div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+
+    <record id="action_pm_dashboard" model="ir.actions.act_window">
+      <field name="name">Dashboard</field>
+      <field name="res_model">mrp.workcenter</field>
+      <field name="view_mode">kanban,list,form</field>
+      <field name="view_id" ref="view_southbrook_pm_kanban"/>
+      <field name="domain">[('active','=',True)]</field>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+          No work centers configured.
+        </p>
+        <p>
+          The dashboard renders one card per station with live
+          counts: in queue, finished today, late MOs touching this
+          station, and equipment-condition alerts. Click any tile
+          to drill into the station detail.
+        </p>
+      </field>
+    </record>
+
+    <menuitem
+        id="menu_pm_dashboard"
+        parent="menu_southbrook_pm_root"
+        name="Dashboard"
+        action="action_pm_dashboard"
+        sequence="5"/>
+
+  </data>
+</odoo>
