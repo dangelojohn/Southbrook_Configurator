@@ -24,7 +24,7 @@ Phase-2 commits (not in this one):
     - POST /my/southbrook/floor/wo/<id>/finish
     - POST /my/southbrook/floor/equipment/<id>/condition
 """
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.exceptions import AccessError
 from odoo.http import request
 from odoo.addons.portal.controllers.portal import CustomerPortal
@@ -234,6 +234,77 @@ class SouthbrookFloorPortal(CustomerPortal):
                 "/my/southbrook/floor/%s" % redirect_wc
             )
         return request.redirect("/my/southbrook/floor")
+
+    # ==================================================================
+    # M12 — kiosk display mode for factory wall-mounted TV
+    # ==================================================================
+    #
+    # /my/southbrook/floor/kiosk renders the same data as the floor
+    # index, but in a layout designed for an HDMI-attached TV mounted
+    # over the shop floor: dark background, very large numbers,
+    # higher-contrast condition pills, no portal chrome. The view
+    # auto-refreshes every 30s so the floor sees state changes
+    # without anyone touching it.
+    #
+    # Auth: same _floor_user_authorized() gate as the operator
+    # tablet views — the device that's connected to the TV runs a
+    # browser logged in as a portal user in the Floor Manager group.
+    # Once that session is established, the kiosk URL just loads.
+
+    @http.route(
+        "/my/southbrook/floor/kiosk",
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def southbrook_floor_kiosk(self, **kw):
+        if not self._floor_user_authorized():
+            return request.redirect("/my")
+        Wc = request.env["mrp.workcenter"].sudo()
+        Mo = request.env["mrp.production"].sudo()
+        Fam = request.env["southbrook.cabinet.family"].sudo()
+
+        # Re-use the existing computed fields on mrp.workcenter
+        # (M10) and southbrook.cabinet.family (M11).
+        wcs = Wc.search([("active", "=", True)], order="code")
+        wc_rows = [
+            {
+                "id": wc.id,
+                "code": wc.code or "",
+                "name": wc.name,
+                "inflight": wc.southbrook_pm_inflight_count,
+                "done_today": wc.southbrook_pm_throughput_today,
+                "late": wc.southbrook_pm_late_count,
+                "alerts": wc.southbrook_pm_equipment_alerts,
+            }
+            for wc in wcs
+        ]
+        fams = Fam.search([], order="sequence")
+        family_rows = [
+            {
+                "id": f.id,
+                "code": f.code,
+                "name": f.name,
+                "inflight": f.inflight_count,
+                "done_today": f.throughput_today,
+                "late": f.late_count,
+            }
+            for f in fams
+        ]
+        total_late = Mo.search_count([
+            ("state", "not in", ["done", "cancel"]),
+            ("date_deadline", "<", fields.Datetime.now()),
+        ])
+
+        return request.render(
+            "southbrook_mrp_pm.portal_floor_kiosk",
+            {
+                "wc_rows": wc_rows,
+                "family_rows": family_rows,
+                "total_late": total_late,
+                "now": fields.Datetime.now(),
+            },
+        )
 
     @http.route(
         "/my/southbrook/floor/<int:workcenter_id>",

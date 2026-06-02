@@ -212,5 +212,97 @@
       </t>
     </template>
 
+    <!-- ================================================================
+         M12 — kiosk display mode template. Full-screen dark theme,
+         no portal chrome (no t-call="portal.portal_layout"). Just
+         <html> + <body> + the kiosk grid. 30s auto-refresh.
+         ================================================================ -->
+    <template id="portal_floor_kiosk"
+              name="Southbrook Floor — Kiosk (factory TV)">
+      <html lang="en">
+        <head>
+          <title>Southbrook Floor — Kiosk</title>
+          <meta charset="utf-8"/>
+          <meta http-equiv="refresh" content="30"/>
+          <link rel="stylesheet"
+                type="text/css"
+                href="/southbrook_mrp_pm/static/src/css/kiosk.css"/>
+        </head>
+        <body class="o_sb_kiosk_body">
+          <div class="o_sb_kiosk">
+
+            <header class="o_sb_kiosk_header">
+              <div class="o_sb_kiosk_h_left">
+                <span class="o_sb_kiosk_brand">SOUTHBROOK</span>
+                <span class="o_sb_kiosk_subbrand">Shop Floor — Live</span>
+              </div>
+              <div class="o_sb_kiosk_h_right">
+                <span class="o_sb_kiosk_clock"
+                      t-esc="now.strftime('%H:%M · %a %b %d')"/>
+                <span class="o_sb_kiosk_late_badge"
+                      t-att-class="'o_sb_kiosk_late_badge_warn' if total_late else 'o_sb_kiosk_late_badge_calm'">
+                  LATE
+                  <strong t-esc="total_late"/>
+                </span>
+              </div>
+            </header>
+
+            <!-- WORKCENTER GRID -->
+            <section class="o_sb_kiosk_section">
+              <h2 class="o_sb_kiosk_h2">Stations</h2>
+              <div class="o_sb_kiosk_grid">
+                <div t-foreach="wc_rows" t-as="row"
+                     class="o_sb_kiosk_card"
+                     t-att-class="'o_sb_kiosk_card_alerts' if row['alerts'] else ('o_sb_kiosk_card_busy' if row['inflight'] else '')">
+                  <div class="o_sb_kiosk_card_code"
+                       t-esc="row['code']"/>
+                  <div class="o_sb_kiosk_card_name"
+                       t-esc="row['name']"/>
+                  <div class="o_sb_kiosk_card_metrics">
+                    <div class="o_sb_kiosk_metric">
+                      <div class="o_sb_kiosk_metric_v"
+                           t-esc="row['inflight']"/>
+                      <div class="o_sb_kiosk_metric_l">queue</div>
+                    </div>
+                    <div class="o_sb_kiosk_metric">
+                      <div class="o_sb_kiosk_metric_v o_sb_kiosk_metric_done"
+                           t-esc="row['done_today']"/>
+                      <div class="o_sb_kiosk_metric_l">today</div>
+                    </div>
+                    <div class="o_sb_kiosk_metric">
+                      <div class="o_sb_kiosk_metric_v o_sb_kiosk_metric_late"
+                           t-esc="row['late']"/>
+                      <div class="o_sb_kiosk_metric_l">late</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- FAMILY ROW -->
+            <section class="o_sb_kiosk_section">
+              <h2 class="o_sb_kiosk_h2">Families</h2>
+              <div class="o_sb_kiosk_fam_row">
+                <div t-foreach="family_rows" t-as="fam"
+                     class="o_sb_kiosk_fam"
+                     t-att-class="'o_sb_kiosk_fam_busy' if fam['inflight'] else ''">
+                  <div class="o_sb_kiosk_fam_name"
+                       t-esc="fam['name']"/>
+                  <div class="o_sb_kiosk_fam_metrics">
+                    <span class="o_sb_kiosk_fam_inflight"
+                          t-esc="fam['inflight']"/>
+                    <span class="o_sb_kiosk_fam_sep">·</span>
+                    <span class="o_sb_kiosk_fam_done"
+                          t-esc="fam['done_today']"/>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </body>
+      </html>
+    </template>
+
   </data>
 </odoo>

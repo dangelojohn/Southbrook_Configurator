@@ -1,0 +1,254 @@
+/* =====================================================================
+ * M12 — Kiosk display mode CSS.
+ *
+ * Served as static file via /southbrook_mrp_pm/static/src/css/kiosk.css
+ * rather than bundled into web.assets_frontend so the kiosk template
+ * stays free of Odoo's frontend chrome. The page is full-screen
+ * dark + high-contrast for HDMI displays mounted 8-12 feet away.
+ * ===================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.o_sb_kiosk_body {
+  background: #1a1a1a;
+  color: #f4ede2;
+  font-family: 'Roboto Flex', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.o_sb_kiosk {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 24px;
+  gap: 16px;
+}
+
+/* ===================================================================
+ * HEADER
+ * =================================================================== */
+.o_sb_kiosk_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #6b3f2a;
+  padding-bottom: 12px;
+}
+
+.o_sb_kiosk_brand {
+  font-size: 24px;
+  letter-spacing: 0.18em;
+  color: #c89e85;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.o_sb_kiosk_subbrand {
+  font-size: 16px;
+  margin-left: 20px;
+  color: #6b665e;
+  font-style: italic;
+}
+
+.o_sb_kiosk_h_right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.o_sb_kiosk_clock {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  color: #c89e85;
+}
+
+.o_sb_kiosk_late_badge {
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.o_sb_kiosk_late_badge strong {
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.o_sb_kiosk_late_badge_calm {
+  background: rgba(56, 142, 60, 0.2);
+  color: rgb(102, 187, 106);
+}
+
+.o_sb_kiosk_late_badge_warn {
+  background: rgba(198, 40, 40, 0.25);
+  color: rgb(255, 138, 128);
+  animation: kiosk-pulse 2s ease-in-out infinite;
+}
+
+@keyframes kiosk-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.75; }
+}
+
+/* ===================================================================
+ * SECTIONS
+ * =================================================================== */
+.o_sb_kiosk_section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.o_sb_kiosk_h2 {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c89e85;
+  margin-bottom: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ===================================================================
+ * STATIONS GRID
+ * =================================================================== */
+.o_sb_kiosk_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  flex: 1;
+}
+
+.o_sb_kiosk_card {
+  background: #252220;
+  border: 1px solid #3a3530;
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.o_sb_kiosk_card_busy {
+  border-color: #6b3f2a;
+  background: #2a221e;
+}
+
+.o_sb_kiosk_card_alerts {
+  border-color: rgb(198, 40, 40);
+  background: rgba(198, 40, 40, 0.1);
+}
+
+.o_sb_kiosk_card_code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: #6b665e;
+}
+
+.o_sb_kiosk_card_name {
+  font-size: 22px;
+  font-weight: 500;
+  color: #f4ede2;
+  margin: 4px 0 16px;
+  line-height: 1.1;
+}
+
+.o_sb_kiosk_card_metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.o_sb_kiosk_metric {
+  text-align: center;
+}
+
+.o_sb_kiosk_metric_v {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 42px;
+  font-weight: 600;
+  color: #c89e85;
+  line-height: 1;
+}
+
+.o_sb_kiosk_metric_done {
+  color: rgb(102, 187, 106);
+}
+
+.o_sb_kiosk_metric_late {
+  color: rgb(255, 138, 128);
+}
+
+.o_sb_kiosk_metric_l {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b665e;
+  margin-top: 4px;
+}
+
+/* ===================================================================
+ * FAMILY ROW
+ * =================================================================== */
+.o_sb_kiosk_fam_row {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 8px;
+}
+
+.o_sb_kiosk_fam {
+  background: #252220;
+  border: 1px solid #3a3530;
+  border-radius: 4px;
+  padding: 12px;
+  text-align: center;
+}
+
+.o_sb_kiosk_fam_busy {
+  border-color: #6b3f2a;
+  background: #2a221e;
+}
+
+.o_sb_kiosk_fam_name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #c89e85;
+  margin-bottom: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.04em;
+}
+
+.o_sb_kiosk_fam_metrics {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.o_sb_kiosk_fam_inflight {
+  color: #f4ede2;
+}
+
+.o_sb_kiosk_fam_sep {
+  color: #3a3530;
+  margin: 0 4px;
+}
+
+.o_sb_kiosk_fam_done {
+  color: rgb(102, 187, 106);
+}
