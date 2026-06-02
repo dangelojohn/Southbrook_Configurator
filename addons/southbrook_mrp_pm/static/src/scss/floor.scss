@@ -1,0 +1,315 @@
+// =====================================================================
+// M16 — Floor Manager portal styling. Tablet-friendly defaults
+// (touch targets >= 44px, no hover-only affordances).
+// Inherits the Signature Series tokens from
+// southbrook_estimating/static/src/scss/_southbrook_design_tokens.scss
+// which is already loaded into web.assets_frontend.
+// =====================================================================
+
+.o_sb_floor {
+  font-family: var(--sb-font-sans, system-ui, sans-serif);
+  color: var(--sb-ink, #1a1814);
+  padding: 24px 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.o_sb_floor_header {
+  margin-bottom: 24px;
+
+  h1 {
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-size: 28px;
+    color: var(--sb-walnut, #6b3f2a);
+    margin: 0 0 6px;
+  }
+
+  p {
+    color: var(--sb-ink-dim, #6b665e);
+    margin: 0;
+  }
+}
+
+.o_sb_floor_breadcrumb {
+  margin: 0 0 8px;
+
+  a {
+    font-family: var(--sb-font-mono, monospace);
+    font-size: 12px;
+    color: var(--sb-walnut, #6b3f2a);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+// ===================================================================
+// Index — workcenter grid
+// ===================================================================
+
+.o_sb_floor_wc_grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.o_sb_floor_wc_tile {
+  background: var(--sb-paper, #fbf7ef);
+  border: 1px solid var(--sb-rule, #d8cfbf);
+  border-radius: 4px;
+  transition: border-color 150ms ease, transform 100ms ease;
+
+  &:hover {
+    border-color: var(--sb-walnut, #6b3f2a);
+    transform: translateY(-1px);
+  }
+
+  &.o_sb_floor_wc_inflight {
+    border-left: 4px solid var(--sb-walnut, #6b3f2a);
+  }
+}
+
+.o_sb_floor_wc_link {
+  display: block;
+  padding: 16px;
+  text-decoration: none;
+  color: inherit;
+  min-height: 100px;
+
+  &:hover {
+    text-decoration: none;
+    color: inherit;
+  }
+}
+
+.o_sb_floor_wc_code {
+  font-family: var(--sb-font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--sb-ink-dim, #6b665e);
+  margin-bottom: 4px;
+}
+
+.o_sb_floor_wc_name {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--sb-walnut, #6b3f2a);
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+
+.o_sb_floor_wc_count_num {
+  font-family: var(--sb-font-mono, monospace);
+  font-size: 24px;
+  color: var(--sb-walnut, #6b3f2a);
+  font-weight: 600;
+}
+
+.o_sb_floor_wc_count_lbl {
+  font-size: 11px;
+  margin-left: 4px;
+  color: var(--sb-ink-dim, #6b665e);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.o_sb_floor_wc_count_empty {
+  font-family: var(--sb-font-mono, monospace);
+  font-size: 12px;
+  color: var(--sb-ink-dim, #6b665e);
+  font-style: italic;
+}
+
+// ===================================================================
+// Per-station — MO card list
+// ===================================================================
+
+.o_sb_floor_wc {
+  .o_sb_floor_wc_h_code {
+    font-family: var(--sb-font-mono, monospace);
+    font-size: 14px;
+    color: var(--sb-ink-dim, #6b665e);
+    margin-right: 12px;
+    letter-spacing: 0.04em;
+  }
+  .o_sb_floor_wc_h_name {
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  }
+}
+
+.o_sb_floor_meta {
+  font-family: var(--sb-font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sb-ink-dim, #6b665e);
+}
+
+.o_sb_floor_queue h2,
+.o_sb_floor_equipment h2 {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-size: 16px;
+  color: var(--sb-walnut, #6b3f2a);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 24px 0 12px;
+}
+
+.o_sb_floor_empty {
+  font-family: var(--sb-font-mono, monospace);
+  color: var(--sb-ink-dim, #6b665e);
+  padding: 16px;
+  background: var(--sb-paper, #fbf7ef);
+  border: 1px dashed var(--sb-rule, #d8cfbf);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.o_sb_floor_mo_card {
+  background: white;
+  border: 1px solid var(--sb-rule, #d8cfbf);
+  border-radius: 4px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.o_sb_floor_mo_header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--sb-linen, #f4ede2);
+  border-bottom: 1px solid var(--sb-rule, #d8cfbf);
+  flex-wrap: wrap;
+
+  strong {
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-size: 16px;
+    color: var(--sb-walnut, #6b3f2a);
+  }
+}
+
+.o_sb_floor_mo_sku {
+  font-size: 11px;
+  color: var(--sb-ink-dim, #6b665e);
+}
+
+.o_sb_floor_mo_state {
+  font-family: var(--sb-font-mono, monospace);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: var(--sb-walnut, #6b3f2a);
+  color: var(--sb-linen, #f4ede2);
+}
+
+.o_sb_floor_mo_deadline {
+  font-family: var(--sb-font-mono, monospace);
+  font-size: 11px;
+  color: var(--sb-ink-dim, #6b665e);
+  margin-left: auto;
+}
+
+.o_sb_floor_wo_list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.o_sb_floor_wo {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sb-rule, #d8cfbf);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.o_sb_floor_wo_ready {
+    background: rgba(43, 79, 107, 0.06);
+    border-left: 3px solid var(--sb-sky, #2b4f6b);
+  }
+
+  &.o_sb_floor_wo_progress {
+    background: rgba(107, 63, 42, 0.06);
+    border-left: 3px solid var(--sb-walnut, #6b3f2a);
+  }
+}
+
+.o_sb_floor_wo_state {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sb-ink-dim, #6b665e);
+}
+
+.o_sb_floor_wo_time {
+  font-size: 12px;
+  color: var(--sb-ink, #1a1814);
+  font-weight: 600;
+}
+
+// ===================================================================
+// Equipment list at the station
+// ===================================================================
+
+.o_sb_floor_eq_list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.o_sb_floor_eq {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid var(--sb-rule, #d8cfbf);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.o_sb_floor_eq_name {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-weight: 500;
+}
+
+.o_sb_floor_eq_pill {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 2px;
+  background: var(--sb-sky-l, #d8e3ec);
+  color: var(--sb-sky, #2b4f6b);
+}
+
+.o_sb_floor_eq_good .o_sb_floor_eq_pill {
+  background: rgba(56, 142, 60, 0.15);
+  color: rgb(46, 125, 50);
+}
+.o_sb_floor_eq_fair .o_sb_floor_eq_pill {
+  background: rgba(13, 71, 161, 0.12);
+  color: rgb(13, 71, 161);
+}
+.o_sb_floor_eq_watch .o_sb_floor_eq_pill {
+  background: rgba(245, 124, 0, 0.15);
+  color: rgb(230, 81, 0);
+}
+.o_sb_floor_eq_critical .o_sb_floor_eq_pill,
+.o_sb_floor_eq_offline .o_sb_floor_eq_pill {
+  background: rgba(198, 40, 40, 0.15);
+  color: rgb(198, 40, 40);
+}

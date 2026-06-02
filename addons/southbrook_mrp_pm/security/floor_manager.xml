@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M17 (Manufacturing PM JTBD 2026-06-01) — Floor Manager
+  res.groups + module category.
+
+  Defines:
+
+    module_category_southbrook_pm     Settings > Users module
+                                       category so the Floor
+                                       Manager group appears in
+                                       the user-form access tab
+                                       alongside other Sothbrook
+                                       application toggles.
+
+    group_floor_manager               'Floor Manager'. Inherits
+                                       base.group_portal so members
+                                       are portal users by default
+                                       (can be promoted to internal
+                                       by the admin if needed).
+                                       Grants the model-level
+                                       accesses defined in
+                                       security/ir.model.access.csv.
+-->
+<odoo>
+  <data noupdate="1">
+
+    <!-- res.groups in Odoo 19 dropped category_id (replaced by
+         privilege_id which is module-internal). For our purposes
+         the group just needs a name + portal inheritance + the
+         ir.model.access.csv hookup. -->
+    <record id="group_floor_manager" model="res.groups">
+      <field name="name">Southbrook Floor Manager</field>
+      <field name="implied_ids" eval="[(4, ref('base.group_portal'))]"/>
+      <field name="comment">
+        Members can access /my/southbrook/floor to see their
+        station's work-order queue, start/finish their own work
+        orders, and toggle the condition pill on equipment
+        assigned to their work center.
+      </field>
+    </record>
+
+  </data>
+</odoo>

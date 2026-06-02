@@ -52,6 +52,11 @@ analysis. Layered build:
         "maintenance",                   # equipment + condition
     ],
     "data": [
+        # M17 — Floor Manager security group + ACL. Loads FIRST so
+        # any subsequent record-create / access check resolves the
+        # group_floor_manager reference.
+        "security/floor_manager.xml",
+        "security/ir.model.access.csv",
         # Layer 1 commit 1 — 8 Southbrook stations as mrp.workcenter.
         "data/workcenters.xml",
         # Layer 1 commit 2 — canonical BoM + 8-station routing for
@@ -79,7 +84,17 @@ analysis. Layered build:
         # Layer 2 commit 2 — M13 — equipment condition field
         # surfaced on the maintenance.equipment form + list views.
         "views/equipment_views.xml",
+        # Layer 3 commit 1 — M16 — Floor Manager portal templates
+        # (/my/southbrook/floor and /my/southbrook/floor/<wc_id>).
+        "views/floor_template.xml",
     ],
+    "assets": {
+        "web.assets_frontend": [
+            # M16 — Floor Manager portal styling. Touch-friendly
+            # tablet layout using shared Signature Series tokens.
+            "southbrook_mrp_pm/static/src/scss/floor.scss",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,

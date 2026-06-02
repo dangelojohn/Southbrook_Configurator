@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_fm_workcenter,Floor Manager workcenter read,mrp.model_mrp_workcenter,group_floor_manager,1,0,0,0
+access_fm_workorder,Floor Manager workorder rw,mrp.model_mrp_workorder,group_floor_manager,1,1,0,0
+access_fm_production,Floor Manager production read,mrp.model_mrp_production,group_floor_manager,1,0,0,0
+access_fm_equipment,Floor Manager equipment rw,maintenance.model_maintenance_equipment,group_floor_manager,1,1,0,0
+access_fm_routing,Floor Manager routing read,mrp.model_mrp_routing_workcenter,group_floor_manager,1,0,0,0

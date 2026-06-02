@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M16 (Manufacturing PM JTBD 2026-06-01) — Floor Manager portal
+  templates.
+
+  Two templates:
+
+    portal_floor_index       Landing — list of work centers with
+                              their in-flight work-order count
+                              and a 'View Queue' link.
+
+    portal_floor_workcenter  Per-station — three sections:
+                              1. Station header (code, name, OEE
+                                  target).
+                              2. Work-order queue grouped by parent
+                                  MO. Each row shows op name, state,
+                                  expected cycle time.
+                              3. Equipment at this station with the
+                                  M13 condition pill.
+
+  Phase-2 commit splices the start/finish + condition-pill action
+  buttons into these templates.
+-->
+<odoo>
+  <data>
+
+    <template id="portal_floor_index"
+              name="Southbrook Floor — Workcenter index">
+      <t t-call="portal.portal_layout">
+        <t t-set="breadcrumbs_searchbar" t-value="True"/>
+        <t t-set="page_name" t-value="'southbrook_floor'"/>
+        <t t-set="title">Floor — Work Centers</t>
+
+        <div class="o_sb_floor o_sb_floor_index">
+          <header class="o_sb_floor_header">
+            <h1>Shop Floor — Work Centers</h1>
+            <p>
+              Pick your station to see its current work-order queue.
+            </p>
+          </header>
+
+          <ul class="o_sb_floor_wc_grid">
+            <li t-foreach="wc_rows" t-as="row"
+                class="o_sb_floor_wc_tile"
+                t-att-class="'o_sb_floor_wc_inflight' if row['inflight'] else ''">
+              <a t-attf-href="/my/southbrook/floor/{{row['id']}}"
+                 class="o_sb_floor_wc_link">
+                <div class="o_sb_floor_wc_code"
+                     t-esc="row['code']"/>
+                <div class="o_sb_floor_wc_name"
+                     t-esc="row['name']"/>
+                <div class="o_sb_floor_wc_count">
+                  <t t-if="row['inflight']">
+                    <span class="o_sb_floor_wc_count_num"
+                          t-esc="row['inflight']"/>
+                    <span class="o_sb_floor_wc_count_lbl">in queue</span>
+                  </t>
+                  <t t-else="">
+                    <span class="o_sb_floor_wc_count_empty">— idle —</span>
+                  </t>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </t>
+    </template>
+
+    <template id="portal_floor_workcenter"
+              name="Southbrook Floor — Per-station queue">
+      <t t-call="portal.portal_layout">
+        <t t-set="page_name" t-value="'southbrook_floor_wc'"/>
+        <t t-set="title"><t t-esc="wc['code']"/> · Queue</t>
+
+        <div class="o_sb_floor o_sb_floor_wc">
+          <header class="o_sb_floor_header">
+            <p class="o_sb_floor_breadcrumb">
+              <a href="/my/southbrook/floor">← All Stations</a>
+            </p>
+            <h1>
+              <span class="o_sb_floor_wc_h_code"
+                    t-esc="wc['code']"/>
+              <span class="o_sb_floor_wc_h_name"
+                    t-esc="wc['name']"/>
+            </h1>
+            <p class="o_sb_floor_meta">
+              OEE Target <strong t-esc="wc['oee_target']"/>%
+            </p>
+          </header>
+
+          <!-- WORK-ORDER QUEUE -->
+          <section class="o_sb_floor_queue">
+            <h2>Queue</h2>
+            <t t-if="not wo_groups">
+              <p class="o_sb_floor_empty">No work orders queued at this station.</p>
+            </t>
+            <t t-else="">
+              <t t-foreach="wo_groups" t-as="grp">
+                <div class="o_sb_floor_mo_card">
+                  <header class="o_sb_floor_mo_header">
+                    <strong t-esc="grp['mo_name']"/>
+                    <span class="o_sb_floor_mo_sku mono"
+                          t-esc="grp['product_sku']"/>
+                    <span class="o_sb_floor_mo_state"
+                          t-esc="grp['mo_state']"/>
+                    <span t-if="grp['deadline']"
+                          class="o_sb_floor_mo_deadline">
+                      Due <t t-esc="grp['deadline']"/>
+                    </span>
+                  </header>
+                  <ul class="o_sb_floor_wo_list">
+                    <li t-foreach="grp['wos']" t-as="wo"
+                        class="o_sb_floor_wo"
+                        t-att-class="'o_sb_floor_wo_' + wo['state']">
+                      <div class="o_sb_floor_wo_label">
+                        <strong t-esc="wo['name']"/>
+                      </div>
+                      <div class="o_sb_floor_wo_state mono"
+                           t-esc="wo['state']"/>
+                      <div class="o_sb_floor_wo_time mono">
+                        <t t-esc="wo['duration_expected']"/> min
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </t>
+            </t>
+          </section>
+
+          <!-- EQUIPMENT AT THIS STATION -->
+          <section class="o_sb_floor_equipment" t-if="equipment">
+            <h2>Equipment at this Station</h2>
+            <ul class="o_sb_floor_eq_list">
+              <li t-foreach="equipment" t-as="eq"
+                  class="o_sb_floor_eq"
+                  t-att-class="'o_sb_floor_eq_' + eq['condition']">
+                <span class="o_sb_floor_eq_name"
+                      t-esc="eq['name']"/>
+                <span class="o_sb_floor_eq_pill mono"
+                      t-esc="eq['condition']"/>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </t>
+    </template>
+
+  </data>
+</odoo>
