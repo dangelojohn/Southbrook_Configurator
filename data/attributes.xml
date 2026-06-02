@@ -270,13 +270,21 @@
     <field name="create_variant">dynamic</field>
     <field name="sequence">60</field>
   </record>
+  <!-- 2026-06-02 — labels rewritten to industry-standard cabinetry
+       shorthand (LH / RH) with the long-form in parentheses for
+       clarity. Single-door cabinets (SB-WALL-1DR, SB-BASE-1DR,
+       single-door variants of CORNER / TALL / VANITY) prompt the
+       customer for LH vs RH at configuration time. Double-door
+       cabinets carry the same attribute but customers typically
+       leave it on N/A since both doors are hinged from outside-
+       to-centre. -->
   <record id="value_hinge_left" model="product.attribute.value">
     <field name="attribute_id" ref="attr_hinge_side"/>
-    <field name="name">Left</field><field name="sequence">1</field>
+    <field name="name">LH (Left Hand)</field><field name="sequence">1</field>
   </record>
   <record id="value_hinge_right" model="product.attribute.value">
     <field name="attribute_id" ref="attr_hinge_side"/>
-    <field name="name">Right</field><field name="sequence">2</field>
+    <field name="name">RH (Right Hand)</field><field name="sequence">2</field>
   </record>
   <record id="value_hinge_na" model="product.attribute.value">
     <field name="attribute_id" ref="attr_hinge_side"/>
