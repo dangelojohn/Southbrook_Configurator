@@ -48,6 +48,7 @@ analysis. Layered build:
     "depends": [
         "southbrook_estimating",         # the 12 cabinet templates + BoMs
         "southbrook_estimating_website", # the Order Builder action endpoint
+        "southbrook_plm",                # ECO model for M20 notification
         "mrp",                           # workcenter + production + routing
         "maintenance",                   # equipment + condition
     ],
