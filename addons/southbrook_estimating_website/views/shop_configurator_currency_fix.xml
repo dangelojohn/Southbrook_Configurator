@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-06-02 — pre-existing v19 bug in OCA website_product_configurator:
+
+      data/config_form_templates.xml:63 renders the wizard's price
+      with display_currency = website._get_and_cache_current_pricelist()
+      .currency_id, but that method can return a non-singleton
+      product.pricelist recordset under guest / context-less /shop
+      visits in Odoo 19. The Many2one access on a non-singleton
+      raises "Expected singleton: res.currency()" → 500 at
+      /shop/<product-slug>.
+
+  The same template at line 655 already uses the safe pattern
+  (website.currency_id). This override propagates that pattern to
+  the failing span without touching the OCA addon in place.
+
+  Filed against OCA fork: TODO (link once issue raised).
+
+  Scope: pure visual swap — the displayed currency is still the
+  website's currency in 99% of single-pricelist deployments
+  (Southbrook ships CAD on a single pricelist family per CLAUDE.md
+  §6). If a future deployment needs a per-pricelist currency we
+  switch to the controller pre-resolving the pricelist and passing
+  a guaranteed-singleton currency into the template context.
+-->
+<odoo>
+  <data>
+
+    <template id="config_form_currency_fix"
+              inherit_id="website_product_configurator.product_configurator"
+              name="Southbrook · configurator price currency fix">
+      <xpath expr="//span[hasclass('config_product_price')]"
+             position="replace">
+        <span class="config_product_price"
+              t-out="cfg_session.price"
+              t-options="{'widget': 'monetary',
+                          'display_currency': website.currency_id}"/>
+      </xpath>
+    </template>
+
+  </data>
+</odoo>

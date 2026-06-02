@@ -32,6 +32,11 @@
         # G4 + G5 + G6 + G8 (2026-06-01) — branded auth pages
         # (login/signup chrome) + project-name field on signup.
         "views/auth_template.xml",
+        # 2026-06-02 — fix 500 on /shop/<slug> caused by upstream
+        # OCA website_product_configurator chaining .currency_id on a
+        # potentially non-singleton pricelist recordset. Override
+        # swaps to website.currency_id (singleton, always available).
+        "views/shop_configurator_currency_fix.xml",
     ],
     # Dedicated asset bundle (charter Q4 answer) so the OWL portal
     # components only load on the Order Builder route. Other portal
