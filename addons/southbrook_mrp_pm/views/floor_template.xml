@@ -120,6 +120,38 @@
                       <div class="o_sb_floor_wo_time mono">
                         <t t-esc="wo['duration_expected']"/> min
                       </div>
+                      <!-- M16 Phase-2 — start / finish form-POSTs. -->
+                      <div class="o_sb_floor_wo_actions">
+                        <t t-if="wo['state'] in ('pending','ready')">
+                          <form method="post"
+                                t-attf-action="/my/southbrook/floor/wo/{{wo['id']}}/start"
+                                class="o_sb_floor_wo_form">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <button type="submit"
+                                    class="o_sb_floor_wo_btn o_sb_floor_wo_start">
+                              ▶ Start
+                            </button>
+                          </form>
+                        </t>
+                        <t t-elif="wo['state'] == 'progress'">
+                          <form method="post"
+                                t-attf-action="/my/southbrook/floor/wo/{{wo['id']}}/finish"
+                                class="o_sb_floor_wo_form">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <button type="submit"
+                                    class="o_sb_floor_wo_btn o_sb_floor_wo_finish">
+                              ✓ Finish
+                            </button>
+                          </form>
+                        </t>
+                        <t t-else="">
+                          <span class="o_sb_floor_wo_btn o_sb_floor_wo_blocked">
+                            ─ blocked
+                          </span>
+                        </t>
+                      </div>
                     </li>
                   </ul>
                 </div>
@@ -136,8 +168,31 @@
                   t-att-class="'o_sb_floor_eq_' + eq['condition']">
                 <span class="o_sb_floor_eq_name"
                       t-esc="eq['name']"/>
-                <span class="o_sb_floor_eq_pill mono"
-                      t-esc="eq['condition']"/>
+                <!-- M16 Phase-2 — condition pill becomes an
+                     auto-submitting select. Picking a value POSTs
+                     to /equipment/<id>/condition which writes back
+                     to maintenance.equipment.southbrook_condition
+                     (M13 field) and redirects here. -->
+                <form method="post"
+                      t-attf-action="/my/southbrook/floor/equipment/{{eq['id']}}/condition"
+                      class="o_sb_floor_eq_form">
+                  <input type="hidden" name="csrf_token"
+                         t-att-value="request.csrf_token()"/>
+                  <select name="condition"
+                          class="o_sb_floor_eq_pill_select mono"
+                          onchange="this.form.submit()">
+                    <option value="good"
+                            t-att-selected="eq['condition'] == 'good' or None">good</option>
+                    <option value="fair"
+                            t-att-selected="eq['condition'] == 'fair' or None">fair</option>
+                    <option value="watch"
+                            t-att-selected="eq['condition'] == 'watch' or None">watch</option>
+                    <option value="critical"
+                            t-att-selected="eq['condition'] == 'critical' or None">critical</option>
+                    <option value="offline"
+                            t-att-selected="eq['condition'] == 'offline' or None">offline</option>
+                  </select>
+                </form>
               </li>
             </ul>
           </section>

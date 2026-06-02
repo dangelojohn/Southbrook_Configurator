@@ -93,6 +93,121 @@ class SouthbrookFloorPortal(CustomerPortal):
             "southbrook_mrp_pm.portal_floor_index", values,
         )
 
+    # ==================================================================
+    # M16 Phase-2 — start/finish/condition action handlers
+    # ==================================================================
+    #
+    # Three POST routes, all CSRF-protected via Odoo's default
+    # csrf=True. Each performs its mutation and redirects back to
+    # the workcenter page so the operator's tablet refreshes with
+    # the new state.
+
+    @http.route(
+        "/my/southbrook/floor/wo/<int:wo_id>/start",
+        type="http",
+        auth="user",
+        website=True,
+        methods=["POST"],
+    )
+    def southbrook_floor_wo_start(self, wo_id, **kw):
+        if not self._floor_user_authorized():
+            return request.redirect("/my")
+        Wo = request.env["mrp.workorder"].sudo()
+        wo = Wo.browse(wo_id).exists()
+        if not wo:
+            return request.redirect("/my/southbrook/floor")
+        # Start only from ready / pending. Direct state write (not
+        # button_start) because Odoo's button_start has side-effects
+        # — component reservations, mrp_workorder timer rows, MO
+        # state cascade — that the floor MVP isn't wired for. Floor
+        # operator gets the state flip + date_start stamp; PMs who
+        # need the full mrp flow use the backend.
+        from odoo import fields as odoo_fields
+        if wo.state in ("pending", "ready", "waiting"):
+            wo.write({
+                "state": "progress",
+                "date_start": odoo_fields.Datetime.now(),
+            })
+        return request.redirect(
+            "/my/southbrook/floor/%s" % wo.workcenter_id.id
+        )
+
+    @http.route(
+        "/my/southbrook/floor/wo/<int:wo_id>/finish",
+        type="http",
+        auth="user",
+        website=True,
+        methods=["POST"],
+    )
+    def southbrook_floor_wo_finish(self, wo_id, **kw):
+        if not self._floor_user_authorized():
+            return request.redirect("/my")
+        Wo = request.env["mrp.workorder"].sudo()
+        wo = Wo.browse(wo_id).exists()
+        if not wo:
+            return request.redirect("/my/southbrook/floor")
+        from odoo import fields as odoo_fields
+        if wo.state == "progress":
+            # Same shortcut pattern as start — direct write of
+            # terminal state. The parent MO does NOT auto-close on
+            # this write (Odoo expects button_finish to cascade);
+            # PMs reconcile via the backend when the whole order
+            # finishes upstream.
+            wo.write({
+                "state": "done",
+                "date_finished": odoo_fields.Datetime.now(),
+            })
+            # Bump the next non-done sibling WO to 'ready' so the
+            # floor portal reflects what the next operator should
+            # see. Odoo's stock auto-cascade happens via
+            # button_finish; since we bypassed it, do it manually.
+            # Filter captures Odoo's gate states: blocked / waiting /
+            # pending / ready (already-ready is a no-op via the
+            # state write).
+            mo = wo.production_id
+            next_pending = mo.workorder_ids.filtered(
+                lambda w: w.state not in ("done", "cancel", "progress")
+                and w.sequence > wo.sequence,
+            )
+            if next_pending:
+                next_wo = min(
+                    next_pending, key=lambda w: w.sequence,
+                )
+                if next_wo.state != "ready":
+                    next_wo.write({"state": "ready"})
+        return request.redirect(
+            "/my/southbrook/floor/%s" % wo.workcenter_id.id
+        )
+
+    @http.route(
+        "/my/southbrook/floor/equipment/<int:eq_id>/condition",
+        type="http",
+        auth="user",
+        website=True,
+        methods=["POST"],
+    )
+    def southbrook_floor_equipment_condition(
+        self, eq_id, condition=None, **kw,
+    ):
+        if not self._floor_user_authorized():
+            return request.redirect("/my")
+        Equip = request.env["maintenance.equipment"].sudo()
+        eq = Equip.browse(eq_id).exists()
+        if not eq:
+            return request.redirect("/my/southbrook/floor")
+        valid = {"good", "fair", "watch", "critical", "offline"}
+        if condition in valid:
+            # The write() override on maintenance.equipment (M13)
+            # stamps southbrook_condition_last_updated +
+            # southbrook_condition_updated_by automatically.
+            eq.write({"southbrook_condition": condition})
+        redirect_wc = eq.workcenter_id.id if eq.workcenter_id else None
+        if redirect_wc:
+            return request.redirect(
+                "/my/southbrook/floor/%s" % redirect_wc
+            )
+        return request.redirect("/my/southbrook/floor")
+
     @http.route(
         "/my/southbrook/floor/<int:workcenter_id>",
         type="http",
