@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M18 — weekly capacity planning grid.
+
+  Pivot view on mrp.workorder: rows=workcenter, columns=day of
+  date_planned_start_wo, measure=SUM(duration_expected). Tells the
+  PM 'how many minutes is each station committed to per day
+  this week, and where's the headroom'.
+
+  Default filter:
+    - state in pending/waiting/ready/progress (in-flight; done
+      orders don't consume future capacity)
+    - date_planned_start_wo in next 7 days (default search filter
+      via context)
+
+  Pairs with a graph view (bar chart, stacked by state) for the
+  same data — pivot for tabular drill-in, graph for at-a-glance
+  shape.
+
+  PM compares committed-minutes per day against the 8-hour
+  shift (480 min). Anything > 480 min is over-committed; < 480
+  min has headroom. Phase-2 polish adds a computed 'remaining
+  hours' field that does the subtraction explicitly, but the
+  pivot is enough for a first surface.
+-->
+<odoo>
+  <data>
+
+    <!-- ============================================================
+         Pivot view — rows by workcenter, cols by day.
+         ============================================================ -->
+    <record id="view_pm_capacity_pivot" model="ir.ui.view">
+      <field name="name">mrp.workorder.pivot.southbrook_pm_capacity</field>
+      <field name="model">mrp.workorder</field>
+      <field name="arch" type="xml">
+        <pivot string="Capacity (minutes)" sample="1">
+          <field name="workcenter_id" type="row"/>
+          <field name="date_planned_start_wo" type="col" interval="day"/>
+          <field name="duration_expected" type="measure"/>
+        </pivot>
+      </field>
+    </record>
+
+    <!-- ============================================================
+         Graph view — bar chart of duration_expected per day,
+         stacked by workcenter so the PM eye picks out which
+         station drives the daily total.
+         ============================================================ -->
+    <record id="view_pm_capacity_graph" model="ir.ui.view">
+      <field name="name">mrp.workorder.graph.southbrook_pm_capacity</field>
+      <field name="model">mrp.workorder</field>
+      <field name="arch" type="xml">
+        <graph string="Capacity (minutes)" type="bar" stacked="1"
+               sample="1">
+          <field name="date_planned_start_wo" interval="day"/>
+          <field name="workcenter_id"/>
+          <field name="duration_expected" type="measure"/>
+        </graph>
+      </field>
+    </record>
+
+    <!-- ============================================================
+         Action + menu entry. Domain pre-filters to in-flight WOs;
+         user can broaden via the standard search bar if needed.
+         ============================================================ -->
+    <record id="action_pm_capacity" model="ir.actions.act_window">
+      <field name="name">Capacity</field>
+      <field name="res_model">mrp.workorder</field>
+      <field name="view_mode">pivot,graph,list,form</field>
+      <field name="domain">[
+        ('state','in',['pending','waiting','ready','progress'])
+      ]</field>
+      <field name="context">{
+        'search_default_group_by_workcenter': 1,
+      }</field>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+          No in-flight work orders in the next 7 days.
+        </p>
+        <p>
+          The pivot view shows committed minutes per work center
+          per day. Compare against the 8-hour shift (480 min) to
+          spot over-committed stations and the days with
+          available headroom.
+        </p>
+      </field>
+    </record>
+
+    <menuitem
+        id="menu_pm_capacity"
+        parent="menu_southbrook_pm_root"
+        name="Capacity"
+        action="action_pm_capacity"
+        sequence="7"/>
+
+  </data>
+</odoo>

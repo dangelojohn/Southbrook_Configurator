@@ -93,6 +93,9 @@ analysis. Layered build:
         # M10 + M11 — PM KPI dashboards (Dashboard + Family
         # Throughput entries under Southbrook PM).
         "views/pm_dashboard.xml",
+        # M18 — weekly capacity planning (pivot + graph on
+        # mrp.workorder, 'Capacity' menu entry).
+        "views/pm_capacity.xml",
     ],
     "assets": {
         "web.assets_frontend": [
