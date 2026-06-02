@@ -22,11 +22,15 @@ Auth model: portal user; `partner_id.parent_id` chain identifies
 the dealer. The controller verifies the order belongs to either
 the logged-in partner OR the partner's parent (dealer org).
 """
+import logging
+
 from odoo import fields, http
 from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome
 from odoo.addons.portal.controllers.portal import CustomerPortal
+
+_logger = logging.getLogger(__name__)
 
 
 # ======================================================================
@@ -166,6 +170,52 @@ class SouthbrookKitchenPlanner(http.Controller):
         user = request.env.user
         partner = user.partner_id
 
+        # 2026-06-02 catalog-picker redesign — channel-aware preview
+        # pricing.
+        #
+        # Display-only. The add-line endpoint and order-line pricing
+        # are unchanged: when the user clicks Add the line is created
+        # with the default product_uom_qty and its price flows through
+        # Odoo's standard product_id_change → pricelist resolution
+        # (which lands on the SAME pricelist as the preview because
+        # the partner is the same). This block just shows a preview
+        # of that figure on the catalog card.
+        #
+        # Resolution path:
+        #   1. sale.order._resolve_channel_pricelist(partner) — custom
+        #      routine #3, same dispatcher the order uses at confirm.
+        #   2. Per-cabinet: pricelist._get_product_price(variant,
+        #      qty=1.0, partner) on the lowest-id variant we already
+        #      use for SKU resolution.
+        #   3. Round to the website currency's decimal_places (same
+        #      currency as list_price), so display matches what the
+        #      order line will round to at confirmation time.
+        #   4. Guarded — if the pricelist or the variant is missing,
+        #      or the call raises, channel_price falls back to
+        #      tmpl.list_price (i.e. retail). The catalog endpoint
+        #      must never 500 over a price-preview failure.
+        SaleOrder = request.env["sale.order"].sudo()
+        channel_pricelist = SaleOrder._resolve_channel_pricelist(partner)
+        channel_label = (
+            channel_pricelist.name if channel_pricelist else ""
+        )
+
+        # Website currency — resolved here (above the loop) so the
+        # per-cabinet channel_price can round to its decimal_places.
+        # JSON-RPC routes don't get `request.website` injected (that
+        # requires `website=True` on the route, which is only valid
+        # for `type='http'`); use get_current_website() instead.
+        Website = request.env["website"].sudo()
+        website = (
+            Website.get_current_website()
+            if hasattr(Website, "get_current_website")
+            else Website
+        )
+        currency = (
+            (website and website.currency_id)
+            or request.env.company.currency_id
+        )
+
         # Catalog: the 12 Q8 cabinet templates resolved by stable
         # xml_id rather than default_code matching.
         #
@@ -213,35 +263,92 @@ class SouthbrookKitchenPlanner(http.Controller):
             tmpl = Tmpl.browse(tmpl_id)  # already sudo'd above
             if not tmpl.exists():
                 continue
-            # SKU resolution priority:
+            # SKU + base-variant resolution. Walked in one pass so the
+            # SKU-resolution and channel-price-resolution paths share
+            # the same variant (the lowest-id product.product with a
+            # default_code; otherwise the lowest-id variant overall).
+            #
+            # SKU priority:
             #   1. Lowest-id variant with non-empty default_code
             #      (the canonical product.product SKU)
             #   2. template.default_code if still set (single-variant
             #      case)
             #   3. Empty string — frontend falls back to displaying
             #      just the name
+            sorted_variants = tmpl.product_variant_ids.sorted("id")
+            base_variant = sorted_variants[:1]
             sku = ""
-            for variant in tmpl.product_variant_ids.sorted("id"):
+            for variant in sorted_variants:
                 if variant.default_code:
                     sku = variant.default_code
+                    base_variant = variant
                     break
             if not sku and tmpl.default_code:
                 sku = tmpl.default_code
+
+            # 2026-06-02 redesign: read display metadata off the
+            # template's southbrook_* fields. Translatable fields
+            # (southbrook_description) resolve in the request's
+            # active language automatically — Tmpl was browsed with
+            # the current env (request.env.user's lang), so accessing
+            # tmpl.southbrook_description here returns the translated
+            # value for that user. No explicit with_context(lang=...)
+            # needed for the public-facing customer flow.
+
+            # 2026-06-02 — channel-aware preview price (display-only;
+            # add-line endpoint and order-line pricing are unchanged
+            # and still flow through standard product_id_change /
+            # pricelist resolution at order time).
+            #
+            # Compute via the canonical Odoo pricelist engine on the
+            # base variant, then round to the website currency's
+            # decimal_places so display matches what an order line
+            # will round to at confirm. Guarded — any exception or
+            # missing prereq falls back to tmpl.list_price (retail).
+            channel_price = tmpl.list_price
+            if channel_pricelist and base_variant:
+                try:
+                    channel_price = channel_pricelist._get_product_price(
+                        base_variant, 1.0, partner,
+                    )
+                except Exception:                       # noqa: BLE001
+                    _logger.warning(
+                        "kitchen_planner_state: pricelist %s could not "
+                        "price cabinet %s (variant id=%s); falling back "
+                        "to list_price for display.",
+                        channel_pricelist.display_name,
+                        sku or tmpl.name,
+                        base_variant.id,
+                        exc_info=True,
+                    )
+            # Round to website currency precision (same path list_price
+            # would be formatted through downstream).
+            if currency:
+                channel_price = currency.round(channel_price)
             catalog.append({
                 "id": tmpl.id,
                 "sku": sku,
                 "name": tmpl.name,
                 "list_price": tmpl.list_price,
+                "channel_price": channel_price,
                 "family": self._family_from_sku(sku),
+                "category": (
+                    tmpl.southbrook_category
+                    or self._CATALOG_DEFAULTS["category"]
+                ),
+                "description": (
+                    tmpl.southbrook_description
+                    or self._CATALOG_DEFAULTS["description"]
+                ),
+                "dimensions": (
+                    tmpl.southbrook_dimensions
+                    or self._CATALOG_DEFAULTS["dimensions"]
+                ),
+                "icon": (
+                    tmpl.southbrook_icon_key
+                    or self._CATALOG_DEFAULTS["icon"]
+                ),
             })
-
-        # Website currency (CAD on the southbrook stack per #5).
-        # JSON-RPC routes don't get `request.website` injected (that
-        # requires `website=True` on the route, which is only valid
-        # for `type='http'`). Use get_current_website() instead.
-        Website = request.env["website"].sudo()
-        website = Website.get_current_website() if hasattr(Website, "get_current_website") else Website
-        currency = (website and website.currency_id) or request.env.company.currency_id
 
         # Partner channel resolution — informs the planner's
         # "your tier / dealer" badge in the viewport corner. Customer
@@ -255,6 +362,10 @@ class SouthbrookKitchenPlanner(http.Controller):
                 "partner_id": partner.id,
                 "partner_name": partner.name,
                 "channel": channel,
+                # 2026-06-02 — pricelist display name (e.g. "Dealer
+                # (-50%)", "Contractor Tier 3 (-35%)", "Retail (List
+                # Price)") for the CatalogPicker channel badge.
+                "channel_label": channel_label,
             },
             "catalog": catalog,
             "currency": {
@@ -301,6 +412,28 @@ class SouthbrookKitchenPlanner(http.Controller):
             if sku.startswith(prefix):
                 return family
         return ""
+
+    # 2026-06-02 catalog-picker redesign — display metadata fields.
+    #
+    # The four southbrook_* fields are now defined on product.template
+    # (southbrook_category, southbrook_description, southbrook_dimensions,
+    # southbrook_icon_key) and seeded by
+    # southbrook_estimating/data/cabinet_catalog_metadata.xml.
+    # kitchen_planner_state reads them off each template below and
+    # emits them under unprefixed keys in the JSON payload (category /
+    # description / dimensions / icon) so the OWL CatalogPicker
+    # contract stays unchanged.
+    #
+    # Defaults applied at the controller layer for cabinets missing
+    # metadata (e.g. third-party templates added to CABINET_XML_IDS
+    # without a metadata seed row): category=Extras, icon=extra,
+    # description/dimensions empty strings.
+    _CATALOG_DEFAULTS = {
+        "category": "Extras",
+        "description": "",
+        "dimensions": "",
+        "icon": "extra",
+    }
 
     # ==================================================================
     # Phase 2 commit 4 — session create + attribute discovery.
@@ -959,7 +1092,7 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         methods=["POST"],
     )
     def southbrook_api_order_add_line(
-        self, order_id, product_tmpl_id=None, **kw,
+        self, order_id, product_tmpl_id=None, qty=None, **kw,
     ):
         try:
             order = self._southbrook_resolve_order(order_id)
@@ -970,6 +1103,17 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
 
         if not product_tmpl_id:
             return {"error": "missing_product_tmpl_id"}
+
+        # Catalog-picker redesign 2026-06-02: optional qty arg carrying
+        # the quantity stepper value through to the order line. Default
+        # 1 keeps the original behaviour for any caller still passing
+        # only product_tmpl_id.
+        try:
+            qty_int = int(qty) if qty is not None else 1
+        except (TypeError, ValueError):
+            qty_int = 1
+        if qty_int < 1:
+            qty_int = 1
 
         Template = request.env["product.template"].sudo()
         tmpl = Template.browse(int(product_tmpl_id)).exists()
@@ -999,7 +1143,7 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             .create({
                 "order_id": order.id,
                 "product_id": variant.id,
-                "product_uom_qty": 1,
+                "product_uom_qty": qty_int,
             })
         )
         # Trigger Odoo's onchange-equivalent so price_unit /

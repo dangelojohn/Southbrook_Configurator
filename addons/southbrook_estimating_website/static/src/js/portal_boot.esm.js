@@ -1,6 +1,7 @@
 /** @odoo-module **/
-// Bundle hash bump 2026-06-01T07:20Z — forces b35cf24 → new hash so
-// any browser holding a cached old bundle URL refetches the fixed code.
+// Bundle hash bump 2026-06-02T11:50Z — filter v2: single-row tab bar
+// (underline-active, superscript counts, horizontal-scroll on overflow)
+// + alternative <select> dropdown behind state.filterMode flag.
 /*
  * SPDX-License-Identifier: LGPL-3.0-only
  *
@@ -30,7 +31,7 @@
  *     },
  *   };
  */
-import { Component, mount, onMounted, useState, xml } from "@odoo/owl";
+import { Component, mount, markup, onMounted, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 
 // ----------------------------------------------------------------------
@@ -1078,7 +1079,8 @@ class HeaderStrip extends Component {
         <div class="o_owl_header_strip">
             <div class="o_owl_hs_cell o_owl_hs_customer">
                 <div class="o_owl_hs_label">Customer</div>
-                <div class="o_owl_hs_value">
+                <div class="o_owl_hs_value"
+                     t-att-title="props.order.partner_name">
                     <t t-esc="props.order.partner_name"/>
                     <span t-if="props.order.via" class="o_owl_hs_sub">
                         (<t t-esc="props.order.via"/>)
@@ -1128,20 +1130,135 @@ class HeaderStrip extends Component {
 }
 
 // ----------------------------------------------------------------------
-// CatalogPicker (G11 + G12 + G13, 2026-06-01).
+// Cabinet icon set (2026-06-02 redesign).
 //
-// Modal that lists the 12 Q8 cabinet templates as tiles. Clicking a
-// tile fires /southbrook/api/order/<id>/add-line and signals success
-// back to the parent so it can refresh state.
+// Stroke-only 48×48 line drawings, one per icon key. Inherit colour
+// via stroke="currentColor" so they tint to whatever colour the
+// surrounding card uses (walnut on hover, ink-dim by default).
+//
+// Keys match the `icon` field stamped by SouthbrookKitchenPlannerSPA
+// ._CATALOG_METADATA in the controller. cabinetIcon() resolves a
+// key to a markup() wrapper so OWL's t-out renders it as HTML; an
+// unknown key falls back to the 'extra' icon.
+// ----------------------------------------------------------------------
+
+const CABINET_ICONS = {
+    wall1: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="12" y="6" width="24" height="36" rx="2"/>
+        <rect x="15" y="9" width="18" height="30" rx="1"/>
+        <circle cx="30" cy="24" r="1" fill="currentColor"/>
+    </svg>`,
+    wall2: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="8" width="40" height="32" rx="2"/>
+        <rect x="7" y="11" width="16" height="26" rx="1"/>
+        <rect x="25" y="11" width="16" height="26" rx="1"/>
+        <circle cx="20" cy="24" r="1" fill="currentColor"/>
+        <circle cx="28" cy="24" r="1" fill="currentColor"/>
+    </svg>`,
+    base1: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="8" y="6" width="32" height="32" rx="2"/>
+        <rect x="11" y="9" width="26" height="26" rx="1"/>
+        <circle cx="34" cy="22" r="1" fill="currentColor"/>
+        <line x1="8" y1="38" x2="40" y2="38"/>
+        <line x1="10" y1="42" x2="38" y2="42"/>
+    </svg>`,
+    base2: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="6" width="40" height="32" rx="2"/>
+        <rect x="7" y="9" width="16" height="26" rx="1"/>
+        <rect x="25" y="9" width="16" height="26" rx="1"/>
+        <circle cx="20" cy="22" r="1" fill="currentColor"/>
+        <circle cx="28" cy="22" r="1" fill="currentColor"/>
+        <line x1="6" y1="38" x2="42" y2="38"/>
+        <line x1="8" y1="42" x2="40" y2="42"/>
+    </svg>`,
+    drawer: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="8" y="6" width="32" height="32" rx="2"/>
+        <rect x="11" y="9" width="26" height="7" rx="1"/>
+        <rect x="11" y="18.5" width="26" height="7" rx="1"/>
+        <rect x="11" y="28" width="26" height="7" rx="1"/>
+        <line x1="20" y1="12.5" x2="28" y2="12.5"/>
+        <line x1="20" y1="22" x2="28" y2="22"/>
+        <line x1="20" y1="31.5" x2="28" y2="31.5"/>
+        <line x1="8" y1="42" x2="40" y2="42"/>
+    </svg>`,
+    sink: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="6" width="40" height="32" rx="2"/>
+        <ellipse cx="24" cy="20" rx="12" ry="6"/>
+        <circle cx="24" cy="20" r="1.5"/>
+        <line x1="11" y1="30" x2="37" y2="30"/>
+        <line x1="6" y1="38" x2="42" y2="38"/>
+        <line x1="8" y1="42" x2="40" y2="42"/>
+    </svg>`,
+    pantry: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="14" y="2" width="20" height="44" rx="2"/>
+        <line x1="17" y1="12" x2="31" y2="12"/>
+        <line x1="17" y1="20" x2="31" y2="20"/>
+        <line x1="17" y1="28" x2="31" y2="28"/>
+        <line x1="17" y1="36" x2="31" y2="36"/>
+        <circle cx="31" cy="24" r="1" fill="currentColor"/>
+    </svg>`,
+    oven: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="12" y="2" width="24" height="44" rx="2"/>
+        <rect x="15" y="6" width="18" height="6" rx="1"/>
+        <rect x="15" y="14" width="18" height="14" rx="1"/>
+        <circle cx="24" cy="21" r="3"/>
+        <rect x="15" y="30" width="18" height="14" rx="1"/>
+    </svg>`,
+    corner: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 6 6 L 30 6 L 42 18 L 42 42 L 6 42 Z"/>
+        <line x1="30" y1="6" x2="42" y2="18"/>
+        <rect x="10" y="11" width="12" height="26" rx="1"/>
+        <circle cx="19" cy="24" r="1" fill="currentColor"/>
+    </svg>`,
+    vanity: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="24" cy="10" rx="14" ry="4"/>
+        <line x1="20" y1="6" x2="28" y2="6"/>
+        <rect x="6" y="14" width="36" height="28" rx="2"/>
+        <rect x="9" y="17" width="14" height="22" rx="1"/>
+        <rect x="25" y="17" width="14" height="22" rx="1"/>
+        <circle cx="21" cy="28" r="1" fill="currentColor"/>
+        <circle cx="27" cy="28" r="1" fill="currentColor"/>
+    </svg>`,
+    extra: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="6" width="14" height="14" rx="1.5"/>
+        <rect x="28" y="6" width="14" height="14" rx="1.5"/>
+        <rect x="6" y="28" width="14" height="14" rx="1.5"/>
+        <rect x="28" y="28" width="14" height="14" rx="1.5"/>
+        <line x1="35" y1="32" x2="35" y2="38"/>
+        <line x1="32" y1="35" x2="38" y2="35"/>
+    </svg>`,
+    worktop: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="20" width="40" height="8" rx="1.5"/>
+        <line x1="10" y1="20" x2="10" y2="28"/>
+        <line x1="38" y1="20" x2="38" y2="28"/>
+        <line x1="2" y1="35" x2="46" y2="35" stroke-dasharray="3 3"/>
+    </svg>`,
+};
+
+function cabinetIcon(key) {
+    return markup(CABINET_ICONS[key] || CABINET_ICONS.extra);
+}
+
+// ----------------------------------------------------------------------
+// CatalogPicker (G11+G12+G13 2026-06-01, redesigned 2026-06-02).
+//
+// Modal that lists the 12 Q8 cabinet templates as filterable cards.
+// 2026-06-02 redesign added: search input, category pills, grid/list
+// view toggle, per-card quantity stepper, SVG icon thumbnails,
+// hover-lift cards, brand-accent Add button with success state.
+//
+// The add path is unchanged — addItem(item) calls props.onPick(item.id,
+// qty), which is the SAME function path the old tile-click used. No
+// duplication, no bypass; the qty arg flows through to the existing
+// /southbrook/api/order/<id>/add-line endpoint.
 //
 // Props:
-//   catalog  — array of {id, sku, name, list_price, family}
-//             (sourced from /api/kitchen-planner/state on parent
-//             mount; passed in instead of re-fetched here)
-//   open     — boolean — whether the modal is shown
-//   busy     — boolean — true while the add-line RPC is in flight
-//   onClose  — fired when user clicks the backdrop or the X button
-//   onPick   — fired with the chosen template id when a tile is clicked
+//   catalog  — array of {id, sku, name, list_price, family, category,
+//                        description, dimensions, icon}
+//   open     — whether the modal is shown
+//   busy     — true while the add-line RPC is in flight
+//   onClose  — fired when user dismisses the modal
+//   onPick   — fired with (templateId, qty) when an Add button is clicked
 // ----------------------------------------------------------------------
 
 class CatalogPicker extends Component {
@@ -1149,7 +1266,9 @@ class CatalogPicker extends Component {
         <div t-if="props.open" class="o_owl_modal_backdrop"
              t-on-click="_onBackdropClick">
             <div class="o_owl_modal_panel o_owl_catalog_panel"
+                 t-att-class="state.viewMode === 'list' ? 'o_owl_catalog_panel_list' : ''"
                  t-on-click.stop="">
+
                 <div class="o_owl_modal_header">
                     <h3 class="o_owl_modal_title">
                         Add a cabinet to your order
@@ -1158,29 +1277,233 @@ class CatalogPicker extends Component {
                             t-on-click="props.onClose"
                             aria-label="Close">×</button>
                 </div>
-                <div class="o_owl_modal_body o_owl_catalog_body">
-                    <p class="o_owl_catalog_hint">
-                        Pick a cabinet family to add to your project.
-                        You can refine dimensions, finish, and door
-                        style after adding.
-                    </p>
-                    <div class="o_owl_catalog_grid">
-                        <button t-foreach="props.catalog"
-                                t-as="item"
-                                t-key="item.id"
-                                class="o_owl_catalog_tile"
-                                t-att-disabled="props.busy"
-                                t-on-click="() => this._onPick(item.id)">
-                            <div class="o_owl_catalog_tile_sku"
-                                 t-esc="item.sku"/>
-                            <div class="o_owl_catalog_tile_name"
-                                 t-esc="item.name"/>
-                            <div class="o_owl_catalog_tile_price"
-                                 t-esc="fmtUsd(item.list_price)"/>
+
+                <div class="o_owl_catalog_toolbar">
+                    <!-- 2026-06-02 filter v2 alternative — compact
+                         &lt;select&gt; dropdown. Renders only when
+                         state.filterMode === 'select' (see setup
+                         comment for how to switch). Same setCategory
+                         handler the tab bar uses. -->
+                    <select t-if="state.filterMode === 'select'"
+                            class="o_owl_catalog_filter_select"
+                            t-on-change="(ev) => this._setCategory(ev.target.value)"
+                            aria-label="Filter by category">
+                        <option t-foreach="getCategoryTabs()"
+                                t-as="tab"
+                                t-key="tab.key"
+                                t-att-value="tab.key"
+                                t-att-selected="state.activeCategory === tab.key ? 'selected' : ''">
+                            <t t-esc="tab.key"/> · <t t-esc="tab.count"/>
+                        </option>
+                    </select>
+                    <div class="o_owl_catalog_search_wrap">
+                        <svg class="o_owl_catalog_search_icon"
+                             viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7"/>
+                            <line x1="20" y1="20" x2="16.5" y2="16.5"/>
+                        </svg>
+                        <input type="search"
+                               class="o_owl_catalog_search"
+                               placeholder="Search cabinets by name or SKU…"
+                               t-att-value="state.searchQuery"
+                               t-on-input="_onSearch"
+                               aria-label="Search catalog"/>
+                    </div>
+                    <div class="o_owl_catalog_view_toggle"
+                         role="group" aria-label="View mode">
+                        <button type="button"
+                                class="o_owl_catalog_view_btn"
+                                t-att-class="state.viewMode === 'grid' ? 'o_owl_catalog_view_btn_active' : ''"
+                                t-on-click="() => this._setView('grid')"
+                                aria-label="Grid view"
+                                title="Grid view">
+                            <svg viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                            </svg>
+                        </button>
+                        <button type="button"
+                                class="o_owl_catalog_view_btn"
+                                t-att-class="state.viewMode === 'list' ? 'o_owl_catalog_view_btn_active' : ''"
+                                t-on-click="() => this._setView('list')"
+                                aria-label="List view"
+                                title="List view">
+                            <svg viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <line x1="4" y1="6" x2="20" y2="6"/>
+                                <line x1="4" y1="12" x2="20" y2="12"/>
+                                <line x1="4" y1="18" x2="20" y2="18"/>
+                            </svg>
                         </button>
                     </div>
+                </div>
+
+                <nav t-if="state.filterMode === 'tabs'"
+                     class="o_owl_catalog_tabs"
+                     role="tablist"
+                     aria-label="Filter by category">
+                    <t t-foreach="getCategoryTabs()" t-as="tab"
+                       t-key="tab.key">
+                        <button type="button"
+                                class="o_owl_catalog_tab"
+                                t-att-class="state.activeCategory === tab.key ? 'o_owl_catalog_tab_active' : ''"
+                                t-on-click="() => this._setCategory(tab.key)"
+                                t-on-keydown="(ev) => this._onTabKeydown(ev, tab.key)"
+                                role="tab"
+                                t-att-aria-selected="state.activeCategory === tab.key ? 'true' : 'false'"
+                                t-att-tabindex="state.activeCategory === tab.key ? '0' : '-1'">
+                            <span class="o_owl_catalog_tab_label"
+                                  t-esc="tab.key"/>
+                            <sup class="o_owl_catalog_tab_count"
+                                 t-esc="tab.count"/>
+                        </button>
+                    </t>
+                </nav>
+
+                <div class="o_owl_modal_body o_owl_catalog_body">
+                    <p class="o_owl_catalog_count">
+                        Showing
+                        <strong t-esc="getFilteredItems().length"/>
+                        of
+                        <strong t-esc="props.catalog.length"/>
+                        cabinet families
+                    </p>
+
+                    <t t-if="getFilteredItems().length === 0">
+                        <div class="o_owl_catalog_empty">
+                            <div class="o_owl_catalog_empty_icon"
+                                 t-out="searchIcon()"/>
+                            <strong>No cabinets match this search.</strong>
+                            <p>Try a different keyword or clear the filter.</p>
+                            <button type="button"
+                                    class="o_owl_catalog_empty_reset"
+                                    t-on-click="_resetFilters">
+                                Reset filters
+                            </button>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div class="o_owl_catalog_grid"
+                             t-att-class="state.viewMode === 'list' ? 'o_owl_catalog_grid_list' : ''">
+                            <article t-foreach="getFilteredItems()"
+                                     t-as="item"
+                                     t-key="item.id"
+                                     class="o_owl_catalog_card"
+                                     t-att-class="state.lastAddedSku === item.sku ? 'o_owl_catalog_card_added' : ''">
+                                <!-- 2026-06-02 card layout v3 — three explicit
+                                     regions so list mode can flex-row cleanly:
+                                       1) icon          (flex:0 0 auto, fixed)
+                                       2) content       (flex:1 1 auto, min-width:0)
+                                       3) aside         (flex:0 0 auto, price+actions)
+                                     The flexible middle is what stops the
+                                     per-character wrap bug in list mode.
+                                     Grid mode places these into a 2-col
+                                     grid: icon|content on top, aside spans full
+                                     width below. -->
+                                <div class="o_owl_catalog_card_icon"
+                                     t-out="cabinetIcon(item.icon)"/>
+                                <div class="o_owl_catalog_card_content">
+                                    <div class="o_owl_catalog_card_titles">
+                                        <span t-if="item.category"
+                                              class="o_owl_catalog_card_badge"
+                                              t-esc="item.category"/>
+                                        <h4 class="o_owl_catalog_card_name"
+                                            t-esc="item.name"/>
+                                        <div class="o_owl_catalog_card_sku"
+                                             t-esc="item.sku"/>
+                                    </div>
+                                    <p t-if="item.description"
+                                       class="o_owl_catalog_card_desc"
+                                       t-esc="item.description"/>
+                                    <div t-if="item.dimensions"
+                                         class="o_owl_catalog_card_dims">
+                                        <svg viewBox="0 0 24 24" fill="none"
+                                             stroke="currentColor"
+                                             stroke-width="1.5"
+                                             stroke-linecap="round"
+                                             stroke-linejoin="round"
+                                             aria-hidden="true">
+                                            <path d="M3 9h18M3 9v6m18-6v6M3 15h18"/>
+                                            <line x1="7" y1="9" x2="7" y2="15"/>
+                                            <line x1="12" y1="9" x2="12" y2="15"/>
+                                            <line x1="17" y1="9" x2="17" y2="15"/>
+                                        </svg>
+                                        <span t-esc="item.dimensions"/>
+                                    </div>
+                                </div>
+                                <div class="o_owl_catalog_card_aside">
+                                    <div class="o_owl_catalog_card_price_row">
+                                        <t t-if="hasChannelDiscount(item)">
+                                            <span class="o_owl_catalog_card_price_strike"
+                                                  t-esc="fmtUsd(item.list_price)"/>
+                                            <span class="o_owl_catalog_card_price"
+                                                  t-esc="fmtUsd(item.channel_price)"/>
+                                            <span class="o_owl_catalog_card_channel_lbl">your price<t t-if="props.channelLabel"> · <t t-esc="channelLabelShort()"/></t></span>
+                                        </t>
+                                        <t t-else="">
+                                            <span class="o_owl_catalog_card_price"
+                                                  t-esc="fmtUsd(item.list_price)"/>
+                                            <span class="o_owl_catalog_card_price_lbl">list</span>
+                                        </t>
+                                    </div>
+                                    <div class="o_owl_catalog_card_actions">
+                                        <div class="o_owl_catalog_qty"
+                                             role="group"
+                                             aria-label="Quantity">
+                                            <button type="button"
+                                                    class="o_owl_catalog_qty_btn"
+                                                    t-att-disabled="props.busy or getQty(item.sku) &lt;= 1"
+                                                    t-on-click="() => this._decQty(item.sku)"
+                                                    aria-label="Decrease quantity">−</button>
+                                            <input type="number" min="1"
+                                                   class="o_owl_catalog_qty_input"
+                                                   t-att-value="getQty(item.sku)"
+                                                   t-on-input="(ev) => this._setQty(item.sku, ev.target.value)"
+                                                   aria-label="Quantity"/>
+                                            <button type="button"
+                                                    class="o_owl_catalog_qty_btn"
+                                                    t-att-disabled="props.busy"
+                                                    t-on-click="() => this._incQty(item.sku)"
+                                                    aria-label="Increase quantity">+</button>
+                                        </div>
+                                        <button type="button"
+                                                class="o_owl_catalog_add_btn"
+                                                t-att-class="state.lastAddedSku === item.sku ? 'o_owl_catalog_add_btn_added' : ''"
+                                                t-att-disabled="props.busy"
+                                                t-on-click="() => this._addItem(item)">
+                                            <t t-if="state.lastAddedSku === item.sku">
+                                                <svg viewBox="0 0 24 24"
+                                                     fill="none"
+                                                     stroke="currentColor"
+                                                     stroke-width="2"
+                                                     stroke-linecap="round"
+                                                     stroke-linejoin="round"
+                                                     aria-hidden="true">
+                                                    <path d="M4 12l5 5L20 6"/>
+                                                </svg>
+                                                Added
+                                            </t>
+                                            <t t-else="">Add</t>
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                    </t>
+
                     <p t-if="props.busy"
-                       class="o_owl_catalog_busy">
+                       class="o_owl_catalog_busy"
+                       role="status" aria-live="polite">
                         Adding cabinet to your order…
                     </p>
                 </div>
@@ -1193,9 +1516,194 @@ class CatalogPicker extends Component {
         busy: Boolean,
         onClose: Function,
         onPick: Function,
+        // 2026-06-02 — channel pricelist label for the optional
+        // channel-pricing badge. Empty string for retail walk-in.
+        channelLabel: { type: String, optional: true },
     };
 
+    // Module-level helpers exposed as instance fields so the template
+    // can resolve them against `this`.
     fmtUsd = fmtUsd;
+    cabinetIcon = cabinetIcon;
+
+    // 2026-06-02 channel-price helpers.
+    //
+    // hasChannelDiscount(item)  True when item.channel_price differs
+    //                           from item.list_price (i.e. the visiting
+    //                           partner is on a non-retail pricelist
+    //                           AND the cabinet has a resolvable
+    //                           channel price). Drives the dual-price
+    //                           treatment in the card.
+    //
+    // channelLabelShort()       Compact label shown next to the
+    //                           channel price. Strips the parenthesised
+    //                           discount tail of pricelist names so
+    //                           "Contractor Tier 3 (-35%)" renders
+    //                           as "TIER 3 -35%" in 11px monospace
+    //                           on the card. Falls back to the empty
+    //                           string when no channel applies.
+    hasChannelDiscount(item) {
+        if (item.channel_price == null || item.list_price == null) {
+            return false;
+        }
+        // Use a small epsilon for float drift (currency rounding).
+        return Math.abs(item.list_price - item.channel_price) > 0.005;
+    }
+
+    channelLabelShort() {
+        const label = (this.props.channelLabel || "").trim();
+        if (!label) return "";
+        // Pricelist names look like "Contractor Tier 3 (-35%)" or
+        // "Dealer (-50%)". Pull out the discount tail if present;
+        // otherwise show the whole label upper-cased.
+        const m = label.match(/\(([^)]+)\)/);
+        if (m) return m[1].toUpperCase();
+        return label.toUpperCase();
+    }
+
+    setup() {
+        this.state = useState({
+            // 2026-06-02 redesign — reactive filter + view state.
+            searchQuery: "",
+            activeCategory: "All",
+            viewMode: "grid",          // 'grid' | 'list'
+            // 2026-06-02 filter v2 — UI variant for the category
+            // filter. 'tabs' renders the underlined single-row tab
+            // bar (default); 'select' renders a compact <select>
+            // dropdown inline in the toolbar instead. Both call
+            // _setCategory so the rest of the component doesn't
+            // know which is showing. TO SWITCH DEFAULT: change the
+            // initial value here to "select".
+            filterMode: "tabs",        // 'tabs' | 'select'
+            qtyBySku: {},              // sku -> integer qty (default 1)
+            lastAddedSku: null,        // briefly set after successful add
+        });
+        // Pre-bind handlers passed by plain reference (same pattern as
+        // OrderBuilder — OWL 2 in this Odoo build doesn't preserve
+        // `this` for non-arrow method props).
+        this._onBackdropClick = this._onBackdropClick.bind(this);
+        this._onSearch = this._onSearch.bind(this);
+        this._resetFilters = this._resetFilters.bind(this);
+    }
+
+    // ------------------------------------------------------------------
+    // Static module-level icon for the empty state. Returns markup so
+    // OWL t-out renders it as inline SVG.
+    // ------------------------------------------------------------------
+    searchIcon() {
+        return markup(`<svg viewBox="0 0 48 48" fill="none"
+                            stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="22" cy="22" r="13"/>
+            <line x1="40" y1="40" x2="31" y2="31"/>
+        </svg>`);
+    }
+
+    // ------------------------------------------------------------------
+    // Derived selectors — filter pipeline.
+    //
+    //   buildDomain()        Returns the current filter criteria as a
+    //                        plain object {category, searchQuery}.
+    //                        Pure function of state — no I/O.
+    //
+    //   applyFilters()       Filters items by the criteria object.
+    //                        Today runs purely client-side over the
+    //                        already-loaded 12-record catalog.
+    //
+    //   getFilteredItems()   Thin wrapper composing build + apply;
+    //                        the template only ever calls this.
+    //
+    // SCALE NOTE: once the catalog grows past a few dozen SKUs,
+    // filtering should move into the ORM domain with pagination.
+    // The transition is a one-method swap: rewrite buildDomain() to
+    // emit a real Odoo polish-notation domain
+    // ([['category','=',x],'|',['name','ilike',q],['sku','ilike',q]])
+    // and push it as a `domain` arg to /southbrook/api/kitchen-
+    // planner/state — the controller evaluates server-side via
+    // search_read with limit/offset pagination. applyFilters()
+    // becomes a debounced fetch instead of an in-memory filter. The
+    // template + caller stay untouched: they only know about
+    // getFilteredItems().
+    // ------------------------------------------------------------------
+
+    // Logical catalog order for the tab bar. Not alphabetical —
+    // it mirrors how a customer thinks about a kitchen: base cabinets
+    // first (the dominant family), then walls, talls, drawers,
+    // vanity, and Extras last. 'All' is always position 0.
+    //
+    // Categories that arrive from the controller but aren't in this
+    // table (e.g. a future "Worktops" split) fall through to the end
+    // alphabetically so the tab row stays deterministic.
+    static CATEGORY_ORDER = [
+        "All",
+        "Base",
+        "Wall",
+        "Tall",
+        "Drawer",
+        "Vanity",
+        "Extras",
+    ];
+
+    getCategoryTabs() {
+        const counts = { All: this.props.catalog.length };
+        for (const item of this.props.catalog) {
+            const c = item.category || "Extras";
+            counts[c] = (counts[c] || 0) + 1;
+        }
+        const ORDER = this.constructor.CATEGORY_ORDER;
+        const orderedKeys = Object.keys(counts).sort((a, b) => {
+            const ai = ORDER.indexOf(a);
+            const bi = ORDER.indexOf(b);
+            if (ai !== -1 && bi !== -1) return ai - bi;
+            if (ai !== -1) return -1;
+            if (bi !== -1) return 1;
+            return a.localeCompare(b);
+        });
+        return orderedKeys.map((k) => ({ key: k, count: counts[k] }));
+    }
+
+    buildDomain() {
+        // Plain-object criteria. `category` is null when 'All' is
+        // active (no category filter). `searchQuery` is the trimmed
+        // search input — empty string when none.
+        const cat = this.state.activeCategory;
+        return {
+            category: (cat && cat !== "All") ? cat : null,
+            searchQuery: (this.state.searchQuery || "").trim(),
+        };
+    }
+
+    applyFilters(items, domain) {
+        const { category, searchQuery } = domain;
+        const q = (searchQuery || "").toLowerCase();
+        // Fast path: no criteria → return the list unchanged.
+        if (!category && !q) return items;
+        return items.filter((item) => {
+            if (category) {
+                const c = item.category || "Extras";
+                if (c !== category) return false;
+            }
+            if (q) {
+                const name = (item.name || "").toLowerCase();
+                const sku = (item.sku || "").toLowerCase();
+                if (!name.includes(q) && !sku.includes(q)) return false;
+            }
+            return true;
+        });
+    }
+
+    getFilteredItems() {
+        return this.applyFilters(this.props.catalog, this.buildDomain());
+    }
+
+    getQty(sku) {
+        const q = this.state.qtyBySku[sku];
+        return q && q > 0 ? q : 1;
+    }
+
+    // ------------------------------------------------------------------
+    // Handlers.
+    // ------------------------------------------------------------------
 
     _onBackdropClick() {
         if (!this.props.busy) {
@@ -1203,9 +1711,85 @@ class CatalogPicker extends Component {
         }
     }
 
-    _onPick(templateId) {
-        if (!this.props.busy) {
-            this.props.onPick(templateId);
+    _onSearch(ev) {
+        this.state.searchQuery = ev.target.value;
+    }
+
+    _setCategory(category) {
+        this.state.activeCategory = category;
+    }
+
+    // Arrow-key navigation between category tabs. Follows the WAI-ARIA
+    // tablist pattern: ArrowLeft / ArrowRight cycle through tabs and
+    // activate immediately (single-select filter); Home / End jump to
+    // the first / last tab. Tab key still moves focus out of the tab
+    // bar to the next focusable control, since only the active tab
+    // has tabindex=0.
+    _onTabKeydown(ev, currentKey) {
+        const tabs = this.getCategoryTabs().map((t) => t.key);
+        const idx = tabs.indexOf(currentKey);
+        if (idx < 0) return;
+        let next = null;
+        if (ev.key === "ArrowRight") {
+            next = tabs[(idx + 1) % tabs.length];
+        } else if (ev.key === "ArrowLeft") {
+            next = tabs[(idx - 1 + tabs.length) % tabs.length];
+        } else if (ev.key === "Home") {
+            next = tabs[0];
+        } else if (ev.key === "End") {
+            next = tabs[tabs.length - 1];
+        }
+        if (next !== null) {
+            ev.preventDefault();
+            this._setCategory(next);
+        }
+    }
+
+    _setView(mode) {
+        if (mode === "grid" || mode === "list") {
+            this.state.viewMode = mode;
+        }
+    }
+
+    _resetFilters() {
+        this.state.searchQuery = "";
+        this.state.activeCategory = "All";
+    }
+
+    _setQty(sku, raw) {
+        const n = parseInt(raw, 10);
+        this.state.qtyBySku[sku] = Number.isFinite(n) && n > 0 ? n : 1;
+    }
+
+    _incQty(sku) {
+        this.state.qtyBySku[sku] = this.getQty(sku) + 1;
+    }
+
+    _decQty(sku) {
+        const next = this.getQty(sku) - 1;
+        this.state.qtyBySku[sku] = next > 0 ? next : 1;
+    }
+
+    async _addItem(item) {
+        if (this.props.busy) return;
+        const qty = this.getQty(item.sku);
+        // Reuses the parent's existing add-line path — onPick now
+        // accepts an optional second qty arg (parent passes it
+        // through to /southbrook/api/order/<id>/add-line). The
+        // ORIGINAL contract — onPick(templateId) — still works
+        // because the qty arg is optional on both sides.
+        try {
+            await this.props.onPick(item.id, qty);
+            this.state.lastAddedSku = item.sku;
+            // Clear the 'Added' indicator after 1.5s so the user can
+            // re-add the same cabinet if they want a second one of it.
+            setTimeout(() => {
+                if (this.state.lastAddedSku === item.sku) {
+                    this.state.lastAddedSku = null;
+                }
+            }, 1500);
+        } catch (e) {
+            // Parent surfaces the error via state.error.
         }
     }
 }
@@ -1261,6 +1845,7 @@ const TEMPLATE = xml`
             <CatalogPicker catalog="state.catalog"
                            open="state.ui.catalog_open"
                            busy="state.catalog_busy"
+                           channelLabel="state.channel_label"
                            onClose="_closeCatalog"
                            onPick="_onPickCabinet"/>
 
@@ -1436,6 +2021,11 @@ class OrderBuilder extends Component {
             // so the CatalogPicker has tiles to render).
             catalog: [],
             catalog_busy: false,
+            // 2026-06-02 channel pricing — pricelist display name
+            // surfaced from kitchen_planner_state.user.channel_label
+            // ("Dealer (-50%)", "Contractor Tier 3 (-35%)", etc.).
+            // Drives the channel badge on each catalog card.
+            channel_label: "",
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
@@ -1479,6 +2069,13 @@ class OrderBuilder extends Component {
             // back to an empty array — the UI will show 'No catalog
             // available' inside the picker.
             this.state.catalog = (payload && payload.catalog) || [];
+            // 2026-06-02 — capture the pricelist label for the
+            // CatalogPicker's channel badge. Empty when the visitor
+            // is on the retail walk-in pricelist (no channel badge).
+            this.state.channel_label = (
+                (payload && payload.user && payload.user.channel_label)
+                || ""
+            );
         } catch (e) {
             // Quiet failure — the catalog button will still render
             // but the modal will be empty. Phase-2 polish surfaces
@@ -1497,19 +2094,34 @@ class OrderBuilder extends Component {
         }
     }
 
-    async _onPickCabinet(productTmplId) {
+    async _onPickCabinet(productTmplId, qty) {
         if (!this.state.order) return;
         this.state.catalog_busy = true;
+        const qtyArg = (typeof qty === "number" && qty > 0)
+            ? Math.floor(qty)
+            : 1;
         try {
             const result = await rpcJsonCall(
                 `/southbrook/api/order/${encodeURIComponent(this.state.order.id)}/add-line`,
-                { product_tmpl_id: productTmplId },
+                {
+                    product_tmpl_id: productTmplId,
+                    // 2026-06-02 catalog redesign — pass qty through.
+                    // Endpoint accepts and validates; defaults to 1
+                    // when omitted, so old callers stay correct.
+                    qty: qtyArg,
+                },
             );
             if (result && result.ok) {
                 // Refresh the order so the new line appears + totals
                 // re-compute. Bumps payload_version, which makes the
                 // KitchenViewport refetch its 3D payload as a bonus.
-                this.state.ui.catalog_open = false;
+                //
+                // 2026-06-02 redesign: do NOT auto-close the modal.
+                // Users browsing the catalog often want to add several
+                // cabinets in one session; the CatalogPicker now shows
+                // a brief 'Added' state per card and the user closes
+                // when done. The error path still surfaces via
+                // state.error and skips the success-state pulse.
                 await this._loadOrder();
             } else {
                 this.state.error = (
@@ -1517,9 +2129,15 @@ class OrderBuilder extends Component {
                     ? `Cannot add cabinets — this order is ${result.state}.`
                     : result?.error || "Could not add the cabinet."
                 );
+                throw new Error(this.state.error);
             }
         } catch (e) {
-            this.state.error = e?.message || String(e);
+            // If the error was already set by the !ok branch above,
+            // don't overwrite it with a generic message.
+            if (!this.state.error) {
+                this.state.error = e?.message || String(e);
+            }
+            throw e;
         } finally {
             this.state.catalog_busy = false;
         }

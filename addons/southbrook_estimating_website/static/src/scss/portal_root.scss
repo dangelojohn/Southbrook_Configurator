@@ -633,17 +633,20 @@
 .o_owl_modal_title {
     font-family: var(--sb-font-display);
     font-variation-settings: "opsz" 36, "wght" 500;
-    font-size: 20px;
+    // 2026-06-02 fluid scale — clamp() so titles grow / shrink with
+    // viewport. Bare px would freeze across mobile → 4K.
+    font-size: clamp(1.05rem, calc(1rem + 0.8vw), 1.5rem);
+    line-height: 1.25;
     color: var(--sb-walnut);
     margin: 0 0 8px;
     letter-spacing: -0.01em;
 }
 
 .o_owl_modal_sub {
-    font-size: 13px;
+    font-size: clamp(0.8rem, calc(0.76rem + 0.25vw), 0.9rem);
+    line-height: 1.5;
     color: var(--sb-ink-dim);
     margin: 0;
-    line-height: 1.5;
 }
 
 .o_owl_modal_review {
@@ -1275,6 +1278,10 @@
 .o_owl_hs_cell {
     padding: 14px 18px;
     border-right: 1px solid var(--sb-rule);
+    // Grid items default to min-width:auto which prevents shrinking
+    // below content size — explicit min-width:0 lets the cell honour
+    // its 1fr/1.4fr track allotment instead of overflowing the strip.
+    min-width: 0;
 
     &:last-child {
         border-right: none;
@@ -1294,7 +1301,16 @@
     font-size: 18px;
     color: var(--sb-ink);
     line-height: 1.2;
-    word-break: break-word;
+    // 2026-06-02 fix — drop word-break:break-word which was wrapping
+    // multi-word names mid-character ("Sarah Johnso\nn"). Defaults
+    // (word-break:normal + overflow-wrap:normal) wrap on whitespace.
+    // overflow-wrap:break-word kicks in only as last-resort for an
+    // unbreakable single token longer than the cell — keeps the
+    // strip layout from overflowing while preserving word-boundary
+    // wrapping for normal names.
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
 
     &.mono {
         font-family: var(--sb-font-mono);
@@ -1471,85 +1487,766 @@
         color: var(--sb-ink-dim);
     }
 
-    // Catalog modal ----------------------------------------------------
+    // ==================================================================
+    // Catalog picker (2026-06-02 redesign).
+    //
+    // Modal panel + redesigned toolbar / pills / card grid. Brand
+    // accent is the Southbrook walnut (#7c3f3f request from the
+    // redesign brief — matched here via var(--sb-walnut) so theme
+    // tokens stay the single source of truth; hover state uses
+    // var(--sb-walnut-deep) where available, falling back to a
+    // darker hex literal where the token isn't defined yet).
+    // ==================================================================
+
+    // Shared accent — central definition so the cards / pills / Add
+    // button stay in lockstep if the walnut token shifts.
+    $catalog-accent:        var(--sb-walnut);
+    $catalog-accent-deep:   #693535;
+
+    // 2026-06-02 fluid typography scale. clamp(min, preferred, max)
+    // so text scales smoothly between mobile and desktop without
+    // exploding on 4K (the cap is the second arg's clamp ceiling).
+    // Always paired with a unitless line-height so vertical rhythm
+    // scales too. Reused by every catalog typography rule below;
+    // tuning the scale happens here, not at every call site.
+    // calc() inside clamp() defers the rem + vw addition to the
+    // browser's runtime CSS engine. Without it, SASS errors at
+    // compile time with "Incompatible units: 'vw' and 'rem'".
+    $cp-title:   clamp(1.05rem,  calc(1rem    + 0.8vw),  1.5rem);   // modal/section titles
+    $cp-name:    clamp(0.9rem,   calc(0.85rem + 0.4vw),  1.05rem);  // card name
+    $cp-price:   clamp(1rem,     calc(0.95rem + 0.5vw),  1.2rem);   // card price (emphasized)
+    $cp-body:    clamp(0.8rem,   calc(0.76rem + 0.25vw), 0.9rem);   // tabs, count, search input
+    $cp-desc:    clamp(0.75rem,  calc(0.72rem + 0.2vw),  0.85rem);  // description + empty body
+    $cp-meta:    clamp(0.7rem,   calc(0.68rem + 0.15vw), 0.8rem);   // sku, dims, busy, qty input
+    $cp-micro:   clamp(0.6rem,   calc(0.58rem + 0.1vw),  0.7rem);   // badges, tab count, channel lbl
+    // Card-grid min-track width: shrinks on small viewports so
+    // cards don't get uncomfortably narrow before wrapping.
+    // calc() wrap for same SASS unit-add reason as above.
+    $cp-card-min: clamp(180px, calc(18vw + 100px), 232px);
+
+    // Modal shell shared by the catalog picker.
+    .o_owl_modal_panel {
+        background: var(--sb-linen);
+        border: 1px solid var(--sb-rule);
+        border-radius: 12px;
+        color: var(--sb-ink);
+        font-family: var(--sb-font-sans);
+        box-shadow: 0 16px 40px rgba(26, 24, 20, 0.24);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+        overflow: hidden;
+    }
+
+    .o_owl_modal_header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px 14px;
+        border-bottom: 1px solid var(--sb-rule);
+    }
+
+    .o_owl_modal_close {
+        background: transparent;
+        border: 0;
+        font-size: clamp(1.25rem, calc(1.1rem + 0.6vw), 1.7rem);
+        line-height: 1;
+        color: var(--sb-ink-dim);
+        padding: 4px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+
+        &:hover {
+            color: var(--sb-walnut);
+            background: var(--sb-paper);
+        }
+    }
 
     .o_owl_catalog_panel {
-        max-width: 760px;
+        max-width: 1040px;
         width: 100%;
     }
 
-    .o_owl_catalog_body {
-        max-height: 70vh;
-        overflow-y: auto;
-        padding: 24px 28px;
+    .o_owl_catalog_panel_list {
+        max-width: 760px;
     }
 
-    .o_owl_catalog_hint {
-        font-size: 14px;
-        color: var(--sb-ink-dim);
-        line-height: 1.5;
-        margin: 0 0 20px;
-    }
-
-    .o_owl_catalog_grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 12px;
-    }
-
-    .o_owl_catalog_tile {
+    // Toolbar — search + view toggle.
+    .o_owl_catalog_toolbar {
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 6px;
-        padding: 16px;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 24px 12px;
+        border-bottom: 1px solid var(--sb-rule);
+    }
+
+    .o_owl_catalog_search_wrap {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .o_owl_catalog_search_icon {
+        position: absolute;
+        left: 12px;
+        width: 16px;
+        height: 16px;
+        color: var(--sb-ink-dim);
+        pointer-events: none;
+    }
+
+    .o_owl_catalog_search {
+        width: 100%;
+        padding: 10px 12px 10px 36px;
+        font-family: var(--sb-font-sans);
+        font-size: $cp-body;
+        line-height: 1.35;
+        color: var(--sb-ink);
         background: var(--sb-paper);
         border: 1px solid var(--sb-rule);
-        border-radius: 4px;
-        cursor: pointer;
-        text-align: left;
-        transition: all 150ms ease;
+        border-radius: 999px;
+        transition: border-color 120ms ease, box-shadow 120ms ease;
 
-        &:hover:not(:disabled) {
-            background: white;
-            border-color: var(--sb-walnut);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(74, 60, 46, 0.08);
+        &::placeholder {
+            color: var(--sb-ink-dim);
         }
 
-        &:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        &:focus {
+            outline: none;
+            border-color: $catalog-accent;
+            box-shadow: 0 0 0 3px rgba(124, 63, 63, 0.18);
+            background: white;
         }
     }
 
-    .o_owl_catalog_tile_sku {
+    .o_owl_catalog_view_toggle {
+        display: inline-flex;
+        background: var(--sb-paper);
+        border: 1px solid var(--sb-rule);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .o_owl_catalog_view_btn {
+        background: transparent;
+        border: 0;
+        padding: 8px 10px;
+        cursor: pointer;
+        color: var(--sb-ink-dim);
+        display: inline-flex;
+        align-items: center;
+
+        svg { width: 16px; height: 16px; }
+
+        &:hover {
+            color: var(--sb-walnut);
+            background: rgba(124, 63, 63, 0.06);
+        }
+    }
+
+    .o_owl_catalog_view_btn_active {
+        background: $catalog-accent;
+        color: white;
+
+        &:hover {
+            background: $catalog-accent-deep;
+            color: white;
+        }
+    }
+
+    // 2026-06-02 filter v2 — compact single-row underlined tab bar.
+    // Replaces the prior 7-pill chip row which wrapped to 3 rows on
+    // narrow widths (~137px vertical). Target row height ~36–40px.
+    //
+    // Layout choices:
+    //   - flex-wrap: nowrap + overflow-x: auto — never wrap to row 2;
+    //     instead scroll horizontally when tabs exceed available width.
+    //   - Tab visual: plain text + small superscript count + 2px
+    //     bottom border that thickens to accent on active. No chip,
+    //     no rounded radius, minimal padding.
+    //   - Source order is the LOGICAL catalog order
+    //     (All / Base / Wall / Tall / Drawer / Vanity / Extras),
+    //     not alphabetical — see CatalogPicker.CATEGORY_ORDER in
+    //     portal_boot.esm.js.
+    .o_owl_catalog_tabs {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 4px;
+        padding: 2px 24px;
+        border-bottom: 1px solid var(--sb-rule);
+        background: var(--sb-paper);
+
+        // 2026-06-02 fix — give the nav a stable minimum height that
+        // matches the tab content's intrinsic height (text + padding
+        // + 2px underline + container padding). Without this the
+        // flex parent collapses to ~16px on first paint and the
+        // overflow-y:hidden crops the lower half of each tab label
+        // until the next layout pass kicks in. clamp() pairs with the
+        // fluid font scale so the height adapts at large viewport
+        // widths.
+        //
+        // Also flex-shrink:0 so a parent flex container (the modal
+        // panel) can't compress the nav out of existence on tight
+        // vertical space.
+        min-height: clamp(38px, calc(34px + 0.5vw), 44px);
+        flex-shrink: 0;
+
+        // iOS / touch smooth horizontal swipe.
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+
+        // Slim scrollbar — present but unobtrusive on overflow.
+        scrollbar-width: thin;
+        scrollbar-color: var(--sb-rule) transparent;
+
+        &::-webkit-scrollbar      { height: 4px; }
+        &::-webkit-scrollbar-track { background: transparent; }
+        &::-webkit-scrollbar-thumb {
+            background: var(--sb-rule);
+            border-radius: 2px;
+        }
+
+        // Right-edge fade affordance — hints there's more to scroll
+        // when the row overflows. position:sticky-ish via mask-image.
+        mask-image: linear-gradient(
+            to right,
+            black 0,
+            black calc(100% - 24px),
+            transparent 100%
+        );
+    }
+
+    .o_owl_catalog_tab {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 3px;
+        background: transparent;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        color: var(--sb-ink-dim);
+        padding: 8px 10px;
+        border-radius: 0;
+        font-family: var(--sb-font-sans);
+        font-size: $cp-body;
+        line-height: 1.3;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 120ms ease, border-color 120ms ease;
+
+        &:hover {
+            color: $catalog-accent;
+        }
+
+        // Visible focus ring on keyboard navigation only — not on click.
+        &:focus-visible {
+            outline: none;
+            border-bottom-color: rgba(124, 63, 63, 0.4);
+            color: $catalog-accent;
+        }
+    }
+
+    .o_owl_catalog_tab_label {
+        font-weight: 400;
+    }
+
+    .o_owl_catalog_tab_count {
+        // Superscript: small, muted, no chip background.
         font-family: var(--sb-font-mono);
-        font-size: 11px;
+        font-size: $cp-micro;
+        line-height: 1;
+        color: var(--sb-ink-dim);
+        // Reset <sup> default vertical offset to be subtle, not jumpy.
+        vertical-align: super;
+        font-feature-settings: "sups" 0; // we control the offset ourselves
+    }
+
+    .o_owl_catalog_tab_active {
+        color: $catalog-accent;
+        border-bottom-color: $catalog-accent;
+
+        .o_owl_catalog_tab_label {
+            font-weight: 500;
+        }
+
+        .o_owl_catalog_tab_count {
+            color: $catalog-accent;
+        }
+
+        &:hover { color: $catalog-accent-deep; }
+    }
+
+    // 2026-06-02 filter v2 alternative — compact <select> dropdown.
+    // Renders inside the toolbar, left of the search input, when
+    // state.filterMode === 'select'. Shares setCategory with the
+    // tab bar.
+    .o_owl_catalog_filter_select {
+        flex: 0 0 auto;
+        padding: 9px 28px 9px 14px;
+        font-family: var(--sb-font-sans);
+        font-size: $cp-body;
+        line-height: 1.3;
+        color: var(--sb-ink);
+        background-color: var(--sb-paper);
+        border: 1px solid var(--sb-rule);
+        border-radius: 999px;
+        cursor: pointer;
+        appearance: none;
+        // Inline SVG chevron — same walnut as the other accent UI.
+        background-image:
+            url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%237c3f3f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='1.5,2 6,6.5 10.5,2'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        background-size: 10px;
+        transition: border-color 120ms ease, box-shadow 120ms ease;
+
+        &:focus {
+            outline: none;
+            border-color: $catalog-accent;
+            box-shadow: 0 0 0 3px rgba(124, 63, 63, 0.18);
+            background-color: white;
+        }
+    }
+
+    // Scrollable body + count line.
+    .o_owl_catalog_body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 24px 24px;
+    }
+
+    .o_owl_catalog_count {
+        margin: 0 0 14px;
+        font-size: $cp-body;
+        line-height: 1.4;
+        color: var(--sb-ink-dim);
+
+        strong {
+            color: var(--sb-walnut);
+            font-weight: 600;
+        }
+    }
+
+    // Card grid. Track min adapts: clamp() shrinks the column floor on
+    // small viewports so cards don't get uncomfortably narrow before
+    // wrapping, while capping at the original 232px on desktop.
+    .o_owl_catalog_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax($cp-card-min, 1fr));
+        gap: 14px;
+    }
+
+    // 2026-06-02 layout v3 — three-region structure (icon / content /
+    // aside) so list mode flex-rows cleanly with a flexible middle
+    // column. Grid mode uses CSS Grid: row 1 has icon | content, row 2
+    // has aside spanning full width below.
+    //
+    // CRITICAL invariants this layout depends on:
+    //   - .o_owl_catalog_card_content { flex:1 1 auto; min-width:0 }
+    //     in list mode — without min-width:0 the column never shrinks
+    //     below its CONTENT min-width and text wraps per-character.
+    //   - .o_owl_catalog_card_icon  { flex:0 0 auto } — fixed width.
+    //   - .o_owl_catalog_card_aside { flex:0 0 auto } — fixed width.
+    //   - Source order is icon -> content -> aside so DOM reading
+    //     order matches the visual left-to-right scan.
+    .o_owl_catalog_card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "icon  content"
+            "aside aside";
+        column-gap: 10px;
+        row-gap: 8px;
+        padding: 12px 14px;
+        background: white;
+        border: 1px solid var(--sb-rule);
+        border-radius: 12px;
+        transition: all 160ms ease;
+
+        &:hover {
+            transform: translateY(-2px);
+            border-color: $catalog-accent;
+            box-shadow: 0 10px 24px rgba(74, 60, 46, 0.10);
+        }
+    }
+
+    .o_owl_catalog_card_added {
+        border-color: rgb(102, 187, 106);
+        box-shadow: 0 0 0 3px rgba(102, 187, 106, 0.18);
+    }
+
+    .o_owl_catalog_card_icon {
+        grid-area: icon;
+        flex: 0 0 auto;          // honoured when list-mode switches to flex
+        align-self: start;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width:  clamp(40px, calc(32px + 1.4vw), 56px);
+        height: clamp(40px, calc(32px + 1.4vw), 56px);
+        border-radius: 8px;
+        background: linear-gradient(
+            135deg,
+            var(--sb-linen) 0%,
+            var(--sb-paper) 100%
+        );
+        color: var(--sb-walnut);
+
+        svg {
+            width:  70%;
+            height: 70%;
+        }
+    }
+
+    .o_owl_catalog_card_content {
+        grid-area: content;
+        flex: 1 1 auto;          // honoured when list-mode switches to flex
+        min-width: 0;            // CRITICAL: allow column to shrink without
+                                 // forcing per-character text wraps
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .o_owl_catalog_card_titles {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .o_owl_catalog_card_aside {
+        grid-area: aside;
+        flex: 0 0 auto;          // honoured when list-mode switches to flex
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    // ==================================================================
+    // List-mode override — single flex-row with three regions.
+    // Source order (icon -> content -> aside) drives the visual left-to-
+    // right reading order without any reordering tricks.
+    // ==================================================================
+    .o_owl_catalog_grid_list {
+        grid-template-columns: 1fr;
+        gap: 10px;
+
+        .o_owl_catalog_card {
+            // Reset the grid template — list mode is plain flex.
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            grid-template-columns: none;
+            grid-template-areas: none;
+            column-gap: 0;
+            row-gap: 0;
+            gap: 14px;
+            padding: 10px 14px;
+            flex-wrap: wrap;    // allow aside to wrap below content on
+                                // very narrow viewports (modal width
+                                // shrink) instead of overflowing.
+        }
+
+        // Aside hugs the right edge; price stacked ABOVE actions.
+        // On wrap (very narrow viewport) the whole aside drops below
+        // content as a single block rather than overflowing.
+        .o_owl_catalog_card_aside {
+            margin-left: auto;
+            align-items: flex-end;
+            flex-direction: column;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .o_owl_catalog_card_price_row {
+            white-space: nowrap;
+            justify-content: flex-end;
+        }
+    }
+
+    .o_owl_catalog_card_badge {
+        display: inline-flex;
+        align-self: flex-start;
+        padding: 2px 10px;
+        font-family: var(--sb-font-mono);
+        font-size: $cp-micro;
+        line-height: 1.6;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--sb-walnut);
+        background: rgba(124, 63, 63, 0.08);
+        border-radius: 999px;
+    }
+
+    // Per-element top margins removed — spacing is owned by the
+    // parent .o_owl_catalog_card flex gap so optional rows with
+    // t-if collapse to ZERO space when their data is absent.
+    .o_owl_catalog_card_name {
+        margin: 0;
+        font-family: var(--sb-font-display);
+        font-weight: 500;
+        font-size: $cp-name;
+        color: var(--sb-ink);
+        line-height: 1.25;
+    }
+
+    .o_owl_catalog_card_sku {
+        font-family: var(--sb-font-mono);
+        font-size: $cp-meta;
+        line-height: 1.35;
         letter-spacing: 0.04em;
         color: var(--sb-ink-dim);
     }
 
-    .o_owl_catalog_tile_name {
-        font-family: var(--sb-font-display);
-        font-weight: 500;
-        font-size: 15px;
-        color: var(--sb-walnut);
-        line-height: 1.2;
+    .o_owl_catalog_card_desc {
+        margin: 0;
+        font-size: $cp-desc;
+        line-height: 1.45;
+        color: var(--sb-ink-dim);
     }
 
-    .o_owl_catalog_tile_price {
+    .o_owl_catalog_card_dims {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
         font-family: var(--sb-font-mono);
-        font-size: 14px;
+        font-size: $cp-meta;
+        line-height: 1.4;
+        color: var(--sb-ink-dim);
+
+        svg {
+            // Scales with the surrounding text via 1em so the ruler
+            // glyph tracks the dimension string at any viewport.
+            width: 1em;
+            height: 1em;
+            color: var(--sb-ink-dim);
+        }
+    }
+
+    .o_owl_catalog_card_price_row {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 0;
+    }
+
+    .o_owl_catalog_card_price_lbl {
+        font-family: var(--sb-font-mono);
+        font-size: $cp-micro;
+        line-height: 1.4;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--sb-ink-dim);
+    }
+
+    .o_owl_catalog_card_price {
+        font-family: var(--sb-font-mono);
+        font-size: $cp-price;
+        line-height: 1.2;
         font-weight: 600;
-        color: var(--sb-sky);
-        margin-top: 4px;
+        color: var(--sb-walnut);
+    }
+
+    // 2026-06-02 channel pricing — dual-price treatment when the
+    // visiting partner is on a non-retail pricelist. Strikethrough
+    // retail next to the emphasized channel price; tiny channel
+    // label in monospace.
+    .o_owl_catalog_card_price_strike {
+        font-family: var(--sb-font-mono);
+        font-size: $cp-desc;
+        line-height: 1.2;
+        font-weight: 400;
+        color: var(--sb-ink-dim);
+        text-decoration: line-through;
+    }
+
+    .o_owl_catalog_card_channel_lbl {
+        font-family: var(--sb-font-mono);
+        font-size: $cp-micro;
+        line-height: 1.6;
+        letter-spacing: 0.08em;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: rgba(124, 63, 63, 0.10);
+        color: var(--sb-walnut);
+        margin-left: auto;
+    }
+
+    // Card actions row — qty stepper + Add button. No margin-top:
+    // spacing is owned by the parent card's flex gap so cards with
+    // fewer rows (no description, no dimensions) shrink correctly.
+    .o_owl_catalog_card_actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 0;
+    }
+
+    .o_owl_catalog_qty {
+        display: inline-flex;
+        align-items: stretch;
+        border: 1px solid var(--sb-rule);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--sb-paper);
+    }
+
+    .o_owl_catalog_qty_btn {
+        background: transparent;
+        border: 0;
+        // Width sized via em so the stepper scales with its glyph.
+        width: 1.9em;
+        font-family: var(--sb-font-sans);
+        font-size: $cp-price;
+        line-height: 1.4;
+        font-weight: 500;
+        color: var(--sb-walnut);
+        cursor: pointer;
+        transition: background 120ms ease;
+
+        &:hover:not(:disabled) {
+            background: rgba(124, 63, 63, 0.08);
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    }
+
+    .o_owl_catalog_qty_input {
+        // Width sized via em so the input grows with the digits at
+        // larger font sizes.
+        width: 2.6em;
+        text-align: center;
+        background: white;
+        border: 0;
+        border-left: 1px solid var(--sb-rule);
+        border-right: 1px solid var(--sb-rule);
+        font-family: var(--sb-font-mono);
+        font-size: $cp-body;
+        line-height: 1.35;
+        color: var(--sb-ink);
+        padding: 4px 0;
+
+        // Hide the spinner — qty buttons handle increment.
+        &::-webkit-inner-spin-button,
+        &::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        appearance: textfield;
+        -moz-appearance: textfield;
+
+        &:focus {
+            outline: none;
+            box-shadow: inset 0 0 0 2px rgba(124, 63, 63, 0.22);
+        }
+    }
+
+    .o_owl_catalog_add_btn {
+        background: $catalog-accent;
+        border: 1px solid $catalog-accent;
+        color: white;
+        font-family: var(--sb-font-sans);
+        font-size: $cp-body;
+        line-height: 1.3;
+        font-weight: 500;
+        padding: 0.5em 1.1em;
+        border-radius: 8px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-width: 5em;
+        transition: all 140ms ease;
+
+        // SVG scales with the surrounding text via 1em.
+        svg { width: 1em; height: 1em; }
+
+        &:hover:not(:disabled) {
+            background: $catalog-accent-deep;
+            border-color: $catalog-accent-deep;
+        }
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    }
+
+    .o_owl_catalog_add_btn_added {
+        background: rgb(102, 187, 106);
+        border-color: rgb(102, 187, 106);
+
+        &:hover:not(:disabled) {
+            background: rgb(81, 152, 86);
+            border-color: rgb(81, 152, 86);
+        }
+    }
+
+    // Empty state.
+    .o_owl_catalog_empty {
+        text-align: center;
+        padding: 40px 24px;
+        color: var(--sb-ink-dim);
+        font-size: $cp-desc;
+        line-height: 1.5;
+
+        strong {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--sb-walnut);
+            font-size: $cp-name;
+            line-height: 1.25;
+        }
+
+        p { margin: 0 0 14px; }
+    }
+
+    .o_owl_catalog_empty_icon {
+        margin-bottom: 16px;
+        color: var(--sb-ink-dim);
+
+        svg {
+            width: 48px;
+            height: 48px;
+        }
+    }
+
+    .o_owl_catalog_empty_reset {
+        background: transparent;
+        border: 1px solid $catalog-accent;
+        color: $catalog-accent;
+        padding: 6px 16px;
+        border-radius: 6px;
+        font-family: var(--sb-font-sans);
+        font-size: $cp-body;
+        line-height: 1.3;
+        cursor: pointer;
+        transition: all 120ms ease;
+
+        &:hover {
+            background: $catalog-accent;
+            color: white;
+        }
     }
 
     .o_owl_catalog_busy {
         text-align: center;
         font-family: var(--sb-font-mono);
-        font-size: 12px;
+        font-size: $cp-meta;
+        line-height: 1.4;
         color: var(--sb-walnut);
         margin: 20px 0 0;
         letter-spacing: 0.04em;
