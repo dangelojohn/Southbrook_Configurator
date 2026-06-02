@@ -228,25 +228,35 @@ async def run():
         except Exception as e:
             failed("CatalogPicker open", str(e)[:120])
 
-        # Wait for the async catalog RPC to populate the tile grid
+        # Wait for the async catalog RPC to populate the card grid
         # before asserting count.
+        #
+        # 2026-06-02 redesign: .o_owl_catalog_tile (old whole-card
+        # click target) was replaced by .o_owl_catalog_card with a
+        # dedicated .o_owl_catalog_add_btn per card. The card itself
+        # is no longer the click target — the Add button is.
         try:
             await page.wait_for_selector(
-                ".o_owl_catalog_tile", timeout=10000,
+                ".o_owl_catalog_card", timeout=10000,
             )
         except Exception as e:
-            failed("catalog tiles wait", str(e)[:120])
-        tile_count = await page.locator(".o_owl_catalog_tile").count()
-        if tile_count >= 10:
-            passed(f"{tile_count} catalog tiles rendered (expect 12)")
+            failed("catalog cards wait", str(e)[:120])
+        card_count = await page.locator(".o_owl_catalog_card").count()
+        if card_count >= 10:
+            passed(f"{card_count} catalog cards rendered (expect 12)")
         else:
-            failed("catalog tiles", f"only {tile_count}")
+            failed("catalog cards", f"only {card_count}")
 
-        # Click the first tile (SB-ACCESSORY by sort order).
-        # This is THE click that crashed with 'this.state undefined'
-        # until the setup() bind fix.
+        # Click the FIRST card's Add button (SB-BASE-1DR after the
+        # logical sort: All / Base / Wall / Tall / Drawer / Vanity /
+        # Extras + the catalog xml_id order within Base). This is THE
+        # click that crashed with 'this.state undefined' until the
+        # setup() bind fix; the harness keeps it as a regression
+        # guard against future bind-context regressions.
         try:
-            await page.locator(".o_owl_catalog_tile").first.click(timeout=5000)
+            await page.locator(
+                ".o_owl_catalog_card .o_owl_catalog_add_btn"
+            ).first.click(timeout=5000)
             await page.wait_for_selector(
                 ".o_owl_lines_topbar",
                 timeout=8000,

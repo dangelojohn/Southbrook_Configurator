@@ -347,3 +347,272 @@ class TestCustomerFlowEndpoints(TransactionCase):
             self.order.southbrook_submitted_date, original_date,
             "Re-submit must not overwrite the original submitted_date",
         )
+
+    # ==================================================================
+    # 2026-06-02 catalog-picker redesign
+    # ==================================================================
+    def test_catalog_picker_metadata_stamped_on_every_cabinet(self):
+        """kitchen_planner_state stamps category / description /
+        dimensions / icon onto each catalog entry — the four fields the
+        redesigned CatalogPicker reads to render search, filter pills,
+        thumbnails, and dimension callouts.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        with stubbed_request(self.env, user=self.user_customer):
+            result = controller.kitchen_planner_state()
+        catalog = result["catalog"]
+        # All 12 Q8 cabinets should resolve via xml_id (this is what
+        # the catalog-tile flake fix locked in 2026-06-01).
+        self.assertEqual(
+            len(catalog), 12,
+            "Expected all 12 Q8 cabinets in the catalog response",
+        )
+        for item in catalog:
+            for key in ("category", "description", "dimensions", "icon"):
+                self.assertIn(
+                    key, item,
+                    f"catalog item {item.get('sku')} missing '{key}' — "
+                    f"redesigned CatalogPicker depends on this field",
+                )
+            self.assertTrue(
+                item["category"],
+                f"{item.get('sku')} has empty category — pill filter "
+                f"would silently drop it",
+            )
+
+    def test_catalog_picker_category_set_covers_redesign_brief(self):
+        """The category set must include the six categories the
+        CatalogPicker's filter pills render: Wall / Base / Drawer /
+        Tall / Vanity / Extras.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        with stubbed_request(self.env, user=self.user_customer):
+            result = controller.kitchen_planner_state()
+        categories = {item["category"] for item in result["catalog"]}
+        for required in (
+            "Wall", "Base", "Drawer", "Tall", "Vanity", "Extras",
+        ):
+            self.assertIn(
+                required, categories,
+                f"Category '{required}' missing — the filter pill row "
+                f"on the CatalogPicker would have a dead category",
+            )
+
+    def test_add_line_accepts_qty_argument(self):
+        """The redesigned card carries a quantity stepper. The qty
+        value must propagate through /add-line to sale.order.line.
+        product_uom_qty.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_order = lambda _id: self.order
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_order_add_line(
+                self.order.id,
+                product_tmpl_id=self.tmpl_wall_1dr.id,
+                qty=3,
+            )
+        self.assertTrue(result.get("ok"))
+        line = self.env["sale.order.line"].browse(result["line_id"])
+        self.assertEqual(
+            line.product_uom_qty, 3.0,
+            "Catalog-picker qty stepper value didn't carry through to "
+            "sale.order.line.product_uom_qty",
+        )
+
+    def test_add_line_defaults_qty_to_one_when_omitted(self):
+        """Original callers (anyone still passing only
+        product_tmpl_id) must keep their original behaviour: qty=1.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_order = lambda _id: self.order
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_order_add_line(
+                self.order.id,
+                product_tmpl_id=self.tmpl_wall_1dr.id,
+            )
+        self.assertTrue(result.get("ok"))
+        line = self.env["sale.order.line"].browse(result["line_id"])
+        self.assertEqual(line.product_uom_qty, 1.0)
+
+    def test_add_line_clamps_qty_below_one_to_one(self):
+        """A malformed payload (qty=0, qty=-2, qty='abc') must not
+        produce a zero-quantity line — clamp to 1 silently.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_order = lambda _id: self.order
+        for bad_qty in (0, -2, "not-a-number"):
+            with stubbed_request(self.env):
+                result = controller.southbrook_api_order_add_line(
+                    self.order.id,
+                    product_tmpl_id=self.tmpl_wall_1dr.id,
+                    qty=bad_qty,
+                )
+            self.assertTrue(
+                result.get("ok"),
+                f"qty={bad_qty!r} should produce a valid line, got "
+                f"{result}",
+            )
+            line = self.env["sale.order.line"].browse(result["line_id"])
+            self.assertEqual(
+                line.product_uom_qty, 1.0,
+                f"qty={bad_qty!r} should have clamped to 1",
+            )
+
+    # ==================================================================
+    # 2026-06-02 — channel-aware preview pricing in the catalog payload
+    # ==================================================================
+    def test_catalog_channel_price_equals_list_price_for_retail_partner(
+        self,
+    ):
+        """A retail partner sees channel_price == list_price for every
+        cabinet — the OWL CatalogPicker's hasChannelDiscount() returns
+        false and the card renders a single price.
+        """
+        # The test partner created in setUpClass has no channel set,
+        # which resolves to retail by default in _resolve_channel_pricelist.
+        # Ensure that's still the case (explicit assertion of the
+        # precondition makes the test self-documenting).
+        self.assertFalse(
+            self.partner_customer.channel,
+            "Test partner should have no channel set (retail default)",
+        )
+
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        with stubbed_request(self.env, user=self.user_customer):
+            result = controller.kitchen_planner_state()
+
+        # Channel label should be the retail pricelist's name.
+        self.assertIn(
+            "Retail", result["user"]["channel_label"],
+            "Retail partner should resolve to the Retail pricelist; "
+            f"got channel_label={result['user']['channel_label']!r}",
+        )
+
+        # Every cabinet's channel_price should match list_price exactly
+        # (retail pricelist has no discount rules).
+        for item in result["catalog"]:
+            self.assertEqual(
+                item["channel_price"], item["list_price"],
+                f"{item['sku']}: channel_price should equal list_price "
+                f"for a retail partner (got channel={item['channel_price']} "
+                f"vs list={item['list_price']})",
+            )
+
+    def test_catalog_channel_price_differs_for_tradesperson_tier_3(self):
+        """A Tradesperson Tier 3 partner sees channel_price < list_price
+        for every cabinet (the −35% chained discount applies), and the
+        channel_label reflects the resolved pricelist's display name.
+        Drives the dual-price treatment in the CatalogPicker card.
+        """
+        # Promote the test partner to tradesperson tier 3 — same
+        # smoke-test shape as the Q7 Demo Tradesperson partner.
+        self.partner_customer.write({
+            "channel": "tradesperson",
+            "tradesperson_tier": "3",
+        })
+
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        with stubbed_request(self.env, user=self.user_customer):
+            result = controller.kitchen_planner_state()
+
+        # Channel label should mention Tier 3 or -35%.
+        label = result["user"]["channel_label"] or ""
+        self.assertTrue(
+            "Tier 3" in label or "35" in label,
+            f"Tradesperson Tier 3 partner should resolve to a tier-3 "
+            f"labelled pricelist; got channel_label={label!r}",
+        )
+
+        # At least the cabinets WITH a variant should price strictly
+        # below list_price. Templates with no variant fall back to
+        # list_price by the controller's defensive fallback — that's
+        # fine; we don't assert against them.
+        priced_below = 0
+        for item in result["catalog"]:
+            if item["channel_price"] < item["list_price"]:
+                priced_below += 1
+            # Sanity: channel_price must never be higher than list.
+            self.assertLessEqual(
+                item["channel_price"], item["list_price"],
+                f"{item['sku']}: channel_price should never exceed "
+                f"list_price (got channel={item['channel_price']} "
+                f"vs list={item['list_price']})",
+            )
+        self.assertGreater(
+            priced_below, 0,
+            "At least one cabinet should price below list_price for "
+            "the Tradesperson Tier 3 channel; got zero — pricelist "
+            "resolution may have fallen back to retail silently",
+        )
+
+    # ==================================================================
+    # 2026-06-02 — filter-contract tests at the controller level
+    #
+    # The OWL CatalogPicker filters client-side via its buildDomain() /
+    # applyFilters() seam. We can't run the JS in a TransactionCase,
+    # but we CAN lock the contract the JS depends on: the controller
+    # always emits a name + sku pair on each catalog item, with the
+    # values portal users actually see (no nulls, no shape drift).
+    # ==================================================================
+    def test_catalog_emits_name_and_sku_per_item_for_filter_match(self):
+        """The JS search-by-name-and-sku filter relies on every catalog
+        item carrying truthy string `name` AND truthy string `sku`.
+        Without both, an `ilike` substring match silently drops the
+        row.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        with stubbed_request(self.env, user=self.user_customer):
+            result = controller.kitchen_planner_state()
+        for item in result["catalog"]:
+            self.assertTrue(
+                item.get("name"),
+                f"item id={item.get('id')} has empty name — catalog "
+                f"search would drop it",
+            )
+            self.assertTrue(
+                item.get("sku"),
+                f"item id={item.get('id')} (name={item.get('name')!r}) "
+                f"has empty sku — catalog search by SKU would drop it",
+            )
+
+    def test_catalog_category_set_drives_filter_pills(self):
+        """The JS getCategoryTabs() builder reads item.category off
+        each catalog row to derive the pill tabs. Every row must
+        carry a non-empty string category for the pill row to be
+        complete.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        with stubbed_request(self.env, user=self.user_customer):
+            result = controller.kitchen_planner_state()
+        for item in result["catalog"]:
+            self.assertTrue(
+                item.get("category"),
+                f"item id={item.get('id')} ({item.get('sku')}) has "
+                f"empty category — would be silently bucketed into "
+                f"the 'Extras' default by the JS getCategoryTabs",
+            )
+
+    def test_add_line_endpoint_unchanged_for_zero_qty_path(self):
+        """Sanity that add-line's int-cast + clamp-to-1 contract
+        matches what the JS qty stepper (also clamped at 1) ships
+        through. The stepper enforces >=1 client-side; the endpoint
+        is the second-line defence. Negative or non-numeric input
+        from a hand-crafted RPC must still produce qty=1, never 0
+        or a 500.
+        """
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_order = lambda _id: self.order
+        for raw in (0, -10, None):
+            with stubbed_request(self.env):
+                result = controller.southbrook_api_order_add_line(
+                    self.order.id,
+                    product_tmpl_id=self.tmpl_wall_1dr.id,
+                    qty=raw,
+                )
+            self.assertTrue(result.get("ok"), f"qty={raw!r}: {result}")
+            line = self.env["sale.order.line"].browse(result["line_id"])
+            self.assertEqual(
+                line.product_uom_qty, 1.0,
+                f"qty={raw!r} must clamp to 1 (defence-in-depth for "
+                f"the JS qty stepper)",
+            )
