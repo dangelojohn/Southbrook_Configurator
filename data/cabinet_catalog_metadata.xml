@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-06-02 catalog-picker redesign — seed the four southbrook_*
+  display-metadata fields on every Q8 cabinet template.
+
+  Same pattern as data/cabinet_prices.xml: one <record> per cabinet
+  xml_id, fields updated in place via Odoo's data-file mechanism.
+
+  noupdate="0" so re-running the install picks up edits — if marketing
+  iterates on a description string we re-deploy the file and the next
+  -u southbrook_estimating brings the change through. Migration
+  19.0.1.1.0/post-migrate.py handles the existing-DB upgrade path
+  (it backfills only when the field is NULL so it doesn't overwrite
+  any post-install edits a power user has made through the form view).
+
+  Field meanings:
+    southbrook_category    Selection — Wall / Base / Drawer / Tall / Vanity / Extras
+    southbrook_description Char (translatable) — one-sentence customer-facing copy
+    southbrook_dimensions  Char — canonical reference dimensions
+    southbrook_icon_key    Char — key into the CABINET_ICONS SVG map
+-->
+<odoo>
+  <data noupdate="0">
+
+    <record id="wall_1dr" model="product.template">
+      <field name="southbrook_category">Wall</field>
+      <field name="southbrook_description">Single-door upper cabinet for above-counter storage.</field>
+      <field name="southbrook_dimensions">15"W &#xD7; 30"H &#xD7; 12"D</field>
+      <field name="southbrook_icon_key">wall1</field>
+    </record>
+
+    <record id="wall_2dr" model="product.template">
+      <field name="southbrook_category">Wall</field>
+      <field name="southbrook_description">Double-door upper cabinet, wide-span storage.</field>
+      <field name="southbrook_dimensions">30"W &#xD7; 30"H &#xD7; 12"D</field>
+      <field name="southbrook_icon_key">wall2</field>
+    </record>
+
+    <record id="base_1dr" model="product.template">
+      <field name="southbrook_category">Base</field>
+      <field name="southbrook_description">Single-door floor cabinet with adjustable shelf.</field>
+      <field name="southbrook_dimensions">18"W &#xD7; 34&#xBD;"H &#xD7; 24"D</field>
+      <field name="southbrook_icon_key">base1</field>
+    </record>
+
+    <record id="base_2dr" model="product.template">
+      <field name="southbrook_category">Base</field>
+      <field name="southbrook_description">Double-door floor cabinet, generous lower storage.</field>
+      <field name="southbrook_dimensions">36"W &#xD7; 34&#xBD;"H &#xD7; 24"D</field>
+      <field name="southbrook_icon_key">base2</field>
+    </record>
+
+    <record id="drawer_bank" model="product.template">
+      <field name="southbrook_category">Drawer</field>
+      <field name="southbrook_description">Stacked drawer bank for utensils &amp; cookware.</field>
+      <field name="southbrook_dimensions">18"W &#xD7; 34&#xBD;"H &#xD7; 24"D</field>
+      <field name="southbrook_icon_key">drawer</field>
+    </record>
+
+    <record id="sink_base" model="product.template">
+      <field name="southbrook_category">Base</field>
+      <field name="southbrook_description">Open base sized to host an undermount sink.</field>
+      <field name="southbrook_dimensions">36"W &#xD7; 34&#xBD;"H &#xD7; 24"D</field>
+      <field name="southbrook_icon_key">sink</field>
+    </record>
+
+    <record id="tall_pantry" model="product.template">
+      <field name="southbrook_category">Tall</field>
+      <field name="southbrook_description">Full-height pantry with multiple shelves.</field>
+      <field name="southbrook_dimensions">24"W &#xD7; 84"H &#xD7; 24"D</field>
+      <field name="southbrook_icon_key">pantry</field>
+    </record>
+
+    <record id="tall_oven" model="product.template">
+      <field name="southbrook_category">Tall</field>
+      <field name="southbrook_description">Tall housing engineered for a built-in oven.</field>
+      <field name="southbrook_dimensions">30"W &#xD7; 84"H &#xD7; 24"D</field>
+      <field name="southbrook_icon_key">oven</field>
+    </record>
+
+    <record id="corner" model="product.template">
+      <field name="southbrook_category">Base</field>
+      <field name="southbrook_description">Corner unit with rotating carousel access.</field>
+      <field name="southbrook_dimensions">36" &#xD7; 36" &#xD7; 34&#xBD;"H</field>
+      <field name="southbrook_icon_key">corner</field>
+    </record>
+
+    <record id="vanity" model="product.template">
+      <field name="southbrook_category">Vanity</field>
+      <field name="southbrook_description">Bathroom vanity base with sink cutout.</field>
+      <field name="southbrook_dimensions">30"W &#xD7; 32"H &#xD7; 21"D</field>
+      <field name="southbrook_icon_key">vanity</field>
+    </record>
+
+    <record id="accessory" model="product.template">
+      <field name="southbrook_category">Extras</field>
+      <field name="southbrook_description">Add-on hardware, trim &amp; filler pieces.</field>
+      <field name="southbrook_dimensions">Varies</field>
+      <field name="southbrook_icon_key">extra</field>
+    </record>
+
+    <record id="worktop" model="product.template">
+      <field name="southbrook_category">Extras</field>
+      <field name="southbrook_description">Cut-to-size worktop / countertop surface.</field>
+      <field name="southbrook_dimensions">Per linear ft</field>
+      <field name="southbrook_icon_key">worktop</field>
+    </record>
+
+  </data>
+</odoo>

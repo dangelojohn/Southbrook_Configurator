@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -130,6 +130,12 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # Order Builder has real numbers to show. Must load AFTER
         # product_templates.xml (overrides list_price=0.0 set there).
         "data/cabinet_prices.xml",
+        # 19.0.1.1.0 (2026-06-02) — catalog-picker redesign metadata
+        # seed (category / description / dimensions / icon_key for all
+        # 12 Q8 cabinets). Must load AFTER product_templates.xml since
+        # it updates records by xml_id reference. Backfill on existing
+        # DBs is handled by migrations/19.0.1.1.0/post-migrate.py.
+        "data/cabinet_catalog_metadata.xml",
         # Commit 9 — Order Builder views, user-prefs view, menu
         "views/sale_order_views.xml",
         "views/res_users_views.xml",
