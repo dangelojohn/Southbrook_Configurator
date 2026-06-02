@@ -30,6 +30,11 @@
         <t t-set="breadcrumbs_searchbar" t-value="True"/>
         <t t-set="page_name" t-value="'southbrook_floor'"/>
         <t t-set="title">Floor — Work Centers</t>
+        <!-- 30-second auto-refresh so queue counts stay current on
+             the operator's tablet without manual reload. -->
+        <t t-set="head">
+          <meta http-equiv="refresh" content="30"/>
+        </t>
 
         <div class="o_sb_floor o_sb_floor_index">
           <header class="o_sb_floor_header">
@@ -71,6 +76,13 @@
       <t t-call="portal.portal_layout">
         <t t-set="page_name" t-value="'southbrook_floor_wc'"/>
         <t t-set="title"><t t-esc="wc['code']"/> · Queue</t>
+        <!-- 30-second auto-refresh. The browser's refresh timer is
+             reset by any link/form click so the operator isn't
+             interrupted mid-interaction; after a start/finish POST
+             the redirect re-arms the timer for the new page. -->
+        <t t-set="head">
+          <meta http-equiv="refresh" content="30"/>
+        </t>
 
         <div class="o_sb_floor o_sb_floor_wc">
           <header class="o_sb_floor_header">

@@ -44,19 +44,46 @@ class SouthbrookFloorPortal(CustomerPortal):
     def _floor_user_authorized(self):
         """True when the current user can use the floor portal.
 
-        Soft check for now — auth='user' on the routes already
-        rejects anonymous users. Strict group-based gate
-        (Floor Manager + Manufacturing User) is Phase-2 polish;
-        the M17 res.groups + ACL are in place but the runtime
-        group-cache behaviour was 303'ing legitimate test users
-        during HTTP probe verification, blocking commit. Looser
-        check here ships the templates + data path; the tighter
-        rule lives one commit ahead.
+        Strict check: require Floor Manager group OR Manufacturing
+        User group. Anonymous + portal users without either group
+        are rejected.
+
+        Why SQL instead of user.has_group(): in the earlier MVP we
+        observed has_group() returning False for users whose
+        group_ids had been mutated via direct SQL INSERT between
+        sessions — Odoo caches the user's groups in the env and
+        the cache lagged behind the DB. Direct query of
+        res_groups_users_rel sidesteps the cache entirely.
         """
         user = request.env.user
         if hasattr(user, "_is_public") and user._is_public():
             return False
-        return True
+
+        # xml_id → numeric group id, sudo'd because portal users
+        # cannot read res.groups directly.
+        ImD = request.env["ir.model.data"].sudo()
+        floor_gid = ImD._xmlid_to_res_id(
+            "southbrook_mrp_pm.group_floor_manager",
+            raise_if_not_found=False,
+        )
+        mrp_gid = ImD._xmlid_to_res_id(
+            "mrp.group_mrp_user",
+            raise_if_not_found=False,
+        )
+        candidate_ids = [g for g in (floor_gid, mrp_gid) if g]
+        if not candidate_ids:
+            return False
+
+        # Direct rel-table lookup — no cache to worry about.
+        self.env.cr.execute(
+            """
+            SELECT 1 FROM res_groups_users_rel
+            WHERE uid = %s AND gid IN %s
+            LIMIT 1
+            """,
+            (user.id, tuple(candidate_ids)),
+        )
+        return bool(self.env.cr.fetchone())
 
     @http.route(
         "/my/southbrook/floor",
