@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 1 — QWeb template inheritance that replaces the body of the OCA
+  website_product_configurator.product_configurator template with the
+  southbrook-configurator-v2.html prototype layout.
+
+  Strategy:
+    - Keep the outer `t-call="website.layout"` and the `#wrap` schema-
+      tagged div from the OCA template so we inherit the website chrome,
+      breadcrumbs, navigation, and meta tags.
+    - Replace the inner #unique_product_configurator section (lines
+      24-127 of the OCA config_form_templates.xml) with the v2 markup.
+    - Phase 1 keeps the markup STATIC — the JS owns all the state and
+      hydrates from the hardcoded OPTIONS map. Phase 2 swaps the static
+      OPTIONS for QWeb loops over product.template.attribute_line_ids
+      so the markup becomes data-driven.
+
+  Mount-point pattern:
+    The v2 root div carries id="sb_cfg_v2_root". The configurator.esm.js
+    bundle finds this div on every page; on pages without it the script
+    no-ops. That makes the v2 UX entirely opt-in per template.
+
+  Per project brief (CLAUDE.md §3): we never patch the OCA module in
+  place. This file is the ONLY thing that touches the OCA template, and
+  it touches it via inheritance only.
+-->
+<odoo>
+  <data>
+
+    <template id="product_configurator_v2_body"
+              inherit_id="website_product_configurator.product_configurator"
+              name="Southbrook · Configurator v2 Body">
+
+      <!-- ============================================================
+           Replace the entire #unique_product_configurator section.
+           ============================================================ -->
+      <xpath expr="//section[@id='unique_product_configurator']"
+             position="replace">
+
+        <!-- v2 root — JS guards on this id; remove it and the v1
+             markup behaviour returns. -->
+        <section id="sb_cfg_v2_root"
+                 class="container py-3 sb_cfg_v2"
+                 itemscope="itemscope"
+                 itemtype="http://schema.org/Product">
+
+          <!-- Top progress bar — fills as more options are selected. -->
+          <div class="sb_cfg_progwrap" role="progressbar"
+               aria-label="Configuration completion"
+               aria-valuemin="0" aria-valuemax="100"
+               aria-valuenow="0">
+            <div class="sb_cfg_progbar" id="sb_cfg_progbar"></div>
+          </div>
+
+          <!-- Breadcrumbs.
+               Phase 1 keeps these static; Phase 2 hydrates them from
+               product.public_category_id chain. -->
+          <div class="sb_cfg_crumbs">
+            Shop ›
+            <span t-if="product_tmpl.public_categ_ids">
+              <t t-foreach="product_tmpl.public_categ_ids"
+                 t-as="cat">
+                <t t-esc="cat.name"/> ›
+              </t>
+            </span>
+            <b t-esc="product_tmpl.name"/>
+          </div>
+
+          <!-- Title row + bulk-tools bar.
+               The bulk tools are visible only to backend / admin
+               users in Phase 1; Phase 4 wires them to real server
+               endpoints. -->
+          <div class="sb_cfg_titlebar">
+            <div class="sb_cfg_titlebar_l">
+              <h1 class="sb_cfg_h1" t-esc="product_tmpl.name"/>
+              <p class="sb_cfg_sub">
+                Build a made-to-spec cabinet · live pricing ·
+                SKU auto-generates as you configure
+              </p>
+            </div>
+            <div t-if="not user_id.share"
+                 class="sb_cfg_bulkbar"
+                 aria-label="Bulk product tooling">
+              <span class="sb_cfg_bulkbar_lbl">Bulk tools</span>
+              <button type="button"
+                      class="sb_cfg_btn sb_cfg_btn_tpl"
+                      data-action="download-template">
+                ⬇ Template Layout
+              </button>
+              <button type="button"
+                      class="sb_cfg_btn sb_cfg_btn_imp"
+                      data-action="open-import">
+                ⤒ Import Product
+              </button>
+            </div>
+          </div>
+
+          <!-- Two-pane grid: sticky left preview/summary + right config -->
+          <div class="sb_cfg_grid">
+
+            <!-- LEFT: live preview + summary card + Add to Quote -->
+            <aside class="sb_cfg_panel sb_cfg_left">
+
+              <div class="sb_cfg_viewer" id="sb_cfg_viewer">
+                <div class="sb_cfg_badge" id="sb_cfg_vbadge">LIVE PREVIEW</div>
+                <div class="sb_cfg_cab" id="sb_cfg_cab"></div>
+                <button type="button"
+                        class="sb_cfg_editimg"
+                        data-action="replace-photo"
+                        aria-label="Replace cabinet photo">
+                  📷 Replace photo
+                </button>
+              </div>
+              <input type="file" id="sb_cfg_imgInput"
+                     accept="image/*" hidden="hidden"/>
+
+              <div class="sb_cfg_summary">
+                <div class="sb_cfg_sumrow">
+                  <span class="sb_cfg_k">
+                    Price <span class="sb_cfg_livetag">LIVE</span>
+                  </span>
+                  <span class="sb_cfg_price" id="sb_cfg_price">
+                    $0<span class="sb_cfg_delta" id="sb_cfg_delta"></span>
+                  </span>
+                </div>
+                <div class="sb_cfg_sumrow">
+                  <span class="sb_cfg_k">Est. Weight</span>
+                  <span class="sb_cfg_weight" id="sb_cfg_weight">— kg</span>
+                </div>
+                <div class="sb_cfg_sumrow">
+                  <span class="sb_cfg_k">Auto SKU</span>
+                  <span class="sb_cfg_sku" id="sb_cfg_sku">—</span>
+                </div>
+                <div class="sb_cfg_specline">
+                  <b>Your build:</b>
+                  <span id="sb_cfg_spec">nothing selected yet</span>
+                </div>
+                <div class="sb_cfg_completion">
+                  <div class="sb_cfg_ring" id="sb_cfg_ring">
+                    <i id="sb_cfg_ringtxt">0%</i>
+                  </div>
+                  <span id="sb_cfg_comptxt">0 of 11 options chosen</span>
+                </div>
+              </div>
+
+              <div class="sb_cfg_actionbar">
+                <span class="sb_cfg_note sb_cfg_note_bad"
+                      id="sb_cfg_valid"
+                      role="status" aria-live="polite">
+                  11 option(s) still needed
+                </span>
+                <button type="button"
+                        class="sb_cfg_btn sb_cfg_btn_primary"
+                        data-action="add-to-quote">
+                  Add to Quote ➞
+                </button>
+              </div>
+
+            </aside>
+
+            <!-- RIGHT: chip-selector configurator. JS owns the inner
+                 group/field rendering — Phase 1 starts empty and is
+                 filled by buildUI() on DOMContentLoaded. -->
+            <section class="sb_cfg_panel sb_cfg_right"
+                     id="sb_cfg_configurator"
+                     aria-label="Cabinet configuration options"/>
+
+          </div>
+
+          <p class="sb_cfg_cap">
+            Phase 1 prototype · chip selectors · conditional validation
+            · live preview · progress ring · CSV bulk tools
+          </p>
+
+        </section>
+
+        <!-- ============================================================
+             Import-products overlay modal — hidden until JS opens it.
+             ============================================================ -->
+        <div class="sb_cfg_overlay" id="sb_cfg_importOverlay"
+             role="dialog" aria-modal="true"
+             aria-labelledby="sb_cfg_import_h"
+             aria-hidden="true">
+          <div class="sb_cfg_modal">
+            <div class="sb_cfg_mhead">
+              <h2 id="sb_cfg_import_h">Import Products · Preview &amp; Validate</h2>
+              <button type="button"
+                      class="sb_cfg_x"
+                      data-action="close-import"
+                      aria-label="Close import modal">✕</button>
+            </div>
+            <div class="sb_cfg_mbody">
+              <div class="sb_cfg_drop" id="sb_cfg_drop">
+                📤 <b>Drop your filled template here</b>
+                or click to browse (.csv)<br/>
+                <span class="sb_cfg_drop_hint">
+                  No file? A sample dataset loads automatically so you
+                  can preview the flow.
+                </span>
+              </div>
+              <input type="file" id="sb_cfg_fileInput"
+                     accept=".csv" hidden="hidden"/>
+              <div class="sb_cfg_statline">
+                <span class="sb_cfg_pill sb_cfg_pill_g"
+                      id="sb_cfg_okCount">0 valid</span>
+                <span class="sb_cfg_pill sb_cfg_pill_r"
+                      id="sb_cfg_badCount">0 errors</span>
+                <span class="sb_cfg_stat_hint">
+                  Only valid rows are committed · you confirm before
+                  anything saves
+                </span>
+              </div>
+              <table class="sb_cfg_table">
+                <thead>
+                  <tr>
+                    <th scope="col">Status</th>
+                    <th scope="col">SKU</th>
+                    <th scope="col">Width</th>
+                    <th scope="col">Series</th>
+                    <th scope="col">Box Material</th>
+                    <th scope="col">Finish</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Issue</th>
+                  </tr>
+                </thead>
+                <tbody id="sb_cfg_previewBody"/>
+              </table>
+            </div>
+            <div class="sb_cfg_mfoot">
+              <button type="button"
+                      class="sb_cfg_btn sb_cfg_btn_ghost"
+                      data-action="download-errors">
+                ⬇ Error report
+              </button>
+              <div class="sb_cfg_mfoot_r">
+                <button type="button"
+                        class="sb_cfg_btn sb_cfg_btn_ghost"
+                        data-action="close-import">Cancel</button>
+                <button type="button"
+                        class="sb_cfg_btn sb_cfg_btn_imp"
+                        id="sb_cfg_commitBtn"
+                        data-action="commit-import">
+                  Commit 0 valid rows
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toast container — JS pops messages into it. -->
+        <div class="sb_cfg_toast" id="sb_cfg_toast"
+             role="status" aria-live="polite"/>
+
+      </xpath>
+
+    </template>
+
+  </data>
+</odoo>
