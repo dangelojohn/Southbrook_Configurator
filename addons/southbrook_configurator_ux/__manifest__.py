@@ -79,6 +79,16 @@ Phase 5 — Tests + a11y
         # templates with their attribute_lines that this UX renders.
         "southbrook_estimating",
     ],
+    "external_dependencies": {
+        # Phase 4 import pipeline (controllers/main.py
+        # SouthbrookImportAPI) uses openpyxl to parse uploaded xlsx
+        # files and to build the template-download response. The Odoo
+        # 19 official Debian image typically has openpyxl pre-
+        # installed; we declare it explicitly so a fresh container
+        # without it raises a clear ImportError pointing here.
+        # Install: pip install --break-system-packages openpyxl
+        "python": ["openpyxl"],
+    },
     "data": [
         # Phase 1 — template inheritance that swaps the configurator
         # body markup. Loads AFTER the OCA module's

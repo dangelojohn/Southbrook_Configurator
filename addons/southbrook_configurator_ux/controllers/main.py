@@ -7,7 +7,7 @@ Phase 2a:
         price_extra + base price + a product.config.session id (created
         or reused).
 
-Phase 2c (this commit):
+Phase 2c:
     POST /southbrook/api/configurator/select
         Updates the session value_ids, returns server-resolved price +
         weight + disabled_value_ids from the OCA product.config.line
@@ -22,6 +22,34 @@ Phase 2c (this commit):
         to /my/southbrook/order-builder/<id> so the client can
         navigate.
 
+Phase 4 (this commit):
+    GET  /southbrook/api/import/template
+        Returns an xlsx file with the live attribute / category / UoM
+        vocabulary baked in as dropdown sources + example rows. Replaces
+        the client-side CSV download the bulk-tools button shipped with
+        in Phases 1-3. Backend-only via auth='user' + internal-user check
+        (portal users can't see the bulk-tools bar anyway).
+
+    POST /southbrook/api/import/preview
+        Accepts a multipart xlsx upload. Parses the PRODUCTS sheet,
+        validates each row against the live vocab + the upsert
+        invariants, returns a per-row {row, sheet, status, errors[]}
+        list. Writes NOTHING — purely a dry-run preview. Backend-only.
+
+    POST /southbrook/api/import/commit
+        Same parsing + validation as /preview, but writes the VALID rows
+        inside a single transaction. Requires `confirm: true` in the
+        payload (refuses otherwise — explicit human gate per the Phase 4
+        stop-point). Upserts product.template by default_code. Returns
+        per-row commit log + summary counters. Backend-only.
+
+    v1 of the import pipeline handles the PRODUCTS sheet only. The
+    template's ATTRIBUTE_LINES / ATTRIBUTE_VALUES / BOM_* / HARDWARE_BOM /
+    ACCESSORIES sheets are recognised but skipped with a "deferred to v2"
+    info row in the preview output. The endpoint contract is shaped to
+    accept multi-sheet payloads from day one so the v2 expansion lands
+    without breaking clients.
+
 Auth model: auth='public' + type='json'. The /shop/<slug> page is
 publicly accessible (it's a catalog page), so anonymous visitors can
 configure too. JSON-RPC routes don't require CSRF tokens. Sessions
@@ -34,6 +62,8 @@ ops because public users don't have direct write ACL on that model,
 but the scope is tight: search-or-create then attach to the request
 user (not to a different user).
 """
+import io
+import json
 import logging
 
 from odoo import http
@@ -41,6 +71,40 @@ from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
+
+# Bool coercion accepted by the importer for fields like sale_ok,
+# is_published, manufacture_route, etc. Anything else is rejected as
+# a row-level error.
+_TRUE_TOKENS = {"true", "yes", "1", "y", "t"}
+_FALSE_TOKENS = {"false", "no", "0", "n", "f", ""}
+
+# Allowed values for the southbrook_category Selection field. Mirrors
+# the field definition in southbrook_estimating.product_template.
+_SOUTHBROOK_CATEGORIES = {"Wall", "Base", "Drawer", "Tall", "Vanity", "Extras"}
+
+# Allowed values for southbrook_icon_key. Validated against the JS
+# CABINET_ICONS map at configurator.esm.js — keep these in sync.
+_SOUTHBROOK_ICON_KEYS = {
+    "wall1", "wall2", "base1", "base2", "drawer", "sink",
+    "pantry", "oven", "corner", "vanity", "extra", "worktop",
+}
+
+# Required PRODUCTS columns. The importer refuses the row if any is
+# blank. uom_id has a default of "Units" applied before this check.
+_PRODUCTS_REQUIRED = ("default_code", "name", "type", "internal_category")
+
+# Recognised sheets in v1. PRODUCTS is processed; the rest are skipped
+# with a "deferred to v2" status row in the preview so callers can see
+# the importer DID notice them.
+_V1_SHEET = "PRODUCTS"
+_V2_SHEETS = ("ATTRIBUTE_LINES", "ATTRIBUTE_VALUES", "BOM_HEADERS",
+              "BOM_LINES", "HARDWARE_BOM", "ACCESSORIES")
+# Reference sheets that the template ships with; the importer reads
+# nothing from these (they're dropdown sources for the spreadsheet
+# itself), but it surfaces them as INFO rows in the preview so a
+# misnamed sheet is easy to spot.
+_REF_SHEETS = ("Instructions", "REF_CATEGORIES", "REF_ATTRIBUTES",
+               "REF_UOM", "REF_FIELDS", "VERSION_STAMP")
 
 
 # Logical attribute groups for the configurator's right pane. Matches
@@ -549,3 +613,502 @@ class SouthbrookConfiguratorAPI(http.Controller):
                     "message": "This configuration session belongs to a "
                                "different user."}
         return session
+
+
+# =====================================================================
+# Phase 4 — bulk product import pipeline.
+#
+# Lives on a separate controller class because the import endpoints use
+# type='http' (file upload + download) rather than type='json'. Keeping
+# them on their own class avoids mixing auth modes + makes the
+# permission boundary obvious to a reviewer.
+# =====================================================================
+
+class SouthbrookImportAPI(http.Controller):
+    """Bulk product import endpoints (Phase 4).
+
+    All three routes require an internal user (not portal, not public).
+    The bulk-tools bar in the OWL configurator only renders for
+    `not user_id.share` — these endpoints enforce the same constraint
+    server-side as a defence-in-depth check (so a portal user can't
+    POST directly even if they bypass the UI gate).
+    """
+
+    # ------------------------------------------------------------------
+    # /template — xlsx download with live vocab baked in.
+    # ------------------------------------------------------------------
+    @http.route(
+        "/southbrook/api/import/template",
+        type="http",
+        auth="user",
+        methods=["GET"],
+    )
+    def import_template(self, **kw):
+        """Return an xlsx file matching scripts/gen_import_template.py
+        but generated on-the-fly from the live DB vocab.
+
+        Why not just serve the static file from
+        ~/Downloads/Southbrook_Product_Import_Template_v1.xlsx?
+        Because that snapshot ages — when a new attribute / category /
+        UoM lands, the on-disk file's REF_* sheets get stale. Generating
+        on-demand keeps the dropdown sources in sync with what the
+        validator on /preview will accept.
+        """
+        if request.env.user.share:
+            return request.make_response(
+                "Bulk template download is internal-users only.",
+                status=403,
+            )
+
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment
+        except ImportError:
+            _logger.error("openpyxl missing in container; can't generate template.")
+            return request.make_response(
+                "Server is missing openpyxl. Install via "
+                "pip install openpyxl in the Odoo container.",
+                status=500,
+            )
+
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+
+        # PRODUCTS sheet — minimal Phase-4 v1 column set. The full
+        # column set (with southbrook_* metadata, BoM, etc.) is shipped
+        # by the offline scripts/gen_import_template.py; for the
+        # backend template-download we keep this to the v1 importable
+        # subset so users aren't tempted to fill columns we'll skip.
+        ws = wb.create_sheet("PRODUCTS")
+        headers = [
+            "default_code", "name", "type", "internal_category", "uom_id",
+            "list_price", "standard_price", "sale_ok", "purchase_ok",
+            "is_published", "config_ok", "weight",
+            "southbrook_category", "southbrook_description",
+            "southbrook_dimensions", "southbrook_icon_key",
+        ]
+        for col_idx, h in enumerate(headers, 1):
+            c = ws.cell(row=1, column=col_idx, value=h)
+            c.font = Font(color="FFFFFF", bold=True)
+            c.fill = PatternFill("solid", fgColor="2F3B52")
+            c.alignment = Alignment(horizontal="center")
+            ws.column_dimensions[
+                openpyxl.utils.get_column_letter(col_idx)].width = 18
+        ws.row_dimensions[1].height = 28
+        ws.freeze_panes = "A2"
+
+        # One example row so the user can see what shapes work.
+        example = [
+            "SB-DEMO-001", "Demo Cabinet 18\"", "consu", "Goods", "Units",
+            295.00, 162.25, "TRUE", "TRUE",
+            "FALSE", "TRUE", 14.0,
+            "Base", "Demo cabinet for template testing.",
+            "18\"W × 34½\"H × 24\"D", "base1",
+        ]
+        for col_idx, v in enumerate(example, 1):
+            ws.cell(row=2, column=col_idx, value=v).fill = (
+                PatternFill("solid", fgColor="EEF2FB"))
+
+        # REF_CATEGORIES — live snapshot.
+        ref_cats = wb.create_sheet("REF_CATEGORIES")
+        ref_cats.cell(row=1, column=1, value="name").font = Font(bold=True)
+        for i, cat in enumerate(
+                request.env["product.category"].sudo().search([]), 2):
+            ref_cats.cell(row=i, column=1, value=cat.name)
+
+        # REF_UOM — live snapshot.
+        ref_uom = wb.create_sheet("REF_UOM")
+        ref_uom.cell(row=1, column=1, value="name").font = Font(bold=True)
+        for i, uom in enumerate(
+                request.env["uom.uom"].sudo().search([("active", "=", True)]), 2):
+            ref_uom.cell(row=i, column=1, value=uom.name)
+
+        # Stream the workbook to bytes.
+        bio = io.BytesIO()
+        wb.save(bio)
+        data = bio.getvalue()
+
+        return request.make_response(
+            data,
+            headers=[
+                ("Content-Type",
+                 "application/vnd.openxmlformats-officedocument."
+                 "spreadsheetml.sheet"),
+                ("Content-Length", str(len(data))),
+                ("Content-Disposition",
+                 'attachment; filename="Southbrook_Product_Template.xlsx"'),
+            ],
+        )
+
+    # ------------------------------------------------------------------
+    # /preview — read xlsx, validate, return per-row results. No writes.
+    # ------------------------------------------------------------------
+    @http.route(
+        "/southbrook/api/import/preview",
+        type="http",
+        auth="user",
+        methods=["POST"],
+        csrf=False,
+    )
+    def import_preview(self, **kw):
+        """Parse + validate an uploaded xlsx and return a per-row report.
+
+        Multipart form upload — the file comes through the `file` field.
+        Response is JSON, even though the route is type='http' (the
+        client expects a JSON body it can render in the preview modal).
+        """
+        result, status = self._import_preview_impl(kw)
+        return self._json_response(result, status)
+
+    # ------------------------------------------------------------------
+    # /commit — same parse/validate as preview, but writes valid rows.
+    # ------------------------------------------------------------------
+    @http.route(
+        "/southbrook/api/import/commit",
+        type="http",
+        auth="user",
+        methods=["POST"],
+        csrf=False,
+    )
+    def import_commit(self, **kw):
+        """Commit valid rows from an uploaded xlsx inside a transaction.
+
+        REQUIRES `confirm` field with value `true` in the form — the
+        explicit human-confirmation gate per the Phase 4 stop-point.
+        Without it the endpoint refuses (400) rather than silently
+        defaulting to "yes".
+        """
+        result, status = self._import_commit_impl(kw)
+        return self._json_response(result, status)
+
+    # ------------------------------------------------------------------
+    # Implementation core — pure dict-returning functions. Easier to
+    # test in isolation: a test calls these directly and inspects the
+    # returned (dict, status_code) tuple without needing to mock
+    # request.make_response.
+    # ------------------------------------------------------------------
+    def _import_preview_impl(self, kw):
+        return self._import_run(kw, commit=False)
+
+    def _import_commit_impl(self, kw):
+        # Confirm gate runs INSIDE the impl so unit tests of the
+        # commit flow can exercise both paths without round-tripping
+        # the route wrapper.
+        confirm = (kw.get("confirm") or "").lower().strip()
+        if confirm != "true":
+            return {
+                "ok": False, "error": "confirm_required",
+                "message": "Commit requires confirm=true in the request body.",
+            }, 400
+        return self._import_run(kw, commit=True)
+
+    # ------------------------------------------------------------------
+    # Shared runner: read xlsx, validate, optionally write.
+    # Returns (response_dict, status_code).
+    # ------------------------------------------------------------------
+    def _import_run(self, kw, commit):
+        """Single entry point for preview + commit so the two share
+        validation logic byte-for-byte.
+
+        commit=False  → preview pass; nothing written; per-row status
+                        for VALID rows is 'preview_ok'.
+        commit=True   → writes valid rows inside the request transaction;
+                        statuses are 'created' / 'updated' / 'error';
+                        invalid rows are 'skipped' with their errors.
+        """
+        if request.env.user.share:
+            return {
+                "ok": False, "error": "forbidden",
+                "message": "Bulk import is internal-users only.",
+            }, 403
+
+        file_storage = request.httprequest.files.get("file")
+        if not file_storage:
+            return {
+                "ok": False, "error": "missing_file",
+                "message": "Upload a file under the 'file' form field.",
+            }, 400
+
+        try:
+            import openpyxl
+        except ImportError:
+            return {
+                "ok": False, "error": "openpyxl_missing",
+                "message": "Server is missing openpyxl.",
+            }, 500
+
+        # Read + parse the file.
+        try:
+            wb = openpyxl.load_workbook(file_storage, read_only=True,
+                                         data_only=True)
+        except Exception as exc:                            # noqa: BLE001
+            return {
+                "ok": False, "error": "unreadable_file",
+                "message": f"Could not parse xlsx: {exc}",
+            }, 400
+
+        report = {
+            "ok": True,
+            "mode": "commit" if commit else "preview",
+            "sheets": [],
+            "summary": {"valid": 0, "invalid": 0, "skipped_sheets": 0,
+                        "created": 0, "updated": 0, "errors": 0},
+        }
+
+        for sheet_name in wb.sheetnames:
+            if sheet_name == _V1_SHEET:
+                self._process_products_sheet(
+                    wb[sheet_name], report, commit=commit)
+            elif sheet_name in _V2_SHEETS:
+                report["sheets"].append({
+                    "sheet": sheet_name,
+                    "status": "deferred",
+                    "message": f"Sheet '{sheet_name}' is recognised but its "
+                               f"importer is deferred to v2. Skipping.",
+                    "rows": [],
+                })
+                report["summary"]["skipped_sheets"] += 1
+            elif sheet_name in _REF_SHEETS:
+                report["sheets"].append({
+                    "sheet": sheet_name,
+                    "status": "reference",
+                    "message": f"Sheet '{sheet_name}' is reference data; "
+                               f"importer doesn't read it.",
+                    "rows": [],
+                })
+            else:
+                report["sheets"].append({
+                    "sheet": sheet_name,
+                    "status": "unknown",
+                    "message": f"Sheet '{sheet_name}' isn't recognised; "
+                               f"importer skipped it.",
+                    "rows": [],
+                })
+                report["summary"]["skipped_sheets"] += 1
+
+        return report, 200
+
+    def _process_products_sheet(self, ws, report, commit):
+        """Validate + (optionally) write each row of the PRODUCTS sheet."""
+        sheet_report = {
+            "sheet": "PRODUCTS",
+            "status": "processed",
+            "rows": [],
+        }
+
+        # Read header row. openpyxl read_only sheets are iter-based so
+        # convert the first row to a list of column names.
+        rows_iter = ws.iter_rows(values_only=True)
+        try:
+            header = [str(c).strip() if c is not None else ""
+                      for c in next(rows_iter)]
+        except StopIteration:
+            sheet_report["status"] = "empty"
+            report["sheets"].append(sheet_report)
+            return
+
+        # Resolve some env shortcuts once.
+        Category = request.env["product.category"].sudo()
+        Uom = request.env["uom.uom"].sudo()
+        Template = request.env["product.template"].sudo()
+
+        # Cache vocab lookups for the validation pass.
+        categs_by_name = {c.name: c for c in Category.search([])}
+        uoms_by_name = {u.name: u for u in Uom.search([("active", "=", True)])}
+
+        for row_idx, raw in enumerate(rows_iter, start=2):
+            row = self._row_to_dict(header, raw)
+            # Skip blank rows (every column empty).
+            if all((not str(v).strip() if v is not None else True)
+                   for v in row.values()):
+                continue
+
+            errors = []
+            normalised = self._normalise_products_row(row, errors)
+            # Vocab lookups
+            cat_name = normalised.get("internal_category", "")
+            cat = categs_by_name.get(cat_name) if cat_name else None
+            if cat_name and not cat:
+                errors.append(f"internal_category '{cat_name}' not "
+                              f"found in product.category")
+            uom_name = normalised.get("uom_id", "") or "Units"
+            uom = uoms_by_name.get(uom_name)
+            if not uom:
+                errors.append(f"uom_id '{uom_name}' not found in uom.uom")
+
+            # Required field check (after normalisation so trimmed values
+            # get a fair shake).
+            for k in _PRODUCTS_REQUIRED:
+                if not normalised.get(k):
+                    errors.append(f"{k} is required")
+
+            row_report = {
+                "row": row_idx,
+                "default_code": normalised.get("default_code") or "",
+                "status": None,
+                "errors": errors,
+            }
+
+            if errors:
+                row_report["status"] = (
+                    "skipped" if commit else "invalid"
+                )
+                report["summary"]["invalid"] += 1
+                sheet_report["rows"].append(row_report)
+                continue
+
+            # Build the write vals. Note: product.template in Odoo 19
+            # exposes uom_id but NOT uom_po_id on the template (it's
+            # on product.product / removed at the template level).
+            vals = {
+                "name": normalised["name"],
+                "default_code": normalised["default_code"],
+                "type": normalised["type"],
+                "categ_id": cat.id,
+                "uom_id": uom.id,
+            }
+            for opt in ("list_price", "standard_price", "weight"):
+                v = normalised.get(opt)
+                if v not in (None, ""):
+                    vals[opt] = v
+            for opt in ("sale_ok", "purchase_ok", "is_published",
+                        "config_ok"):
+                v = normalised.get(opt)
+                if v is not None:
+                    vals[opt] = v
+            for opt in ("southbrook_category", "southbrook_description",
+                        "southbrook_dimensions", "southbrook_icon_key"):
+                v = normalised.get(opt)
+                if v not in (None, ""):
+                    vals[opt] = v
+
+            if not commit:
+                row_report["status"] = "preview_ok"
+                row_report["proposed_vals"] = {
+                    k: v for k, v in vals.items()
+                    if k in ("name", "default_code", "list_price",
+                             "southbrook_category", "southbrook_icon_key")
+                }
+                report["summary"]["valid"] += 1
+                sheet_report["rows"].append(row_report)
+                continue
+
+            # COMMIT path — upsert by default_code.
+            try:
+                existing = Template.search(
+                    [("default_code", "=", vals["default_code"])], limit=1)
+                if existing:
+                    existing.write(vals)
+                    row_report["status"] = "updated"
+                    row_report["product_tmpl_id"] = existing.id
+                    report["summary"]["updated"] += 1
+                else:
+                    new = Template.create(vals)
+                    row_report["status"] = "created"
+                    row_report["product_tmpl_id"] = new.id
+                    report["summary"]["created"] += 1
+                report["summary"]["valid"] += 1
+            except Exception as exc:                        # noqa: BLE001
+                row_report["status"] = "error"
+                row_report["errors"].append(
+                    f"Write failed: {exc.__class__.__name__}: {exc}")
+                report["summary"]["errors"] += 1
+                report["summary"]["invalid"] += 1
+
+            sheet_report["rows"].append(row_report)
+
+        report["sheets"].append(sheet_report)
+
+    def _row_to_dict(self, header, raw_tuple):
+        """Pair the raw cell values with the column names. Missing
+        trailing cells (openpyxl returns shorter tuples for sparse
+        rows) get None."""
+        out = {}
+        for i, name in enumerate(header):
+            if not name:
+                continue
+            try:
+                out[name] = raw_tuple[i]
+            except IndexError:
+                out[name] = None
+        return out
+
+    def _normalise_products_row(self, row, errors):
+        """Coerce types + validate enums BEFORE the DB lookups + write.
+
+        Returns a new dict with normalised values (strings stripped,
+        booleans converted, numerics cast). Anything that fails type
+        coercion appends to `errors` and the row gets skipped.
+        """
+        out = {}
+
+        def _str(k):
+            v = row.get(k)
+            if v is None: return ""
+            return str(v).strip()
+
+        def _num(k):
+            v = row.get(k)
+            if v is None or (isinstance(v, str) and not v.strip()):
+                return None
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                errors.append(f"{k} '{v}' is not numeric")
+                return None
+
+        def _bool(k):
+            v = row.get(k)
+            if v is None: return None
+            if isinstance(v, bool): return v
+            s = str(v).strip().lower()
+            if s in _TRUE_TOKENS: return True
+            if s in _FALSE_TOKENS: return False
+            errors.append(f"{k} '{v}' is not a boolean")
+            return None
+
+        # Strings
+        for k in ("default_code", "name", "type", "internal_category",
+                  "uom_id", "southbrook_description",
+                  "southbrook_dimensions"):
+            out[k] = _str(k)
+
+        # Numerics
+        for k in ("list_price", "standard_price", "weight"):
+            out[k] = _num(k)
+
+        # Booleans
+        for k in ("sale_ok", "purchase_ok", "is_published", "config_ok"):
+            out[k] = _bool(k)
+
+        # Enum: type must be one of consu/service/combo
+        if out["type"] and out["type"] not in ("consu", "service", "combo"):
+            errors.append(
+                f"type '{out['type']}' must be one of: consu, service, combo")
+
+        # Enum: southbrook_category
+        sc = _str("southbrook_category")
+        if sc and sc not in _SOUTHBROOK_CATEGORIES:
+            errors.append(
+                f"southbrook_category '{sc}' must be one of: "
+                f"{', '.join(sorted(_SOUTHBROOK_CATEGORIES))}")
+        out["southbrook_category"] = sc
+
+        # Enum: southbrook_icon_key
+        sik = _str("southbrook_icon_key")
+        if sik and sik not in _SOUTHBROOK_ICON_KEYS:
+            errors.append(
+                f"southbrook_icon_key '{sik}' isn't in the supported set; "
+                f"falls back to 'extra' on render but the importer flags it.")
+        out["southbrook_icon_key"] = sik
+
+        return out
+
+    def _json_response(self, payload, status=200):
+        """Return a JSON body via an http response (since the routes are
+        type='http' for the file-upload semantics)."""
+        return request.make_response(
+            json.dumps(payload),
+            status=status,
+            headers=[("Content-Type", "application/json")],
+        )
