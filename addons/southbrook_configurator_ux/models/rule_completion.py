@@ -123,13 +123,26 @@ class RuleCompletion(models.AbstractModel):
         for v_name, allowed in _DOOR_STYLE_ALLOW.items():
             domains_by_value_name[v_name] = ensure_domain(v_name, allowed)
 
-        # Q8 cabinet templates that carry both Box Material + Door Style
-        # attribute_lines and need full rule coverage. Accessory (46) +
-        # Worktop (47) carry Box Material only.
-        q8_tmpl_ids = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]
+        # Scope every product.template that exposes Box Material OR
+        # Door Style to its customers — that covers the Q8 locked
+        # templates AND the catalog_expansion's 40 common-category
+        # templates AND any future template wired through the OCA
+        # configurator. Each template gets exactly the rules it needs:
+        # templates without Door Style (open shelves, drawer banks,
+        # accessories) get only Box Material rules; templates without
+        # Box Material (none in current scope, but defensive) get only
+        # Door Style rules.
+        box_lines = AttrLine.search(
+            [("attribute_id", "=", box_attr.id)]) if box_attr else AttrLine
+        door_lines = AttrLine.search(
+            [("attribute_id", "=", door_attr.id)]) if door_attr else AttrLine
+        scoped_tmpl_ids = sorted({
+            l.product_tmpl_id.id
+            for l in (box_lines | door_lines)
+        })
 
         deleted, created = 0, 0
-        for tmpl_id in q8_tmpl_ids:
+        for tmpl_id in scoped_tmpl_ids:
             tmpl_lines = AttrLine.search(
                 [("product_tmpl_id", "=", tmpl_id)])
             box_line = tmpl_lines.filtered(
@@ -149,10 +162,17 @@ class RuleCompletion(models.AbstractModel):
                 stale.unlink()
 
             # CREATE one config.line per (value) pointing to the right
-            # per-value domain.
+            # per-value domain. OCA constraint: config.line value_ids
+            # must be a subset of the attribute_line's value_ids — so
+            # only emit a rule for a value that the template ACTUALLY
+            # exposes (e.g. SB-WALL-GLASS restricts Door Style to just
+            # "Custom (Signature)", so it gets ONE door rule, not three).
             if box_line:
+                box_line_value_ids = set(box_line.value_ids.ids)
                 for v_name, attr_val in box_vals.items():
                     if v_name not in _BOX_MATERIAL_ALLOW:
+                        continue
+                    if attr_val.id not in box_line_value_ids:
                         continue
                     ConfigLine.create({
                         "product_tmpl_id": tmpl_id,
@@ -163,8 +183,11 @@ class RuleCompletion(models.AbstractModel):
                     })
                     created += 1
             if door_line:
+                door_line_value_ids = set(door_line.value_ids.ids)
                 for v_name, attr_val in door_vals.items():
                     if v_name not in _DOOR_STYLE_ALLOW:
+                        continue
+                    if attr_val.id not in door_line_value_ids:
                         continue
                     ConfigLine.create({
                         "product_tmpl_id": tmpl_id,
