@@ -105,6 +105,11 @@ Phase 5 — Tests + a11y
         # Loads AFTER tactical_price_extras so the price seed re-runs
         # against the freshly-created PTAVs.
         "data/catalog_expansion.xml",
+        # Rule-completion — fills OCA product.config.line gaps so
+        # Contemporary + Elegance don't disable Box Material values
+        # that were only mentioned in Contractor / Signature rules.
+        # Loads LAST so the catalog templates are fully wired first.
+        "data/rule_completion.xml",
     ],
     "assets": {
         "web.assets_frontend": [

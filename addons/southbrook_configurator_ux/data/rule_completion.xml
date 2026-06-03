@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fill in OCA product.config.line rule gaps so the Box Material + Door
+  Style availabilities match the spec for every series. Without this,
+  picking Contemporary disables both box materials (the values appear
+  in Contractor / Signature rules whose domains don't match the current
+  pick → OCA semantics treats them as restricted-and-unavailable).
+
+  The deltas table + builder lives in models/rule_completion.py. Loads
+  AFTER tactical_price_extras + catalog_expansion so it runs against
+  the freshly-built attribute_lines.
+-->
+<odoo noupdate="0">
+  <function model="southbrook.configurator_ux.rule_completion"
+            name="complete_rules"/>
+</odoo>
