@@ -100,6 +100,11 @@ Phase 5 — Tests + a11y
         # southbrook_estimating ships authoritative seed data from
         # Price Master.
         "data/tactical_price_extras.xml",
+        # Common-category catalog expansion — ~40 industry-standard
+        # cabinet templates with full product_configurator wiring.
+        # Loads AFTER tactical_price_extras so the price seed re-runs
+        # against the freshly-created PTAVs.
+        "data/catalog_expansion.xml",
     ],
     "assets": {
         "web.assets_frontend": [
