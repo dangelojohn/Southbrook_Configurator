@@ -130,14 +130,15 @@
             <div class="sb_cfg_mbody">
               <div class="sb_cfg_drop" id="sb_cfg_drop">
                 📤 <b>Drop your filled template here</b>
-                or click to browse (.csv)<br/>
+                or click to browse (.xlsx)<br/>
                 <span class="sb_cfg_drop_hint">
-                  No file? A sample dataset loads automatically so you
-                  can preview the flow.
+                  No file? Click ⬇ Template Layout above to download a
+                  starter spreadsheet with the expected columns and an
+                  example row.
                 </span>
               </div>
               <input type="file" id="sb_cfg_fileInput"
-                     accept=".csv" hidden="hidden"/>
+                     accept=".xlsx" hidden="hidden"/>
               <div class="sb_cfg_statline">
                 <span class="sb_cfg_pill sb_cfg_pill_g"
                       id="sb_cfg_okCount">0 valid</span>
