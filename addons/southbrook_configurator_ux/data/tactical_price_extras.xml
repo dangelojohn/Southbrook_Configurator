@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TACTICAL: backfill product.template.attribute.value.price_extra +
+  weight_extra so the configurator's LIVE badges stop showing $295 / 0.0 kg
+  for every combination. The deltas table lives in
+  models/tactical_price_seed.py — edit there, then `-u` this module.
+
+  REMOVE this file (and the manifest entry, and models/tactical_price_seed.py)
+  once southbrook_estimating/data/attribute_values.xml is populated with the
+  authoritative price_extras from Southbrook_Consolidated_Dataset.xlsx
+  Price Master.
+-->
+<odoo noupdate="0">
+  <function model="southbrook.configurator_ux.tactical_seed"
+            name="backfill_demo_price_extras"/>
+</odoo>

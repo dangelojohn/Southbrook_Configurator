@@ -95,6 +95,11 @@ Phase 5 — Tests + a11y
         # data/config_form_templates.xml because of the dependency
         # ordering above.
         "views/configurator_template.xml",
+        # TACTICAL — demo-grade price_extra/weight_extra backfill so the
+        # LIVE recalc badges show non-zero deltas. Delete once
+        # southbrook_estimating ships authoritative seed data from
+        # Price Master.
+        "data/tactical_price_extras.xml",
     ],
     "assets": {
         "web.assets_frontend": [
