@@ -94,24 +94,6 @@ const FINISH_COLORS = {
 const SKU_ATTR_NAMES = ["Width", "Series", "Finish"];
 const SPEC_ATTR_NAMES = ["Width", "Series", "Finish", "Hinge Side", "Handle"];
 
-// CSV template + sample for the bulk-tools workflow. Headers must match
-// the Phase-4 server-side parser's column order.
-const TEMPLATE_HEADERS = [
-    "SKU", "Product_Name", "Price", "Weight_kg", "Image", "Family",
-    "Width", "Series", "Box_Material", "Door_Style", "Finish",
-    "Hinge_Side", "Finished_Sides", "Gables", "Handle", "Accessories",
-    "Door_Count",
-];
-const SAMPLE_CSV = [
-    TEMPLATE_HEADERS.join(","),
-    "SB-001,Base 18 Sig,325.00,24.6,a.jpg,Base,18 in,Signature,Maple,Five-Piece Woodgrain,Walnut Stain,Right,Both,Standard,Bar Pull,Soft-Close,1",
-    "SB-002,Base 12 Con,219.00,16.0,b.jpg,Base,12 in,Contractor Series,White Melamine,Thermofoil Slab — White,White,Left,None,Standard,Knob,None,1",
-    "SB-003,Base 24 Ele,360.00,30.0,c.jpg,Base,24 in,Elegance,Maple,Five-Piece Woodgrain,Cherry Stain,Right,Both,Finished,Cup Pull,Pull-Outs,2",
-    "SB-004,Base 15 Mel,248.00,18.0,d.jpg,Base,15 in,Contemporary,White Melamine,Thermofoil Slab — White,Walnut Stain,Left,Left,Standard,Bar Pull,Soft-Close,1",
-    "SB-005,Base 21 Sig,410.00,33.0,e.jpg,Base,21 in,Signature,Maple,Custom (Signature),Custom,Right,Both,Decorative,Integrated,Drawer Organisers,2",
-].join("\n");
-
-
 // =====================================================================
 // ConfiguratorV2 — single OWL component owning the entire reactive UI
 // =====================================================================
@@ -336,8 +318,13 @@ class ConfiguratorV2 extends Component {
             closedGroups: {},               // {<title>: true}  — collapsed groups
             userPhoto: null,                // dataURL or null
             previewBadge: "LIVE PREVIEW",
-            // Bulk tools (Phase 4 wiring deferred)
+            // Bulk tools — Phase 4: full server-side preview/commit
+            // pipeline. importReport caches the entire /preview or
+            // /commit response so the commit step doesn't need to
+            // re-request; importRows is the flattened per-row view
+            // used by the preview table + error CSV.
             importRows: [],
+            importReport: null,
         });
 
         // Refs for DOM-attached interactions (file inputs + drop zones).
@@ -833,24 +820,41 @@ class ConfiguratorV2 extends Component {
     // Bulk tools — preserved client-side logic from Phase 1
     // ------------------------------------------------------------------
 
+    // ------------------------------------------------------------------
+    // Bulk tools (Phase 4) — server-driven template download +
+    // upload + preview + commit pipeline.
+    // ------------------------------------------------------------------
+
     onDownloadTemplate() {
-        const example = [
-            "SB-BASE-1DR-001", "Base 1-Door 18in", "295.00", "24.6",
-            "base-1dr.jpg", "Base", "18 in", "Signature", "Maple",
-            "Five-Piece Woodgrain", "Walnut Stain", "RH (Right Hand)", "Both",
-            "Standard", "Bar Pull", "Soft-Close", "1",
-        ];
-        const csv = `${TEMPLATE_HEADERS.join(",")}\n${example.join(",")}\n`;
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-        a.download = "Southbrook_Product_Template_v1.csv";
-        a.click();
-        this._toast(`Template downloaded · ${TEMPLATE_HEADERS.length} columns + example row`);
+        // Server-side xlsx generation. Navigate to the route as a
+        // download — the browser handles the file save automatically.
+        // No fetch needed: the Content-Disposition: attachment header
+        // triggers the download dialog and the URL gets the user's
+        // session cookie via same-origin.
+        window.location.href = "/southbrook/api/import/template";
+        this._toast("Generating template — your download should start in a moment.");
     }
 
     onOpenImport() {
-        const rows = this._parseCSV(SAMPLE_CSV);
-        this._renderImport(rows);
+        // Clear any stale preview rows from a previous session.
+        this.state.importRows = [];
+        this.state.importReport = null;
+        const body = document.getElementById("sb_cfg_previewBody");
+        if (body) body.innerHTML = `
+            <tr><td colspan="8" style="text-align:center;color:#6b7488;
+                                        padding:20px">
+                Drop an xlsx file above (or click to browse) to preview
+                what would be imported.
+            </td></tr>`;
+        const ok = document.getElementById("sb_cfg_okCount");
+        const bad = document.getElementById("sb_cfg_badCount");
+        const commitBtn = document.getElementById("sb_cfg_commitBtn");
+        if (ok) ok.textContent = "0 valid";
+        if (bad) bad.textContent = "0 errors";
+        if (commitBtn) {
+            commitBtn.textContent = "Commit 0 valid rows";
+            commitBtn.disabled = true;
+        }
         const overlay = document.getElementById("sb_cfg_importOverlay");
         if (overlay) {
             overlay.classList.add("sb_cfg_overlay_show");
@@ -860,20 +864,23 @@ class ConfiguratorV2 extends Component {
 
     _wireImportOverlay() {
         // The overlay markup lives outside the OWL tree (body-level
-        // position:fixed). Wire its click handlers via the imperative
-        // DOM API — there's only one of each so this is safe.
+        // position:fixed). Wire its click handlers + drop zone via the
+        // imperative DOM API.
         const overlay = document.getElementById("sb_cfg_importOverlay");
         if (!overlay) return;
         overlay.querySelectorAll('[data-action="close-import"]')
             .forEach((b) => b.addEventListener("click", () => this._closeImport()));
         const dl = overlay.querySelector('[data-action="download-errors"]');
         if (dl) dl.addEventListener("click", () => this._downloadImportErrors());
-        const commit = overlay.querySelector('[data-action="commit-import"]');
-        if (commit) commit.addEventListener("click", () => this._commitImport());
+        const commitBtn = overlay.querySelector('[data-action="commit-import"]');
+        if (commitBtn) commitBtn.addEventListener("click", () => this._commitImport());
 
         const drop = document.getElementById("sb_cfg_drop");
         const fileInput = document.getElementById("sb_cfg_fileInput");
         if (drop && fileInput) {
+            // xlsx + csv accepted, but the server-side parser is
+            // openpyxl which only handles xlsx for v1.
+            fileInput.accept = ".xlsx";
             drop.addEventListener("click", () => fileInput.click());
             ["dragover", "dragenter"].forEach((evName) => {
                 drop.addEventListener(evName, (e) => {
@@ -890,19 +897,187 @@ class ConfiguratorV2 extends Component {
             drop.addEventListener("drop", (e) => {
                 const f = e.dataTransfer.files[0];
                 if (f) {
-                    fileInput.onchange({ target: { files: [f] } });
+                    this._submitImportPreview(f);
                 }
             });
             fileInput.onchange = (e) => {
                 const f = e.target.files[0];
                 if (!f) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    this._renderImport(this._parseCSV(ev.target.result));
-                    this._toast(`Parsed ${f.name}`);
-                };
-                reader.readAsText(f);
+                this._submitImportPreview(f);
             };
+        }
+    }
+
+    async _submitImportPreview(file) {
+        // POST multipart to /preview. Read-only — no writes hit the DB
+        // until the user explicitly clicks Commit.
+        this._toast(`Uploading ${file.name}…`);
+        const formData = new FormData();
+        formData.append("file", file);
+        try {
+            const res = await fetch("/southbrook/api/import/preview", {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin",
+            });
+            const body = await res.json();
+            this._renderImportReport(body);
+            if (body.ok) {
+                const summary = body.summary || {};
+                this._toast(
+                    `Preview: ${summary.valid || 0} valid · `
+                    + `${summary.invalid || 0} invalid · `
+                    + `${summary.skipped_sheets || 0} sheet(s) deferred`
+                );
+            } else {
+                this._toast(
+                    `Preview failed: ${body.message || body.error || "unknown"}`
+                );
+            }
+        } catch (err) {
+            this._toast(`Network error: ${err.message || String(err)}`);
+        }
+    }
+
+    _renderImportReport(report) {
+        // Cache for the commit button + error CSV download.
+        this.state.importReport = report;
+        // Flatten all PRODUCTS rows for display (other sheets get
+        // their own summary row so the user can see they were noticed).
+        const allRows = [];
+        for (const sheet of (report.sheets || [])) {
+            if (sheet.sheet === "PRODUCTS") {
+                for (const row of (sheet.rows || [])) {
+                    allRows.push(row);
+                }
+            } else if (sheet.status === "deferred") {
+                allRows.push({
+                    row: "—",
+                    default_code: "",
+                    status: "deferred",
+                    sheet: sheet.sheet,
+                    errors: [sheet.message],
+                });
+            } else if (sheet.status === "unknown") {
+                allRows.push({
+                    row: "—",
+                    default_code: "",
+                    status: "unknown",
+                    sheet: sheet.sheet,
+                    errors: [sheet.message],
+                });
+            }
+        }
+        this.state.importRows = allRows;
+
+        const body = document.getElementById("sb_cfg_previewBody");
+        if (!body) return;
+        const html = allRows.map((row) => {
+            const isOk = row.status === "preview_ok"
+                       || row.status === "created"
+                       || row.status === "updated";
+            const isErr = row.status === "invalid"
+                        || row.status === "error"
+                        || row.status === "skipped";
+            const isInfo = row.status === "deferred"
+                        || row.status === "unknown";
+            const cls = isErr ? "sb_cfg_row_bad" : "";
+            const statClass = isOk ? "g" : isErr ? "r" : "g";
+            const statText = isOk ? "✓ " + row.status
+                          : isErr ? "✕ " + row.status
+                          : "ⓘ " + row.status;
+            const errCellText = (row.errors || []).join("; ")
+                              + (row.sheet ? ` [${row.sheet}]` : "");
+            const proposed = row.proposed_vals || {};
+            return `
+                <tr class="${cls}">
+                  <td><span class="sb_cfg_rowstat sb_cfg_rowstat_${statClass}">${statText}</span></td>
+                  <td>${row.default_code || ""}</td>
+                  <td>${proposed.name || ""}</td>
+                  <td>${proposed.list_price !== undefined ? "$" + proposed.list_price : ""}</td>
+                  <td>${proposed.southbrook_category || ""}</td>
+                  <td>${proposed.southbrook_icon_key || ""}</td>
+                  <td>${row.row || ""}</td>
+                  <td class="sb_cfg_reason">${errCellText}</td>
+                </tr>`;
+        }).join("");
+        body.innerHTML = html || `
+            <tr><td colspan="8" style="text-align:center;color:#6b7488;
+                                        padding:20px">
+                No rows in the file.
+            </td></tr>`;
+        const summary = report.summary || {};
+        const okEl = document.getElementById("sb_cfg_okCount");
+        const badEl = document.getElementById("sb_cfg_badCount");
+        const commitBtn = document.getElementById("sb_cfg_commitBtn");
+        if (okEl) okEl.textContent = `${summary.valid || 0} valid`;
+        if (badEl) badEl.textContent = `${summary.invalid || 0} errors`;
+        if (commitBtn) {
+            const n = summary.valid || 0;
+            commitBtn.textContent = `Commit ${n} valid row${n === 1 ? "" : "s"}`;
+            commitBtn.disabled = n === 0;
+        }
+    }
+
+    async _commitImport() {
+        // The commit step uses the file STILL in the file input
+        // element (the user's last upload). We require a file because
+        // /commit takes the file fresh on each POST — no server-side
+        // caching of the preview content (deliberate: prevents stale
+        // commits if the user edits and re-uploads).
+        const fileInput = document.getElementById("sb_cfg_fileInput");
+        const file = fileInput && fileInput.files && fileInput.files[0];
+        if (!file) {
+            this._toast("Upload a file first, then click Commit.");
+            return;
+        }
+        // Human-confirmation gate at the client: an explicit prompt
+        // before we send confirm=true. The server ALSO requires it,
+        // so this is the second of two consents.
+        const valid = (this.state.importReport
+                    && this.state.importReport.summary
+                    && this.state.importReport.summary.valid) || 0;
+        if (valid === 0) {
+            this._toast("No valid rows to commit.");
+            return;
+        }
+        if (!window.confirm(
+            `Commit ${valid} valid product${valid === 1 ? "" : "s"} now? `
+            + `This will create or update product.template records. `
+            + `Invalid rows are skipped.`
+        )) {
+            return;
+        }
+        this._toast(`Committing ${valid} row(s)…`);
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("confirm", "true");
+        try {
+            const res = await fetch("/southbrook/api/import/commit", {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin",
+            });
+            const body = await res.json();
+            this._renderImportReport(body);
+            if (body.ok) {
+                const s = body.summary || {};
+                this._toast(
+                    `Committed: ${s.created || 0} created · `
+                    + `${s.updated || 0} updated · `
+                    + `${s.invalid || 0} skipped · `
+                    + `${s.errors || 0} errors`
+                );
+                // Close the overlay after a beat so the user sees the
+                // updated row statuses before it vanishes.
+                setTimeout(() => this._closeImport(), 2400);
+            } else {
+                this._toast(
+                    `Commit failed: ${body.message || body.error || "unknown"}`
+                );
+            }
+        } catch (err) {
+            this._toast(`Network error: ${err.message || String(err)}`);
         }
     }
 
@@ -914,81 +1089,21 @@ class ConfiguratorV2 extends Component {
         }
     }
 
-    _parseCSV(text) {
-        const lines = text.trim().split(/\r?\n/);
-        const head = lines[0].split(",").map((s) => s.trim());
-        return lines.slice(1).map((ln) => {
-            const cells = ln.split(",");
-            const o = {};
-            head.forEach((hh, i) => {
-                o[hh] = (cells[i] || "").trim();
-            });
-            return o;
-        });
-    }
-
-    _validateImportRow(r) {
-        const errs = [];
-        if (!r.SKU) errs.push("SKU required");
-        if (r.Price && Number.isNaN(parseFloat(r.Price))) {
-            errs.push("Price not numeric");
-        }
-        if (r.Box_Material === "White Melamine"
-            && ["Maple Stain", "Cherry Stain", "Walnut Stain"].includes(r.Finish)) {
-            errs.push(`Finish '${r.Finish}' invalid for White Melamine`);
-        }
-        if (r.Series !== "Signature" && r.Door_Style === "Custom (Signature)") {
-            errs.push("Custom door needs Signature series");
-        }
-        return errs;
-    }
-
-    _renderImport(rows) {
-        this.state.importRows = rows;
-        const body = document.getElementById("sb_cfg_previewBody");
-        if (!body) return;
-        let ok = 0, bad = 0;
-        const html = rows.map((r) => {
-            const e = this._validateImportRow(r);
-            const good = e.length === 0;
-            if (good) ok++; else bad++;
-            return `
-                <tr class="${good ? "" : "sb_cfg_row_bad"}">
-                  <td><span class="sb_cfg_rowstat sb_cfg_rowstat_${good ? "g" : "r"}">${good ? "✓ OK" : "✕ ERR"}</span></td>
-                  <td>${r.SKU || ""}</td>
-                  <td>${r.Width || ""}</td>
-                  <td>${r.Series || ""}</td>
-                  <td>${r.Box_Material || ""}</td>
-                  <td>${r.Finish || ""}</td>
-                  <td>$${r.Price || ""}</td>
-                  <td class="sb_cfg_reason">${e.join("; ")}</td>
-                </tr>
-            `;
-        }).join("");
-        body.innerHTML = html;
-        document.getElementById("sb_cfg_okCount").textContent = `${ok} valid`;
-        document.getElementById("sb_cfg_badCount").textContent = `${bad} errors`;
-        document.getElementById("sb_cfg_commitBtn").textContent =
-            `Commit ${ok} valid row${ok === 1 ? "" : "s"}`;
-    }
-
-    _commitImport() {
-        const ok = this.state.importRows
-            .filter((r) => this._validateImportRow(r).length === 0).length;
-        const bad = this.state.importRows.length - ok;
-        this._closeImport();
-        this._toast(`${ok} product(s) imported · ${bad} skipped (errors logged)`);
-        // Phase 4: replace this with a JSON-RPC POST to
-        // /southbrook/api/import/commit that requires explicit
-        // confirm:true and wraps writes in a single transaction.
-    }
-
     _downloadImportErrors() {
-        const rows = this.state.importRows
-            .filter((r) => this._validateImportRow(r).length);
-        const csv = `SKU,Issues\n${rows.map(
-            (r) => `${r.SKU || ""},"${this._validateImportRow(r).join("; ")}"`
-        ).join("\n")}`;
+        // CSV of the rows the server marked as invalid or errored.
+        const rows = (this.state.importRows || [])
+            .filter((r) => (r.errors || []).length);
+        if (!rows.length) {
+            this._toast("No errored rows to download.");
+            return;
+        }
+        const csv = "row,sku,sheet,issues\n"
+            + rows.map((r) => {
+                const sku = (r.default_code || "").replace(/"/g, '""');
+                const sheet = (r.sheet || "PRODUCTS").replace(/"/g, '""');
+                const issues = (r.errors || []).join("; ").replace(/"/g, '""');
+                return `${r.row || ""},"${sku}","${sheet}","${issues}"`;
+            }).join("\n");
         const a = document.createElement("a");
         a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
         a.download = "import_errors.csv";

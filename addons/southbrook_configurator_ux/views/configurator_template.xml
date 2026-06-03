@@ -153,11 +153,11 @@
                   <tr>
                     <th scope="col">Status</th>
                     <th scope="col">SKU</th>
-                    <th scope="col">Width</th>
-                    <th scope="col">Series</th>
-                    <th scope="col">Box Material</th>
-                    <th scope="col">Finish</th>
+                    <th scope="col">Name</th>
                     <th scope="col">Price</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Icon</th>
+                    <th scope="col">Row</th>
                     <th scope="col">Issue</th>
                   </tr>
                 </thead>
