@@ -205,7 +205,25 @@ class CatalogExpansion(models.AbstractModel):
 
         for (sku, name, family_val, category_badge, icon_key, price,
              attr_keys, width_subset) in _CATALOG:
-            existing = Template.search([("default_code", "=", sku)], limit=1)
+            # Look up by default_code, OR by name as fallback (covers
+            # re-runs after a prior build wrote the template but lost
+            # default_code through variant recompute — see SKU-fix note
+            # below).
+            existing = (
+                Template.search([("default_code", "=", sku)], limit=1)
+                or Template.search([("name", "=", name)], limit=1)
+            )
+            # NB: default_code is set in TWO places (template-level AND
+            # variant-level) because Odoo's product.template.default_code
+            # is a related-store field reading from product.product. With
+            # create_variant='dynamic' on these attributes, the variant
+            # gets recreated whenever attribute_lines change — and the
+            # newly-spawned variant loses any default_code we wrote at
+            # template-creation time. So we write it once up-front (so
+            # the search-by-default_code lookup keeps working on re-runs)
+            # and then again AFTER attribute_lines are wired (so the
+            # post-recompute variant carries it through to the public-
+            # facing SKU display in the configurator response).
             vals = {
                 "name": name,
                 "default_code": sku,
@@ -257,6 +275,17 @@ class CatalogExpansion(models.AbstractModel):
                     "attribute_id": attr.id,
                     "value_ids": [(6, 0, value_ids)],
                 })
+
+            # POST-attribute-line write of default_code. The variant
+            # recompute triggered by attribute_line creation discarded
+            # the default_code we set in vals; re-write it now so it
+            # survives on the freshly-spawned variant(s). Touch every
+            # variant directly since the template-level write doesn't
+            # always cascade to all variants when there are multiple.
+            tmpl.write({"default_code": sku})
+            for variant in tmpl.product_variant_ids:
+                if not variant.default_code:
+                    variant.default_code = sku
 
         # After templates are created, the tactical price_extras seed
         # should be re-run so the new PTAVs get their deltas.
