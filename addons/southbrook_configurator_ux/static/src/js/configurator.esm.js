@@ -15,13 +15,21 @@
 //     + action bar, right chip grid, top progress bar, optional bulk-tools
 //     bar.
 //
+// Phase 2c additions on top:
+//   - After every chip / select pick the component POSTs to the new
+//     /southbrook/api/configurator/select endpoint with the complete
+//     pick set. The server returns selected_value_ids, server-resolved
+//     price + weight, and disabled_value_ids from the OCA rule engine.
+//     The component reconciles its state from the response (server is
+//     authoritative; client picks are optimistic).
+//   - isValueDisabled() now returns state.disabledValueIds.includes(id);
+//     the hardcoded Box-Material/Series rules are GONE.
+//   - onAddToQuote POSTs to /southbrook/api/configurator/commit.
+//     On success: navigate to redirect URL (the customer's Order
+//     Builder). On login_required: navigate to login_url with a
+//     return-to-here query string.
+//
 // What did NOT change:
-//   - The conditional disable rules are still hardcoded (Box Material =
-//     White Melamine forbids wood stains; Series != Signature forbids
-//     Custom door/finish). Phase 2c replaces these with disabled_value_ids
-//     pulled from the rule engine via /select.
-//   - Price recalc is still client-side (sum base_price + price_extra of
-//     picked values). Phase 2c adds server reconcile via /select.
 //   - Cabinet preview render still uses the prototype's CSS-box drawing.
 //   - Bulk template / import overlay logic is preserved (no Odoo server
 //     wiring yet — Phase 4).
@@ -63,10 +71,10 @@ async function rpcJsonCall(url, params = {}) {
 }
 
 
-// ---------- Phase-2b hardcoded constants (Phase 2c replaces) ----------
+// ---------- Phase-2b/c constants ----------
 
 // Mapping of finish / box-material display names to a representative
-// colour swatch for the CSS cabinet preview. Phase 2c will source these
+// colour swatch for the CSS cabinet preview. Phase 3+ will source these
 // from product.template.attribute.value.html_color (which the /state
 // endpoint already surfaces as val.html_color but only for "color"
 // display_type attributes today).
@@ -212,8 +220,10 @@ class ConfiguratorV2 extends Component {
                 t-out="validationText"/>
           <button type="button"
                   class="sb_cfg_btn sb_cfg_btn_primary"
+                  t-att-disabled="state.adding ? 'disabled' : null"
                   t-on-click="onAddToQuote">
-            Add to Quote ➞
+            <t t-if="state.adding">Adding…</t>
+            <t t-else="">Add to Quote ➞</t>
           </button>
         </div>
 
@@ -314,6 +324,14 @@ class ConfiguratorV2 extends Component {
             attributes: {},                 // {<id>: {name, display_type, sequence, required, values: [...]}}
             // Picks: {<attribute_id>: <selected_value_id> | null}
             picked: {},
+            // 2c: server-resolved fields after each /select.
+            serverPrice: null,              // null until first /select responds
+            serverWeight: null,
+            disabledValueIds: [],           // value_ids forbidden by OCA rule engine
+            selecting: false,               // /select RPC in flight
+            // 2c: /commit state.
+            adding: false,                  // /commit RPC in flight
+            commitMessage: null,            // surfaced if /commit fails
             // UI flags
             closedGroups: {},               // {<title>: true}  — collapsed groups
             userPhoto: null,                // dataURL or null
@@ -345,6 +363,15 @@ class ConfiguratorV2 extends Component {
             } finally {
                 this.state.loading = false;
             }
+        });
+
+        // After mount, fire one /select with the current pick set so
+        // the disabled_value_ids + server_price + server_weight land
+        // BEFORE the user makes their first pick. This gives the rule
+        // engine a chance to disable invalid initial combinations
+        // (e.g. session restored from a partial earlier visit).
+        onMounted(() => {
+            this._serverReconcile();
         });
 
         // Drag-drop on the viewer for the photo replace, and a sync of
@@ -407,18 +434,25 @@ class ConfiguratorV2 extends Component {
 
     get formattedPrice() {
         const cur = this.state.currency || { symbol: "$", position: "before" };
-        const amt = Math.round(this.totalPrice).toLocaleString();
+        // Prefer the server-resolved price (authoritative — reflects
+        // OCA's full price computation including any rule effects).
+        // Fall back to the client-side sum during the brief moment
+        // between mount and first /select response.
+        const raw = this.state.serverPrice !== null
+            ? this.state.serverPrice
+            : this.totalPrice;
+        const amt = Math.round(raw).toLocaleString();
         return cur.position === "after"
             ? `${amt}${cur.symbol}`
             : `${cur.symbol}${amt}`;
     }
 
     get weightText() {
-        // Phase 2b shows "—" — Phase 2c will surface the server-resolved
-        // weight from the /select response. Showing a placeholder is
-        // more honest than the Phase-1 client-side estimate that didn't
-        // reflect the real product weight.
-        return "—";
+        // Server-resolved weight from /select response. Shows "—" until
+        // the first pick triggers /select (no point estimating client-
+        // side when the server is one round-trip away).
+        if (this.state.serverWeight === null) return "—";
+        return `${this.state.serverWeight.toFixed(1)} kg`;
     }
 
     get autoSku() {
@@ -544,43 +578,15 @@ class ConfiguratorV2 extends Component {
     }
 
     // ------------------------------------------------------------------
-    // Phase-2b hardcoded disable rules.
+    // Disable check — sourced from the server's /select response.
     //
-    // Phase 2c replaces this whole method with a lookup against a
-    // server-provided `disabled_value_ids` set returned by /select.
-    // The rules below mirror the southbrook-configurator-v2.html
-    // prototype exactly so the visual contract holds.
+    // Phase 2b shipped a hardcoded ruleset that mirrored the prototype.
+    // Phase 2c replaces it with state.disabledValueIds, which the
+    // /select endpoint populates from OCA's product.config.line rule
+    // engine. Server is authoritative; the client just renders the set.
     // ------------------------------------------------------------------
     isValueDisabled(attr, val) {
-        if (!attr) return false;
-        // Resolve the canonical picks BY NAME — works regardless of
-        // attribute ids, which differ per environment.
-        const pickedNameOf = (attrName) => {
-            const attrId = Object.keys(this.state.attributes)
-                .find((id) => this.state.attributes[id].name === attrName);
-            if (!attrId) return null;
-            const valId = this.state.picked[attrId];
-            if (valId === null) return null;
-            const a = this.state.attributes[attrId];
-            const v = a.values.find((vv) => vv.id === valId);
-            return v ? v.name : null;
-        };
-        const boxName = pickedNameOf("Box Material");
-        const seriesName = pickedNameOf("Series");
-
-        if (attr.name === "Finish" && boxName === "White Melamine"
-            && ["Maple Stain", "Cherry Stain", "Walnut Stain"].includes(val.name)) {
-            return true;
-        }
-        if (attr.name === "Door Style" && seriesName !== "Signature"
-            && val.name === "Custom (Signature)") {
-            return true;
-        }
-        if (attr.name === "Finish" && seriesName !== "Signature"
-            && val.name === "Custom") {
-            return true;
-        }
-        return false;
+        return this.state.disabledValueIds.includes(val.id);
     }
 
     // ------------------------------------------------------------------
@@ -616,21 +622,72 @@ class ConfiguratorV2 extends Component {
         }
     }
 
-    _pick(attrId, valId) {
+    async _pick(attrId, valId) {
+        // Optimistic client update — the chip flips selected immediately
+        // so the UI feels responsive even before /select returns.
         this.state.picked[attrId] = valId;
-        // After picking, re-evaluate the disable rules and clear any
-        // currently-picked value that the new state makes invalid.
-        for (const [aid, attr] of Object.entries(this.state.attributes)) {
-            const pickedValId = this.state.picked[aid];
-            if (pickedValId === null) continue;
-            const pickedVal = attr.values.find((v) => v.id === pickedValId);
-            if (pickedVal && this.isValueDisabled(attr, pickedVal)) {
-                this.state.picked[aid] = null;
+        await this._serverReconcile();
+    }
+
+    async _serverReconcile() {
+        // POST the COMPLETE current pick set; the server resolves what
+        // changed against the session and applies the rule engine.
+        if (this.state.sessionId === null) return;
+        const valueIds = Object.values(this.state.picked)
+            .filter((v) => v !== null);
+        this.state.selecting = true;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/configurator/select",
+                {
+                    session_id: this.state.sessionId,
+                    value_ids: valueIds,
+                },
+            );
+            if (r && r.ok) {
+                this.state.disabledValueIds = r.disabled_value_ids || [];
+                this.state.serverPrice = r.price;
+                this.state.serverWeight = r.weight;
+                // The server may have cleared picks the rule engine
+                // marks as invalid — reconcile our local picked map
+                // back to what the server actually kept.
+                this._reconcilePicksFromServer(r.selected_value_ids || []);
+            } else if (r && r.error === "rule_blocked") {
+                this._toast(`Rule: ${r.message || "selection forbidden"}`);
+            } else if (r && r.error === "session_locked") {
+                this._toast(
+                    "This session was already committed. Reload the page "
+                    + "to start a new configuration."
+                );
             }
+        } catch (err) {
+            // Network blip — keep the optimistic state and surface a
+            // muted toast so the customer knows pricing may be stale.
+            console.warn("select RPC failed:", err);
+            this._toast("Couldn't sync with server — pricing may be stale.");
+        } finally {
+            this.state.selecting = false;
         }
     }
 
-    onAddToQuote() {
+    _reconcilePicksFromServer(serverValueIds) {
+        const newPicked = {};
+        for (const attrId of Object.keys(this.state.attributes)) {
+            newPicked[attrId] = null;
+        }
+        for (const valId of serverValueIds) {
+            for (const [attrId, attr] of Object.entries(this.state.attributes)) {
+                if (attr.values.some((v) => v.id === valId)) {
+                    newPicked[attrId] = valId;
+                    break;
+                }
+            }
+        }
+        this.state.picked = newPicked;
+    }
+
+    async onAddToQuote() {
+        if (this.state.adding) return;
         const missing = Object.entries(this.state.picked)
             .filter(([_, valId]) => valId === null)
             .map(([aid, _]) => this.state.attributes[aid].name);
@@ -638,13 +695,43 @@ class ConfiguratorV2 extends Component {
             this._toast(`Please choose: ${missing.join(", ")}`);
             return;
         }
-        this._toast(
-            `Added to quote · ${this.autoSku} · ${this.formattedPrice}`
-        );
-        // Phase 2c: POST /southbrook/api/configurator/commit
-        // {session_id, order_id} → materialise variant + add to a draft
-        // sale.order for the logged-in portal user (target A per the
-        // Phase-2 cart-target decision).
+        this.state.adding = true;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/configurator/commit",
+                { session_id: this.state.sessionId },
+            );
+            if (r && r.ok) {
+                this._toast(
+                    `Added to quote · ${this.autoSku} · `
+                    + `redirecting to your order…`
+                );
+                if (r.redirect) {
+                    window.location.href = r.redirect;
+                }
+            } else if (r && r.error === "login_required") {
+                // Send the visitor to signup with a return URL so they
+                // come back to this exact configuration page after.
+                const ret = encodeURIComponent(window.location.pathname);
+                const login = r.login_url || "/web/signup";
+                this._toast("Sign in or create a free account to continue…");
+                window.location.href = `${login}?redirect=${ret}`;
+            } else if (r && r.error === "validation_failed") {
+                this._toast(`Couldn't commit: ${r.message}`);
+            } else if (r && r.error === "session_locked") {
+                this._toast(
+                    "This session was already committed. Reload to start fresh."
+                );
+            } else {
+                this._toast(
+                    `Couldn't add to quote: ${(r && (r.message || r.error)) || "unknown error"}`
+                );
+            }
+        } catch (err) {
+            this._toast(`Network error: ${err.message || String(err)}`);
+        } finally {
+            this.state.adding = false;
+        }
     }
 
     // ------------------------------------------------------------------
