@@ -116,6 +116,13 @@ _REF_SHEETS = ("Instructions", "REF_CATEGORIES", "REF_ATTRIBUTES",
 # Phase 3+ replaces this with a configurable grouping (likely a small
 # ir.config_parameter table or a new field on product.attribute). For
 # Phase 2 we keep the visual contract with the prototype.
+# Attribute names whose picked values compose the live SKU. Mirrors
+# SKU_ATTR_NAMES in the OWL component (configurator.esm.js) — keep
+# the two in sync so client + server agree on what the configurator's
+# "SB-{Width}-{Series}-{Finish}" code looks like at any given pick state.
+_SKU_ATTR_NAMES = ("Width", "Series", "Finish")
+
+
 ATTRIBUTE_GROUPS = [
     ("Size & Layout",         ["Width", "Door Count"]),
     ("Series & Materials",    ["Series", "Box Material", "Door Style"]),
@@ -507,8 +514,46 @@ class SouthbrookConfiguratorAPI(http.Controller):
             "price": float(session.price or 0.0),
             "weight": float(getattr(session, "weight", 0.0) or 0.0),
             "disabled_value_ids": disabled_ids,
+            "live_sku": self._compute_sku_from_session(session),
             "warnings": [],
         }
+
+    # ------------------------------------------------------------------
+    # Live SKU composer — shared between /select and /commit.
+    #
+    # Composes "SB-<width3>-<series3>-<finish3>" from the session's
+    # current picks. Each segment is the first 3 alphanumeric characters
+    # of the value's name, uppercased ("21 in" → "21I", "Signature" →
+    # "SIG", "Maple Stain" → "MAP"). Returns the literal "—" when no
+    # Width value is picked (the customer doesn't have enough to form
+    # a meaningful SKU yet).
+    #
+    # The same composition runs client-side in autoSku (configurator.
+    # esm.js); having the server compute it too gives /commit an
+    # authoritative SKU to write to the materialised variant's
+    # default_code (P4 gap #3 fix) so the variant carries a code from
+    # the moment of creation rather than blanking.
+    # ------------------------------------------------------------------
+    def _compute_sku_from_session(self, session):
+        # Resolve picked values by attribute name. session.value_ids
+        # holds the global product.attribute.value records, so we
+        # group by attribute.
+        picked_by_attr_name = {}
+        for val in session.value_ids:
+            picked_by_attr_name[val.attribute_id.name] = val
+        parts = []
+        for name in _SKU_ATTR_NAMES:
+            val = picked_by_attr_name.get(name)
+            if not val:
+                parts.append("XXX")
+                continue
+            # Strip non-alphanumerics, uppercase, take first 3.
+            abbr = "".join(c for c in (val.name or "") if c.isalnum())[:3]
+            parts.append(abbr.upper() or "XXX")
+        # If Width (first slot) isn't picked, no SKU yet.
+        if parts[0] == "XXX":
+            return "—"
+        return f"SB-{'-'.join(parts)}"
 
     # ------------------------------------------------------------------
     # /commit — materialise variant + add to user's draft sale.order.

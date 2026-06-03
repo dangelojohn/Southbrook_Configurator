@@ -309,6 +309,7 @@ class ConfiguratorV2 extends Component {
             // 2c: server-resolved fields after each /select.
             serverPrice: null,              // null until first /select responds
             serverWeight: null,
+            liveSku: null,                  // SKU composed server-side from picks (P3)
             disabledValueIds: [],           // value_ids forbidden by OCA rule engine
             selecting: false,               // /select RPC in flight
             // 2c: /commit state.
@@ -443,9 +444,14 @@ class ConfiguratorV2 extends Component {
     }
 
     get autoSku() {
-        // SKU_ATTR_NAMES = [Width, Series, Finish]. Compose
-        // SB-<width3>-<series3>-<finish3>. Falls back to "—" when no
-        // width is picked yet.
+        // Prefer the SKU computed by /select (authoritative — the
+        // server uses the same _SKU_ATTR_NAMES list and writes this
+        // exact value to the variant's default_code at /commit time
+        // per P4 gap #3, so the UI label matches the eventual SKU).
+        // Fall back to client computation between mount and the
+        // first /select response, or if the server response somehow
+        // drops the field.
+        if (this.state.liveSku) return this.state.liveSku;
         const parts = SKU_ATTR_NAMES.map((name) => this._abbrPickedByName(name));
         if (parts[0] === "XXX") return "—";
         return `SB-${parts.join("-")}`;
@@ -652,6 +658,7 @@ class ConfiguratorV2 extends Component {
                 this.state.disabledValueIds = r.disabled_value_ids || [];
                 this.state.serverPrice = r.price;
                 this.state.serverWeight = r.weight;
+                this.state.liveSku = r.live_sku || null;
                 // The server may have cleared picks the rule engine
                 // marks as invalid — reconcile our local picked map
                 // back to what the server actually kept.

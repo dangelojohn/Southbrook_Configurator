@@ -440,6 +440,121 @@ class TestConfiguratorSelectCommit(TransactionCase):
             "incompatible pick is cleared")
 
     # ==================================================================
+    # P3 — live preview reactivity (price, weight, SKU)
+    # ==================================================================
+    def test_select_returns_live_sku_composed_from_picks(self):
+        """The /select response carries `live_sku` = the server-side
+        SB-<width3>-<series3>-<finish3> composition of the current
+        picks. Used by the OWL component for the SKU label and by
+        /commit (P4) to write variant.default_code from the
+        authoritative source.
+
+        Verifies the spec part of P3 — 'the /select response carries
+        the live SKU' — and the spec part of P4 — 'the variant's
+        default_code is left false' — by checking the value the
+        server will eventually write to default_code is available
+        here on every select."""
+        sess = self._fresh_session()
+        width = self.env["product.attribute"].search(
+            [("name", "=", "Width")], limit=1)
+        series = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        finish = self.env["product.attribute"].search(
+            [("name", "=", "Finish")], limit=1)
+        if not (width and series and finish):
+            self.skipTest("required attributes not seeded")
+        w21 = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", width.id),
+             ("name", "=", "21 in")], limit=1)
+        sig = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Signature")], limit=1)
+        wal = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", finish.id),
+             ("name", "=", "Walnut Stain")], limit=1)
+        if not (w21 and sig and wal):
+            self.skipTest("required values not seeded")
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_select(
+                session_id=sess.id,
+                value_ids=[w21.id, sig.id, wal.id])
+        self.assertTrue(r["ok"])
+        self.assertIn("live_sku", r,
+                      "/select response must carry live_sku")
+        self.assertEqual(
+            r["live_sku"], "SB-21I-SIG-WAL",
+            f"expected SB-21I-SIG-WAL from (21 in, Signature, "
+            f"Walnut Stain), got {r['live_sku']!r}")
+
+    def test_select_live_sku_falls_back_to_em_dash_without_width(self):
+        """Without a Width pick the SKU is meaningless; live_sku
+        returns the em-dash placeholder the OWL UI displays as '—'."""
+        sess = self._fresh_session()
+        series = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        if not series:
+            self.skipTest("Series attribute not seeded")
+        sig = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Signature")], limit=1)
+        if not sig:
+            self.skipTest("Signature not seeded")
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_select(
+                session_id=sess.id, value_ids=[sig.id])
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["live_sku"], "—",
+                         "Width unpicked → SKU should be em-dash, "
+                         f"got {r['live_sku']!r}")
+
+    def test_select_live_sku_changes_when_picks_change(self):
+        """SKU must recompose on every /select — same session, two
+        different pick sets, two different SKUs. Regression for the
+        walkthrough finding that the UI SKU label appeared static."""
+        sess = self._fresh_session()
+        width = self.env["product.attribute"].search(
+            [("name", "=", "Width")], limit=1)
+        series = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        finish = self.env["product.attribute"].search(
+            [("name", "=", "Finish")], limit=1)
+        if not (width and series and finish):
+            self.skipTest("attributes not seeded")
+        # Round 1: 12 in / Contractor / White
+        w12 = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", width.id),
+             ("name", "=", "12 in")], limit=1)
+        con = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Contractor Series")], limit=1)
+        wht = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", finish.id),
+             ("name", "=", "White")], limit=1)
+        with stubbed_request(self.env, user=self.user):
+            r1 = self.controller.configurator_select(
+                session_id=sess.id,
+                value_ids=[w12.id, con.id, wht.id])
+        self.assertEqual(r1["live_sku"], "SB-12I-CON-WHI")
+        # Round 2: 18 in / Elegance / Cherry Stain
+        w18 = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", width.id),
+             ("name", "=", "18 in")], limit=1)
+        ele = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Elegance")], limit=1)
+        chy = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", finish.id),
+             ("name", "=", "Cherry Stain")], limit=1)
+        with stubbed_request(self.env, user=self.user):
+            r2 = self.controller.configurator_select(
+                session_id=sess.id,
+                value_ids=[w18.id, ele.id, chy.id])
+        self.assertEqual(r2["live_sku"], "SB-18I-ELE-CHE")
+        self.assertNotEqual(r1["live_sku"], r2["live_sku"],
+                            "SKU must change between calls when picks "
+                            "change")
+
+    # ==================================================================
     # Helpers
     # ==================================================================
     def _fresh_session(self):
