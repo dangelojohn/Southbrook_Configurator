@@ -682,6 +682,21 @@ class ConfiguratorV2 extends Component {
     }
 
     _reconcilePicksFromServer(serverValueIds) {
+        // Snapshot the previous pick set so we can diff against the
+        // server's response and surface any picks the rule engine
+        // cleared (e.g. switching Series to Signature invalidates a
+        // previously-picked White Melamine, so OCA's update_config
+        // drops it from session.value_ids). Without this notice the
+        // completion counter just silently drops 9/12 → 8/12 and the
+        // customer doesn't know which option vanished or why.
+        const previouslyPickedAttrs = Object.entries(this.state.picked)
+            .filter(([_, vid]) => vid !== null)
+            .map(([aid, vid]) => {
+                const attr = this.state.attributes[aid];
+                const val = attr?.values?.find((v) => v.id === vid);
+                return {aid, attrName: attr?.name, valName: val?.name};
+            });
+
         const newPicked = {};
         for (const attrId of Object.keys(this.state.attributes)) {
             newPicked[attrId] = null;
@@ -694,6 +709,28 @@ class ConfiguratorV2 extends Component {
                 }
             }
         }
+
+        // Diff: any attribute that had a value before but doesn't now
+        // was cleared by the server (rule engine drop). Tell the
+        // customer by name + by previous value so they can re-pick
+        // without a "what just happened" moment.
+        const cleared = previouslyPickedAttrs.filter(
+            (p) => newPicked[p.aid] === null,
+        );
+        if (cleared.length) {
+            const labels = cleared
+                .filter((p) => p.attrName)
+                .map((p) => p.valName
+                            ? `${p.attrName} (${p.valName})`
+                            : p.attrName);
+            if (labels.length) {
+                this._toast(
+                    `Cleared by rule change: ${labels.join(", ")} — `
+                    + `please re-pick.`
+                );
+            }
+        }
+
         this.state.picked = newPicked;
     }
 

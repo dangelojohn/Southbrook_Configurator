@@ -373,6 +373,73 @@ class TestConfiguratorSelectCommit(TransactionCase):
         self.assertIn(white_mel.id, r["selected_value_ids"])
 
     # ==================================================================
+    # P2 — silent-clear regression
+    # ==================================================================
+    def test_select_series_swap_clears_incompatible_box_material(self):
+        """When the customer swaps Series from Contractor to Signature
+        with White Melamine already picked, OCA's update_config must
+        drop White Melamine from session.value_ids (Signature requires
+        Maple). The /select response's selected_value_ids drives the
+        client-side reconcile + 'cleared by rule change' toast — this
+        test asserts the server-side half of that contract.
+
+        Walkthrough symptom: completion counter dropped 9/12 → 8/12
+        with no explanation. The fix in the OWL component surfaces a
+        toast naming the cleared attribute + its previous value. This
+        test ensures the server actually does the clear (without it,
+        the client would have nothing to notify about)."""
+        sess = self._fresh_session()
+        series = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        box = self.env["product.attribute"].search(
+            [("name", "=", "Box Material")], limit=1)
+        if not (series and box):
+            self.skipTest("attributes not seeded")
+        contractor = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Contractor Series")], limit=1)
+        signature = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Signature")], limit=1)
+        white_mel = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", box.id),
+             ("name", "=", "White Melamine")], limit=1)
+        if not (contractor and signature and white_mel):
+            self.skipTest("values not seeded")
+
+        # Step 1: pick Contractor + White Melamine. Both should land
+        # in selected_value_ids.
+        with stubbed_request(self.env, user=self.user):
+            r1 = self.controller.configurator_select(
+                session_id=sess.id,
+                value_ids=[contractor.id, white_mel.id])
+        self.assertTrue(r1["ok"])
+        self.assertIn(contractor.id, r1["selected_value_ids"])
+        self.assertIn(white_mel.id, r1["selected_value_ids"])
+        before_count = len(r1["selected_value_ids"])
+
+        # Step 2: swap Series to Signature while still asking for
+        # White Melamine. The rule engine must clear White Melamine
+        # (Signature requires Maple).
+        with stubbed_request(self.env, user=self.user):
+            r2 = self.controller.configurator_select(
+                session_id=sess.id,
+                value_ids=[signature.id, white_mel.id])
+        self.assertTrue(r2["ok"])
+        self.assertIn(signature.id, r2["selected_value_ids"])
+        self.assertNotIn(
+            white_mel.id, r2["selected_value_ids"],
+            "White Melamine should have been cleared on Series swap "
+            "to Signature — without this clear, the client wouldn't "
+            "know to surface a 'cleared by rule change' toast")
+        # And the count should reflect the drop (client uses this
+        # to update the progress ring 'N of M options chosen').
+        self.assertLess(
+            len(r2["selected_value_ids"]), before_count,
+            "Total selected_value_ids count should drop after the "
+            "incompatible pick is cleared")
+
+    # ==================================================================
     # Helpers
     # ==================================================================
     def _fresh_session(self):
