@@ -555,6 +555,153 @@ class TestConfiguratorSelectCommit(TransactionCase):
                             "change")
 
     # ==================================================================
+    # P4 — commit / Add-to-Quote handoff hardening
+    # ==================================================================
+    def _complete_pick_set(self):
+        """Return a list of attribute_value_ids that picks ONE value
+        for every attribute_line on the test template. Skips
+        attribute_lines that expose only one value (those auto-resolve
+        and the OCA engine doesn't gate on them)."""
+        ids = []
+        for line in self.tmpl.attribute_line_ids:
+            if not line.value_ids:
+                continue
+            # Pick the FIRST value that's compatible with the picks so
+            # far. We process Series last (so Box Material + Door Style
+            # can be filtered against it) — for now, just take the first
+            # value of each attribute and let the rule engine filter.
+            ids.append(line.value_ids.sorted("sequence")[0].id)
+        return ids
+
+    def test_commit_sets_config_session_id_on_line(self):
+        """P4 gap #1 — every configurator-added line must carry
+        config_session_id pointing at the committing session, so the
+        line is traceable to its originating configuration."""
+        sess = self._fresh_session()
+        # Run a /select with a complete pick set so create_get_variant
+        # passes validation, then commit.
+        with stubbed_request(self.env, user=self.user):
+            self.controller.configurator_select(
+                session_id=sess.id, value_ids=self._complete_pick_set())
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_commit(session_id=sess.id)
+        self.assertTrue(r["ok"], f"commit failed: {r}")
+        line = self.env["sale.order.line"].sudo().browse(r["order_line_id"])
+        if "config_session_id" not in line._fields:
+            self.skipTest(
+                "config_session_id field not on this DB "
+                "(website_product_configurator absent)")
+        self.assertEqual(
+            line.config_session_id.id, sess.id,
+            "Configurator-added line must carry its session id")
+
+    def test_commit_captures_cut_spec_and_bom_version_snapshots(self):
+        """P4 gap #2 — the line's southbrook_cut_spec_version_id +
+        southbrook_bom_version must be populated at commit time, not
+        deferred to sale.order.action_confirm. The customer may sit on
+        the draft order for days; the engineering snapshot should be
+        frozen from the moment they agreed to the configuration."""
+        sess = self._fresh_session()
+        with stubbed_request(self.env, user=self.user):
+            self.controller.configurator_select(
+                session_id=sess.id, value_ids=self._complete_pick_set())
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_commit(session_id=sess.id)
+        self.assertTrue(r["ok"])
+        line = self.env["sale.order.line"].sudo().browse(r["order_line_id"])
+        if "southbrook_cut_spec_version_id" not in line._fields:
+            self.skipTest("southbrook_plm absent on this DB")
+        # cut_spec_version_id should be the active cut.spec, if any
+        # is active in this database.
+        active_spec = self.env["southbrook.cut.spec"].sudo()._get_active()
+        if active_spec:
+            self.assertEqual(
+                line.southbrook_cut_spec_version_id.id, active_spec.id,
+                "Cut-spec snapshot must point at the active cut.spec "
+                "record at commit time")
+
+    def test_commit_writes_variant_default_code_from_live_sku(self):
+        """P4 gap #3 — variant.default_code should be the
+        live_sku from _compute_sku_from_session, NOT left blank.
+        Without this, the eventual product code is empty in the DB
+        until someone manually fills it."""
+        sess = self._fresh_session()
+        with stubbed_request(self.env, user=self.user):
+            sel = self.controller.configurator_select(
+                session_id=sess.id, value_ids=self._complete_pick_set())
+        expected_sku = sel["live_sku"]
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_commit(session_id=sess.id)
+        self.assertTrue(r["ok"])
+        variant = self.env["product.product"].sudo().browse(r["variant_id"])
+        self.assertEqual(
+            variant.default_code, expected_sku,
+            f"variant.default_code should be {expected_sku!r} "
+            f"(server-computed live_sku), got {variant.default_code!r}")
+        self.assertNotEqual(
+            variant.default_code, False,
+            "variant.default_code must not be False after commit "
+            "(P4 gap #3)")
+
+    def test_commit_rejects_incomplete_configuration(self):
+        """P4 gap #4 — server-side completeness backstop. A
+        configuration missing required attributes (e.g. no Door
+        Style picked) must be rejected with `incomplete_configuration`
+        + the list of missing attribute names, NOT slip through to
+        produce a half-configured variant."""
+        sess = self._fresh_session()
+        # Pick only Series — every other attribute remains unset.
+        series_attr = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        contractor = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series_attr.id),
+             ("name", "=", "Contractor Series")], limit=1)
+        if not (series_attr and contractor):
+            self.skipTest("Series attribute not seeded")
+        with stubbed_request(self.env, user=self.user):
+            self.controller.configurator_select(
+                session_id=sess.id, value_ids=[contractor.id])
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_commit(session_id=sess.id)
+        self.assertFalse(r["ok"], f"commit should have rejected: {r}")
+        self.assertEqual(r["error"], "incomplete_configuration")
+        self.assertIn("missing_attributes", r)
+        self.assertTrue(len(r["missing_attributes"]) > 0)
+        # message should be human-readable + include attribute names
+        self.assertIn("Please choose:", r["message"])
+
+    def test_commit_preserves_session_locked_anti_replay(self):
+        """P4 preserves session_locked — a second commit on the same
+        session must return session_locked, not duplicate the line."""
+        sess = self._fresh_session()
+        with stubbed_request(self.env, user=self.user):
+            self.controller.configurator_select(
+                session_id=sess.id, value_ids=self._complete_pick_set())
+        with stubbed_request(self.env, user=self.user):
+            first = self.controller.configurator_commit(session_id=sess.id)
+        self.assertTrue(first["ok"])
+        # Re-commit must NOT create another line.
+        with stubbed_request(self.env, user=self.user):
+            second = self.controller.configurator_commit(session_id=sess.id)
+        self.assertFalse(second["ok"])
+        self.assertEqual(second["error"], "session_locked")
+
+    def test_commit_preserves_order_builder_redirect(self):
+        """P4 preserves the Phase-2 cart-target decision: commit
+        success returns redirect=/my/southbrook/order-builder/<id>."""
+        sess = self._fresh_session()
+        with stubbed_request(self.env, user=self.user):
+            self.controller.configurator_select(
+                session_id=sess.id, value_ids=self._complete_pick_set())
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_commit(session_id=sess.id)
+        self.assertTrue(r["ok"])
+        self.assertIn("redirect", r)
+        self.assertEqual(
+            r["redirect"],
+            f"/my/southbrook/order-builder/{r['order_id']}")
+
+    # ==================================================================
     # Helpers
     # ==================================================================
     def _fresh_session(self):

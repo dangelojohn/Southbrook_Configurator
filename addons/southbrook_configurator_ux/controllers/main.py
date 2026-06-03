@@ -628,15 +628,53 @@ class SouthbrookConfiguratorAPI(http.Controller):
                     "message": "This configuration has already been added "
                                "to a quote. Start a new one to add another."}
 
+        # Server-side completeness backstop (P4 gap #4). The OWL
+        # component runs its own validator before submit, but a
+        # client bypass (raw RPC, stale tab, broken disabled-state
+        # logic) must NOT slip an incomplete configuration through.
+        # OCA's create_get_variant calls validate_configuration
+        # internally — we don't repeat its work — but we DO want a
+        # human-readable error for the simple case of an attribute
+        # whose pick is missing. Build the list before calling
+        # create_get_variant so the error message is specific
+        # rather than the generic "Required field" OCA raises.
+        missing_attr_names = []
+        picked_attr_ids = {v.attribute_id.id for v in session.value_ids}
+        for line in session.product_tmpl_id.attribute_line_ids:
+            # Skip attribute_lines that expose only one value — those
+            # auto-resolve and the OCA engine doesn't gate on them.
+            if len(line.value_ids) <= 1:
+                continue
+            if line.attribute_id.id not in picked_attr_ids:
+                missing_attr_names.append(line.attribute_id.name)
+        if missing_attr_names:
+            return {
+                "ok": False,
+                "error": "incomplete_configuration",
+                "missing_attributes": missing_attr_names,
+                "message": (f"Please choose: "
+                            f"{', '.join(missing_attr_names)}"),
+            }
+
         # Materialise (or fetch existing) variant for the picks.
         # OCA's create_get_variant calls validate_configuration first;
-        # it raises ValidationError on rule violation or missing
-        # required values.
+        # it raises ValidationError on rule violation or remaining
+        # required-attribute gaps the completeness check above missed.
         try:
             variant = session.sudo().create_get_variant()
         except (UserError, ValidationError) as exc:
             return {"ok": False, "error": "validation_failed",
                     "message": getattr(exc, "args", [str(exc)])[0]}
+
+        # P4 gap #3 — variant.default_code is left blank by OCA's
+        # _get_config_name on dynamic-variant templates. Write the
+        # server-authoritative SKU so the variant carries its code
+        # from the moment of creation. Use sudo because public-side
+        # users may not have write ACL on product.product directly
+        # (the variant was just created via session.sudo() anyway).
+        live_sku = self._compute_sku_from_session(session)
+        if live_sku and live_sku != "—" and not variant.default_code:
+            variant.sudo().default_code = live_sku
 
         # Resolve or create the user's draft sale.order. Same pattern
         # as southbrook_estimating_website's G9 self-service order
@@ -671,13 +709,47 @@ class SouthbrookConfiguratorAPI(http.Controller):
         # customer can change qty in the Order Builder. Trigger
         # product_id_change so price_unit / name / uom populate from
         # the variant.
-        line = request.env["sale.order.line"].sudo().create({
+        #
+        # P4 gap #1 — wire config_session_id to the committing session
+        # so every configurator-added line is traceable to its
+        # originating session (matches the OCA cart-add path in
+        # website_product_configurator/models/sale_order.py).
+        line_vals = {
             "order_id": order.id,
             "product_id": variant.id,
             "product_uom_qty": 1,
-        })
+        }
+        # Only set config_session_id if the field exists (it does on
+        # this stack via website_product_configurator, but guard so
+        # the commit path doesn't break if that addon is uninstalled).
+        SaleOrderLine = request.env["sale.order.line"].sudo()
+        if "config_session_id" in SaleOrderLine._fields:
+            line_vals["config_session_id"] = session.id
+        line = SaleOrderLine.create(line_vals)
         if hasattr(line, "product_id_change"):
             line.product_id_change()
+
+        # P4 gap #2 — capture the cut-spec + BoM version snapshots on
+        # the line at commit time, NOT at sale.order.action_confirm.
+        # Configurator commits land draft lines; the customer may
+        # leave them in the cart for days before confirming the order.
+        # Snapshotting at commit ensures the engineering record is
+        # frozen from the moment the customer agreed to that
+        # configuration, not from whatever the active spec happens
+        # to be when they later push the order through.
+        if hasattr(line, "_capture_southbrook_version_snapshots"):
+            try:
+                line._capture_southbrook_version_snapshots()
+            except Exception:                               # noqa: BLE001
+                # Non-fatal: snapshot failure means the line stays
+                # un-versioned; sale.order.action_confirm's later call
+                # will still fire and try again. Log so a missing
+                # cut-spec is visible during ECO transitions.
+                _logger.warning(
+                    "Cut-spec snapshot capture failed on line %s "
+                    "for session %s; line + variant already created.",
+                    line.id, session.id, exc_info=True,
+                )
 
         # Lock the session: state='done' + product_id link. A new
         # configuration starts a new session via /state.
