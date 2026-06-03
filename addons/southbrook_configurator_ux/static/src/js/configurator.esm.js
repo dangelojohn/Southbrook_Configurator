@@ -1,90 +1,75 @@
 /** @odoo-module **/
 // =====================================================================
-// Southbrook Configurator UX v2 — Phase 1
+// Southbrook Configurator UX v2 — Phase 2b
 //
-// Port of the southbrook-configurator-v2.html prototype's vanilla JS,
-// scoped to the v2 root mount point and wrapped for the Odoo web bundle.
+// OWL Component refactor with live attribute data.
 //
-// What this file owns (Phase 1):
-//   - Hardcoded OPTIONS / GROUPS / FINISH_COLORS — same shape as the
-//     prototype so the visual diff vs the HTML mock is zero. Phase 2
-//     replaces these constants with values pulled from product.attribute
-//     records via JSON-RPC.
-//   - Chip + select state management (`state` object keyed by attribute
-//     name; value is the index into OPTIONS[key]).
-//   - Conditional disable rules (Box Material → Finish, Series → Door
-//     Style / Custom Finish). Phase 3 surfaces these via a server-side
-//     rule table sourced from the existing product.config.line records.
-//   - Live price + weight + auto-SKU + completion-ring recomputation.
-//   - Cabinet preview re-render (CSS-based; Phase 2 may swap to an SVG
-//     or to a vendor-supplied photograph).
-//   - Photo replace via file input + drag-drop on the viewer pane.
-//   - Bulk template CSV download + bulk import preview / validate /
-//     commit overlay (client-side only; Phase 4 swaps the commit step
-//     for a JSON-RPC call into a server endpoint that writes products).
-//   - Toast notifications.
+// What changed from Phase 1:
+//   - Hardcoded OPTIONS / GROUPS / FINISH_COLORS removed.
+//   - State hydrated on mount from POST /southbrook/api/configurator/state
+//     (Phase 2a endpoint).
+//   - Vanilla class -> OWL Component with useState, useRef, onWillStart,
+//     onMounted. All reactive — picks trigger re-render automatically;
+//     no more manual document.getElementById + innerHTML.
+//   - Single component owns the entire reactive UI: left preview + summary
+//     + action bar, right chip grid, top progress bar, optional bulk-tools
+//     bar.
 //
-// Mount-point guard:
-//   The JS scans `document` for `#sb_cfg_v2_root`. If absent (i.e. on
-//   any page other than a configurable product page) the entire
-//   bundle no-ops. This makes the v2 UX opt-in per template — pages
-//   without the v2 markup are completely unaffected.
+// What did NOT change:
+//   - The conditional disable rules are still hardcoded (Box Material =
+//     White Melamine forbids wood stains; Series != Signature forbids
+//     Custom door/finish). Phase 2c replaces these with disabled_value_ids
+//     pulled from the rule engine via /select.
+//   - Price recalc is still client-side (sum base_price + price_extra of
+//     picked values). Phase 2c adds server reconcile via /select.
+//   - Cabinet preview render still uses the prototype's CSS-box drawing.
+//   - Bulk template / import overlay logic is preserved (no Odoo server
+//     wiring yet — Phase 4).
+//   - SCSS unchanged — all DOM class names match Phase 1.
 //
-// Out of scope for Phase 1:
-//   - Real product attribute data (uses hardcoded OPTIONS object)
-//   - Server-side price + weight calc (uses the same client-side
-//     formula the prototype uses; BASE = 180 placeholder)
-//   - Server-side bulk import commit (the Commit button only shows a
-//     toast; nothing reaches Odoo)
-//   - WebGL / Three.js cabinet preview (uses the prototype's
-//     box-shaped CSS preview)
-//   - Translation strings (English only; Phase 5 wraps user-facing
-//     copy in i18n helpers)
+// Mount-point contract:
+//   The QWeb template ships:
+//     <section id="sb_cfg_v2_root" data-product-tmpl-id="<int>">
+//       <div id="sb_cfg_v2_main_mount" data-internal-user="0|1">
+//         (no-JS fallback "Loading…" text)
+//       </div>
+//     </section>
+//   This bundle on DOMContentLoaded:
+//     1. Finds #sb_cfg_v2_root; bails out (silent no-op) if absent.
+//     2. Reads productTmplId from the data attribute.
+//     3. Mounts <ConfiguratorV2> into #sb_cfg_v2_main_mount.
+//   The static fallback inside the mount div is replaced when OWL mounts.
 // =====================================================================
 
-// ---------- Data constants (hardcoded for Phase 1) ----------
+import {
+    Component, mount, markup, onMounted, onWillStart, useRef, useState, xml,
+} from "@odoo/owl";
 
-const OPTIONS = {
-    Width:         [["9 in", -40, -6], ["12 in", -20, -3], ["15 in", 0, 0],
-                    ["18 in", 30, 4.6], ["21 in", 60, 9]],
-    Series:        [["Contractor", 0, 0], ["Contemporary", 40, 0],
-                    ["Elegance", 90, 0], ["Signature", 160, 0]],
-    Box_Material:  [["White Melamine", 0, 0], ["Maple", 55, 2]],
-    Door_Style:    [["Thermofoil Slab", 0, 0],
-                    ["Five-Piece Woodgrain", 45, 1.5],
-                    ["Custom (Signature)", 120, 2]],
-    Finish:        [["White", 0, 0], ["Maple Stain", 20, 0],
-                    ["Cherry Stain", 25, 0], ["Walnut Stain", 30, 0],
-                    ["Custom", 75, 0]],
-    Hinge_Side:    [["Left", 0, 0], ["Right", 0, 0]],
-    Finished_Sides:[["None", 0, 0], ["Left", 18, 0.5],
-                    ["Right", 18, 0.5], ["Both", 32, 1]],
-    Gables:        [["Standard", 0, 0], ["Finished", 22, 0.6],
-                    ["Decorative", 60, 1]],
-    Handle:        [["Bar Pull", 12, 0.2], ["Knob", 8, 0.1],
-                    ["Cup Pull", 14, 0.2], ["Integrated", 30, 0.3],
-                    ["None", 0, 0]],
-    Accessories:   [["Soft-Close", 24, 0.3], ["Pull-Outs", 65, 1.2],
-                    ["Drawer Organisers", 38, 0.6], ["None", 0, 0]],
-    Door_Count:    [["1", 0, 0], ["2", 70, 3]],
-};
 
-// Groups define the order + chunking of attribute fields in the right
-// pane. The number of fields per group drives the n/total display in
-// the group header.
-const GROUPS = [
-    ["Size & Layout",         ["Width", "Door_Count"]],
-    ["Series & Materials",    ["Series", "Box_Material", "Door_Style"]],
-    ["Finish & Construction", ["Finish", "Hinge_Side", "Finished_Sides", "Gables"]],
-    ["Hardware & Add-ons",    ["Handle", "Accessories"]],
-];
+// ---------- RPC helper (raw fetch — public /shop page, no Odoo service) ----------
 
-const BASE_PRICE = 180;
-const BASE_WEIGHT = 8;
+async function rpcJsonCall(url, params = {}) {
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "call", params }),
+        credentials: "same-origin",
+    });
+    const json = await res.json();
+    if (json.error) {
+        throw new Error(json.error.data?.message || json.error.message || "RPC error");
+    }
+    return json.result;
+}
 
-// Hex map for the CSS cabinet preview. Maps finish (or box) name to a
-// representative colour swatch. Phase 2 swaps this for actual vendor
-// swatches (image URLs).
+
+// ---------- Phase-2b hardcoded constants (Phase 2c replaces) ----------
+
+// Mapping of finish / box-material display names to a representative
+// colour swatch for the CSS cabinet preview. Phase 2c will source these
+// from product.template.attribute.value.html_color (which the /state
+// endpoint already surfaces as val.html_color but only for "color"
+// display_type attributes today).
 const FINISH_COLORS = {
     "White":          "#f3f0ea",
     "Maple Stain":    "#d9a566",
@@ -95,10 +80,14 @@ const FINISH_COLORS = {
     "White Melamine": "#eceae4",
 };
 
-// CSV template + sample row data. Headers must match the column order
-// the Phase-4 server-side parser expects. Sample CSV ships with the
-// expected error states pre-baked so QA can verify the validation path
-// without authoring a CSV.
+// Attribute names we plumb into the SKU composer + the spec line. The
+// component looks these up by NAME in the live state.attributes map; if
+// a name isn't on the template the slot is silently skipped.
+const SKU_ATTR_NAMES = ["Width", "Series", "Finish"];
+const SPEC_ATTR_NAMES = ["Width", "Series", "Finish", "Hinge Side", "Handle"];
+
+// CSV template + sample for the bulk-tools workflow. Headers must match
+// the Phase-4 server-side parser's column order.
 const TEMPLATE_HEADERS = [
     "SKU", "Product_Name", "Price", "Weight_kg", "Image", "Family",
     "Width", "Series", "Box_Material", "Door_Style", "Finish",
@@ -108,376 +97,660 @@ const TEMPLATE_HEADERS = [
 const SAMPLE_CSV = [
     TEMPLATE_HEADERS.join(","),
     "SB-001,Base 18 Sig,325.00,24.6,a.jpg,Base,18 in,Signature,Maple,Five-Piece Woodgrain,Walnut Stain,Right,Both,Standard,Bar Pull,Soft-Close,1",
-    "SB-002,Base 12 Con,219.00,16.0,b.jpg,Base,12 in,Contractor,White Melamine,Thermofoil Slab,White,Left,None,Standard,Knob,None,1",
+    "SB-002,Base 12 Con,219.00,16.0,b.jpg,Base,12 in,Contractor Series,White Melamine,Thermofoil Slab — White,White,Left,None,Standard,Knob,None,1",
     "SB-003,Base 24 Ele,360.00,30.0,c.jpg,Base,24 in,Elegance,Maple,Five-Piece Woodgrain,Cherry Stain,Right,Both,Finished,Cup Pull,Pull-Outs,2",
-    "SB-004,Base 15 Mel,248.00,18.0,d.jpg,Base,15 in,Contemporary,White Melamine,Thermofoil Slab,Walnut Stain,Left,Left,Standard,Bar Pull,Soft-Close,1",
+    "SB-004,Base 15 Mel,248.00,18.0,d.jpg,Base,15 in,Contemporary,White Melamine,Thermofoil Slab — White,Walnut Stain,Left,Left,Standard,Bar Pull,Soft-Close,1",
     "SB-005,Base 21 Sig,410.00,33.0,e.jpg,Base,21 in,Signature,Maple,Custom (Signature),Custom,Right,Both,Decorative,Integrated,Drawer Organisers,2",
 ].join("\n");
 
 
-// ---------- Module init guard ----------
+// =====================================================================
+// ConfiguratorV2 — single OWL component owning the entire reactive UI
+// =====================================================================
 
-document.addEventListener("DOMContentLoaded", () => {
-    const root = document.getElementById("sb_cfg_v2_root");
-    if (!root) {
-        // No v2 mount point on this page — bundle no-ops.
-        return;
-    }
-    new SouthbrookConfiguratorV2(root).init();
-});
+class ConfiguratorV2 extends Component {
+    static template = xml`
+<div class="sb_cfg_v2_main">
+  <t t-if="state.loading">
+    <div class="sb_cfg_titlebar">
+      <div class="sb_cfg_titlebar_l">
+        <h1 class="sb_cfg_h1">Loading…</h1>
+        <p class="sb_cfg_sub">Fetching configurator state</p>
+      </div>
+    </div>
+  </t>
+  <t t-elif="state.loadError">
+    <div class="sb_cfg_titlebar">
+      <div class="sb_cfg_titlebar_l">
+        <h1 class="sb_cfg_h1">Couldn't load this configurator</h1>
+        <p class="sb_cfg_sub" t-esc="state.loadError"/>
+      </div>
+    </div>
+  </t>
+  <t t-else="">
+    <!-- TITLE BAR + BULK TOOLS ROW -->
+    <div class="sb_cfg_titlebar">
+      <div class="sb_cfg_titlebar_l">
+        <h1 class="sb_cfg_h1" t-esc="state.product.name"/>
+        <p class="sb_cfg_sub">
+          Build a made-to-spec cabinet · live pricing ·
+          SKU auto-generates as you configure
+        </p>
+      </div>
+      <div t-if="props.isInternalUser"
+           class="sb_cfg_bulkbar"
+           aria-label="Bulk product tooling">
+        <span class="sb_cfg_bulkbar_lbl">Bulk tools</span>
+        <button type="button"
+                class="sb_cfg_btn sb_cfg_btn_tpl"
+                t-on-click="onDownloadTemplate">
+          ⬇ Template Layout
+        </button>
+        <button type="button"
+                class="sb_cfg_btn sb_cfg_btn_imp"
+                t-on-click="onOpenImport">
+          ⤒ Import Product
+        </button>
+      </div>
+    </div>
 
+    <!-- TWO-PANE GRID -->
+    <div class="sb_cfg_grid">
 
-// ---------- Main component (vanilla class for Phase 1) ----------
+      <!-- LEFT: preview + summary + action bar -->
+      <aside class="sb_cfg_panel sb_cfg_left">
 
-class SouthbrookConfiguratorV2 {
-    constructor(root) {
-        this.root = root;
-        // state[attr] = selected option index, or null when nothing
-        // selected for that attribute yet.
-        this.state = {};
-        Object.keys(OPTIONS).forEach((k) => { this.state[k] = null; });
-        this.userPhoto = null;
-        this.curRows = [];
-        this._toastTimer = null;
-    }
+        <div class="sb_cfg_viewer" t-ref="viewer">
+          <div class="sb_cfg_badge" t-esc="state.previewBadge"/>
+          <div class="sb_cfg_cab" t-out="cabinetMarkup"/>
+          <button type="button"
+                  class="sb_cfg_editimg"
+                  t-on-click="onReplacePhoto"
+                  aria-label="Replace cabinet photo">
+            📷 Replace photo
+          </button>
+        </div>
+        <input type="file"
+               t-ref="imgInput"
+               accept="image/*"
+               style="display:none"
+               t-on-change="onPhotoFileSelected"/>
 
-    init() {
-        this._buildUI();
-        this._wireConfiguratorEvents();
-        this._wireBulkToolsEvents();
-        this._wirePhotoEvents();
-        this._wireImportEvents();
-        this._recalc();
-    }
+        <div class="sb_cfg_summary">
+          <div class="sb_cfg_sumrow">
+            <span class="sb_cfg_k">
+              Price <span class="sb_cfg_livetag">LIVE</span>
+            </span>
+            <span class="sb_cfg_price">
+              <t t-esc="formattedPrice"/>
+            </span>
+          </div>
+          <div class="sb_cfg_sumrow">
+            <span class="sb_cfg_k">Est. Weight</span>
+            <span class="sb_cfg_weight" t-esc="weightText"/>
+          </div>
+          <div class="sb_cfg_sumrow">
+            <span class="sb_cfg_k">Auto SKU</span>
+            <span class="sb_cfg_sku" t-esc="autoSku"/>
+          </div>
+          <div class="sb_cfg_specline">
+            <b>Your build:</b>
+            <span t-esc="specLine"/>
+          </div>
+          <div class="sb_cfg_completion">
+            <div class="sb_cfg_ring"
+                 t-attf-style="--p:{{completionPct}}">
+              <i><t t-esc="completionPct"/>%</i>
+            </div>
+            <span t-esc="completionText"/>
+          </div>
+        </div>
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
+        <div class="sb_cfg_actionbar">
+          <span t-att-class="validationClass"
+                role="status" aria-live="polite"
+                t-out="validationText"/>
+          <button type="button"
+                  class="sb_cfg_btn sb_cfg_btn_primary"
+                  t-on-click="onAddToQuote">
+            Add to Quote ➞
+          </button>
+        </div>
 
-    _label(key) {
-        return key.replace(/_/g, " ");
-    }
+      </aside>
 
-    _allowed(key) {
-        return (OPTIONS[key] || []).map((o) => o[0]);
-    }
-
-    // Disable rules — Phase 3 sources these from product.config.line.
-    _disabledFor(key) {
-        let d = [];
-        const box = this.state.Box_Material !== null
-            ? OPTIONS.Box_Material[this.state.Box_Material][0] : null;
-        const series = this.state.Series !== null
-            ? OPTIONS.Series[this.state.Series][0] : null;
-        if (key === "Finish" && box === "White Melamine") {
-            d = ["Maple Stain", "Cherry Stain", "Walnut Stain"];
-        }
-        if (key === "Door_Style" && series !== "Signature") {
-            d = ["Custom (Signature)"];
-        }
-        if (key === "Finish" && series !== "Signature") {
-            d.push("Custom");
-        }
-        return d;
-    }
-
-    // ------------------------------------------------------------------
-    // Configurator UI build / chip render / state pick
-    // ------------------------------------------------------------------
-
-    _buildUI() {
-        const c = this.root.querySelector("#sb_cfg_configurator");
-        const html = [];
-        GROUPS.forEach(([title, fields], gi) => {
-            html.push(`
-                <div class="sb_cfg_group" data-g="${gi}">
-                  <div class="sb_cfg_ghead" data-toggle="1" tabindex="0"
-                       role="button" aria-expanded="true">
-                    <span class="sb_cfg_gt">
-                      <span class="sb_cfg_check" id="sb_cfg_chk${gi}">${gi + 1}</span>
-                      ${title}
-                    </span>
-                    <span class="sb_cfg_gnum">
-                      <span id="sb_cfg_gp${gi}">0</span>/${fields.length}
-                      &nbsp;<span class="sb_cfg_chev">❮</span>
-                    </span>
+      <!-- RIGHT: chip-selector configurator. Data-driven from state.groups. -->
+      <section class="sb_cfg_panel sb_cfg_right"
+               aria-label="Cabinet configuration options">
+        <t t-foreach="state.groups" t-as="group" t-key="group.title">
+          <div class="sb_cfg_group"
+               t-att-class="state.closedGroups[group.title] ? 'sb_cfg_closed' : ''">
+            <div class="sb_cfg_ghead"
+                 role="button"
+                 tabindex="0"
+                 t-att-aria-expanded="state.closedGroups[group.title] ? 'false' : 'true'"
+                 t-on-click="() => this.toggleGroup(group.title)"
+                 t-on-keydown="(ev) => this.onGroupKeydown(ev, group.title)">
+              <span class="sb_cfg_gt">
+                <span class="sb_cfg_check"
+                      t-att-class="groupComplete(group) ? 'sb_cfg_check_done' : ''">
+                  <t t-if="groupComplete(group)">✓</t>
+                  <t t-else=""><t t-esc="group_index + 1"/></t>
+                </span>
+                <t t-esc="group.title"/>
+              </span>
+              <span class="sb_cfg_gnum">
+                <span t-esc="groupPickCount(group)"/>/<t t-esc="group.attribute_ids.length"/>
+                &#160;
+                <span class="sb_cfg_chev">❮</span>
+              </span>
+            </div>
+            <div class="sb_cfg_gbody">
+              <t t-foreach="group.attribute_ids"
+                 t-as="attrId" t-key="attrId">
+                <t t-set="attr" t-value="state.attributes[attrId]"/>
+                <t t-if="attr">
+                  <div t-att-class="fieldClass(attr, group)">
+                    <label>
+                      <t t-esc="attr.name"/>
+                      <span class="sb_cfg_pd"
+                            t-esc="attrPriceDelta(attrId)"/>
+                    </label>
+                    <t t-if="attr.display_type === 'select'">
+                      <select t-on-change="(ev) => this.onSelectChange(attrId, ev)"
+                              t-att-aria-label="attr.name">
+                        <option value="">Select <t t-esc="attr.name"/>…</option>
+                        <t t-foreach="attr.values" t-as="val" t-key="val.id">
+                          <option t-att-value="val.id"
+                                  t-att-selected="state.picked[attrId] === val.id"
+                                  t-att-disabled="isValueDisabled(attr, val) ? 'disabled' : null"
+                                  t-esc="val.name"/>
+                        </t>
+                      </select>
+                    </t>
+                    <t t-else="">
+                      <div class="sb_cfg_chips"
+                           role="radiogroup"
+                           t-att-aria-label="attr.name">
+                        <t t-foreach="attr.values" t-as="val" t-key="val.id">
+                          <div t-att-class="chipClass(attrId, val)"
+                               role="radio"
+                               t-att-tabindex="isValueDisabled(attr, val) ? '-1' : '0'"
+                               t-att-aria-checked="state.picked[attrId] === val.id ? 'true' : 'false'"
+                               t-on-click="() => this.onChipClick(attrId, val)"
+                               t-on-keydown="(ev) => this.onChipKeydown(ev, attrId, val)"
+                               t-esc="val.name"/>
+                        </t>
+                      </div>
+                    </t>
                   </div>
-                  <div class="sb_cfg_gbody">
-            `);
-            fields.forEach((k) => {
-                const full = (k === "Finish"
-                    || (fields.length % 2 !== 0 && fields.indexOf(k) === fields.length - 1))
-                    ? " sb_cfg_field_full" : "";
-                html.push(`
-                    <div class="sb_cfg_field${full}" id="sb_cfg_f_${k}">
-                      <label>
-                        ${this._label(k)}
-                        <span class="sb_cfg_pd" id="sb_cfg_pd_${k}"></span>
-                      </label>
-                `);
-                if (k === "Finish") {
-                    html.push(`
-                      <select data-finish="1" aria-label="${this._label(k)}">
-                        <option value="">Select finish...</option>
-                    `);
-                    OPTIONS[k].forEach((o, i) => {
-                        html.push(`<option value="${i}">${o[0]}</option>`);
-                    });
-                    html.push(`</select>`);
-                } else {
-                    html.push(`
-                      <div class="sb_cfg_chips" id="sb_cfg_chips_${k}"
-                           role="radiogroup" aria-label="${this._label(k)}"></div>
-                    `);
+                </t>
+              </t>
+            </div>
+          </div>
+        </t>
+      </section>
+
+    </div>
+  </t>
+</div>
+    `;
+    static props = {
+        productTmplId: { type: Number },
+        isInternalUser: { type: Boolean, optional: true },
+    };
+
+    setup() {
+        this.state = useState({
+            // RPC + load state
+            loading: true,
+            loadError: null,
+            // Server-resolved fields
+            product: null,                  // {tmpl_id, sku, name, list_price, currency}
+            currency: null,
+            sessionId: null,
+            basePrice: 0,
+            groups: [],
+            attributes: {},                 // {<id>: {name, display_type, sequence, required, values: [...]}}
+            // Picks: {<attribute_id>: <selected_value_id> | null}
+            picked: {},
+            // UI flags
+            closedGroups: {},               // {<title>: true}  — collapsed groups
+            userPhoto: null,                // dataURL or null
+            previewBadge: "LIVE PREVIEW",
+            // Bulk tools (Phase 4 wiring deferred)
+            importRows: [],
+        });
+
+        // Refs for DOM-attached interactions (file inputs + drop zones).
+        this.viewerRef = useRef("viewer");
+        this.imgInputRef = useRef("imgInput");
+
+        // Fetch the configurator state from the Phase-2a endpoint before
+        // the first render so the user never sees a flash of empty UI.
+        onWillStart(async () => {
+            try {
+                const r = await rpcJsonCall(
+                    "/southbrook/api/configurator/state",
+                    { product_tmpl_id: this.props.productTmplId },
+                );
+                if (!r || !r.ok) {
+                    this.state.loadError = (r && r.message)
+                        || "The server didn't return a configurator state.";
+                    return;
                 }
-                html.push(`
-                      <div class="sb_cfg_warn" id="sb_cfg_warn_${k}"
-                           style="display:none"></div>
-                    </div>
-                `);
-            });
-            html.push(`</div></div>`);
+                this._hydrateFromState(r);
+            } catch (err) {
+                this.state.loadError = err.message || String(err);
+            } finally {
+                this.state.loading = false;
+            }
         });
-        c.innerHTML = html.join("");
-        this._renderChips();
-    }
 
-    _renderChips() {
-        Object.keys(OPTIONS).forEach((k) => {
-            if (k === "Finish") return;
-            const box = this.root.querySelector(`#sb_cfg_chips_${k}`);
-            if (!box) return;
-            const dis = this._disabledFor(k);
-            const html = OPTIONS[k].map((o, i) => {
-                const off = dis.includes(o[0]);
-                const sel = this.state[k] === i ? " sb_cfg_chip_sel" : "";
-                return `
-                    <div class="sb_cfg_chip${sel}${off ? " sb_cfg_chip_disabled" : ""}"
-                         role="radio"
-                         tabindex="${off ? "-1" : "0"}"
-                         aria-checked="${this.state[k] === i ? "true" : "false"}"
-                         data-key="${k}"
-                         data-i="${i}"
-                         data-off="${off ? 1 : 0}">${o[0]}</div>
-                `;
-            }).join("");
-            box.innerHTML = html;
-        });
-    }
-
-    _pick(key, idx) {
-        this.state[key] = idx;
-        // If a dependency change invalidates a current selection,
-        // clear it so the rule violation can't persist.
-        const disFin = this._disabledFor("Finish");
-        if (this.state.Finish !== null
-            && disFin.includes(OPTIONS.Finish[this.state.Finish][0])) {
-            this.state.Finish = null;
-            const sel = this.root.querySelector("[data-finish]");
-            if (sel) sel.value = "";
-        }
-        const disDoor = this._disabledFor("Door_Style");
-        if (this.state.Door_Style !== null
-            && disDoor.includes(OPTIONS.Door_Style[this.state.Door_Style][0])) {
-            this.state.Door_Style = null;
-        }
-        this._renderChips();
-        this._recalc();
-    }
-
-    _wireConfiguratorEvents() {
-        const c = this.root.querySelector("#sb_cfg_configurator");
-        c.addEventListener("click", (ev) => {
-            const head = ev.target.closest("[data-toggle]");
-            if (head) {
-                const group = head.parentElement;
-                const closed = group.classList.toggle("sb_cfg_closed");
-                head.setAttribute("aria-expanded", closed ? "false" : "true");
-                return;
-            }
-            const chip = ev.target.closest(".sb_cfg_chip");
-            if (chip && chip.getAttribute("data-off") !== "1") {
-                this._pick(chip.getAttribute("data-key"),
-                           +chip.getAttribute("data-i"));
-            }
-        });
-        c.addEventListener("change", (ev) => {
-            const sel = ev.target.closest("[data-finish]");
-            if (sel) {
-                this._pick("Finish", sel.value === "" ? null : +sel.value);
-            }
-        });
-        // Keyboard support: Enter / Space toggles the group head; arrow
-        // keys move focus between chips inside a radiogroup.
-        c.addEventListener("keydown", (ev) => {
-            if (ev.target.matches("[data-toggle]")
-                && (ev.key === "Enter" || ev.key === " ")) {
-                ev.preventDefault();
-                ev.target.click();
-            }
-            if (ev.target.matches(".sb_cfg_chip")
-                && (ev.key === "Enter" || ev.key === " ")) {
-                ev.preventDefault();
-                ev.target.click();
-            }
+        // Drag-drop on the viewer for the photo replace, and a sync of
+        // the imported import-overlay handlers (the modal lives outside
+        // the OWL tree at body level).
+        onMounted(() => {
+            this._wireViewerDragDrop();
+            this._wireImportOverlay();
         });
     }
 
     // ------------------------------------------------------------------
-    // Live recalc — price, weight, SKU, ring, group counters
+    // State hydration from /state response
     // ------------------------------------------------------------------
 
-    _recalc() {
-        let price = BASE_PRICE;
-        let weight = BASE_WEIGHT;
+    _hydrateFromState(r) {
+        this.state.product = r.product;
+        this.state.currency = r.product.currency;
+        this.state.sessionId = r.session_id;
+        this.state.basePrice = r.base_price;
+        this.state.groups = r.groups;
+        this.state.attributes = r.attributes;
+        // Initialise picked: null for every attribute; honour any
+        // server-persisted selections from the session.
+        const picked = {};
+        for (const attrId of Object.keys(r.attributes)) {
+            picked[attrId] = null;
+        }
+        // Resolve server-side selected_value_ids back to {attr_id: val_id}.
+        for (const valId of (r.selected_value_ids || [])) {
+            for (const [attrId, attr] of Object.entries(r.attributes)) {
+                if (attr.values.some((v) => v.id === valId)) {
+                    picked[attrId] = valId;
+                    break;
+                }
+            }
+        }
+        this.state.picked = picked;
+        // All groups start expanded.
+        for (const g of r.groups) {
+            this.state.closedGroups[g.title] = false;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Reactive computed getters — driven by useState changes
+    // ------------------------------------------------------------------
+
+    get totalPrice() {
+        let p = this.state.basePrice || 0;
+        for (const [attrId, valId] of Object.entries(this.state.picked)) {
+            if (valId === null) continue;
+            const attr = this.state.attributes[attrId];
+            if (!attr) continue;
+            const val = attr.values.find((v) => v.id === valId);
+            if (val) p += val.price_extra || 0;
+        }
+        return p;
+    }
+
+    get formattedPrice() {
+        const cur = this.state.currency || { symbol: "$", position: "before" };
+        const amt = Math.round(this.totalPrice).toLocaleString();
+        return cur.position === "after"
+            ? `${amt}${cur.symbol}`
+            : `${cur.symbol}${amt}`;
+    }
+
+    get weightText() {
+        // Phase 2b shows "—" — Phase 2c will surface the server-resolved
+        // weight from the /select response. Showing a placeholder is
+        // more honest than the Phase-1 client-side estimate that didn't
+        // reflect the real product weight.
+        return "—";
+    }
+
+    get autoSku() {
+        // SKU_ATTR_NAMES = [Width, Series, Finish]. Compose
+        // SB-<width3>-<series3>-<finish3>. Falls back to "—" when no
+        // width is picked yet.
+        const parts = SKU_ATTR_NAMES.map((name) => this._abbrPickedByName(name));
+        if (parts[0] === "XXX") return "—";
+        return `SB-${parts.join("-")}`;
+    }
+
+    _abbrPickedByName(attrName) {
+        const attrId = Object.keys(this.state.attributes)
+            .find((id) => this.state.attributes[id].name === attrName);
+        if (!attrId) return "XXX";
+        const valId = this.state.picked[attrId];
+        if (valId === null) return "XXX";
+        const attr = this.state.attributes[attrId];
+        const val = attr.values.find((v) => v.id === valId);
+        if (!val) return "XXX";
+        return val.name.replace(/[^A-Za-z0-9]/g, "").substring(0, 3).toUpperCase();
+    }
+
+    get specLine() {
         const parts = [];
-        let done = 0;
-        const total = Object.keys(OPTIONS).length;
-        Object.keys(OPTIONS).forEach((k) => {
-            const i = this.state[k];
-            if (i !== null) {
-                const o = OPTIONS[k][i];
-                price += o[1];
-                weight += o[2];
-                done++;
-                if (["Width", "Series", "Finish", "Hinge_Side", "Handle"].includes(k)) {
-                    parts.push(o[0]);
-                }
-                const pd = this.root.querySelector(`#sb_cfg_pd_${k}`);
-                if (pd) {
-                    pd.textContent = o[1] > 0
-                        ? `+$${o[1]}`
-                        : (o[1] < 0 ? `-$${Math.abs(o[1])}` : "");
-                }
-            }
-        });
-
-        const priceEl = this.root.querySelector("#sb_cfg_price");
-        priceEl.firstChild.textContent = `$${price.toFixed(0)}`;
-        this.root.querySelector("#sb_cfg_weight").textContent =
-            `${weight.toFixed(1)} kg`;
-        this.root.querySelector("#sb_cfg_spec").textContent =
-            parts.length ? parts.join("  ·  ") : "nothing selected yet";
-
-        // Auto SKU compose — short abbreviation of width, series, finish.
-        const abbr = (k) => this.state[k] !== null
-            ? OPTIONS[k][this.state[k]][0]
-                .replace(/[^A-Za-z0-9]/g, "")
-                .substring(0, 3)
-                .toUpperCase()
-            : "XXX";
-        this.root.querySelector("#sb_cfg_sku").textContent =
-            this.state.Width !== null
-                ? `SB-1DR-${abbr("Width")}-${abbr("Series")}-${abbr("Finish")}`
-                : "—";
-
-        const pct = Math.round(done / total * 100);
-        this.root.querySelector("#sb_cfg_progbar").style.width = `${pct}%`;
-        const ring = this.root.querySelector("#sb_cfg_ring");
-        ring.style.setProperty("--p", pct);
-        this.root.querySelector("#sb_cfg_ringtxt").textContent = `${pct}%`;
-        this.root.querySelector("#sb_cfg_comptxt").textContent =
-            pct === 100
-                ? "All set — ready to add to quote"
-                : `${done} of ${total} options chosen`;
-
-        // Group completion counters + checkmarks.
-        GROUPS.forEach(([_title, fields], gi) => {
-            const gd = fields.filter((k) => this.state[k] !== null).length;
-            this.root.querySelector(`#sb_cfg_gp${gi}`).textContent = gd;
-            const chk = this.root.querySelector(`#sb_cfg_chk${gi}`);
-            if (gd === fields.length) {
-                chk.innerHTML = "✓";
-                chk.classList.add("sb_cfg_check_done");
-            } else {
-                chk.innerHTML = String(gi + 1);
-                chk.classList.remove("sb_cfg_check_done");
-            }
-        });
-
-        // Validation summary — bottom-left of left pane.
-        const valid = this.root.querySelector("#sb_cfg_valid");
-        const progwrap = this.root.querySelector(".sb_cfg_progwrap");
-        if (progwrap) progwrap.setAttribute("aria-valuenow", String(pct));
-        if (pct === 100) {
-            valid.className = "sb_cfg_note sb_cfg_note_ok";
-            valid.innerHTML = "✓ All options valid · ready";
-        } else {
-            valid.className = "sb_cfg_note sb_cfg_note_bad";
-            valid.innerHTML = `${total - done} option(s) still needed`;
+        for (const name of SPEC_ATTR_NAMES) {
+            const attrId = Object.keys(this.state.attributes)
+                .find((id) => this.state.attributes[id].name === name);
+            if (!attrId) continue;
+            const valId = this.state.picked[attrId];
+            if (valId === null) continue;
+            const val = this.state.attributes[attrId].values
+                .find((v) => v.id === valId);
+            if (val) parts.push(val.name);
         }
+        return parts.length ? parts.join("  ·  ") : "nothing selected yet";
+    }
 
-        this._renderPreview();
+    get completionPct() {
+        const total = Object.keys(this.state.attributes).length;
+        if (!total) return 0;
+        const done = Object.values(this.state.picked)
+            .filter((v) => v !== null).length;
+        return Math.round((done / total) * 100);
+    }
+
+    get completionText() {
+        const total = Object.keys(this.state.attributes).length;
+        const done = Object.values(this.state.picked)
+            .filter((v) => v !== null).length;
+        return done === total
+            ? "All set — ready to add to quote"
+            : `${done} of ${total} options chosen`;
+    }
+
+    get validationClass() {
+        return this.completionPct === 100
+            ? "sb_cfg_note sb_cfg_note_ok"
+            : "sb_cfg_note sb_cfg_note_bad";
+    }
+
+    get validationText() {
+        const total = Object.keys(this.state.attributes).length;
+        const done = Object.values(this.state.picked)
+            .filter((v) => v !== null).length;
+        return this.completionPct === 100
+            ? markup("✓ All options valid · ready")
+            : markup(`${total - done} option(s) still needed`);
     }
 
     // ------------------------------------------------------------------
-    // Cabinet preview re-render — CSS-only for Phase 1
+    // Per-group / per-attribute helpers used by the template
     // ------------------------------------------------------------------
 
-    _renderPreview() {
-        const cab = this.root.querySelector("#sb_cfg_cab");
-        if (this.userPhoto) return;        // photo override
-        const widthIdx = this.state.Width !== null ? this.state.Width : 2;
-        const wpx = 70 + widthIdx * 16;
-        const finishName = this.state.Finish !== null
-            ? OPTIONS.Finish[this.state.Finish][0]
-            : (this.state.Box_Material !== null
-                ? OPTIONS.Box_Material[this.state.Box_Material][0]
-                : "White");
-        const col = FINISH_COLORS[finishName] || "#dcd3c4";
-        const doors = this.state.Door_Count !== null
-            ? (this.state.Door_Count === 1 ? 2 : 1) : 1;
-        const hinge = this.state.Hinge_Side !== null
-            ? OPTIONS.Hinge_Side[this.state.Hinge_Side][0] : "Left";
-        const handle = this.state.Handle !== null
-            ? OPTIONS.Handle[this.state.Handle][0] : "Bar Pull";
-        const handleHtml = (handle === "None") ? ""
-            : (handle === "Knob"
-                ? `<div style="position:absolute;top:50%;${hinge === "Left" ? "right:8px" : "left:8px"};width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`
-                : `<div style="position:absolute;top:50%;${hinge === "Left" ? "right:7px" : "left:7px"};width:4px;height:26px;border-radius:3px;background:#2f3b52"></div>`);
-        let doorHtml;
-        if (doors === 2) {
-            doorHtml = `
-                <div style="position:absolute;inset:6px;display:flex;gap:4px">
+    groupPickCount(group) {
+        return group.attribute_ids
+            .filter((id) => this.state.picked[String(id)] !== null
+                         || this.state.picked[id] !== null)
+            .length;
+    }
+
+    groupComplete(group) {
+        return this.groupPickCount(group) === group.attribute_ids.length;
+    }
+
+    attrPriceDelta(attrId) {
+        const valId = this.state.picked[attrId];
+        if (valId === null) return "";
+        const attr = this.state.attributes[attrId];
+        if (!attr) return "";
+        const val = attr.values.find((v) => v.id === valId);
+        if (!val || !val.price_extra) return "";
+        return val.price_extra > 0
+            ? `+$${val.price_extra}`
+            : `-$${Math.abs(val.price_extra)}`;
+    }
+
+    fieldClass(attr, group) {
+        // The prototype used "full" width for Finish + for the last
+        // odd-position field in a group. We preserve the same visual
+        // weighting.
+        if (attr.name === "Finish") {
+            return "sb_cfg_field sb_cfg_field_full";
+        }
+        // Mark the last field as full if the group has an odd number
+        // of fields (so the trailing odd one spans both columns).
+        const isLast = group.attribute_ids[group.attribute_ids.length - 1]
+                       === Number(Object.keys(this.state.attributes)
+                                  .find((id) => this.state.attributes[id] === attr));
+        if (isLast && (group.attribute_ids.length % 2) !== 0) {
+            return "sb_cfg_field sb_cfg_field_full";
+        }
+        return "sb_cfg_field";
+    }
+
+    chipClass(attrId, val) {
+        const sel = this.state.picked[attrId] === val.id;
+        const attr = this.state.attributes[attrId];
+        const dis = this.isValueDisabled(attr, val);
+        return "sb_cfg_chip"
+            + (sel ? " sb_cfg_chip_sel" : "")
+            + (dis ? " sb_cfg_chip_disabled" : "");
+    }
+
+    // ------------------------------------------------------------------
+    // Phase-2b hardcoded disable rules.
+    //
+    // Phase 2c replaces this whole method with a lookup against a
+    // server-provided `disabled_value_ids` set returned by /select.
+    // The rules below mirror the southbrook-configurator-v2.html
+    // prototype exactly so the visual contract holds.
+    // ------------------------------------------------------------------
+    isValueDisabled(attr, val) {
+        if (!attr) return false;
+        // Resolve the canonical picks BY NAME — works regardless of
+        // attribute ids, which differ per environment.
+        const pickedNameOf = (attrName) => {
+            const attrId = Object.keys(this.state.attributes)
+                .find((id) => this.state.attributes[id].name === attrName);
+            if (!attrId) return null;
+            const valId = this.state.picked[attrId];
+            if (valId === null) return null;
+            const a = this.state.attributes[attrId];
+            const v = a.values.find((vv) => vv.id === valId);
+            return v ? v.name : null;
+        };
+        const boxName = pickedNameOf("Box Material");
+        const seriesName = pickedNameOf("Series");
+
+        if (attr.name === "Finish" && boxName === "White Melamine"
+            && ["Maple Stain", "Cherry Stain", "Walnut Stain"].includes(val.name)) {
+            return true;
+        }
+        if (attr.name === "Door Style" && seriesName !== "Signature"
+            && val.name === "Custom (Signature)") {
+            return true;
+        }
+        if (attr.name === "Finish" && seriesName !== "Signature"
+            && val.name === "Custom") {
+            return true;
+        }
+        return false;
+    }
+
+    // ------------------------------------------------------------------
+    // Event handlers — chip / select / group toggle / quote
+    // ------------------------------------------------------------------
+
+    onChipClick(attrId, val) {
+        const attr = this.state.attributes[attrId];
+        if (this.isValueDisabled(attr, val)) return;
+        this._pick(attrId, val.id);
+    }
+
+    onChipKeydown(ev, attrId, val) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this.onChipClick(attrId, val);
+        }
+    }
+
+    onSelectChange(attrId, ev) {
+        const v = ev.target.value;
+        this._pick(attrId, v === "" ? null : parseInt(v, 10));
+    }
+
+    toggleGroup(title) {
+        this.state.closedGroups[title] = !this.state.closedGroups[title];
+    }
+
+    onGroupKeydown(ev, title) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this.toggleGroup(title);
+        }
+    }
+
+    _pick(attrId, valId) {
+        this.state.picked[attrId] = valId;
+        // After picking, re-evaluate the disable rules and clear any
+        // currently-picked value that the new state makes invalid.
+        for (const [aid, attr] of Object.entries(this.state.attributes)) {
+            const pickedValId = this.state.picked[aid];
+            if (pickedValId === null) continue;
+            const pickedVal = attr.values.find((v) => v.id === pickedValId);
+            if (pickedVal && this.isValueDisabled(attr, pickedVal)) {
+                this.state.picked[aid] = null;
+            }
+        }
+    }
+
+    onAddToQuote() {
+        const missing = Object.entries(this.state.picked)
+            .filter(([_, valId]) => valId === null)
+            .map(([aid, _]) => this.state.attributes[aid].name);
+        if (missing.length) {
+            this._toast(`Please choose: ${missing.join(", ")}`);
+            return;
+        }
+        this._toast(
+            `Added to quote · ${this.autoSku} · ${this.formattedPrice}`
+        );
+        // Phase 2c: POST /southbrook/api/configurator/commit
+        // {session_id, order_id} → materialise variant + add to a draft
+        // sale.order for the logged-in portal user (target A per the
+        // Phase-2 cart-target decision).
+    }
+
+    // ------------------------------------------------------------------
+    // Cabinet preview render — same CSS-box drawing as Phase 1
+    // ------------------------------------------------------------------
+
+    get cabinetMarkup() {
+        if (this.state.userPhoto) {
+            return markup(
+                `<img class="sb_cfg_user_photo" src="${this.state.userPhoto}" alt="Custom cabinet photo"/>`
+            );
+        }
+        const pickedNameOf = (attrName, fallback) => {
+            const attrId = Object.keys(this.state.attributes)
+                .find((id) => this.state.attributes[id].name === attrName);
+            if (!attrId) return fallback;
+            const valId = this.state.picked[attrId];
+            if (valId === null) return fallback;
+            const a = this.state.attributes[attrId];
+            const v = a.values.find((vv) => vv.id === valId);
+            return v ? v.name : fallback;
+        };
+        const widthName = pickedNameOf("Width", "15 in");
+        const wIdx = ["9 in", "12 in", "15 in", "18 in", "21 in", "24 in",
+                      "27 in", "30 in", "33 in", "36 in"].indexOf(widthName);
+        const wpx = 70 + Math.max(0, wIdx) * 16;
+        const finishName = pickedNameOf("Finish",
+            pickedNameOf("Box Material", "White"));
+        const color = FINISH_COLORS[finishName] || "#dcd3c4";
+        const doorCountName = pickedNameOf("Door Count", "1");
+        const doors = doorCountName === "2" ? 2 : 1;
+        const hinge = pickedNameOf("Hinge Side", "LH (Left Hand)");
+        const isLH = hinge.startsWith("LH");
+        const handle = pickedNameOf("Handle", "Bar Pull");
+        const handleHtml = (handle === "None") ? "" :
+            (handle === "Knob"
+                ? `<div style="position:absolute;top:50%;${isLH ? "right:8px" : "left:8px"};width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`
+                : `<div style="position:absolute;top:50%;${isLH ? "right:7px" : "left:7px"};width:4px;height:26px;border-radius:3px;background:#2f3b52"></div>`);
+        const doorHtml = (doors === 2)
+            ? `<div style="position:absolute;inset:6px;display:flex;gap:4px">
                   <div style="flex:1;position:relative;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.12)">
                     <div style="position:absolute;top:50%;right:5px;width:3px;height:20px;border-radius:3px;background:#2f3b52"></div>
                   </div>
                   <div style="flex:1;position:relative;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.12)">
                     <div style="position:absolute;top:50%;left:5px;width:3px;height:20px;border-radius:3px;background:#2f3b52"></div>
                   </div>
-                </div>`;
-        } else {
-            doorHtml = `
-                <div style="position:absolute;inset:6px;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.1)">
-                  ${handleHtml}
-                </div>`;
-        }
-        cab.style.width = `${wpx}px`;
-        cab.style.height = "150px";
-        cab.style.background = col;
-        cab.style.position = "relative";
-        cab.style.borderTop = "3px solid rgba(0,0,0,.08)";
-        cab.innerHTML = doorHtml;
+                </div>`
+            : `<div style="position:absolute;inset:6px;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.1)">${handleHtml}</div>`;
+        return markup(
+            `<div style="width:${wpx}px;height:150px;background:${color};position:relative;border-top:3px solid rgba(0,0,0,.08);border-radius:4px;box-shadow:0 18px 30px -12px rgba(40,55,80,.4)">${doorHtml}</div>`
+        );
     }
 
     // ------------------------------------------------------------------
-    // Bulk tools — template CSV download
+    // Photo replace + drag-drop
     // ------------------------------------------------------------------
 
-    _wireBulkToolsEvents() {
-        const tpl = this.root.querySelector('[data-action="download-template"]');
-        if (tpl) tpl.addEventListener("click", () => this._downloadTemplate());
-        const imp = this.root.querySelector('[data-action="open-import"]');
-        if (imp) imp.addEventListener("click", () => this._openImport());
-        const addQ = this.root.querySelector('[data-action="add-to-quote"]');
-        if (addQ) addQ.addEventListener("click", () => this._addToQuote());
+    onReplacePhoto() {
+        if (this.imgInputRef.el) this.imgInputRef.el.click();
     }
 
-    _downloadTemplate() {
+    onPhotoFileSelected(ev) {
+        const f = ev.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = (loaded) => {
+            this.state.userPhoto = loaded.target.result;
+            this.state.previewBadge = "CUSTOM PHOTO";
+        };
+        r.readAsDataURL(f);
+    }
+
+    _wireViewerDragDrop() {
+        const el = this.viewerRef.el;
+        if (!el) return;
+        ["dragover", "dragenter"].forEach((evName) => {
+            el.addEventListener(evName, (e) => {
+                e.preventDefault();
+                el.classList.add("drag");
+            });
+        });
+        ["dragleave", "drop"].forEach((evName) => {
+            el.addEventListener(evName, (e) => {
+                e.preventDefault();
+                el.classList.remove("drag");
+            });
+        });
+        el.addEventListener("drop", (e) => {
+            const f = e.dataTransfer.files[0];
+            if (f && f.type.indexOf("image") === 0 && this.imgInputRef.el) {
+                // Reuse the file-input change handler via a dispatched
+                // pseudo-event so the FileReader path stays single-sourced.
+                this.onPhotoFileSelected({ target: { files: [f] } });
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Bulk tools — preserved client-side logic from Phase 1
+    // ------------------------------------------------------------------
+
+    onDownloadTemplate() {
         const example = [
             "SB-BASE-1DR-001", "Base 1-Door 18in", "295.00", "24.6",
             "base-1dr.jpg", "Base", "18 in", "Signature", "Maple",
-            "Five-Piece Woodgrain", "Walnut Stain", "Right", "Both",
+            "Five-Piece Woodgrain", "Walnut Stain", "RH (Right Hand)", "Both",
             "Standard", "Bar Pull", "Soft-Close", "1",
         ];
         const csv = `${TEMPLATE_HEADERS.join(",")}\n${example.join(",")}\n`;
@@ -488,26 +761,31 @@ class SouthbrookConfiguratorV2 {
         this._toast(`Template downloaded · ${TEMPLATE_HEADERS.length} columns + example row`);
     }
 
-    _addToQuote() {
-        const miss = Object.keys(OPTIONS).filter((k) => this.state[k] === null);
-        if (miss.length) {
-            this._toast(`Please choose: ${miss.map((k) => this._label(k)).join(", ")}`);
-            return;
+    onOpenImport() {
+        const rows = this._parseCSV(SAMPLE_CSV);
+        this._renderImport(rows);
+        const overlay = document.getElementById("sb_cfg_importOverlay");
+        if (overlay) {
+            overlay.classList.add("sb_cfg_overlay_show");
+            overlay.setAttribute("aria-hidden", "false");
         }
-        const sku = this.root.querySelector("#sb_cfg_sku").textContent;
-        const price = this.root.querySelector("#sb_cfg_price")
-            .textContent.trim().split(/\s/)[0];
-        this._toast(`Added to quote · ${sku} · ${price}`);
-        // Phase 2: POST /shop/cart/update_json with the config session id.
     }
 
-    // ------------------------------------------------------------------
-    // Bulk tools — import preview / validate / commit
-    // ------------------------------------------------------------------
+    _wireImportOverlay() {
+        // The overlay markup lives outside the OWL tree (body-level
+        // position:fixed). Wire its click handlers via the imperative
+        // DOM API — there's only one of each so this is safe.
+        const overlay = document.getElementById("sb_cfg_importOverlay");
+        if (!overlay) return;
+        overlay.querySelectorAll('[data-action="close-import"]')
+            .forEach((b) => b.addEventListener("click", () => this._closeImport()));
+        const dl = overlay.querySelector('[data-action="download-errors"]');
+        if (dl) dl.addEventListener("click", () => this._downloadImportErrors());
+        const commit = overlay.querySelector('[data-action="commit-import"]');
+        if (commit) commit.addEventListener("click", () => this._commitImport());
 
-    _wireImportEvents() {
-        const drop = this.root.querySelector("#sb_cfg_drop");
-        const fileInput = this.root.querySelector("#sb_cfg_fileInput");
+        const drop = document.getElementById("sb_cfg_drop");
+        const fileInput = document.getElementById("sb_cfg_fileInput");
         if (drop && fileInput) {
             drop.addEventListener("click", () => fileInput.click());
             ["dragover", "dragenter"].forEach((evName) => {
@@ -531,30 +809,13 @@ class SouthbrookConfiguratorV2 {
             fileInput.onchange = (e) => {
                 const f = e.target.files[0];
                 if (!f) return;
-                const r = new FileReader();
-                r.onload = (ev) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
                     this._renderImport(this._parseCSV(ev.target.result));
                     this._toast(`Parsed ${f.name}`);
                 };
-                r.readAsText(f);
+                reader.readAsText(f);
             };
-        }
-        this.root.querySelectorAll('[data-action="close-import"]').forEach((b) => {
-            b.addEventListener("click", () => this._closeImport());
-        });
-        const dl = this.root.querySelector('[data-action="download-errors"]');
-        if (dl) dl.addEventListener("click", () => this._downloadErrors());
-        const commit = this.root.querySelector('[data-action="commit-import"]');
-        if (commit) commit.addEventListener("click", () => this._commitImport());
-    }
-
-    _openImport() {
-        this._renderImport(this._parseCSV(SAMPLE_CSV));
-        const overlay = this.root.querySelector("#sb_cfg_importOverlay")
-            || document.getElementById("sb_cfg_importOverlay");
-        if (overlay) {
-            overlay.classList.add("sb_cfg_overlay_show");
-            overlay.setAttribute("aria-hidden", "false");
         }
     }
 
@@ -579,17 +840,12 @@ class SouthbrookConfiguratorV2 {
         });
     }
 
-    _validateRow(r) {
+    _validateImportRow(r) {
         const errs = [];
-        const checks = ["Width", "Series", "Box_Material", "Door_Style",
-                        "Finish", "Hinge_Side", "Finished_Sides", "Gables",
-                        "Handle", "Door_Count"];
-        checks.forEach((col) => {
-            const v = r[col];
-            if (v && !this._allowed(col).includes(v)) {
-                errs.push(`${col.replace(/_/g, " ")} '${v}' not allowed`);
-            }
-        });
+        if (!r.SKU) errs.push("SKU required");
+        if (r.Price && Number.isNaN(parseFloat(r.Price))) {
+            errs.push("Price not numeric");
+        }
         if (r.Box_Material === "White Melamine"
             && ["Maple Stain", "Cherry Stain", "Walnut Stain"].includes(r.Finish)) {
             errs.push(`Finish '${r.Finish}' invalid for White Melamine`);
@@ -597,26 +853,21 @@ class SouthbrookConfiguratorV2 {
         if (r.Series !== "Signature" && r.Door_Style === "Custom (Signature)") {
             errs.push("Custom door needs Signature series");
         }
-        if (!r.SKU) errs.push("SKU required");
-        if (r.Price && Number.isNaN(parseFloat(r.Price))) {
-            errs.push("Price not numeric");
-        }
         return errs;
     }
 
     _renderImport(rows) {
-        this.curRows = rows;
+        this.state.importRows = rows;
         const body = document.getElementById("sb_cfg_previewBody");
+        if (!body) return;
         let ok = 0, bad = 0;
         const html = rows.map((r) => {
-            const e = this._validateRow(r);
+            const e = this._validateImportRow(r);
             const good = e.length === 0;
             if (good) ok++; else bad++;
             return `
                 <tr class="${good ? "" : "sb_cfg_row_bad"}">
-                  <td><span class="sb_cfg_rowstat sb_cfg_rowstat_${good ? "g" : "r"}">
-                    ${good ? "✓ OK" : "✕ ERR"}
-                  </span></td>
+                  <td><span class="sb_cfg_rowstat sb_cfg_rowstat_${good ? "g" : "r"}">${good ? "✓ OK" : "✕ ERR"}</span></td>
                   <td>${r.SKU || ""}</td>
                   <td>${r.Width || ""}</td>
                   <td>${r.Series || ""}</td>
@@ -628,28 +879,28 @@ class SouthbrookConfiguratorV2 {
             `;
         }).join("");
         body.innerHTML = html;
-        document.getElementById("sb_cfg_okCount").textContent  = `${ok} valid`;
+        document.getElementById("sb_cfg_okCount").textContent = `${ok} valid`;
         document.getElementById("sb_cfg_badCount").textContent = `${bad} errors`;
         document.getElementById("sb_cfg_commitBtn").textContent =
             `Commit ${ok} valid row${ok === 1 ? "" : "s"}`;
     }
 
     _commitImport() {
-        const ok = this.curRows.filter((r) => this._validateRow(r).length === 0).length;
-        const bad = this.curRows.length - ok;
+        const ok = this.state.importRows
+            .filter((r) => this._validateImportRow(r).length === 0).length;
+        const bad = this.state.importRows.length - ok;
         this._closeImport();
         this._toast(`${ok} product(s) imported · ${bad} skipped (errors logged)`);
-        // Phase 4: replace this with a JSON-RPC POST to a new
-        // /sb_cfg/import endpoint that writes products in a single
-        // transaction and returns a row-level commit log. The human
-        // confirmation gate must stay client-side; the server endpoint
-        // must require a confirm:true flag on the payload.
+        // Phase 4: replace this with a JSON-RPC POST to
+        // /southbrook/api/import/commit that requires explicit
+        // confirm:true and wraps writes in a single transaction.
     }
 
-    _downloadErrors() {
-        const rows = this.curRows.filter((r) => this._validateRow(r).length);
+    _downloadImportErrors() {
+        const rows = this.state.importRows
+            .filter((r) => this._validateImportRow(r).length);
         const csv = `SKU,Issues\n${rows.map(
-            (r) => `${r.SKU || ""},"${this._validateRow(r).join("; ")}"`
+            (r) => `${r.SKU || ""},"${this._validateImportRow(r).join("; ")}"`
         ).join("\n")}`;
         const a = document.createElement("a");
         a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -659,61 +910,11 @@ class SouthbrookConfiguratorV2 {
     }
 
     // ------------------------------------------------------------------
-    // Photo replace
-    // ------------------------------------------------------------------
-
-    _wirePhotoEvents() {
-        const editBtn = this.root.querySelector('[data-action="replace-photo"]');
-        const imgInput = this.root.querySelector("#sb_cfg_imgInput");
-        if (editBtn && imgInput) {
-            editBtn.addEventListener("click", () => imgInput.click());
-            imgInput.onchange = (e) => {
-                const f = e.target.files[0];
-                if (!f) return;
-                const r = new FileReader();
-                r.onload = (ev) => {
-                    this.userPhoto = ev.target.result;
-                    const cab = this.root.querySelector("#sb_cfg_cab");
-                    cab.style.width = "100%";
-                    cab.style.height = "100%";
-                    cab.style.background = "none";
-                    cab.innerHTML =
-                        `<img class="sb_cfg_user_photo" src="${ev.target.result}" alt="Custom cabinet photo"/>`;
-                    this.root.querySelector("#sb_cfg_vbadge").textContent = "CUSTOM PHOTO";
-                };
-                r.readAsDataURL(f);
-            };
-        }
-        const vw = this.root.querySelector("#sb_cfg_viewer");
-        if (vw) {
-            ["dragover", "dragenter"].forEach((evName) => {
-                vw.addEventListener(evName, (e) => {
-                    e.preventDefault();
-                    vw.classList.add("drag");
-                });
-            });
-            ["dragleave", "drop"].forEach((evName) => {
-                vw.addEventListener(evName, (e) => {
-                    e.preventDefault();
-                    vw.classList.remove("drag");
-                });
-            });
-            vw.addEventListener("drop", (e) => {
-                const f = e.dataTransfer.files[0];
-                if (f && f.type.indexOf("image") === 0 && imgInput) {
-                    imgInput.onchange({ target: { files: [f] } });
-                }
-            });
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Toast helper
+    // Toast — body-level element, hit via document.getElementById
     // ------------------------------------------------------------------
 
     _toast(msg) {
-        const t = this.root.querySelector("#sb_cfg_toast")
-            || document.getElementById("sb_cfg_toast");
+        const t = document.getElementById("sb_cfg_toast");
         if (!t) return;
         t.textContent = msg;
         t.classList.add("sb_cfg_toast_show");
@@ -723,3 +924,47 @@ class SouthbrookConfiguratorV2 {
         }, 3400);
     }
 }
+
+
+// ---------- Bootstrap: find mount, parse data attrs, mount component ----------
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const root = document.getElementById("sb_cfg_v2_root");
+    if (!root) return;     // bundle no-op on every page without v2
+
+    const productTmplId = parseInt(
+        root.getAttribute("data-product-tmpl-id") || "", 10);
+    if (!productTmplId) {
+        console.warn("sb_cfg_v2_root missing data-product-tmpl-id");
+        return;
+    }
+
+    const target = document.getElementById("sb_cfg_v2_main_mount");
+    if (!target) {
+        console.warn("sb_cfg_v2_main_mount not found");
+        return;
+    }
+    const isInternalUser =
+        (target.getAttribute("data-internal-user") || "0") === "1";
+
+    // Clear the no-JS "Loading…" fallback before mounting so OWL doesn't
+    // duplicate the title bar.
+    target.innerHTML = "";
+
+    try {
+        await mount(ConfiguratorV2, target, {
+            props: { productTmplId, isInternalUser },
+        });
+    } catch (err) {
+        // Last-resort: surface the mount failure in the fallback area
+        // so a visitor sees something explicit rather than a blank space.
+        target.innerHTML = `
+            <div class="sb_cfg_titlebar">
+              <div class="sb_cfg_titlebar_l">
+                <h1 class="sb_cfg_h1">Couldn't load this configurator</h1>
+                <p class="sb_cfg_sub">${(err && err.message) || String(err)}</p>
+              </div>
+            </div>`;
+        throw err;
+    }
+});

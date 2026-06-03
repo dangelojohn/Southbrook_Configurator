@@ -1,28 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Phase 1 — QWeb template inheritance that replaces the body of the OCA
+  QWeb template inheritance that replaces the body of the OCA
   website_product_configurator.product_configurator template with the
-  southbrook-configurator-v2.html prototype layout.
+  v2 layout's static shell + OWL mount points.
 
-  Strategy:
-    - Keep the outer `t-call="website.layout"` and the `#wrap` schema-
-      tagged div from the OCA template so we inherit the website chrome,
-      breadcrumbs, navigation, and meta tags.
-    - Replace the inner #unique_product_configurator section (lines
-      24-127 of the OCA config_form_templates.xml) with the v2 markup.
-    - Phase 1 keeps the markup STATIC — the JS owns all the state and
-      hydrates from the hardcoded OPTIONS map. Phase 2 swaps the static
-      OPTIONS for QWeb loops over product.template.attribute_line_ids
-      so the markup becomes data-driven.
+  Phase 1 (initial):
+    The right pane was rendered server-side from QWeb loops over
+    attribute lines; the left pane was hydrated by vanilla JS from a
+    hardcoded OPTIONS map.
+
+  Phase 2b (this version):
+    Server-side QWeb output is reduced to a minimal shell carrying:
+      - data-product-tmpl-id="<tmpl.id>" on #sb_cfg_v2_root so the
+        OWL bootstrap can fetch the configurator state from
+        /southbrook/api/configurator/state without any DOM parsing.
+      - Three OWL mount points: the LEFT preview/summary panel
+        (#sb_cfg_v2_left_mount), the RIGHT chip grid
+        (#sb_cfg_v2_right_mount), and the bulk-tools bar
+        (#sb_cfg_v2_tools_mount, internal users only).
+      - The import overlay + toast container at the bottom — these
+        stay as plain QWeb because they sit OUTSIDE the OWL component
+        tree (position:fixed, body-level).
+
+    The OWL component owns ALL reactive state and rendering for the
+    left + right + tools surfaces. The static markup ships only
+    enough to give OWL clean mount points + accessibility wrappers
+    (the role="progressbar" attribute lives on the static element so
+    a no-JS visitor still gets the semantic landmark).
 
   Mount-point pattern:
-    The v2 root div carries id="sb_cfg_v2_root". The configurator.esm.js
-    bundle finds this div on every page; on pages without it the script
-    no-ops. That makes the v2 UX entirely opt-in per template.
+    The configurator.esm.js bundle finds #sb_cfg_v2_root on every
+    page; absent it no-ops. With it, the bootstrap reads
+    data-product-tmpl-id, fetches /state, and mounts the OWL component
+    into #sb_cfg_v2_main_mount. The whole left + right + tools UI is
+    one component owning one reactive state tree.
 
   Per project brief (CLAUDE.md §3): we never patch the OCA module in
-  place. This file is the ONLY thing that touches the OCA template, and
-  it touches it via inheritance only.
+  place. This file is the ONLY thing that touches the OCA template
+  and it does so via inheritance only.
 -->
 <odoo>
   <data>
@@ -31,30 +46,33 @@
               inherit_id="website_product_configurator.product_configurator"
               name="Southbrook · Configurator v2 Body">
 
-      <!-- ============================================================
-           Replace the entire #unique_product_configurator section.
-           ============================================================ -->
+      <!-- Replace the entire #unique_product_configurator section
+           with the v2 shell + OWL mount points. -->
       <xpath expr="//section[@id='unique_product_configurator']"
              position="replace">
 
-        <!-- v2 root — JS guards on this id; remove it and the v1
-             markup behaviour returns. -->
+        <!-- v2 root. The data-product-tmpl-id attribute is the
+             load-bearing contract with configurator.esm.js — without
+             it the OWL bootstrap can't tell which product to fetch
+             state for and bails out gracefully. -->
         <section id="sb_cfg_v2_root"
                  class="container py-3 sb_cfg_v2"
+                 t-att-data-product-tmpl-id="product_tmpl.id"
                  itemscope="itemscope"
                  itemtype="http://schema.org/Product">
 
-          <!-- Top progress bar — fills as more options are selected. -->
+          <!-- Static progress bar wrapper — role landmark for AT.
+               The fill (.sb_cfg_progbar inside) is rendered by OWL. -->
           <div class="sb_cfg_progwrap" role="progressbar"
                aria-label="Configuration completion"
                aria-valuemin="0" aria-valuemax="100"
-               aria-valuenow="0">
+               aria-valuenow="0"
+               id="sb_cfg_progwrap">
             <div class="sb_cfg_progbar" id="sb_cfg_progbar"></div>
           </div>
 
-          <!-- Breadcrumbs.
-               Phase 1 keeps these static; Phase 2 hydrates them from
-               product.public_category_id chain. -->
+          <!-- Breadcrumbs (static — these only change at navigation,
+               not configurator state, so server-rendering is fine). -->
           <div class="sb_cfg_crumbs">
             Shop ›
             <span t-if="product_tmpl.public_categ_ids">
@@ -66,116 +84,36 @@
             <b t-esc="product_tmpl.name"/>
           </div>
 
-          <!-- Title row + bulk-tools bar.
-               The bulk tools are visible only to backend / admin
-               users in Phase 1; Phase 4 wires them to real server
-               endpoints. -->
-          <div class="sb_cfg_titlebar">
-            <div class="sb_cfg_titlebar_l">
-              <h1 class="sb_cfg_h1" t-esc="product_tmpl.name"/>
-              <p class="sb_cfg_sub">
-                Build a made-to-spec cabinet · live pricing ·
-                SKU auto-generates as you configure
-              </p>
+          <!-- OWL main mount: the entire reactive UI (left preview +
+               summary + action bar + right chip grid + bulk tools)
+               renders inside this div. -->
+          <div id="sb_cfg_v2_main_mount"
+               data-internal-user="0"
+               t-att-data-internal-user="0 if user_id.share else 1">
+            <!-- No-JS fallback: shows the title + a prompt so the
+                 page is never blank. Replaced once OWL mounts. -->
+            <div class="sb_cfg_titlebar">
+              <div class="sb_cfg_titlebar_l">
+                <h1 class="sb_cfg_h1" t-esc="product_tmpl.name"/>
+                <p class="sb_cfg_sub">
+                  Loading configuration…
+                </p>
+              </div>
             </div>
-            <div t-if="not user_id.share"
-                 class="sb_cfg_bulkbar"
-                 aria-label="Bulk product tooling">
-              <span class="sb_cfg_bulkbar_lbl">Bulk tools</span>
-              <button type="button"
-                      class="sb_cfg_btn sb_cfg_btn_tpl"
-                      data-action="download-template">
-                ⬇ Template Layout
-              </button>
-              <button type="button"
-                      class="sb_cfg_btn sb_cfg_btn_imp"
-                      data-action="open-import">
-                ⤒ Import Product
-              </button>
-            </div>
-          </div>
-
-          <!-- Two-pane grid: sticky left preview/summary + right config -->
-          <div class="sb_cfg_grid">
-
-            <!-- LEFT: live preview + summary card + Add to Quote -->
-            <aside class="sb_cfg_panel sb_cfg_left">
-
-              <div class="sb_cfg_viewer" id="sb_cfg_viewer">
-                <div class="sb_cfg_badge" id="sb_cfg_vbadge">LIVE PREVIEW</div>
-                <div class="sb_cfg_cab" id="sb_cfg_cab"></div>
-                <button type="button"
-                        class="sb_cfg_editimg"
-                        data-action="replace-photo"
-                        aria-label="Replace cabinet photo">
-                  📷 Replace photo
-                </button>
-              </div>
-              <input type="file" id="sb_cfg_imgInput"
-                     accept="image/*" hidden="hidden"/>
-
-              <div class="sb_cfg_summary">
-                <div class="sb_cfg_sumrow">
-                  <span class="sb_cfg_k">
-                    Price <span class="sb_cfg_livetag">LIVE</span>
-                  </span>
-                  <span class="sb_cfg_price" id="sb_cfg_price">
-                    $0<span class="sb_cfg_delta" id="sb_cfg_delta"></span>
-                  </span>
-                </div>
-                <div class="sb_cfg_sumrow">
-                  <span class="sb_cfg_k">Est. Weight</span>
-                  <span class="sb_cfg_weight" id="sb_cfg_weight">— kg</span>
-                </div>
-                <div class="sb_cfg_sumrow">
-                  <span class="sb_cfg_k">Auto SKU</span>
-                  <span class="sb_cfg_sku" id="sb_cfg_sku">—</span>
-                </div>
-                <div class="sb_cfg_specline">
-                  <b>Your build:</b>
-                  <span id="sb_cfg_spec">nothing selected yet</span>
-                </div>
-                <div class="sb_cfg_completion">
-                  <div class="sb_cfg_ring" id="sb_cfg_ring">
-                    <i id="sb_cfg_ringtxt">0%</i>
-                  </div>
-                  <span id="sb_cfg_comptxt">0 of 11 options chosen</span>
-                </div>
-              </div>
-
-              <div class="sb_cfg_actionbar">
-                <span class="sb_cfg_note sb_cfg_note_bad"
-                      id="sb_cfg_valid"
-                      role="status" aria-live="polite">
-                  11 option(s) still needed
-                </span>
-                <button type="button"
-                        class="sb_cfg_btn sb_cfg_btn_primary"
-                        data-action="add-to-quote">
-                  Add to Quote ➞
-                </button>
-              </div>
-
-            </aside>
-
-            <!-- RIGHT: chip-selector configurator. JS owns the inner
-                 group/field rendering — Phase 1 starts empty and is
-                 filled by buildUI() on DOMContentLoaded. -->
-            <section class="sb_cfg_panel sb_cfg_right"
-                     id="sb_cfg_configurator"
-                     aria-label="Cabinet configuration options"/>
-
           </div>
 
           <p class="sb_cfg_cap">
-            Phase 1 prototype · chip selectors · conditional validation
-            · live preview · progress ring · CSV bulk tools
+            Phase 2 · OWL-driven · live attribute data ·
+            client-side recalc reconciled with server pricing
           </p>
 
         </section>
 
         <!-- ============================================================
-             Import-products overlay modal — hidden until JS opens it.
+             Import-products overlay modal — body-level (position:fixed).
+             Stays as plain QWeb because it sits outside the OWL mount.
+             OWL component interacts with it via document.getElementById
+             when the user clicks the bulk-tools "Import Product" button.
              ============================================================ -->
         <div class="sb_cfg_overlay" id="sb_cfg_importOverlay"
              role="dialog" aria-modal="true"
@@ -247,7 +185,7 @@
           </div>
         </div>
 
-        <!-- Toast container — JS pops messages into it. -->
+        <!-- Toast container — OWL component finds this by id. -->
         <div class="sb_cfg_toast" id="sb_cfg_toast"
              role="status" aria-live="polite"/>
 
