@@ -619,7 +619,19 @@ class ConfiguratorV2 extends Component {
     async _serverReconcile() {
         // POST the COMPLETE current pick set; the server resolves what
         // changed against the session and applies the rule engine.
+        //
+        // RACE GUARD: rapid clicks fire multiple overlapping /select
+        // RPCs. Each later request includes a SUPERSET of the picks
+        // the earlier ones sent. If an earlier response arrives after
+        // a later one, naive reconciliation overwrites
+        // state.picked with the older snapshot — eating the user's
+        // newer clicks. Stamp each call with a monotonic sequence
+        // number and bail at every await boundary if a newer call has
+        // started.
         if (this.state.sessionId === null) return;
+        if (this._reconcileSeq === undefined) this._reconcileSeq = 0;
+        const mySeq = ++this._reconcileSeq;
+
         const valueIds = Object.values(this.state.picked)
             .filter((v) => v !== null);
         this.state.selecting = true;
@@ -631,6 +643,11 @@ class ConfiguratorV2 extends Component {
                     value_ids: valueIds,
                 },
             );
+            // Stale-response guard. If another reconcile fired during
+            // the await, drop this response — the newer one (with the
+            // user's later clicks) is what should win.
+            if (mySeq !== this._reconcileSeq) return;
+
             if (r && r.ok) {
                 this.state.disabledValueIds = r.disabled_value_ids || [];
                 this.state.serverPrice = r.price;
@@ -650,10 +667,17 @@ class ConfiguratorV2 extends Component {
         } catch (err) {
             // Network blip — keep the optimistic state and surface a
             // muted toast so the customer knows pricing may be stale.
+            // Don't surface stale-response errors either.
+            if (mySeq !== this._reconcileSeq) return;
             console.warn("select RPC failed:", err);
             this._toast("Couldn't sync with server — pricing may be stale.");
         } finally {
-            this.state.selecting = false;
+            // Only flip selecting back off when WE were the most
+            // recent call. Otherwise a still-pending newer call is
+            // doing the work.
+            if (mySeq === this._reconcileSeq) {
+                this.state.selecting = false;
+            }
         }
     }
 
