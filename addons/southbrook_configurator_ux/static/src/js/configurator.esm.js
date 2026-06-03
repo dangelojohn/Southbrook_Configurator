@@ -1014,8 +1014,14 @@ class ConfiguratorV2 extends Component {
 
 
 // ---------- Bootstrap: find mount, parse data attrs, mount component ----------
+//
+// The frontend_lazy bundle (where this file lands) is loaded async/defer,
+// often AFTER DOMContentLoaded has already fired. Attaching a DOMContentLoaded
+// listener at module-load time misses the event entirely and the component
+// never mounts. Pattern: check document.readyState first; if the DOM is
+// already past 'loading', call init() synchronously. Otherwise wait.
 
-document.addEventListener("DOMContentLoaded", async () => {
+async function bootstrapConfiguratorV2() {
     const root = document.getElementById("sb_cfg_v2_root");
     if (!root) return;     // bundle no-op on every page without v2
 
@@ -1054,4 +1060,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>`;
         throw err;
     }
-});
+}
+
+if (document.readyState === "loading") {
+    // DOM still parsing — listen for DOMContentLoaded.
+    document.addEventListener("DOMContentLoaded", bootstrapConfiguratorV2);
+} else {
+    // DOM already parsed (the lazy bundle landed after DOMContentLoaded).
+    // Run init immediately — but defer one microtask so any other
+    // module-load-time side effects on this page complete first.
+    Promise.resolve().then(bootstrapConfiguratorV2);
+}
