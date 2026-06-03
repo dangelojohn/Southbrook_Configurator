@@ -1,8 +1,17 @@
 # Storefront Audit — `/shop` Visibility Review
 
-**Generated 2026-06-03.** Report-only — no `is_published` / website-visibility
-flag was changed by this audit. A human should review each row below and
-decide whether to unpublish.
+**Generated 2026-06-03.**
+
+**Status update 2026-06-03 (later in the same session):** the human reviewer
+authorized the unpublish recommendations from §1 and §2 below. The 6 rows
+(`product_template` ids `36, 37, 38, 39, 42, 211`) were marked
+`is_published = false` via a single SQL UPDATE; public `/shop` now shows 47
+templates (was 53) and the duplicate cards + the test artifact are gone
+verified against `https://southbrookcabinetry.space/shop`. The actual
+`product_template` records and their attribute_lines / config.lines /
+existing sale.order.line references were preserved — only the website
+visibility flag was toggled, so the change is reversible by flipping the
+flag back.
 
 ## TL;DR
 
