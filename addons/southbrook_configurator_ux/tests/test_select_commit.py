@@ -284,6 +284,95 @@ class TestConfiguratorSelectCommit(TransactionCase):
         self.assertEqual(r["error"], "order_forbidden")
 
     # ==================================================================
+    # P1 — premature-disable filter
+    # ==================================================================
+    def test_select_empty_picks_does_not_disable_any_chip(self):
+        """At page-load (no picks), every value the template exposes
+        should be available — the customer must not see chips greyed
+        before they've picked anything.
+
+        Regression for the Box Material dead-end the sales-rep walk-
+        through flagged: with rule-completion in place, the OCA engine
+        treated all Box Material + Door Style values as unavailable
+        whenever Series was unpicked, because each value's "Series
+        allows V" domain failed to match the empty pick set. The
+        controller post-processes the disabled set to clear values
+        whose only restricting rules trigger off an unpicked
+        attribute."""
+        sess = self._fresh_session()
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_select(
+                session_id=sess.id, value_ids=[])
+        self.assertTrue(r["ok"])
+        # Nothing picked yet → nothing should be disabled.
+        self.assertEqual(r["disabled_value_ids"], [],
+                         f"expected empty disabled set at page-load, "
+                         f"got {r['disabled_value_ids']}")
+
+    def test_select_series_picked_disables_only_real_conflicts(self):
+        """After picking Contractor Series, Maple (incompatible with
+        Contractor under Rule 2) should be disabled, but White Melamine
+        and all unrelated-attribute values should remain available."""
+        sess = self._fresh_session()
+        series = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        box = self.env["product.attribute"].search(
+            [("name", "=", "Box Material")], limit=1)
+        if not (series and box):
+            self.skipTest("Series / Box Material attributes not seeded")
+        contractor = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Contractor Series")], limit=1)
+        white_mel = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", box.id),
+             ("name", "=", "White Melamine")], limit=1)
+        maple = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", box.id),
+             ("name", "=", "Maple")], limit=1)
+        if not (contractor and white_mel and maple):
+            self.skipTest("Required values not seeded")
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_select(
+                session_id=sess.id, value_ids=[contractor.id])
+        self.assertTrue(r["ok"])
+        disabled = set(r["disabled_value_ids"])
+        self.assertNotIn(white_mel.id, disabled,
+                         "White Melamine should be selectable under "
+                         "Contractor (it IS in the allow list)")
+        self.assertIn(maple.id, disabled,
+                      "Maple should be disabled under Contractor "
+                      "(Maple is NOT in the Contractor allow list)")
+
+    def test_select_series_then_white_melamine_succeeds(self):
+        """The completion path the customer was blocked from: pick
+        Contractor, then pick White Melamine. The /select call must
+        return ok=True and both values must land in
+        selected_value_ids."""
+        sess = self._fresh_session()
+        series = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        box = self.env["product.attribute"].search(
+            [("name", "=", "Box Material")], limit=1)
+        if not (series and box):
+            self.skipTest("attributes not seeded")
+        contractor = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Contractor Series")], limit=1)
+        white_mel = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", box.id),
+             ("name", "=", "White Melamine")], limit=1)
+        if not (contractor and white_mel):
+            self.skipTest("values not seeded")
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_select(
+                session_id=sess.id,
+                value_ids=[contractor.id, white_mel.id])
+        self.assertTrue(r["ok"],
+                        f"select rejected the valid combo: {r}")
+        self.assertIn(contractor.id, r["selected_value_ids"])
+        self.assertIn(white_mel.id, r["selected_value_ids"])
+
+    # ==================================================================
     # Helpers
     # ==================================================================
     def _fresh_session(self):

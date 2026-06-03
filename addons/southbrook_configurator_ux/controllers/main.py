@@ -435,7 +435,71 @@ class SouthbrookConfiguratorAPI(http.Controller):
                 session.id, exc_info=True,
             )
             available_ids = list(all_val_ids)
-        disabled_ids = sorted(set(all_val_ids) - set(available_ids))
+        disabled_ids = set(all_val_ids) - set(available_ids)
+
+        # Filter out "premature" disables. OCA's values_available
+        # treats a value as unavailable whenever NO config.line domain
+        # matches the current picks — including the empty-picks case.
+        # At page-load with nothing chosen, every value with any rule
+        # whose domain depends on Series (or any other attribute) gets
+        # flagged disabled, because no Series has been picked yet to
+        # satisfy the "Series in [...]" condition. The customer sees
+        # ALL Box Material chips greyed and can't progress.
+        #
+        # The customer's mental model: a chip is disabled only if a
+        # value I already PICKED makes it impossible. If the trigger
+        # attribute hasn't been picked yet, the chip should still be
+        # selectable. So for every disabled value, walk its restricting
+        # rules: keep it disabled only if at least one rule has a
+        # trigger attribute the user HAS picked AND the user's pick
+        # doesn't satisfy that rule's allow list. Drop disability for
+        # rules whose trigger attributes are still unset.
+        picked_value_ids_by_attr = {
+            aid: vid for aid, vid in attr_val_dict.items()
+            if vid and vid != []
+        }
+        # Convert single-int picks to sets for the membership test
+        # below. Treat list picks (which the controller uses to clear
+        # an attribute via update_config) as "nothing picked".
+        picked_set_by_attr = {
+            aid: {vid if isinstance(vid, int) else None}
+            for aid, vid in picked_value_ids_by_attr.items()
+            if isinstance(vid, int)
+        }
+        refined_disabled = set()
+        for vid in disabled_ids:
+            # Find every config.line that mentions this value. These
+            # are the rules that can FORBID v under the wrong picks.
+            rules = tmpl.config_line_ids.filtered(
+                lambda r, _vid=vid: _vid in r.value_ids.ids)
+            for rule in rules:
+                # A rule has one or more domain.line records (attribute,
+                # condition, value_ids). For each:
+                rule_blocks = False
+                for dl in rule.domain_id.domain_line_ids:
+                    trigger_attr_id = dl.attribute_id.id
+                    if trigger_attr_id not in picked_set_by_attr:
+                        # User hasn't picked the trigger attribute yet
+                        # — this rule's domain isn't actively blocking.
+                        continue
+                    user_picks = picked_set_by_attr[trigger_attr_id]
+                    allowed = set(dl.value_ids.ids)
+                    if dl.condition == "in":
+                        # Rule says trigger ∈ allowed; if user's pick
+                        # isn't in allowed, the rule blocks.
+                        if not (user_picks & allowed):
+                            rule_blocks = True
+                            break
+                    else:  # condition == "not in"
+                        # Rule says trigger ∉ allowed; if user's pick
+                        # IS in allowed, the rule blocks.
+                        if user_picks & allowed:
+                            rule_blocks = True
+                            break
+                if rule_blocks:
+                    refined_disabled.add(vid)
+                    break
+        disabled_ids = sorted(refined_disabled)
 
         return {
             "ok": True,
