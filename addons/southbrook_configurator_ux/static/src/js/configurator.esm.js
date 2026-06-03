@@ -268,7 +268,7 @@ class ConfiguratorV2 extends Component {
                           <div t-att-class="chipClass(attrId, val)"
                                role="radio"
                                t-att-tabindex="isValueDisabled(attr, val) ? '-1' : '0'"
-                               t-att-aria-checked="state.picked[attrId] === val.id ? 'true' : 'false'"
+                               t-att-aria-checked="_effectivePicked(attrId) === val.id ? 'true' : 'false'"
                                t-on-click="() => this.onChipClick(attrId, val)"
                                t-on-keydown="(ev) => this.onChipKeydown(ev, attrId, val)"
                                t-esc="val.name"/>
@@ -484,18 +484,54 @@ class ConfiguratorV2 extends Component {
         return parts.length ? parts.join("  ·  ") : "nothing selected yet";
     }
 
+    // ------------------------------------------------------------------
+    // "Effective pick" — state.picked plus the implicit single-value
+    // defaults. An attribute_line that exposes ONE value (e.g. Family
+    // on a Base cabinet, Door Count on a single-door template) has no
+    // real choice to make — the customer would be clicking the only
+    // available chip just to advance the counter. The server-side
+    // /commit completeness backstop already treats single-value lines
+    // as implicit (it skips them from the missing-attributes check),
+    // so the client UI is brought into the same model. The chip itself
+    // still renders selectable + click registers a real pick; this is
+    // purely the display + completion math.
+    // ------------------------------------------------------------------
+    _isImplicitlyPicked(attrId) {
+        const attr = this.state.attributes[attrId];
+        return !!attr && attr.values && attr.values.length === 1;
+    }
+
+    _effectivePicked(attrId) {
+        if (this.state.picked[attrId] !== null
+            && this.state.picked[attrId] !== undefined) {
+            return this.state.picked[attrId];
+        }
+        if (this._isImplicitlyPicked(attrId)) {
+            return this.state.attributes[attrId].values[0].id;
+        }
+        return null;
+    }
+
+    _isAttributeSatisfied(attrId) {
+        return this._effectivePicked(attrId) !== null;
+    }
+
     get completionPct() {
-        const total = Object.keys(this.state.attributes).length;
+        const attrIds = Object.keys(this.state.attributes);
+        const total = attrIds.length;
         if (!total) return 0;
-        const done = Object.values(this.state.picked)
-            .filter((v) => v !== null).length;
+        const done = attrIds.filter(
+            (aid) => this._isAttributeSatisfied(aid)
+        ).length;
         return Math.round((done / total) * 100);
     }
 
     get completionText() {
-        const total = Object.keys(this.state.attributes).length;
-        const done = Object.values(this.state.picked)
-            .filter((v) => v !== null).length;
+        const attrIds = Object.keys(this.state.attributes);
+        const total = attrIds.length;
+        const done = attrIds.filter(
+            (aid) => this._isAttributeSatisfied(aid)
+        ).length;
         return done === total
             ? "All set — ready to add to quote"
             : `${done} of ${total} options chosen`;
@@ -508,9 +544,11 @@ class ConfiguratorV2 extends Component {
     }
 
     get validationText() {
-        const total = Object.keys(this.state.attributes).length;
-        const done = Object.values(this.state.picked)
-            .filter((v) => v !== null).length;
+        const attrIds = Object.keys(this.state.attributes);
+        const total = attrIds.length;
+        const done = attrIds.filter(
+            (aid) => this._isAttributeSatisfied(aid)
+        ).length;
         return this.completionPct === 100
             ? markup("✓ All options valid · ready")
             : markup(`${total - done} option(s) still needed`);
@@ -522,8 +560,8 @@ class ConfiguratorV2 extends Component {
 
     groupPickCount(group) {
         return group.attribute_ids
-            .filter((id) => this.state.picked[String(id)] !== null
-                         || this.state.picked[id] !== null)
+            .filter((id) => this._isAttributeSatisfied(String(id))
+                         || this._isAttributeSatisfied(id))
             .length;
     }
 
@@ -562,7 +600,14 @@ class ConfiguratorV2 extends Component {
     }
 
     chipClass(attrId, val) {
-        const sel = this.state.picked[attrId] === val.id;
+        // Treat a single-value attribute's chip as visually selected
+        // even if the customer hasn't explicitly clicked it (they have
+        // no real choice). Real clicks still mark state.picked through
+        // onChipClick.
+        const explicitlyPicked = this.state.picked[attrId] === val.id;
+        const implicitlyPicked = this._isImplicitlyPicked(attrId)
+                              && this.state.attributes[attrId].values[0].id === val.id;
+        const sel = explicitlyPicked || implicitlyPicked;
         const attr = this.state.attributes[attrId];
         const dis = this.isValueDisabled(attr, val);
         return "sb_cfg_chip"
@@ -743,8 +788,14 @@ class ConfiguratorV2 extends Component {
 
     async onAddToQuote() {
         if (this.state.adding) return;
+        // Match the server-side completeness check: skip
+        // attributes whose chip set has only one value (no real
+        // choice for the customer) when computing the "missing"
+        // list. The /commit endpoint will still backstop a true
+        // partial config with `incomplete_configuration`.
         const missing = Object.entries(this.state.picked)
-            .filter(([_, valId]) => valId === null)
+            .filter(([attrId, valId]) =>
+                valId === null && !this._isImplicitlyPicked(attrId))
             .map(([aid, _]) => this.state.attributes[aid].name);
         if (missing.length) {
             this._toast(`Please choose: ${missing.join(", ")}`);

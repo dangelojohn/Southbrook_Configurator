@@ -192,6 +192,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
     # ==================================================================
     def test_commit_creates_variant_line_and_redirect(self):
         sess = self._fresh_session()
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(session_id=sess.id)
         self.assertTrue(r["ok"], f"commit returned {r}")
@@ -214,6 +215,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
 
     def test_commit_locks_session_after_success(self):
         sess = self._fresh_session()
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             self.controller.configurator_commit(session_id=sess.id)
         sess.invalidate_recordset()
@@ -223,6 +225,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
 
     def test_commit_committed_session_returns_session_locked(self):
         sess = self._fresh_session()
+        self._complete_via_select(sess)
         # First commit
         with stubbed_request(self.env, user=self.user):
             self.controller.configurator_commit(session_id=sess.id)
@@ -238,6 +241,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
             "partner_id": self.partner.id,
         })
         sess = self._fresh_session()
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(session_id=sess.id)
         self.assertTrue(r["ok"])
@@ -252,6 +256,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
             ("state", "=", "draft"),
         ]).unlink()
         sess = self._fresh_session()
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(session_id=sess.id)
         self.assertTrue(r["ok"])
@@ -264,6 +269,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
             "partner_id": self.partner.id,
         })
         sess = self._fresh_session()
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(
                 session_id=sess.id, order_id=target.id)
@@ -277,6 +283,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
             "partner_id": other_partner.id,
         })
         sess = self._fresh_session()
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(
                 session_id=sess.id, order_id=their_order.id)
@@ -702,6 +709,94 @@ class TestConfiguratorSelectCommit(TransactionCase):
             f"/my/southbrook/order-builder/{r['order_id']}")
 
     # ==================================================================
+    # P5 — single-value attribute auto-pick (Door Count etc.)
+    # ==================================================================
+    def test_door_count_serializes_with_real_value_id(self):
+        """Verify the /state response carries a real backend
+        product.attribute.value.id for every Door Count value on the
+        test template. The user observed a chip 'rendering without
+        an underlying value id'; this test ensures the wire payload
+        actually carries the id."""
+        # Use /state — same path the OWL component hits at mount.
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_state(
+                product_tmpl_id=self.tmpl.id)
+        self.assertTrue(r["ok"])
+        # Find Door Count by name across the attributes map.
+        door_count = None
+        for aid, attr in r["attributes"].items():
+            if attr["name"] == "Door Count":
+                door_count = attr
+                break
+        if door_count is None:
+            self.skipTest("Door Count attribute not present on this DB")
+        self.assertTrue(len(door_count["values"]) >= 1,
+                        "Door Count must expose at least one value")
+        for val in door_count["values"]:
+            # Each value must carry a real integer id matching an
+            # existing product.attribute.value row.
+            self.assertIsInstance(val["id"], int)
+            self.assertTrue(val["id"] > 0)
+            db_val = self.env["product.attribute.value"].browse(val["id"])
+            self.assertTrue(
+                db_val.exists(),
+                f"Door Count value id={val['id']} doesn't resolve to a "
+                f"product.attribute.value record")
+
+    def test_state_response_carries_value_count_per_attribute(self):
+        """The OWL component treats a single-value attribute_line as
+        implicitly satisfied for the completion counter (the customer
+        has no real choice to make). For that to work the /state
+        response must carry a stable `values` array per attribute so
+        the client can detect `values.length === 1`. Verify the
+        response shape supports this — every attribute has a non-
+        empty values list."""
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_state(
+                product_tmpl_id=self.tmpl.id)
+        self.assertTrue(r["ok"])
+        for aid, attr in r["attributes"].items():
+            self.assertIn("values", attr,
+                          f"attribute id={aid} missing 'values' key")
+            self.assertIsInstance(attr["values"], list)
+            self.assertGreater(
+                len(attr["values"]), 0,
+                f"attribute '{attr['name']}' (id={aid}) has no values "
+                f"— client cannot render any chip OR detect implicit "
+                f"single-value satisfaction")
+
+    def test_commit_succeeds_without_explicit_single_value_pick(self):
+        """The /commit completeness backstop must SKIP single-value
+        attribute_lines from the missing-attributes check — the
+        customer has no real choice to make for Family on a Base
+        cabinet, Door Count on a single-door cabinet etc. This is the
+        server-side contract that makes the client's 'effective pick'
+        treatment safe."""
+        sess = self._fresh_session()
+        # Build a pick set that covers ALL multi-value attributes but
+        # OMITS every single-value attribute. Commit should still pass
+        # the completeness backstop.
+        ids = []
+        omitted = []
+        for line in self.tmpl.attribute_line_ids:
+            if not line.value_ids:
+                continue
+            if len(line.value_ids) <= 1:
+                omitted.append(line.attribute_id.name)
+                continue
+            ids.append(line.value_ids.sorted("sequence")[0].id)
+        with stubbed_request(self.env, user=self.user):
+            self.controller.configurator_select(
+                session_id=sess.id, value_ids=ids)
+        with stubbed_request(self.env, user=self.user):
+            r = self.controller.configurator_commit(session_id=sess.id)
+        self.assertTrue(
+            r["ok"],
+            f"commit rejected when only multi-value attributes were "
+            f"picked (single-value attributes omitted: {omitted}). "
+            f"Response: {r}")
+
+    # ==================================================================
     # Helpers
     # ==================================================================
     def _fresh_session(self):
@@ -710,3 +805,13 @@ class TestConfiguratorSelectCommit(TransactionCase):
             "product_tmpl_id": self.tmpl.id,
             "user_id": self.user.id,
         })
+
+    def _complete_via_select(self, sess):
+        """Pick a complete value set on the session via /select, so a
+        following /commit call passes the P4 completeness backstop.
+        Returns the /select response. Picks the first compatible value
+        of each attribute_line."""
+        value_ids = self._complete_pick_set()
+        with stubbed_request(self.env, user=self.user):
+            return self.controller.configurator_select(
+                session_id=sess.id, value_ids=value_ids)
