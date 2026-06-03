@@ -89,7 +89,7 @@
                renders inside this div. -->
           <div id="sb_cfg_v2_main_mount"
                data-internal-user="0"
-               t-att-data-internal-user="0 if user_id.share else 1">
+               t-att-data-internal-user="'0' if request.env.user.share else '1'">
             <!-- No-JS fallback: shows the title + a prompt so the
                  page is never blank. Replaced once OWL mounts. -->
             <div class="sb_cfg_titlebar">
