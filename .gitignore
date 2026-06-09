@@ -6,6 +6,13 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
+# --- Curl/wget mishaps (HTML response saved as filename) ---
+# Filenames containing < or > are virtually always shell-pipe accidents
+# (e.g. `curl ... > something` where `something` got eaten by the shell
+# and the response body landed as a literal pathname). Block them all.
+*<*
+*>*
+
 # --- Editor & OS noise ---
 .DS_Store
 *.swp
@@ -20,6 +27,9 @@ __pycache__/
 .odoorc
 odoo.conf
 *.log
+
+# --- Local secrets ---
+.env
 
 # --- docs/ exclusions ---
 # Archive of superseded canonical docs — kept on disk for diff-reconstruction

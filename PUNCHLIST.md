@@ -5,6 +5,91 @@
 
 ---
 
+## 2026-06-09 · v1.2 platform-expansion status (read first)
+
+The original punchlist below scopes the **Estimating Application surface**
+(`addons/southbrook_estimating/` + `southbrook_estimating_website/`). On
+2026-06-09 the platform expanded to the full SAMI / Southbrook AI
+Kitchen Platform per `~/Downloads/CLAUDE_CODE_PROJECT_INIT.md`
+(public-redacted at `github.com/dangelojohn/PLM-v19/docs/CLAUDE_CODE_PROJECT_INIT.md`).
+See `CLAUDE.md` §11 for the wider scope.
+
+### Init-doc gates (the new master gate table)
+
+| Gate | Status |
+|---|---|
+| G1 BoM-contents parity | ✅ GREEN |
+| G2 Panel-formula sign-off (Peter Tuschak) | ✅ CLOSED 2026-06-09 |
+| G2a Owner-confirm Module 2 deploy | ⏸ **ONLY open gate** |
+| G3 Gemini ↔ Odoo contract | ✅ CLOSED |
+| G4 Config-engine spec | ✅ CLOSED |
+| G5 FreeCAD 1.0 headless | ✅ GREEN |
+| G6 Flutter ↔ Odoo contract | ✅ CLOSED |
+
+### v1.2 modules now live on QNAP
+
+`southbrookcabinetry.space` runs (as of 2026-06-09):
+`southbrook_freecad_bridge`, `southbrook_hardware_catalog`,
+`southbrook_kitchen_mrp`, `southbrook_kitchen_workspace`,
+`southbrook_ai_design`, `southbrook_config_engine`,
+`southbrook_customer_portal`, `southbrook_dealer_portal`,
+`southbrook_api`. Plus pre-existing `southbrook_estimating` +
+`southbrook_plm` + the 3 pre-Module-0 customs.
+
+### What this section explicitly does NOT supersede
+
+Every item below dated 2026-05-29 / 05-30 / 05-31 remains the
+authoritative record for the **Estimating Application surface**.
+The Phase-1 prerequisite gate (artifacts #7 and #8 outstanding
+from John) still applies to the estimating brief — it does NOT
+gate the v1.2 platform-expansion work, which has its own canonical
+brief at `~/Downloads/CLAUDE_CODE_PROJECT_INIT.md`.
+
+### v1.2-scope outstanding (read this for "what's left on the wider build")
+
+Six categories with status as of 2026-06-09:
+
+**Owner-gated** (waiting on John's say-so):
+- G2a — Module 2 deployment surface (server action on `mrp.production`
+  confirm + Regenerate CAD button + kanban CAD-status badges).
+  Scaffolded but dormant.
+- Bridge → Odoo `/plm/cad_callback` POST. Wiring exists; activating
+  means setting `ODOO_API_KEY` on the bridge. Tied to G2a.
+
+**Not yet deployed to QNAP**:
+- FreeCAD bridge container. The Odoo-side controllers are live, but
+  there is no bridge service to call. Image is ~2.6 GB.
+- Real Gemini API key. `gemini.use_mock=True` is the live default.
+
+**Content-gated** (need external data):
+- 6 real `.FCStd` parametric template masters. We render procedurally.
+- Real 179-row Marathon Hardware workbook. 15-SKU representative seed
+  is the placeholder.
+
+**Code I haven't written**:
+- TechDraw elevation drawings (`reportlab` installation PDF is the
+  live substitute).
+- Playwright / Cypress E2E browser tests.
+- Flutter UI past login + project-list screens (the api_client is done).
+
+**Operational**:
+- Forgejo runner provisioning (recipe in `.forgejo/README.md`).
+  CI workflow + Makefile already in place; need a runner online.
+- 3 AM backup verification — picks up new tables automatically per
+  the [[qnap_backup_strategy]] memory; confirm on next run.
+
+**Memory + docs**:
+- This punchlist refresh ✅ (you are reading it).
+- In-repo `CLAUDE.md` v1.2 ✅ (added §11).
+- Memory file `[[sami_southbrook_full_platform_build]]` ✅ written
+  2026-06-09 with file layout + test scoreboard + critical patterns
+  + deploy recipe.
+- Branch landing: `feature/module-0-skeleton` is N commits ahead of
+  `main`. No merge has happened — QNAP deploy went directly from the
+  feature branch via rsync.
+
+---
+
 ## 2026-05-29 · Phase-1 prerequisites (blocking scaffold)
 
 The brief's §1 lists 8 canonical input artifacts. As of workspace bootstrap, only

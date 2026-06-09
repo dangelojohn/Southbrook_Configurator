@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_southbrook_config_engine_root"
+              name="Config Engine"
+              parent="southbrook_kitchen_workspace.menu_southbrook_kitchen_workspace_root"
+              sequence="70"/>
+
+    <menuitem id="menu_sb_placement_rule"
+              name="Placement Rules"
+              parent="menu_southbrook_config_engine_root"
+              action="action_sb_placement_rule"
+              sequence="10"/>
+</odoo>

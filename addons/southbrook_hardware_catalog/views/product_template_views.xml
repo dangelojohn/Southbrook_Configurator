@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Hardware-catalog fields on the product variant form. Tab visible
+        only when x_hardware_category is set (so non-hardware products
+        don't see it).
+    -->
+    <record id="view_product_product_form_hardware" model="ir.ui.view">
+        <field name="name">product.product.form.hardware</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Hardware Catalog" name="hardware_catalog">
+                    <group>
+                        <field name="x_hardware_category"/>
+                        <field name="x_hardware_brand_id"/>
+                        <field name="x_marathon_sku"/>
+                        <field name="x_pricing_pending"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

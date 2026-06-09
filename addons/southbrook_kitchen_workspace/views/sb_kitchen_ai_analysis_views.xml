@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_kitchen_ai_analysis_form" model="ir.ui.view">
+        <field name="name">sb.kitchen.ai.analysis.form</field>
+        <field name="model">sb.kitchen.ai.analysis</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_confirm" string="Confirm"
+                            type="object" class="oe_highlight"
+                            invisible="confirmed_by_human"/>
+                    <button name="action_unconfirm" string="Un-Confirm"
+                            type="object"
+                            invisible="not confirmed_by_human"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="project_id"/>
+                            <field name="date_analyzed"/>
+                            <field name="confirmed_by_human" widget="boolean_toggle"/>
+                            <field name="confirmed_by_user_id"/>
+                            <field name="confirmed_at"/>
+                        </group>
+                        <group>
+                            <field name="sink_detected"/>
+                            <field name="window_count"/>
+                            <field name="room_door_count"/>
+                            <field name="floor_area_m2_approx"/>
+                            <field name="ceiling_height_mm_approx"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Raw Gemini Response">
+                            <field name="raw_response_json"/>
+                        </page>
+                        <page string="Detected Appliances">
+                            <field name="detected_appliances_json"/>
+                        </page>
+                        <page string="Detected Dimensions">
+                            <field name="detected_dimensions_json"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sb_placement_rule_user,access.sb.placement.rule.user,model_sb_placement_rule,base.group_user,1,0,0,0
+access_sb_placement_rule_manager,access.sb.placement.rule.manager,model_sb_placement_rule,sales_team.group_sale_manager,1,1,1,1

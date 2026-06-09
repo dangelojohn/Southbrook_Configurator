@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============ Side-bar entry on the My Account page ============ -->
+    <template id="portal_my_home_kitchen_projects"
+              name="Portal Home — Kitchen Projects"
+              inherit_id="portal.portal_my_home" priority="40">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Kitchen Projects</t>
+                <t t-set="url" t-value="'/my/kitchen-projects'"/>
+                <t t-set="placeholder_count" t-value="'kitchen_project_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- ============ List page ============ -->
+    <template id="portal_kitchen_projects_list" name="Portal — Kitchen Projects List">
+        <t t-call="portal.portal_layout">
+            <h2>My Kitchen Projects</h2>
+            <t t-if="not projects">
+                <p>You do not have any kitchen projects yet.</p>
+            </t>
+            <t t-if="projects">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Theme</th>
+                            <th>State</th>
+                            <th>Target</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="projects" t-as="p">
+                            <td>
+                                <span t-field="p.code"/> — <span t-field="p.name"/>
+                            </td>
+                            <td><span t-field="p.theme"/></td>
+                            <td><span t-field="p.state"/></td>
+                            <td><span t-field="p.date_target"/></td>
+                            <td>
+                                <a t-attf-href="/my/kitchen-project/#{p.id}" class="btn btn-sm btn-primary">
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+        </t>
+    </template>
+
+    <!-- ============ Detail / review page ============ -->
+    <template id="portal_kitchen_project_detail" name="Portal — Kitchen Project Detail">
+        <t t-call="portal.portal_layout">
+            <h2>
+                <span t-field="project.code"/> — <span t-field="project.name"/>
+            </h2>
+            <p>
+                <strong>State:</strong> <span t-field="project.state"/>
+                <br/>
+                <strong>Theme:</strong> <span t-field="project.theme"/>
+                <br/>
+                <strong>Target:</strong> <span t-field="project.date_target"/>
+            </p>
+
+            <h3>3D Preview</h3>
+            <t t-set="selected" t-value="project.selected_design_option_id"/>
+            <t t-set="preview_option" t-value="selected if selected else options[:1]"/>
+            <div t-if="preview_option" class="o_kitchen_canvas mb-3"
+                 t-att-data-placement="preview_option.placement_data_json or ''"
+                 style="width:100%; min-height:420px; background:#f5f1e8;">
+                <noscript>
+                    <p class="text-muted">JavaScript is required for the 3D preview.</p>
+                </noscript>
+            </div>
+            <p t-if="not preview_option" class="text-muted">
+                The 3D preview will appear once a concept has been published for you.
+            </p>
+
+            <h3>Design Options</h3>
+            <t t-if="not options">
+                <p>No design options published yet.</p>
+            </t>
+            <t t-if="options">
+                <div class="row">
+                    <t t-foreach="options" t-as="opt">
+                        <div class="col-md-4 mb-3">
+                            <div t-attf-class="card #{opt.is_selected and 'border-success' or ''}">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <span t-field="opt.name"/>
+                                        <span t-if="opt.is_selected" class="badge bg-success">Selected</span>
+                                    </h5>
+                                    <p class="card-text"><span t-field="opt.description"/></p>
+                                    <p class="card-text">
+                                        <strong>Estimated:</strong>
+                                        <span t-field="opt.estimated_price"/>
+                                    </p>
+                                    <p class="card-text">
+                                        <small>
+                                            Lead time:
+                                            <span t-field="opt.estimated_lead_time_days"/> days
+                                        </small>
+                                    </p>
+                                    <form t-if="project.state in ('designing','awaiting_customer') and not opt.is_selected"
+                                          t-attf-action="/my/kitchen-project/#{project.id}/select/#{opt.id}"
+                                          method="post">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-outline-primary">
+                                            Select this option
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </t>
+
+            <t t-if="project.state == 'awaiting_customer'">
+                <hr/>
+                <h3>Final Approval</h3>
+                <p t-if="not project.selected_design_option_id">
+                    Pick a design option above first.
+                </p>
+                <form t-if="project.selected_design_option_id"
+                      t-attf-action="/my/kitchen-project/#{project.id}/approve"
+                      method="post">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+                    <button type="submit" class="btn btn-success btn-lg">
+                        I approve "<span t-field="project.selected_design_option_id.name"/>"
+                    </button>
+                </form>
+            </t>
+
+            <t t-if="project.state in ('approved','in_production','done')">
+                <hr/>
+                <h3>Approved</h3>
+                <p>
+                    Approved option:
+                    <strong t-field="project.selected_design_option_id.name"/>
+                </p>
+                <t t-if="project.sale_order_id">
+                    <p>
+                        <a t-attf-href="/report/pdf/southbrook_estimating.report_signature_spec_sheet_doc/#{project.sale_order_id.id}"
+                           class="btn btn-outline-primary" target="_blank">
+                            Download Spec Sheet (PDF)
+                        </a>
+                    </p>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

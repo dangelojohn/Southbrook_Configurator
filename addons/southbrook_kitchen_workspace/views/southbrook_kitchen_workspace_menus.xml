@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_southbrook_kitchen_workspace_root"
+              name="Kitchen Workspace"
+              parent="sale.sale_menu_root"
+              sequence="60"/>
+
+    <menuitem id="menu_sb_kitchen_project"
+              name="Projects"
+              parent="menu_southbrook_kitchen_workspace_root"
+              action="action_sb_kitchen_project"
+              sequence="10"/>
+</odoo>

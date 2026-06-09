@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Seed rules from docs/config_engine_spec.md §6 (clearances) and §4
+        (theme width preferences). Engineering / management can revise
+        these via the back-office without a code change.
+    -->
+
+    <!-- ============ Clearance defaults per appliance kind ============ -->
+    <record id="clearance_stove" model="sb.placement.rule">
+        <field name="name">Stove clearance: 30mm each side</field>
+        <field name="kind">clearance</field>
+        <field name="appliance_kind">stove</field>
+        <field name="constraint_json">{"left_mm": 30, "right_mm": 30}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="clearance_fridge" model="sb.placement.rule">
+        <field name="name">Fridge clearance: 25mm each side (counter-depth)</field>
+        <field name="kind">clearance</field>
+        <field name="appliance_kind">fridge</field>
+        <field name="constraint_json">{"left_mm": 25, "right_mm": 25}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="clearance_dishwasher" model="sb.placement.rule">
+        <field name="name">Dishwasher: cabinet-flank (0mm)</field>
+        <field name="kind">clearance</field>
+        <field name="appliance_kind">dishwasher</field>
+        <field name="constraint_json">{"left_mm": 0, "right_mm": 0}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="clearance_sink" model="sb.placement.rule">
+        <field name="name">Sink: cabinet-flank (0mm)</field>
+        <field name="kind">clearance</field>
+        <field name="appliance_kind">sink</field>
+        <field name="constraint_json">{"left_mm": 0, "right_mm": 0}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <!-- ============ Theme width preferences ============ -->
+    <record id="width_pref_signature" model="sb.placement.rule">
+        <field name="name">Signature prefers larger 2-door bases</field>
+        <field name="kind">width_pref</field>
+        <field name="theme">signature</field>
+        <field name="constraint_json">{"preferred_widths_mm": [900, 800, 600, 450, 300, 225]}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="width_pref_elegance" model="sb.placement.rule">
+        <field name="name">Elegance prefers premium 800/900</field>
+        <field name="kind">width_pref</field>
+        <field name="theme">elegance</field>
+        <field name="constraint_json">{"preferred_widths_mm": [900, 800, 750, 600, 450, 300]}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="width_pref_contemporary" model="sb.placement.rule">
+        <field name="name">Contemporary prefers consistent 750 modules</field>
+        <field name="kind">width_pref</field>
+        <field name="theme">contemporary</field>
+        <field name="constraint_json">{"preferred_widths_mm": [750, 600, 900, 450, 300, 225]}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="width_pref_contractor" model="sb.placement.rule">
+        <field name="name">Contractor: 600mm 1-door simplicity</field>
+        <field name="kind">width_pref</field>
+        <field name="theme">contractor</field>
+        <field name="constraint_json">{"preferred_widths_mm": [600, 450, 300, 800, 900, 225]}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <!-- ============ Corner preferences ============ -->
+    <record id="corner_pref_signature" model="sb.placement.rule">
+        <field name="name">Signature: lazy susan first, diagonal second</field>
+        <field name="kind">corner_pref</field>
+        <field name="theme">signature</field>
+        <field name="constraint_json">{"first_choice": "lazy_susan", "fallback": "diagonal"}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="corner_pref_elegance" model="sb.placement.rule">
+        <field name="name">Elegance: diagonal first, lazy susan second</field>
+        <field name="kind">corner_pref</field>
+        <field name="theme">elegance</field>
+        <field name="constraint_json">{"first_choice": "diagonal", "fallback": "lazy_susan"}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="corner_pref_contemporary" model="sb.placement.rule">
+        <field name="name">Contemporary: blind corner first</field>
+        <field name="kind">corner_pref</field>
+        <field name="theme">contemporary</field>
+        <field name="constraint_json">{"first_choice": "blind", "fallback": "lazy_susan"}</field>
+        <field name="priority">100</field>
+    </record>
+
+    <record id="corner_pref_contractor" model="sb.placement.rule">
+        <field name="name">Contractor: blind corner only</field>
+        <field name="kind">corner_pref</field>
+        <field name="theme">contractor</field>
+        <field name="constraint_json">{"first_choice": "blind", "fallback": "blind"}</field>
+        <field name="priority">100</field>
+    </record>
+</odoo>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Two mail templates fired from sb.kitchen.project lifecycle hooks.
+        Edit the bodies via Settings > Technical > Email Templates — they
+        stay in this seed file as the documented defaults.
+    -->
+
+    <!-- ============ Concepts ready (customer-facing) ============ -->
+    <record id="email_template_concepts_ready" model="mail.template">
+        <field name="name">Southbrook: Concepts Ready</field>
+        <field name="model_id" ref="model_sb_kitchen_project"/>
+        <field name="subject">Your kitchen concepts are ready to review</field>
+        <field name="email_from">{{ user.email_formatted }}</field>
+        <field name="partner_to">{{ object.partner_id.id }}</field>
+        <field name="lang">{{ object.partner_id.lang }}</field>
+        <field name="auto_delete" eval="False"/>
+        <field name="body_html" type="html">
+<div style="font-family:Roboto,Helvetica,Arial,sans-serif; color:#1c2d49; max-width:600px;">
+    <h2 style="color:#1c2d49;">Your kitchen concepts are ready</h2>
+    <p>Hello <t t-out="object.partner_id.name"/>,</p>
+    <p>
+        We've finished the first round of concepts for
+        <strong t-out="object.name"/> (<t t-out="object.code"/>).
+        Three options are waiting for you to compare and pick a favourite.
+    </p>
+    <p style="margin: 24px 0;">
+        <a t-attf-href="/my/kitchen-project/{{ object.id }}"
+           style="background:#1c2d49; color:white; padding:12px 20px;
+                  text-decoration:none; border-radius:4px; font-weight:600;">
+            Review your concepts
+        </a>
+    </p>
+    <p style="color:#666; font-size: 13px;">
+        Theme: <t t-out="object.theme or 'Signature'"/><br/>
+        Target completion: <t t-out="object.date_target or 'TBD'"/>
+    </p>
+    <p>Reply to this email if you have questions before you decide.</p>
+    <p>— The Southbrook design team</p>
+</div>
+        </field>
+    </record>
+
+    <!-- ============ Design approved (designer-facing) ============ -->
+    <record id="email_template_design_approved" model="mail.template">
+        <field name="name">Southbrook: Design Approved</field>
+        <field name="model_id" ref="model_sb_kitchen_project"/>
+        <field name="subject">{{ object.partner_id.name }} approved {{ object.code }}</field>
+        <field name="email_from">{{ user.email_formatted }}</field>
+        <field name="email_to">{{ object.salesperson_id.email or user.email }}</field>
+        <field name="lang">{{ user.lang }}</field>
+        <field name="auto_delete" eval="False"/>
+        <field name="body_html" type="html">
+<div style="font-family:Roboto,Helvetica,Arial,sans-serif; color:#1c2d49; max-width:600px;">
+    <h2 style="color:#1c2d49;">Customer approval recorded</h2>
+    <p>
+        <strong t-out="object.partner_id.name"/> approved a concept on
+        <strong t-out="object.code"/> — <t t-out="object.name"/>.
+    </p>
+    <p>
+        Selected option:
+        <strong t-out="object.selected_design_option_id.name or '(none)'"/>
+    </p>
+    <p style="margin: 24px 0;">
+        <a t-attf-href="/odoo/action-base.action_open_view_form_view/{{ object.id }}"
+           style="background:#1c2d49; color:white; padding:12px 20px;
+                  text-decoration:none; border-radius:4px; font-weight:600;">
+            Open project
+        </a>
+    </p>
+    <p style="color:#666; font-size: 13px;">
+        Next step: release to production when you've reviewed the engineering
+        package.
+    </p>
+</div>
+        </field>
+    </record>
+</odoo>

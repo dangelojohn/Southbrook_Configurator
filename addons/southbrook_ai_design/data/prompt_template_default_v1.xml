@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="prompt_default_v1" model="sb.gemini.prompt.template">
+        <field name="code">default_v1</field>
+        <field name="version_note">Initial prompt per docs/ai_prompt_spec.md §1</field>
+        <field name="active">True</field>
+        <field name="model">gemini-2.5-pro</field>
+        <field name="temperature">0.1</field>
+        <field name="top_k">16</field>
+        <field name="top_p">0.7</field>
+        <field name="max_output_tokens">4096</field>
+        <field name="body">You are analyzing a photograph of a kitchen room (or an empty room intended for a kitchen). Your job is to produce a structured room analysis — NOT a kitchen design.
+
+Return JSON exactly matching the schema "southbrook.gemini.room_analysis.v1".
+
+Rules you MUST follow:
+
+1. NEVER recommend cabinets. The cabinet placement happens downstream.
+2. Mark sink_detected: true ONLY when you can SEE a sink fixture (basin + tap). If you see a stovetop, fridge, or empty corner where a sink could go, leave it false.
+3. All numeric dimensions are approximate — provide your best guess but ASSUME a human will re-measure. Do not over-claim precision.
+4. Wall segments: identify the room outline as a sequence of straight walls. Use ids "wall_north", "wall_east", etc. (cardinal directions chosen so the longest wall is north).
+5. Appliances: list ONLY appliances you can see. Do not invent. A stove must be on a wall_segment_id (or null if free-standing in the middle of the room — island).
+6. position_pct_along_wall is 0.0 at the leftmost end of the wall as the viewer faces it, 1.0 at the rightmost.
+7. For ANY dimension you are &lt;50% confident about, return the dimension AND set the corresponding dimensions_confidence entry to your true confidence (do not inflate to keep the field populated).
+8. If a person, prop, or shadow makes a measurement impossible, return null for that dimension and add a string to model_warnings naming the issue.
+
+Plausibility bounds (out-of-range dimensions will be rejected):
+  wall length:     300 mm  ≤  L  ≤  15 000 mm
+  appliance:       100 mm  ≤  D  ≤   2 000 mm
+  ceiling height: 1 500 mm  ≤  H  ≤   4 500 mm
+
+If the image is not a kitchen photo, return an empty room object and an empty appliances list, with model_warnings = ["image_not_a_kitchen"].
+
+DO NOT include any prose outside the JSON. DO NOT wrap the JSON in backticks. The entire response body must be parseable as JSON.</field>
+    </record>
+</odoo>

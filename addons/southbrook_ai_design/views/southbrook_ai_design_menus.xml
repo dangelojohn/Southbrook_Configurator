@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_southbrook_ai_design_root"
+              name="AI Design"
+              parent="southbrook_kitchen_workspace.menu_southbrook_kitchen_workspace_root"
+              sequence="50"/>
+
+    <menuitem id="menu_sb_gemini_prompt_template"
+              name="Prompt Templates"
+              parent="menu_southbrook_ai_design_root"
+              action="action_sb_gemini_prompt_template"
+              sequence="10"/>
+</odoo>

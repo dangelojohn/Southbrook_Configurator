@@ -1,0 +1,24 @@
+name: southbrook_kitchen
+description: Southbrook Cabinetry customer mobile app — upload a kitchen photo, review A/B/C concepts, approve a design, download the quote.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  flutter_secure_storage: ^9.2.0
+  image_picker: ^1.1.0
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

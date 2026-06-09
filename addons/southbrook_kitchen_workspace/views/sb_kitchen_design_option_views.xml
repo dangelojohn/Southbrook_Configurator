@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_kitchen_design_option_list" model="ir.ui.view">
+        <field name="name">sb.kitchen.design.option.list</field>
+        <field name="model">sb.kitchen.design.option</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="project_id"/>
+                <field name="name"/>
+                <field name="estimated_price"/>
+                <field name="estimated_lead_time_days"/>
+                <field name="is_selected" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+</odoo>

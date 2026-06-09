@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_southbrook_kitchen_mrp_root"
+              name="Kitchen MRP"
+              parent="mrp.menu_mrp_root"
+              sequence="60"/>
+
+    <menuitem id="menu_sb_production_package"
+              name="Production Packages"
+              parent="menu_southbrook_kitchen_mrp_root"
+              action="action_sb_production_package"
+              sequence="10"/>
+
+    <menuitem id="menu_sb_cutlist"
+              name="Cut Lists"
+              parent="menu_southbrook_kitchen_mrp_root"
+              action="action_sb_cutlist"
+              sequence="20"/>
+
+    <menuitem id="menu_sb_hardware_package"
+              name="Hardware Packages"
+              parent="menu_southbrook_kitchen_mrp_root"
+              action="action_sb_hardware_package"
+              sequence="30"/>
+</odoo>
