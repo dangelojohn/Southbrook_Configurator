@@ -136,7 +136,7 @@ _AUDIT_STEPS = (
       "Door Count", "Family Subtype")),
     ("step_door_finish", 20,
      ("Door Style", "Door Overlay", "Wood Species", "Finish",
-      "Edge Profile", "Glass Insert", "Crown Molding")),
+      "Door Edge Profile", "Glass Insert", "Crown Molding")),
     ("step_hardware", 30,
      ("Hinge Side", "Handle", "Pull Finish", "Finished Sides", "Gables")),
     ("step_interior", 40,
