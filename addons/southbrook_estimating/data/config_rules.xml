@@ -774,6 +774,200 @@
   <!-- records once the new attribute_lines exist on each cabinet     -->
   <!-- template (Phase 2).                                            -->
 
-  <!-- END CONFIGURATOR AUDIT v1 ====================================== -->
+  <!-- END CONFIGURATOR AUDIT v1 (domains) =========================== -->
+
+  <!-- ================================================================== -->
+  <!-- CONFIGURATOR AUDIT v1 — gating rules (Phase 2B)                   -->
+  <!--                                                                    -->
+  <!-- Binds A1, A3, A4 from the audit doc to per-cabinet config.line     -->
+  <!-- records. A2 (beaded inset premium-only) and A5-A8 are deferred —  -->
+  <!-- they're either non-overlay scoping or family-conditional and       -->
+  <!-- need a wider rule rewrite that pulls in family as a co-domain.    -->
+  <!-- ================================================================== -->
+
+  <record id="ruleA1_wall_1dr_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_1dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40000</field>
+  </record>
+  <record id="ruleA1_wall_2dr_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_2dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40010</field>
+  </record>
+  <record id="ruleA1_base_1dr_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40020</field>
+  </record>
+  <record id="ruleA1_base_2dr_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40030</field>
+  </record>
+  <record id="ruleA1_drawer_bank_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40040</field>
+  </record>
+  <record id="ruleA1_sink_base_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40050</field>
+  </record>
+  <record id="ruleA1_tall_pantry_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40060</field>
+  </record>
+  <record id="ruleA1_tall_oven_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_id" ref="attr_line_tall_oven_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40070</field>
+  </record>
+  <record id="ruleA1_corner_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40080</field>
+  </record>
+  <record id="ruleA1_vanity_overlay_when_frameless" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial')])]"/>
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="sequence">40090</field>
+  </record>
+  <record id="ruleA3_wall_1dr_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_1dr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41000</field>
+  </record>
+  <record id="ruleA3_wall_2dr_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_2dr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41010</field>
+  </record>
+  <record id="ruleA3_base_1dr_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41020</field>
+  </record>
+  <record id="ruleA3_base_2dr_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41030</field>
+  </record>
+  <record id="ruleA3_drawer_bank_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41040</field>
+  </record>
+  <record id="ruleA3_sink_base_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41050</field>
+  </record>
+  <record id="ruleA3_tall_pantry_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41060</field>
+  </record>
+  <record id="ruleA3_tall_oven_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_id" ref="attr_line_tall_oven_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41070</field>
+  </record>
+  <record id="ruleA3_corner_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41080</field>
+  </record>
+  <record id="ruleA3_vanity_frame_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">41090</field>
+  </record>
+  <record id="ruleA4_base_1dr_drawer_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_drawer_plywood_5_8'), ref('value_drawer_particleboard'), ref('value_drawer_metal_blum')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">42000</field>
+  </record>
+  <record id="ruleA4_base_2dr_drawer_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_drawer_plywood_5_8'), ref('value_drawer_particleboard'), ref('value_drawer_metal_blum')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">42010</field>
+  </record>
+  <record id="ruleA4_drawer_bank_drawer_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_drawer_plywood_5_8'), ref('value_drawer_particleboard'), ref('value_drawer_metal_blum')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">42020</field>
+  </record>
+  <record id="ruleA4_tall_pantry_drawer_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_drawer_plywood_5_8'), ref('value_drawer_particleboard'), ref('value_drawer_metal_blum')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">42030</field>
+  </record>
+  <record id="ruleA4_corner_drawer_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_drawer_plywood_5_8'), ref('value_drawer_particleboard'), ref('value_drawer_metal_blum')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">42040</field>
+  </record>
+  <record id="ruleA4_vanity_drawer_when_contractor" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_drawer_plywood_5_8'), ref('value_drawer_particleboard'), ref('value_drawer_metal_blum')])]"/>
+    <field name="domain_id" ref="domain_series_is_contractor"/>
+    <field name="sequence">42050</field>
+  </record>
+
+  <!-- END Phase 2B gating rules — A1=10, A3=10, A4=6 (26 total) ============= -->
 
 </odoo>
