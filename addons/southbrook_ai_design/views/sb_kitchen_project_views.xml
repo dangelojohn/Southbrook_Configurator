@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Module-6 view extension is intentionally minimal — the workspace
+        owns the project form. analyze_photo() is exposed via Python and
+        will get an OWL action button when the workspace UI lands
+        (Phase 2 frontend).
+    -->
+</odoo>
