@@ -292,4 +292,50 @@
     <field name="sequence">40</field>
   </record>
 
+  <!-- ============================================================== -->
+  <!-- SB-ACCESSORY + SB-WORKTOP — both Q8 templates carry an audit  -->
+  <!-- subset (no door styling, no interior storage). Group what they -->
+  <!-- DO have so the wizard renders the same four-step shape even on -->
+  <!-- the accessory/worktop SKUs. Phase 2L test catches the gap if   -->
+  <!-- a future contributor adds an attribute_line to either without  -->
+  <!-- updating this block.                                            -->
+  <!-- ============================================================== -->
+  <record id="step_line_accessory_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="accessory"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_accessory_family'), ref('attr_line_accessory_series'), ref('attr_line_accessory_box_material'), ref('attr_line_accessory_accessory_type')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_accessory_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="accessory"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_accessory_finish')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_accessory_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="accessory"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_accessory_finished_sides')])]"/>
+    <field name="sequence">30</field>
+  </record>
+
+  <record id="step_line_worktop_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="worktop"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_worktop_family'), ref('attr_line_worktop_series'), ref('attr_line_worktop_box_material')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_worktop_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="worktop"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_worktop_finish')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_worktop_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="worktop"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_worktop_finished_sides')])]"/>
+    <field name="sequence">30</field>
+  </record>
+
 </odoo>

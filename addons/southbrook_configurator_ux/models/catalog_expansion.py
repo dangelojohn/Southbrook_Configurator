@@ -133,7 +133,7 @@ _ATTRS_TALL = (
 _AUDIT_STEPS = (
     ("step_construction", 10,
      ("Family", "Width", "Series", "Box Material", "Frame Style",
-      "Door Count", "Family Subtype")),
+      "Door Count", "Family Subtype", "Accessory Type")),
     ("step_door_finish", 20,
      ("Door Style", "Door Overlay", "Wood Species", "Finish",
       "Door Edge Profile", "Glass Insert", "Crown Molding")),
