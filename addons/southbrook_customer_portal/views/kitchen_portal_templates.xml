@@ -66,6 +66,20 @@
                 <strong>Target:</strong> <span t-field="project.date_target"/>
             </p>
 
+            <h3>3D Preview</h3>
+            <t t-set="selected" t-value="project.selected_design_option_id"/>
+            <t t-set="preview_option" t-value="selected if selected else options[:1]"/>
+            <div t-if="preview_option" class="o_kitchen_canvas mb-3"
+                 t-att-data-placement="preview_option.placement_data_json or ''"
+                 style="width:100%; min-height:420px; background:#f5f1e8;">
+                <noscript>
+                    <p class="text-muted">JavaScript is required for the 3D preview.</p>
+                </noscript>
+            </div>
+            <p t-if="not preview_option" class="text-muted">
+                The 3D preview will appear once a concept has been published for you.
+            </p>
+
             <h3>Design Options</h3>
             <t t-if="not options">
                 <p>No design options published yet.</p>

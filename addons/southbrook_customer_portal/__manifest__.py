@@ -49,6 +49,13 @@ Three.js KitchenCanvas (Phase 2):
         "security/ir.model.access.csv",
         "views/kitchen_portal_templates.xml",
     ],
+    "assets": {
+        "web.assets_frontend": [
+            ("include", "web.assets_frontend"),
+            "southbrook_customer_portal/static/src/js/kitchen_dims.js",
+            "southbrook_customer_portal/static/src/js/kitchen_canvas.js",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,
