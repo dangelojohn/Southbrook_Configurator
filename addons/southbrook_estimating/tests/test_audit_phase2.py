@@ -375,3 +375,93 @@ class TestAuditPhase2PriceExtras(SouthbrookTestCase):
                 "name match between attributes.xml and "
                 "tactical_price_seed.py's _DEMO_DELTAS dict.",
             )
+
+
+@tagged("post_install", "-at_install", "southbrook")
+class TestAuditPhase2CatalogExpansion(SouthbrookTestCase):
+    """Phase 2L parity — every cabinet seeded by catalog_expansion.py
+    must wear the same audit shape as the 10 Q8 cabinets defined in
+    static XML. The Q8 set already gets explicit per-cabinet test
+    coverage above; this class catches drift on the 30 extended SKUs.
+
+    Failure modes this guards against:
+      - a code change to catalog_expansion narrows or breaks the
+        _AUDIT_STEPS membership map without touching the static XML,
+        so the Q8 set still passes but expanded cabinets render as a
+        flat scroll
+      - the soft-close default extension stops firing on the expanded
+        set (e.g. an indent error in the if-attr_name=='Accessories'
+        block)
+      - a future audit-rule on Wood Species or Finish ships only via
+        static XML and silently doesn't bind to catalog-expanded SKUs
+    """
+
+    def _all_sb_templates(self):
+        """All SB-* templates that catalog_expansion produces."""
+        return self.env["product.template"].search([
+            ("default_code", "=like", "SB-%"),
+        ])
+
+    def test_01_every_catalog_cabinet_has_some_step_lines(self):
+        """No SB-* cabinet should render as a flat-list scroll. Even
+        accessory SKUs that only carry a couple of attributes should
+        get those attributes grouped into a step bucket so the wizard
+        is visually consistent across the catalog."""
+        skipped = []  # documented exemptions (e.g. SB-WORKTOP)
+        for tmpl in self._all_sb_templates():
+            attr_count = len(tmpl.attribute_line_ids)
+            step_count = len(tmpl.config_step_line_ids)
+            if attr_count == 0:
+                # Nothing to group — fine.
+                skipped.append(tmpl.default_code)
+                continue
+            self.assertGreater(
+                step_count, 0,
+                f"{tmpl.default_code} has {attr_count} attribute_lines "
+                f"but no step_lines — would render as a flat scroll. "
+                f"catalog_expansion._AUDIT_STEPS may have lost a name.",
+            )
+
+    def test_02_soft_close_default_on_every_accessories_line(self):
+        """Every cabinet that exposes the Accessories attribute should
+        default to Soft-Close pre-selected. catalog_expansion seeds
+        this on the 30 extended SKUs in the same loop that seeds
+        attribute_line value_ids."""
+        soft_close = self._ref("value_accessory_soft_close")
+        accessories_attr = self._ref("attr_accessories")
+        for tmpl in self._all_sb_templates():
+            acc_line = tmpl.attribute_line_ids.filtered(
+                lambda l: l.attribute_id.id == accessories_attr.id
+            )
+            if not acc_line:
+                continue
+            self.assertEqual(
+                acc_line.default_val.id, soft_close.id,
+                f"{tmpl.default_code}: Accessories line missing the "
+                "Soft-Close default. catalog_expansion's Phase 2I "
+                "block (line ~360 — `if attr_name == 'Accessories'`) "
+                "may have stopped firing on this cabinet shape.",
+            )
+
+    def test_03_q8_and_extended_cabinets_share_step_shape(self):
+        """Spot-check that 4 representative extended cabinets carry
+        the same 4 audit step labels the Q8 set does — no extra
+        buckets, no missing buckets."""
+        expected_labels = {
+            "Construction & Sizing", "Door & Finish",
+            "Hardware & Sides", "Interior & Accessories",
+        }
+        for sku in ("SB-CORNER-BLIND", "SB-WALL-GLASS",
+                    "SB-VAN-1DR", "SB-TALL-FRIDGE"):
+            tmpl = self.env["product.template"].search([
+                ("default_code", "=", sku),
+            ], limit=1)
+            if not tmpl:
+                self.skipTest(f"{sku} not in DB — extended catalog "
+                              "may have changed; update this list.")
+            seen = set(tmpl.config_step_line_ids.mapped(
+                "config_step_id.name"))
+            self.assertEqual(
+                seen, expected_labels,
+                f"{sku}: step labels diverged from Q8 set. Seen={seen}",
+            )
