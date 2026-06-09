@@ -1,0 +1,16 @@
+{
+  "name": "southbrook-e2e",
+  "version": "1.0.0",
+  "description": "Playwright E2E smoke tests for the SAMI / Southbrook AI Kitchen Platform.",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test smoke.spec.js",
+    "test:prod": "SAMI_URL=https://southbrookcabinetry.space playwright test",
+    "install-browsers": "playwright install chromium",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

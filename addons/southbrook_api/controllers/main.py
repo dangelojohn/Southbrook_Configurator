@@ -118,6 +118,12 @@ class SouthbrookApi(http.Controller):
             payload = json.loads(request.httprequest.data or b"{}")
         except json.JSONDecodeError:
             return _error("bad_json", "Request body is not JSON.", 400)
+        # A bare JSON literal ("foo", 1, [...], true) parses cleanly but
+        # is not the dict we expect — guard before .get() so the API
+        # surface returns a structured 400 rather than a generic 500.
+        if not isinstance(payload, dict):
+            return _error("bad_json",
+                          "Request body must be a JSON object.", 400)
         email = (payload.get("email") or "").strip().lower()
         password = payload.get("password") or ""
         if not (email and password):

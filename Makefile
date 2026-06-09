@@ -5,7 +5,8 @@
 # you run `make test` on your laptop the same way.
 
 .PHONY: help up down logs install install-fresh test test-quick test-bridge \
-        bridge-build bridge-restart shell psql .check-env
+        bridge-build bridge-restart shell psql .check-env \
+        e2e-install e2e e2e-prod
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -104,6 +105,18 @@ test-quick: .check-env
 test-bridge: .check-env
 	docker exec sami-odoo odoo -d $(DB) -u southbrook_freecad_bridge \
 	  --test-enable --test-tags=southbrook_freecad_bridge $(ODOO_FLAGS)
+
+# ---------------------------------------------------------------------------
+# Playwright E2E
+# ---------------------------------------------------------------------------
+e2e-install:
+	cd tests/e2e && npm install && npx playwright install chromium
+
+e2e: .check-env
+	cd tests/e2e && npm test
+
+e2e-prod:
+	cd tests/e2e && SAMI_URL=https://southbrookcabinetry.space npm test
 
 # ---------------------------------------------------------------------------
 # Bridge
