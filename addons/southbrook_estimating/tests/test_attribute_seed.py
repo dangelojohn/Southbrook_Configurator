@@ -31,12 +31,16 @@ class TestAttributeSeed(SouthbrookTestCase):
         self._ref("attr_accessory_type")
 
     def test_03_all_attributes_use_dynamic_variant_creation(self):
-        """Q6 — every attribute is create_variant='dynamic' EXCEPT the
-        multi-select Accessories attribute, which Odoo's check constraint
+        """Q6 — every attribute is create_variant='dynamic' EXCEPT
+        multi-select attributes, which Odoo's check constraint
         `product_attribute_check_multi_checkbox_no_variant` forces to
         no_variant (NF18). Multi-select values are independently chosen
         price-extras on the configured line — they never materialise as
-        variant axes — so no_variant is semantically correct anyway."""
+        variant axes — so no_variant is semantically correct anyway.
+
+        Audit Phase 2 (2026-06-09) added Interior Storage and Lighting
+        as multi-select attributes, extending the exempt set from one
+        attribute to three."""
         # Walk every attribute we seeded (find by external id prefix)
         # and assert create_variant.
         seeded = self.env["ir.model.data"].search([
@@ -45,7 +49,7 @@ class TestAttributeSeed(SouthbrookTestCase):
         ])
         self.assertGreater(len(seeded), 0)
         # NF18 exception: multi-select attrs must be no_variant.
-        multi_exempt = {"Accessories"}
+        multi_exempt = {"Accessories", "Interior Storage", "Lighting"}
         for data in seeded:
             attr = self.env["product.attribute"].browse(data.res_id)
             expected = "no_variant" if attr.name in multi_exempt else "dynamic"

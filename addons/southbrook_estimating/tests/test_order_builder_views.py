@@ -136,26 +136,28 @@ class TestOrderBuilderViews(SouthbrookTestCase):
         Pins the placement so a future refactor doesn't silently move the
         button into a different region.
         """
-        import re
+        from lxml import etree
         form_view = self.env.ref("sale.view_order_form")
         arch = self.env["sale.order"].get_view(form_view.id, "form")["arch"]
 
-        # Find the button_box div span in the arch (greedy across newlines).
-        # The button name must appear between the opening div tag with
-        # name='button_box' and its closing </div>. If it lands in <header>
-        # or <footer> instead, this regex misses.
-        button_box_match = re.search(
-            r'<div[^>]*\bname=["\']button_box["\'][^>]*>(.*?)</div>',
-            arch, re.DOTALL,
-        )
+        root = etree.fromstring(arch)
+        # Find the button_box <div> and check action_duplicate_as_draft
+        # appears as a descendant button. A regex can't reliably scope
+        # this because the inherited form has nested <div>s inside each
+        # stat-button (o_stat_info) — a non-greedy regex stops at the
+        # first inner </div>.
+        button_boxes = root.xpath("//div[@name='button_box']")
         self.assertTrue(
-            button_box_match,
+            button_boxes,
             "button_box div not present in compiled arch",
         )
-        button_box_content = button_box_match.group(1)
+        names = []
+        for bb in button_boxes:
+            names.extend(bb.xpath(".//button/@name"))
         self.assertIn(
             "action_duplicate_as_draft",
-            button_box_content,
+            names,
             "NF6 button is NOT inside button_box — placement drifted "
-            "(expected stat-button container, found elsewhere)",
+            "(expected stat-button container, found elsewhere). "
+            f"Buttons currently in button_box: {names}",
         )
