@@ -329,3 +329,95 @@ the rules in `config_rules.xml`, the pre-migrate orphan cleanup,
 and the manifest version bump. The actual binding requires the
 catalog_expansion fix on the configurator_ux side. The audit
 recommendation is **Option α** — make the rebuild non-destructive.
+
+## Phase 2H — Non-destructive rebuild (THE FIX, applied live)
+
+**Status:** Applied and verified live on QNAP 2026-06-09. **All 47 gating
+rules now bind correctly** (was 22). Upgrade time dropped from ~5min
+(full rebuild) to ~100s (reconcile-only). Apply this hunk on the
+configurator-ux-v2 merge.
+
+### The diff (in catalog_expansion.py, around line 302)
+
+```diff
+             if existing:
+                 existing.write(vals)
+                 tmpl = existing
+                 updated += 1
+-                # Wipe existing lines so the rebuild matches the catalog
+-                # spec — this is idempotent.
+-                tmpl.attribute_line_ids.unlink()
++                # Audit Phase 2H — DO NOT unlink existing attribute_lines.
++                # Destructive rebuild was the root cause of the
++                # gating-rule cascade-delete cycle. Instead, reconcile
++                # below (write or create), then delete obsolete lines.
+             else:
+                 tmpl = Template.create(vals)
+                 created += 1
+
++            # Phase 2H — desired attribute_id set for obsolete cleanup.
++            desired_attr_ids = set()
++
+             for attr_name in attr_keys:
+                 ...
++                desired_attr_ids.add(attr.id)
++                # Phase 2H reconcile: find existing line for
++                # (template, attribute). Write or create.
++                existing_line = AttrLine.search([
++                    ("product_tmpl_id", "=", tmpl.id),
++                    ("attribute_id", "=", attr.id),
++                ], limit=1)
++                if existing_line:
++                    current_ids = set(existing_line.value_ids.ids)
++                    if current_ids != set(value_ids):
++                        existing_line.write({"value_ids": [(6, 0, value_ids)]})
++                    line = existing_line
++                else:
++                    line = AttrLine.create({
+                         "product_tmpl_id": tmpl.id,
+                         "attribute_id": attr.id,
+                         "value_ids": [(6, 0, value_ids)],
+                     })
+
+@@ after the reconcile loop, before tmpl.write({"default_code": sku}) @@
++            # Phase 2H obsolete cleanup. Delete attribute_lines whose
++            # attribute_id is NOT in the desired attr_keys set —
++            # legitimate cleanup for catalog removals. Crucially this
++            # does NOT touch unchanged lines; their IDs are preserved
++            # so gating rule FKs survive.
++            obsolete = tmpl.attribute_line_ids.filtered(
++                lambda l: l.attribute_id.id not in desired_attr_ids
++            )
++            if obsolete:
++                obsolete.unlink()
+```
+
+### Live verification (QNAP 2026-06-09 after Phase 2H deploy)
+
+```
+band 40 (A1) = 10/10 ✓   band 43 (A2) = 10/10 ✓
+band 41 (A3) = 10/10 ✓   band 45 (A6) =  6/6  ✓
+band 42 (A4) =  6/6  ✓   band 46 (A7) =  5/5  ✓
+                                       ────────
+                       TOTAL = 47/47 rules bound (100%)
+```
+
+### Suggested commit message
+
+```
+fix(catalog): non-destructive rebuild — reconcile write/create
+
+Replace tmpl.attribute_line_ids.unlink() + recreate loop with a
+write-or-create reconcile, plus an obsolete-line cleanup that only
+removes attribute_lines whose attribute_id is no longer in the
+catalog spec for that cabinet.
+
+Closes the cascade-delete cycle that was destroying gating rules
+from southbrook_estimating's config_rules.xml on every upgrade.
+All 47 audit gating rules now bind correctly (was 22).
+
+Bonus: upgrade time drops from ~5min to ~100s.
+
+[from audit branch — see docs/configurator_audit_phase2d_patch.md
+"Phase 2H" section]
+```
