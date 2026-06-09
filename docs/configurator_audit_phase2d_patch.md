@@ -190,3 +190,81 @@ This closes the Phase 2C blocker recorded in
 `docs/configurator_audit_phase2c_blocker.md`. The audit work is fully
 production-ready once this single patch lands on
 `feature/configurator-ux-v2`.
+
+## Phase 2E follow-up — xml_id registration (also production-verified)
+
+After Phase 2D landed, the per-cabinet attribute_lines were correct
+but the **Phase 2B gating rules** (A1/A3/A4 in `config_rules.xml`)
+still only bound on 4 of 10 cabinets — because the rules reference
+attribute_lines by `xml_id` (e.g. `attr_line_wall_1dr_door_overlay`),
+and `catalog_expansion.py`'s `AttrLine.create()` call never registered
+xml_ids for the rows it created.
+
+Add this second patch hunk to
+`addons/southbrook_configurator_ux/models/catalog_expansion.py`:
+
+```diff
+@@ in build_catalog(), after Attr / AttrVal caches @@
++        # Audit Phase 2E (2026-06-09) — attribute xml_id cache.
++        # The Phase 2B gating rules in southbrook_estimating reference
++        # attribute_lines via xml_id. Register matching xml_ids so the
++        # rules can bind. Cache:
++        #   attr_id → "attr_<short_name>"
++        IMD = self.env["ir.model.data"]
++        _attr_xmlid_by_id = {}
++        for imd in IMD.search([
++            ("model", "=", "product.attribute"),
++            ("module", "=", "southbrook_estimating"),
++            ("name", "=like", "attr_%"),
++        ]):
++            _attr_xmlid_by_id[imd.res_id] = imd.name.replace("attr_", "", 1)
++        _tmpl_xmlid_by_sku = {}
++        for imd in IMD.search([
++            ("model", "=", "product.template"),
++            ("module", "=", "southbrook_estimating"),
++        ]):
++            tmpl = Template.browse(imd.res_id)
++            if tmpl.exists() and tmpl.default_code:
++                _tmpl_xmlid_by_sku[tmpl.default_code] = imd.name
+
+@@ in the attribute_line creation loop @@
+-                AttrLine.create({
++                line = AttrLine.create({
+                     "product_tmpl_id": tmpl.id,
+                     "attribute_id": attr.id,
+                     "value_ids": [(6, 0, value_ids)],
+                 })
++                # Audit Phase 2E — register ir.model.data xml_id so
++                # the gating rules can resolve their attribute_line refs.
++                tmpl_xmlid = _tmpl_xmlid_by_sku.get(sku)
++                attr_short = _attr_xmlid_by_id.get(attr.id)
++                if tmpl_xmlid and attr_short:
++                    xml_name = "attr_line_%s_%s" % (tmpl_xmlid, attr_short)
++                    if not IMD.search_count([
++                        ("module", "=", "southbrook_estimating"),
++                        ("name", "=", xml_name),
++                    ]):
++                        IMD.create({
++                            "module": "southbrook_estimating",
++                            "name": xml_name,
++                            "model": "product.template.attribute.line",
++                            "res_id": line.id,
++                            "noupdate": False,
++                        })
+```
+
+### Phase 2E verification (live on QNAP 2026-06-09)
+
+| Metric | Before Phase 2E | After Phase 2E |
+|---|---|---|
+| `ir.model.data` xml_ids for `product.template.attribute.line` | 102 | **213** |
+| Phase 2B rules binding (40-band — A1 overlay) | 4/10 | **10/10** ✓ |
+| Phase 2B rules binding (41-band — A3 frame_style) | 4/10 | **10/10** ✓ |
+| Phase 2B rules binding (42-band — A4 drawer_construction) | 3/6 | **6/6** ✓ |
+| Phase 2F rules (A2/A5/A6/A7) | impossible | **all bind** (Phase 2F shipped on audit branch in config_rules.xml) |
+
+### Apply both hunks as a single configurator_ux commit
+
+The combined diff is the entire Phase 2D + 2E patch. Apply both hunks
+in `feature/configurator-ux-v2` as one commit titled
+`audit-v1: extend catalog for new attributes + register xml_ids`.
