@@ -5,7 +5,7 @@
     <record id="view_southbrook_eco_form_inherit_pg" model="ir.ui.view">
         <field name="name">southbrook.eco.form.inherit.productgraph</field>
         <field name="model">southbrook.eco</field>
-        <field name="inherit_id" ref="southbrook_plm.view_southbrook_eco_form"/>
+        <field name="inherit_id" ref="southbrook_plm.view_eco_form"/>
         <field name="arch" type="xml">
             <!-- Add the PG group at the end of the main sheet so it sits
                  below the existing target / approval / document blocks. -->
