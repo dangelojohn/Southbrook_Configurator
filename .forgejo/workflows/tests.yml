@@ -1,0 +1,87 @@
+name: SAMI tests
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+  pull_request:
+    branches:
+      - main
+
+# Cancel in-flight runs of the same branch when a new push lands.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  southbrook-tests:
+    # `runs-on` labels must match what the Forgejo runner advertises.
+    # The runner installed on the QNAP advertises `linux-amd64`; adjust
+    # if the runner reports a different label.
+    runs-on: linux-amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Compose env
+        run: cp .env.example .env
+
+      - name: Build images
+        run: |
+          docker compose build odoo
+          # freecad-bridge build is ~5 min (FreeCAD apt install). Cache via
+          # buildx is set up at the runner level — if cold, this is slow but
+          # subsequent runs reuse the layer cache.
+          docker compose build freecad-bridge
+
+      - name: Bring up stack
+        run: |
+          docker compose up -d db
+          # Wait for postgres healthy.
+          for i in $(seq 1 30); do
+            STATE=$(docker inspect sami-postgres --format '{{.State.Health.Status}}' 2>/dev/null || echo none)
+            echo "postgres tick $i: $STATE"
+            [ "$STATE" = "healthy" ] && break
+            sleep 5
+          done
+          docker compose up -d odoo freecad-bridge
+
+      - name: Wait for Odoo health
+        run: |
+          for i in $(seq 1 36); do
+            STATE=$(docker inspect sami-odoo --format '{{.State.Health.Status}}' 2>/dev/null || echo none)
+            echo "odoo tick $i: $STATE"
+            [ "$STATE" = "healthy" ] && exit 0
+            sleep 10
+          done
+          docker compose logs odoo | tail -100
+          exit 1
+
+      - name: Install SAMI addons
+        run: make install
+
+      - name: Run full test sweep
+        run: make test
+
+      - name: Capture artifacts on failure
+        if: failure()
+        run: |
+          mkdir -p artifacts
+          docker compose logs odoo > artifacts/odoo.log
+          docker compose logs freecad-bridge > artifacts/bridge.log
+
+      - name: Upload artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ github.run_id }}
+          path: artifacts/
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
