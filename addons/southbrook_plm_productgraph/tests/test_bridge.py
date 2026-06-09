@@ -68,18 +68,20 @@ class TestBridge(TransactionCase):
         cls.ebom.action_submit_for_review()
         cls.ebom.action_release()
 
-        # Use a document-type ECO so _apply_document is the PLM-side handler
-        # (no mrp.bom mutation on the PLM side — the bridge is the only thing
-        # that touches mrp.bom in this test).
+        # Use a rule-kind ECO so _apply_rule is the PLM-side handler — it
+        # only requires a git_ref (no mrp.bom mutation, no cut_spec touch,
+        # no document attachment required). Keeps the bridge as the sole
+        # thing touching mrp.bom in this test.
         cls.eco_type = cls.env["southbrook.eco.type"].create({
-            "name": "Bridge Test (Document)",
-            "target_kind": "document",
+            "name": "Bridge Test (Rule)",
+            "target_kind": "rule",
         })
 
     def _make_eco(self, **extra):
         vals = {
             "title": "Bridge fires release",
             "eco_type_id": self.eco_type.id,
+            "git_ref": "test/abc123def456",
         }
         vals.update(extra)
         return self.env["southbrook.eco"].create(vals)
