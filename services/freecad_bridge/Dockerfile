@@ -24,12 +24,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         xvfb \
         ca-certificates \
         curl \
+        python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# freecadcmd ships with Debian's /usr/bin/python3, which is a DIFFERENT
+# Python from the slim image's /usr/local/bin/python3 where the pip
+# install above landed. Install ezdxf into the FreeCAD Python too so
+# render_cabinet.py can emit DXFs.
+RUN /usr/bin/python3 -m pip install --break-system-packages --no-cache-dir \
+        ezdxf==1.4.2
 
 COPY main.py .
 COPY scripts/ /app/scripts/

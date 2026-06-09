@@ -148,18 +148,92 @@ def _build_carcass(panel_dict: dict, family: str) -> dict:
     return out
 
 
-def _export_dxf(shape: Part.Shape, path: Path) -> None:
-    """Export a single panel as DXF R12. We export the top-down view of
-    the panel face (X×Y plane) — what the cutting/nesting division
-    needs for nest planning. FreeCAD's Import module handles the DXF
-    write."""
-    # Create a single-object document so Import.export sees it.
-    doc = App.newDocument("dxf_export")
-    obj = doc.addObject("Part::Feature", "panel")
-    obj.Shape = shape
-    doc.recompute()
-    Import.export([obj], str(path))
-    App.closeDocument(doc.Name)
+def _export_dxf(panel_name: str, length_mm: float, width_mm: float, path: Path) -> None:
+    """Export a single panel as DXF R12 using ezdxf.
+
+    The cutting/nesting division wants a flat 2D outline of the panel
+    face (length × width) — that's what they nest into stock sheets.
+    The thickness dimension is irrelevant for nesting; it appears in
+    the shop-floor drawing.
+
+    Using ezdxf — pure Python, no GUI dep — instead of FreeCAD's Draft
+    workbench (which needs the Gui module that freecadcmd does not
+    load). We emit a single LWPOLYLINE rectangle on layer
+    PANEL_OUTLINE, plus the panel name as a TEXT annotation in the
+    lower-left corner."""
+    try:
+        import ezdxf  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError(
+            "ezdxf is not installed in the bridge container; "
+            "add to requirements.txt and rebuild."
+        ) from exc
+
+    # DXF R12 per init-doc Module 2 — predates LWPOLYLINE (R2000),
+    # so we emit 4 LINE entities for the panel rectangle.
+    doc = ezdxf.new("R12", setup=True)
+    doc.layers.add(name="PANEL_OUTLINE", color=1)  # red
+    doc.layers.add(name="PANEL_LABEL", color=7)    # white/black on white
+
+    msp = doc.modelspace()
+    corners = [
+        ((0, 0), (length_mm, 0)),
+        ((length_mm, 0), (length_mm, width_mm)),
+        ((length_mm, width_mm), (0, width_mm)),
+        ((0, width_mm), (0, 0)),
+    ]
+    for start, end in corners:
+        msp.add_line(start, end, dxfattribs={"layer": "PANEL_OUTLINE"})
+    msp.add_text(
+        f"{panel_name} {length_mm:.1f} x {width_mm:.1f} mm",
+        dxfattribs={"layer": "PANEL_LABEL", "height": max(20.0, width_mm / 20)},
+    ).set_placement((5, -25))
+    doc.saveas(str(path))
+
+
+def _export_svg(panel_name: str, length_mm: float, width_mm: float,
+                thickness_mm: float, path: Path) -> None:
+    """Export a single panel as an SVG shop drawing.
+
+    Stock SVG strings — no dependency needed. Per-panel SVG includes:
+      - the rectangular outline scaled to mm with a margin
+      - dimension callouts on length + width
+      - panel-name + thickness label
+    """
+    margin = 30
+    # Scale so the longer dimension is 800 px (keeps the SVG readable).
+    scale = 800.0 / max(length_mm, width_mm)
+    width_px = length_mm * scale + margin * 2
+    height_px = width_mm * scale + margin * 2
+
+    rect_x = margin
+    rect_y = margin
+    rect_w = length_mm * scale
+    rect_h = width_mm * scale
+    label_y = rect_y + rect_h + 18
+    title_y = 18
+
+    svg = f"""<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="{width_px:.0f}" height="{height_px:.0f}"
+     viewBox="0 0 {width_px:.0f} {height_px:.0f}">
+  <style>
+    .panel {{ fill: #f5f1e8; stroke: #333; stroke-width: 1.5; }}
+    .label {{ font: 12px sans-serif; fill: #333; }}
+    .title {{ font: 14px sans-serif; font-weight: 600; fill: #1c2d49; }}
+    .dim   {{ font: 10px sans-serif; fill: #666; }}
+  </style>
+  <text class="title" x="{margin}" y="{title_y}">{panel_name} — {thickness_mm:.2f} mm thick</text>
+  <rect class="panel" x="{rect_x}" y="{rect_y}" width="{rect_w:.1f}" height="{rect_h:.1f}"/>
+  <text class="dim" x="{rect_x + rect_w/2:.1f}" y="{label_y}" text-anchor="middle">
+    length: {length_mm:.1f} mm
+  </text>
+  <text class="dim" x="{rect_x - 6:.1f}" y="{rect_y + rect_h/2:.1f}"
+        text-anchor="end" dominant-baseline="middle">
+    width: {width_mm:.1f} mm
+  </text>
+</svg>
+"""
+    path.write_text(svg)
 
 
 def _export_step(shapes: list, path: Path) -> None:
@@ -191,29 +265,37 @@ def main() -> None:
 
     carcass = _build_carcass(panel_dict, spec.get("family", "base"))
 
-    artifacts = {"dxf": [], "step": []}
-
-    # Per-panel DXFs.
-    # NOTE: Import.export DXF works inconsistently headless — the DXF
-    # writer is part of the Draft workbench which expects the GUI module.
-    # We attempt the export and only record artifacts that actually
-    # materialise on disk; missing DXFs surface in `warnings` instead
-    # of artifacts so the caller knows.
+    artifacts = {"dxf": [], "svg": [], "step": []}
     warnings = []
-    for name in ("side_L", "side_R", "top", "bottom", "back",
-                 "adjustable_shelf", "door"):
-        shape = carcass.get(name)
-        if shape is None or name.startswith("_"):
+
+    # Per-panel DXF + SVG. We pull the panel's length × width directly
+    # from panel_dict (the same source the BoM math + G1 use) rather
+    # than reverse-engineering it from the Part.Shape bounding box.
+    PANEL_KEYS = ("side_L", "side_R", "top", "bottom", "back",
+                  "adjustable_shelf", "door")
+    for name in PANEL_KEYS:
+        if carcass.get(name) is None or name.startswith("_"):
             continue
-        path = output_dir / f"{name}.dxf"
+        dim = panel_dict.get(name)
+        if dim is None or not isinstance(dim, tuple) or len(dim) != 3:
+            continue
+        length_mm, width_mm, thickness_mm = dim
+
+        dxf_path = output_dir / f"{name}.dxf"
         try:
-            _export_dxf(shape, path)
+            _export_dxf(name, length_mm, width_mm, dxf_path)
+            artifacts["dxf"].append(str(dxf_path))
         except Exception as exc:
             sys.stderr.write(f"DXF export raised for {name}: {exc}\n")
-        if path.exists() and path.stat().st_size > 0:
-            artifacts["dxf"].append(str(path))
-        else:
-            warnings.append(f"dxf_unavailable_headless:{name}")
+            warnings.append(f"dxf_failed:{name}:{exc}")
+
+        svg_path = output_dir / f"{name}.svg"
+        try:
+            _export_svg(name, length_mm, width_mm, thickness_mm, svg_path)
+            artifacts["svg"].append(str(svg_path))
+        except Exception as exc:
+            sys.stderr.write(f"SVG export raised for {name}: {exc}\n")
+            warnings.append(f"svg_failed:{name}:{exc}")
 
     # Whole-carcass STEP.
     step_shapes = [(k, v) for k, v in carcass.items()
