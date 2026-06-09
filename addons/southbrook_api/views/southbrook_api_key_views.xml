@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_api_key_list" model="ir.ui.view">
+        <field name="name">southbrook.api.key.list</field>
+        <field name="model">southbrook.api.key</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="label"/>
+                <field name="user_id"/>
+                <field name="create_date"/>
+                <field name="last_used_at"/>
+                <field name="expires_at"/>
+                <field name="revoked_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_api_key_form" model="ir.ui.view">
+        <field name="name">southbrook.api.key.form</field>
+        <field name="model">southbrook.api.key</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_revoke" string="Revoke"
+                            type="object"
+                            invisible="revoked_at"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="user_id"/>
+                        <field name="label"/>
+                        <field name="create_date"/>
+                        <field name="last_used_at"/>
+                        <field name="expires_at"/>
+                        <field name="revoked_at"/>
+                        <field name="revoked_reason"/>
+                        <field name="key_hash"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_api_key" model="ir.actions.act_window">
+        <field name="name">API Keys</field>
+        <field name="res_model">southbrook.api.key</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
