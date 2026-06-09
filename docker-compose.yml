@@ -79,11 +79,22 @@ services:
     container_name: sami-freecad-bridge
     environment:
       FREECAD_BRIDGE_SECRET: ${FREECAD_BRIDGE_SECRET:?FREECAD_BRIDGE_SECRET must be set in .env}
+      # Bridge needs the same panel formulas Odoo uses (G1 contract).
+      PYTHONPATH: /srv/shared
+      FREECAD_TEMPLATES_DIR: /srv/freecad_templates
+      # Service-account credentials the bridge uses to XML-RPC back into
+      # Odoo (ir.attachment.create + /plm/cad_callback). Leave defaults
+      # for local dev; rotate before any non-local deployment.
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: ${ODOO_DB:-southbrook}
+      ODOO_USER: ${ODOO_USER:-admin}
+      ODOO_API_KEY: ${ODOO_API_KEY:-admin}
+    volumes:
+      - ./shared:/srv/shared:ro
+      - ./freecad_templates:/srv/freecad_templates:ro
     ports:
       - "8001:8000"
     restart: unless-stopped
-    # Module 0 placeholder — only /health is implemented. Module 2 fills in
-    # /render /status /validate /templates and the FreeCAD runtime.
 
 volumes:
   postgres-data:

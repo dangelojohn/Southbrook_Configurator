@@ -1,13 +1,30 @@
-# SAMI / Southbrook — FreeCAD bridge skeleton (Module 0).
+# SAMI / Southbrook — FreeCAD bridge (Module 2).
 #
-# This is a placeholder image: it only serves GET /health. Module 2 will
-# replace this base with one that installs FreeCAD 1.0 AppImage and the
-# freecadcmd entrypoint (G5 gate). Keep this slim until then.
+# Installs FreeCAD headless + the FastAPI surface. The Debian package
+# brings in `FreeCAD` Python bindings plus the `freecadcmd` headless
+# entrypoint that render_cabinet.py invokes. Image is ~1.5 GB after
+# install — acceptable for the dev/CI bridge; a slim production image
+# is a later optimisation.
+#
+# G5 gate: `docker compose exec freecad-bridge freecadcmd --version`
+# must report a FreeCAD 1.0+ runtime before render-related tests count
+# as passing.
 
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# FreeCAD pulls in a lot of Qt/X11 deps even for headless use — that's
+# the cost of the official Debian package. xvfb is included so any
+# render that incidentally pokes the Qt event loop has a virtual display.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        freecad \
+        xvfb \
+        ca-certificates \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
