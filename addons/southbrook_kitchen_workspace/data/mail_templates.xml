@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <!--
-        Two mail templates fired from sb.kitchen.project lifecycle hooks.
+        Mail templates fired from sb.kitchen.project lifecycle hooks.
         Edit the bodies via Settings > Technical > Email Templates — they
         stay in this seed file as the documented defaults.
+
+        State transition → template fired:
+          designing      → awaiting_customer    email_template_concepts_ready    (→ customer)
+          awaiting_customer → approved          email_template_design_approved   (→ salesperson)
+          approved       → in_production        email_template_released_to_production (→ salesperson)
+          in_production  → done                 email_template_project_done      (→ customer)
+          (cancel has no email — operators handle out-of-band)
     -->
 
     <!-- ============ Concepts ready (customer-facing) ============ -->
@@ -41,6 +48,43 @@
         </field>
     </record>
 
+    <!-- ============ Released to production (designer / mfg-facing) ============ -->
+    <record id="email_template_released_to_production" model="mail.template">
+        <field name="name">Southbrook: Released to Production</field>
+        <field name="model_id" ref="model_sb_kitchen_project"/>
+        <field name="subject">{{ object.code }} released to production</field>
+        <field name="email_from">{{ user.email_formatted }}</field>
+        <field name="email_to">{{ object.salesperson_id.email or user.email }}</field>
+        <field name="lang">{{ user.lang }}</field>
+        <field name="auto_delete" eval="False"/>
+        <field name="body_html" type="html">
+<div style="font-family:Roboto,Helvetica,Arial,sans-serif; color:#1c2d49; max-width:600px;">
+    <h2 style="color:#1c2d49;">Released to production</h2>
+    <p>
+        <strong t-out="object.code"/> — <t t-out="object.name"/> has moved
+        from <strong>approved</strong> to <strong>in production</strong>.
+    </p>
+    <p>
+        Customer: <strong t-out="object.partner_id.name"/><br/>
+        Selected option:
+        <strong t-out="object.selected_design_option_id.name or '(none)'"/><br/>
+        Target completion: <t t-out="object.date_target or 'TBD'"/>
+    </p>
+    <p style="margin: 24px 0;">
+        <a t-attf-href="/odoo/action-base.action_open_view_form_view/{{ object.id }}"
+           style="background:#1c2d49; color:white; padding:12px 20px;
+                  text-decoration:none; border-radius:4px; font-weight:600;">
+            Open project
+        </a>
+    </p>
+    <p style="color:#666; font-size: 13px;">
+        Next: MOs are now visible to the shop floor. Watch the project
+        chatter for production milestones.
+    </p>
+</div>
+        </field>
+    </record>
+
     <!-- ============ Design approved (designer-facing) ============ -->
     <record id="email_template_design_approved" model="mail.template">
         <field name="name">Southbrook: Design Approved</field>
@@ -72,6 +116,44 @@
         Next step: release to production when you've reviewed the engineering
         package.
     </p>
+</div>
+        </field>
+    </record>
+
+    <!-- ============ Project done (customer-facing) ============ -->
+    <record id="email_template_project_done" model="mail.template">
+        <field name="name">Southbrook: Project Complete</field>
+        <field name="model_id" ref="model_sb_kitchen_project"/>
+        <field name="subject">Your kitchen project is complete</field>
+        <field name="email_from">{{ user.email_formatted }}</field>
+        <field name="partner_to">{{ object.partner_id.id }}</field>
+        <field name="lang">{{ object.partner_id.lang }}</field>
+        <field name="auto_delete" eval="False"/>
+        <field name="body_html" type="html">
+<div style="font-family:Roboto,Helvetica,Arial,sans-serif; color:#1c2d49; max-width:600px;">
+    <h2 style="color:#1c2d49;">Your kitchen is complete</h2>
+    <p>Hello <t t-out="object.partner_id.name"/>,</p>
+    <p>
+        We've finished work on <strong t-out="object.name"/>
+        (<t t-out="object.code"/>). Thank you for trusting Southbrook with
+        your kitchen.
+    </p>
+    <p style="margin: 24px 0;">
+        <a t-attf-href="/my/kitchen-project/{{ object.id }}"
+           style="background:#1c2d49; color:white; padding:12px 20px;
+                  text-decoration:none; border-radius:4px; font-weight:600;">
+            View your project
+        </a>
+    </p>
+    <p style="color:#666; font-size: 13px;">
+        Completed: <t t-out="object.date_completed or fields.Date.today()"/><br/>
+        Theme: <t t-out="object.theme or 'Signature'"/>
+    </p>
+    <p>
+        We'd love your feedback. Reply to this email or contact your
+        salesperson directly.
+    </p>
+    <p>— The Southbrook team</p>
 </div>
         </field>
     </record>
