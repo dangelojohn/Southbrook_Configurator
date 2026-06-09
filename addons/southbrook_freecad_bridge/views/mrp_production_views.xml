@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Adds the CAD Artifacts tab and the colour-coded shop-floor kanban
+        badge for x_cad_status. The "Regenerate CAD" button lands in the
+        Module-2 deploy commit (gated by G2a owner-confirmation).
+    -->
+    <record id="view_mrp_production_form_cad" model="ir.ui.view">
+        <field name="name">mrp.production.form.cad</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="CAD Artifacts" name="cad_artifacts">
+                    <group>
+                        <field name="x_cad_status" widget="badge"
+                               decoration-info="x_cad_status == 'pending'"
+                               decoration-warning="x_cad_status == 'rendering'"
+                               decoration-success="x_cad_status == 'done'"
+                               decoration-danger="x_cad_status == 'error'"/>
+                        <field name="x_plm_eco_id"/>
+                    </group>
+                    <field name="x_cad_attachment_ids" widget="many2many_binary"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
