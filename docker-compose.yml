@@ -1,0 +1,74 @@
+# SAMI / Southbrook AI Kitchen Platform — local dev compose.
+#
+# Brings up Odoo 19 CE + Postgres 16 + the FreeCAD bridge skeleton.
+#
+# Quick start:
+#   cp .env.example .env       # then edit secrets
+#   docker compose up -d
+#   open http://localhost:8069  # Odoo login (db: southbrook)
+#   curl http://localhost:8001/health  # FreeCAD bridge health
+#
+# The existing addons/ tree is mounted directly into the Odoo container so
+# in-flight Phase work (configurator-attribute audit etc.) keeps working
+# without a rebuild.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sami-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-southbrook}
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-odoo} -d ${POSTGRES_DB:-southbrook}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  odoo:
+    image: odoo:19
+    container_name: sami-odoo
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST: db
+      USER: ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "8069:8069"
+      - "8072:8072"   # longpolling / websocket
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      - odoo-data:/var/lib/odoo
+    restart: unless-stopped
+    # Override the default cmd to point at our addons dir + admin password.
+    command: >
+      odoo
+      --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+      --database=${ODOO_DB:-southbrook}
+      --db_host=db
+      --db_user=${POSTGRES_USER:-odoo}
+      --db_password=${POSTGRES_PASSWORD}
+      --admin-password=${ODOO_MASTER_PASSWORD:-admin}
+
+  freecad-bridge:
+    build:
+      context: ./services/freecad_bridge
+      dockerfile: Dockerfile
+    container_name: sami-freecad-bridge
+    environment:
+      FREECAD_BRIDGE_SECRET: ${FREECAD_BRIDGE_SECRET:?FREECAD_BRIDGE_SECRET must be set in .env}
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+    # Module 0 placeholder — only /health is implemented. Module 2 fills in
+    # /render /status /validate /templates and the FreeCAD runtime.
+
+volumes:
+  postgres-data:
+  odoo-data:
