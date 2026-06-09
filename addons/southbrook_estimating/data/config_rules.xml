@@ -1195,4 +1195,258 @@
 
   <!-- END Phase 2F deferred rules — A2=10, A5=8, A6=6, A7=5 (29 total) ─ -->
 
+  <!-- ============================================================== -->
+  <!-- A8 — Finish scoped by Wood Species (P2)                         -->
+  <!-- maple_stain only on Maple                                       -->
+  <!-- cherry_stain on Cherry or Alder                                 -->
+  <!-- walnut_stain on Walnut, Red Oak, White Oak Rift, or Hickory     -->
+  <!-- (white + custom finishes have no rule → always available;      -->
+  <!--  MDF Painted gets {white, custom} by elimination of stains.)   -->
+  <!-- ============================================================== -->
+
+  <record id="domain_species_is_maple" model="product.config.domain">
+    <field name="name">Species is Maple</field>
+  </record>
+  <record id="domain_species_is_maple_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_species_maple')])]"/>
+  </record>
+
+  <record id="domain_species_allows_cherry_stain" model="product.config.domain">
+    <field name="name">Species allows Cherry Stain (Cherry or Alder)</field>
+  </record>
+  <record id="domain_species_allows_cherry_stain_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_species_cherry'), ref('value_species_alder')])]"/>
+  </record>
+
+  <record id="domain_species_allows_walnut_stain" model="product.config.domain">
+    <field name="name">Species allows Walnut Stain (Walnut, Oak, Hickory)</field>
+  </record>
+  <record id="domain_species_allows_walnut_stain_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_species_walnut'), ref('value_species_red_oak'), ref('value_species_white_oak_rift'), ref('value_species_hickory')])]"/>
+  </record>
+
+  <record id="ruleA8_wall_1dr_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_1dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47000</field>
+  </record>
+  <record id="ruleA8_wall_2dr_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_2dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47010</field>
+  </record>
+  <record id="ruleA8_base_1dr_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47020</field>
+  </record>
+  <record id="ruleA8_base_2dr_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47030</field>
+  </record>
+  <record id="ruleA8_drawer_bank_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47040</field>
+  </record>
+  <record id="ruleA8_sink_base_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47050</field>
+  </record>
+  <record id="ruleA8_tall_pantry_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47060</field>
+  </record>
+  <record id="ruleA8_tall_oven_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_id" ref="attr_line_tall_oven_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47070</field>
+  </record>
+  <record id="ruleA8_corner_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47080</field>
+  </record>
+  <record id="ruleA8_vanity_maple_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+    <field name="domain_id" ref="domain_species_is_maple"/>
+    <field name="sequence">47090</field>
+  </record>
+  <record id="ruleA8_wall_1dr_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_1dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47100</field>
+  </record>
+  <record id="ruleA8_wall_2dr_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_2dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47110</field>
+  </record>
+  <record id="ruleA8_base_1dr_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47120</field>
+  </record>
+  <record id="ruleA8_base_2dr_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47130</field>
+  </record>
+  <record id="ruleA8_drawer_bank_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47140</field>
+  </record>
+  <record id="ruleA8_sink_base_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47150</field>
+  </record>
+  <record id="ruleA8_tall_pantry_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47160</field>
+  </record>
+  <record id="ruleA8_tall_oven_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_id" ref="attr_line_tall_oven_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47170</field>
+  </record>
+  <record id="ruleA8_corner_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47180</field>
+  </record>
+  <record id="ruleA8_vanity_cherry_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_cherry_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_cherry_stain"/>
+    <field name="sequence">47190</field>
+  </record>
+  <record id="ruleA8_wall_1dr_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_1dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47200</field>
+  </record>
+  <record id="ruleA8_wall_2dr_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_2dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47210</field>
+  </record>
+  <record id="ruleA8_base_1dr_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47220</field>
+  </record>
+  <record id="ruleA8_base_2dr_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47230</field>
+  </record>
+  <record id="ruleA8_drawer_bank_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47240</field>
+  </record>
+  <record id="ruleA8_sink_base_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47250</field>
+  </record>
+  <record id="ruleA8_tall_pantry_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47260</field>
+  </record>
+  <record id="ruleA8_tall_oven_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_id" ref="attr_line_tall_oven_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47270</field>
+  </record>
+  <record id="ruleA8_corner_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47280</field>
+  </record>
+  <record id="ruleA8_vanity_walnut_stain_by_species" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_finish"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_finish_walnut_stain')])]"/>
+    <field name="domain_id" ref="domain_species_allows_walnut_stain"/>
+    <field name="sequence">47290</field>
+  </record>
+
+  <!-- END A8 — 3 domains + 30 rules (10 cabinets × 3 stains) ──────── -->
 </odoo>
