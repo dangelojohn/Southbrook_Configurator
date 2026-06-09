@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_kitchen_project_list" model="ir.ui.view">
+        <field name="name">sb.kitchen.project.list</field>
+        <field name="model">sb.kitchen.project</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="theme"/>
+                <field name="salesperson_id"/>
+                <field name="date_target"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state in ['designing', 'awaiting_customer']"
+                       decoration-success="state in ['approved', 'in_production', 'done']"
+                       decoration-danger="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sb_kitchen_project_form" model="ir.ui.view">
+        <field name="name">sb.kitchen.project.form</field>
+        <field name="model">sb.kitchen.project</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_start_designing" string="Start Designing"
+                            type="object" class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_submit_to_customer" string="Submit to Customer"
+                            type="object" class="oe_highlight"
+                            invisible="state != 'designing'"/>
+                    <button name="action_customer_approves" string="Customer Approves"
+                            type="object" class="oe_highlight"
+                            invisible="state != 'awaiting_customer'"/>
+                    <button name="action_release_to_production" string="Release to Production"
+                            type="object" class="oe_highlight"
+                            invisible="state != 'approved'"/>
+                    <button name="action_done" string="Mark Done"
+                            type="object" class="oe_highlight"
+                            invisible="state != 'in_production'"/>
+                    <button name="action_cancel" string="Cancel"
+                            type="object"
+                            invisible="state in ['done', 'cancelled']"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,designing,awaiting_customer,approved,in_production,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Project name…"/>
+                        </h1>
+                        <h2>
+                            <field name="code"/>
+                        </h2>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="opportunity_id"/>
+                            <field name="salesperson_id"/>
+                            <field name="theme"/>
+                        </group>
+                        <group>
+                            <field name="date_created"/>
+                            <field name="date_target"/>
+                            <field name="date_completed"/>
+                            <field name="sale_order_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Design Options" name="design_options">
+                            <field name="design_option_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="description"/>
+                                    <field name="estimated_price"/>
+                                    <field name="estimated_lead_time_days"/>
+                                    <field name="is_selected" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="AI Analysis" name="ai_analysis">
+                            <field name="ai_analysis_id"/>
+                        </page>
+                        <page string="Appliances" name="appliances">
+                            <field name="appliance_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="appliance_type"/>
+                                    <field name="width_mm"/>
+                                    <field name="height_mm"/>
+                                    <field name="depth_mm"/>
+                                    <field name="requires_clearance_mm"/>
+                                    <field name="confirmed_by_human" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Approvals" name="approvals">
+                            <field name="approval_ids">
+                                <list>
+                                    <field name="approval_type"/>
+                                    <field name="approver_id"/>
+                                    <field name="approver_type"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="date_decided"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sb_kitchen_project" model="ir.actions.act_window">
+        <field name="name">Kitchen Projects</field>
+        <field name="res_model">sb.kitchen.project</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

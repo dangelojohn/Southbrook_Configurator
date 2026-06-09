@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_kitchen_approval_list" model="ir.ui.view">
+        <field name="name">sb.kitchen.approval.list</field>
+        <field name="model">sb.kitchen.approval</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="project_id"/>
+                <field name="approval_type"/>
+                <field name="approver_id"/>
+                <field name="approver_type"/>
+                <field name="state" widget="badge"/>
+                <field name="date_decided"/>
+            </list>
+        </field>
+    </record>
+</odoo>

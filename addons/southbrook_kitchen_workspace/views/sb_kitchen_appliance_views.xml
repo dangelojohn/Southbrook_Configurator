@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_kitchen_appliance_list" model="ir.ui.view">
+        <field name="name">sb.kitchen.appliance.list</field>
+        <field name="model">sb.kitchen.appliance</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="project_id"/>
+                <field name="name"/>
+                <field name="appliance_type"/>
+                <field name="width_mm"/>
+                <field name="height_mm"/>
+                <field name="depth_mm"/>
+                <field name="requires_clearance_mm"/>
+                <field name="confirmed_by_human" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+</odoo>

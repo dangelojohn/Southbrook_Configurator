@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="seq_sb_kitchen_project" model="ir.sequence">
+        <field name="name">Kitchen Project</field>
+        <field name="code">sb.kitchen.project</field>
+        <field name="prefix">KP/%(year)s/</field>
+        <field name="padding">6</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+</odoo>

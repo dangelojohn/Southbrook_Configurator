@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sb_kitchen_project_user,access.sb.kitchen.project.user,model_sb_kitchen_project,base.group_user,1,1,1,0
+access_sb_kitchen_project_manager,access.sb.kitchen.project.manager,model_sb_kitchen_project,sales_team.group_sale_manager,1,1,1,1
+access_sb_kitchen_design_option_user,access.sb.kitchen.design.option.user,model_sb_kitchen_design_option,base.group_user,1,1,1,1
+access_sb_kitchen_ai_analysis_user,access.sb.kitchen.ai.analysis.user,model_sb_kitchen_ai_analysis,base.group_user,1,1,1,1
+access_sb_kitchen_appliance_user,access.sb.kitchen.appliance.user,model_sb_kitchen_appliance,base.group_user,1,1,1,1
+access_sb_kitchen_approval_user,access.sb.kitchen.approval.user,model_sb_kitchen_approval,base.group_user,1,1,1,1
