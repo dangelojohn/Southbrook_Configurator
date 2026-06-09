@@ -51,7 +51,6 @@ Three.js KitchenCanvas (Phase 2):
     ],
     "assets": {
         "web.assets_frontend": [
-            ("include", "web.assets_frontend"),
             "southbrook_customer_portal/static/src/js/kitchen_dims.js",
             "southbrook_customer_portal/static/src/js/kitchen_canvas.js",
         ],
