@@ -13,3 +13,4 @@ from . import test_qweb_reports
 from . import test_demo_data
 from . import test_phase1_smoke
 from . import test_catalog_metadata_seed
+from . import test_audit_phase2
