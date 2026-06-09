@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.1.5.0",
+    "version": "19.0.1.6.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -125,6 +125,12 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "data/product_templates.xml",
         # Commit 5+7 — 4 rule triggers + 65 per-template config.line records
         "data/config_rules.xml",
+        # Phase 2K (2026-06-09) — wizard step grouping. Four config.step
+        # buckets (Construction / Door & Finish / Hardware / Interior) +
+        # 40 step_lines binding each cabinet's attribute_lines into
+        # exactly one bucket. MUST load AFTER product_templates.xml so
+        # the attribute_line refs resolve.
+        "data/config_steps.xml",
         # G13 (2026-06-01) — retail list_price seed for the 12 Q8
         # cabinet templates so price transparency in the customer
         # Order Builder has real numbers to show. Must load AFTER

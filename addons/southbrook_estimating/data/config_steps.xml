@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 2K (audit 2026-06-09) — wizard step grouping.
+
+  Without product.config.step records, the OCA wizard renders
+  all 18-21 attribute_lines per cabinet as one long flat scroll.
+  At Southbrook's post-audit attribute count, that is unusable.
+
+  Four step buckets cover every audit attribute:
+
+    1. Construction &amp; Sizing — family / width / series / box /
+       frame_style / door_count / family_subtype
+    2. Door &amp; Finish        — door_style / overlay / species /
+       finish / edge / glass / crown
+    3. Hardware &amp; Sides     — hinge / handle / pull_finish /
+       finished_sides / gables
+    4. Interior &amp; Accessories — drawer_construction / interior_storage /
+       lighting / accessories
+
+  Per-cabinet step_lines reference only the attribute_lines that
+  actually exist on each template (e.g. sink_base has no
+  drawer_construction, so its Interior step omits that ref).
+-->
+<odoo noupdate="0">
+
+  <!-- ============================================================== -->
+  <!-- Four step buckets (global, shared across all 10 cabinets)       -->
+  <!-- ============================================================== -->
+  <record id="step_construction" model="product.config.step">
+    <field name="name">Construction &amp; Sizing</field>
+  </record>
+  <record id="step_door_finish" model="product.config.step">
+    <field name="name">Door &amp; Finish</field>
+  </record>
+  <record id="step_hardware" model="product.config.step">
+    <field name="name">Hardware &amp; Sides</field>
+  </record>
+  <record id="step_interior" model="product.config.step">
+    <field name="name">Interior &amp; Accessories</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- Per-cabinet step_lines binding step → attribute_lines           -->
+  <!-- ============================================================== -->
+  <record id="step_line_wall_1dr_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_1dr_family'), ref('attr_line_wall_1dr_width'), ref('attr_line_wall_1dr_series'), ref('attr_line_wall_1dr_box_material'), ref('attr_line_wall_1dr_frame_style'), ref('attr_line_wall_1dr_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_wall_1dr_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_1dr_door_style'), ref('attr_line_wall_1dr_door_overlay'), ref('attr_line_wall_1dr_wood_species'), ref('attr_line_wall_1dr_finish'), ref('attr_line_wall_1dr_edge_profile'), ref('attr_line_wall_1dr_glass_insert'), ref('attr_line_wall_1dr_crown_molding')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_wall_1dr_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_1dr_hinge_side'), ref('attr_line_wall_1dr_handle'), ref('attr_line_wall_1dr_pull_finish'), ref('attr_line_wall_1dr_finished_sides'), ref('attr_line_wall_1dr_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_wall_1dr_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_1dr_lighting'), ref('attr_line_wall_1dr_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_wall_2dr_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_2dr_family'), ref('attr_line_wall_2dr_width'), ref('attr_line_wall_2dr_series'), ref('attr_line_wall_2dr_box_material'), ref('attr_line_wall_2dr_frame_style'), ref('attr_line_wall_2dr_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_wall_2dr_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_2dr_door_style'), ref('attr_line_wall_2dr_door_overlay'), ref('attr_line_wall_2dr_wood_species'), ref('attr_line_wall_2dr_finish'), ref('attr_line_wall_2dr_edge_profile'), ref('attr_line_wall_2dr_glass_insert'), ref('attr_line_wall_2dr_crown_molding')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_wall_2dr_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_2dr_hinge_side'), ref('attr_line_wall_2dr_handle'), ref('attr_line_wall_2dr_pull_finish'), ref('attr_line_wall_2dr_finished_sides'), ref('attr_line_wall_2dr_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_wall_2dr_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_wall_2dr_lighting'), ref('attr_line_wall_2dr_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_base_1dr_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_1dr_family'), ref('attr_line_base_1dr_width'), ref('attr_line_base_1dr_series'), ref('attr_line_base_1dr_box_material'), ref('attr_line_base_1dr_frame_style'), ref('attr_line_base_1dr_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_base_1dr_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_1dr_door_style'), ref('attr_line_base_1dr_door_overlay'), ref('attr_line_base_1dr_wood_species'), ref('attr_line_base_1dr_finish'), ref('attr_line_base_1dr_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_base_1dr_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_1dr_hinge_side'), ref('attr_line_base_1dr_handle'), ref('attr_line_base_1dr_pull_finish'), ref('attr_line_base_1dr_finished_sides'), ref('attr_line_base_1dr_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_base_1dr_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_1dr_drawer_construction'), ref('attr_line_base_1dr_interior_storage'), ref('attr_line_base_1dr_lighting'), ref('attr_line_base_1dr_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_base_2dr_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_2dr_family'), ref('attr_line_base_2dr_width'), ref('attr_line_base_2dr_series'), ref('attr_line_base_2dr_box_material'), ref('attr_line_base_2dr_frame_style'), ref('attr_line_base_2dr_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_base_2dr_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_2dr_door_style'), ref('attr_line_base_2dr_door_overlay'), ref('attr_line_base_2dr_wood_species'), ref('attr_line_base_2dr_finish'), ref('attr_line_base_2dr_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_base_2dr_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_2dr_hinge_side'), ref('attr_line_base_2dr_handle'), ref('attr_line_base_2dr_pull_finish'), ref('attr_line_base_2dr_finished_sides'), ref('attr_line_base_2dr_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_base_2dr_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_base_2dr_drawer_construction'), ref('attr_line_base_2dr_interior_storage'), ref('attr_line_base_2dr_lighting'), ref('attr_line_base_2dr_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_drawer_bank_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_drawer_bank_family'), ref('attr_line_drawer_bank_width'), ref('attr_line_drawer_bank_series'), ref('attr_line_drawer_bank_box_material'), ref('attr_line_drawer_bank_frame_style'), ref('attr_line_drawer_bank_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_drawer_bank_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_drawer_bank_door_style'), ref('attr_line_drawer_bank_door_overlay'), ref('attr_line_drawer_bank_wood_species'), ref('attr_line_drawer_bank_finish'), ref('attr_line_drawer_bank_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_drawer_bank_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_drawer_bank_hinge_side'), ref('attr_line_drawer_bank_handle'), ref('attr_line_drawer_bank_pull_finish'), ref('attr_line_drawer_bank_finished_sides'), ref('attr_line_drawer_bank_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_drawer_bank_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_drawer_bank_drawer_construction'), ref('attr_line_drawer_bank_interior_storage'), ref('attr_line_drawer_bank_lighting'), ref('attr_line_drawer_bank_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_sink_base_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_sink_base_family'), ref('attr_line_sink_base_width'), ref('attr_line_sink_base_series'), ref('attr_line_sink_base_box_material'), ref('attr_line_sink_base_frame_style'), ref('attr_line_sink_base_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_sink_base_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_sink_base_door_style'), ref('attr_line_sink_base_door_overlay'), ref('attr_line_sink_base_wood_species'), ref('attr_line_sink_base_finish'), ref('attr_line_sink_base_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_sink_base_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_sink_base_hinge_side'), ref('attr_line_sink_base_handle'), ref('attr_line_sink_base_pull_finish'), ref('attr_line_sink_base_finished_sides'), ref('attr_line_sink_base_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_sink_base_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_sink_base_interior_storage'), ref('attr_line_sink_base_lighting'), ref('attr_line_sink_base_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_tall_pantry_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_pantry_family'), ref('attr_line_tall_pantry_width'), ref('attr_line_tall_pantry_series'), ref('attr_line_tall_pantry_box_material'), ref('attr_line_tall_pantry_frame_style'), ref('attr_line_tall_pantry_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_tall_pantry_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_pantry_door_style'), ref('attr_line_tall_pantry_door_overlay'), ref('attr_line_tall_pantry_wood_species'), ref('attr_line_tall_pantry_finish'), ref('attr_line_tall_pantry_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_tall_pantry_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_pantry_hinge_side'), ref('attr_line_tall_pantry_handle'), ref('attr_line_tall_pantry_pull_finish'), ref('attr_line_tall_pantry_finished_sides'), ref('attr_line_tall_pantry_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_tall_pantry_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_pantry_drawer_construction'), ref('attr_line_tall_pantry_interior_storage'), ref('attr_line_tall_pantry_lighting'), ref('attr_line_tall_pantry_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_tall_oven_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_oven_family'), ref('attr_line_tall_oven_width'), ref('attr_line_tall_oven_series'), ref('attr_line_tall_oven_box_material'), ref('attr_line_tall_oven_frame_style'), ref('attr_line_tall_oven_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_tall_oven_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_oven_door_style'), ref('attr_line_tall_oven_door_overlay'), ref('attr_line_tall_oven_wood_species'), ref('attr_line_tall_oven_finish'), ref('attr_line_tall_oven_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_tall_oven_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_oven_hinge_side'), ref('attr_line_tall_oven_handle'), ref('attr_line_tall_oven_pull_finish'), ref('attr_line_tall_oven_finished_sides'), ref('attr_line_tall_oven_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_tall_oven_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_tall_oven_lighting'), ref('attr_line_tall_oven_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_corner_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_corner_family'), ref('attr_line_corner_width'), ref('attr_line_corner_series'), ref('attr_line_corner_box_material'), ref('attr_line_corner_frame_style'), ref('attr_line_corner_door_count'), ref('attr_line_corner_family_subtype')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_corner_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_corner_door_style'), ref('attr_line_corner_door_overlay'), ref('attr_line_corner_wood_species'), ref('attr_line_corner_finish'), ref('attr_line_corner_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_corner_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_corner_hinge_side'), ref('attr_line_corner_handle'), ref('attr_line_corner_pull_finish'), ref('attr_line_corner_finished_sides'), ref('attr_line_corner_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_corner_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_corner_drawer_construction'), ref('attr_line_corner_interior_storage'), ref('attr_line_corner_lighting'), ref('attr_line_corner_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+  <record id="step_line_vanity_construction" model="product.config.step.line">
+    <field name="config_step_id" ref="step_construction"/>
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_vanity_family'), ref('attr_line_vanity_width'), ref('attr_line_vanity_series'), ref('attr_line_vanity_box_material'), ref('attr_line_vanity_frame_style'), ref('attr_line_vanity_door_count')])]"/>
+    <field name="sequence">10</field>
+  </record>
+  <record id="step_line_vanity_door_finish" model="product.config.step.line">
+    <field name="config_step_id" ref="step_door_finish"/>
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_vanity_door_style'), ref('attr_line_vanity_door_overlay'), ref('attr_line_vanity_wood_species'), ref('attr_line_vanity_finish'), ref('attr_line_vanity_edge_profile')])]"/>
+    <field name="sequence">20</field>
+  </record>
+  <record id="step_line_vanity_hardware" model="product.config.step.line">
+    <field name="config_step_id" ref="step_hardware"/>
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_vanity_hinge_side'), ref('attr_line_vanity_handle'), ref('attr_line_vanity_pull_finish'), ref('attr_line_vanity_finished_sides'), ref('attr_line_vanity_gables')])]"/>
+    <field name="sequence">30</field>
+  </record>
+  <record id="step_line_vanity_interior" model="product.config.step.line">
+    <field name="config_step_id" ref="step_interior"/>
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_ids" eval="[(6, 0, [ref('attr_line_vanity_drawer_construction'), ref('attr_line_vanity_interior_storage'), ref('attr_line_vanity_lighting'), ref('attr_line_vanity_accessories')])]"/>
+    <field name="sequence">40</field>
+  </record>
+
+</odoo>
