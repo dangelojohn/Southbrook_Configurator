@@ -136,6 +136,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_wall_1dr_door_count" model="product.template.attribute.line">
@@ -274,6 +275,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_wall_2dr_door_count" model="product.template.attribute.line">
@@ -411,6 +413,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_base_1dr_door_count" model="product.template.attribute.line">
@@ -549,6 +552,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_base_2dr_door_count" model="product.template.attribute.line">
@@ -685,6 +689,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_drawer_bank_door_count" model="product.template.attribute.line">
@@ -821,6 +826,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_sink_base_door_count" model="product.template.attribute.line">
@@ -956,6 +962,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_tall_pantry_door_count" model="product.template.attribute.line">
@@ -1090,6 +1097,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_tall_oven_door_count" model="product.template.attribute.line">
@@ -1224,6 +1232,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_corner_door_count" model="product.template.attribute.line">
@@ -1366,6 +1375,7 @@ ref('value_accessory_soft_close'),
 ref('value_accessory_drawer_organisers'),
 ref('value_accessory_pull_outs')
     ])]"/>
+    <field name="default_val" ref="value_accessory_soft_close"/>
   </record>
 
   <record id="attr_line_vanity_door_count" model="product.template.attribute.line">
