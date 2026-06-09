@@ -124,6 +124,25 @@ _ATTRS_TALL = (
     "Accessories",
 ) + _AUDIT_UNIVERSAL + _AUDIT_DRAWER_INTERIOR + _AUDIT_TALL_EXTRA
 
+# Phase 2L (audit 2026-06-09) — wizard step membership map. Each
+# step bucket lists the attribute names it owns. Used in the reconcile
+# loop to create/update product.config.step.line records on every
+# expanded cabinet so the configurator wizard renders the same four
+# tabs as the 10 Q8-locked cabinets defined statically in
+# southbrook_estimating/data/config_steps.xml.
+_AUDIT_STEPS = (
+    ("step_construction", 10,
+     ("Family", "Width", "Series", "Box Material", "Frame Style",
+      "Door Count", "Family Subtype")),
+    ("step_door_finish", 20,
+     ("Door Style", "Door Overlay", "Wood Species", "Finish",
+      "Edge Profile", "Glass Insert", "Crown Molding")),
+    ("step_hardware", 30,
+     ("Hinge Side", "Handle", "Pull Finish", "Finished Sides", "Gables")),
+    ("step_interior", 40,
+     ("Drawer Construction", "Interior Storage", "Lighting", "Accessories")),
+)
+
 # Subset overrides — when a cabinet exposes only a specific values from a
 # multi-value attribute. Keyed by (sku_default_code, attribute_name) →
 # list of value names. Anything not listed gets the full attribute value
@@ -423,6 +442,50 @@ class CatalogExpansion(models.AbstractModel):
             )
             if obsolete:
                 obsolete.unlink()
+
+            # Phase 2L — reconcile product.config.step.line records so
+            # the OCA wizard renders this cabinet's attribute_lines in
+            # the same four-tab layout as the Q8 cabinets in
+            # data/config_steps.xml. Non-destructive: write only when
+            # the attribute_line set actually changes; unlink the step
+            # binding only when no member attribute applies.
+            StepLine = self.env["product.config.step.line"]
+            attr_line_by_name = {
+                ln.attribute_id.name: ln.id
+                for ln in tmpl.attribute_line_ids
+            }
+            for step_xmlid, step_seq, member_attr_names in _AUDIT_STEPS:
+                step = self.env.ref(
+                    f"southbrook_estimating.{step_xmlid}",
+                    raise_if_not_found=False,
+                )
+                if not step:
+                    continue
+                member_ids = [
+                    attr_line_by_name[n] for n in member_attr_names
+                    if n in attr_line_by_name
+                ]
+                existing_sl = StepLine.search([
+                    ("product_tmpl_id", "=", tmpl.id),
+                    ("config_step_id", "=", step.id),
+                ], limit=1)
+                if not member_ids:
+                    if existing_sl:
+                        existing_sl.unlink()
+                    continue
+                if existing_sl:
+                    current = set(existing_sl.attribute_line_ids.ids)
+                    if current != set(member_ids):
+                        existing_sl.write({
+                            "attribute_line_ids": [(6, 0, member_ids)],
+                        })
+                else:
+                    StepLine.create({
+                        "product_tmpl_id": tmpl.id,
+                        "config_step_id": step.id,
+                        "attribute_line_ids": [(6, 0, member_ids)],
+                        "sequence": step_seq,
+                    })
 
             # POST-attribute-line write of default_code. The variant
             # recompute triggered by attribute_line creation discarded
