@@ -64,7 +64,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -195,7 +201,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -327,7 +339,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -458,7 +476,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -590,7 +614,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -718,7 +748,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -848,7 +884,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -976,7 +1018,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -1104,7 +1152,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 
@@ -1240,7 +1294,13 @@ ref('value_box_maple')
     <field name="value_ids" eval="[(6, 0, [
 ref('value_door_thermofoil_slab_white'),
 ref('value_door_five_piece_woodgrain'),
-ref('value_door_custom')
+ref('value_door_custom'),
+ref('value_door_shaker'),
+ref('value_door_raised_panel'),
+ref('value_door_beadboard'),
+ref('value_door_mullion_glass'),
+ref('value_door_v_groove'),
+ref('value_door_reeded')
     ])]"/>
   </record>
 

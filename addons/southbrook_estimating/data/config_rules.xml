@@ -1193,6 +1193,70 @@
     <field name="sequence">46040</field>
   </record>
 
+  <!-- ============================================================== -->
+  <!-- A5 — Mullion glass + Reeded door styles are wall-only            -->
+  <!-- For 8 non-wall cabinets, restrict door_style to the 7 values     -->
+  <!-- that exclude mullion_glass + reeded. Each cabinet's family is    -->
+  <!-- fixed in its attribute_line (e.g. base_1dr → family=base only),  -->
+  <!-- so domain_family_is_not_wall is unconditionally true on each.    -->
+  <!-- ============================================================== -->
+  <record id="ruleA5_base_1dr_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43000</field>
+  </record>
+  <record id="ruleA5_base_2dr_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43010</field>
+  </record>
+  <record id="ruleA5_drawer_bank_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43020</field>
+  </record>
+  <record id="ruleA5_sink_base_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43030</field>
+  </record>
+  <record id="ruleA5_tall_pantry_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43040</field>
+  </record>
+  <record id="ruleA5_tall_oven_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_id" ref="attr_line_tall_oven_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43050</field>
+  </record>
+  <record id="ruleA5_corner_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43060</field>
+  </record>
+  <record id="ruleA5_vanity_door_style_not_wall_only" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_door_style"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_door_thermofoil_slab_white'), ref('value_door_five_piece_woodgrain'), ref('value_door_custom'), ref('value_door_shaker'), ref('value_door_raised_panel'), ref('value_door_beadboard'), ref('value_door_v_groove')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="sequence">43070</field>
+  </record>
+
   <!-- END Phase 2F deferred rules — A2=10, A5=8, A6=6, A7=5 (29 total) ─ -->
 
   <!-- ============================================================== -->
