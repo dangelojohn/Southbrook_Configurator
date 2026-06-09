@@ -1,12 +1,18 @@
 # SAMI / Southbrook AI Kitchen Platform — local dev compose.
 #
-# Brings up Odoo 19 CE + Postgres 16 + the FreeCAD bridge skeleton.
+# Brings up Odoo 19 CE + Postgres 16 + the FreeCAD bridge skeleton with the
+# full southbrook-v19cr addons tree mounted (custom addons + OCA configurator).
 #
 # Quick start:
 #   cp .env.example .env       # then edit secrets
 #   docker compose up -d
-#   open http://localhost:8069  # Odoo login (db: southbrook)
+#   open http://localhost:8169  # Odoo login (db: southbrook)
 #   curl http://localhost:8001/health  # FreeCAD bridge health
+#
+# Port note: Odoo defaults to 8169/8172 (not the canonical 8069/8072) to
+# coexist with the OCA-only dev clone at ~/Downloads/Official/V19C/ which
+# already binds 8069/8072. Override via ODOO_HTTP_PORT / ODOO_LONGPOLLING_PORT
+# in .env if you stop V19C.
 #
 # The existing addons/ tree is mounted directly into the Odoo container so
 # in-flight Phase work (configurator-attribute audit etc.) keeps working
@@ -30,7 +36,10 @@ services:
       retries: 10
 
   odoo:
-    image: odoo:19
+    build:
+      context: ./services/odoo
+      dockerfile: Dockerfile
+    image: sami-odoo:dev
     container_name: sami-odoo
     depends_on:
       db:
@@ -39,14 +48,22 @@ services:
       HOST: db
       USER: ${POSTGRES_USER:-odoo}
       PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      # shared/southbrook_dims.py is the canonical 7-panel formula source.
+      # Mounted at /srv/shared and exposed via PYTHONPATH so Odoo addons +
+      # test_bom_contents.py (G1) can `from southbrook_dims import ...`.
+      PYTHONPATH: /srv/shared
     ports:
-      - "8069:8069"
-      - "8072:8072"   # longpolling / websocket
+      - "${ODOO_HTTP_PORT:-8169}:8069"
+      - "${ODOO_LONGPOLLING_PORT:-8172}:8072"   # longpolling / websocket
     volumes:
       - ./addons:/mnt/extra-addons:ro
+      - ./shared:/srv/shared:ro
       - odoo-data:/var/lib/odoo
     restart: unless-stopped
-    # Override the default cmd to point at our addons dir + admin password.
+    # Override the default cmd to point at our addons dir.
+    # The master-admin password is set in odoo.conf, not via CLI (no such
+    # Odoo flag exists). Configure inside the running container after init,
+    # or mount a config file at /etc/odoo/odoo.conf.
     command: >
       odoo
       --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
@@ -54,7 +71,6 @@ services:
       --db_host=db
       --db_user=${POSTGRES_USER:-odoo}
       --db_password=${POSTGRES_PASSWORD}
-      --admin-password=${ODOO_MASTER_PASSWORD:-admin}
 
   freecad-bridge:
     build:
