@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Representative seed catalog — ~20 SKUs covering all 9 hardware
+        categories (hinge, slide, pin, screw, handle, leveler, cam_lock,
+        bumper, other). The 179-row Marathon workbook import replaces
+        this file when the trade-account session lands.
+
+        Every SKU has x_pricing_pending=True because trade-account login
+        is needed to resolve cost/price.
+
+        Vendor info (product.supplierinfo) links each SKU to Marathon —
+        the configurator-resolution method picks SKUs by x_marathon_sku,
+        which is the stable identifier inside hardware_map.json.
+    -->
+
+    <!-- ============ HINGES ============ -->
+    <record id="hw_blum_clip_top_blumotion_110" model="product.product">
+        <field name="name">Blum CLIP top BLUMOTION 110° (Soft-Close, Full Overlay)</field>
+        <field name="default_code">BLM-110-SC</field>
+        <field name="x_marathon_sku">BLM-110-SC</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">hinge</field>
+        <field name="x_hardware_brand_id" ref="brand_blum"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_blum_clip_top_110_nosc" model="product.product">
+        <field name="name">Blum CLIP top 110° (Non-Soft-Close, Full Overlay)</field>
+        <field name="default_code">BLM-110-NSC</field>
+        <field name="x_marathon_sku">BLM-110-NSC</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">hinge</field>
+        <field name="x_hardware_brand_id" ref="brand_blum"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_salice_200_sc" model="product.product">
+        <field name="name">Salice 200 Series (Soft-Close, Full Overlay)</field>
+        <field name="default_code">SAL-200-SC</field>
+        <field name="x_marathon_sku">SAL-200-SC</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">hinge</field>
+        <field name="x_hardware_brand_id" ref="brand_salice"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ SLIDES ============ -->
+    <record id="hw_blum_movento_450" model="product.product">
+        <field name="name">Blum MOVENTO 450 mm (Soft-Close, Heavy-Duty)</field>
+        <field name="default_code">BLM-MOV-450</field>
+        <field name="x_marathon_sku">BLM-MOV-450</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_blum"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_hettich_quadro_450" model="product.product">
+        <field name="name">Hettich Quadro V6 450 mm (Push-To-Open)</field>
+        <field name="default_code">HET-QUAD-450</field>
+        <field name="x_marathon_sku">HET-QUAD-450</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_hettich"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_accuride_3832_400" model="product.product">
+        <field name="name">Accuride 3832 400 mm (Side-Mount, 75 lb)</field>
+        <field name="default_code">ACC-3832-400</field>
+        <field name="x_marathon_sku">ACC-3832-400</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_accuride"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ PINS ============ -->
+    <record id="hw_shelf_pin_5mm" model="product.product">
+        <field name="name">Shelf Pin 5 mm Steel (Bag of 100)</field>
+        <field name="default_code">MRH-SHLFPIN-5MM</field>
+        <field name="x_marathon_sku">MRH-SHLFPIN-5MM</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">pin</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ HANDLES ============ -->
+    <record id="hw_handle_pull_128" model="product.product">
+        <field name="name">Bar Pull 128 mm CC (Brushed Nickel)</field>
+        <field name="default_code">MRH-HDL-PUL128</field>
+        <field name="x_marathon_sku">MRH-HDL-PUL128</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_top_knobs"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_handle_knob_30" model="product.product">
+        <field name="name">Cabinet Knob 30 mm (Brushed Nickel)</field>
+        <field name="default_code">MRH-HDL-KNB30</field>
+        <field name="x_marathon_sku">MRH-HDL-KNB30</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_berenson"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ SCREWS / FASTENERS ============ -->
+    <record id="hw_screw_eurocam_25pk" model="product.product">
+        <field name="name">Eurocam Screw 25-Pack (cabinet mounting)</field>
+        <field name="default_code">MRH-MTGSCR-25PK</field>
+        <field name="x_marathon_sku">MRH-MTGSCR-25PK</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">screw</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ LEVELERS ============ -->
+    <record id="hw_leveler_50mm" model="product.product">
+        <field name="name">Cabinet Leveler 50 mm (M6 thread)</field>
+        <field name="default_code">MRH-LVL-50</field>
+        <field name="x_marathon_sku">MRH-LVL-50</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">leveler</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ CAM-LOCKS / RTA ============ -->
+    <record id="hw_camlock_kit" model="product.product">
+        <field name="name">Cam-Lock Kit (RTA Joinery)</field>
+        <field name="default_code">MRH-CAMLOCK-KIT</field>
+        <field name="x_marathon_sku">MRH-CAMLOCK-KIT</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">cam_lock</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ BUMPERS / STOPS ============ -->
+    <record id="hw_door_bumper_clear" model="product.product">
+        <field name="name">Door Bumper Dot — Clear PU (Bag of 100)</field>
+        <field name="default_code">MRH-DOORBUMP-CL</field>
+        <field name="x_marathon_sku">MRH-DOORBUMP-CL</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">bumper</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ OTHER (sink / specialty) ============ -->
+    <record id="hw_sink_water_barrier" model="product.product">
+        <field name="name">Sink-Base Water Barrier — 1 m roll</field>
+        <field name="default_code">MRH-WATERBARRIER-1M</field>
+        <field name="x_marathon_sku">MRH-WATERBARRIER-1M</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+
+    <!-- ============ supplier-info linking everything to Marathon ============ -->
+    <record id="si_blum_clip_top_sc" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_blum_clip_top_blumotion_110"/>
+        <field name="product_code">BLM-110-SC</field>
+        <field name="min_qty">100</field>
+    </record>
+    <record id="si_blum_movento_450" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_blum_movento_450"/>
+        <field name="product_code">BLM-MOV-450</field>
+        <field name="min_qty">10</field>
+    </record>
+    <record id="si_shelf_pin" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_shelf_pin_5mm"/>
+        <field name="product_code">MRH-SHLFPIN-5MM</field>
+        <field name="min_qty">1</field>
+    </record>
+    <record id="si_leveler" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_leveler_50mm"/>
+        <field name="product_code">MRH-LVL-50</field>
+        <field name="min_qty">100</field>
+    </record>
+</odoo>

@@ -1,0 +1,39 @@
+{
+  "_comment": "Hardware-resolution rules. SKUs must match x_marathon_sku on product.product records. per_door_soft_close is picked when the configurator's soft_close flag is true; per_door otherwise. per_family adds cabinet-family-specific extras on top of per_cabinet.",
+
+  "per_door_soft_close": {
+    "BLM-110-SC": 2,
+    "MRH-DOORBUMP-CL": 2,
+    "MRH-HDL-PUL128": 1
+  },
+
+  "per_door": {
+    "BLM-110-NSC": 2,
+    "MRH-DOORBUMP-CL": 2,
+    "MRH-HDL-PUL128": 1
+  },
+
+  "per_drawer": {
+    "BLM-MOV-450": 1,
+    "MRH-HDL-PUL128": 1
+  },
+
+  "per_shelf": {
+    "MRH-SHLFPIN-5MM": 4
+  },
+
+  "per_cabinet": {
+    "MRH-CAMLOCK-KIT": 1,
+    "MRH-LVL-50": 4,
+    "MRH-MTGSCR-25PK": 1
+  },
+
+  "per_family": {
+    "tall": {
+      "MRH-LVL-50": 4
+    },
+    "sink": {
+      "MRH-WATERBARRIER-1M": 1
+    }
+  }
+}

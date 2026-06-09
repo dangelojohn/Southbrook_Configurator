@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Marathon Hardware — wholesale cabinet-hardware distributor.
+        Sourced from marathon-import/res.partner.marathon.csv. The TO CONFIRM
+        items there (dealer account #, AP/orders email, payment terms,
+        currency, branch) stay as notes until a trade-account session lands.
+    -->
+    <record id="partner_marathon_hardware" model="res.partner">
+        <field name="name">Marathon Hardware</field>
+        <field name="company_type">company</field>
+        <field name="is_company" eval="True"/>
+        <field name="supplier_rank" eval="1"/>
+        <field name="customer_rank" eval="0"/>
+        <field name="street">1-4120B Sladeview Crescent</field>
+        <field name="city">Mississauga</field>
+        <field name="zip">L5L 5Z3</field>
+        <field name="phone">+1 905-607-8665</field>
+        <field name="website">https://marathonhardware.com</field>
+        <field name="comment">Wholesale cabinet-hardware distributor (est. 1990; 6 locations across 3 provinces; serves Canada + US). Toll-free: 800-840-1228. Legal entity: Marathon Fasteners &amp; Hardware Inc. TO CONFIRM before purchasing: dealer account #, AP/orders email, payment terms, currency (CAD vs USD for Southbrook), and which branch services Southbrook.</field>
+    </record>
+</odoo>
