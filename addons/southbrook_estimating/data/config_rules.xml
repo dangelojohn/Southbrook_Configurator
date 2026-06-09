@@ -648,5 +648,132 @@
   <field name="sequence">30000</field>
 </record>
 
+  <!-- ============================================================== -->
+  <!-- CONFIGURATOR AUDIT v1  (2026-06-09) — gating rules             -->
+  <!--                                                                -->
+  <!-- These domains are reusable predicates. Per-template            -->
+  <!-- product.config.line records that bind them to the new          -->
+  <!-- attribute lines are intentionally NOT in this commit — they    -->
+  <!-- need attribute_line_ids that don't exist until the new         -->
+  <!-- attributes are added to each cabinet template's attribute_ids. -->
+  <!-- This wiring is the Phase-2 follow-up (sales rep + dev review). -->
+  <!--                                                                -->
+  <!-- The domains here document the BUSINESS rules so the audit      -->
+  <!-- is self-contained and any future agent (human or LLM) wiring   -->
+  <!-- the new attributes can drop in the matching config.line.       -->
+  <!-- ============================================================== -->
+
+  <!-- ─ Frame style predicates ──────────────────────────────────── -->
+  <record id="domain_frame_is_framed" model="product.config.domain">
+    <field name="name">Frame Style is Framed</field>
+  </record>
+  <record id="domain_frame_is_framed_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_frame_is_framed"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_framed')])]"/>
+  </record>
+
+  <record id="domain_frame_is_frameless" model="product.config.domain">
+    <field name="name">Frame Style is Frameless</field>
+  </record>
+  <record id="domain_frame_is_frameless_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_frame_is_frameless"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_frame_frameless')])]"/>
+  </record>
+
+  <!-- ─ Premium-series predicate (used for inset, dovetail, etc.) ─ -->
+  <record id="domain_series_is_premium" model="product.config.domain">
+    <field name="name">Series is Premium (Elegance or Signature)</field>
+  </record>
+  <record id="domain_series_is_premium_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_series_is_premium"/>
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_series_elegance'), ref('value_series_signature')
+    ])]"/>
+  </record>
+
+  <!-- ─ Family predicates for the new gating rules ──────────────── -->
+  <record id="domain_family_is_wall" model="product.config.domain">
+    <field name="name">Family is Wall</field>
+  </record>
+  <record id="domain_family_is_wall_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_family_is_wall"/>
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_family_wall')])]"/>
+  </record>
+
+  <record id="domain_family_is_base" model="product.config.domain">
+    <field name="name">Family is Base</field>
+  </record>
+  <record id="domain_family_is_base_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_family_is_base"/>
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_family_base')])]"/>
+  </record>
+
+  <record id="domain_family_is_corner" model="product.config.domain">
+    <field name="name">Family is Corner</field>
+  </record>
+  <record id="domain_family_is_corner_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_family_is_corner"/>
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_family_corner')])]"/>
+  </record>
+
+  <!-- ─ Audit-v1 business rules (documented; bind in Phase 2) ───── -->
+  <!--                                                                -->
+  <!-- Rule A1 (inset overlay requires framed):                       -->
+  <!--   When the wired config.line for door_overlay is added,        -->
+  <!--   apply domain_frame_is_frameless to restrict the value_ids    -->
+  <!--   to {full overlay, partial overlay} (no inset on frameless).  -->
+  <!--                                                                -->
+  <!-- Rule A2 (beaded inset is premium-series only):                 -->
+  <!--   On door_overlay, when series is NOT in premium, restrict     -->
+  <!--   value_ids to {full, partial, inset} (no beaded_inset).       -->
+  <!--                                                                -->
+  <!-- Rule A3 (frameless not on contractor series):                  -->
+  <!--   On frame_style, when series is contractor, restrict          -->
+  <!--   value_ids to {framed only}.                                  -->
+  <!--                                                                -->
+  <!-- Rule A4 (dovetail premium-only):                               -->
+  <!--   On drawer_construction, when series is contractor, restrict  -->
+  <!--   value_ids to {plywood, particleboard} only.                  -->
+  <!--                                                                -->
+  <!-- Rule A5 (mullion-glass door requires Wall family):             -->
+  <!--   On door_style, when family is NOT wall, omit                 -->
+  <!--   {mullion_glass, reeded} from value_ids.                      -->
+  <!--                                                                -->
+  <!-- Rule A6 (lazy susan is corner-only):                           -->
+  <!--   On interior_storage, when family is NOT corner, omit         -->
+  <!--   value_int_lazy_susan from value_ids.                         -->
+  <!--                                                                -->
+  <!-- Rule A7 (pull-out trash is base-only):                         -->
+  <!--   On interior_storage, when family is NOT base, omit           -->
+  <!--   value_int_pullout_trash from value_ids.                      -->
+  <!--                                                                -->
+  <!-- Rule A8 (interior LED requires glass-door wall):               -->
+  <!--   On lighting, when glass_insert=none AND family≠wall,         -->
+  <!--   omit value_lighting_interior_led.                            -->
+  <!--                                                                -->
+  <!-- These are NOT enforced in Python (per Q3.4 acceptance gate).   -->
+  <!-- They will be wired declaratively as product.config.line        -->
+  <!-- records once the new attribute_lines exist on each cabinet     -->
+  <!-- template (Phase 2).                                            -->
+
+  <!-- END CONFIGURATOR AUDIT v1 ====================================== -->
 
 </odoo>

@@ -455,4 +455,406 @@
     <field name="name">2</field><field name="sequence">2</field>
   </record>
 
+  <!-- ================================================================== -->
+  <!-- CONFIGURATOR AUDIT v1  (2026-06-09)                                -->
+  <!--                                                                    -->
+  <!-- Adds the attribute depth that competitive semi-custom and          -->
+  <!-- fully-custom kitchen-cabinet manufacturers (Wood-Mode, Plain &     -->
+  <!-- Fancy, Mouser, Wellborn, Brighton, Cabico, MasterBrand's Diamond/  -->
+  <!-- KraftMaid family) treat as table-stakes in 2026. The 11 locked     -->
+  <!-- attributes from Q2 are unchanged. These 10 new attributes + 6 new  -->
+  <!-- door styles all carry create_variant='dynamic' per Q6 and slot     -->
+  <!-- into the existing UI without breaking the Phase-1 acceptance test. -->
+  <!--                                                                    -->
+  <!-- Pricing deltas are intentionally NOT in this commit — every value  -->
+  <!-- needs a real number in each of the 6 channels (#5 Price Master).   -->
+  <!-- Sales rep / product manager populates those before launch.         -->
+  <!-- ================================================================== -->
+
+  <!-- ============================================================== -->
+  <!-- 15 · frame_style (NEW — table-stakes for any cabinet quote)    -->
+  <!-- ============================================================== -->
+  <!-- Framed vs frameless (Euro) is the first question any high-end  -->
+  <!-- buyer or sales rep asks. Drives box construction, hinge type,  -->
+  <!-- door overlay options, and the visible interior aesthetic.      -->
+  <record id="attr_frame_style" model="product.attribute">
+    <field name="name">Frame Style</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">120</field>
+  </record>
+  <record id="value_frame_framed" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="name">Framed (Traditional)</field><field name="sequence">1</field>
+  </record>
+  <record id="value_frame_frameless" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="name">Frameless (Euro)</field><field name="sequence">2</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 16 · door_overlay (NEW — drives visible aesthetic + price)     -->
+  <!-- ============================================================== -->
+  <!-- Inset and beaded-inset are the premium-tier door styles that   -->
+  <!-- mark a true semi-custom build out from a stock cabinet. Inset  -->
+  <!-- requires framed construction (frameless can't be inset).       -->
+  <record id="attr_door_overlay" model="product.attribute">
+    <field name="name">Door Overlay</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">130</field>
+  </record>
+  <record id="value_overlay_full" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="name">Full Overlay</field><field name="sequence">1</field>
+  </record>
+  <record id="value_overlay_partial" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="name">Partial Overlay (1/2 in reveal)</field><field name="sequence">2</field>
+  </record>
+  <record id="value_overlay_inset" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="name">Full Inset</field><field name="sequence">3</field>
+  </record>
+  <record id="value_overlay_beaded_inset" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="name">Beaded Inset (Premium)</field><field name="sequence">4</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 17 · wood_species (NEW — first-class, replaces "finish" stains)-->
+  <!-- ============================================================== -->
+  <!-- The current attr_finish conflates species + stain ("Maple      -->
+  <!-- Stain", "Cherry Stain", "Walnut Stain"). Splitting species out -->
+  <!-- as a first-class attribute is how every premium manufacturer   -->
+  <!-- presents the option, and it makes the catalog cross-shoppable. -->
+  <!-- The existing attr_finish stays in place for stain/paint color  -->
+  <!-- selection. Phase-2 wiring will scope attr_finish values to     -->
+  <!-- the chosen species (e.g. "natural cherry" hides on Maple).     -->
+  <record id="attr_wood_species" model="product.attribute">
+    <field name="name">Wood Species</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">140</field>
+  </record>
+  <record id="value_species_maple" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">Maple (Hard)</field><field name="sequence">1</field>
+  </record>
+  <record id="value_species_cherry" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">Cherry</field><field name="sequence">2</field>
+  </record>
+  <record id="value_species_red_oak" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">Red Oak</field><field name="sequence">3</field>
+  </record>
+  <record id="value_species_white_oak_rift" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">White Oak — Rift</field><field name="sequence">4</field>
+  </record>
+  <record id="value_species_walnut" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">Walnut (American Black)</field><field name="sequence">5</field>
+  </record>
+  <record id="value_species_alder" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">Alder</field><field name="sequence">6</field>
+  </record>
+  <record id="value_species_hickory" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">Hickory</field><field name="sequence">7</field>
+  </record>
+  <record id="value_species_mdf_painted" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="name">MDF (Painted)</field><field name="sequence">8</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 18 · drawer_construction (NEW — premium signal)                -->
+  <!-- ============================================================== -->
+  <!-- Dovetail solid-wood drawers are the dividing line between      -->
+  <!-- semi-custom and stock. Every Tier-1 competitor lists this on   -->
+  <!-- the spec sheet. Rule: dovetail not available on Contractor.    -->
+  <record id="attr_drawer_construction" model="product.attribute">
+    <field name="name">Drawer Construction</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">150</field>
+  </record>
+  <record id="value_drawer_dovetail_hardwood" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="name">Dovetail Solid Hardwood</field><field name="sequence">1</field>
+  </record>
+  <record id="value_drawer_plywood_5_8" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="name">5/8 in Plywood (Routed)</field><field name="sequence">2</field>
+  </record>
+  <record id="value_drawer_particleboard" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="name">Melamine Particleboard</field><field name="sequence">3</field>
+  </record>
+  <record id="value_drawer_metal_blum" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="name">Metal (Blum Legrabox)</field><field name="sequence">4</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 19 · pull_finish (NEW — promotes a sub-detail to first class)  -->
+  <!-- ============================================================== -->
+  <!-- Existing attr_handle covers style (bar/knob/cup/integrated).   -->
+  <!-- attr_pull_finish covers the metal finish. Both are first-class -->
+  <!-- in any competitive catalog. Customer-facing selection matters  -->
+  <!-- because hardware finish drives the room's whole palette.       -->
+  <record id="attr_pull_finish" model="product.attribute">
+    <field name="name">Pull Finish</field>
+    <field name="display_type">color</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">160</field>
+  </record>
+  <record id="value_pull_polished_nickel" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Polished Nickel</field><field name="sequence">1</field>
+  </record>
+  <record id="value_pull_brushed_nickel" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Brushed Nickel</field><field name="sequence">2</field>
+  </record>
+  <record id="value_pull_matte_black" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Matte Black</field><field name="sequence">3</field>
+  </record>
+  <record id="value_pull_antique_bronze" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Antique Bronze</field><field name="sequence">4</field>
+  </record>
+  <record id="value_pull_brushed_brass" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Brushed Brass</field><field name="sequence">5</field>
+  </record>
+  <record id="value_pull_polished_chrome" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Polished Chrome</field><field name="sequence">6</field>
+  </record>
+  <record id="value_pull_oil_rubbed_bronze" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Oil-Rubbed Bronze</field><field name="sequence">7</field>
+  </record>
+  <record id="value_pull_champagne_bronze" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="name">Champagne Bronze</field><field name="sequence">8</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 20 · interior_storage (NEW — replaces vague "Pull-Outs")       -->
+  <!-- ============================================================== -->
+  <!-- The current attr_accessories has 3 buckets (Soft-Close, Drawer -->
+  <!-- Organisers, Pull-Outs) which is too coarse to drive a BoM.     -->
+  <!-- This new multi-select gives 10 specific interior items that    -->
+  <!-- compete with high-end specialty catalogs (Rev-A-Shelf, Hafele).-->
+  <!-- attr_accessories stays for back-compat; phase-2 deprecates it. -->
+  <record id="attr_interior_storage" model="product.attribute">
+    <field name="name">Interior Storage</field>
+    <field name="display_type">multi</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">170</field>
+  </record>
+  <record id="value_int_pullout_trash" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Pull-Out Trash (Double Bin)</field><field name="sequence">1</field>
+  </record>
+  <record id="value_int_spice_pullout" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Spice Pull-Out (Vertical)</field><field name="sequence">2</field>
+  </record>
+  <record id="value_int_knife_block" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Knife Block Drawer Insert</field><field name="sequence">3</field>
+  </record>
+  <record id="value_int_cutlery_tray_wood" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Cutlery Tray (Solid Wood)</field><field name="sequence">4</field>
+  </record>
+  <record id="value_int_lazy_susan" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Lazy Susan (Kidney)</field><field name="sequence">5</field>
+  </record>
+  <record id="value_int_rollout_tray" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Roll-Out Tray (Full Extension)</field><field name="sequence">6</field>
+  </record>
+  <record id="value_int_mixer_lift" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Mixer Lift Shelf</field><field name="sequence">7</field>
+  </record>
+  <record id="value_int_wine_rack" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Wine Rack Insert (X-Cube)</field><field name="sequence">8</field>
+  </record>
+  <record id="value_int_charging_drawer" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Charging Drawer (USB-C Outlet)</field><field name="sequence">9</field>
+  </record>
+  <record id="value_int_tipout_sink" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="name">Tip-Out Sink Tray</field><field name="sequence">10</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 21 · lighting (NEW — high-margin upsell)                       -->
+  <!-- ============================================================== -->
+  <record id="attr_lighting" model="product.attribute">
+    <field name="name">Lighting</field>
+    <field name="display_type">multi</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">180</field>
+  </record>
+  <record id="value_lighting_none" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="name">None</field><field name="sequence">1</field>
+  </record>
+  <record id="value_lighting_under_cabinet_led" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="name">Under-Cabinet LED Strip</field><field name="sequence">2</field>
+  </record>
+  <record id="value_lighting_interior_led" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="name">Interior LED (Glass-Door Display)</field><field name="sequence">3</field>
+  </record>
+  <record id="value_lighting_toekick_led" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="name">Toekick LED Accent</field><field name="sequence">4</field>
+  </record>
+  <record id="value_lighting_puck" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="name">Puck Lights (Surface Mount)</field><field name="sequence">5</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 22 · glass_insert (NEW — required for any glass-door wall)     -->
+  <!-- ============================================================== -->
+  <record id="attr_glass_insert" model="product.attribute">
+    <field name="name">Glass Insert</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">190</field>
+  </record>
+  <record id="value_glass_none" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="name">None</field><field name="sequence">1</field>
+  </record>
+  <record id="value_glass_clear" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="name">Clear (1/4 in Tempered)</field><field name="sequence">2</field>
+  </record>
+  <record id="value_glass_frosted" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="name">Frosted</field><field name="sequence">3</field>
+  </record>
+  <record id="value_glass_seeded" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="name">Seeded</field><field name="sequence">4</field>
+  </record>
+  <record id="value_glass_reeded" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="name">Reeded</field><field name="sequence">5</field>
+  </record>
+  <record id="value_glass_leaded" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="name">Leaded (Mullion Pattern)</field><field name="sequence">6</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 23 · edge_profile (NEW — door + counter)                       -->
+  <!-- ============================================================== -->
+  <record id="attr_edge_profile" model="product.attribute">
+    <field name="name">Door Edge Profile</field>
+    <field name="display_type">radio</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">200</field>
+  </record>
+  <record id="value_edge_square" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="name">Square (Modern)</field><field name="sequence">1</field>
+  </record>
+  <record id="value_edge_eased" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="name">Eased</field><field name="sequence">2</field>
+  </record>
+  <record id="value_edge_bevel" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="name">Bevel</field><field name="sequence">3</field>
+  </record>
+  <record id="value_edge_ogee" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="name">Ogee (Traditional)</field><field name="sequence">4</field>
+  </record>
+  <record id="value_edge_bullnose" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="name">Bullnose</field><field name="sequence">5</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- 24 · crown_molding (NEW — first-class, was hidden in handle?)  -->
+  <!-- ============================================================== -->
+  <record id="attr_crown_molding" model="product.attribute">
+    <field name="name">Crown Molding</field>
+    <field name="display_type">select</field>
+    <field name="create_variant">dynamic</field>
+    <field name="sequence">210</field>
+  </record>
+  <record id="value_crown_none" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_crown_molding"/>
+    <field name="name">None</field><field name="sequence">1</field>
+  </record>
+  <record id="value_crown_simple" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_crown_molding"/>
+    <field name="name">Simple Cove (1.5 in)</field><field name="sequence">2</field>
+  </record>
+  <record id="value_crown_ogee" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_crown_molding"/>
+    <field name="name">Ogee (3 in)</field><field name="sequence">3</field>
+  </record>
+  <record id="value_crown_stacked" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_crown_molding"/>
+    <field name="name">Stacked Two-Tier (4.5 in)</field><field name="sequence">4</field>
+  </record>
+  <record id="value_crown_dental" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_crown_molding"/>
+    <field name="name">Dental (Traditional)</field><field name="sequence">5</field>
+  </record>
+
+  <!-- ============================================================== -->
+  <!-- New door styles — extends the existing attr_door_style          -->
+  <!-- ============================================================== -->
+  <!-- Shaker is the #1 selling door style in North America 2026.     -->
+  <!-- Raised panel + beadboard are required for any traditional sale.-->
+  <!-- Mullion-glass and reeded are the wall-cabinet premium options. -->
+  <record id="value_door_shaker" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Shaker</field><field name="sequence">4</field>
+  </record>
+  <record id="value_door_raised_panel" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Raised Panel</field><field name="sequence">5</field>
+  </record>
+  <record id="value_door_beadboard" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Beadboard</field><field name="sequence">6</field>
+  </record>
+  <record id="value_door_mullion_glass" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Mullion Glass</field><field name="sequence">7</field>
+  </record>
+  <record id="value_door_v_groove" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">V-Groove</field><field name="sequence">8</field>
+  </record>
+  <record id="value_door_reeded" model="product.attribute.value">
+    <field name="attribute_id" ref="attr_door_style"/>
+    <field name="name">Reeded</field><field name="sequence">9</field>
+  </record>
+
+  <!-- END CONFIGURATOR AUDIT v1 ====================================== -->
+
 </odoo>
