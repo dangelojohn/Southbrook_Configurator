@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Extend southbrook.eco form with the ProductGraph linkage group. -->
+    <record id="view_southbrook_eco_form_inherit_pg" model="ir.ui.view">
+        <field name="name">southbrook.eco.form.inherit.productgraph</field>
+        <field name="model">southbrook.eco</field>
+        <field name="inherit_id" ref="southbrook_plm.view_southbrook_eco_form"/>
+        <field name="arch" type="xml">
+            <!-- Add the PG group at the end of the main sheet so it sits
+                 below the existing target / approval / document blocks. -->
+            <xpath expr="//sheet" position="inside">
+                <group string="ProductGraph Linkage" name="pg_linkage">
+                    <group>
+                        <field name="pg_ebom_id"
+                               options="{'no_create': True}"
+                               readonly="state == 'applied'"/>
+                        <field name="pg_auto_release"
+                               readonly="state == 'applied'"/>
+                    </group>
+                    <group>
+                        <field name="pg_release_id" readonly="1"
+                               invisible="not pg_release_id"/>
+                    </group>
+                </group>
+            </xpath>
+            <!-- Smart button to jump to the resulting pg.release. -->
+            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
+                <button name="action_view_pg_release"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-paper-plane"
+                        invisible="not pg_release_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">PG Release</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
