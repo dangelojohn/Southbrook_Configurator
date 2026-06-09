@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_hardware_package_list" model="ir.ui.view">
+        <field name="name">sb.hardware.package.list</field>
+        <field name="model">sb.hardware.package</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="mo_id"/>
+                <field name="line_count"/>
+                <field name="has_pricing_pending" widget="boolean_toggle"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sb_hardware_package_form" model="ir.ui.view">
+        <field name="name">sb.hardware.package.form</field>
+        <field name="model">sb.hardware.package</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,picked,delivered"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="mo_id"/>
+                        <field name="has_pricing_pending"/>
+                    </group>
+                    <field name="line_ids">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="product_id"/>
+                            <field name="hardware_category"/>
+                            <field name="brand_id"/>
+                            <field name="qty"/>
+                            <field name="pricing_pending" widget="boolean_toggle"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sb_hardware_package" model="ir.actions.act_window">
+        <field name="name">Hardware Packages</field>
+        <field name="res_model">sb.hardware.package</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

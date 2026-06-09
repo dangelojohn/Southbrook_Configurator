@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_production_package_list" model="ir.ui.view">
+        <field name="name">sb.production.package.list</field>
+        <field name="model">sb.production.package</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="mo_id"/>
+                <field name="cutlist_id"/>
+                <field name="hardware_package_id"/>
+                <field name="has_pricing_pending" widget="boolean_toggle"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sb_production_package_form" model="ir.ui.view">
+        <field name="name">sb.production.package.form</field>
+        <field name="model">sb.production.package</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,ready,released,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="mo_id"/>
+                        <field name="cutlist_id"/>
+                        <field name="hardware_package_id"/>
+                        <field name="has_pricing_pending"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sb_production_package" model="ir.actions.act_window">
+        <field name="name">Production Packages</field>
+        <field name="res_model">sb.production.package</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_cutlist_list" model="ir.ui.view">
+        <field name="name">sb.cutlist.list</field>
+        <field name="model">sb.cutlist</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="mo_id"/>
+                <field name="line_count"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'exported'"
+                       decoration-success="state == 'nested' or state == 'done'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sb_cutlist_form" model="ir.ui.view">
+        <field name="name">sb.cutlist.form</field>
+        <field name="model">sb.cutlist</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,exported,nested,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="mo_id"/>
+                        <field name="line_count"/>
+                    </group>
+                    <notebook>
+                        <page string="Lines" name="lines">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="panel_name"/>
+                                    <field name="qty"/>
+                                    <field name="length_mm"/>
+                                    <field name="width_mm"/>
+                                    <field name="thickness_mm"/>
+                                    <field name="substrate"/>
+                                    <field name="grain_dir"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Nesting Result" name="nesting">
+                            <field name="nesting_result_json"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sb_cutlist" model="ir.actions.act_window">
+        <field name="name">Cut Lists</field>
+        <field name="res_model">sb.cutlist</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

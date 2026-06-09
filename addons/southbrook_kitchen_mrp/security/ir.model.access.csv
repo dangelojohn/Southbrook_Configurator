@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sb_cutlist_user,access.sb.cutlist.user,model_sb_cutlist,mrp.group_mrp_user,1,1,1,0
+access_sb_cutlist_manager,access.sb.cutlist.manager,model_sb_cutlist,mrp.group_mrp_manager,1,1,1,1
+access_sb_cutlist_line_user,access.sb.cutlist.line.user,model_sb_cutlist_line,mrp.group_mrp_user,1,1,1,1
+access_sb_hardware_package_user,access.sb.hardware.package.user,model_sb_hardware_package,mrp.group_mrp_user,1,1,1,0
+access_sb_hardware_package_manager,access.sb.hardware.package.manager,model_sb_hardware_package,mrp.group_mrp_manager,1,1,1,1
+access_sb_hardware_package_line_user,access.sb.hardware.package.line.user,model_sb_hardware_package_line,mrp.group_mrp_user,1,1,1,1
+access_sb_production_package_user,access.sb.production.package.user,model_sb_production_package,mrp.group_mrp_user,1,1,1,0
+access_sb_production_package_manager,access.sb.production.package.manager,model_sb_production_package,mrp.group_mrp_manager,1,1,1,1
