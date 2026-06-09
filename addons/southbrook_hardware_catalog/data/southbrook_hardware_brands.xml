@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        The ~19 brands the init doc cites the Marathon workbook covers.
+        Codes are stable identifiers used in xml_ids and the
+        hardware_map.json so a brand swap doesn't ripple through code.
+    -->
+    <record id="brand_blum" model="southbrook.hardware.brand">
+        <field name="name">Blum</field>
+        <field name="code">blum</field>
+        <field name="sequence">10</field>
+        <field name="note">Austrian hinge/slide market leader. CLIP top BLUMOTION hinges + MOVENTO/TANDEM slides. Launching at Marathon July 2026.</field>
+    </record>
+    <record id="brand_salice" model="southbrook.hardware.brand">
+        <field name="name">Salice</field>
+        <field name="code">salice</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="brand_hettich" model="southbrook.hardware.brand">
+        <field name="name">Hettich</field>
+        <field name="code">hettich</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="brand_hafele" model="southbrook.hardware.brand">
+        <field name="name">Häfele</field>
+        <field name="code">hafele</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="brand_grass" model="southbrook.hardware.brand">
+        <field name="name">Grass</field>
+        <field name="code">grass</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="brand_kv" model="southbrook.hardware.brand">
+        <field name="name">Knape &amp; Vogt</field>
+        <field name="code">kv</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="brand_accuride" model="southbrook.hardware.brand">
+        <field name="name">Accuride</field>
+        <field name="code">accuride</field>
+        <field name="sequence">70</field>
+    </record>
+    <record id="brand_richelieu" model="southbrook.hardware.brand">
+        <field name="name">Richelieu</field>
+        <field name="code">richelieu</field>
+        <field name="sequence">80</field>
+    </record>
+    <record id="brand_berenson" model="southbrook.hardware.brand">
+        <field name="name">Berenson</field>
+        <field name="code">berenson</field>
+        <field name="sequence">90</field>
+    </record>
+    <record id="brand_top_knobs" model="southbrook.hardware.brand">
+        <field name="name">Top Knobs</field>
+        <field name="code">top_knobs</field>
+        <field name="sequence">100</field>
+    </record>
+    <record id="brand_liberty" model="southbrook.hardware.brand">
+        <field name="name">Liberty Hardware</field>
+        <field name="code">liberty</field>
+        <field name="sequence">110</field>
+    </record>
+    <record id="brand_belwith" model="southbrook.hardware.brand">
+        <field name="name">Belwith Keeler</field>
+        <field name="code">belwith</field>
+        <field name="sequence">120</field>
+    </record>
+    <record id="brand_rev_a_shelf" model="southbrook.hardware.brand">
+        <field name="name">Rev-A-Shelf</field>
+        <field name="code">rev_a_shelf</field>
+        <field name="sequence">130</field>
+    </record>
+    <record id="brand_sugatsune" model="southbrook.hardware.brand">
+        <field name="name">Sugatsune</field>
+        <field name="code">sugatsune</field>
+        <field name="sequence">140</field>
+    </record>
+    <record id="brand_lama" model="southbrook.hardware.brand">
+        <field name="name">Lama</field>
+        <field name="code">lama</field>
+        <field name="sequence">150</field>
+    </record>
+    <record id="brand_mepla" model="southbrook.hardware.brand">
+        <field name="name">Mepla</field>
+        <field name="code">mepla</field>
+        <field name="sequence">160</field>
+    </record>
+    <record id="brand_ridder" model="southbrook.hardware.brand">
+        <field name="name">Ridder</field>
+        <field name="code">ridder</field>
+        <field name="sequence">170</field>
+    </record>
+    <record id="brand_marathon" model="southbrook.hardware.brand">
+        <field name="name">Marathon (House Brand)</field>
+        <field name="code">marathon</field>
+        <field name="sequence">180</field>
+        <field name="note">Marathon's house-brand line for commodity items (screws, pins, levelers, bumpers).</field>
+    </record>
+    <record id="brand_generic" model="southbrook.hardware.brand">
+        <field name="name">Generic / Unbranded</field>
+        <field name="code">generic</field>
+        <field name="sequence">990</field>
+    </record>
+</odoo>

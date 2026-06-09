@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_southbrook_hardware_root"
+              name="Hardware Catalog"
+              parent="stock.menu_stock_root"
+              sequence="80"/>
+
+    <menuitem id="menu_southbrook_hardware_brand"
+              name="Brands"
+              parent="menu_southbrook_hardware_root"
+              action="action_southbrook_hardware_brand"
+              sequence="10"/>
+</odoo>
