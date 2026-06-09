@@ -970,4 +970,229 @@
 
   <!-- END Phase 2B gating rules — A1=10, A3=10, A4=6 (26 total) ============= -->
 
+<!-- ================================================================== -->
+  <!-- CONFIGURATOR AUDIT v1 — Phase 2F deferred rules                    -->
+  <!--                                                                    -->
+  <!-- Adds A2 (beaded inset = premium-only), A5 (mullion glass =        -->
+  <!-- wall-only), A6 (lazy susan = corner-only), A7 (pull-out trash =   -->
+  <!-- base-only) from the audit rule set.                                -->
+  <!--                                                                    -->
+  <!-- These rules bind to attribute_lines that get their xml_ids         -->
+  <!-- registered by Phase 2E's catalog_expansion.py patch.               -->
+  <!-- ================================================================== -->
+
+  <!-- ─ New domain predicates for Phase 2F ─────────────────────── -->
+  <record id="domain_series_is_not_premium" model="product.config.domain">
+    <field name="name">Series is NOT Premium (contractor or contemporary)</field>
+  </record>
+  <record id="domain_series_is_not_premium_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="attribute_id" ref="attr_series"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_series_contractor'), ref('value_series_contemporary')])]"/>
+  </record>
+
+  <record id="domain_family_is_not_wall" model="product.config.domain">
+    <field name="name">Family is NOT Wall</field>
+  </record>
+  <record id="domain_family_is_not_wall_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_family_is_not_wall"/>
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_family_base'), ref('value_family_drawer'), ref('value_family_sink'), ref('value_family_tall'), ref('value_family_corner'), ref('value_family_vanity'), ref('value_family_worktop'), ref('value_family_accessory')])]"/>
+  </record>
+
+  <record id="domain_family_is_not_corner" model="product.config.domain">
+    <field name="name">Family is NOT Corner</field>
+  </record>
+  <record id="domain_family_is_not_corner_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_family_is_not_corner"/>
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_family_wall'), ref('value_family_base'), ref('value_family_drawer'), ref('value_family_sink'), ref('value_family_tall'), ref('value_family_vanity'), ref('value_family_worktop'), ref('value_family_accessory')])]"/>
+  </record>
+
+  <record id="domain_family_is_not_base" model="product.config.domain">
+    <field name="name">Family is NOT Base</field>
+  </record>
+  <record id="domain_family_is_not_base_line" model="product.config.domain.line">
+    <field name="domain_id" ref="domain_family_is_not_base"/>
+    <field name="attribute_id" ref="attr_family"/>
+    <field name="condition">in</field>
+    <field name="operator">and</field>
+    <field name="value_ids" eval="[(6, 0, [ref('value_family_wall'), ref('value_family_drawer'), ref('value_family_sink'), ref('value_family_tall'), ref('value_family_corner'), ref('value_family_vanity'), ref('value_family_worktop'), ref('value_family_accessory')])]"/>
+  </record>
+
+  <!-- ─ A2 rules: beaded inset overlay = premium-series only ── -->
+  <record id="ruleA2_wall_1dr_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_1dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43000</field>
+  </record>
+  <record id="ruleA2_wall_2dr_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_wall_2dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43010</field>
+  </record>
+  <record id="ruleA2_base_1dr_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43020</field>
+  </record>
+  <record id="ruleA2_base_2dr_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43030</field>
+  </record>
+  <record id="ruleA2_drawer_bank_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43040</field>
+  </record>
+  <record id="ruleA2_sink_base_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43050</field>
+  </record>
+  <record id="ruleA2_tall_pantry_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43060</field>
+  </record>
+  <record id="ruleA2_tall_oven_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_line_id" ref="attr_line_tall_oven_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43070</field>
+  </record>
+  <record id="ruleA2_corner_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43080</field>
+  </record>
+  <record id="ruleA2_vanity_overlay_no_beaded_when_not_premium" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_overlay_full'), ref('value_overlay_partial'), ref('value_overlay_inset')])]"/>
+    <field name="domain_id" ref="domain_series_is_not_premium"/>
+    <field name="sequence">43090</field>
+  </record>
+
+  <!-- ─ A5 rules: DEFERRED to Phase 2G ──────────────────────────────
+       Mullion Glass + Reeded are wall-only by audit intent. But the
+       per-cabinet door_style attribute_lines still carry only the
+       original 3 values (Thermofoil Slab, Five-Piece Woodgrain, Custom)
+       — the new 6 door styles haven't been added to the per-cabinet
+       attribute_line value_ids yet. Adding A5 rules referencing the
+       new values triggers the OCA validation:
+         "Values must belong to the attribute of the corresponding
+          attribute_line set on the configuration line"
+       A5 ships in Phase 2G once the per-cabinet door_style lines are
+       expanded (either via _VALUE_SUBSETS in catalog_expansion.py, or
+       a Phase 2A v2 product_templates.xml refresh).
+  -->
+
+  <!-- ─ A6 rules: lazy susan interior = corner only ─────────────── -->
+  <record id="ruleA6_base_1dr_no_lazy_susan_when_not_corner" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_1dr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_pullout_trash'), ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_corner"/>
+    <field name="sequence">45000</field>
+  </record>
+  <record id="ruleA6_base_2dr_no_lazy_susan_when_not_corner" model="product.config.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_line_id" ref="attr_line_base_2dr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_pullout_trash'), ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_corner"/>
+    <field name="sequence">45010</field>
+  </record>
+  <record id="ruleA6_drawer_bank_no_lazy_susan_when_not_corner" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_pullout_trash'), ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_corner"/>
+    <field name="sequence">45020</field>
+  </record>
+  <record id="ruleA6_sink_base_no_lazy_susan_when_not_corner" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_pullout_trash'), ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_corner"/>
+    <field name="sequence">45030</field>
+  </record>
+  <record id="ruleA6_tall_pantry_no_lazy_susan_when_not_corner" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_pullout_trash'), ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_corner"/>
+    <field name="sequence">45040</field>
+  </record>
+  <record id="ruleA6_vanity_no_lazy_susan_when_not_corner" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_pullout_trash'), ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_corner"/>
+    <field name="sequence">45050</field>
+  </record>
+
+  <!-- ─ A7 rules: pull-out trash interior = base only ───────────── -->
+  <record id="ruleA7_drawer_bank_no_pullout_trash_when_not_base" model="product.config.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_line_id" ref="attr_line_drawer_bank_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_lazy_susan'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_base"/>
+    <field name="sequence">46000</field>
+  </record>
+  <record id="ruleA7_sink_base_no_pullout_trash_when_not_base" model="product.config.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_line_id" ref="attr_line_sink_base_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_lazy_susan'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_base"/>
+    <field name="sequence">46010</field>
+  </record>
+  <record id="ruleA7_tall_pantry_no_pullout_trash_when_not_base" model="product.config.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_line_id" ref="attr_line_tall_pantry_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_lazy_susan'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_base"/>
+    <field name="sequence">46020</field>
+  </record>
+  <record id="ruleA7_corner_no_pullout_trash_when_not_base" model="product.config.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_line_id" ref="attr_line_corner_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_lazy_susan'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_base"/>
+    <field name="sequence">46030</field>
+  </record>
+  <record id="ruleA7_vanity_no_pullout_trash_when_not_base" model="product.config.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_line_id" ref="attr_line_vanity_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [ref('value_int_spice_pullout'), ref('value_int_knife_block'), ref('value_int_cutlery_tray_wood'), ref('value_int_lazy_susan'), ref('value_int_rollout_tray'), ref('value_int_mixer_lift'), ref('value_int_wine_rack'), ref('value_int_charging_drawer'), ref('value_int_tipout_sink')])]"/>
+    <field name="domain_id" ref="domain_family_is_not_base"/>
+    <field name="sequence">46040</field>
+  </record>
+
+  <!-- END Phase 2F deferred rules — A2=10, A5=8, A6=6, A7=5 (29 total) ─ -->
+
 </odoo>

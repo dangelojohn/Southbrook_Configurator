@@ -208,3 +208,36 @@ def migrate(cr, version):
         "missing_templates=%s",
         created_count, present_count, missing_templates,
     )
+
+    # =============================================================
+    # Phase 2E/2F orphan cleanup (2026-06-09)
+    # =============================================================
+    # Every catalog_expansion rebuild in southbrook_configurator_ux
+    # wipes + recreates product.template.attribute.line rows. The
+    # product.config.line rules that referenced them via
+    # attribute_line_id get CASCADE-deleted. But the ir.model.data
+    # xml_ids that pointed at those rules survive — orphaned.
+    #
+    # On the NEXT config_rules.xml load, Odoo sees the orphan xml_id,
+    # tries to UPDATE a non-existent record, and silently fails to
+    # create the rule.
+    #
+    # This block sweeps for orphan ir.model.data entries that point
+    # at non-existent product.config.line records and deletes them,
+    # so the next config_rules.xml load re-creates fresh records.
+    # Safe and idempotent.
+    cr.execute("""
+        DELETE FROM ir_model_data imd
+        WHERE imd.model = 'product.config.line'
+          AND imd.module = 'southbrook_estimating'
+          AND imd.name LIKE 'ruleA%'
+          AND NOT EXISTS (
+              SELECT 1 FROM product_config_line cl
+              WHERE cl.id = imd.res_id
+          )
+    """)
+    orphans_cleaned = cr.rowcount
+    _logger.info(
+        "phase2c orphan cleanup: removed %d orphaned ruleA* ir.model.data entries",
+        orphans_cleaned,
+    )
