@@ -268,3 +268,64 @@ Add this second patch hunk to
 The combined diff is the entire Phase 2D + 2E patch. Apply both hunks
 in `feature/configurator-ux-v2` as one commit titled
 `audit-v1: extend catalog for new attributes + register xml_ids`.
+
+## Phase 2F binding-cycle finding (must-fix in configurator_ux)
+
+The 19.0.1.3.0 pre-migrate orphan cleanup (shipped on the audit branch)
+correctly purges stale `ir.model.data` entries for `ruleA*` xml_ids
+that point at since-deleted `product.config.line` rows. Verified live:
+the cleanup removed 25 orphans on its first run.
+
+But the rules still bind at only ~50% (11 of 22 in the band tested).
+Root cause is the module-load ordering:
+
+1. `southbrook_estimating` upgrade starts.
+2. Pre-migrate runs: 25 orphan rule xml_ids cleaned up. ✓
+3. Data files load: `config_rules.xml` creates rules referencing
+   attribute_line xml_ids. Rules bind to current attribute_line IDs. ✓
+4. Post-migrate runs (Phase 2C/2E backfill). ✓
+5. **`southbrook_configurator_ux` upgrade starts.**
+6. `catalog_expansion.py` wipes every cabinet's `attribute_line_ids`
+   and rebuilds with **new** row IDs.
+7. The Phase 2B/2F rules' `attribute_line_id` FK was pointing at
+   IDs that no longer exist → **CASCADE delete** removes them.
+8. Phase 2E xml_id registration adds new attribute_line xml_ids
+   pointing at the new row IDs. But the rule rows are gone now.
+
+End state on every fresh upgrade: ~50% of rules bind (the 4 cabinets
+whose attribute_lines happen to survive the rebuild). 6 of 10
+cabinets per rule type lose their rules to CASCADE delete.
+
+### Recommended fix (Phase 2H — belongs to configurator_ux owners)
+
+The right fix is in `southbrook_configurator_ux`, not on this
+audit branch. Options ranked best to worst:
+
+**Option α — Make catalog_expansion non-destructive (best).**
+Change line 245 from `tmpl.attribute_line_ids.unlink()` to a
+reconcile loop: for each desired (attribute_id, value_subset) tuple
+in `attr_keys`, find the existing attribute_line and `write()` it
+to match the desired value_ids; only create new lines for tuples
+not yet present; only delete lines that are no longer in `attr_keys`.
+This preserves attribute_line IDs across upgrades, which preserves
+FK references from the gating rules.
+
+**Option β — Reload config_rules.xml in configurator_ux's post-migrate.**
+Add `migrations/<version>/post-migrate.py` to
+`southbrook_configurator_ux` that calls
+`convert_xml_import(env, 'southbrook_estimating',
+'data/config_rules.xml', ...)` after `catalog_expansion.build_catalog()`
+runs. This re-creates the deleted rules against the new
+attribute_line IDs.
+
+**Option γ — Put config_rules.xml inside configurator_ux.**
+Move `addons/southbrook_estimating/data/config_rules.xml` into
+`addons/southbrook_configurator_ux/data/` so it loads in the same
+module after `catalog_expansion.xml`. Architecturally clean but
+breaks the audit-attributes-in-estimating boundary.
+
+The audit branch ships everything it can ship on the estimating side:
+the rules in `config_rules.xml`, the pre-migrate orphan cleanup,
+and the manifest version bump. The actual binding requires the
+catalog_expansion fix on the configurator_ux side. The audit
+recommendation is **Option α** — make the rebuild non-destructive.
