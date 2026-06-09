@@ -1447,5 +1447,925 @@ ref('value_finished_both')
     ])]"/>
   </record>
 
+<!-- ================================================================== -->
+  <!-- CONFIGURATOR AUDIT v1 — attribute_lines per cabinet (Phase 2A)    -->
+  <!-- 80 records binding the 10 new attributes from attributes.xml      -->
+  <!-- to each cabinet template's attribute_ids.                         -->
+  <!--                                                                    -->
+  <!-- Layout by cabinet family. Per-family subsetting (e.g. glass on    -->
+  <!-- wall only, lazy susan included even for non-corner — the gating   -->
+  <!-- happens via the A1-A8 rules documented in config_rules.xml,       -->
+  <!-- bound via product.config.line in the next commit).                -->
+  <!-- ================================================================== -->
+
+  <!-- ── wall_1dr ── -->
+  <record id="attr_line_wall_1dr_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_1dr_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_1dr_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_1dr_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_1dr_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_1dr_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_1dr_glass_insert" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_glass_none'),
+      ref('value_glass_clear'),
+      ref('value_glass_frosted'),
+      ref('value_glass_seeded'),
+      ref('value_glass_reeded'),
+      ref('value_glass_leaded')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_1dr_crown_molding" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_1dr"/>
+    <field name="attribute_id" ref="attr_crown_molding"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_crown_none'),
+      ref('value_crown_simple'),
+      ref('value_crown_ogee'),
+      ref('value_crown_stacked'),
+      ref('value_crown_dental')
+    ])]"/>
+  </record>
+
+  <!-- ── wall_2dr ── -->
+  <record id="attr_line_wall_2dr_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_2dr_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_2dr_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_2dr_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_2dr_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_2dr_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_2dr_glass_insert" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_glass_insert"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_glass_none'),
+      ref('value_glass_clear'),
+      ref('value_glass_frosted'),
+      ref('value_glass_seeded'),
+      ref('value_glass_reeded'),
+      ref('value_glass_leaded')
+    ])]"/>
+  </record>
+  <record id="attr_line_wall_2dr_crown_molding" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="wall_2dr"/>
+    <field name="attribute_id" ref="attr_crown_molding"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_crown_none'),
+      ref('value_crown_simple'),
+      ref('value_crown_ogee'),
+      ref('value_crown_stacked'),
+      ref('value_crown_dental')
+    ])]"/>
+  </record>
+
+  <!-- ── base_1dr ── -->
+  <record id="attr_line_base_1dr_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_1dr_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_1dr_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_1dr_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_1dr_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_1dr_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_1dr_drawer_construction" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_drawer_dovetail_hardwood'),
+      ref('value_drawer_plywood_5_8'),
+      ref('value_drawer_particleboard'),
+      ref('value_drawer_metal_blum')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_1dr_interior_storage" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_1dr"/>
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_int_pullout_trash'),
+      ref('value_int_spice_pullout'),
+      ref('value_int_knife_block'),
+      ref('value_int_cutlery_tray_wood'),
+      ref('value_int_lazy_susan'),
+      ref('value_int_rollout_tray'),
+      ref('value_int_mixer_lift'),
+      ref('value_int_wine_rack'),
+      ref('value_int_charging_drawer'),
+      ref('value_int_tipout_sink')
+    ])]"/>
+  </record>
+
+  <!-- ── base_2dr ── -->
+  <record id="attr_line_base_2dr_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_2dr_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_2dr_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_2dr_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_2dr_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_2dr_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_2dr_drawer_construction" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_drawer_dovetail_hardwood'),
+      ref('value_drawer_plywood_5_8'),
+      ref('value_drawer_particleboard'),
+      ref('value_drawer_metal_blum')
+    ])]"/>
+  </record>
+  <record id="attr_line_base_2dr_interior_storage" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="base_2dr"/>
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_int_pullout_trash'),
+      ref('value_int_spice_pullout'),
+      ref('value_int_knife_block'),
+      ref('value_int_cutlery_tray_wood'),
+      ref('value_int_lazy_susan'),
+      ref('value_int_rollout_tray'),
+      ref('value_int_mixer_lift'),
+      ref('value_int_wine_rack'),
+      ref('value_int_charging_drawer'),
+      ref('value_int_tipout_sink')
+    ])]"/>
+  </record>
+
+  <!-- ── drawer_bank ── -->
+  <record id="attr_line_drawer_bank_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_drawer_bank_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_drawer_bank_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_drawer_bank_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_drawer_bank_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_drawer_bank_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_drawer_bank_drawer_construction" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_drawer_dovetail_hardwood'),
+      ref('value_drawer_plywood_5_8'),
+      ref('value_drawer_particleboard'),
+      ref('value_drawer_metal_blum')
+    ])]"/>
+  </record>
+  <record id="attr_line_drawer_bank_interior_storage" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="drawer_bank"/>
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_int_pullout_trash'),
+      ref('value_int_spice_pullout'),
+      ref('value_int_knife_block'),
+      ref('value_int_cutlery_tray_wood'),
+      ref('value_int_lazy_susan'),
+      ref('value_int_rollout_tray'),
+      ref('value_int_mixer_lift'),
+      ref('value_int_wine_rack'),
+      ref('value_int_charging_drawer'),
+      ref('value_int_tipout_sink')
+    ])]"/>
+  </record>
+
+  <!-- ── sink_base ── -->
+  <record id="attr_line_sink_base_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_sink_base_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_sink_base_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_sink_base_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_sink_base_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_sink_base_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_sink_base_interior_storage" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="sink_base"/>
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_int_pullout_trash'),
+      ref('value_int_spice_pullout'),
+      ref('value_int_knife_block'),
+      ref('value_int_cutlery_tray_wood'),
+      ref('value_int_lazy_susan'),
+      ref('value_int_rollout_tray'),
+      ref('value_int_mixer_lift'),
+      ref('value_int_wine_rack'),
+      ref('value_int_charging_drawer'),
+      ref('value_int_tipout_sink')
+    ])]"/>
+  </record>
+
+  <!-- ── tall_pantry ── -->
+  <record id="attr_line_tall_pantry_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_pantry_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_pantry_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_pantry_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_pantry_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_pantry_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_pantry_drawer_construction" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_drawer_dovetail_hardwood'),
+      ref('value_drawer_plywood_5_8'),
+      ref('value_drawer_particleboard'),
+      ref('value_drawer_metal_blum')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_pantry_interior_storage" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_pantry"/>
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_int_pullout_trash'),
+      ref('value_int_spice_pullout'),
+      ref('value_int_knife_block'),
+      ref('value_int_cutlery_tray_wood'),
+      ref('value_int_lazy_susan'),
+      ref('value_int_rollout_tray'),
+      ref('value_int_mixer_lift'),
+      ref('value_int_wine_rack'),
+      ref('value_int_charging_drawer'),
+      ref('value_int_tipout_sink')
+    ])]"/>
+  </record>
+
+  <!-- ── tall_oven ── -->
+  <record id="attr_line_tall_oven_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_oven_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_oven_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_oven_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_oven_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_tall_oven_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="tall_oven"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+
+  <!-- ── corner ── -->
+  <record id="attr_line_corner_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_corner_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_corner_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_corner_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_corner_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_corner_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_corner_drawer_construction" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_drawer_dovetail_hardwood'),
+      ref('value_drawer_plywood_5_8'),
+      ref('value_drawer_particleboard'),
+      ref('value_drawer_metal_blum')
+    ])]"/>
+  </record>
+  <record id="attr_line_corner_interior_storage" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="corner"/>
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_int_pullout_trash'),
+      ref('value_int_spice_pullout'),
+      ref('value_int_knife_block'),
+      ref('value_int_cutlery_tray_wood'),
+      ref('value_int_lazy_susan'),
+      ref('value_int_rollout_tray'),
+      ref('value_int_mixer_lift'),
+      ref('value_int_wine_rack'),
+      ref('value_int_charging_drawer'),
+      ref('value_int_tipout_sink')
+    ])]"/>
+  </record>
+
+  <!-- ── vanity ── -->
+  <record id="attr_line_vanity_frame_style" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_frame_style"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_frame_framed'),
+      ref('value_frame_frameless')
+    ])]"/>
+  </record>
+  <record id="attr_line_vanity_door_overlay" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_door_overlay"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_overlay_full'),
+      ref('value_overlay_partial'),
+      ref('value_overlay_inset'),
+      ref('value_overlay_beaded_inset')
+    ])]"/>
+  </record>
+  <record id="attr_line_vanity_wood_species" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_wood_species"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_species_maple'),
+      ref('value_species_cherry'),
+      ref('value_species_red_oak'),
+      ref('value_species_white_oak_rift'),
+      ref('value_species_walnut'),
+      ref('value_species_alder'),
+      ref('value_species_hickory'),
+      ref('value_species_mdf_painted')
+    ])]"/>
+  </record>
+  <record id="attr_line_vanity_pull_finish" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_pull_finish"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_pull_polished_nickel'),
+      ref('value_pull_brushed_nickel'),
+      ref('value_pull_matte_black'),
+      ref('value_pull_antique_bronze'),
+      ref('value_pull_brushed_brass'),
+      ref('value_pull_polished_chrome'),
+      ref('value_pull_oil_rubbed_bronze'),
+      ref('value_pull_champagne_bronze')
+    ])]"/>
+  </record>
+  <record id="attr_line_vanity_edge_profile" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_edge_profile"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_edge_square'),
+      ref('value_edge_eased'),
+      ref('value_edge_bevel'),
+      ref('value_edge_ogee'),
+      ref('value_edge_bullnose')
+    ])]"/>
+  </record>
+  <record id="attr_line_vanity_lighting" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_lighting"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_lighting_none'),
+      ref('value_lighting_under_cabinet_led'),
+      ref('value_lighting_toekick_led'),
+      ref('value_lighting_puck')
+    ])]"/>
+  </record>
+  <record id="attr_line_vanity_drawer_construction" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_drawer_construction"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_drawer_dovetail_hardwood'),
+      ref('value_drawer_plywood_5_8'),
+      ref('value_drawer_particleboard'),
+      ref('value_drawer_metal_blum')
+    ])]"/>
+  </record>
+  <record id="attr_line_vanity_interior_storage" model="product.template.attribute.line">
+    <field name="product_tmpl_id" ref="vanity"/>
+    <field name="attribute_id" ref="attr_interior_storage"/>
+    <field name="value_ids" eval="[(6, 0, [
+      ref('value_int_pullout_trash'),
+      ref('value_int_spice_pullout'),
+      ref('value_int_knife_block'),
+      ref('value_int_cutlery_tray_wood'),
+      ref('value_int_lazy_susan'),
+      ref('value_int_rollout_tray'),
+      ref('value_int_mixer_lift'),
+      ref('value_int_wine_rack'),
+      ref('value_int_charging_drawer'),
+      ref('value_int_tipout_sink')
+    ])]"/>
+  </record>
+
+  <!-- END AUDIT v1 attribute_lines — 77 records ============== -->
 
 </odoo>
