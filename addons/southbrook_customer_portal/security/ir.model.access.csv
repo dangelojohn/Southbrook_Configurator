@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_portal_kitchen_project,access.portal.kitchen.project,southbrook_kitchen_workspace.model_sb_kitchen_project,base.group_portal,1,0,0,0
+access_portal_design_option,access.portal.design.option,southbrook_kitchen_workspace.model_sb_kitchen_design_option,base.group_portal,1,0,0,0
+access_portal_appliance,access.portal.appliance,southbrook_kitchen_workspace.model_sb_kitchen_appliance,base.group_portal,1,0,0,0
+access_portal_ai_analysis,access.portal.ai.analysis,southbrook_kitchen_workspace.model_sb_kitchen_ai_analysis,base.group_portal,1,0,0,0
+access_portal_approval,access.portal.approval,southbrook_kitchen_workspace.model_sb_kitchen_approval,base.group_portal,1,0,0,0
