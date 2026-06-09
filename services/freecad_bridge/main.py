@@ -215,20 +215,49 @@ def _run_render_job(job_id: str) -> None:
     logger.info("render starting: job_id=%s", job_id)
 
     try:
-        # Module-2 stub: render_cabinet.py invocation lives here once
-        # the FreeCAD runtime is verified (G5). For the in-flight scope,
-        # we mark the job 'done' with no artifacts so the callback path
-        # and XML-RPC plumbing can be developed and tested independently.
-        # The fail-soft behaviour is intentional — see test_render_stub.
-        job.artifacts = {}
+        import json as _json
+        import subprocess
+        import tempfile
+
+        output_dir = Path(tempfile.mkdtemp(prefix=f"render_{job_id}_"))
+        spec_payload = {
+            "production_id": job.spec.production_id,
+            "dimensions": {
+                "width_mm": job.spec.dimensions.width_mm,
+                "height_mm": job.spec.dimensions.height_mm,
+                "depth_mm": job.spec.dimensions.depth_mm,
+            },
+            "family": job.spec.family,
+            "door_count": job.spec.door_count,
+            "output_dir": str(output_dir),
+        }
+        result = subprocess.run(
+            ["freecadcmd", "/app/scripts/render_cabinet.py",
+             "--", _json.dumps(spec_payload)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"freecadcmd exited {result.returncode}: {result.stderr[-500:]}"
+            )
+        manifest_line = None
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("{") and '"schema"' in line:
+                manifest_line = line
+        if not manifest_line:
+            raise RuntimeError("render script produced no manifest on stdout")
+        manifest = _json.loads(manifest_line)
+        job.artifacts = manifest.get("artifacts") or {}
         job.attachment_ids = []
         job.status = "done"
-        logger.info("render done (stub): job_id=%s", job_id)
+        logger.info("render done: job_id=%s panels=%s",
+                    job_id, manifest.get("panel_count"))
     except Exception as exc:
         job.status = "error"
         job.error = str(exc)
         logger.exception("render failed: job_id=%s", job_id)
 
-    # XML-RPC + callback intentionally deferred until ODOO_API_KEY is
+    # XML-RPC + Odoo callback intentionally deferred until ODOO_API_KEY is
     # actually set on a real deployment. For Module 2 G2a (owner-confirm
     # before deploy), the bridge never reaches Odoo from the dev clone.
