@@ -137,10 +137,12 @@ class SbKitchenProject(models.Model):
     def action_submit_to_customer(self):
         self._require_at_least_one_design_option()
         self.action_set_state("awaiting_customer")
+        self._send_lifecycle_email("email_template_concepts_ready")
 
     def action_customer_approves(self):
         self._require_selected_design_option()
         self.action_set_state("approved")
+        self._send_lifecycle_email("email_template_design_approved")
 
     def action_release_to_production(self):
         self.action_set_state("in_production")
@@ -166,6 +168,35 @@ class SbKitchenProject(models.Model):
                     "Cannot record customer approval: no design option "
                     "is selected. Mark exactly one as selected first."
                 ))
+
+    # ------------------------------------------------------------------
+    # Lifecycle email
+    # ------------------------------------------------------------------
+    def _send_lifecycle_email(self, template_xml_id: str):
+        """Send a lifecycle mail.template to the audience that template names.
+
+        Templates are seeded in data/mail_templates.xml. Failure to find
+        a template (e.g. template_xml_id misspelled) is a warning, not a
+        block — the state machine ran first and is the authoritative
+        contract; email is a side-effect.
+        """
+        Template = self.env["mail.template"].sudo()
+        full_xml_id = f"southbrook_kitchen_workspace.{template_xml_id}"
+        template = self.env.ref(full_xml_id, raise_if_not_found=False)
+        if not template:
+            return  # template removed / renamed — caller carries on
+        for project in self:
+            try:
+                template.with_context(
+                    lang=project.partner_id.lang or self.env.user.lang,
+                ).send_mail(project.id, force_send=False)
+            except Exception:
+                # The transition must not roll back on email failure.
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Lifecycle email %s failed for project %s",
+                    full_xml_id, project.code, exc_info=True,
+                )
 
     # ------------------------------------------------------------------
     # AI-analysis confirmation gate (init-doc GAP-02 / Module 6)

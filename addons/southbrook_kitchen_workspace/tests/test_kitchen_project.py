@@ -206,6 +206,58 @@ class TestKitchenWorkspace(TransactionCase):
     # ------------------------------------------------------------------
     # DoD — designer creates a project, attaches photos, selects options
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Lifecycle email notifications
+    # ------------------------------------------------------------------
+    def test_concepts_ready_email_template_seeded(self):
+        template = self.env.ref(
+            "southbrook_kitchen_workspace.email_template_concepts_ready",
+            raise_if_not_found=False,
+        )
+        self.assertTrue(template, "Concepts-ready email template must be seeded")
+        self.assertEqual(template.model_id.model, "sb.kitchen.project")
+
+    def test_design_approved_email_template_seeded(self):
+        template = self.env.ref(
+            "southbrook_kitchen_workspace.email_template_design_approved",
+            raise_if_not_found=False,
+        )
+        self.assertTrue(template, "Design-approved email template must be seeded")
+        self.assertEqual(template.model_id.model, "sb.kitchen.project")
+
+    def test_submit_to_customer_queues_concepts_ready_email(self):
+        project = self._new_project()
+        project.action_start_designing()
+        self.DesignOption.create({
+            "project_id": project.id, "name": "Option A",
+        })
+        before = self.env["mail.mail"].search_count([])
+        project.action_submit_to_customer()
+        after = self.env["mail.mail"].search_count([])
+        self.assertGreater(
+            after, before,
+            "action_submit_to_customer must queue an email",
+        )
+
+    def test_customer_approves_queues_design_approved_email(self):
+        project = self._new_project()
+        project.action_start_designing()
+        self.DesignOption.create({
+            "project_id": project.id, "name": "Option A",
+            "is_selected": True,
+        })
+        project.action_submit_to_customer()
+        before = self.env["mail.mail"].search_count([])
+        project.action_customer_approves()
+        after = self.env["mail.mail"].search_count([])
+        self.assertGreater(
+            after, before,
+            "action_customer_approves must queue an email",
+        )
+
+    # ------------------------------------------------------------------
+    # DoD — designer creates a project, attaches photos, selects options
+    # ------------------------------------------------------------------
     def test_dod_create_attach_select(self):
         project = self._new_project(name="DoD walk-through", theme="signature")
 

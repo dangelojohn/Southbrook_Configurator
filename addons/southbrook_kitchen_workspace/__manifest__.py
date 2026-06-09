@@ -44,6 +44,7 @@ when the design + spec are written.
     "data": [
         "security/ir.model.access.csv",
         "data/sequence_data.xml",
+        "data/mail_templates.xml",
         "views/sb_kitchen_project_views.xml",
         "views/sb_kitchen_design_option_views.xml",
         "views/sb_kitchen_ai_analysis_views.xml",
