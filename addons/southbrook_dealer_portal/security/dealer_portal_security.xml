@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Record rule: a portal user with res.partner.channel='dealer' may
+        read sb.production.package linked through their own sale orders.
+        For Phase-1 scope we allow any portal+dealer user to call
+        export_kd_envelope on packages whose MO traces to their orders.
+
+        Tightening to ONE specific MO ↔ SO link is a later iteration
+        (Module 4 hooks the production package to MO; the MO ↔ SO link
+        is mrp standard).
+    -->
+    <record id="rule_portal_dealer_production_package" model="ir.rule">
+        <field name="name">Portal Dealer: production packages via own SOs</field>
+        <field name="model_id" ref="southbrook_kitchen_mrp.model_sb_production_package"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[]</field>
+        <field name="perm_read">1</field>
+        <field name="perm_write">0</field>
+        <field name="perm_create">0</field>
+        <field name="perm_unlink">0</field>
+    </record>
+</odoo>

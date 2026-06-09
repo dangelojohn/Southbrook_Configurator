@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_portal_production_package,access.portal.production.package,southbrook_kitchen_mrp.model_sb_production_package,base.group_portal,1,0,0,0
+access_portal_cutlist,access.portal.cutlist,southbrook_kitchen_mrp.model_sb_cutlist,base.group_portal,1,0,0,0
+access_portal_cutlist_line,access.portal.cutlist.line,southbrook_kitchen_mrp.model_sb_cutlist_line,base.group_portal,1,0,0,0
+access_portal_hardware_package,access.portal.hardware.package,southbrook_kitchen_mrp.model_sb_hardware_package,base.group_portal,1,0,0,0
+access_portal_hardware_package_line,access.portal.hardware.package.line,southbrook_kitchen_mrp.model_sb_hardware_package_line,base.group_portal,1,0,0,0

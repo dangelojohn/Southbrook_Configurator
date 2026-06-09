@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_dealer_orders_list" name="Portal — Dealer Orders List">
+        <t t-call="portal.portal_layout">
+            <h2>Dealer Orders</h2>
+            <t t-if="not orders">
+                <p>No orders yet.</p>
+            </t>
+            <t t-if="orders">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Date</th>
+                            <th>State</th>
+                            <th>Total (Dealer)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="orders" t-as="o">
+                            <td><span t-field="o.name"/></td>
+                            <td><span t-field="o.date_order"/></td>
+                            <td><span t-field="o.state"/></td>
+                            <td><span t-field="o.amount_total"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+        </t>
+    </template>
+</odoo>
