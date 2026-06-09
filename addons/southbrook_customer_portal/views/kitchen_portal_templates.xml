@@ -79,6 +79,13 @@
             <p t-if="not preview_option" class="text-muted">
                 The 3D preview will appear once a concept has been published for you.
             </p>
+            <!-- The canvas script loads as a native ES module so the browser
+                 handles the Three.js CDN imports + the relative kitchen_dims
+                 import without going through Odoo's asset bundler. Loading
+                 only when there IS a preview option keeps the public list
+                 page lean. -->
+            <script t-if="preview_option" type="module"
+                    src="/southbrook_customer_portal/static/src/js/kitchen_canvas.js"/>
 
             <h3>Design Options</h3>
             <t t-if="not options">

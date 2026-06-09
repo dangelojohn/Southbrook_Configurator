@@ -114,23 +114,11 @@ test("/web/login renders without console errors", async ({ page }) => {
   // Filter out a few non-bug errors Odoo emits that aren't ours:
   // - cookieStore is null (cookie-consent extension noise)
   // - Failed to load resource: anything 404 on optional assets
-  //
-  // KNOWN: kitchen_canvas registered against web.assets_frontend with
-  // native ES module imports (incl. CDN-hosted Three.js) that Odoo's
-  // asset bundler does not transform. The asset emits an "unmet
-  // dependencies" error on every public page. Needs a rewrite to use
-  // Odoo's @odoo/odoo-* module system or a separate <script type=module>
-  // tag; tracked as a Phase-3 KitchenCanvas integration item. Until
-  // then, the smoke filter excludes this specific error so the test
-  // still catches NEW JS regressions.
   const ours = errors.filter(
     (e) =>
       !e.includes("cookieStore") &&
       !e.includes("Failed to load resource") &&
-      !e.includes("favicon") &&
-      !e.includes("southbrook_customer_portal/js/kitchen_canvas") &&
-      !e.includes("three.module.js") &&
-      !e.includes("OrbitControls.js"),
+      !e.includes("favicon"),
   );
   expect(ours, `Unexpected console errors:\n${ours.join("\n")}`).toEqual([]);
 });
