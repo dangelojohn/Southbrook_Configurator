@@ -6,26 +6,12 @@
 > as canonical, treat the prior packages as the starting point, and only generate
 > code under `addons/southbrook_estimating/` (and a small companion website addon).
 >
-> **HOWEVER** — as of 2026-06-09 the platform has expanded well beyond the
-> two-addon scope this brief was written against. **Read §11 (Platform
-> expansion, 2026-06-09) before assuming scope.** Sections 0–10 remain
-> the canonical brief for `southbrook_estimating` + `southbrook_estimating_website`;
-> §11 names the other 10 addons + REST API + Flutter app + render
-> pipeline that now sit alongside them, and the canonical brief for THAT
-> wider scope (`~/Downloads/CLAUDE_CODE_PROJECT_INIT.md`).
->
 > **Amendment history.**
 > - **v1.0 (2026-05-28)** — initial draft.
 > - **v1.1 (2026-05-29)** — Q1/Q2/Q3/Q5/Q7/Q8/Q21 corrections folded in after
 >   Claude Code's 21-question gate. The 21 locked decisions are catalogued in
 >   `PUNCHLIST.md` § "2026-05-29 · Locked decisions" — that is the canonical
 >   source for any decision detail; this brief is the operating frame.
-> - **v1.2 (2026-06-09)** — §11 appended. Platform expanded to the full
->   SAMI / Southbrook AI Kitchen Platform (Modules 0..9 + REST API + Flutter
->   skeleton + FreeCAD render pipeline). All deployed live to QNAP
->   `southbrookcabinetry.space` the same day. The two-addon scope of v1.0
->   remains the operating frame for the Estimating Application surface;
->   anything else lives under §11's canon.
 
 ---
 
@@ -492,163 +478,9 @@ When you start, do this in order:
 
 That's the brief. Build deliberately, ask early, and keep the receipts.
 
----
-
-## 11 · Platform expansion (2026-06-09)
-
-Sections 0–10 above describe the original Estimating Application scope.
-On 2026-06-09 the platform was extended to the full **SAMI / Southbrook
-AI Kitchen Platform** per `~/Downloads/CLAUDE_CODE_PROJECT_INIT.md`
-(public-redacted copy at `github.com/dangelojohn/PLM-v19/docs/CLAUDE_CODE_PROJECT_INIT.md`).
-That init doc is the operating frame for everything in this section.
-
-### 11.1 · What's in the repo beyond the Estimating Application
-
-```
-addons/
-  southbrook_estimating/          §0-10 canonical (foundation, do NOT rebuild)
-  southbrook_estimating_website/  §0-10 canonical (3D-launch website surface)
-  southbrook_configurator_ux/     PRE-EXISTING configurator UX layer
-  southbrook_mrp_pm/              PRE-EXISTING MRP PM dashboard
-  southbrook_plm/                 PRE-EXISTING (deployed 2026-05-31; see memory)
-
-  -------- the rest below were added 2026-06-09 in feature/module-0-skeleton --------
-
-  southbrook_freecad_bridge/      Module 2: bridge addon — G1 BoM-contents
-                                   gate, /plm/cad_callback controller, 18 render-smoke
-  southbrook_hardware_catalog/    Module 3: 19 brands + Marathon vendor + 15-SKU
-                                   representative seed + resolution method
-  southbrook_kitchen_mrp/         Module 4: sb.cutlist + sb.hardware.package +
-                                   sb.production.package (orchestrator
-                                   generate_from_mo() is idempotent)
-  southbrook_kitchen_workspace/   Module 5: sb.kitchen.project + design_option +
-                                   ai_analysis + appliance + approval; state
-                                   machine + GAP-02 human-confirmation gate
-  southbrook_ai_design/           Module 6: Gemini caller + validator + lander
-                                   (mock backend is install default — flip
-                                   ir.config_parameter gemini.use_mock for prod)
-  southbrook_config_engine/       Module 7: sb.placement.rule + pack_stretch
-                                   greedy-then-backtrack + 5 canonical layouts
-  southbrook_customer_portal/     Module 8: /my/kitchen-projects + Three.js
-                                   KitchenCanvas (vanilla JS, no OWL build)
-  southbrook_dealer_portal/       Module 9: /my/dealer + KD JSON export +
-                                   reportlab installation PDF (GAP-06)
-  southbrook_api/                 /api/v1/* implementing G6 Flutter contract
-
-services/
-  freecad_bridge/                 FastAPI + freecadcmd + ezdxf — produces
-                                   7 DXF + 7 SVG + 1 STEP per render
-                                   (NOT yet deployed to QNAP)
-  odoo/                           Custom image: odoo:19 + Mako pre-baked
-                                   (LOCAL dev; QNAP uses stock odoo:19 +
-                                    runtime pip install of Mako/ezdxf/reportlab)
-
-shared/
-  southbrook_dims.py              Single source of 7 panel formulas;
-                                   G2 signed off by Peter Tuschak 2026-06-09
-  southbrook_dims.js              Browser/Node twin, parity-asserted
-
-flutter_app/
-  pubspec.yaml + lib/api_client.dart + lib/main.dart  — skeleton with
-                                   reference G6 API client; UI past login +
-                                   project-list screen is follow-up work
-
-docs/
-  api_contracts/gemini_odoo_contract.md   G3 (signed off)
-  api_contracts/flutter_odoo_contract.md  G6 (signed off)
-  config_engine_spec.md                   G4 (signed off)
-  ai_prompt_spec.md                       Module 6 prompt
-  WORKTREES.md                            Multi-session worktree pattern
-```
-
-### 11.2 · Gate status (2026-06-09)
-
-| Gate | Status |
-|---|---|
-| G1 BoM-contents parity | ✅ GREEN — `addons/southbrook_freecad_bridge/tests/test_bom_contents.py` + `test_dims_js_parity.py` |
-| G2 Panel-formula sign-off (Peter Tuschak) | ✅ CLOSED 2026-06-09 — constants in `shared/southbrook_dims.py` are FINAL |
-| G2a Owner-confirm Module 2 deploy | ⏸ **ONLY OPEN GATE** — server action + Regenerate button + kanban CAD badges SCAFFOLDED but DORMANT until John says go |
-| G3 Gemini ↔ Odoo contract | ✅ CLOSED — `docs/api_contracts/gemini_odoo_contract.md` |
-| G4 Config-engine spec | ✅ CLOSED — `docs/config_engine_spec.md` |
-| G5 FreeCAD 1.0 headless | ✅ GREEN — `services/freecad_bridge` image (~2.6 GB) |
-| G6 Flutter ↔ Odoo contract | ✅ CLOSED — `docs/api_contracts/flutter_odoo_contract.md` + `flutter_app/lib/api_client.dart` reference impl |
-
-### 11.3 · Test contract (151 method-level + 18 render-smoke subTests)
-
-Run any module's suite:
-
-```bash
-docker exec sami-odoo odoo -d southbrook \
-  --db_host=db --db_user=odoo --db_password=$POSTGRES_PASSWORD \
-  -u <module> --test-enable --test-tags=<tag> \
-  --stop-after-init --no-http --http-port=8899 --gevent-port=8902 \
-  --workers=0 --max-cron-threads=0
-```
-
-The `--http-port=8899 --gevent-port=8902` dodge is **mandatory** — `--no-http`
-alone does not stop the gevent worker from binding 8072. See the
-[[southbrook_plm_deploy]] memory for the discovery context.
-
-### 11.4 · Critical patterns to know
-
-- **Branch + worktree.** All v1.2 work lives on `feature/module-0-skeleton`.
-  Multiple concurrent Claude sessions sharing the same `~/southbrook-v19cr`
-  worktree caused branch-flip incidents during the build — fix is one
-  `git worktree add` per concurrent branch. See `docs/WORKTREES.md`.
-- **Two Pythons in `freecad-bridge`.** `/usr/local/bin/python3` (slim
-  image, pip-managed via requirements.txt) AND `/usr/bin/python3`
-  (Debian, used by freecadcmd, pip-managed via Dockerfile
-  `--break-system-packages`). Every Python dep must land in BOTH.
-- **`freecadcmd` quirks** baked into `services/freecad_bridge/scripts/render_cabinet.py`:
-  does NOT inherit `PYTHONPATH` (use `sys.path.insert(0, "/srv/shared")`);
-  does NOT set `__name__ == "__main__"` (call `main()` unconditionally);
-  DXF via FreeCAD Draft requires GUI module unavailable headless
-  (use ezdxf instead); DXF R12 forbids LWPOLYLINE (emit 4 LINE entities).
-- **virtiofs cache** intermittently drops the `/srv/shared` mount inside
-  `sami-odoo`. Symptom: `ModuleNotFoundError: No module named 'southbrook_dims'`
-  even though host has the file. Fix: `docker compose restart odoo`.
-- **`gemini.use_mock=True` is the install default.** Tests + dev work
-  offline without an API key. To use real Gemini in production: flip the
-  `ir.config_parameter` + set `gemini.api_key`.
-- **Odoo 19 API gotchas hit this round:** `res.users.groups_id` →
-  `group_ids`; `_login()` now takes `(credential_dict, user_agent_env)`;
-  `_sql_constraints` deprecated (use `@api.constrains`);
-  `res.partner.mobile` removed; `("include", "<bundle>")` in the SAME
-  bundle's assets dict is a circular self-reference.
-
-### 11.5 · Live deployment
-
-`https://southbrookcabinetry.space` runs all 9 new addons as of 2026-06-09
-(pip deps installed at runtime; FreeCAD bridge service NOT yet deployed
-to QNAP — only the Odoo-side controllers are live). Pre-deploy backup
-at `/share/CACHEDEV3_DATA/Container/southbrook/backups/sb-pre-fullstack-20260609-180620.dump`.
-Deploy recipe + container caveats fully written up in the
-[[sami_southbrook_full_platform_build]] memory.
-
-### 11.6 · What's pending
-
-The non-trivial pending items as of 2026-06-09 — all explicitly deferred
-or owner-gated:
-
-- **G2a** — owner go-ahead to wire Module 2's deployment surface live
-- **FreeCAD bridge container** — not yet on QNAP (only the Odoo addons are)
-- **Real Gemini key** — production flip from `gemini.use_mock=True`
-- **6 real `.FCStd` template masters** — currently rendering procedurally
-- **Real 179-row Marathon catalog** — 15-SKU representative seed in place
-- **Flutter UI past login + list skeleton** — `api_client.dart` is complete
-- **Email notifications** — `mail.template` records for "concepts ready" etc.
-- **TechDraw elevation drawings** — reportlab installation PDF is the live substitute
-- **CI pipeline + Playwright E2E** — every test runs locally / in `sami-odoo` only
-
-### 11.7 · Where the canonical brief lives for the wider scope
-
-- **The init doc** (`~/Downloads/CLAUDE_CODE_PROJECT_INIT.md`) is the
-  authoritative spec for Modules 0..9 + Flutter + every gate. Read it
-  first when touching anything that's not the original Estimating
-  Application.
-- **Public redacted copy** lives at `github.com/dangelojohn/PLM-v19/docs/CLAUDE_CODE_PROJECT_INIT.md`.
-- **The build session memory** is `~/.claude/projects/-Users-naadmin/memory/sami_southbrook_full_platform_build.md` — has the file layout, test scoreboard, gate status, dev-stack ports, branch-flip mitigation, Odoo-19 API gotchas, deploy recipe.
-
-For everything inside `addons/southbrook_estimating/` and
-`addons/southbrook_estimating_website/`, the original brief (§0–10
-above) remains the operating frame. §11 takes over for the rest.
+<!-- HISTORICAL: §11 was removed per the user's explicit revert. The wider
+     platform-expansion canon now lives in:
+       ~/Downloads/CLAUDE_CODE_PROJECT_INIT.md  (the init doc)
+       ~/.claude/projects/-Users-naadmin/memory/sami_southbrook_full_platform_build.md
+     This file stays scoped to the Estimating Application surface.
+-->
