@@ -656,7 +656,11 @@
   <record id="attr_interior_storage" model="product.attribute">
     <field name="name">Interior Storage</field>
     <field name="display_type">multi</field>
-    <field name="create_variant">dynamic</field>
+    <!-- Odoo 19 constraint: display_type='multi' requires
+         create_variant='no_variant'. Multi-checkbox is a non-variant
+         option set; each chosen item rolls into the BoM but does not
+         create a product variant. (NF caught at live install 2026-06-09.) -->
+    <field name="create_variant">no_variant</field>
     <field name="sequence">170</field>
   </record>
   <record id="value_int_pullout_trash" model="product.attribute.value">
@@ -706,7 +710,8 @@
   <record id="attr_lighting" model="product.attribute">
     <field name="name">Lighting</field>
     <field name="display_type">multi</field>
-    <field name="create_variant">dynamic</field>
+    <!-- Same Odoo 19 constraint as attr_interior_storage. -->
+    <field name="create_variant">no_variant</field>
     <field name="sequence">180</field>
   </record>
   <record id="value_lighting_none" model="product.attribute.value">
