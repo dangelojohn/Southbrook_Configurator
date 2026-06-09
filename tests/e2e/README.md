@@ -42,10 +42,35 @@ make e2e-prod    # prod
 Plus a 9th: `/web/login` renders without JS console errors (catches JS
 crashes that don't surface as HTTP 500).
 
-## What it does NOT cover
+## Authenticated journey tests
 
-- Logged-in customer or dealer flows (requires fixture credentials);
-  see `tests/e2e/journey.spec.js` (out of scope today).
+`journey.spec.js` covers the surfaces anon smoke can't — full
+/api/v1 round-trip and a real /web/login form submit.
+
+The journey suite is **env-driven**:
+
+```bash
+export SAMI_TEST_USER='portal-test@example.com'
+export SAMI_TEST_PASS='portal-test-strong-password'
+npm test              # runs smoke + journey together
+```
+
+When the env vars are unset, every journey test cleanly skips. CI can
+opt-in by injecting the two env vars as secrets.
+
+### One-time setup: create the portal user
+
+The journey suite needs a Southbrook portal user. Easiest path:
+
+1. Log into the Odoo backend as admin.
+2. Settings → Users & Companies → Users → Create.
+3. Set name + email + password; under "Access Rights", grant only
+   the Portal user-type group.
+4. Optionally: create one `sb.kitchen.project` with `partner_id` set
+   to that user's partner_id so `/api/v1/kitchen-projects` returns
+   non-empty data.
+
+### What it does NOT cover
 - Three.js KitchenCanvas rendering (would need a project with seeded
   placement_data); covered by visual snapshot when that fixture lands.
 - File downloads (installation PDF, quote PDF) — content-type sanity is

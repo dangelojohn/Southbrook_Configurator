@@ -6,7 +6,7 @@
 
 .PHONY: help up down logs install install-fresh test test-quick test-bridge \
         bridge-build bridge-restart shell psql .check-env \
-        e2e-install e2e e2e-prod
+        e2e-install e2e e2e-prod e2e-smoke e2e-journey
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -117,6 +117,14 @@ e2e: .check-env
 
 e2e-prod:
 	cd tests/e2e && SAMI_URL=https://southbrookcabinetry.space npm test
+
+# Run just the anon smoke (skip journey even if SAMI_TEST_USER is set).
+e2e-smoke: .check-env
+	cd tests/e2e && npx playwright test smoke.spec.js
+
+# Run just the authenticated journey (requires SAMI_TEST_USER + SAMI_TEST_PASS).
+e2e-journey: .check-env
+	cd tests/e2e && npx playwright test journey.spec.js
 
 # ---------------------------------------------------------------------------
 # Bridge
