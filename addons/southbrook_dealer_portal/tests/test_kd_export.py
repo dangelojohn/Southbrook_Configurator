@@ -81,3 +81,23 @@ class TestKdExport(TransactionCase):
     def test_is_kd_variant_flag_writable(self):
         self.package.is_kd_variant = True
         self.assertTrue(self.package.is_kd_variant)
+
+    # ------------------------------------------------------------------
+    # Installation PDF (GAP-06)
+    # ------------------------------------------------------------------
+    def test_installation_pdf_emits_bytes(self):
+        pdf = self.package.export_installation_pdf()
+        self.assertIsInstance(pdf, bytes)
+        self.assertGreater(len(pdf), 1000,
+                            "Installation PDF must be at least 1 KB")
+        # Every PDF starts with %PDF magic.
+        self.assertTrue(pdf.startswith(b"%PDF"),
+                         "Output must be a valid PDF byte sequence")
+
+    def test_installation_pdf_with_kd_variant(self):
+        self.package.is_kd_variant = True
+        pdf = self.package.export_installation_pdf()
+        # KD variant adds an extra page; expect larger size than non-KD.
+        self.assertGreater(len(pdf), 1500,
+                            "KD variant PDF should include hole pages")
+        self.assertTrue(pdf.startswith(b"%PDF"))

@@ -145,6 +145,14 @@
                     Approved option:
                     <strong t-field="project.selected_design_option_id.name"/>
                 </p>
+                <t t-if="project.sale_order_id">
+                    <p>
+                        <a t-attf-href="/report/pdf/southbrook_estimating.report_signature_spec_sheet_doc/#{project.sale_order_id.id}"
+                           class="btn btn-outline-primary" target="_blank">
+                            Download Spec Sheet (PDF)
+                        </a>
+                    </p>
+                </t>
             </t>
         </t>
     </template>

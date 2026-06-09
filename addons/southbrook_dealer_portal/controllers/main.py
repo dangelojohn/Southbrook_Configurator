@@ -60,6 +60,29 @@ class DealerPortal(http.Controller):
         )
 
     # ------------------------------------------------------------------
+    # Installation-drawing PDF (GAP-06)
+    # ------------------------------------------------------------------
+    @http.route(
+        ["/my/dealer/production-package/<int:pkg_id>/installation-pdf"],
+        type="http", auth="user", website=True, methods=["GET"],
+    )
+    def installation_pdf(self, pkg_id, **kw):
+        self._require_dealer()
+        Package = request.env["sb.production.package"].sudo()
+        package = Package.browse(pkg_id).exists()
+        if not package:
+            raise MissingError(_("Production package not found."))
+        pdf_bytes = package.export_installation_pdf()
+        return request.make_response(
+            pdf_bytes,
+            headers=[
+                ("Content-Type", "application/pdf"),
+                ("Content-Disposition",
+                 f'attachment; filename="installation_{package.name}.pdf"'),
+            ],
+        )
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
     def _require_dealer(self):
