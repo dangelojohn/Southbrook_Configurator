@@ -133,6 +133,14 @@ class SouthbrookOrderAnalytics(models.Model):
             cabinet_count += int(line.product_uom_qty)
             # Panel + door counts pull from the BoM rollup. Stub for commit
             # 6 — real numbers land when commit 8 ships _compute_panel_dimensions.
+            # TODO(phase-3-sprint-b): wire to mrp.bom._compute_panel_dimensions
+            # so the gate-walk D4 column shows real panel counts. Today this
+            # returns 0 for every line because demo variants are created bare
+            # (no product.config.session), so the W×H×D + family + door_count
+            # the rollup needs aren't on the variant. Two paths considered:
+            #   (a) re-seed demos through a real configurator session
+            #   (b) live-compute from line.name + default dims when no session
+            # See docs/PHASE_3_PLAN.md Sprint B for the decision matrix.
         return {
             "series": (series_counts.most_common(1)[0][0]
                        if series_counts else False),
