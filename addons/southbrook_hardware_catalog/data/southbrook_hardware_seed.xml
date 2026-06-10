@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <!--
-        Representative seed catalog — ~20 SKUs covering all 9 hardware
+        Representative seed catalog — 29 SKUs covering all 9 hardware
         categories (hinge, slide, pin, screw, handle, leveler, cam_lock,
         bumper, other). The 179-row Marathon workbook import replaces
         this file when the trade-account session lands.
@@ -12,6 +12,13 @@
         Vendor info (product.supplierinfo) links each SKU to Marathon —
         the configurator-resolution method picks SKUs by x_marathon_sku,
         which is the stable identifier inside hardware_map.json.
+
+        2026-06-10 audit — added 15 SKUs covering the Marathon category
+        gaps that surfaced during brand audit (DTC hinges, King Slide
+        slides, more pull sizes/finishes, hinge accessories). Part
+        numbers follow Marathon's documented naming convention but
+        are NOT verified against the live catalog — Path B (catalog
+        file ingest) replaces them with authoritative SKUs.
     -->
 
     <!-- ============ HINGES ============ -->
@@ -43,6 +50,50 @@
         <field name="is_storable" eval="True"/>
         <field name="x_hardware_category">hinge</field>
         <field name="x_hardware_brand_id" ref="brand_salice"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <!-- Hinges added 2026-06-10 — Marathon catalog audit Path A. Part
+         numbers follow Marathon's "<brand-prefix>-<series>-<deg>-<sc>"
+         convention; Path B (real catalog file ingest) will overwrite
+         with verified codes. -->
+    <record id="hw_dtc_c80_110_sc" model="product.product">
+        <field name="name">DTC C80 110° (Soft-Close, Full Overlay)</field>
+        <field name="default_code">DTC-C80-110-SC</field>
+        <field name="x_marathon_sku">DTC-C80-110-SC</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">hinge</field>
+        <field name="x_hardware_brand_id" ref="brand_dtc"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_dtc_c80_110_nsc" model="product.product">
+        <field name="name">DTC C80 110° (Non-Soft-Close, Full Overlay)</field>
+        <field name="default_code">DTC-C80-110-NSC</field>
+        <field name="x_marathon_sku">DTC-C80-110-NSC</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">hinge</field>
+        <field name="x_hardware_brand_id" ref="brand_dtc"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_salice_c2r_165_sc" model="product.product">
+        <field name="name">Salice C2R Series 165° Blind Corner (Soft-Close)</field>
+        <field name="default_code">SAL-C2R-165</field>
+        <field name="x_marathon_sku">SAL-C2R-165</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">hinge</field>
+        <field name="x_hardware_brand_id" ref="brand_salice"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_hettich_sensys_110_sc" model="product.product">
+        <field name="name">Hettich Sensys 8645i 110° (Soft-Close, Full Overlay)</field>
+        <field name="default_code">HET-SEN-110</field>
+        <field name="x_marathon_sku">HET-SEN-110</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">hinge</field>
+        <field name="x_hardware_brand_id" ref="brand_hettich"/>
         <field name="x_pricing_pending" eval="True"/>
     </record>
 
@@ -77,6 +128,39 @@
         <field name="x_hardware_brand_id" ref="brand_accuride"/>
         <field name="x_pricing_pending" eval="True"/>
     </record>
+    <!-- Slides added 2026-06-10 — King Slide covers Marathon's
+         "Ball Bearing" + "Undermount" categories at mid-tier price;
+         Hettich Actro fills the Hettich undermount slot. -->
+    <record id="hw_king_slide_3032_18" model="product.product">
+        <field name="name">King Slide 3032 18&quot; (Ball-Bearing, 100 lb)</field>
+        <field name="default_code">KS-3032-18</field>
+        <field name="x_marathon_sku">KS-3032-18</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_king_slide"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_king_slide_k2832_21" model="product.product">
+        <field name="name">King Slide K2832 21&quot; (Soft-Close Undermount)</field>
+        <field name="default_code">KS-K2832-21</field>
+        <field name="x_marathon_sku">KS-K2832-21</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_king_slide"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_hettich_actro_500" model="product.product">
+        <field name="name">Hettich Actro 5D 500 mm (Soft-Close Undermount)</field>
+        <field name="default_code">HET-ACTRO-500</field>
+        <field name="x_marathon_sku">HET-ACTRO-500</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_hettich"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
 
     <!-- ============ PINS ============ -->
     <record id="hw_shelf_pin_5mm" model="product.product">
@@ -109,6 +193,70 @@
         <field name="is_storable" eval="True"/>
         <field name="x_hardware_category">handle</field>
         <field name="x_hardware_brand_id" ref="brand_berenson"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <!-- Pulls and knobs added 2026-06-10 to cover the audit's
+         attr_pull_finish + attr_handle x size matrix. The configurator
+         seeds Brushed Nickel as baseline; Matte Black, Antique Bronze,
+         and Brushed Brass are the most-requested finish premiums. -->
+    <record id="hw_handle_pull_96_bn" model="product.product">
+        <field name="name">Bar Pull 96 mm CC (Brushed Nickel)</field>
+        <field name="default_code">MRH-HDL-PUL96-BN</field>
+        <field name="x_marathon_sku">MRH-HDL-PUL96-BN</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_top_knobs"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_handle_pull_128_mb" model="product.product">
+        <field name="name">Bar Pull 128 mm CC (Matte Black)</field>
+        <field name="default_code">MRH-HDL-PUL128-MB</field>
+        <field name="x_marathon_sku">MRH-HDL-PUL128-MB</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_top_knobs"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_handle_pull_128_ab" model="product.product">
+        <field name="name">Bar Pull 128 mm CC (Antique Bronze)</field>
+        <field name="default_code">MRH-HDL-PUL128-AB</field>
+        <field name="x_marathon_sku">MRH-HDL-PUL128-AB</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_top_knobs"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_handle_pull_192_bn" model="product.product">
+        <field name="name">Bar Pull 192 mm CC (Brushed Nickel)</field>
+        <field name="default_code">MRH-HDL-PUL192-BN</field>
+        <field name="x_marathon_sku">MRH-HDL-PUL192-BN</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_top_knobs"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_handle_knob_30_mb" model="product.product">
+        <field name="name">Cabinet Knob 30 mm (Matte Black)</field>
+        <field name="default_code">MRH-HDL-KNB30-MB</field>
+        <field name="x_marathon_sku">MRH-HDL-KNB30-MB</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_berenson"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_handle_app_pull_18_bn" model="product.product">
+        <field name="name">Appliance Pull 18&quot; (Brushed Nickel)</field>
+        <field name="default_code">MRH-HDL-APP18-BN</field>
+        <field name="x_marathon_sku">MRH-HDL-APP18-BN</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_top_knobs"/>
         <field name="x_pricing_pending" eval="True"/>
     </record>
 
@@ -160,7 +308,7 @@
         <field name="x_pricing_pending" eval="True"/>
     </record>
 
-    <!-- ============ OTHER (sink / specialty) ============ -->
+    <!-- ============ OTHER (sink / specialty / hinge accessories) ========= -->
     <record id="hw_sink_water_barrier" model="product.product">
         <field name="name">Sink-Base Water Barrier — 1 m roll</field>
         <field name="default_code">MRH-WATERBARRIER-1M</field>
@@ -169,6 +317,30 @@
         <field name="is_storable" eval="True"/>
         <field name="x_hardware_category">other</field>
         <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <!-- Hinge accessories added 2026-06-10 for Marathon's "Hinge
+         Accessories" category. Mounting plates and cover caps are
+         per-hinge consumables; rolled up by the configurator at the
+         same multiplier as the hinge itself. -->
+    <record id="hw_blum_clip_mounting_plate" model="product.product">
+        <field name="name">Blum CLIP Mounting Plate (Cross-Cam, Screw-On)</field>
+        <field name="default_code">BLM-MTPL</field>
+        <field name="x_marathon_sku">BLM-MTPL</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_blum"/>
+        <field name="x_pricing_pending" eval="True"/>
+    </record>
+    <record id="hw_blum_clip_cover_cap" model="product.product">
+        <field name="name">Blum CLIP Cover Cap (Set of 2, Nickel)</field>
+        <field name="default_code">BLM-CAP</field>
+        <field name="x_marathon_sku">BLM-CAP</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_blum"/>
         <field name="x_pricing_pending" eval="True"/>
     </record>
 
@@ -195,6 +367,33 @@
         <field name="partner_id" ref="partner_marathon_hardware"/>
         <field name="product_id" ref="hw_leveler_50mm"/>
         <field name="product_code">MRH-LVL-50</field>
+        <field name="min_qty">100</field>
+    </record>
+    <!-- Supplier-info added 2026-06-10 — representative coverage of
+         the new brand additions so test_marathon_supplierinfo_links
+         stays meaningful as the seed grows. -->
+    <record id="si_dtc_c80_sc" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_dtc_c80_110_sc"/>
+        <field name="product_code">DTC-C80-110-SC</field>
+        <field name="min_qty">100</field>
+    </record>
+    <record id="si_king_slide_undermount" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_king_slide_k2832_21"/>
+        <field name="product_code">KS-K2832-21</field>
+        <field name="min_qty">10</field>
+    </record>
+    <record id="si_pull_128_mb" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_handle_pull_128_mb"/>
+        <field name="product_code">MRH-HDL-PUL128-MB</field>
+        <field name="min_qty">25</field>
+    </record>
+    <record id="si_blum_mounting_plate" model="product.supplierinfo">
+        <field name="partner_id" ref="partner_marathon_hardware"/>
+        <field name="product_id" ref="hw_blum_clip_mounting_plate"/>
+        <field name="product_code">BLM-MTPL</field>
         <field name="min_qty">100</field>
     </record>
 </odoo>
