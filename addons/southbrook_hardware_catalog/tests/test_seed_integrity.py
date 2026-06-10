@@ -7,14 +7,14 @@ from odoo.tests.common import TransactionCase, tagged
 @tagged("post_install", "-at_install", "southbrook", "hardware_catalog", "seed")
 class TestSeedIntegrity(TransactionCase):
 
-    def test_all_21_brands_present(self):
-        """Module ships 21 brand records — the original 19 from the
-        Marathon workbook plus DTC and King Slide added 2026-06-10
-        after auditing marathonhardware.com."""
+    def test_all_36_brands_present(self):
+        """Module ships 36 brand records — original 19 + DTC/King Slide
+        (Tier 1) + 15 Marathon-homepage brands (Tier 2.2). Locks the
+        floor; growth is fine, silent drops are not."""
         Brand = self.env["southbrook.hardware.brand"]
         self.assertEqual(
-            Brand.search_count([]), 21,
-            "Expected 21 brand records, got a different count",
+            Brand.search_count([]), 36,
+            "Expected 36 brand records, got a different count",
         )
 
     def test_marathon_aligned_additions_present(self):
