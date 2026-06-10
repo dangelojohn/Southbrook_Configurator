@@ -19,18 +19,22 @@ module.exports = defineConfig({
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    // Use the real hostname so Caddy's vhost routing fires; Chromium's
-    // --host-resolver-rules maps it to the QNAP IP at the network stack
-    // level (sidesteps the forbidden Host header override and the need
-    // for a local /etc/hosts entry).
-    baseURL: process.env.SB_BASE_URL || 'https://southbrookcabinetry.space:9443',
+    // Caddy's configured vhost is southbrookcabinetry.local, NOT .space.
+    // The .space domain is the public Cloudflare-tunnel entry — when
+    // cloudflared forwards to QNAP it rewrites Host to .local. From LAN
+    // we have to use the .local hostname directly so Caddy matches the
+    // right reverse_proxy block; otherwise the request falls through to
+    // a default vhost and Odoo's dbfilter rejects with "Database not
+    // found." Chromium's --host-resolver-rules maps the hostname to
+    // the QNAP IP at the network stack so we don't need /etc/hosts.
+    baseURL: process.env.SB_BASE_URL || 'https://southbrookcabinetry.local:9443',
     ignoreHTTPSErrors: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     launchOptions: {
       args: [
-        '--host-resolver-rules=MAP southbrookcabinetry.space 192.168.68.108',
+        '--host-resolver-rules=MAP southbrookcabinetry.local 192.168.68.108',
         '--ignore-certificate-errors',
       ],
     },
