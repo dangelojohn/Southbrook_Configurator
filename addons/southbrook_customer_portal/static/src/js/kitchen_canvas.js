@@ -13,8 +13,13 @@
 // the manufacturing CAD). The scene composes BoxGeometry per panel
 // from the dim formulas; nothing is downloaded except a placement JSON.
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/controls/OrbitControls.js";
+// `three` is resolved by the importmap in
+// addons/southbrook_customer_portal/views/kitchen_portal_templates.xml
+// to /southbrook_customer_portal/static/lib/three/three.module.min.js.
+// OrbitControls.js itself does `import { ... } from 'three'`, so the
+// same importmap makes that work too.
+import * as THREE from "three";
+import { OrbitControls } from "../lib/three/OrbitControls.js";
 
 import {
   BOX_TH, BACK_TH, DOOR_TH, side, top, bottom, back, door,

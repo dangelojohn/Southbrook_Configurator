@@ -80,10 +80,18 @@
                 The 3D preview will appear once a concept has been published for you.
             </p>
             <!-- The canvas script loads as a native ES module so the browser
-                 handles the Three.js CDN imports + the relative kitchen_dims
-                 import without going through Odoo's asset bundler. Loading
-                 only when there IS a preview option keeps the public list
-                 page lean. -->
+                 handles the Three.js + relative kitchen_dims import without
+                 going through Odoo's asset bundler. Three.js is vendored
+                 under static/lib/three/ (no CDN dependency); the importmap
+                 below maps the bare 'three' specifier (used by both
+                 kitchen_canvas.js and the vendored OrbitControls.js) to
+                 the vendored module. Loading only when there IS a preview
+                 option keeps the public list page lean. -->
+            <script t-if="preview_option" type="importmap">{
+                "imports": {
+                    "three": "/southbrook_customer_portal/static/lib/three/three.module.min.js"
+                }
+            }</script>
             <script t-if="preview_option" type="module"
                     src="/southbrook_customer_portal/static/src/js/kitchen_canvas.js"/>
 
