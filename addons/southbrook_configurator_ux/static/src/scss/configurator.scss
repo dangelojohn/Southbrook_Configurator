@@ -1,0 +1,699 @@
+// =====================================================================
+// Southbrook Configurator UX v2 — SCSS
+//
+// Phase 1 — port of the southbrook-configurator-v2.html prototype's
+// inline <style> block to a properly scoped SCSS file.
+//
+// Scoping discipline:
+//   Every selector is descendant-scoped under .sb_cfg_v2 (the v2 root's
+//   section class). This ensures the v2 visual treatment NEVER leaks
+//   into other portal pages (the /my/southbrook order builder, the
+//   homepage, the standard /shop pages without configurators, etc.).
+//   The wider chrome (Odoo website header, footer, breadcrumbs) is
+//   untouched.
+//
+// Tokens:
+//   The prototype's palette is captured at the top of this file as
+//   SCSS variables so a Phase-2 brand sweep can map them onto the
+//   Signature Series design tokens (--sb-walnut, --sb-linen, etc.)
+//   defined in southbrook_estimating/_southbrook_design_tokens.scss
+//   without touching every selector body. For Phase 1 we ship the
+//   prototype's exact palette so the visual diff vs the HTML mock is
+//   zero — visual matching first, brand reconciliation second.
+//
+// Accessibility:
+//   focus-visible rings preserved on every interactive element;
+//   prefers-reduced-motion respected on the progress bar transition;
+//   chip selectors use role=radiogroup/radio so screen readers see
+//   them as a single-select group (the JS wires the role on init).
+// =====================================================================
+
+// ---------- Palette (prototype HEX → SCSS vars) ----------
+$sb-cfg-bg:           #eef1f5;
+$sb-cfg-card:         #ffffff;
+$sb-cfg-rule:         #e3e6ec;
+$sb-cfg-rule-soft:    #eef0f4;
+$sb-cfg-ink:          #1d2433;
+$sb-cfg-ink-mid:      #2f3b52;
+$sb-cfg-ink-dim:      #6b7488;
+$sb-cfg-ink-quiet:    #9097a8;
+$sb-cfg-ink-faint:    #90979a;
+
+$sb-cfg-accent:       #c89b5a;            // Southbrook gold
+$sb-cfg-accent-deep:  #b08543;
+$sb-cfg-accent-soft:  #fbe7c1;
+
+$sb-cfg-blue:         #2f57c4;            // Import button + SKU
+$sb-cfg-blue-soft:    #eef2fb;
+$sb-cfg-blue-rule:    #d3def6;
+
+$sb-cfg-ok:           #1f9d6b;
+$sb-cfg-ok-soft:      #e6f7ef;
+
+$sb-cfg-err:          #c0392b;
+$sb-cfg-err-soft:     #fdecea;
+$sb-cfg-warn:         #b07d2a;
+$sb-cfg-warn-soft:    #fff7e8;
+$sb-cfg-warn-rule:    #f0dca8;
+
+$sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
+
+// ---------- Root scope ----------
+.sb_cfg_v2 {
+    background: $sb-cfg-bg;
+    color: $sb-cfg-ink;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Arial, sans-serif;
+    line-height: 1.5;
+    max-width: 1180px;
+    margin: 22px auto;
+    padding: 0 20px;
+    box-sizing: border-box;
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    // ===== Progress bar =====
+    .sb_cfg_progwrap {
+        height: 4px;
+        background: $sb-cfg-rule;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 18px;
+    }
+    .sb_cfg_progbar {
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, $sb-cfg-accent, $sb-cfg-ok);
+        transition: width 350ms ease;
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
+        }
+    }
+
+    // ===== Breadcrumbs =====
+    .sb_cfg_crumbs {
+        font-size: 12px;
+        color: $sb-cfg-ink-quiet;
+        margin-bottom: 10px;
+
+        b {
+            color: $sb-cfg-ink-mid;
+            font-weight: 600;
+        }
+    }
+
+    // ===== Title bar =====
+    .sb_cfg_titlebar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+    .sb_cfg_h1 {
+        font-size: 25px;
+        color: $sb-cfg-ink-mid;
+        margin: 0;
+    }
+    .sb_cfg_sub {
+        color: $sb-cfg-ink-dim;
+        font-size: 13px;
+        margin: 3px 0 0;
+    }
+
+    // ===== Bulk-tools bar =====
+    .sb_cfg_bulkbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: $sb-cfg-card;
+        border: 1px solid $sb-cfg-rule;
+        border-radius: 12px;
+        padding: 10px 14px;
+    }
+    .sb_cfg_bulkbar_lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: $sb-cfg-ink-quiet;
+        font-weight: 700;
+        margin-right: 4px;
+    }
+
+    // ===== Buttons =====
+    .sb_cfg_btn {
+        border: 0;
+        border-radius: 9px;
+        padding: 10px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: filter 150ms ease, background 150ms ease;
+
+        &:hover { filter: brightness(0.97); }
+        &:focus-visible {
+            outline: 2px solid $sb-cfg-blue;
+            outline-offset: 2px;
+        }
+        &:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+    }
+    .sb_cfg_btn_tpl {
+        background: $sb-cfg-blue-soft;
+        color: $sb-cfg-blue;
+        border: 1px solid $sb-cfg-blue-rule;
+    }
+    .sb_cfg_btn_imp {
+        background: $sb-cfg-blue;
+        color: white;
+    }
+    .sb_cfg_btn_primary {
+        background: $sb-cfg-accent;
+        color: white;
+        font-size: 15px;
+        padding: 13px 26px;
+    }
+    .sb_cfg_btn_ghost {
+        background: $sb-cfg-card;
+        border: 1px solid #d6dae3;
+        color: $sb-cfg-ink-dim;
+    }
+
+    // ===== Two-pane grid =====
+    .sb_cfg_grid {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 22px;
+        align-items: start;
+
+        @media (max-width: 860px) {
+            grid-template-columns: 1fr;
+        }
+    }
+    .sb_cfg_panel {
+        background: $sb-cfg-card;
+        border: 1px solid $sb-cfg-rule;
+        border-radius: 14px;
+        padding: 18px;
+    }
+    .sb_cfg_left {
+        position: sticky;
+        top: 84px;
+
+        @media (max-width: 860px) {
+            position: static;
+        }
+    }
+
+    // ===== Viewer / cabinet preview =====
+    .sb_cfg_viewer {
+        position: relative;
+        border-radius: 12px;
+        height: 250px;
+        background: linear-gradient(160deg, #f3f5f9, #e6eaf1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .sb_cfg_viewer.drag {
+        outline: 3px dashed $sb-cfg-blue;
+        outline-offset: -6px;
+    }
+    .sb_cfg_cab {
+        transition: width 350ms ease, height 350ms ease,
+                    background 350ms ease;
+        border-radius: 4px;
+        box-shadow: 0 18px 30px -12px rgba(40, 55, 80, 0.4);
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
+        }
+    }
+    .sb_cfg_badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        background: rgba(255, 255, 255, 0.85);
+        color: $sb-cfg-ink-mid;
+        padding: 4px 9px;
+        border-radius: 20px;
+    }
+    .sb_cfg_editimg {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.92);
+        color: $sb-cfg-blue;
+        padding: 6px 11px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 1px solid $sb-cfg-blue-rule;
+    }
+    .sb_cfg_viewer img.sb_cfg_user_photo {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    // ===== Summary card =====
+    .sb_cfg_summary {
+        margin-top: 18px;
+        border-top: 1px solid $sb-cfg-rule-soft;
+        padding-top: 14px;
+    }
+    .sb_cfg_sumrow {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 8px;
+    }
+    .sb_cfg_k {
+        font-size: 12px;
+        color: $sb-cfg-ink-dim;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .sb_cfg_price {
+        font-size: 32px;
+        font-weight: 700;
+        color: $sb-cfg-ink-mid;
+    }
+    .sb_cfg_price .sb_cfg_delta {
+        font-size: 13px;
+        font-weight: 600;
+        color: $sb-cfg-ok;
+        margin-left: 6px;
+    }
+    .sb_cfg_weight {
+        font-size: 16px;
+        font-weight: 600;
+        color: #445;
+    }
+    .sb_cfg_sku {
+        font-size: 13px;
+        font-weight: 600;
+        color: $sb-cfg-blue;
+    }
+    .sb_cfg_specline {
+        margin-top: 10px;
+        font-size: 12px;
+        color: $sb-cfg-ink-dim;
+        background: #f6f8fb;
+        border-radius: 8px;
+        padding: 9px 11px;
+
+        b { color: $sb-cfg-ink-mid; }
+    }
+    .sb_cfg_livetag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        color: $sb-cfg-ok;
+        background: $sb-cfg-ok-soft;
+        padding: 2px 7px;
+        border-radius: 20px;
+        margin-left: 6px;
+    }
+
+    // ===== Completion ring =====
+    .sb_cfg_completion {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 14px;
+        font-size: 12px;
+        color: $sb-cfg-ink-dim;
+    }
+    .sb_cfg_ring {
+        --p: 0;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: conic-gradient($sb-cfg-ok calc(var(--p) * 1%),
+                                   $sb-cfg-rule 0);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 11px;
+        color: $sb-cfg-ink-mid;
+    }
+    .sb_cfg_ring i {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-style: normal;
+    }
+
+    // ===== Action bar =====
+    .sb_cfg_actionbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid $sb-cfg-rule-soft;
+    }
+    .sb_cfg_note {
+        font-size: 12px;
+
+        &.sb_cfg_note_ok  { color: $sb-cfg-ok; }
+        &.sb_cfg_note_bad { color: $sb-cfg-err; }
+    }
+
+    // ===== Right pane / configurator groups =====
+    .sb_cfg_group {
+        border: 1px solid $sb-cfg-rule-soft;
+        border-radius: 11px;
+        margin-bottom: 12px;
+        overflow: hidden;
+    }
+    .sb_cfg_ghead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 13px 15px;
+        background: #fafbfd;
+        cursor: pointer;
+        user-select: none;
+
+        &:focus-visible {
+            outline: 2px solid $sb-cfg-blue;
+            outline-offset: -2px;
+        }
+    }
+    .sb_cfg_gt {
+        font-weight: 600;
+        font-size: 14px;
+        color: $sb-cfg-ink-mid;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .sb_cfg_gnum {
+        font-size: 11px;
+        color: $sb-cfg-ink-quiet;
+        font-weight: 600;
+    }
+    .sb_cfg_check {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #c3cad6;
+        color: white;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &.sb_cfg_check_done {
+            background: $sb-cfg-ok;
+        }
+    }
+    .sb_cfg_chev {
+        transition: transform 200ms ease;
+        color: $sb-cfg-ink-quiet;
+    }
+    .sb_cfg_group.sb_cfg_closed {
+        .sb_cfg_chev { transform: rotate(-90deg); }
+        .sb_cfg_gbody { display: none; }
+    }
+    .sb_cfg_gbody {
+        padding: 8px 15px 15px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+
+        @media (max-width: 860px) {
+            grid-template-columns: 1fr;
+        }
+    }
+    .sb_cfg_field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .sb_cfg_field.sb_cfg_field_full {
+        grid-column: 1 / -1;
+    }
+    .sb_cfg_field label {
+        font-size: 12px;
+        font-weight: 600;
+        color: $sb-cfg-ink-dim;
+        display: flex;
+        justify-content: space-between;
+    }
+    .sb_cfg_pd {            // price-delta hint next to each label
+        color: $sb-cfg-ok;
+        font-weight: 600;
+    }
+
+    // ===== Chip selectors =====
+    .sb_cfg_chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+    .sb_cfg_chip {
+        padding: 7px 12px;
+        border: 1px solid #d6dae3;
+        border-radius: 20px;
+        font-size: 12.5px;
+        cursor: pointer;
+        background: white;
+        color: $sb-cfg-ink;
+        transition: border-color 120ms ease, background 120ms ease,
+                    color 120ms ease;
+        user-select: none;
+
+        &:hover {
+            border-color: $sb-cfg-accent;
+        }
+        &:focus-visible {
+            outline: 2px solid $sb-cfg-blue;
+            outline-offset: 2px;
+        }
+        &.sb_cfg_chip_sel {
+            background: $sb-cfg-chip-on;
+            color: white;
+            border-color: $sb-cfg-chip-on;
+        }
+        &.sb_cfg_chip_disabled {
+            opacity: 0.38;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+    }
+    .sb_cfg_field select {
+        padding: 9px 10px;
+        border: 1px solid #d6dae3;
+        border-radius: 8px;
+        font-size: 13px;
+        background: white;
+
+        &:focus {
+            outline: none;
+            border-color: $sb-cfg-blue;
+            box-shadow: 0 0 0 3px rgba(47, 87, 196, 0.18);
+        }
+    }
+    .sb_cfg_warn {
+        font-size: 11px;
+        color: $sb-cfg-warn;
+        background: $sb-cfg-warn-soft;
+        border: 1px solid $sb-cfg-warn-rule;
+        border-radius: 7px;
+        padding: 6px 9px;
+        margin-top: 4px;
+    }
+
+    .sb_cfg_cap {
+        font-size: 11px;
+        color: $sb-cfg-ink-faint;
+        text-align: center;
+        margin-top: 18px;
+    }
+}
+
+// ===== Import overlay (fixed; lives at body level via z-index) =====
+// Lives OUTSIDE the .sb_cfg_v2 scope because the markup is rendered as
+// a sibling of the section (and position:fixed escapes the layout
+// flow). Selectors are still uniquely sb_cfg_* prefixed to avoid leaks.
+.sb_cfg_overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 28, 46, 0.55);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 16px;
+    z-index: 1050;
+
+    &.sb_cfg_overlay_show {
+        display: flex;
+    }
+}
+.sb_cfg_modal {
+    background: white;
+    border-radius: 14px;
+    max-width: 820px;
+    width: 100%;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sb_cfg_mhead {
+    padding: 18px 22px;
+    border-bottom: 1px solid $sb-cfg-rule-soft;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h2 {
+        font-size: 18px;
+        color: $sb-cfg-ink-mid;
+        margin: 0;
+    }
+}
+.sb_cfg_x {
+    cursor: pointer;
+    font-size: 20px;
+    color: $sb-cfg-ink-quiet;
+    border: 0;
+    background: transparent;
+
+    &:focus-visible {
+        outline: 2px solid $sb-cfg-blue;
+    }
+}
+.sb_cfg_mbody {
+    padding: 18px 22px;
+    overflow: auto;
+}
+.sb_cfg_drop {
+    border: 2px dashed #cfd5e0;
+    border-radius: 12px;
+    padding: 26px;
+    text-align: center;
+    color: $sb-cfg-ink-dim;
+    cursor: pointer;
+    margin-bottom: 16px;
+
+    &:hover, &.sb_cfg_drop_drag {
+        border-color: $sb-cfg-blue;
+        background: #f7f9fd;
+    }
+}
+.sb_cfg_drop_hint {
+    font-size: 11px;
+}
+.sb_cfg_statline {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.sb_cfg_pill {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+
+    &.sb_cfg_pill_g { background: $sb-cfg-ok-soft;  color: $sb-cfg-ok; }
+    &.sb_cfg_pill_r { background: $sb-cfg-err-soft; color: $sb-cfg-err; }
+}
+.sb_cfg_stat_hint {
+    color: $sb-cfg-ink-quiet;
+    font-size: 12px;
+}
+.sb_cfg_table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+
+    th, td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid $sb-cfg-rule-soft;
+    }
+    th {
+        color: $sb-cfg-ink-dim;
+        font-weight: 600;
+        background: #fafbfd;
+        position: sticky;
+        top: 0;
+    }
+    tr.sb_cfg_row_bad {
+        background: #fff6f5;
+    }
+}
+.sb_cfg_rowstat {
+    font-weight: 700;
+    font-size: 11px;
+
+    &.sb_cfg_rowstat_g { color: $sb-cfg-ok; }
+    &.sb_cfg_rowstat_r { color: $sb-cfg-err; }
+}
+.sb_cfg_reason {
+    font-size: 11px;
+    color: $sb-cfg-err;
+}
+.sb_cfg_mfoot {
+    padding: 16px 22px;
+    border-top: 1px solid $sb-cfg-rule-soft;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+.sb_cfg_mfoot_r {
+    display: flex;
+    gap: 10px;
+}
+
+// ===== Toast =====
+.sb_cfg_toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: $sb-cfg-ink-mid;
+    color: white;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    z-index: 1060;
+    opacity: 0;
+    transition: opacity 250ms ease;
+    pointer-events: none;
+    max-width: 90%;
+
+    &.sb_cfg_toast_show {
+        opacity: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+}
