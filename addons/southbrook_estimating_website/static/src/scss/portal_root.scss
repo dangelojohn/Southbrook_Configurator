@@ -553,6 +553,22 @@
     }
 }
 
+// Phase 3 Sprint C4 — danger variant for the Cancel Order button.
+// Visually distinct from the primary CTA (Confirm) so an accidental
+// click is unlikely. Renders as a desaturated red outline; hover
+// fills the background for clear affordance.
+.o_owl_btn_danger {
+    color: #983b3b;
+    border-color: #c87272;
+    background: white;
+
+    &:hover:not(:disabled) {
+        background: #fbecec;
+        border-color: #983b3b;
+        color: #6e2323;
+    }
+}
+
 .o_owl_footer_total {
     text-align: right;
     border-left: 1px solid var(--sb-rule);

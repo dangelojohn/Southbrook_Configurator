@@ -289,6 +289,18 @@ class FooterActions extends Component {
                     Duplicate as Draft
                 </button>
 
+                <!-- Phase 3 Sprint C4 — Cancel order. State-guarded
+                     server-side: only draft/sent are cancelable from
+                     the portal. The button hides itself once the
+                     salesperson has confirmed (post-confirmation
+                     cancellation goes through the backend). -->
+                <button t-if="_canCancel()"
+                        class="o_owl_btn o_owl_btn_secondary o_owl_btn_danger"
+                        t-on-click="_onCancelClick"
+                        t-att-disabled="props.busy">
+                    Cancel Order
+                </button>
+
                 <!-- Confirm vs Request a Price.
                      Step 5 (2026-06-01): dealer mode now opens a
                      confirmation modal before firing the irreversible
@@ -409,6 +421,27 @@ class FooterActions extends Component {
         const s = this.props.order?.state;
         return s === "draft" || s === "sent";
     }
+
+    // Phase 3 Sprint C4 — Cancel order availability.
+    // Same gate as _canConfirm: only draft/sent are cancelable from
+    // the portal. Server enforces the same rule; this check is purely
+    // for hiding the button at rest.
+    _canCancel() {
+        const s = this.props.order?.state;
+        return s === "draft" || s === "sent";
+    }
+
+    _onCancelClick = () => {
+        if (!this._canCancel()) return;
+        const msg = "Cancel this order? This cannot be undone from " +
+                    "the portal — you would have to contact your dealer " +
+                    "to reopen it.";
+        if (typeof window !== "undefined" && window.confirm
+            && !window.confirm(msg)) {
+            return;
+        }
+        this.props.onAction("cancel");
+    };
 
     _confirmAction() {
         return this.props.mode === "customer" ? "request_price" : "confirm";

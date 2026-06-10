@@ -1283,6 +1283,48 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "redirect_url": f"/my/southbrook/order-builder/{new_id}",
             }
 
+        if action_code == "cancel":
+            # Phase 3 Sprint C4 — customer cancels an unconfirmed order.
+            # State-guarded: only draft/sent are cancelable from the
+            # portal. Once the salesperson has confirmed, cancellation
+            # has to go through the backend (rebates, MO cleanup, etc.).
+            if order.state not in ("draft", "sent"):
+                return {
+                    "error": "wrong_state",
+                    "message": (
+                        "Cancellation from the portal is only allowed "
+                        "before pricing review confirms the order — "
+                        "current state: " + str(order.state)
+                    ),
+                }
+            try:
+                # action_cancel() is Odoo sale.order's built-in. It
+                # cleans up any reserved inventory + invoice draft.
+                # We sudo so portal users (who lack write on sale.order
+                # directly) can fire it; the record-rule already
+                # confirmed via _southbrook_resolve_order that THIS
+                # order belongs to THIS user.
+                order_su.sudo().action_cancel()
+            except Exception as exc:  # noqa: BLE001
+                return {
+                    "error": "cancel_failed",
+                    "message": str(exc),
+                }
+            try:
+                order.sudo().message_post(
+                    body=(
+                        "<strong>Cancelled by customer</strong>"
+                        " via the portal — <em>{}</em>."
+                        .format(request.env.user.name or "customer")
+                    ),
+                    subject="Order cancelled by customer",
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            return {"ok": True, "new_state": order.state}
+
         if action_code == "print":
             # Signature Spec Sheet QWeb PDF — the customer-print
             # report from southbrook_estimating Track 1. We hand the
