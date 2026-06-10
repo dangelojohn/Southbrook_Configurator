@@ -165,3 +165,187 @@ The Q8 lock blocks new template additions in this audit. Flagging the gap so it 
 
 *Submitted to the Southbrook product committee for review.*
 *Acceptance: configurator installs clean (`odoo-bin -i southbrook_estimating --stop-after-init`), new attributes appear in the order-builder attribute pane, no regressions on the existing Q7 smoke test (Demo Tradesperson Tier 3 9-line build, BoM preview, MO creation).*
+
+---
+
+# Implementation outcome (2026-06-09 → 2026-06-10)
+
+The proposed audit was accepted and shipped over Phases **2A → 2N**. This
+section is the handoff: what landed, where it lives, and the two
+silent-killer gotchas a future contributor must know before touching
+audit-class data.
+
+## What's live on `origin/main`
+
+| Surface | Before audit | After |
+|---|---|---|
+| User-facing attributes | 11 | **21** (10 new from §3 above) |
+| Door style values | 3 | **9** (6 new) |
+| Declarative gating rules | 4 | **85** (`ruleA1`–`ruleA8`) |
+| Wizard layout | one flat scroll | **4 tabbed steps** per cabinet |
+| Accessories default | nothing pre-selected | **Soft-Close** on 34/34 SB-* cabinets |
+| `price_extra` deltas | sparse | **62 new** demo-grade deltas |
+| Regression tests | 0 audit-specific | **23** locked in (`test_audit_phase2.py`) |
+| Live-browser walkthrough | none | Playwright scaffold in `e2e/` |
+| Deploy reproducibility | scp by hand | `scripts/deploy_to_qnap.sh` |
+
+Module version after Phase 2N: `southbrook_estimating == 19.0.1.7.0`.
+
+## Phase-by-phase trace
+
+| Phase | Concern | Files touched | Where the rules / data live |
+|---|---|---|---|
+| 2A/2B | Add 10 attrs + wire to 12 templates | `data/attributes.xml`, `data/product_templates.xml`, `data/config_rules.xml` | 77 new `attr_line_*` + A1+A3+A4 rules |
+| 2C | Backfill broken attr_lines on 6 cabinets | `migrations/19.0.1.2.0/post-migrate.py` | ORM-level write-or-create |
+| 2D/2E/2H | `catalog_expansion.py` non-destructive reconcile | `addons/southbrook_configurator_ux/models/catalog_expansion.py` | preserve attr_line row IDs → preserve gating-rule FKs |
+| 2F | Add A2/A6/A7 rules | `data/config_rules.xml` | 21 more `ruleA*` records |
+| 2I | A5 + soft-close + `rule_completion` scoping fix | `data/config_rules.xml`, `data/product_templates.xml`, `addons/southbrook_configurator_ux/models/rule_completion.py`, `catalog_expansion.py` | A5=8 rules, `default_val`, sequence-scoped unlink |
+| 2J | A8 finish-by-species | `data/config_rules.xml` | 3 new domains + 30 rules |
+| 2K/2L | 4-tab wizard layout | `data/config_steps.xml`, `__manifest__.py`, `catalog_expansion.py` | 4 `product.config.step` + 40 `step_line` records + per-expanded-cabinet seeding |
+| 2M | Pricing pass | `addons/southbrook_configurator_ux/models/tactical_price_seed.py` | 62 new `(attr, value) → (price_extra, weight_extra)` deltas |
+| 2N | Catalog parity test | `tests/test_audit_phase2.py`, `data/config_steps.xml`, `catalog_expansion.py` | Adds SB-ACCESSORY + SB-WORKTOP step lines; "Accessory Type" in step map |
+
+## The gating-rule pattern (how to add one safely)
+
+Every audit-class rule is **one `product.config.line`** restricting one
+attribute on one template, gated by one `product.config.domain`.
+
+```xml
+<record id="domain_species_is_maple" model="product.config.domain">
+  <field name="name">Species is Maple</field>
+</record>
+<record id="domain_species_is_maple_line" model="product.config.domain.line">
+  <field name="domain_id" ref="domain_species_is_maple"/>
+  <field name="attribute_id" ref="attr_wood_species"/>
+  <field name="condition">in</field>
+  <field name="operator">and</field>
+  <field name="value_ids" eval="[(6, 0, [ref('value_species_maple')])]"/>
+</record>
+
+<record id="ruleA8_base_1dr_maple_stain_by_species" model="product.config.line">
+  <field name="product_tmpl_id" ref="base_1dr"/>
+  <field name="attribute_line_id" ref="attr_line_base_1dr_finish"/>
+  <field name="value_ids" eval="[(6, 0, [ref('value_finish_maple_stain')])]"/>
+  <field name="domain_id" ref="domain_species_is_maple"/>
+  <field name="sequence">47000</field>
+</record>
+```
+
+**OCA's per-value AND semantic** is the rule that catches people: for
+each attribute *value* V, OCA finds every `config.line` that mentions V
+in its `value_ids`, ANDs all their `domain_id`s together, and shows V
+only if the combined domain matches current picks. So:
+
+- A value mentioned in ONE rule with domain D → available only when D
+  is satisfied. (Most cases.)
+- A value mentioned in MULTIPLE rules with domains D1, D2 → available
+  only when **both** are satisfied. (Rare, often a bug.)
+- A value mentioned in ZERO rules → always available.
+
+When in doubt, write **one rule per (template × value)** with the
+combined domain expressed as a single `condition=in` with a value
+list — never two rules for the same value.
+
+## Sequence-range convention
+
+| Range | Owner | Purpose |
+|---|---|---|
+| `10–99` | `rule1_*` (Series → Door Style, original) | OCA expects sequence on read |
+| `20000–20999` | `rule_completion.complete_rules()` | per-value "Series allows V" pattern (sequence 20000 for box, 20010 for door) |
+| `40000–47999` | static `config_rules.xml` audit rules | A1=40000, A3=41000, A4=42000, A5=43000, A8=47000, etc. |
+
+**Don't write rules at sequence 20000 or 20010** — `rule_completion`
+will delete them on the next install. That's the Phase 2I gotcha.
+
+## Two silent-killer gotchas
+
+### 1. `rule_completion.complete_rules()` will delete your rule
+
+`southbrook_configurator_ux/models/rule_completion.py` was built to
+rewrite the broken seed "Contractor → box_material allowed = [...]"
+pattern into per-value `config.line` records. Its rewrite **deletes
+all existing `config.line` records on the `Box Material` and `Door
+Style` attribute_lines** before recreating its own.
+
+The Phase 2I fix narrowed the delete to `sequence IN (20000, 20010)` —
+so audit rules at sequence 4xxxx survive. **If you add a rule at
+sequence 20000 or 20010, it will be silently wiped.** If you need to
+restrict `Box Material` or `Door Style` with a new audit rule, pick a
+sequence in 4xxxx.
+
+### 2. `catalog_expansion.py` rebuilds attribute_lines every install
+
+`southbrook_configurator_ux/models/catalog_expansion.py` walks the
+catalog and reconciles each template's `attribute_line_ids` to match
+the `_ATTRS_*` constants. The original implementation called `.unlink()`
+on existing attribute_lines before recreating them — which **cascade-
+deleted every `config.line` that referenced those attribute_lines**,
+including audit rules.
+
+Phase 2H switched to a non-destructive write-or-create pattern:
+
+```python
+existing = AttrLine.search([
+    ("product_tmpl_id", "=", tmpl.id),
+    ("attribute_id", "=", attr.id),
+], limit=1)
+if existing:
+    if set(existing.value_ids.ids) != set(desired_value_ids):
+        existing.write({"value_ids": [(6, 0, desired_value_ids)]})
+    line = existing
+else:
+    line = AttrLine.create({...})
+```
+
+**Don't go back to `.unlink()` + `.create()`.** Audit gating rules
+have foreign keys to `attribute_line_id`; preserving the row IDs is
+what keeps them bound.
+
+## Tested by
+
+| Risk | Test |
+|---|---|
+| Rule got silently deleted | `TestAuditPhase2Rules.test_01_audit_rule_total` — asserts `ruleA*` count |
+| Soft-Close default lost | `TestAuditPhase2SoftClose.test_01_all_q8_cabinets_default_soft_close` |
+| Step membership drifted | `TestAuditPhase2WizardSteps.test_03_step_lines_partition_all_attribute_lines` |
+| Premium attr value at $0 | `TestAuditPhase2PriceExtras.test_02_premium_audit_values_carry_non_zero_price_extra` |
+| Catalog-expanded SKU lost shape | `TestAuditPhase2CatalogExpansion.test_01_every_catalog_cabinet_has_some_step_lines` |
+| Attribute name drifted in `_AUDIT_STEPS` | `TestAuditPhase2CatalogExpansion.test_03_q8_and_extended_cabinets_share_step_shape` |
+
+Run with:
+
+```sh
+./scripts/deploy_to_qnap.sh southbrook_estimating  # rsync + upgrade
+# Or directly with tests:
+ssh admin@<qnap> '/share/.../system-docker exec southbrook-odoo \
+  odoo -u southbrook_estimating -d southbrook --stop-after-init \
+  --no-http --test-enable --test-tags=southbrook'
+```
+
+## Where things live (file index)
+
+```
+addons/
+  southbrook_estimating/
+    data/attributes.xml          ← 10 audit attrs + 6 new door styles
+    data/product_templates.xml   ← attr_lines per Q8 cabinet, soft-close default_val
+    data/config_rules.xml        ← 85 ruleA* gating rules + their domains
+    data/config_steps.xml        ← 4 wizard steps + step_lines for 12 Q8 cabinets
+    migrations/19.0.1.2.0/post-migrate.py   ← Phase 2C backfill
+    migrations/19.0.1.3.0/pre-migrate.py    ← Phase 2G orphan-xml_id cleanup
+    tests/test_audit_phase2.py   ← 23 regression tests
+  southbrook_configurator_ux/
+    models/catalog_expansion.py  ← non-destructive reconcile + _AUDIT_STEPS + soft-close
+    models/rule_completion.py    ← sequence-scoped unlink (don't widen)
+    models/tactical_price_seed.py ← 108 demo-grade price/weight deltas
+
+scripts/deploy_to_qnap.sh        ← rsync + odoo -u; encodes system-docker quirk
+e2e/                             ← Playwright suite (needs SB_ADMIN_PASSWORD)
+docs/configurator_audit_2026_06.md ← this file
+```
+
+---
+
+*Implementation completed 2026-06-10. Live on QNAP southbrook stack
+at `southbrook_estimating == 19.0.1.7.0`. 23/23 audit regression
+tests green.*
