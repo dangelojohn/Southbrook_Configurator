@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <!--
-        The ~19 brands the init doc cites the Marathon workbook covers.
+        21 brands sourced through Marathon Hardware. The original seed
+        was 19; DTC and King Slide were added 2026-06-10 after auditing
+        marathonhardware.com — DTC is one of Marathon's two named
+        hinge categories (alongside Salice), and King Slide is a common
+        Taiwanese drawer-slide OEM at Marathon's mid-tier price point.
         Codes are stable identifiers used in xml_ids and the
         hardware_map.json so a brand swap doesn't ripple through code.
     -->
@@ -15,6 +19,12 @@
         <field name="name">Salice</field>
         <field name="code">salice</field>
         <field name="sequence">20</field>
+    </record>
+    <record id="brand_dtc" model="southbrook.hardware.brand">
+        <field name="name">DTC</field>
+        <field name="code">dtc</field>
+        <field name="sequence">25</field>
+        <field name="note">Chinese hinge/slide maker. Marathon promotes DTC alongside Salice as a top-tier hinge category — homepage navigation calls out "DTC Hinges" as its own bin.</field>
     </record>
     <record id="brand_hettich" model="southbrook.hardware.brand">
         <field name="name">Hettich</field>
@@ -40,6 +50,12 @@
         <field name="name">Accuride</field>
         <field name="code">accuride</field>
         <field name="sequence">70</field>
+    </record>
+    <record id="brand_king_slide" model="southbrook.hardware.brand">
+        <field name="name">King Slide</field>
+        <field name="code">king_slide</field>
+        <field name="sequence">75</field>
+        <field name="note">Taiwanese drawer-slide OEM. Supplies ball-bearing and undermount slides to multiple distributors, often under their own labeling. Sourced through Marathon for mid-tier slide SKUs.</field>
     </record>
     <record id="brand_richelieu" model="southbrook.hardware.brand">
         <field name="name">Richelieu</field>
