@@ -7,14 +7,12 @@
             Settings → Technical → System Parameters to activate the
             on-confirm bridge POST + the Regenerate CAD button.
 
-            Uses set_param so the call is idempotent — re-runs are safe.
-            The URL and secret parameters are intentionally NOT seeded
-            here; the code falls back to DEFAULT_BRIDGE_URL and admin
-            sets the secret via the UI on first use.
+            set_param is idempotent: re-running -u does NOT overwrite an
+            admin's True value (set_param does overwrite, but noupdate=1
+            means this call only fires on -i, not -u). For new installs
+            the gate lands explicitly OFF.
         -->
-        <function model="ir.config_parameter" name="set_param">
-            <value>freecad_bridge.enabled</value>
-            <value>false</value>
-        </function>
+        <function model="ir.config_parameter" name="set_param"
+                  eval="('freecad_bridge.enabled', 'false')"/>
     </data>
 </odoo>
