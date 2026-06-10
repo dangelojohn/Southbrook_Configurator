@@ -1959,11 +1959,52 @@ const TEMPLATE = xml`
             </div>
             <div t-elif="state.ui.current_tab === 'history'"
                  class="o_owl_tab_panel o_owl_panel_history">
-                <p class="o_owl_panel_placeholder">
-                    <strong>History panel</strong> — Phase 3 polish
-                    surfaces the NF6 parent-order chain
-                    (v1 → v2 → v3 …).
-                </p>
+                <!-- Phase 3 Sprint C3 — NF6 parent-order chain.
+                     state.order.history_chain is newest-first, each
+                     entry: {id, name, version, state, amount_total,
+                     date_order, is_current}. Empty list for v1
+                     orders that were never duplicated. -->
+                <t t-if="(state.order.history_chain || []).length &lt;= 1">
+                    <p class="o_owl_panel_placeholder">
+                        <strong>No prior versions.</strong>
+                        This is the first version of this order.
+                        If a sales rep duplicates it via the backend
+                        ("Duplicate as Draft"), the prior version
+                        appears here as v1, this one becomes v2, etc.
+                    </p>
+                </t>
+                <ol t-else="" class="o_owl_history_chain">
+                    <li t-foreach="state.order.history_chain || []"
+                        t-as="entry" t-key="entry.id"
+                        t-att-class="'o_owl_history_entry ' +
+                                     (entry.is_current ? 'o_owl_history_current' : '') +
+                                     ' o_owl_history_state_' + entry.state">
+                        <div class="o_owl_history_version">
+                            v<t t-esc="entry.version"/>
+                        </div>
+                        <div class="o_owl_history_body">
+                            <div class="o_owl_history_name">
+                                <a t-if="!entry.is_current"
+                                   t-attf-href="/my/southbrook/order-builder/#{entry.id}"
+                                   t-esc="entry.name"/>
+                                <strong t-else="" t-esc="entry.name"/>
+                                <span t-if="entry.is_current"
+                                      class="o_owl_history_chip">
+                                    Current
+                                </span>
+                            </div>
+                            <div class="o_owl_history_meta">
+                                <span t-esc="entry.state"/>
+                                <span t-if="entry.date_order">
+                                    · <t t-esc="entry.date_order.slice(0, 10)"/>
+                                </span>
+                                <span t-if="entry.amount_total">
+                                    · <t t-esc="fmtUsd(entry.amount_total)"/>
+                                </span>
+                            </div>
+                        </div>
+                    </li>
+                </ol>
             </div>
             <div t-elif="state.ui.current_tab === 'print'"
                  class="o_owl_tab_panel o_owl_panel_print">

@@ -1676,6 +1676,14 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                     if order.state in ("sale", "done") and order.date_order
                     else None
                 ),
+                # Phase 3 Sprint C3 — parent-order chain (NF6 history).
+                # Newest first, each entry: {id, name, version, state,
+                # amount_total, date_order, is_current}. Empty list
+                # for v1 orders that were never duplicated.
+                "history_chain": (
+                    order._southbrook_history_chain()
+                    if hasattr(order, "_southbrook_history_chain") else []
+                ),
             },
             "lines": lines,
             "zones": zones,

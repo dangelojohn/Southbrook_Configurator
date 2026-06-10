@@ -398,6 +398,39 @@ class SaleOrder(models.Model):
             },
         }
 
+    # ------------------------------------------------------------------
+    # Phase 3 Sprint C3 — version-history chain walker.
+    # ------------------------------------------------------------------
+    def _southbrook_history_chain(self, max_depth=20):
+        """Walk parent_order_id backwards and return the ancestry.
+
+        Returns a list of dicts (newest first) covering EVERY order in
+        the chain — including self. Caller renders it as a timeline.
+
+        max_depth guards against pathological cycles; 20 is enough for
+        any plausible iterative-design workflow (Image Floor's typical
+        v3 is the high-water mark in observed practice).
+        """
+        self.ensure_one()
+        chain = []
+        seen = set()
+        cur = self
+        while cur and cur.id not in seen and len(chain) < max_depth:
+            seen.add(cur.id)
+            chain.append({
+                "id": cur.id,
+                "name": cur.name,
+                "version": int(cur.version or 1),
+                "state": cur.state,
+                "amount_total": float(cur.amount_total or 0.0),
+                "date_order": (
+                    cur.date_order.isoformat() if cur.date_order else None
+                ),
+                "is_current": cur.id == self.id,
+            })
+            cur = cur.parent_order_id
+        return chain
+
     def action_duplicate_as_draft(self):
         """Create a new draft sale.order copied from this one (NF6).
 
