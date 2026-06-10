@@ -6,31 +6,15 @@
             does NOT change MO confirm behaviour. Flip to True in
             Settings → Technical → System Parameters to activate the
             on-confirm bridge POST + the Regenerate CAD button.
-        -->
-        <record id="param_freecad_bridge_enabled" model="ir.config_parameter">
-            <field name="key">freecad_bridge.enabled</field>
-            <field name="value">false</field>
-        </record>
 
-        <!--
-            Bridge service URL. Default points at the internal docker DNS
-            for the bridge container. Override if the deployment topology
-            puts the bridge elsewhere.
+            Uses set_param so the call is idempotent — re-runs are safe.
+            The URL and secret parameters are intentionally NOT seeded
+            here; the code falls back to DEFAULT_BRIDGE_URL and admin
+            sets the secret via the UI on first use.
         -->
-        <record id="param_freecad_bridge_url" model="ir.config_parameter">
-            <field name="key">freecad_bridge.url</field>
-            <field name="value">http://southbrook-freecad-bridge:8000</field>
-        </record>
-
-        <!--
-            Shared secret for the /plm/cad_callback header check. The
-            bridge sends X-Bridge-Secret on its callback; this row's
-            value must match what the bridge container has in its env.
-            Leave empty here; an admin sets the real value on first use.
-        -->
-        <record id="param_freecad_bridge_secret" model="ir.config_parameter">
-            <field name="key">freecad_bridge.secret</field>
-            <field name="value"></field>
-        </record>
+        <function model="ir.config_parameter" name="set_param">
+            <value>freecad_bridge.enabled</value>
+            <value>false</value>
+        </function>
     </data>
 </odoo>
