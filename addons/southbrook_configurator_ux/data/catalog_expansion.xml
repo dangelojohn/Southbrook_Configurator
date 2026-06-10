@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Build the common-category kitchen cabinet catalog (~40 templates).
+  The deltas table + builder lives in models/catalog_expansion.py.
+
+  noupdate=0 so the catalog rebuilds on each -u; the builder is
+  idempotent (writes existing templates by SKU rather than duplicating).
+  Loads AFTER tactical_price_extras.xml so the price-extra seed runs
+  again on the NEW templates' freshly-created PTAVs.
+-->
+<odoo noupdate="0">
+  <function model="southbrook.configurator_ux.catalog_expansion"
+            name="build_catalog"/>
+</odoo>

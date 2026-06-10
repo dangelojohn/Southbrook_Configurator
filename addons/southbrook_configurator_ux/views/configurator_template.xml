@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  QWeb template inheritance that replaces the body of the OCA
+  website_product_configurator.product_configurator template with the
+  v2 layout's static shell + OWL mount points.
+
+  Phase 1 (initial):
+    The right pane was rendered server-side from QWeb loops over
+    attribute lines; the left pane was hydrated by vanilla JS from a
+    hardcoded OPTIONS map.
+
+  Phase 2b (this version):
+    Server-side QWeb output is reduced to a minimal shell carrying:
+      - data-product-tmpl-id="<tmpl.id>" on #sb_cfg_v2_root so the
+        OWL bootstrap can fetch the configurator state from
+        /southbrook/api/configurator/state without any DOM parsing.
+      - Three OWL mount points: the LEFT preview/summary panel
+        (#sb_cfg_v2_left_mount), the RIGHT chip grid
+        (#sb_cfg_v2_right_mount), and the bulk-tools bar
+        (#sb_cfg_v2_tools_mount, internal users only).
+      - The import overlay + toast container at the bottom — these
+        stay as plain QWeb because they sit OUTSIDE the OWL component
+        tree (position:fixed, body-level).
+
+    The OWL component owns ALL reactive state and rendering for the
+    left + right + tools surfaces. The static markup ships only
+    enough to give OWL clean mount points + accessibility wrappers
+    (the role="progressbar" attribute lives on the static element so
+    a no-JS visitor still gets the semantic landmark).
+
+  Mount-point pattern:
+    The configurator.esm.js bundle finds #sb_cfg_v2_root on every
+    page; absent it no-ops. With it, the bootstrap reads
+    data-product-tmpl-id, fetches /state, and mounts the OWL component
+    into #sb_cfg_v2_main_mount. The whole left + right + tools UI is
+    one component owning one reactive state tree.
+
+  Per project brief (CLAUDE.md §3): we never patch the OCA module in
+  place. This file is the ONLY thing that touches the OCA template
+  and it does so via inheritance only.
+-->
+<odoo>
+  <data>
+
+    <template id="product_configurator_v2_body"
+              inherit_id="website_product_configurator.product_configurator"
+              name="Southbrook · Configurator v2 Body">
+
+      <!-- Replace the entire #unique_product_configurator section
+           with the v2 shell + OWL mount points. -->
+      <xpath expr="//section[@id='unique_product_configurator']"
+             position="replace">
+
+        <!-- v2 root. The data-product-tmpl-id attribute is the
+             load-bearing contract with configurator.esm.js — without
+             it the OWL bootstrap can't tell which product to fetch
+             state for and bails out gracefully. -->
+        <section id="sb_cfg_v2_root"
+                 class="container py-3 sb_cfg_v2"
+                 t-att-data-product-tmpl-id="product_tmpl.id"
+                 itemscope="itemscope"
+                 itemtype="http://schema.org/Product">
+
+          <!-- Static progress bar wrapper — role landmark for AT.
+               The fill (.sb_cfg_progbar inside) is rendered by OWL. -->
+          <div class="sb_cfg_progwrap" role="progressbar"
+               aria-label="Configuration completion"
+               aria-valuemin="0" aria-valuemax="100"
+               aria-valuenow="0"
+               id="sb_cfg_progwrap">
+            <div class="sb_cfg_progbar" id="sb_cfg_progbar"></div>
+          </div>
+
+          <!-- Breadcrumbs (static — these only change at navigation,
+               not configurator state, so server-rendering is fine). -->
+          <div class="sb_cfg_crumbs">
+            Shop ›
+            <span t-if="product_tmpl.public_categ_ids">
+              <t t-foreach="product_tmpl.public_categ_ids"
+                 t-as="cat">
+                <t t-esc="cat.name"/> ›
+              </t>
+            </span>
+            <b t-esc="product_tmpl.name"/>
+          </div>
+
+          <!-- OWL main mount: the entire reactive UI (left preview +
+               summary + action bar + right chip grid + bulk tools)
+               renders inside this div. -->
+          <div id="sb_cfg_v2_main_mount"
+               data-internal-user="0"
+               t-att-data-internal-user="'0' if request.env.user.share else '1'">
+            <!-- No-JS fallback: shows the title + a prompt so the
+                 page is never blank. Replaced once OWL mounts. -->
+            <div class="sb_cfg_titlebar">
+              <div class="sb_cfg_titlebar_l">
+                <h1 class="sb_cfg_h1" t-esc="product_tmpl.name"/>
+                <p class="sb_cfg_sub">
+                  Loading configuration…
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p class="sb_cfg_cap">
+            Phase 2 · OWL-driven · live attribute data ·
+            client-side recalc reconciled with server pricing
+          </p>
+
+        </section>
+
+        <!-- ============================================================
+             Import-products overlay modal — body-level (position:fixed).
+             Stays as plain QWeb because it sits outside the OWL mount.
+             OWL component interacts with it via document.getElementById
+             when the user clicks the bulk-tools "Import Product" button.
+             ============================================================ -->
+        <div class="sb_cfg_overlay" id="sb_cfg_importOverlay"
+             role="dialog" aria-modal="true"
+             aria-labelledby="sb_cfg_import_h"
+             aria-hidden="true">
+          <div class="sb_cfg_modal">
+            <div class="sb_cfg_mhead">
+              <h2 id="sb_cfg_import_h">Import Products · Preview &amp; Validate</h2>
+              <button type="button"
+                      class="sb_cfg_x"
+                      data-action="close-import"
+                      aria-label="Close import modal">✕</button>
+            </div>
+            <div class="sb_cfg_mbody">
+              <div class="sb_cfg_drop" id="sb_cfg_drop">
+                📤 <b>Drop your filled template here</b>
+                or click to browse (.xlsx)<br/>
+                <span class="sb_cfg_drop_hint">
+                  No file? Click ⬇ Template Layout above to download a
+                  starter spreadsheet with the expected columns and an
+                  example row.
+                </span>
+              </div>
+              <input type="file" id="sb_cfg_fileInput"
+                     accept=".xlsx" hidden="hidden"/>
+              <div class="sb_cfg_statline">
+                <span class="sb_cfg_pill sb_cfg_pill_g"
+                      id="sb_cfg_okCount">0 valid</span>
+                <span class="sb_cfg_pill sb_cfg_pill_r"
+                      id="sb_cfg_badCount">0 errors</span>
+                <span class="sb_cfg_stat_hint">
+                  Only valid rows are committed · you confirm before
+                  anything saves
+                </span>
+              </div>
+              <table class="sb_cfg_table">
+                <thead>
+                  <tr>
+                    <th scope="col">Status</th>
+                    <th scope="col">SKU</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Icon</th>
+                    <th scope="col">Row</th>
+                    <th scope="col">Issue</th>
+                  </tr>
+                </thead>
+                <tbody id="sb_cfg_previewBody"/>
+              </table>
+            </div>
+            <div class="sb_cfg_mfoot">
+              <button type="button"
+                      class="sb_cfg_btn sb_cfg_btn_ghost"
+                      data-action="download-errors">
+                ⬇ Error report
+              </button>
+              <div class="sb_cfg_mfoot_r">
+                <button type="button"
+                        class="sb_cfg_btn sb_cfg_btn_ghost"
+                        data-action="close-import">Cancel</button>
+                <button type="button"
+                        class="sb_cfg_btn sb_cfg_btn_imp"
+                        id="sb_cfg_commitBtn"
+                        data-action="commit-import">
+                  Commit 0 valid rows
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toast container — OWL component finds this by id. -->
+        <div class="sb_cfg_toast" id="sb_cfg_toast"
+             role="status" aria-live="polite"/>
+
+      </xpath>
+
+    </template>
+
+  </data>
+</odoo>
