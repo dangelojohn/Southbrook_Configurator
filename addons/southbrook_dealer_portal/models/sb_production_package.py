@@ -183,6 +183,34 @@ class SbProductionPackage(models.Model):
         elevation render lands when a GUI-FreeCAD path is wired.
         """
         self.ensure_one()
+
+        def _selection_label(recordset, fname, value):
+            """Return the human label for a selection-field value.
+
+            Handles both static-list and callable selections — Odoo
+            related-Selection fields, since the 2026-06-10 hardware-
+            catalog refactor, expose .selection as a function rather
+            than the static list. dict(...).get(value) would crash
+            with 'function object is not iterable'.
+
+            Falls back to the raw value when label can't be resolved
+            (covers extension-flagged values that aren't in the active
+            selection list anymore).
+            """
+            if not value:
+                return "-"
+            field = recordset._fields[fname]
+            try:
+                opts = field._description_selection(recordset.env)
+            except Exception:  # noqa: BLE001
+                opts = field.selection
+            try:
+                return dict(opts).get(value, value)
+            except TypeError:
+                # opts is still a callable for some reason — last
+                # resort, return the raw value.
+                return value
+
         try:
             from reportlab.lib.pagesizes import letter
             from reportlab.lib.styles import getSampleStyleSheet
@@ -337,8 +365,8 @@ class SbProductionPackage(models.Model):
                 p = ln.product_id
                 hw_rows.append([
                     p.x_marathon_sku or p.default_code or p.name,
-                    dict(p._fields["x_hardware_category"].selection).get(
-                        p.x_hardware_category, p.x_hardware_category or "-"),
+                    _selection_label(p, "x_hardware_category",
+                                     p.x_hardware_category),
                     p.x_hardware_brand_id.name or "-",
                     str(ln.qty),
                     "PENDING" if ln.pricing_pending else "OK",
