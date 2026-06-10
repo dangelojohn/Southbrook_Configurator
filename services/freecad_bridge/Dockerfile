@@ -22,10 +22,15 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         freecad \
         xvfb \
+        xauth \
         ca-certificates \
         curl \
         python3-pip \
     && rm -rf /var/lib/apt/lists/*
+# xauth is required by xvfb-run to set up the X authority cookie before
+# launching freecadcmd in headless GUI mode. Without it: "xvfb-run:
+# error: xauth command not found" + GUI modules (FreeCADGui, TechDraw,
+# TechDrawGui) cannot load.
 
 WORKDIR /app
 
