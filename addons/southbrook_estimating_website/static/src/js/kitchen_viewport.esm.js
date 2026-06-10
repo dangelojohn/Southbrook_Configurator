@@ -197,6 +197,9 @@ export class KitchenViewport extends Component {
         this._camera.position.set(3000, 1800, 4000);
 
         // Lights — 1 hemi + 1 key directional + 1 fill (T1C4 pattern).
+        // These render the FIRST FRAME — phase 3 sprint A2 upgrades to
+        // a PBR environment map below, but the env-map prefilter takes
+        // a few hundred ms and we want pixels on screen immediately.
         const hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbf, 0.5);
         this._scene.add(hemi);
         const dirA = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -214,6 +217,16 @@ export class KitchenViewport extends Component {
         const dirB = new THREE.DirectionalLight(0xffffff, 0.3);
         dirB.position.set(-1000, 1000, 1500);
         this._scene.add(dirB);
+
+        // Phase 3 Sprint A2 — procedural studio environment map.
+        // Builds a CanvasTexture with a warm-overhead → cool-floor
+        // vertical gradient, runs it through PMREMGenerator to produce
+        // a prefiltered mip-chain, and assigns the result as
+        // scene.environment. Adds soft PBR reflections on the cabinet
+        // material's metalness/roughness without needing an HDR file
+        // (smaller bundle, no external dependency, fully air-gapped).
+        // Lazy-deferred so the first paint uses the 3-light rig above.
+        requestAnimationFrame(() => this._installStudioEnvironment());
 
         if (THREE.OrbitControls) {
             this._controls = new THREE.OrbitControls(this._camera, canvas);
@@ -304,6 +317,63 @@ export class KitchenViewport extends Component {
         this._frameId = requestAnimationFrame(() => this._animate());
         if (this._controls) this._controls.update();
         this._renderer.render(this._scene, this._camera);
+    }
+
+    /**
+     * Phase 3 Sprint A2 — build a small studio environment texture
+     * procedurally, prefilter it via PMREMGenerator, and assign as
+     * scene.environment.
+     *
+     * Why procedural instead of an HDR file:
+     *   - air-gapped (no Polyhaven/HDRihaven/jsDelivr dependency)
+     *   - smaller (the gradient is ~2 KB encoded vs ~512 KB-2 MB HDR)
+     *   - reproducible — the gradient is part of the source code
+     *
+     * The resulting envmap is a soft vertical gradient — warm
+     * overhead, cool shadow at floor level. Good for matte cabinet
+     * surfaces; not appropriate for shiny metalwork. (Hardware finish
+     * pass in Sprint B will revisit.)
+     */
+    _installStudioEnvironment() {
+        if (!this._renderer || !this._scene) return;
+        try {
+            // 1024x512 equirectangular canvas — small but enough
+            // mip levels for the PMREM prefilter to be smooth.
+            const w = 1024, h = 512;
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            // Vertical gradient: top = warm key, mid = neutral,
+            // bottom = cool floor bounce. Hex codes match the
+            // 3-light rig above so the PBR pass blends cleanly
+            // with the existing direct-lit look.
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0.00, "#fff5e8");  // overhead warm
+            grad.addColorStop(0.40, "#e8e4dc");  // soft mid
+            grad.addColorStop(0.70, "#c9c4ba");  // shadow side
+            grad.addColorStop(1.00, "#8a8680");  // floor
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.mapping = THREE.EquirectangularReflectionMapping;
+            if (THREE.SRGBColorSpace) {
+                tex.colorSpace = THREE.SRGBColorSpace;
+            }
+            const pmrem = new THREE.PMREMGenerator(this._renderer);
+            const envRT = pmrem.fromEquirectangular(tex);
+            this._scene.environment = envRT.texture;
+            // Don't visually replace the existing bg; just light the
+            // PBR materials with the env. The off-white scene bg
+            // stays the same.
+            tex.dispose();
+            pmrem.dispose();
+        } catch (exc) {
+            // Non-fatal: if env install fails for any reason
+            // (old browser, WebGL2 missing) the 3-light rig still
+            // renders the scene fine. Console-warn for visibility
+            // but don't break the configurator.
+            console.warn("[KitchenViewport] env install skipped:", exc);
+        }
     }
 
     _fitRendererToCanvas() {
