@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../build_env.dart';
 import '../services/auth_storage.dart';
 import '../theme.dart';
 import 'project_list_screen.dart';
@@ -30,7 +31,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _error;
   bool _busy = false;
-  bool _showAdvanced = false;
+  // Auto-expand server URL field on staging builds so testers can re-target
+  // the backend without hunting for the toggle.
+  bool _showAdvanced = BuildEnv.staging;
 
   @override
   void initState() {
@@ -95,6 +98,35 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (BuildEnv.staging) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        border: Border.all(color: const Color(0xFFD97706)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.science_outlined,
+                              size: 16, color: Color(0xFF92400E)),
+                          SizedBox(width: 8),
+                          Text(
+                            'STAGING — pre-release channel',
+                            style: TextStyle(
+                              color: Color(0xFF92400E),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   Container(
                     height: 56,
