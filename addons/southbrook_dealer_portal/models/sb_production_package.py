@@ -6,15 +6,23 @@ assembled on site. The Central Kitchens channel consumes the export
 JSON; for Module 9 scope we ship the envelope structure + the action
 that emits it. The consumer-side cabling lands when a real Central
 Kitchens dealer is signed."""
+import base64
 import io
 import json
-from typing import Dict, List
+import logging
+import os
+from typing import Dict, List, Optional, Tuple
+
+import requests
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
 KD_ENVELOPE_SCHEMA = "southbrook.kd_flatpack.v1"
+ELEVATION_SCHEMA = "southbrook.elevation.v1"
+
+_logger = logging.getLogger(__name__)
 
 
 class SbProductionPackage(models.Model):
@@ -25,6 +33,89 @@ class SbProductionPackage(models.Model):
         help="When True this package ships as knock-down (assembled "
              "on site). KD export includes pre-drilled hole positions.",
     )
+
+    # ------------------------------------------------------------------
+    # Helpers — cabinet box dimensions from cutlist
+    # ------------------------------------------------------------------
+    def _derive_box_dimensions(self) -> Optional[Tuple[float, float, float]]:
+        """Recover (width, height, depth) in mm from the cutlist panels.
+
+        Used by the installation-PDF elevation render to know the carcass
+        size to pass to the bridge. The cutlist is authoritative because
+        it carries the as-cut panel dimensions; rebuilding height/width/
+        depth is straight inverse of southbrook_dims.panel_cut_list:
+
+          side_L: (height, depth, thickness)
+          top:    (width - 2*thickness, depth - rabbet, thickness)
+          back:   (width - 2*thickness + offsets, height - 2*thickness, thk)
+
+        Returns None when the cutlist is missing or the required panels
+        aren't present (e.g. a hardware-only package).
+        """
+        if not self.cutlist_id:
+            return None
+        by_name = {
+            ln.panel_name: ln for ln in self.cutlist_id.line_ids
+        }
+        side = by_name.get("side_L") or by_name.get("side_R")
+        top = by_name.get("top") or by_name.get("bottom")
+        if not (side and top):
+            return None
+        thickness = side.thickness_mm or 18.0
+        height = side.length_mm
+        depth = side.width_mm
+        width = top.length_mm + 2 * thickness
+        return (width, height, depth)
+
+    def _fetch_elevation_svgs(
+        self, dimensions: Tuple[float, float, float],
+    ) -> Optional[Dict[str, bytes]]:
+        """Call the freecad-bridge /render_elevation endpoint.
+
+        Returns a dict {label: svg_bytes} on success, or None when the
+        bridge is unreachable or returns an error (the installation PDF
+        gracefully degrades to text-only if the elevation isn't available).
+        Env vars FREECAD_BRIDGE_URL + FREECAD_BRIDGE_SECRET come from
+        services/odoo container env (docker-compose.yml).
+        """
+        bridge_url = os.environ.get(
+            "FREECAD_BRIDGE_URL", "http://freecad-bridge:8000",
+        )
+        bridge_secret = os.environ.get("FREECAD_BRIDGE_SECRET")
+        if not bridge_secret:
+            _logger.info("elevation: bridge secret unset, skipping")
+            return None
+        width, height, depth = dimensions
+        door_count = 2 if width >= 600 else 1
+        family = "wall" if "wall" in (self.name or "").lower() else "base"
+        payload = {
+            "production_id": self.id,
+            "dimensions": {
+                "width_mm": width, "height_mm": height, "depth_mm": depth,
+            },
+            "family": family,
+            "door_count": door_count,
+        }
+        try:
+            resp = requests.post(
+                f"{bridge_url}/render_elevation",
+                json=payload,
+                headers={"X-Bridge-Secret": bridge_secret},
+                timeout=45,
+            )
+        except requests.RequestException as exc:
+            _logger.warning("elevation: bridge unreachable: %s", exc)
+            return None
+        if resp.status_code != 200:
+            _logger.warning("elevation: bridge returned %s: %s",
+                            resp.status_code, resp.text[:200])
+            return None
+        body = resp.json()
+        svgs_b64 = body.get("svgs_b64") or {}
+        return {
+            label: base64.b64decode(b64)
+            for label, b64 in svgs_b64.items()
+        }
 
     def export_kd_envelope(self) -> dict:
         """Emit the JSON envelope a KD-channel dealer consumes.
@@ -144,6 +235,67 @@ class SbProductionPackage(models.Model):
             "Cut-list dimensions are authoritative; consult the spec "
             "sheet alongside this reference for cosmetic specs.",
             styles["Italic"]))
+
+        # ---- TechDraw elevation views (page 2 — front/top/side) ----
+        # Calls the freecad-bridge /render_elevation endpoint which runs
+        # FreeCAD + TechDraw under xvfb and returns three orthographic
+        # projections as inline base64-encoded SVGs. The PDF gracefully
+        # degrades to text-only if the bridge is unreachable.
+        box_dims = self._derive_box_dimensions()
+        if box_dims:
+            elevation_svgs = self._fetch_elevation_svgs(box_dims)
+            if elevation_svgs:
+                try:
+                    from svglib.svglib import svg2rlg
+                    from reportlab.graphics import renderPDF
+                    from reportlab.platypus.flowables import Flowable
+
+                    class _SvgFlowable(Flowable):
+                        """Wrap a svglib Drawing as a platypus Flowable."""
+                        def __init__(self, drawing, max_w_mm, max_h_mm):
+                            super().__init__()
+                            self.drawing = drawing
+                            scale = min(
+                                (max_w_mm * mm) / drawing.width,
+                                (max_h_mm * mm) / drawing.height,
+                            )
+                            drawing.width *= scale
+                            drawing.height *= scale
+                            drawing.scale(scale, scale)
+                            self.width = drawing.width
+                            self.height = drawing.height
+                        def draw(self):
+                            renderPDF.draw(self.drawing, self.canv, 0, 0)
+
+                    story.append(PageBreak())
+                    story.append(Paragraph(
+                        "Elevation Views", styles["Heading1"]))
+                    story.append(Paragraph(
+                        f"Carcass {int(box_dims[0])} × {int(box_dims[1])} × "
+                        f"{int(box_dims[2])} mm — third-angle projection.",
+                        styles["Italic"]))
+                    story.append(Spacer(1, 4 * mm))
+                    for label in ("frontview", "topview", "sideview"):
+                        svg_bytes = elevation_svgs.get(label)
+                        if not svg_bytes:
+                            continue
+                        try:
+                            drawing = svg2rlg(io.BytesIO(svg_bytes))
+                            if drawing is None:
+                                continue
+                            story.append(Paragraph(
+                                label.replace("view", "").title(),
+                                styles["Heading3"]))
+                            story.append(_SvgFlowable(drawing, 160, 80))
+                            story.append(Spacer(1, 4 * mm))
+                        except Exception as exc:  # noqa: BLE001
+                            _logger.warning(
+                                "elevation %s SVG embed failed: %s",
+                                label, exc)
+                except ImportError as exc:
+                    _logger.warning(
+                        "elevation: svglib import failed (%s); skipping",
+                        exc)
 
         # ---- Cut list table ----
         story.append(PageBreak())

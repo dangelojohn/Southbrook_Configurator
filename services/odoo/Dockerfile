@@ -17,6 +17,13 @@
 #                Already shipped with most Odoo images but pinning the
 #                version makes the QNAP deploy reproducible.
 #
+#   svglib     — used by export_installation_pdf to convert TechDraw
+#                elevation SVGs (returned by the freecad-bridge
+#                /render_elevation endpoint, base64 in the response) into
+#                ReportLab Drawing objects that platypus embeds directly
+#                in the multi-page PDF. Brings tinycss2 + cssselect2 as
+#                transitive deps but those are pure-python.
+#
 # Pin versions match what gets installed via `pip install` post-recreate
 # today, so swapping to this image is behaviour-preserving.
 
@@ -26,5 +33,6 @@ USER root
 RUN pip install --break-system-packages --no-cache-dir \
         Mako==1.3.12 \
         ezdxf==1.4.2 \
-        reportlab==4.1.0
+        reportlab==4.1.0 \
+        svglib==1.5.1
 USER odoo

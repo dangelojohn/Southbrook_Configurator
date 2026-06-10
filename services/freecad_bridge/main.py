@@ -188,6 +188,88 @@ def render(spec: RenderSpec, background: BackgroundTasks) -> dict:
     return {"job_id": job_id, "status": record.status}
 
 
+class ElevationSpec(BaseModel):
+    production_id: int = Field(..., gt=0)
+    dimensions: Dimensions
+    family: str = Field(default="base")
+    door_count: int = Field(default=1, ge=0, le=4)
+
+
+@app.post("/render_elevation", dependencies=[Depends(require_secret)])
+def render_elevation(spec: ElevationSpec) -> dict:
+    """Synchronous TechDraw elevation render.
+
+    Unlike /render (parametric carcass STEP/DXF/SVG, long-running, async),
+    this endpoint produces a small, deterministic three-view orthographic
+    drawing of the same carcass — fast enough to run inline in the dealer
+    portal's installation-PDF export request. Wall-clock on the QNAP is
+    under 8 seconds for a single cabinet (most of which is xvfb startup).
+
+    Returns the manifest JSON plus base64-encoded SVG bodies for the
+    caller to embed directly (no second round-trip to fetch each view).
+    """
+    import base64
+    import json as _json
+    import subprocess
+    import tempfile
+
+    output_dir = Path(tempfile.mkdtemp(prefix="elev_"))
+    spec_payload = {
+        "production_id": spec.production_id,
+        "dimensions": {
+            "width_mm": spec.dimensions.width_mm,
+            "height_mm": spec.dimensions.height_mm,
+            "depth_mm": spec.dimensions.depth_mm,
+        },
+        "family": spec.family,
+        "door_count": spec.door_count,
+        "output_dir": str(output_dir),
+    }
+    try:
+        result = subprocess.run(
+            ["xvfb-run", "-a", "freecadcmd",
+             "/app/scripts/render_elevation.py",
+             "--", _json.dumps(spec_payload)],
+            capture_output=True, text=True, timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="render_timeout")
+
+    if result.returncode != 0:
+        logger.error("elevation freecadcmd failed rc=%s stderr=%s",
+                     result.returncode, result.stderr[-500:])
+        raise HTTPException(
+            status_code=500,
+            detail=f"freecadcmd_exit_{result.returncode}",
+        )
+
+    # Find the manifest JSON on stdout (last line that looks like it).
+    manifest_line = None
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("{") and '"schema"' in line:
+            manifest_line = line
+    if not manifest_line:
+        raise HTTPException(status_code=500,
+                            detail="no_manifest_on_stdout")
+    manifest = _json.loads(manifest_line)
+
+    # Read every SVG inline as base64 so the caller (dealer portal) can
+    # embed without another HTTP round-trip. SVGs are ~1-2 KB each so the
+    # response body stays small.
+    svgs_b64 = {}
+    for svg_path_str in manifest.get("artifacts", {}).get("svg", []):
+        p = Path(svg_path_str)
+        if p.exists():
+            svgs_b64[p.stem] = base64.b64encode(p.read_bytes()).decode()
+
+    return {
+        "schema": "southbrook.elevation.v1",
+        "manifest": manifest,
+        "svgs_b64": svgs_b64,
+    }
+
+
 @app.get("/status/{job_id}", dependencies=[Depends(require_secret)])
 def status(job_id: str) -> dict:
     job = JOBS.get(job_id)
