@@ -1,0 +1,37 @@
+// SAMI / Southbrook — vendored web fonts.
+//
+// Phase 3 Sprint A1 (per docs/PHASE_3_PLAN.md). Removes the implicit
+// dependency on system-installed Roboto Flex + JetBrains Mono. Before
+// this file, the SCSS named those families in `font-family` rules but
+// nothing actually loaded them — every visitor without the fonts on
+// their OS fell through to the `sans-serif` / `monospace` fallbacks.
+//
+// Loaded BEFORE every other SCSS in the web.assets_frontend bundle so
+// the @font-face declarations win the cascade.
+//
+// woff2 sources: Google Fonts CDN at vendor time (2026-06-10). Stored
+// as static assets so the configurator works air-gapped and survives
+// any future Google Fonts URL churn. License: Apache 2.0 (both fonts).
+
+// font-display: swap — text renders immediately in the fallback,
+// then re-paints in Roboto Flex once the woff2 lands. Avoids the
+// "FOIT" (Flash Of Invisible Text) the default `block` gives.
+
+@font-face {
+  font-family: "Roboto Flex";
+  font-style: normal;
+  font-weight: 300 700;   // variable axis range
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("/southbrook_estimating_website/static/src/fonts/RobotoFlex.woff2")
+       format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 700;   // variable axis range
+  font-display: swap;
+  src: url("/southbrook_estimating_website/static/src/fonts/JetBrainsMono.woff2")
+       format("woff2-variations");
+}

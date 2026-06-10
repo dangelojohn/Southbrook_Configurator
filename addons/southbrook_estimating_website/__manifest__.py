@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -47,10 +47,15 @@
     # <OrderBuilder/> component into it.
     "assets": {
         "web.assets_frontend": [
+            # Phase 3 Sprint A1 — vendored @font-face declarations
+            # for Roboto Flex + JetBrains Mono. MUST load before the
+            # design tokens so subsequent SCSS sees the families
+            # already declared. Air-gapped (no Google Fonts CDN).
+            "southbrook_estimating_website/static/src/scss/fonts.scss",
             # Step 2 (2026-06-01) — shared Signature Series design
-            # tokens, loaded FIRST. Cross-addon path because the
-            # website depends on the estimating addon (which owns
-            # the design spine). See
+            # tokens, loaded FIRST after fonts. Cross-addon path
+            # because the website depends on the estimating addon
+            # (which owns the design spine). See
             # docs/CUSTOMER_TO_MANUFACTURING_FLOW.md §5.
             "southbrook_estimating/static/src/scss/_southbrook_design_tokens.scss",
             # Phase 2.5 — Three.js library back-ported from
