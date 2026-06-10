@@ -1071,13 +1071,24 @@ class ZoneGroup extends Component {
 // ----------------------------------------------------------------------
 
 class TabBar extends Component {
+    // Phase 3 Sprint D1 — Tab/Tablist role pattern from the WAI-ARIA
+    // Authoring Practices. Arrow keys cycle between tabs; Home/End
+    // jump to ends; Tab key moves focus OUT of the tablist into the
+    // panel content (browser default — no JS needed).
     static template = xml`
-        <div class="o_owl_tabs">
+        <div class="o_owl_tabs" role="tablist"
+             aria-label="Order builder sections"
+             t-on-keydown="_onKeydown">
             <t t-foreach="props.tabs" t-as="tab" t-key="tab.code">
                 <button class="o_owl_tab"
+                        role="tab"
                         t-att-class="{
                             'o_owl_tab_active': tab.code === props.activeTab,
                         }"
+                        t-att-aria-selected="tab.code === props.activeTab ? 'true' : 'false'"
+                        t-att-tabindex="tab.code === props.activeTab ? '0' : '-1'"
+                        t-att-data-tab-code="tab.code"
+                        t-att-id="'o_owl_tab_' + tab.code"
                         t-on-click.stop="() => props.onTabChange(tab.code)">
                     <t t-esc="tab.label"/>
                     <span t-if="tab.count !== null and tab.count !== undefined"
@@ -1092,6 +1103,40 @@ class TabBar extends Component {
         activeTab: String,
         onTabChange: Function,
     };
+
+    _onKeydown(event) {
+        // Roving-tabindex Left/Right cycling; Home/End jump to ends.
+        const codes = this.props.tabs.map((t) => t.code);
+        const cur = codes.indexOf(this.props.activeTab);
+        if (cur < 0) return;
+        let next = cur;
+        switch (event.key) {
+            case "ArrowRight":
+            case "ArrowDown":
+                next = (cur + 1) % codes.length;
+                break;
+            case "ArrowLeft":
+            case "ArrowUp":
+                next = (cur - 1 + codes.length) % codes.length;
+                break;
+            case "Home":
+                next = 0;
+                break;
+            case "End":
+                next = codes.length - 1;
+                break;
+            default:
+                return;
+        }
+        event.preventDefault();
+        this.props.onTabChange(codes[next]);
+        // Focus the newly-active tab so arrow nav continues.
+        const root = event.currentTarget;
+        const target = root && root.querySelector(
+            `[data-tab-code="${codes[next]}"]`,
+        );
+        if (target && target.focus) target.focus();
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -1899,7 +1944,9 @@ const TEMPLATE = xml`
 
             <!-- Tab panels. T2C9 fills Lines. T2C10-11 fill the rest. -->
             <div t-if="state.ui.current_tab === 'lines'"
-                 class="o_owl_tab_panel o_owl_panel_lines">
+                 class="o_owl_tab_panel o_owl_panel_lines"
+                 role="tabpanel" aria-labelledby="o_owl_tab_lines"
+                 tabindex="0">
                 <!-- T2C9 — multi-zone line grid. G11 empty-state CTA. -->
                 <t t-if="state.lines.length === 0">
                     <div class="o_owl_panel_placeholder o_owl_lines_empty">
@@ -1944,21 +1991,29 @@ const TEMPLATE = xml`
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
-                 class="o_owl_tab_panel o_owl_panel_kitchen3d">
+                 class="o_owl_tab_panel o_owl_panel_kitchen3d"
+                 role="tabpanel" aria-labelledby="o_owl_tab_kitchen3d"
+                 tabindex="0">
                 <KitchenViewport orderId="props.orderId"
                                  payloadVersion="state.payload_version"
                                  onLineSelected.bind="_onKitchen3dLineSelected"/>
             </div>
             <div t-elif="state.ui.current_tab === 'bom'"
-                 class="o_owl_tab_panel o_owl_panel_bom">
+                 class="o_owl_tab_panel o_owl_panel_bom"
+                 role="tabpanel" aria-labelledby="o_owl_tab_bom"
+                 tabindex="0">
                 <BoMPreview rollup="state.bom_rollup"/>
             </div>
             <div t-elif="state.ui.current_tab === 'validation'"
-                 class="o_owl_tab_panel o_owl_panel_validation">
+                 class="o_owl_tab_panel o_owl_panel_validation"
+                 role="tabpanel" aria-labelledby="o_owl_tab_validation"
+                 tabindex="0">
                 <ValidationStrip issues="state.validation"/>
             </div>
             <div t-elif="state.ui.current_tab === 'history'"
-                 class="o_owl_tab_panel o_owl_panel_history">
+                 class="o_owl_tab_panel o_owl_panel_history"
+                 role="tabpanel" aria-labelledby="o_owl_tab_history"
+                 tabindex="0">
                 <!-- Phase 3 Sprint C3 — NF6 parent-order chain.
                      state.order.history_chain is newest-first, each
                      entry: {id, name, version, state, amount_total,
@@ -2007,7 +2062,9 @@ const TEMPLATE = xml`
                 </ol>
             </div>
             <div t-elif="state.ui.current_tab === 'print'"
-                 class="o_owl_tab_panel o_owl_panel_print">
+                 class="o_owl_tab_panel o_owl_panel_print"
+                 role="tabpanel" aria-labelledby="o_owl_tab_print"
+                 tabindex="0">
                 <p class="o_owl_panel_placeholder">
                     <strong>Customer Print panel</strong> — Phase 3
                     polish embeds the Signature Spec Sheet PDF preview
