@@ -10,4 +10,10 @@
               parent="menu_southbrook_hardware_root"
               action="action_southbrook_hardware_brand"
               sequence="10"/>
+
+    <menuitem id="menu_southbrook_hardware_import"
+              name="Import Marathon CSV"
+              parent="menu_southbrook_hardware_root"
+              action="action_southbrook_hardware_import"
+              sequence="20"/>
 </odoo>
