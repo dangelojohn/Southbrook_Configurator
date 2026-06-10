@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_southbrook_hardware_import_form" model="ir.ui.view">
+        <field name="name">southbrook.hardware.import.wizard.form</field>
+        <field name="model">southbrook.hardware.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Marathon Hardware CSV">
+                <sheet>
+                    <group>
+                        <field name="csv_file" filename="csv_filename"/>
+                        <field name="csv_filename"/>
+                        <field name="dry_run"/>
+                    </group>
+                    <group string="Result"
+                           invisible="not (created_count or updated_count or error_count)">
+                        <field name="created_count"/>
+                        <field name="updated_count"/>
+                        <field name="error_count"/>
+                    </group>
+                    <group string="Log"
+                           invisible="not result_log">
+                        <field name="result_log" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Import" name="action_import"
+                            type="object" class="btn-primary"/>
+                    <button string="Close" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_hardware_import" model="ir.actions.act_window">
+        <field name="name">Import Marathon CSV</field>
+        <field name="res_model">southbrook.hardware.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

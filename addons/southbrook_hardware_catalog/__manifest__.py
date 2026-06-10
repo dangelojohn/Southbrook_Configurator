@@ -61,6 +61,7 @@ Outstanding:
         "views/southbrook_hardware_brand_views.xml",
         "views/product_template_views.xml",
         "views/southbrook_hardware_menus.xml",
+        "wizards/southbrook_hardware_import_views.xml",
     ],
     "installable": True,
     "application": False,
