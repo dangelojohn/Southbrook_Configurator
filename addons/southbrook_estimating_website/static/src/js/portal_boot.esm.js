@@ -31,7 +31,7 @@
  *     },
  *   };
  */
-import { Component, mount, markup, onMounted, useState, xml } from "@odoo/owl";
+import { Component, mount, markup, onMounted, onWillUnmount, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 
 // ----------------------------------------------------------------------
@@ -2182,7 +2182,53 @@ class OrderBuilder extends Component {
         onMounted(() => {
             this._loadOrder();
             this._loadCatalog();
+            this._startRealtimeSync();
         });
+        onWillUnmount(() => this._stopRealtimeSync());
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 3 Sprint D3 — realtime sync.
+    //
+    // Two designers / dealers on the same order see each other's
+    // edits within ~5s. We poll _loadOrder() on a fixed interval
+    // while the tab is visible; document.visibilityState pauses the
+    // poll when the tab is in the background (saves server load and
+    // mobile battery).
+    //
+    // Why polling vs the planned bus.bus subscription:
+    //   The portal_boot.esm.js bootstrap is a standalone OWL mount
+    //   (no service registry), so wiring up @bus/services/bus_service
+    //   needs scaffolding that exceeds D3's 0.5d budget. A 5-second
+    //   visibility-gated poll achieves the same end-user effect (sub-
+    //   5s sync) and degrades gracefully if the network blips. When
+    //   the bus_service refactor lands (post-Phase 3), this method
+    //   becomes a one-liner that listens on the same channel the
+    //   backend already posts to.
+    //
+    // Per-tab interval; cleared on unmount.
+    // ------------------------------------------------------------------
+    _startRealtimeSync() {
+        const POLL_MS = 5000;
+        if (this._realtimeTimer) clearInterval(this._realtimeTimer);
+        const tick = () => {
+            if (typeof document !== "undefined"
+                && document.visibilityState === "hidden") {
+                return;
+            }
+            if (this.state.loading || this.state.action_busy) {
+                return;
+            }
+            this._loadOrder();
+        };
+        this._realtimeTimer = setInterval(tick, POLL_MS);
+    }
+
+    _stopRealtimeSync() {
+        if (this._realtimeTimer) {
+            clearInterval(this._realtimeTimer);
+            this._realtimeTimer = null;
+        }
     }
 
     // ------------------------------------------------------------------
