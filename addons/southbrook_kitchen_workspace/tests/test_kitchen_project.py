@@ -255,6 +255,70 @@ class TestKitchenWorkspace(TransactionCase):
             "action_customer_approves must queue an email",
         )
 
+    def test_released_to_production_email_template_seeded(self):
+        template = self.env.ref(
+            "southbrook_kitchen_workspace.email_template_released_to_production",
+            raise_if_not_found=False,
+        )
+        self.assertTrue(
+            template, "Released-to-production email template must be seeded")
+        self.assertEqual(template.model_id.model, "sb.kitchen.project")
+
+    def test_project_done_email_template_seeded(self):
+        template = self.env.ref(
+            "southbrook_kitchen_workspace.email_template_project_done",
+            raise_if_not_found=False,
+        )
+        self.assertTrue(template, "Project-done email template must be seeded")
+        self.assertEqual(template.model_id.model, "sb.kitchen.project")
+
+    def test_release_to_production_queues_email(self):
+        project = self._new_project()
+        project.action_start_designing()
+        self.DesignOption.create({
+            "project_id": project.id, "name": "Option A",
+            "is_selected": True,
+        })
+        project.action_submit_to_customer()
+        project.action_customer_approves()
+        before = self.env["mail.mail"].search_count([])
+        project.action_release_to_production()
+        after = self.env["mail.mail"].search_count([])
+        self.assertGreater(
+            after, before,
+            "action_release_to_production must queue an email",
+        )
+
+    def test_action_done_queues_email(self):
+        project = self._new_project()
+        project.action_start_designing()
+        self.DesignOption.create({
+            "project_id": project.id, "name": "Option A",
+            "is_selected": True,
+        })
+        project.action_submit_to_customer()
+        project.action_customer_approves()
+        project.action_release_to_production()
+        before = self.env["mail.mail"].search_count([])
+        project.action_done()
+        after = self.env["mail.mail"].search_count([])
+        self.assertGreater(
+            after, before,
+            "action_done must queue an email",
+        )
+
+    def test_action_cancel_queues_no_email(self):
+        # Cancellation is out-of-band by design — chatter + operator phone
+        # call, never an automated cold-cancel email.
+        project = self._new_project()
+        before = self.env["mail.mail"].search_count([])
+        project.action_cancel()
+        after = self.env["mail.mail"].search_count([])
+        self.assertEqual(
+            after, before,
+            "action_cancel must NOT queue an email",
+        )
+
     # ------------------------------------------------------------------
     # DoD — designer creates a project, attaches photos, selects options
     # ------------------------------------------------------------------

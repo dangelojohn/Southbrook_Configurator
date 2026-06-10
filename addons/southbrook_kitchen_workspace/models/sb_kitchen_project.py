@@ -146,11 +146,16 @@ class SbKitchenProject(models.Model):
 
     def action_release_to_production(self):
         self.action_set_state("in_production")
+        self._send_lifecycle_email("email_template_released_to_production")
 
     def action_done(self):
         self.action_set_state("done")
+        self._send_lifecycle_email("email_template_project_done")
 
     def action_cancel(self):
+        # Intentional: cancellation goes out-of-band (chatter + operator
+        # phone call). An automated cancellation email reads as cold for
+        # what is usually a delicate conversation.
         self.action_set_state("cancelled")
 
     def _require_at_least_one_design_option(self):
