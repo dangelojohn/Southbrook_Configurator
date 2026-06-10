@@ -35,5 +35,38 @@
     "sink": {
       "MRH-WATERBARRIER-1M": 1
     }
+  },
+
+  "_pull_override_comment": "When resolve() is called with pull_finish=<key>, the legacy default pull SKUs (pull_default_skus, knob_default_skus) get stripped from the result and replaced with the finish-specific SKU from by_pull_finish[finish] / by_knob_finish[finish]. Finish keys match the snake_case form of attr_pull_finish values from southbrook_estimating/data/attributes.xml. Pull-size lookup falls through to 'default' when a specific size isn't seeded.",
+
+  "pull_default_skus": ["MRH-HDL-PUL128"],
+  "knob_default_skus": ["MRH-HDL-KNB30"],
+
+  "by_pull_finish": {
+    "brushed_nickel": {
+      "default": "MRH-HDL-PUL128",
+      "96mm":  "MRH-HDL-PUL96-BN",
+      "128mm": "MRH-HDL-PUL128",
+      "192mm": "MRH-HDL-PUL192-BN"
+    },
+    "matte_black": {
+      "default": "MRH-HDL-PUL128-MB",
+      "128mm":   "MRH-HDL-PUL128-MB"
+    },
+    "antique_bronze": {
+      "default": "MRH-HDL-PUL128-AB",
+      "128mm":   "MRH-HDL-PUL128-AB"
+    }
+  },
+
+  "by_knob_finish": {
+    "brushed_nickel": "MRH-HDL-KNB30",
+    "matte_black":    "MRH-HDL-KNB30-MB"
+  },
+
+  "_appliance_pull_comment": "Tall_oven and tall_fridge cabinets get an appliance pull per appliance-door front via the resolver's mount_appliance flag.",
+
+  "appliance_pulls": {
+    "brushed_nickel": "MRH-HDL-APP18-BN"
   }
 }
