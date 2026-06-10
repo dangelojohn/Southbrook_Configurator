@@ -17,7 +17,7 @@ from odoo.tests.common import HttpCase, tagged
 ADDON_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-@tagged("post_install", "-at_install", "southbrook", "phase-3", "fonts")
+@tagged("post_install", "-at_install", "southbrook", "phase_3", "fonts")
 class TestVendoredFonts(HttpCase):
 
     def test_roboto_flex_woff2_exists_on_disk(self):
