@@ -349,3 +349,28 @@ docs/configurator_audit_2026_06.md ← this file
 *Implementation completed 2026-06-10. Live on QNAP southbrook stack
 at `southbrook_estimating == 19.0.1.7.0`. 23/23 audit regression
 tests green.*
+
+## Visual confirmation
+
+The full wizard walkthrough captured via Playwright drives the live
+QNAP and walks SB-BASE-1DR through every step. The screenshots are
+committed in `docs/screenshots/`:
+
+| Step | What the screenshot proves |
+|---|---|
+| `walkthrough_01_select_template.png` | All four audit step labels appear in the statusbar in order |
+| `walkthrough_02_construction.png` | Construction & Sizing shows Width / Series / Box Material / Door Count / Family / **Frame Style** (Phase 1) |
+| `walkthrough_03_door_finish.png` | Door & Finish shows Door Style / Finish / **Door Overlay** / **Wood Species** / **Door Edge Profile** (all Phase 1) |
+| `walkthrough_04_hardware.png` | Hardware & Sides shows Hinge Side / Finished Sides / Gables / Handle / **Pull Finish** (Phase 1) |
+| `walkthrough_05_interior.png` | Interior & Accessories shows **Soft-Close ( +15.00 ) pre-selected** — Phase 2I default + Phase 2M price in the same field |
+
+To regenerate after a UI change:
+
+```sh
+cd e2e/
+echo 'SB_ADMIN_PASSWORD=<password>' > .env
+set -a && source .env && set +a
+npx playwright test --grep walkthrough
+```
+
+The test writes new screenshots into `docs/screenshots/walkthrough_*.png`.

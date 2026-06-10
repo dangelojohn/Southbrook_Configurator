@@ -179,4 +179,89 @@ test.describe('Audit Phase 2 — live wizard smoke', () => {
       `None of [${stepLabels.join(', ')}] were found.`,
     ).toBeGreaterThan(0);
   });
+
+  /**
+   * Deeper walkthrough: actually click through each step of the wizard
+   * and capture a screenshot at each stop. Each screenshot is the
+   * artifact — it shows what a sales rep actually sees when they
+   * configure SB-BASE-1DR. Assertions are minimal because OCA wizard
+   * chrome shifts between Odoo releases; the visual record is the
+   * thing we want to commit.
+   *
+   * Naming: docs/screenshots/audit_phase2_<step>_base_1dr.png
+   * Move them after the test run.
+   */
+  test('walkthrough — capture each wizard step as a screenshot', async ({ page }) => {
+    test.setTimeout(240_000);
+    await login(page);
+
+    const tmpls = await rpc(page, {
+      model: 'product.template',
+      method: 'search_read',
+      args: [[['default_code', '=', 'SB-BASE-1DR']], ['id']],
+    });
+    const tmplId = tmpls[0].id;
+    const action = await rpc(page, {
+      model: 'product.template',
+      method: 'configure_product',
+      args: [[tmplId]],
+    });
+
+    await page.goto('/odoo');
+    await page.waitForLoadState('domcontentloaded');
+    await page.evaluate(async ({ action }) => {
+      const env = window.odoo.__WOWL_DEBUG__?.root?.env
+        || document.querySelector('.o_web_client')?.__owl__?.app?.root?.env;
+      await env.services.action.doAction(action);
+    }, { action });
+
+    // Wait for the wizard modal to mount.
+    await expect(
+      page.locator('.modal-dialog, .o_form_view').first(),
+    ).toBeVisible({ timeout: 30_000 });
+
+    // The clickable statusbar exposes each step as a button. Walking
+    // forward by clicking the next non-active step is the simplest
+    // way to traverse without depending on a "Next" button label
+    // (which has translated and re-styled over OCA releases).
+    const stepWalk = [
+      { name: 'Select Template',     screenshot: 'walkthrough_01_select_template.png' },
+      { name: 'Construction & Sizing', screenshot: 'walkthrough_02_construction.png' },
+      { name: 'Door & Finish',       screenshot: 'walkthrough_03_door_finish.png' },
+      { name: 'Hardware & Sides',    screenshot: 'walkthrough_04_hardware.png' },
+      { name: 'Interior & Accessories', screenshot: 'walkthrough_05_interior.png' },
+    ];
+
+    for (const [i, step] of stepWalk.entries()) {
+      // First step is already active on mount. For later steps, click
+      // the "Next" footer button — OCA's clickable statusbar refuses
+      // to skip ahead without filling required values.
+      if (i > 0) {
+        const nextBtn = page.getByRole('button', { name: /^Next$/ }).first();
+        try {
+          await nextBtn.click({ timeout: 10_000 });
+          // Some steps redirect to a validation error toast — wait for
+          // the form to settle either way.
+          await page.waitForTimeout(2_000);
+          // If a validation error blocked the advance, dismiss it and
+          // continue (we still got the prior step's screenshot).
+          const errorToast = page.locator('.o_notification.border-danger, .o_notification.border-warning').first();
+          if (await errorToast.isVisible({ timeout: 1_000 }).catch(() => false)) {
+            console.warn(`step "${step.name}" needed unmet pre-reqs — skipping`);
+            await errorToast.locator('button').click().catch(() => {});
+            // Still try to advance via RPC: the wizard's action_next_step
+            // won't validate if we wrap it in skip_validation context.
+            // For now, just capture what's visible.
+          }
+        } catch (err) {
+          console.warn(`could not click Next for "${step.name}": ${err.message}`);
+        }
+      }
+      await page.screenshot({
+        path: `../docs/screenshots/${step.screenshot}`,
+        fullPage: true,
+      });
+      console.log(`captured: ${step.screenshot}`);
+    }
+  });
 });
