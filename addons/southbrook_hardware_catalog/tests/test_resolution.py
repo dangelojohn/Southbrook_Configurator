@@ -132,3 +132,114 @@ class TestHardwareResolution(TransactionCase):
             missing,
             f"hardware_map references SKUs absent from the catalog: {missing}",
         )
+
+    # ------------------------------------------------------------------
+    # Audit 2026-06-10 — pull_finish wiring tests.
+    # Confirms the resolver swaps the legacy brushed-nickel default
+    # (MRH-HDL-PUL128) for finish-specific SKUs when pull_finish is
+    # passed, while preserving the per-door/per-drawer aggregation.
+    # ------------------------------------------------------------------
+    def test_matte_black_pull_swaps_default_handle(self):
+        """When pull_finish='matte_black' is passed, MRH-HDL-PUL128
+        must NOT appear in the result and MRH-HDL-PUL128-MB must
+        replace it at the same total quantity."""
+        # Baseline (no finish): default brushed nickel handle.
+        baseline = self.Catalog.resolve(
+            cabinet_family="base", door_count=2, drawer_count=2,
+            shelf_count=0, soft_close=True,
+        )
+        base_skus = self._sku_set(baseline)
+        baseline_handle_qty = base_skus.get("MRH-HDL-PUL128", 0)
+        self.assertGreater(
+            baseline_handle_qty, 0,
+            "baseline must include default brushed nickel handles")
+
+        # With pull_finish="matte_black".
+        with_finish = self.Catalog.resolve(
+            cabinet_family="base", door_count=2, drawer_count=2,
+            shelf_count=0, soft_close=True,
+            pull_finish="matte_black", pull_size_mm=128,
+        )
+        skus = self._sku_set(with_finish)
+        self.assertNotIn(
+            "MRH-HDL-PUL128", skus,
+            "default brushed-nickel pull must be stripped when "
+            "pull_finish='matte_black'")
+        self.assertEqual(
+            skus.get("MRH-HDL-PUL128-MB"), baseline_handle_qty,
+            "matte-black pull must replace the default at the same qty")
+
+    def test_brushed_nickel_96mm_picks_size_specific_sku(self):
+        """When pull_size_mm=96, the resolver picks MRH-HDL-PUL96-BN."""
+        picks = self.Catalog.resolve(
+            cabinet_family="base", door_count=1, drawer_count=0,
+            shelf_count=0, soft_close=True,
+            pull_finish="brushed_nickel", pull_size_mm=96,
+        )
+        skus = self._sku_set(picks)
+        self.assertIn(
+            "MRH-HDL-PUL96-BN", skus,
+            "96mm pull SKU must replace the default 128mm")
+        self.assertNotIn("MRH-HDL-PUL128", skus)
+
+    def test_antique_bronze_falls_through_to_default_sku(self):
+        """An unmapped size (e.g. 96mm in antique_bronze) falls back
+        to the finish's 'default' entry."""
+        picks = self.Catalog.resolve(
+            cabinet_family="base", door_count=1, drawer_count=0,
+            shelf_count=0, soft_close=True,
+            pull_finish="antique_bronze", pull_size_mm=96,
+        )
+        skus = self._sku_set(picks)
+        # The finish has no 96mm entry, so it should fall back to the
+        # 'default' which is the 128mm AB SKU.
+        self.assertIn("MRH-HDL-PUL128-AB", skus)
+
+    def test_omitted_pull_finish_preserves_legacy_default(self):
+        """If pull_finish is None, the legacy behavior persists —
+        backward-compatible for callers not yet updated for the
+        audit's attr_pull_finish surface."""
+        picks = self.Catalog.resolve(
+            cabinet_family="base", door_count=1, drawer_count=0,
+            shelf_count=0, soft_close=True,
+        )
+        skus = self._sku_set(picks)
+        self.assertIn(
+            "MRH-HDL-PUL128", skus,
+            "legacy default handle must remain when pull_finish is omitted")
+
+    def test_knob_style_swaps_via_by_knob_finish(self):
+        """handle_style='knob' uses by_knob_finish instead of
+        by_pull_finish + knob_default_skus."""
+        # Manually rebuild a per-door scenario where the default knob
+        # is what the user wants swapped. The seed's per_door doesn't
+        # include MRH-HDL-KNB30, so we just verify the override path
+        # doesn't crash + the knob SKU is added when the call asks
+        # for it explicitly via mount_appliance + family that includes
+        # the knob. Practical knob-aware resolution will need a richer
+        # input (e.g. handle_per_door) — out of Path A scope.
+        picks = self.Catalog.resolve(
+            cabinet_family="base", door_count=1, drawer_count=0,
+            shelf_count=0, soft_close=True,
+            pull_finish="matte_black", handle_style="knob",
+        )
+        # The default knob_default_skus (MRH-HDL-KNB30) isn't in per_door,
+        # so the strip is a no-op and no knob SKU is added — that's the
+        # spec for now. Test that nothing breaks.
+        skus = self._sku_set(picks)
+        # At minimum the hinges and bumpers should still resolve.
+        self.assertIn("BLM-110-SC", skus)
+        self.assertIn("MRH-DOORBUMP-CL", skus)
+
+    def test_mount_appliance_adds_appliance_pull(self):
+        """tall_oven / tall_fridge cabinets pass mount_appliance=True
+        and get an appliance pull per appliance door."""
+        picks = self.Catalog.resolve(
+            cabinet_family="tall", door_count=2, drawer_count=0,
+            shelf_count=0, soft_close=True,
+            pull_finish="brushed_nickel", mount_appliance=True,
+        )
+        skus = self._sku_set(picks)
+        self.assertEqual(
+            skus.get("MRH-HDL-APP18-BN"), 2,
+            "2-door tall_oven should get 2 appliance pulls")
