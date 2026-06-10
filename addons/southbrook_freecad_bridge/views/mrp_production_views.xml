@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        Adds the CAD Artifacts tab and the colour-coded shop-floor kanban
-        badge for x_cad_status. The "Regenerate CAD" button lands in the
-        Module-2 deploy commit (gated by G2a owner-confirmation).
+        Adds the CAD Artifacts tab, the colour-coded shop-floor kanban
+        badge for x_cad_status, and the "Regenerate CAD" manager button.
+        Behaviour is gated by the `freecad_bridge.enabled` system parameter
+        (G2a). The button raises UserError when the gate is off; the
+        on-confirm hook silently no-ops.
     -->
     <record id="view_mrp_production_form_cad" model="ir.ui.view">
         <field name="name">mrp.production.form.cad</field>
@@ -20,6 +22,11 @@
                                decoration-danger="x_cad_status == 'error'"/>
                         <field name="x_plm_eco_id"/>
                     </group>
+                    <button name="action_regenerate_cad"
+                            string="Regenerate CAD"
+                            type="object" class="btn-secondary"
+                            groups="mrp.group_mrp_manager"
+                            confirm="Post a fresh render job to the FreeCAD bridge for this MO? Existing artifacts will be superseded."/>
                     <field name="x_cad_attachment_ids" widget="many2many_binary"/>
                 </page>
             </xpath>

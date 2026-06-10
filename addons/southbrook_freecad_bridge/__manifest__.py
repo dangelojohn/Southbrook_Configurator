@@ -45,6 +45,7 @@ addons tree.
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/system_parameters.xml",
         "views/mrp_production_views.xml",
     ],
     "installable": True,
