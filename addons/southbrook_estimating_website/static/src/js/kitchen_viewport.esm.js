@@ -269,13 +269,26 @@ export class KitchenViewport extends Component {
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
             }),
-            // P25C3 — hover highlight (sky emissive over carcass base).
+            // P25C3 — emissive hover highlight (now deprecated by
+            // A3 inverted-hull outline below, but kept as a fallback
+            // for older browsers where the BackSide outline glitches).
             highlight: new THREE.MeshStandardMaterial({
                 color: 0xc89e85,
                 emissive: 0x2b4f6b,
                 emissiveIntensity: 0.4,
                 roughness: 0.5,
                 metalness: 0.1,
+            }),
+            // Phase 3 Sprint A3 — outline material for the inverted-
+            // hull hover highlight. Renders the BackSide of a slightly
+            // larger shell over the hovered cabinet so only the silhouette
+            // shows through. Pure Three.js core; no EffectComposer /
+            // OutlinePass example module required.
+            outline: new THREE.MeshBasicMaterial({
+                color: 0x2b4f6b,          // --sb-sky
+                side: THREE.BackSide,
+                depthWrite: false,
+                transparent: false,
             }),
         };
 
@@ -554,14 +567,17 @@ export class KitchenViewport extends Component {
     _setHoveredLine(lineId) {
         if (lineId === this._hoveredLineId) return;
 
-        // Restore previously hovered cabinet's materials.
+        // Phase 3 Sprint A3 — clear the previous outline-shell siblings.
+        // The shell is a child of the original mesh that we add on hover
+        // and remove on un-hover. No material swap = no PBR cache thrash.
         if (this._hoveredLineId !== null && this._cabinetGroup) {
             this._cabinetGroup.traverse((obj) => {
                 if (obj.isMesh
                     && obj.userData?.lineId === this._hoveredLineId
-                    && obj.userData?._origMaterialHover) {
-                    obj.material = obj.userData._origMaterialHover;
-                    obj.userData._origMaterialHover = null;
+                    && obj.userData?._outlineShell) {
+                    obj.remove(obj.userData._outlineShell);
+                    obj.userData._outlineShell.geometry.dispose?.();
+                    obj.userData._outlineShell = null;
                 }
             });
         }
@@ -569,14 +585,22 @@ export class KitchenViewport extends Component {
         this._hoveredLineId = lineId;
         this.state.hoveredLineId = lineId;
 
-        if (lineId !== null && this._cabinetGroup && this._materials.highlight) {
-            const hl = this._materials.highlight;
+        if (lineId !== null && this._cabinetGroup && this._materials.outline) {
+            const outlineMat = this._materials.outline;
+            // Inverted-hull outline: child mesh, BackSide material,
+            // scaled up by ~3% so the silhouette protrudes past the
+            // original mesh by a couple of millimetres at typical
+            // cabinet scale. depthWrite disabled so it does not
+            // occlude the original mesh's surface.
             this._cabinetGroup.traverse((obj) => {
-                if (obj.isMesh && obj.userData?.lineId === lineId) {
-                    if (!obj.userData._origMaterialHover) {
-                        obj.userData._origMaterialHover = obj.material;
-                    }
-                    obj.material = hl;
+                if (obj.isMesh
+                    && obj.userData?.lineId === lineId
+                    && !obj.userData._outlineShell) {
+                    const shell = new THREE.Mesh(obj.geometry, outlineMat);
+                    shell.scale.set(1.03, 1.03, 1.03);
+                    shell.userData._isOutlineShell = true;
+                    obj.add(shell);
+                    obj.userData._outlineShell = shell;
                 }
             });
             const info = this._linesIndex[lineId];
