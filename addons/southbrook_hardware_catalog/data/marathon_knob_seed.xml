@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Tier 1.2 (audit 2026-06-10) - Marathon finish vocabulary +
+        5 knob templates with finish variants.
+
+        20 distinct finishes harvested from
+        ~/marathon_crawler/marathon_products.json (Marathon homepage
+        scrape, June 2026). The configurator can pick a narrower
+        subset via attr_pull_finish in southbrook_estimating; the
+        full vendor vocabulary lives here as Marathon publishes it.
+    -->
+
+    <!-- ============ Finish attribute + values ============ -->
+    <record id="attr_marathon_finish" model="product.attribute">
+        <field name="name">Marathon Finish</field>
+        <field name="display_type">radio</field>
+        <field name="create_variant">always</field>
+    </record>
+    <record id="value_finish_antique_copper_bronze_highlight" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Antique Copper Bronze Highlight</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="value_finish_antique_pewter" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Antique Pewter</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="value_finish_black_nickel" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Black Nickel</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="value_finish_bronze_champagne" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Bronze Champagne</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="value_finish_brushed_brass" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Brushed Brass</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="value_finish_brushed_chrome" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Brushed Chrome</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="value_finish_brushed_nickel" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Brushed Nickel</field>
+        <field name="sequence">70</field>
+    </record>
+    <record id="value_finish_brushed_satin_nickel" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Brushed Satin Nickel</field>
+        <field name="sequence">80</field>
+    </record>
+    <record id="value_finish_gold_champagne" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Gold Champagne</field>
+        <field name="sequence">90</field>
+    </record>
+    <record id="value_finish_golden_champagne" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Golden Champagne</field>
+        <field name="sequence">100</field>
+    </record>
+    <record id="value_finish_golden_cymbal" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Golden Cymbal</field>
+        <field name="sequence">110</field>
+    </record>
+    <record id="value_finish_graphite" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Graphite</field>
+        <field name="sequence">120</field>
+    </record>
+    <record id="value_finish_matte_black" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Matte Black</field>
+        <field name="sequence">130</field>
+    </record>
+    <record id="value_finish_matte_white" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Matte White</field>
+        <field name="sequence">140</field>
+    </record>
+    <record id="value_finish_oil_rubbed_bronze" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Oil-Rubbed Bronze</field>
+        <field name="sequence">150</field>
+    </record>
+    <record id="value_finish_polished_chrome" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Polished Chrome</field>
+        <field name="sequence">160</field>
+    </record>
+    <record id="value_finish_satin_gold" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Satin Gold</field>
+        <field name="sequence">170</field>
+    </record>
+    <record id="value_finish_stone_grey" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Stone Grey</field>
+        <field name="sequence">180</field>
+    </record>
+    <record id="value_finish_weathered_iron" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Weathered Iron</field>
+        <field name="sequence">190</field>
+    </record>
+    <record id="value_finish_weathered_steel" model="product.attribute.value">
+        <field name="attribute_id" ref="attr_marathon_finish"/>
+        <field name="name">Weathered Steel</field>
+        <field name="sequence">200</field>
+    </record>
+
+    <!-- ============ 5 Marathon knob templates ============ -->
+    <record id="tmpl_marathon_9621" model="product.template">
+        <field name="name">Mesa Contemporary Knob (9621)</field>
+        <field name="default_code">MRH-9621</field>
+        <field name="x_marathon_sku">9621</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/decorative-hardware/962x/9621-mesa/primary-hero/6435/image-thumb__6435__productPageSlider/9621-pc-web.d0669c00.webp</field>
+        <field name="attribute_line_ids" eval="[(5, 0, 0), (0, 0, {
+            'attribute_id': ref('attr_marathon_finish'),
+            'value_ids': [(6, 0, [ref('value_finish_golden_champagne'),
+                                    ref('value_finish_golden_cymbal'),
+                                    ref('value_finish_matte_black'),
+                                    ref('value_finish_oil_rubbed_bronze'),
+                                    ref('value_finish_polished_chrome'),
+                                    ref('value_finish_black_nickel'),
+                                    ref('value_finish_brushed_brass'),
+                                    ref('value_finish_brushed_satin_nickel')])]
+        })]"/>
+    </record>
+    <record id="tmpl_marathon_9530" model="product.template">
+        <field name="name">Volta Classic Knob (9530)</field>
+        <field name="default_code">MRH-9530</field>
+        <field name="x_marathon_sku">9530</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/decorative-hardware/953x/9530-volta/Web%20Images/55790/image-thumb__55790__productPageSlider/9530-GCH.3a5d5e85.webp</field>
+        <field name="attribute_line_ids" eval="[(5, 0, 0), (0, 0, {
+            'attribute_id': ref('attr_marathon_finish'),
+            'value_ids': [(6, 0, [ref('value_finish_oil_rubbed_bronze'),
+                                    ref('value_finish_polished_chrome'),
+                                    ref('value_finish_satin_gold'),
+                                    ref('value_finish_weathered_iron'),
+                                    ref('value_finish_weathered_steel'),
+                                    ref('value_finish_antique_copper_bronze_highlight'),
+                                    ref('value_finish_black_nickel'),
+                                    ref('value_finish_brushed_chrome'),
+                                    ref('value_finish_brushed_nickel'),
+                                    ref('value_finish_gold_champagne'),
+                                    ref('value_finish_matte_black'),
+                                    ref('value_finish_matte_white')])]
+        })]"/>
+    </record>
+    <record id="tmpl_marathon_9766" model="product.template">
+        <field name="name">Ponte Transitional Knob (9766)</field>
+        <field name="default_code">MRH-9766</field>
+        <field name="x_marathon_sku">9766</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/decorative-hardware/976x/9766-ponte/hero/4890/image-thumb__4890__productPageSlider/9766-sgr.f3e39b82.webp</field>
+        <field name="attribute_line_ids" eval="[(5, 0, 0), (0, 0, {
+            'attribute_id': ref('attr_marathon_finish'),
+            'value_ids': [(6, 0, [ref('value_finish_brushed_nickel'),
+                                    ref('value_finish_matte_black'),
+                                    ref('value_finish_polished_chrome'),
+                                    ref('value_finish_stone_grey')])]
+        })]"/>
+    </record>
+    <record id="tmpl_marathon_9531" model="product.template">
+        <field name="name">Copo Classic Knob (9531)</field>
+        <field name="default_code">MRH-9531</field>
+        <field name="x_marathon_sku">9531</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/decorative-hardware/953x/9531-copo/Web%20Images/49599/image-thumb__49599__productPageSlider/9531-PC.28dcd9b9.webp</field>
+        <field name="attribute_line_ids" eval="[(5, 0, 0), (0, 0, {
+            'attribute_id': ref('attr_marathon_finish'),
+            'value_ids': [(6, 0, [ref('value_finish_brushed_satin_nickel'),
+                                    ref('value_finish_polished_chrome')])]
+        })]"/>
+    </record>
+    <record id="tmpl_marathon_9627" model="product.template">
+        <field name="name">Claremont Transitional Knob (9627)</field>
+        <field name="default_code">MRH-9627</field>
+        <field name="x_marathon_sku">9627</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/decorative-hardware/962x/9627-claremont/Web%20Images/49592/image-thumb__49592__productPageSlider/9627-PC.d32a5327.webp</field>
+        <field name="attribute_line_ids" eval="[(5, 0, 0), (0, 0, {
+            'attribute_id': ref('attr_marathon_finish'),
+            'value_ids': [(6, 0, [ref('value_finish_brushed_brass'),
+                                    ref('value_finish_brushed_nickel'),
+                                    ref('value_finish_graphite'),
+                                    ref('value_finish_matte_black'),
+                                    ref('value_finish_polished_chrome'),
+                                    ref('value_finish_antique_pewter'),
+                                    ref('value_finish_bronze_champagne')])]
+        })]"/>
+    </record>
+</odoo>

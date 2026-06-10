@@ -47,7 +47,7 @@ Outstanding:
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.4.0",
+    "version": "19.0.0.6.0",
     "depends": [
         "product",
         "purchase",
@@ -58,6 +58,11 @@ Outstanding:
         "data/res_partner_marathon.xml",
         "data/southbrook_hardware_brands.xml",
         "data/southbrook_hardware_seed.xml",
+        # Tier 1.2 (2026-06-10) - 5 Marathon knob templates with
+        # finish variants (20 distinct Marathon finishes). Must load
+        # AFTER southbrook_hardware_brands.xml since each template
+        # references brand_marathon.
+        "data/marathon_knob_seed.xml",
         "views/southbrook_hardware_brand_views.xml",
         "views/product_template_views.xml",
         "views/southbrook_hardware_menus.xml",
