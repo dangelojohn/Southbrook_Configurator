@@ -2426,3 +2426,118 @@
         color: rgb(140, 40, 30);
     }
 }
+
+// ======================================================================
+// Phase 3 Sprint D2 — Touch + mobile breakpoint pass.
+//
+// Targets WCAG 2.1 AA touch-target spec (>=44x44 CSS px) + sane
+// responsive collapse of the 3-pane portal layout below 768px.
+//
+// Two breakpoints:
+//   - 768px  — tablet / landscape phone. 3-pane → vertical stack;
+//              header strip wraps; tabs become horizontally scrollable;
+//              footer becomes sticky-bottom.
+//   - 480px  — narrow phone. Catalog grid single column; drawer is a
+//              full-viewport modal; History entries stack vertically.
+// ======================================================================
+
+@media (max-width: 768px) {
+
+    // Touch targets ----------------------------------------------------
+    .o_owl_btn,
+    .o_owl_tab,
+    .o_owl_line_row button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    // Tabs become horizontally-scrollable so 6 tabs don't crush text.
+    .o_owl_tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        flex-wrap: nowrap;
+    }
+    .o_owl_tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    // HeaderStrip — 5 cells -> 2-column grid.
+    .o_owl_header_strip {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .o_owl_hs_cell { padding: 12px 14px; }
+    .o_owl_hs_customer {
+        // Customer name spans both columns for legibility.
+        grid-column: 1 / -1;
+    }
+
+    // Footer — sticky-bottom so action buttons stay reachable
+    // without scrolling to the end of a long order.
+    .o_owl_footer {
+        position: sticky;
+        bottom: 0;
+        background: white;
+        border-top: 1px solid var(--sb-rule);
+        z-index: 5;
+        padding: 8px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .o_owl_footer_actions {
+        flex: 1 1 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .o_owl_footer_total {
+        flex: 1 1 100%;
+        border-left: none;
+        border-top: 1px solid var(--sb-rule);
+        padding-left: 0;
+        padding-top: 8px;
+        min-width: 0;
+        text-align: right;
+    }
+
+    // History timeline — looser spacing for thumb-friendly tap targets.
+    .o_owl_history_entry {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+
+    // ConfigDrawer + CatalogPicker — full-viewport modal so the
+    // tappable area maxes out and the partial overlay doesn't leave
+    // the user reaching across the screen.
+    .o_owl_drawer_backdrop,
+    .o_owl_catalog_backdrop {
+        padding: 0;
+    }
+    .o_owl_drawer_panel,
+    .o_owl_catalog_panel {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+    }
+
+    // Catalog tiles single-column; ~75vw thumbnails so the cabinet
+    // image actually reads at thumb-zoom distance.
+    .o_owl_catalog_grid {
+        grid-template-columns: 1fr;
+    }
+
+    // History entries — version chip on its own row so the body
+    // gets full width.
+    .o_owl_history_entry {
+        flex-direction: column;
+        gap: 4px;
+    }
+    .o_owl_history_version { min-width: 0; }
+}
