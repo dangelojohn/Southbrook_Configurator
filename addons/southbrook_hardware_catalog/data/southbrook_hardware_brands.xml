@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <!--
-        21 brands sourced through Marathon Hardware. The original seed
-        was 19; DTC and King Slide were added 2026-06-10 after auditing
-        marathonhardware.com — DTC is one of Marathon's two named
-        hinge categories (alongside Salice), and King Slide is a common
-        Taiwanese drawer-slide OEM at Marathon's mid-tier price point.
+        36 brands sourced through Marathon Hardware. Original seed
+        was 19 (Blum through Generic); +DTC + King Slide added Tier 1
+        2026-06-10 from Marathon's hinge/slide category names; +15
+        added Tier 2.2 same day from Marathon's homepage /brand/<name>
+        feature list (Amerock, Emtek, Schaub, Citterio Giulio, Viefe,
+        Roberto Marella, Italiana Ferramenta, Vibo, L&S Lighting,
+        FastCap, True Position Tools, Robertson, 3M, Klingspor,
+        Eureka).
         Codes are stable identifiers used in xml_ids and the
         hardware_map.json so a brand swap doesn't ripple through code.
     -->
@@ -106,6 +109,102 @@
         <field name="name">Ridder</field>
         <field name="code">ridder</field>
         <field name="sequence">170</field>
+    </record>
+    <!-- ============================================================== -->
+    <!-- Tier 2.2 (audit 2026-06-10) — 15 more brands featured on        -->
+    <!-- marathonhardware.com's homepage but not in the original seed.   -->
+    <!-- Sequence 200-340 leaves room for future additions; ordering by  -->
+    <!-- category keeps related brands together when sorted by sequence. -->
+    <!-- ============================================================== -->
+    <record id="brand_amerock" model="southbrook.hardware.brand">
+        <field name="name">Amerock</field>
+        <field name="code">amerock</field>
+        <field name="sequence">200</field>
+        <field name="note">American decorative-hardware manufacturer (handles, knobs, pulls). Builder-grade through transitional pricing. Marathon homepage feature brand.</field>
+    </record>
+    <record id="brand_emtek" model="southbrook.hardware.brand">
+        <field name="name">Emtek</field>
+        <field name="code">emtek</field>
+        <field name="sequence">210</field>
+        <field name="note">Premium American handle/knob maker. Bronze + stainless + crystal lines. Often paired with Wood-Mode-class cabinets.</field>
+    </record>
+    <record id="brand_schaub" model="southbrook.hardware.brand">
+        <field name="name">Schaub and Company</field>
+        <field name="code">schaub</field>
+        <field name="sequence">220</field>
+        <field name="note">American designer handle/knob brand. Hand-finished metals.</field>
+    </record>
+    <record id="brand_citterio_giulio" model="southbrook.hardware.brand">
+        <field name="name">Citterio Giulio</field>
+        <field name="code">citterio_giulio</field>
+        <field name="sequence">230</field>
+        <field name="note">Italian designer handles. Premium tier — knurled and architectural pulls.</field>
+    </record>
+    <record id="brand_viefe" model="southbrook.hardware.brand">
+        <field name="name">Viefe</field>
+        <field name="code">viefe</field>
+        <field name="sequence">240</field>
+        <field name="note">Spanish designer handle/pull maker. Architectural finishes.</field>
+    </record>
+    <record id="brand_roberto_marella" model="southbrook.hardware.brand">
+        <field name="name">Roberto Marella</field>
+        <field name="code">roberto_marella</field>
+        <field name="sequence">250</field>
+        <field name="note">Italian designer hardware. Bespoke + minimalist pull lines.</field>
+    </record>
+    <record id="brand_italiana_ferramenta" model="southbrook.hardware.brand">
+        <field name="name">Italiana Ferramenta</field>
+        <field name="code">italiana_ferramenta</field>
+        <field name="sequence">260</field>
+        <field name="note">Italian cabinet-hardware OEM. Makes the K Push Tech push-and-magnetic catch system widely used on touch-latch cabinets.</field>
+    </record>
+    <record id="brand_vibo" model="southbrook.hardware.brand">
+        <field name="name">Vibo</field>
+        <field name="code">vibo</field>
+        <field name="sequence">270</field>
+        <field name="note">Italian drawer-organizer + kitchen-systems specialist. Pull-out bins, lazy-susan kits, tall-pantry pull-outs.</field>
+    </record>
+    <record id="brand_ls_lighting" model="southbrook.hardware.brand">
+        <field name="name">L&amp;S Lighting</field>
+        <field name="code">ls_lighting</field>
+        <field name="sequence">280</field>
+        <field name="note">Italian LED-strip + under-cabinet lighting. Moove + M-Series strip lines. Marathon's primary LED supplier.</field>
+    </record>
+    <record id="brand_fastcap" model="southbrook.hardware.brand">
+        <field name="name">FastCap</field>
+        <field name="code">fastcap</field>
+        <field name="sequence">290</field>
+        <field name="note">American woodworking-accessory maker. Self-adhesive screw covers, peel-stick veneer caps, jigs.</field>
+    </record>
+    <record id="brand_true_position_tools" model="southbrook.hardware.brand">
+        <field name="name">True Position Tools</field>
+        <field name="code">true_position_tools</field>
+        <field name="sequence">300</field>
+        <field name="note">American precision-installation jigs. TP-1934 cabinet-pull jig is industry standard.</field>
+    </record>
+    <record id="brand_robertson" model="southbrook.hardware.brand">
+        <field name="name">Robertson</field>
+        <field name="code">robertson</field>
+        <field name="sequence">310</field>
+        <field name="note">Canadian square-drive screw standard. Marathon house brand of fasteners.</field>
+    </record>
+    <record id="brand_3m" model="southbrook.hardware.brand">
+        <field name="name">3M</field>
+        <field name="code">three_m</field>
+        <field name="sequence">320</field>
+        <field name="note">American industrial conglomerate. Random-orbital sanders, adhesive backing for LED strip, abrasives.</field>
+    </record>
+    <record id="brand_klingspor" model="southbrook.hardware.brand">
+        <field name="name">Klingspor</field>
+        <field name="code">klingspor</field>
+        <field name="sequence">330</field>
+        <field name="note">German precision abrasives. Cabinet-grade sanding belts + paper.</field>
+    </record>
+    <record id="brand_eureka" model="southbrook.hardware.brand">
+        <field name="name">Eureka</field>
+        <field name="code">eureka</field>
+        <field name="sequence">340</field>
+        <field name="note">Italian cabinet-system hardware (pull-outs, wire baskets, sliding-shelf kits). Marathon homepage feature brand.</field>
     </record>
     <record id="brand_marathon" model="southbrook.hardware.brand">
         <field name="name">Marathon (House Brand)</field>
