@@ -47,7 +47,7 @@ Outstanding:
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.7.0",
+    "version": "19.0.0.8.0",
     "depends": [
         "product",
         "purchase",
@@ -63,6 +63,12 @@ Outstanding:
         # AFTER southbrook_hardware_brands.xml since each template
         # references brand_marathon.
         "data/marathon_knob_seed.xml",
+        # Tier 2.2-extension (2026-06-10) - 20 more Marathon products
+        # from the noisier ~/marathon_browser_20 scrape. Clean fields
+        # only (SKU, name, brand, category, primary image URL).
+        # Per-finish variants will follow once a Path B catalog file
+        # lands and lets us reconstruct the variant axes confidently.
+        "data/marathon_browser20_seed.xml",
         "views/southbrook_hardware_brand_views.xml",
         "views/product_template_views.xml",
         "views/southbrook_hardware_menus.xml",
