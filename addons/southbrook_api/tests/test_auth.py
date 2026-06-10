@@ -26,6 +26,21 @@ class TestApiAuth(HttpCase):
         })
 
     # ------------------------------------------------------------------
+    # /health — no auth, fast, safe for monitors
+    # ------------------------------------------------------------------
+    def test_health_no_auth_returns_ok_with_schema(self):
+        resp = self.url_open("/api/v1/health")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["schema"], SCHEMA)
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["service"], "southbrook_api")
+        self.assertEqual(body["api_version"], "v1")
+        self.assertEqual(body["schema_version"], SCHEMA)
+        # db key present (may be the test DB or southbrook depending on context).
+        self.assertIn("db", body)
+
+    # ------------------------------------------------------------------
     # /auth/login
     # ------------------------------------------------------------------
     def test_login_returns_api_key_and_schema(self):

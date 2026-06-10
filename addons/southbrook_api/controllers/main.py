@@ -107,6 +107,31 @@ def supports_idempotency(handler: Callable) -> Callable:
 class SouthbrookApi(http.Controller):
 
     # ==================================================================
+    # §3.0 — GET /api/v1/health  (no auth — for monitors + smoke)
+    # ==================================================================
+    @http.route(
+        "/api/v1/health", type="http", auth="public",
+        methods=["GET"], csrf=False,
+    )
+    def health(self, **_):
+        """Liveness probe. Returns immediately with schema + version +
+        db identifier; no DB writes, no model loads. Safe for high-frequency
+        polling. Does NOT require an X-Api-Key header.
+
+        Surfaces enough state for an external monitor to distinguish
+        'service running but DB unreachable' from 'service down', without
+        leaking anything an unauthenticated caller shouldn't see.
+        """
+        db_name = request.env.cr.dbname if request.env and request.env.cr else None
+        return _json({
+            "status": "ok",
+            "service": "southbrook_api",
+            "api_version": "v1",
+            "schema_version": SCHEMA_VERSION,
+            "db": db_name,
+        })
+
+    # ==================================================================
     # §3.1 — POST /api/v1/auth/login
     # ==================================================================
     @http.route(

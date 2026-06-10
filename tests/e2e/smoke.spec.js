@@ -60,6 +60,19 @@ test("/my/dealer/orders blocked for anon", async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
+// REST API — health endpoint (no auth, for monitors + smoke).
+// ---------------------------------------------------------------------------
+test("/api/v1/health returns 200 + schema + status ok", async ({ request }) => {
+  const resp = await request.get("/api/v1/health");
+  expect(resp.status()).toBe(200);
+  const body = await resp.json();
+  expect(body.schema).toBe(SCHEMA);
+  expect(body.status).toBe("ok");
+  expect(body.service).toBe("southbrook_api");
+  expect(body.api_version).toBe("v1");
+});
+
+// ---------------------------------------------------------------------------
 // REST API — G6 contract shape on error envelopes.
 // ---------------------------------------------------------------------------
 test("/api/v1/me without X-Api-Key returns 401 + schema", async ({ request }) => {

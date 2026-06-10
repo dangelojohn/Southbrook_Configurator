@@ -73,6 +73,32 @@ returns to login screen.
 
 All responses are JSON unless noted. All timestamps are ISO 8601 UTC.
 
+### 3.0 GET /api/v1/health  (no auth)
+
+Liveness probe for monitors, load balancers, and pre-deploy smoke. No
+`X-Api-Key` required; does no DB writes or model loads, so it's safe
+for high-frequency polling.
+
+```jsonc
+{
+  "schema": "southbrook.flutter.api.v1",
+  "status": "ok",
+  "service": "southbrook_api",
+  "api_version": "v1",
+  "schema_version": "southbrook.flutter.api.v1",
+  "db": "southbrook"   // db name or null when the request context lacks one
+}
+```
+
+Status codes:
+- `200 OK` — service up; the response is enough for an external monitor
+  to distinguish "service running but DB unreachable" (the controller
+  itself wouldn't respond, so a 5xx or connect-refused) from "service down".
+
+The body leaks nothing an unauthenticated caller couldn't already
+discover from the public site (the db name is implied by the URL
+hostname most of the time). Don't add anything sensitive here.
+
 ### 3.1 GET /api/v1/me
 
 Returns the authenticated user's profile.
