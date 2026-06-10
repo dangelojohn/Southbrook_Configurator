@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Tier 2.2 stretch (audit 2026-06-10) — 20 Marathon products
+        ingested from ~/marathon_browser_20/marathon_products.json
+        (the larger Cloudflare-survived scrape).
+
+        Source data had noisy text fields (finish / specs were
+        contaminated with page chrome) so this ingest harvests
+        only the clean fields: SKU, name, brand (inferred from
+        name), category (inferred from name), primary image URL.
+        Per-finish variants will be added once a clean catalog
+        file lands (Path B).
+    -->
+
+    <record id="tmpl_marathon_pr_1130816" model="product.template">
+        <field name="name">K Push Tech Push and Magnetic Catches</field>
+        <field name="default_code">PR-1130816</field>
+        <field name="x_marathon_sku">PR-1130816</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_italiana_ferramenta"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/hinges-and-plates/concealed-hinges/accessories/if-kpush/IFC010002861/49110/image-thumb__49110__productPageSlider/KPT_37_concealed_magnet_white.124dcea2.webp</field>
+    </record>
+    <record id="tmpl_marathon_03_lmoove2wdc_dbk" model="product.template">
+        <field name="name">L&amp;S Moove 2, 3m, Black, WDC, 2700/4000K</field>
+        <field name="default_code">03-LMOOVE2WDC-DBK</field>
+        <field name="x_marathon_sku">03-LMOOVE2WDC-DBK</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/moove/moove-2/63047/image-thumb__63047__productPageSlider/MOOVE%202_TEC%20%2803-LMOOVE2WDC-DBK%29.5c657b3a.webp</field>
+    </record>
+    <record id="tmpl_marathon_03_lext_2200" model="product.template">
+        <field name="name">M-Series Led Strip 8mm X 5m</field>
+        <field name="default_code">03-LEXT-2200</field>
+        <field name="x_marathon_sku">03-LEXT-2200</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/led-strip/62938/image-thumb__62938__productPageSlider/16050_LS-Light-Strip%20reel%20gen%20%2803-MLED851000xx%29.f4baf03b.webp</field>
+    </record>
+    <record id="tmpl_marathon_03_ltriac96w" model="product.template">
+        <field name="name">L&amp;S Triac Power Driver, 96W</field>
+        <field name="default_code">03-LTRIAC96W</field>
+        <field name="x_marathon_sku">03-LTRIAC96W</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/triac/62653/image-thumb__62653__productPageSlider/_DSC0087%20%2803-LTRIAC96W%29.238b24f8.webp</field>
+    </record>
+    <record id="tmpl_marathon_03_lmeclite_mc500" model="product.template">
+        <field name="name">L&amp;S Mec Lite Modules</field>
+        <field name="default_code">03-LMECLITE-MC500</field>
+        <field name="x_marathon_sku">03-LMECLITE-MC500</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/mec-lite/mec-lite-dipswitch-generic/62713/image-thumb__62713__productPageSlider/SENSOR%20MODULE_24V%20%2803-LMECLITE-DIPSWITCH%29.803f1e45.webp</field>
+    </record>
+    <record id="tmpl_marathon_03_lflexedc_dbk" model="product.template">
+        <field name="name">L&amp;S FlexSpot Light, Sleek Black, EDC 3000K/4000K</field>
+        <field name="default_code">03-LFLEXEDC-DBK</field>
+        <field name="x_marathon_sku">03-LFLEXEDC-DBK</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/flexspot/62667/image-thumb__62667__productPageSlider/FLEXSPOT-EMOTION_still_1.ea0527c4.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_1747094" model="product.template">
+        <field name="name">L&amp;S MEC Pro Aluminium Profiles</field>
+        <field name="default_code">PR-1747094</field>
+        <field name="x_marathon_sku">PR-1747094</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/mec-pro/Mec%205/62789/image-thumb__62789__productPageSlider/03-LMECPRO5-DBK.a2474ec5.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_1792061" model="product.template">
+        <field name="name">L&amp;S Sensors for Wired C Module</field>
+        <field name="default_code">PR-1792061</field>
+        <field name="x_marathon_sku">PR-1792061</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/mec-lite/mec-lite-wiredc/62720/image-thumb__62720__productPageSlider/WIRED%20C_TOUCH%20%2803-LMECLITE-WIREDC-TOUCH-DG%29.b62bc375.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_1752859" model="product.template">
+        <field name="name">L&amp;S Mec Lite Remotes</field>
+        <field name="default_code">PR-1752859</field>
+        <field name="x_marathon_sku">PR-1752859</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/mec-lite/mec-lite-remotes/62725/image-thumb__62725__productPageSlider/4CH%20REMOTE_black_with%20SUPPORT%20%2803-LMECLITE-ZIGBEE-REMOTE4C-DBK%29.648ff042.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_1791900" model="product.template">
+        <field name="name">L&amp;S Sensors for Dipswitch Module</field>
+        <field name="default_code">PR-1791900</field>
+        <field name="x_marathon_sku">PR-1791900</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/mec-lite/mec-lite-dipswitch-generic/62715/image-thumb__62715__productPageSlider/WIRELESS%20IR-DOOR%20SENSOR%20%2803-LMECLITE-DIPSWITCH-WLIR-DBK%20and%2003-LMECLITE-DIPSWITCH-WLTOUCH-DBK%29%29.5a553f8f.webp</field>
+    </record>
+    <record id="tmpl_marathon_03_lmoove1wdc_dbk" model="product.template">
+        <field name="name">L&amp;S Moove 1, 3m, Black, WDC, 2700/4000K</field>
+        <field name="default_code">03-LMOOVE1WDC-DBK</field>
+        <field name="x_marathon_sku">03-LMOOVE1WDC-DBK</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/moove/moove-1/62995/image-thumb__62995__productPageSlider/MOOVE%201_ABACO_TEC.e0b49199.webp</field>
+    </record>
+    <record id="tmpl_marathon_03_lmoove3wdc_dbk" model="product.template">
+        <field name="name">L&amp;S Moove 3 3M. Black WDC 2700/4000K</field>
+        <field name="default_code">03-LMOOVE3WDC-DBK</field>
+        <field name="x_marathon_sku">03-LMOOVE3WDC-DBK</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_ls_lighting"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/lighting/l-s-lighting/moove/moove-3/63050/image-thumb__63050__productPageSlider/MOOVE%203_TEC%20%2803-LMOOVE3WDC-DBK%29.425e4893.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_424911" model="product.template">
+        <field name="name">Float Shelf System</field>
+        <field name="default_code">PR-424911</field>
+        <field name="x_marathon_sku">PR-424911</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/kitchen-accessories/shelving-systems/float/product/12502/image-thumb__12502__itemsGrid/float-2800mm-profile-no-shelf.1bf558e2.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_411997" model="product.template">
+        <field name="name">Gola Profiles</field>
+        <field name="default_code">PR-411997</field>
+        <field name="x_marathon_sku">PR-411997</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_italiana_ferramenta"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/decorative-hardware/laguna-gola/new-assets-web-2/39844/image-thumb__39844__itemsGrid/1682-AUC-AN.259e5f31.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_406153" model="product.template">
+        <field name="name">Grantchester Contemporary Pull (9668)</field>
+        <field name="default_code">PR-406153</field>
+        <field name="x_marathon_sku">PR-406153</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">handle</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/decorative-hardware/966x/9668-grantchester/new-assets/46009/image-thumb__46009__productPageSlider/9668-416-BSN-HSS.b9d01f12.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_880149" model="product.template">
+        <field name="name">M-Series SpaceBin Waste System Hardware Kits</field>
+        <field name="default_code">PR-880149</field>
+        <field name="x_marathon_sku">PR-880149</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/kitchen-accessories/waste-solutions/marathon/products/spacebin/kits/ecommerce/42926/image-thumb__42926__productPageSlider/041-SBM15-36-AG_4.ce7803dc.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_1033326" model="product.template">
+        <field name="name">Salice Progressa Undermount Slide</field>
+        <field name="default_code">PR-1033326</field>
+        <field name="x_marathon_sku">PR-1033326</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_salice"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/drawer-systems-slides/slides/undermount/salice/Progressa/e-com%20images/47672/image-thumb__47672__productPageSlider/SALICE-FUTURA-F70-EU__03_51_10__SENZA-RIQUADRO.f38e5e7f.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_424727" model="product.template">
+        <field name="name">M-Series Max Bin Waste Storage System</field>
+        <field name="default_code">PR-424727</field>
+        <field name="x_marathon_sku">PR-424727</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_marathon"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/kitchen-accessories/waste-solutions/ubstor/maxbin/hero/450/med/23792/image-thumb__23792__productPageSlider/Maxbin%20450-18%20Inch%20540%20Height%20Open%202K%20Web.d6d49764.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_601639" model="product.template">
+        <field name="name">DTC Legacy Endura Internal Drawer</field>
+        <field name="default_code">PR-601639</field>
+        <field name="x_marathon_sku">PR-601639</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">other</field>
+        <field name="x_hardware_brand_id" ref="brand_dtc"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/drawer-systems-slides/drawer-systems/legacy/endura/product-variations/internal-kits/7266/image-thumb__7266__productPageSlider/172mm-internal-drawer-box-matte-grey-photoshopped-web.03eca96d.webp</field>
+    </record>
+    <record id="tmpl_marathon_pr_602728" model="product.template">
+        <field name="name">Salice Progressa+ Undermount Slide</field>
+        <field name="default_code">PR-602728</field>
+        <field name="x_marathon_sku">PR-602728</field>
+        <field name="type">consu</field>
+        <field name="is_storable" eval="True"/>
+        <field name="x_hardware_category">slide</field>
+        <field name="x_hardware_brand_id" ref="brand_salice"/>
+        <field name="x_pricing_pending" eval="True"/>
+        <field name="x_marathon_image_url">https://marathonhardware-hac5hpb8hxfheeea.z02.azurefd.net/products/drawer-systems-slides/slides/undermount/salice/Progressa/e-com%20images/47674/image-thumb__47674__productPageSlider/SALICE-FUTURA-F70-EU__03_45_05__SOLO-RIQUADRO.06bddc01.webp</field>
+    </record>
+</odoo>
