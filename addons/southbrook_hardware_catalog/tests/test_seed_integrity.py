@@ -28,6 +28,40 @@ class TestSeedIntegrity(TransactionCase):
                 brand.active,
                 f"{xml_id} should be active by default")
 
+    def test_seed_sku_count_at_least_29(self):
+        """Path A SKU additions 2026-06-10 brought the seed catalog
+        to 29 hardware SKUs. Locks the floor — adding more is fine,
+        silent drops are not."""
+        Product = self.env["product.product"]
+        n = Product.search_count([("x_hardware_category", "!=", False)])
+        self.assertGreaterEqual(
+            n, 29,
+            f"Expected at least 29 hardware SKUs, got {n}")
+
+    def test_marathon_aligned_sku_additions_present(self):
+        """2026-06-10 Path A — spot-check that each new category
+        addition (DTC hinge, King Slide undermount, multi-finish pull,
+        appliance pull, hinge accessory) has a representative SKU
+        with the right brand attached."""
+        cases = [
+            ("hw_dtc_c80_110_sc", "brand_dtc"),
+            ("hw_king_slide_k2832_21", "brand_king_slide"),
+            ("hw_handle_pull_128_mb", "brand_top_knobs"),
+            ("hw_handle_app_pull_18_bn", "brand_top_knobs"),
+            ("hw_blum_clip_mounting_plate", "brand_blum"),
+        ]
+        for sku_ref, brand_ref in cases:
+            product = self.env.ref(
+                f"southbrook_hardware_catalog.{sku_ref}")
+            expected_brand = self.env.ref(
+                f"southbrook_hardware_catalog.{brand_ref}")
+            self.assertEqual(
+                product.x_hardware_brand_id, expected_brand,
+                f"{sku_ref} brand drifted from {brand_ref}")
+            self.assertTrue(
+                product.x_marathon_sku,
+                f"{sku_ref} missing x_marathon_sku")
+
     def test_brand_codes_unique_and_lowercased(self):
         Brand = self.env["southbrook.hardware.brand"]
         codes = Brand.search([]).mapped("code")
