@@ -161,12 +161,26 @@
                     <strong t-field="project.selected_design_option_id.name"/>
                 </p>
                 <t t-if="project.sale_order_id">
+                    <!-- Phase 3 Sprint A4 — in-page PDF preview.
+                         The button still works as a fallback (and as
+                         the only path on iOS Safari, which silently
+                         blanks PDF iframes). On desktop + Android we
+                         render the same PDF inline via <iframe>.
+                         pdf_preview.esm.js progressively enhances any
+                         element marked data-pdf-preview-src. -->
                     <p>
                         <a t-attf-href="/report/pdf/southbrook_estimating.report_signature_spec_sheet_doc/#{project.sale_order_id.id}"
                            class="btn btn-outline-primary" target="_blank">
                             Download Spec Sheet (PDF)
                         </a>
                     </p>
+                    <div class="o_sb_pdf_preview mt-3"
+                         t-attf-data-pdf-preview-src="/report/pdf/southbrook_estimating.report_signature_spec_sheet_doc/#{project.sale_order_id.id}"
+                         data-pdf-preview-title="Spec Sheet preview">
+                    </div>
+                    <script type="text/javascript"
+                            src="/southbrook_customer_portal/static/src/js/pdf_preview.js">
+                    </script>
                 </t>
             </t>
         </t>
