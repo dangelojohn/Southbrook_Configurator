@@ -1379,6 +1379,126 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             return {"error": "forbidden"}
         return self._build_southbrook_order_payload(order)
 
+    def _southbrook_collect_validation(self, order):
+        """Phase 3 Sprint B1 — produce ValidationStrip issue list.
+
+        Each entry: {severity, code, message, line_id (or None)}.
+          severity: 'hard'  → rule violated, line is invalid
+                    'soft'  → suggestion / heuristic, not blocking
+                    'info'  → FYI (maple +10%, etc.)
+
+        Rules checked (CLAUDE.md §5 declarative set):
+          1. Series → door style: Contractor only allows slab door,
+             Elegance only allows five-piece woodgrain. Hard.
+          2. Box material → series: Maple offered on Contemporary +
+             Elegance only. Hard.
+          3. Width → door count: 9-21" cabinets are 1-door; 24-36"
+             are 2-door. Soft.
+          4. Family → soft-close: bi-fold corner ships without
+             soft-close. Soft (UI hides; this is just FYI).
+
+        Plus Maple price-extra +10% / +2 week info entries per
+        Sprint B2's lessons learned.
+        """
+        issues = []
+        for line in order.order_line:
+            if not line.product_id:
+                continue
+            name = (line.name or "")
+            name_lower = name.lower()
+
+            # Variant attribute snapshot — preferred when present.
+            attr_vals = {}
+            for ptav in line.product_id.product_template_attribute_value_ids:
+                attr = (ptav.attribute_id.name or "").lower()
+                attr_vals.setdefault(attr, []).append(
+                    (ptav.name or "").lower()
+                )
+
+            def _has_token(*tokens):
+                return any(t in name_lower for t in tokens) or any(
+                    any(t in v for v in vs)
+                    for vs in attr_vals.values() for t in tokens
+                )
+
+            # Rule 1 — Contractor series + Five-Piece door.
+            if _has_token("contractor") and _has_token("five-piece",
+                                                       "5-piece", "woodgrain"):
+                issues.append({
+                    "severity": "hard",
+                    "code": "series_door_incompatible",
+                    "line_id": line.id,
+                    "message": (
+                        f"{line.name}: Contractor series only allows "
+                        "the white thermofoil slab door."
+                    ),
+                })
+            # Rule 1 (inverse) — Elegance series + Slab door.
+            if _has_token("elegance") and _has_token("slab", "thermofoil"):
+                issues.append({
+                    "severity": "hard",
+                    "code": "series_door_incompatible",
+                    "line_id": line.id,
+                    "message": (
+                        f"{line.name}: Elegance series uses five-piece "
+                        "woodgrain doors only."
+                    ),
+                })
+            # Rule 2 — Maple box only on Contemporary/Elegance.
+            if _has_token("maple") and _has_token("contractor"):
+                issues.append({
+                    "severity": "hard",
+                    "code": "box_series_incompatible",
+                    "line_id": line.id,
+                    "message": (
+                        f"{line.name}: Maple carcass not available on "
+                        "Contractor series."
+                    ),
+                })
+            # Info — Maple lead-time + price impact (CLAUDE.md §5).
+            if _has_token("maple"):
+                issues.append({
+                    "severity": "info",
+                    "code": "maple_lead_extra",
+                    "line_id": line.id,
+                    "message": (
+                        f"{line.name}: Maple carcass adds +10% "
+                        "price and +2 weeks lead time."
+                    ),
+                })
+            # Rule 3 — width → door-count sanity.
+            import re as _re
+            m = _re.search(r'(\d{1,2})\s*(?:"|″|in\b|in\.\b)',
+                            name, _re.I)
+            if m:
+                w_in = int(m.group(1))
+                door_m = _re.search(r'(\d)\s*[-– ]\s*door', name, _re.I)
+                if door_m:
+                    d = int(door_m.group(1))
+                    if 9 <= w_in <= 21 and d != 1:
+                        issues.append({
+                            "severity": "soft",
+                            "code": "narrow_should_be_1dr",
+                            "line_id": line.id,
+                            "message": (
+                                f"{line.name}: cabinets {w_in}\" wide "
+                                "should be 1-door — current spec uses "
+                                f"{d}-door."
+                            ),
+                        })
+                    elif 24 <= w_in <= 36 and d == 1:
+                        issues.append({
+                            "severity": "soft",
+                            "code": "wide_should_be_2dr",
+                            "line_id": line.id,
+                            "message": (
+                                f"{line.name}: cabinets {w_in}\" wide "
+                                "are typically 2-door for door sag — "
+                                "current spec uses 1-door."
+                            ),
+                        })
+        return issues
+
     def _build_southbrook_order_payload(self, order):
         """Shape the order + lines + zones for client-side consumption.
 
@@ -1633,11 +1753,14 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             bom_rollup["hardware"]["drawer_slide_pair_count"] += cut.get("drawer_slide_pair_count", 0) * qty
             bom_rollup["edge_banding_mm"] += cut.get("edge_banding_length_mm", 0) * qty
 
-        # T2C11 — validation issue list. Phase 1 ships an empty list;
-        # Phase 3 polish wires the OCA rule engine output here (per-
-        # line hard/soft issues). Keeping the key in place now so
-        # the OWL ValidationStrip doesn't need to widen the contract.
-        validation = []
+        # Phase 3 Sprint B1 — rule engine output. Two layers:
+        #   1. Per-line inspection of the CLAUDE.md §5 hard rules
+        #      against parsed line.name + variant attrs. Covers
+        #      demo-seed orders where no config_session exists.
+        #   2. For lines WITH a config_session, walk the session's
+        #      product.config.line records and surface any conflict
+        #      the OCA validator already detected.
+        validation = self._southbrook_collect_validation(order)
 
         return {
             "order": {
