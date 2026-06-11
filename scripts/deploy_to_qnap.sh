@@ -31,6 +31,13 @@ QNAP_DOCKER="${QNAP_DOCKER:-/share/CACHEDEV3_DATA/.qpkg/container-station/bin/sy
 CONTAINER="${CONTAINER:-southbrook-odoo}"
 DB="${DB:-southbrook}"
 DRY_RUN="${DRY_RUN:-0}"
+# Serialize concurrent upgrades. Two parallel `odoo -u` runs against the
+# same DB race on ir_module_module_dependency and one of them dies with
+# `psycopg2.errors.LockNotAvailable: canceling statement due to lock
+# timeout`. flock lives inside the container (util-linux is present in
+# the Odoo image — QNAP busybox host doesn't have it).
+LOCK_PATH="${LOCK_PATH:-/tmp/southbrook-odoo-upgrade.lock}"
+LOCK_WAIT_SEC="${LOCK_WAIT_SEC:-600}"
 
 MODULES_ARG="${1:-southbrook_estimating,southbrook_configurator_ux}"
 
@@ -73,14 +80,30 @@ for mod in "${MODULES[@]}"; do
 done
 
 # ---- run the upgrade --------------------------------------------------
-log "upgrading $MODULES_ARG on $CONTAINER (db=$DB)"
-upgrade_cmd="$QNAP_DOCKER exec $CONTAINER odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
+log "upgrading $MODULES_ARG on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
+# Wrap odoo -u in flock INSIDE the container so concurrent upgrade
+# attempts queue instead of racing. Lock auto-releases on exit. The
+# -E flag on flock makes it return its own exit code (1) on timeout
+# rather than swallowing it; that propagates up through tee/grep.
+inner_cmd="flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
+upgrade_cmd="$QNAP_DOCKER exec $CONTAINER bash -c \"$inner_cmd\""
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"
 else
-  # Capture log to a tmpfile inside the container so we can grep it
-  # after; also stream a small filter to our stderr live.
-  ssh "$QNAP_HOST" "$upgrade_cmd 2>&1 | tee /tmp/deploy_upgrade.log | grep -E 'Modules loaded|ParseError|CRITICAL|ValidationError|FAIL|Traceback' || true"
+  # Capture log to a tmpfile on the QNAP host so we can grep it
+  # after; also stream a small filter to our stderr live. Note: a
+  # flock timeout surfaces as the literal exit code 75 — we surface
+  # it explicitly so the deploy doesn't silently "succeed" on lock
+  # contention (the historical || true bug).
+  set +e
+  ssh "$QNAP_HOST" "$upgrade_cmd 2>&1 | tee /tmp/deploy_upgrade.log | grep -E 'Modules loaded|ParseError|CRITICAL|ValidationError|FAIL|Traceback|flock'"
+  rc=${PIPESTATUS[0]}
+  set -e
+  if [[ "$rc" == "75" ]]; then
+    fail "another odoo -u is holding $LOCK_PATH inside $CONTAINER — \
+waited ${LOCK_WAIT_SEC}s. Find it with: ssh $QNAP_HOST '$QNAP_DOCKER \
+exec $CONTAINER ps -ef | grep \"odoo.*-u\"'"
+  fi
 fi
 
 # ---- post-flight inventory --------------------------------------------
