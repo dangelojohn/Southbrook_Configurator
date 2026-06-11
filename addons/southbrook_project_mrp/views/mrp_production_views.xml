@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="mrp_production_form_job" model="ir.ui.view">
+        <field name="name">mrp.production.form.southbrook.job</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+            <field name="user_id" position="after">
+                <field name="project_task_id"
+                       options="{'no_create': True}"
+                       help="Customer job this MO belongs to."/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Let users filter/group MOs by job. -->
+    <record id="mrp_production_search_job" model="ir.ui.view">
+        <field name="name">mrp.production.search.southbrook.job</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.view_mrp_production_filter"/>
+        <field name="arch" type="xml">
+            <field name="product_id" position="after">
+                <field name="project_task_id"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

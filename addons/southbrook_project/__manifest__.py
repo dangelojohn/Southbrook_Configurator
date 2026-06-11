@@ -41,6 +41,11 @@ These are flagged in the README for a human operator.
     "version": "19.0.0.1.0",
     "depends": [
         "project",
+        # x_southbrook_sale_order_id is a Many2one to sale.order, so sale MUST
+        # be a hard dependency — without it a cold install that loads this
+        # module before sale fails ("unknown comodel_name 'sale.order'"). Works
+        # warm in prod only because sale happens to be loaded already.
+        "sale",
     ],
     "data": [
         "data/project_tags.xml",
