@@ -70,6 +70,34 @@ class TestManufacturingIntelligenceEngine(TransactionCase):
         self.assertEqual(rollup["x_mi_install_blocker_count"], 1)
         self.assertEqual(rollup["x_mi_assembly_blocker_count"], 0)
 
+    def test_existing_checks_are_stage_aware(self):
+        Engine = self.env["southbrook.mi.engine"]
+        cut = Engine._cut_checks_from_panels(
+            [
+                {
+                    "panel_name": "Tall pantry side",
+                    "qty": 1,
+                    "length_mm": 3000,
+                    "width_mm": 1300,
+                    "thickness_mm": 19,
+                    "substrate": "plywood",
+                    "grain_dir": "length",
+                }
+            ],
+            {"waste_area_m2": 0.2},
+        )
+        hardware = Engine._hardware_checks_from_summary(None)
+        install = Engine._install_checks_from_dimensions(900, 2400, 650)
+        self.assertEqual(cut[0]["stage"], "saw")
+        self.assertEqual(cut[0]["sequence"], 10)
+        self.assertTrue(cut[0]["is_gate"])
+        self.assertEqual(hardware[0]["stage"], "assembly")
+        self.assertEqual(hardware[0]["sequence"], 40)
+        self.assertEqual(
+            [check["stage"] for check in install],
+            ["install", "install", "install"],
+        )
+
     def test_cut_summary(self):
         Engine = self.env["southbrook.mi.engine"]
         summary = Engine._compute_cut_summary(

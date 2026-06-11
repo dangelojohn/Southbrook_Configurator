@@ -179,6 +179,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             if length and width and not fits_straight and not fits_rotated:
                 checks.append(
                     {
+                        **self._stage_values("saw", 10),
                         "name": "Oversized panel",
                         "severity": "blocker",
                         "category": "cut",
@@ -196,6 +197,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             ):
                 checks.append(
                     {
+                        **self._stage_values("saw", 10),
                         "name": "Grain direction rotation review",
                         "severity": "warning",
                         "category": "cut",
@@ -207,6 +209,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if (summary or {}).get("waste_area_m2", 0.0) >= 0.09:
             checks.append(
                 {
+                    **self._stage_values("saw", 10, is_gate=False),
                     "name": "Reusable offcut",
                     "severity": "info",
                     "category": "cut",
@@ -226,6 +229,7 @@ class SouthbrookMiEngine(models.AbstractModel):
                 continue
             checks.append(
                 {
+                    **self._stage_values("saw", 10, is_gate=False),
                     "name": "Batch cut duplicate panels",
                     "severity": "info",
                     "category": "cut",
@@ -293,6 +297,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             if "shelf" in name and (panel.get("length_mm") or 0) > 900:
                 checks.append(
                     {
+                        **self._stage_values("assembly", 40),
                         "name": "Long shelf requires assembly review",
                         "severity": "warning",
                         "category": "assembly",
@@ -325,6 +330,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             if weight_kg >= 60.0:
                 checks.append(
                     {
+                        **self._stage_values("assembly", 40),
                         "name": "Mechanical lift required",
                         "severity": "blocker",
                         "category": "assembly",
@@ -335,6 +341,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             elif weight_kg >= 23.0:
                 checks.append(
                     {
+                        **self._stage_values("assembly", 40),
                         "name": "Two-person panel handling",
                         "severity": "warning",
                         "category": "assembly",
@@ -349,6 +356,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if not summary:
             return [
                 {
+                    **self._stage_values("assembly", 40),
                     "name": "Missing hardware package",
                     "severity": "blocker",
                     "category": "hardware",
@@ -361,6 +369,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if not summary.get("line_count"):
             checks.append(
                 {
+                    **self._stage_values("assembly", 40),
                     "name": "Empty hardware pick list",
                     "severity": "blocker",
                     "category": "hardware",
@@ -371,6 +380,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if summary.get("has_pricing_pending"):
             checks.append(
                 {
+                    **self._stage_values("assembly", 40),
                     "name": "Hardware pricing pending",
                     "severity": "warning",
                     "category": "hardware",
@@ -381,6 +391,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if summary.get("state") == "draft":
             checks.append(
                 {
+                    **self._stage_values("assembly", 40),
                     "name": "Hardware not picked",
                     "severity": "warning",
                     "category": "hardware",
@@ -396,6 +407,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if height_mm and height_mm >= 2400:
             checks.append(
                 {
+                    **self._stage_values("install", 70),
                     "name": "Tall cabinet install review",
                     "severity": "warning",
                     "category": "install",
@@ -408,6 +420,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             if tip_up_diagonal_mm >= 2440:
                 checks.append(
                     {
+                        **self._stage_values("install", 70),
                         "name": "Tip-up clearance review",
                         "severity": "warning",
                         "category": "install",
@@ -418,6 +431,7 @@ class SouthbrookMiEngine(models.AbstractModel):
                 )
         checks.append(
             {
+                **self._stage_values("install", 70, is_gate=False),
                 "name": "Filler and scribe confirmation",
                 "severity": "info",
                 "category": "install",
@@ -444,6 +458,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if not cutlist:
             self._create_check(
                 {
+                    **self._stage_values("saw", 10),
                     "production_id": production.id,
                     "name": "Missing cutlist",
                     "severity": "blocker",
@@ -464,6 +479,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if "x_cad_status" in production._fields and production.x_cad_status != "done":
             self._create_check(
                 {
+                    **self._stage_values("cnc", 20),
                     "production_id": production.id,
                     "name": "CAD not complete",
                     "severity": "warning",
@@ -498,6 +514,7 @@ class SouthbrookMiEngine(models.AbstractModel):
         if not package.cutlist_id:
             self._create_check(
                 {
+                    **self._stage_values("saw", 10),
                     "production_package_id": package.id,
                     "name": "Missing cutlist",
                     "severity": "blocker",
@@ -512,6 +529,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             if summary["yield_pct"] and summary["yield_pct"] < 45:
                 self._create_check(
                     {
+                        **self._stage_values("saw", 10),
                         "production_package_id": package.id,
                         "name": "Low sheet yield",
                         "severity": "warning",
