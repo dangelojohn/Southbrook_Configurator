@@ -20,6 +20,17 @@ class TestManufacturingIntelligenceViews(TransactionCase):
         self.assertIn("x_mi_edge_band_m", arch)
         self.assertIn("x_mi_install_warning_count", arch)
 
+    def test_package_view_has_stage_gate_fields(self):
+        view = self.env.ref(
+            "southbrook_manufacturing_intelligence.view_sb_production_package_form_mi"
+        )
+        arch = view.arch_db
+        self.assertIn("x_mi_blocked_stage", arch)
+        self.assertIn("x_mi_next_stage_action", arch)
+        self.assertIn("x_mi_saw_blocker_count", arch)
+        self.assertIn("stage", arch)
+        self.assertIn("is_gate", arch)
+
     def test_pm_kanban_has_intelligence_chip_marker(self):
         view = self.env.ref(
             "southbrook_manufacturing_intelligence.view_southbrook_pm_kanban_mi"

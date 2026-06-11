@@ -19,12 +19,21 @@
                                        decoration-success="x_mi_status == 'ok'"
                                        decoration-warning="x_mi_status == 'review'"
                                        decoration-danger="x_mi_status == 'blocked'"/>
+                                <field name="x_mi_blocked_stage"/>
+                                <field name="x_mi_next_stage_action"/>
                                 <field name="x_mi_next_action"/>
                                 <field name="x_mi_install_warning_count"/>
                             </group>
                             <group>
                                 <field name="x_mi_blocker_count"/>
                                 <field name="x_mi_warning_count"/>
+                                <field name="x_mi_saw_blocker_count"/>
+                                <field name="x_mi_cnc_blocker_count"/>
+                                <field name="x_mi_edgeband_blocker_count"/>
+                                <field name="x_mi_assembly_blocker_count"/>
+                                <field name="x_mi_finish_qc_blocker_count"/>
+                                <field name="x_mi_delivery_blocker_count"/>
+                                <field name="x_mi_install_blocker_count"/>
                                 <field name="x_mi_yield_pct"/>
                                 <field name="x_mi_waste_area_m2"/>
                                 <field name="x_mi_edge_band_m"/>
@@ -32,6 +41,9 @@
                         </group>
                         <field name="x_mi_check_ids" readonly="1">
                             <list>
+                                <field name="sequence"/>
+                                <field name="stage"/>
+                                <field name="is_gate"/>
                                 <field name="severity"/>
                                 <field name="category"/>
                                 <field name="name"/>
