@@ -5,6 +5,7 @@
 // to LoginScreen or ProjectListScreen accordingly.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import 'api_client.dart';
 import 'screens/login_screen.dart';
@@ -13,6 +14,12 @@ import 'services/auth_storage.dart';
 import 'theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Force the semantics tree on. Without this, Flutter web only emits
+  // <flt-semantics> when an assistive tech is detected — so DevTools
+  // and automated test runners see an empty a11y tree even though the
+  // app has the right Semantics widgets in place.
+  SemanticsBinding.instance.ensureSemantics();
   runApp(const SouthbrookApp());
 }
 
