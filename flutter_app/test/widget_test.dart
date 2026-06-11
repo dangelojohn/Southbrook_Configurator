@@ -48,10 +48,13 @@ void main() {
     expect(draft.canUploadPhoto, isTrue);
     expect(draft.canApprove, isFalse);
 
+    // Contract keys: detail endpoint sends `concept_ids` + `selected_design_option_id`.
     final ready = Project.fromJson({
       'id': 2, 'code': 'KP-2', 'name': 'Y', 'state': 'awaiting_customer',
-      'design_option_count': 3, 'selected_option_id': 11,
+      'concept_ids': [11, 12, 13], 'selected_design_option_id': 11,
     });
+    expect(ready.designOptionCount, 3);
+    expect(ready.selectedOptionId, 11);
     expect(ready.canReviewConcepts, isTrue);
     expect(ready.canApprove, isTrue);
 
@@ -81,6 +84,43 @@ void main() {
     final cMissing = Concept.fromJson({'id': 9, 'name': 'Concept C'});
     expect(cMissing.estimatedPrice, isNull);
     expect(cMissing.isSelected, isFalse);
+  });
+
+  test('Concept.fromJson reads contract keys and coerces false', () {
+    final c = Concept.fromJson({
+      'id': 7, 'name': 'Concept A', 'estimated_price': 12500,
+      'description_html': '<p>Bright galley</p>', 'preview_attachment_id': 99,
+      'is_selected': true,
+    });
+    expect(c.description, '<p>Bright galley</p>');
+    expect(c.previewAttachmentId, 99);
+    expect(c.isSelected, isTrue);
+
+    // Odoo sends `false` for empty Char/Many2one — must not throw, must be null.
+    final cFalse = Concept.fromJson({
+      'id': 8, 'name': 'B', 'description_html': false,
+      'estimated_price': false, 'preview_attachment_id': false,
+      'placement_data': false,
+    });
+    expect(cFalse.description, isNull);
+    expect(cFalse.estimatedPrice, isNull);
+    expect(cFalse.previewAttachmentId, isNull);
+    expect(cFalse.placementData, isNull);
+  });
+
+  test('Project.fromJson coerces Odoo false-for-empty (regression: C1)', () {
+    // The real backend sends `false`, not null/omitted, for empty fields.
+    // A raw `as String?` cast would throw TypeError here.
+    final p = Project.fromJson({
+      'id': 5, 'code': 'KP-5', 'name': 'Empty', 'state': 'draft',
+      'theme': false, 'date_target': false, 'date_completed': false,
+      'selected_design_option_id': false, 'concept_count': false,
+    });
+    expect(p.theme, isNull);
+    expect(p.dateTarget, isNull);
+    expect(p.dateCompleted, isNull);
+    expect(p.selectedOptionId, isNull);
+    expect(p.designOptionCount, 0);
   });
 
   test('SouthbrookColors.stateChip maps every known state', () {

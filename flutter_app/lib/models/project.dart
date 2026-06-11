@@ -36,21 +36,37 @@ class Project {
     this.hasQuote = false,
   });
 
+  // Odoo serializes empty Char/Date/Many2one fields as `false`, not null, so
+  // every optional field is coerced by *type* — a raw `as String?` cast would
+  // throw on a `false` value. Keys match the 'southbrook.flutter.api.v1'
+  // contract; the list endpoint (_project_summary) and the detail endpoint
+  // (_project_detail) carry different shapes, so counts read either an
+  // explicit count or the length of an id list.
   factory Project.fromJson(Map<String, dynamic> json) {
+    String? str(dynamic v) => v is String ? v : null;
+    int? integer(dynamic v) => v is int ? v : null;
+    bool flag(dynamic v) => v is bool ? v : false;
+    int count(String countKey, String idsKey) {
+      final c = json[countKey];
+      if (c is int) return c;
+      final ids = json[idsKey];
+      return ids is List ? ids.length : 0;
+    }
+
     return Project(
       id: json['id'] as int,
-      code: json['code'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      state: json['state'] as String? ?? 'draft',
-      theme: json['theme'] as String?,
-      dateTarget: json['date_target'] as String?,
-      dateCompleted: json['date_completed'] as String?,
-      hasAiAnalysis: json['has_ai_analysis'] as bool? ?? false,
-      aiConfirmed: json['ai_confirmed'] as bool? ?? false,
-      photoCount: json['photo_count'] as int? ?? 0,
-      designOptionCount: json['design_option_count'] as int? ?? 0,
-      selectedOptionId: json['selected_option_id'] as int?,
-      hasQuote: json['has_quote'] as bool? ?? false,
+      code: str(json['code']) ?? '',
+      name: str(json['name']) ?? '',
+      state: str(json['state']) ?? 'draft',
+      theme: str(json['theme']),
+      dateTarget: str(json['date_target']),
+      dateCompleted: str(json['date_completed']),
+      hasAiAnalysis: flag(json['ai_ready']),
+      aiConfirmed: flag(json['ai_confirmed']),
+      photoCount: count('photo_count', 'photo_attachment_ids'),
+      designOptionCount: count('concept_count', 'concept_ids'),
+      selectedOptionId: integer(json['selected_design_option_id']),
+      hasQuote: flag(json['has_quote']),
     );
   }
 
