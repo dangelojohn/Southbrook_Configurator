@@ -28,4 +28,34 @@
         </field>
     </record>
 
+    <!--
+      FIX A — project overview kanban: replace the inflated open_task_count
+      (which counts every task, including production subtasks under each
+      customer job) with southbrook_top_level_task_count (top-level only).
+
+      The user's complaint: /odoo/project shows "Test" with "4 Tasks" when
+      it's really 1 customer job + 3 sub-steps. Operators read this as
+      4 jobs, which misreads queue volume.
+
+      We surgically replace the field reference inside the existing button
+      so:
+        * label_tasks ("Tasks") stays
+        * the card layout is untouched
+        * the task-progress 0/3 chip on the card (computed elsewhere) is
+          unaffected
+    -->
+    <record id="view_project_kanban_inherit_southbrook"
+            model="ir.ui.view">
+        <field name="name">project.project.kanban.inherit.southbrook</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.view_project_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='open_task_count']"
+                   position="replace">
+                <field name="southbrook_top_level_task_count"
+                       class="o_value"/>
+            </xpath>
+        </field>
+    </record>
+
 </odoo>
