@@ -52,30 +52,56 @@ class TestManufacturingIntelligenceViews(TransactionCase):
         checks_action = self.env.ref(
             "southbrook_manufacturing_intelligence.action_southbrook_mi_checks"
         )
+        checks_search = self.env.ref(
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_check_search"
+        )
         self.assertEqual(checks_action.view_mode, "list")
-        self.assertTrue(checks_action.search_view_id)
+        self.assertEqual(checks_action.search_view_id, checks_search)
+
+        packages_action = self.env.ref(
+            "southbrook_manufacturing_intelligence.action_southbrook_mi_packages"
+        )
+        package_list = self.env.ref(
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_package_list"
+        )
+        self.assertEqual(packages_action.view_mode, "list,form")
+        self.assertEqual(packages_action.view_id, package_list)
 
         check_list = self.env.ref(
             "southbrook_manufacturing_intelligence.view_southbrook_mi_check_list"
         )
-        self.assertIn('field name="stage"', check_list.arch_db)
-        self.assertIn('field name="is_gate"', check_list.arch_db)
-        self.assertIn('field name="workcenter_id"', check_list.arch_db)
+        for field_name in [
+            "sequence",
+            "stage",
+            "severity",
+            "is_gate",
+            "category",
+            "name",
+            "production_package_id",
+            "production_id",
+            "workcenter_id",
+            "message",
+            "recommendation",
+        ]:
+            self.assertIn('name="%s"' % field_name, check_list.arch_db)
 
-        check_search = self.env.ref(
-            "southbrook_manufacturing_intelligence.view_southbrook_mi_check_search"
-        )
-        for marker in [
-            "stage_saw",
-            "stage_install",
+        for filter_name in [
+            "blockers",
+            "warnings",
             "gate_checks",
+            "stage_saw",
+            "stage_cnc",
+            "stage_edgeband",
+            "stage_assembly",
+            "stage_finish_qc",
+            "stage_delivery",
+            "stage_install",
             "group_stage",
+            "group_severity",
+            "group_package",
             "group_workcenter",
         ]:
-            self.assertIn(marker, check_search.arch_db)
+            self.assertIn('name="%s"' % filter_name, checks_search.arch_db)
 
-        package_list = self.env.ref(
-            "southbrook_manufacturing_intelligence.view_southbrook_mi_package_list"
-        )
-        self.assertIn("x_mi_blocked_stage", package_list.arch_db)
-        self.assertIn("x_mi_next_stage_action", package_list.arch_db)
+        for field_name in ["x_mi_blocked_stage", "x_mi_next_stage_action"]:
+            self.assertIn('name="%s"' % field_name, package_list.arch_db)
