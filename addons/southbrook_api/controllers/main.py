@@ -263,6 +263,16 @@ class SouthbrookApi(http.Controller):
         if ctype not in ("image/jpeg", "image/jpg", "image/png"):
             return _error("unsupported_media_type",
                           f"Unsupported mime type {ctype!r}.", 415)
+        # The mime header can lie and a truncated upload would otherwise blow
+        # up the downstream AI pipeline (PIL) with an uncaught 500. Verify the
+        # bytes actually decode as an image and reject corrupt rasters cleanly.
+        try:
+            import io as _io
+            from PIL import Image as _PILImage
+            _PILImage.open(_io.BytesIO(data)).verify()
+        except Exception:
+            return _error("invalid_image",
+                          "Photo is not a readable image.", 422)
 
         attachment = request.env["ir.attachment"].sudo().create({
             "name": file_storage.filename or "photo.jpg",
