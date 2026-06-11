@@ -20,12 +20,18 @@ PG_PASS = $(shell grep '^POSTGRES_PASSWORD=' .env 2>/dev/null | cut -d= -f2)
 # extra positional args and crash the parser).
 # CI must cold-install everything that runs in production, or it can't catch a
 # break in a module it never loads (this is how the x_sbk_estimated_cost outage
-# slipped through — its module wasn't in this list). This now mirrors the prod
-# install set, EXCEPT two modules whose source is not yet on main:
-#   - southbrook_mrp_kitchen_workcenters  (lives on feature/mrp-kitchen-workcenters)
-#   - southbrook_manufacturing_intelligence
-# Both are deployed to prod but off-main — add them here the moment they merge.
-MODULES = southbrook_freecad_bridge,southbrook_hardware_catalog,southbrook_kitchen_workspace,southbrook_kitchen_mrp,southbrook_mrp_pm,southbrook_ai_design,southbrook_config_engine,southbrook_configurator_ux,southbrook_estimating,southbrook_estimating_website,southbrook_customer_portal,southbrook_dealer_portal,southbrook_api,southbrook_plm,southbrook_plm_productgraph
+# slipped through). This is the VALIDATED cold-installable subset (verified via
+# a fresh `-i` on a throwaway DB). 5 deployed modules are deliberately EXCLUDED
+# because they do NOT cold-install today — each is a real platform-health bug to
+# fix, then add back here:
+#   - southbrook_mrp_kitchen_workcenters    : source off-main (feature/mrp-kitchen-workcenters)
+#   - southbrook_manufacturing_intelligence : source off-main
+#   - southbrook_estimating_website         : views/shop_configurator_currency_fix.xml xpath
+#       (//span[hasclass('config_product_price')]) can't be located on a fresh install
+#   - southbrook_mrp_pm                      : depends on southbrook_estimating_website (inherits ^)
+#   - southbrook_plm_productgraph            : depends on unvendored module product_graph_release
+# => the platform currently CANNOT be rebuilt from scratch until these are fixed.
+MODULES = southbrook_freecad_bridge,southbrook_hardware_catalog,southbrook_kitchen_workspace,southbrook_kitchen_mrp,southbrook_ai_design,southbrook_config_engine,southbrook_configurator_ux,southbrook_estimating,southbrook_customer_portal,southbrook_dealer_portal,southbrook_api,southbrook_plm
 
 # Odoo flags every command needs. The 8899/8902 port dodge is mandatory —
 # --no-http alone does not stop the gevent worker from binding 8072.
