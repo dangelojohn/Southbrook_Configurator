@@ -69,6 +69,8 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
         "views/product_template_views.xml",
         "views/tool_crib_views.xml",
         "views/tool_asset_views.xml",
+        "views/workcenter_tool_requirement_views.xml",
+        "views/tool_kit_views.xml",
         "views/menus.xml",
     ],
     "demo": [

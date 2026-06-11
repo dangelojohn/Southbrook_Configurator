@@ -42,6 +42,18 @@
               action="action_tool_asset"
               sequence="10"/>
 
+    <menuitem id="menu_southbrook_tools_kits"
+              name="Tool Kits"
+              parent="menu_southbrook_tools_config_root"
+              action="action_tool_kit"
+              sequence="30"/>
+
+    <menuitem id="menu_southbrook_tools_wc_requirements"
+              name="Tool Requirements"
+              parent="menu_southbrook_tools_config_root"
+              action="action_workcenter_tool_requirement"
+              sequence="40"/>
+
     <!-- ─── Inventory → Products → Southbrook Tools and Consumables ─ -->
     <menuitem id="menu_southbrook_tools_products"
               name="Southbrook Tools &amp; Consumables"

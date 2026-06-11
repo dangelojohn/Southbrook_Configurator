@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_tool_kit_list" model="ir.ui.view">
+        <field name="name">southbrook.tool.kit.list</field>
+        <field name="model">southbrook.tool.kit</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="workcenter_id"/>
+                <field name="tool_crib_id"/>
+                <field name="line_count"/>
+                <field name="active" invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tool_kit_form" model="ir.ui.view">
+        <field name="name">southbrook.tool.kit.form</field>
+        <field name="model">southbrook.tool.kit</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="code" placeholder="Kit code..."/>
+                            <span> </span>
+                            <field name="name" placeholder="Kit name..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="workcenter_id"
+                                   options="{'no_create_edit': True}"/>
+                            <field name="tool_crib_id"
+                                   options="{'no_create_edit': True}"/>
+                        </group>
+                        <group>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Components" name="components">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="tool_category_id"/>
+                                    <field name="product_id"/>
+                                    <field name="quantity"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tool_kit_search" model="ir.ui.view">
+        <field name="name">southbrook.tool.kit.search</field>
+        <field name="model">southbrook.tool.kit</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="workcenter_id"/>
+                <filter name="archived" string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_workcenter" string="Work Center"
+                            context="{'group_by': 'workcenter_id'}"/>
+                    <filter name="group_crib" string="Tool Crib"
+                            context="{'group_by': 'tool_crib_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_tool_kit" model="ir.actions.act_window">
+        <field name="name">Tool Kits</field>
+        <field name="res_model">southbrook.tool.kit</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_tool_kit_search"/>
+    </record>
+
+</odoo>

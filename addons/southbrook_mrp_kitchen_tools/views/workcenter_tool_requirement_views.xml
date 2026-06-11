@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_workcenter_tool_requirement_list" model="ir.ui.view">
+        <field name="name">southbrook.workcenter.tool.requirement.list</field>
+        <field name="model">southbrook.workcenter.tool.requirement</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="workcenter_id"/>
+                <field name="tool_category_id"/>
+                <field name="product_id"/>
+                <field name="quantity"/>
+                <field name="is_mandatory" widget="boolean_toggle"/>
+                <field name="notes" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_workcenter_tool_requirement_form" model="ir.ui.view">
+        <field name="name">southbrook.workcenter.tool.requirement.form</field>
+        <field name="model">southbrook.workcenter.tool.requirement</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="workcenter_id"
+                                   options="{'no_create_edit': True}"/>
+                            <field name="tool_category_id"
+                                   options="{'no_create_edit': True}"/>
+                            <field name="product_id"
+                                   options="{'no_create_edit': True}"/>
+                        </group>
+                        <group>
+                            <field name="quantity"/>
+                            <field name="is_mandatory"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_workcenter_tool_requirement" model="ir.actions.act_window">
+        <field name="name">Work Center Tool Requirements</field>
+        <field name="res_model">southbrook.workcenter.tool.requirement</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Inline requirement editor on mrp.workcenter form -->
+    <record id="view_mrp_workcenter_form_inherit_kt" model="ir.ui.view">
+        <field name="name">mrp.workcenter.form.inherit.kt</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="inherit_id" ref="mrp.mrp_workcenter_view"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="Southbrook Tool Control"
+                      name="southbrook_tool_control">
+                    <group string="Required Tools">
+                        <field name="southbrook_tool_requirement_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="tool_category_id"/>
+                                <field name="product_id"/>
+                                <field name="quantity"/>
+                                <field name="is_mandatory" widget="boolean_toggle"/>
+                                <field name="notes"/>
+                            </list>
+                        </field>
+                    </group>
+                    <group string="Serving Tool Cribs">
+                        <field name="southbrook_tool_crib_ids" nolabel="1"
+                               options="{'no_create': True}"/>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+</odoo>

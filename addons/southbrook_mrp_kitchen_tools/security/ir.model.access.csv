@@ -12,3 +12,19 @@ access_tool_asset_operator,Tool asset read+write for tool operators,model_southb
 access_tool_asset_crib,Tool asset CRUD for crib manager,model_southbrook_tool_asset,group_tool_crib_manager,1,1,1,1
 access_tool_asset_maintenance,Tool asset CRUD for maintenance tech,model_southbrook_tool_asset,group_maintenance_technician,1,1,1,0
 access_tool_asset_admin,Tool asset CRUD for system admin,model_southbrook_tool_asset,base.group_system,1,1,1,1
+access_wc_tool_req_user,WC tool req read for MRP users,model_southbrook_workcenter_tool_requirement,mrp.group_mrp_user,1,0,0,0
+access_wc_tool_req_operator,WC tool req read for tool operators,model_southbrook_workcenter_tool_requirement,group_tool_operator,1,0,0,0
+access_wc_tool_req_crib,WC tool req CRUD for crib manager,model_southbrook_workcenter_tool_requirement,group_tool_crib_manager,1,1,1,1
+access_wc_tool_req_admin,WC tool req CRUD for system admin,model_southbrook_workcenter_tool_requirement,base.group_system,1,1,1,1
+access_op_tool_req_user,Operation tool req read for MRP users,model_southbrook_operation_tool_requirement,mrp.group_mrp_user,1,0,0,0
+access_op_tool_req_operator,Operation tool req read for tool operators,model_southbrook_operation_tool_requirement,group_tool_operator,1,0,0,0
+access_op_tool_req_crib,Operation tool req CRUD for crib manager,model_southbrook_operation_tool_requirement,group_tool_crib_manager,1,1,1,1
+access_op_tool_req_admin,Operation tool req CRUD for system admin,model_southbrook_operation_tool_requirement,base.group_system,1,1,1,1
+access_tool_kit_user,Tool kit read for MRP users,model_southbrook_tool_kit,mrp.group_mrp_user,1,0,0,0
+access_tool_kit_operator,Tool kit read for tool operators,model_southbrook_tool_kit,group_tool_operator,1,0,0,0
+access_tool_kit_crib,Tool kit CRUD for crib manager,model_southbrook_tool_kit,group_tool_crib_manager,1,1,1,1
+access_tool_kit_admin,Tool kit CRUD for system admin,model_southbrook_tool_kit,base.group_system,1,1,1,1
+access_tool_kit_line_user,Tool kit line read for MRP users,model_southbrook_tool_kit_line,mrp.group_mrp_user,1,0,0,0
+access_tool_kit_line_operator,Tool kit line read for tool operators,model_southbrook_tool_kit_line,group_tool_operator,1,0,0,0
+access_tool_kit_line_crib,Tool kit line CRUD for crib manager,model_southbrook_tool_kit_line,group_tool_crib_manager,1,1,1,1
+access_tool_kit_line_admin,Tool kit line CRUD for system admin,model_southbrook_tool_kit_line,base.group_system,1,1,1,1
