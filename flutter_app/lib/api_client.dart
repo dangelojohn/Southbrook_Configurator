@@ -12,6 +12,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -58,12 +59,22 @@ class SouthbrookApiClient {
     try {
       body = jsonDecode(resp.body) as Map<String, dynamic>;
     } on FormatException {
+      developer.log(
+        'malformed response (${resp.statusCode}) for ${resp.request?.url}',
+        name: 'SouthbrookApiClient',
+      );
       throw ApiException(resp.statusCode, 'malformed_response', resp.body);
     }
     if (resp.statusCode >= 400) {
+      final code = body['error'] as String? ?? 'unknown_error';
+      developer.log(
+        'API error ${resp.statusCode} $code for ${resp.request?.url}: '
+        '${body['message'] ?? ''}',
+        name: 'SouthbrookApiClient',
+      );
       throw ApiException(
         resp.statusCode,
-        body['error'] as String? ?? 'unknown_error',
+        code,
         body['message'] as String? ?? '',
       );
     }
