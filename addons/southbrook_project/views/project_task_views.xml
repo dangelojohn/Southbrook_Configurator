@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+      Surfaces the four cabinetry custom fields plus the clearer
+      priority in a dedicated "Cabinetry Specs" section of the
+      project.task form. Anchored after the existing description
+      tab so the operator sees specs immediately under the title.
+    -->
+    <record id="view_project_task_form_inherit_southbrook"
+            model="ir.ui.view">
+        <field name="name">project.task.form.inherit.southbrook</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_form2"/>
+        <field name="arch" type="xml">
+
+            <!-- Add Cabinetry Specs as a new notebook tab. Placed
+                 after the Description tab so operators see specs
+                 next to (not buried below) the body text. -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Cabinetry Specs"
+                      name="southbrook_cabinetry_specs">
+                    <group>
+                        <group string="Material + Hardware">
+                            <field name="x_southbrook_material_species"/>
+                            <field name="x_southbrook_unit_count"/>
+                            <field name="x_southbrook_priority"
+                                   widget="badge"
+                                   decoration-warning="x_southbrook_priority == 'rush'"
+                                   decoration-danger="x_southbrook_priority == 'urgent'"/>
+                        </group>
+                        <group string="Linkage">
+                            <field name="x_southbrook_sale_order_id"
+                                   options="{'no_create': True, 'no_open': False}"/>
+                        </group>
+                    </group>
+                    <group string="Hardware Specs">
+                        <field name="x_southbrook_hardware_specs"
+                               nolabel="1"
+                               placeholder="Hinges: Blum 110° soft-close (qty 4)&#10;Handles: 5 1/16&quot; brushed nickel bar pull (qty 6)&#10;Drawer slides: Blum Tandem Plus full-extension (qty 3 pair)"/>
+                    </group>
+                </page>
+            </xpath>
+
+            <!-- Add the Southbrook priority + originating-SO to the
+                 header bar so they're visible without scrolling to
+                 the Cabinetry Specs tab. The stock priority star
+                 stays put — this just augments it. -->
+            <xpath expr="//header" position="inside">
+                <field name="x_southbrook_priority"
+                       widget="badge"
+                       decoration-info="x_southbrook_priority == 'standard'"
+                       decoration-warning="x_southbrook_priority == 'rush'"
+                       decoration-danger="x_southbrook_priority == 'urgent'"/>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!--
+      Task list view — surface the originating SO + priority as
+      optional columns so the operator can sort the queue by them.
+    -->
+    <record id="view_project_task_list_inherit_southbrook"
+            model="ir.ui.view">
+        <field name="name">project.task.list.inherit.southbrook</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_tree2"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='priority']" position="after">
+                <field name="x_southbrook_priority"
+                       widget="badge"
+                       decoration-warning="x_southbrook_priority == 'rush'"
+                       decoration-danger="x_southbrook_priority == 'urgent'"
+                       optional="show"/>
+                <field name="x_southbrook_material_species" optional="hide"/>
+                <field name="x_southbrook_unit_count" optional="hide"/>
+                <field name="x_southbrook_sale_order_id" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+      Search view — let users filter by Rush / Urgent + by material
+      + by originating SO.
+    -->
+    <record id="view_project_task_search_inherit_southbrook"
+            model="ir.ui.view">
+        <field name="name">project.task.search.inherit.southbrook</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_search_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='message_needaction']"
+                   position="before">
+                <separator/>
+                <filter name="southbrook_rush"
+                        string="Rush"
+                        domain="[('x_southbrook_priority', '=', 'rush')]"/>
+                <filter name="southbrook_urgent"
+                        string="Urgent"
+                        domain="[('x_southbrook_priority', '=', 'urgent')]"/>
+                <separator/>
+                <field name="x_southbrook_sale_order_id"/>
+                <field name="x_southbrook_material_species"/>
+            </xpath>
+            <xpath expr="//group" position="inside">
+                <filter name="group_southbrook_priority"
+                        string="Southbrook Priority"
+                        context="{'group_by': 'x_southbrook_priority'}"/>
+                <filter name="group_southbrook_material"
+                        string="Material / Species"
+                        context="{'group_by': 'x_southbrook_material_species'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
