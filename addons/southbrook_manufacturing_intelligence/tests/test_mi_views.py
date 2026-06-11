@@ -38,3 +38,13 @@ class TestManufacturingIntelligenceViews(TransactionCase):
         self.assertIn("o_sb_mi_chip", view.arch_db)
         self.assertIn("x_mi_workcenter_blocker_count", view.arch_db)
         self.assertIn("x_mi_workcenter_warning_count", view.arch_db)
+
+    def test_manager_dashboard_views_load(self):
+        for xmlid in [
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_check_list",
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_check_search",
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_package_list",
+            "southbrook_manufacturing_intelligence.action_southbrook_mi_checks",
+            "southbrook_manufacturing_intelligence.action_southbrook_mi_packages",
+        ]:
+            self.assertTrue(self.env.ref(xmlid, raise_if_not_found=False), xmlid)
