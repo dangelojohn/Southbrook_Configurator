@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="project_task_form_mrp" model="ir.ui.view">
+        <field name="name">project.task.form.southbrook.mrp</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_form2"/>
+        <field name="arch" type="xml">
+
+            <!-- Smart button: how many MOs make up this job. -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button class="oe_stat_button" type="object"
+                        name="action_view_productions" icon="fa-wrench"
+                        invisible="production_count == 0">
+                    <field name="production_count" widget="statinfo"
+                           string="MOs"/>
+                </button>
+            </xpath>
+
+            <!-- Read-only build status the PM reads at a glance. -->
+            <xpath expr="//field[@name='user_ids']" position="after">
+                <field name="components_available"
+                       widget="badge"
+                       decoration-success="components_available == 'ready'"
+                       decoration-warning="components_available == 'partial'"
+                       decoration-danger="components_available == 'waiting'"
+                       invisible="production_count == 0"/>
+                <field name="mo_state_summary"
+                       invisible="production_count == 0"/>
+                <field name="mo_reference"
+                       invisible="production_count == 0"/>
+                <field name="mo_product_summary"
+                       invisible="production_count == 0"/>
+                <field name="job_industrial_cost"
+                       invisible="production_count == 0"/>
+                <field name="company_currency_id" column_invisible="1"/>
+            </xpath>
+
+            <!-- Manufacturing page: the job's MOs + the manual link action. -->
+            <xpath expr="//notebook" position="inside">
+                <page name="manufacturing" string="Manufacturing"
+                      groups="mrp.group_mrp_user">
+                    <field name="x_southbrook_sale_order_id" invisible="1"/>
+                    <button type="object"
+                            name="action_link_productions_from_sale"
+                            string="Link MOs from Sale" class="btn-secondary"
+                            invisible="not x_southbrook_sale_order_id"/>
+                    <field name="production_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="product_id"/>
+                            <field name="bom_id"/>
+                            <field name="product_qty"/>
+                            <field name="state" widget="badge"/>
+                            <field name="reservation_state" widget="badge"
+                                   optional="show"/>
+                            <field name="date_start" optional="hide"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
