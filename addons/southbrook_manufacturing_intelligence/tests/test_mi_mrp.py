@@ -78,3 +78,41 @@ class TestManufacturingIntelligenceMrp(TransactionCase):
         package.action_recompute_manufacturing_intelligence()
         self.assertGreater(package.x_mi_yield_pct, 0)
         self.assertAlmostEqual(package.x_mi_edge_band_m, 1.4)
+
+    def test_package_recompute_writes_stage_rollups(self):
+        product_values = {"name": "MI Rollup Product"}
+        if "detailed_type" in self.env["product.product"]._fields:
+            product_values["detailed_type"] = "consu"
+        elif "type" in self.env["product.product"]._fields:
+            product_values["type"] = "consu"
+        product = self.env["product.product"].create(product_values)
+        mo = self.env["mrp.production"].create(
+            {
+                "product_id": product.id,
+                "product_uom_id": product.uom_id.id,
+                "product_qty": 1,
+            }
+        )
+        cutlist = self.env["sb.cutlist"].create({"mo_id": mo.id})
+        self.env["sb.cutlist.line"].create(
+            {
+                "cutlist_id": cutlist.id,
+                "panel_name": "side_L",
+                "qty": 1,
+                "length_mm": 3000,
+                "width_mm": 1300,
+                "thickness_mm": 19,
+                "substrate": "melamine_white_5_8",
+                "grain_dir": "with_grain",
+            }
+        )
+        package = self.env["sb.production.package"].create(
+            {
+                "mo_id": mo.id,
+                "cutlist_id": cutlist.id,
+            }
+        )
+        package.action_recompute_manufacturing_intelligence()
+        self.assertEqual(package.x_mi_blocked_stage, "saw")
+        self.assertIn("Split the part", package.x_mi_next_stage_action)
+        self.assertEqual(package.x_mi_saw_blocker_count, 1)

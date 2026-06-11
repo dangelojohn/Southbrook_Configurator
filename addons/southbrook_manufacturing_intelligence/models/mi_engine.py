@@ -617,6 +617,7 @@ class SouthbrookMiEngine(models.AbstractModel):
             [("production_package_id", "=", package.id)]
         )
         severities = checks.mapped("severity")
+        stage_rollup = self._stage_rollup_from_checks(checks)
         package.write(
             {
                 "x_mi_status": self._status_from_severities(severities),
@@ -631,6 +632,7 @@ class SouthbrookMiEngine(models.AbstractModel):
                     )
                 ),
                 "x_mi_next_action": self._next_action_from_checks(checks),
+                **stage_rollup,
             }
         )
         return True
