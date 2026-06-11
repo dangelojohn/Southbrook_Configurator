@@ -72,20 +72,67 @@ for mod in "${MODULES[@]}"; do
     "$src/" "$QNAP_HOST:$QNAP_ADDONS_DIR/$mod/"
 done
 
-# ---- run the upgrade --------------------------------------------------
+# ---- run the upgrade (a COLD registry load — validate it!) ------------
+# `-u --stop-after-init` loads the FULL registry in a fresh process. If it
+# fails, a later live restart will ALSO crash-loop. This failure was once
+# masked here (`| grep ... || true`) and a restart took the site down, so we
+# now FAIL LOUDLY unless we see a clean 'Modules loaded' with no load errors.
 log "upgrading $MODULES_ARG on $CONTAINER (db=$DB)"
 upgrade_cmd="$QNAP_DOCKER exec $CONTAINER odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"
+  log "DRY: (would then assert cold-load success + live /web/login 200)"
 else
-  # Capture log to a tmpfile inside the container so we can grep it
-  # after; also stream a small filter to our stderr live.
-  ssh "$QNAP_HOST" "$upgrade_cmd 2>&1 | tee /tmp/deploy_upgrade.log | grep -E 'Modules loaded|ParseError|CRITICAL|ValidationError|FAIL|Traceback' || true"
+  log "running cold upgrade (this validates a future restart will boot)…"
+  ssh "$QNAP_HOST" "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1 || true"
+  upgrade_log="$(ssh "$QNAP_HOST" 'cat /tmp/deploy_upgrade.log' 2>/dev/null || true)"
+  printf '%s\n' "$upgrade_log" \
+    | grep -E 'Modules loaded|Registry loaded|ParseError|CRITICAL|ValidationError|AssertionError|Failed to load registry|Traceback' \
+    | sed 's/^/[odoo] /' >&2 || true
+  if printf '%s\n' "$upgrade_log" | grep -qE 'Failed to load registry|CRITICAL|AssertionError|Traceback \(most recent'; then
+    fail "cold upgrade hit a registry/load error (see [odoo] lines above). NOT trusting this deploy — a live restart would crash. Investigate before restarting $CONTAINER."
+  fi
+  if ! printf '%s\n' "$upgrade_log" | grep -q 'Modules loaded'; then
+    log "tail of upgrade log:"; printf '%s\n' "$upgrade_log" | tail -20 >&2
+    fail "cold upgrade did not reach 'Modules loaded' — treat as FAILED."
+  fi
+  log "cold upgrade OK — registry loads cleanly."
 fi
 
-# ---- post-flight inventory --------------------------------------------
+# ---- health gate: the LIVE server must actually serve -----------------
+health_check() {
+  ssh "$QNAP_HOST" "$QNAP_DOCKER exec $CONTAINER python3 -c \"import urllib.request as u
+try: u.urlopen('http://localhost:8069/web/login', timeout=10); print(200)
+except u.HTTPError as e: print(e.code)
+except Exception: print('boot')\"" 2>/dev/null || true
+}
 if [[ "$DRY_RUN" != "1" ]]; then
-  log "post-deploy state:"
+  log "verifying live server health (/web/login)…"
+  h="$(health_check)"
+  [[ "$h" == "200" ]] || fail "live /web/login returned '$h' (expected 200) — deploy may have left the site unhealthy; investigate $CONTAINER."
+  log "live /web/login → 200 ✓"
+fi
+
+# ---- optional hard restart (controller/Python changes need it) --------
+# Python controller code is loaded at server start; a `-u` alone won't swap
+# it. Set RESTART=1 to hard stop+start (cold-load already validated above),
+# then re-gate on health. A soft `restart` can leave stale workers — use
+# stop+start. See memory: qnap-odoo-upgrade-cache-reset (warm-vs-cold trap).
+if [[ "${RESTART:-0}" == "1" && "$DRY_RUN" != "1" ]]; then
+  log "RESTART=1 → hard stop+start $CONTAINER (loads new Python code)…"
+  ssh "$QNAP_HOST" "$QNAP_DOCKER stop $CONTAINER && $QNAP_DOCKER start $CONTAINER"
+  log "waiting for /web/login 200…"
+  ok=0
+  for i in $(seq 1 30); do
+    [[ "$(health_check)" == "200" ]] && { ok=1; log "live /web/login → 200 after $i checks ✓"; break; }
+    sleep 6
+  done
+  [[ "$ok" == "1" ]] || fail "after restart, $CONTAINER never returned 200 on /web/login — site may be DOWN. Roll back / investigate now."
+fi
+
+# ---- post-flight inventory (informational ONLY — not a success signal) -
+if [[ "$DRY_RUN" != "1" ]]; then
+  log "post-deploy module versions (informational; success was gated above):"
   ssh "$QNAP_HOST" "$QNAP_DOCKER exec southbrook-postgres psql -U odoo -d $DB -t -c \"
     SELECT name, latest_version
     FROM ir_module_module
