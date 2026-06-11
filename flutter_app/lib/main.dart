@@ -10,6 +10,7 @@ import 'api_client.dart';
 import 'screens/login_screen.dart';
 import 'screens/project_list_screen.dart';
 import 'services/auth_storage.dart';
+import 'session_guard.dart';
 import 'theme.dart';
 
 void main() {
@@ -23,6 +24,7 @@ class SouthbrookApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Southbrook Kitchen',
+      navigatorKey: appNavigatorKey,
       theme: buildSouthbrookTheme(),
       debugShowCheckedModeBanner: false,
       home: const _BootGate(),
@@ -55,6 +57,7 @@ class _BootGateState extends State<_BootGate> {
     final client = SouthbrookApiClient(
       Uri.parse(snapshot.baseUri),
       apiKey: snapshot.apiKey,
+      onUnauthorized: () => SessionGuard.expire(_storage),
     );
     // We *could* probe /api/v1/me to validate the key here, but a stale
     // key still fails gracefully on the project list — the user lands

@@ -54,20 +54,6 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     ));
   }
 
-  // A 401 means the stored key is stale/expired — clear it and return to
-  // login rather than stranding the user on a dead error screen (this is
-  // NOT the "no projects" case). Fixes the silent-failure the bug brief hit.
-  void _handleUnauthorized() {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await widget.storage.clear();
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => LoginScreen(storage: widget.storage)),
-        (route) => false,
-      );
-    });
-  }
-
   String _friendlyError(Object? error) {
     if (error is ApiException) {
       // 5xx (incl. the retryable 502 from the origin) — distinct from a real
@@ -106,7 +92,8 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
             if (snap.hasError) {
               final error = snap.error;
               if (error is ApiException && error.statusCode == 401) {
-                _handleUnauthorized();
+                // SessionGuard (wired via client.onUnauthorized) is already
+                // routing back to login — just hold a spinner until it does.
                 return const Center(child: CircularProgressIndicator());
               }
               return _ErrorState(

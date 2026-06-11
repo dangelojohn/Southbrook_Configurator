@@ -33,7 +33,13 @@ class SouthbrookApiClient {
   final Uri baseUri;
   String? apiKey;
 
-  SouthbrookApiClient(this.baseUri, {this.apiKey});
+  /// Invoked once when any authenticated request comes back 401 (stale /
+  /// revoked key). Set on post-login clients to drive SessionGuard; left
+  /// null on the pre-login client so a bad-credentials 401 during login is
+  /// handled by the login screen itself, not a redirect loop.
+  void Function()? onUnauthorized;
+
+  SouthbrookApiClient(this.baseUri, {this.apiKey, this.onUnauthorized});
 
   Map<String, String> _headers({String? idempotencyKey, bool requireKey = true}) {
     final h = <String, String>{
@@ -72,6 +78,9 @@ class SouthbrookApiClient {
         '${body['message'] ?? ''}',
         name: 'SouthbrookApiClient',
       );
+      if (resp.statusCode == 401) {
+        onUnauthorized?.call();
+      }
       throw ApiException(
         resp.statusCode,
         code,
