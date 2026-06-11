@@ -97,3 +97,53 @@ class TestProjectMrpIntegration(TransactionCase):
             "sale_line_id": so.order_line[0].id})
         self.assertEqual(mo.project_task_id, job,
                          "an MO traced to a sale that has a job must back-link")
+
+    # --- B2: cost rollup is non-zero on a costed MO -------------------------
+    def test_b2_cost_rollup(self):
+        self.fp.standard_price = 250.0
+        task = self.env["project.task"].create(
+            {"name": "Cost Job", "project_id": self.project.id})
+        mo = self._make_mo()
+        mo.product_qty = 2.0
+        mo.project_task_id = task.id
+        task.invalidate_recordset()
+        # estimated = standard_price * qty = 250 * 2 = 500 (non-zero even uncosted)
+        self.assertEqual(task.job_estimated_cost, 500.0)
+        # actual industrial cost: costing module absent in test -> 0, no error
+        self.assertEqual(task.job_industrial_cost, 0.0)
+
+    # --- B3: at-risk + accurate aggregate -----------------------------------
+    def test_b3_at_risk_and_aggregate(self):
+        task = self.env["project.task"].create(
+            {"name": "Risk Job", "project_id": self.project.id})
+        mo = self._make_mo()
+        mo.action_confirm()            # confirmed; components not reserved
+        mo.project_task_id = task.id
+        task.invalidate_recordset()
+        self.assertNotEqual(task.components_available, "ready")
+        self.assertTrue(task.job_at_risk)
+        self.assertIn("waiting on components", task.job_risk_reason)
+        self.assertIn("Confirmed", task.mo_state_summary)   # readable, not a count
+
+    # --- B4: ECO soft-reference never crashes when southbrook.eco absent ----
+    def test_b4_eco_soft(self):
+        task = self.env["project.task"].create(
+            {"name": "ECO Job", "project_id": self.project.id})
+        self._make_mo().project_task_id = task.id
+        task.invalidate_recordset()
+        self.assertEqual(task.eco_count, 0)
+        self.assertEqual(task.eco_pending_count, 0)
+
+    # --- B5: stage <-> MO divergence is flagged -----------------------------
+    def test_b5_stage_divergence(self):
+        finishing = self.env["project.task.type"].create(
+            {"name": "Finishing", "project_ids": [(4, self.project.id)]})
+        task = self.env["project.task"].create({
+            "name": "Stage Job", "project_id": self.project.id,
+            "stage_id": finishing.id})
+        mo = self._make_mo()
+        mo.action_confirm()            # confirmed, not "started"
+        mo.project_task_id = task.id
+        task.invalidate_recordset()
+        self.assertTrue(task.stage_mo_divergence)
+        self.assertIn("Finishing", task.stage_mo_note)

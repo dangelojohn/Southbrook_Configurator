@@ -7,42 +7,64 @@
         <field name="inherit_id" ref="project.view_task_form2"/>
         <field name="arch" type="xml">
 
-            <!-- Smart button: how many MOs make up this job. -->
+            <!-- Smart buttons: MOs (B6) + ECOs (B4) -->
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button class="oe_stat_button" type="object"
                         name="action_view_productions" icon="fa-wrench"
                         invisible="production_count == 0">
-                    <field name="production_count" widget="statinfo"
-                           string="MOs"/>
+                    <field name="production_count" widget="statinfo" string="MOs"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_view_ecos" icon="fa-exchange"
+                        invisible="eco_count == 0">
+                    <field name="eco_count" widget="statinfo" string="ECOs"/>
                 </button>
             </xpath>
 
-            <!-- Read-only build status the PM reads at a glance. -->
+            <!-- B3/B4/B5: risk / spec-change / stage-divergence banners -->
+            <xpath expr="//div[@name='button_box']" position="after">
+                <div class="alert alert-danger" role="alert"
+                     invisible="not job_at_risk">
+                    <strong>At risk: </strong>
+                    <field name="job_risk_reason" nolabel="1" class="oe_inline"/>
+                </div>
+                <div class="alert alert-warning" role="alert"
+                     invisible="eco_pending_count == 0">
+                    <strong>Spec change in flight: </strong>
+                    <field name="eco_pending_count" nolabel="1" class="oe_inline"/>
+                    pending engineering change(s) on this job's BoMs.
+                </div>
+                <div class="alert alert-warning" role="alert"
+                     invisible="not stage_mo_divergence">
+                    <field name="stage_mo_note" nolabel="1" class="oe_inline"/>
+                </div>
+            </xpath>
+
+            <!-- B1: the accountable PM -->
             <xpath expr="//field[@name='user_ids']" position="after">
-                <field name="components_available"
-                       widget="badge"
+                <field name="pm_id" widget="many2one_avatar_user"/>
+
+                <!-- B3: build status, read-only, from mrp/stock -->
+                <field name="components_available" widget="badge"
                        decoration-success="components_available == 'ready'"
                        decoration-warning="components_available == 'partial'"
                        decoration-danger="components_available == 'waiting'"
                        invisible="production_count == 0"/>
-                <field name="mo_state_summary"
-                       invisible="production_count == 0"/>
-                <field name="mo_reference"
-                       invisible="production_count == 0"/>
-                <field name="mo_product_summary"
-                       invisible="production_count == 0"/>
-                <field name="job_industrial_cost"
-                       invisible="production_count == 0"/>
+                <field name="mo_state_summary" invisible="production_count == 0"/>
+                <field name="mo_reference" invisible="production_count == 0"/>
+                <field name="mo_product_summary" invisible="production_count == 0"/>
+
+                <!-- B2: cost (actual + estimated) -->
                 <field name="company_currency_id" column_invisible="1"/>
-                <field name="job_install_due"
-                       invisible="not job_install_due"/>
-                <field name="job_cad_status"
-                       invisible="not job_cad_status"/>
-                <field name="job_next_action"
-                       invisible="not job_next_action"/>
+                <field name="job_industrial_cost" invisible="production_count == 0"/>
+                <field name="job_estimated_cost" invisible="production_count == 0"/>
+
+                <field name="job_install_due" invisible="not job_install_due"/>
+                <field name="job_cad_status" invisible="not job_cad_status"/>
+                <field name="job_next_action" invisible="not job_next_action"/>
             </xpath>
 
-            <!-- Manufacturing page: the job's MOs + the manual link action. -->
+            <!-- B6: Manufacturing page — the job's MOs (rows open the MO) -->
             <xpath expr="//notebook" position="inside">
                 <page name="manufacturing" string="Manufacturing"
                       groups="mrp.group_mrp_user">
@@ -60,12 +82,33 @@
                             <field name="state" widget="badge"/>
                             <field name="reservation_state" widget="badge"
                                    optional="show"/>
-                            <field name="date_start" optional="hide"/>
+                            <field name="date_deadline" optional="show"/>
                         </list>
                     </field>
                 </page>
             </xpath>
 
+        </field>
+    </record>
+
+    <!-- B3 (ideal): flag at-risk / ECO jobs on the Kanban card. -->
+    <record id="project_task_kanban_mrp" model="ir.ui.view">
+        <field name="name">project.task.kanban.southbrook.mrp</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//templates" position="before">
+                <field name="job_at_risk"/>
+                <field name="eco_pending_count"/>
+                <field name="components_available"/>
+            </xpath>
+            <xpath expr="//footer" position="inside">
+                <span class="badge text-bg-danger ms-1" t-if="record.job_at_risk.raw_value"
+                      title="At risk">At risk</span>
+                <span class="badge text-bg-warning ms-1"
+                      t-if="record.eco_pending_count.raw_value &gt; 0"
+                      title="Pending ECO">ECO</span>
+            </xpath>
         </field>
     </record>
 

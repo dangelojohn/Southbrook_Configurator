@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// B7 — guarantee the full cabinetry pipeline (5 stages: Design & Quote →
+// Cutting & Machining → Assembly → Finishing → Delivery & Install) renders
+// side-by-side at desktop widths. Reinforces southbrook_project's responsive
+// kanban with a tighter min so 5 columns fit down to ~1100px with no
+// horizontal scroll, while staying readable. Scoped to project.task only.
+.o_kanban_view.o_kanban_project_task {
+    @media (min-width: 1100px) {
+        .o_kanban_group {
+            flex: 1 1 0;
+            min-width: 200px;   // 5 × 200 = 1000px fits inside 1100px
+            max-width: 340px;   // don't get absurdly wide on an empty board
+        }
+        .o_kanban_renderer { overflow-x: auto; }  // scroll only if it truly can't fit
+    }
+}
