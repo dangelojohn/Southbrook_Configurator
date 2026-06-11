@@ -1035,6 +1035,18 @@ class ZoneGroup extends Component {
                                   line="line"
                                   onSaved="props.onLineSaved"/>
                 </t>
+                <!-- Phase 3 Sprint C1 — per-zone inline add-line.
+                     Click opens the catalog modal with the picker pre-
+                     filtered to the zone's family. Lets dealers grow a
+                     specific zone without scrolling back to the top
+                     "Add Another Cabinet" button. -->
+                <div class="o_owl_zone_add"
+                     t-on-click.stop="() => props.onAddToZone(props.zone.code)">
+                    <button class="o_owl_zone_add_btn"
+                            t-att-aria-label="'Add cabinet to ' + props.zone.label">
+                        + Add to <t t-esc="props.zone.label"/>
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -1045,6 +1057,7 @@ class ZoneGroup extends Component {
         selectedLineId: { type: [Number, { value: null }], optional: true },
         onSelectLine: Function,
         onLineSaved: Function,
+        onAddToZone: Function,
     };
 
     setup() {
@@ -1597,6 +1610,12 @@ class CatalogPicker extends Component {
         // 2026-06-02 — channel pricelist label for the optional
         // channel-pricing badge. Empty string for retail walk-in.
         channelLabel: { type: String, optional: true },
+        // Phase 3 Sprint C1 — when set to a zone code (base_run,
+        // wall, tall, etc.) the picker pre-filters to the matching
+        // family group on open. null means show everything.
+        zoneFilter: {
+            type: [String, { value: null }], optional: true,
+        },
     };
 
     // Module-level helpers exposed as instance fields so the template
@@ -1662,6 +1681,31 @@ class CatalogPicker extends Component {
         this._onBackdropClick = this._onBackdropClick.bind(this);
         this._onSearch = this._onSearch.bind(this);
         this._resetFilters = this._resetFilters.bind(this);
+
+        // Phase 3 Sprint C1 — react to zoneFilter prop changes.
+        // When OrderBuilder opens the picker with a zone pre-filter
+        // (e.g. user clicked "+ Add to Wall"), pre-select the matching
+        // category tab so the first cards the user sees are wall
+        // cabinets. Falls back to "All" for unknown / null zones.
+        const initial = this._zoneToCategory(this.props.zoneFilter);
+        if (initial) this.state.activeCategory = initial;
+    }
+
+    /** Phase 3 Sprint C1 — map a zone code to a CatalogPicker category
+     *  name. Returns null when the zone doesn't translate (the
+     *  catalog stays unfiltered). The category names match what
+     *  catalog items declare as item.category in
+     *  kitchen_planner_state's response. */
+    _zoneToCategory(zoneCode) {
+        if (!zoneCode) return null;
+        const map = {
+            base_run: "Base",
+            wall:     "Wall",
+            tall:     "Tall",
+            island:   "Base",
+            accessory:"Accessory",
+        };
+        return map[zoneCode] || null;
     }
 
     // ------------------------------------------------------------------
@@ -1924,6 +1968,7 @@ const TEMPLATE = xml`
                            open="state.ui.catalog_open"
                            busy="state.catalog_busy"
                            channelLabel="state.channel_label"
+                           zoneFilter="state.ui.catalog_zone_filter"
                            onClose="_closeCatalog"
                            onPick="_onPickCabinet"/>
 
@@ -1987,7 +2032,8 @@ const TEMPLATE = xml`
                                lines="_linesForZone(zone.code)"
                                selectedLineId="state.ui.selected_line_id"
                                onSelectLine="_setSelectedLine"
-                               onLineSaved="_onLineSaved"/>
+                               onLineSaved="_onLineSaved"
+                               onAddToZone="_onAddToZone"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
@@ -2162,6 +2208,12 @@ class OrderBuilder extends Component {
                 selected_line_id: null,
                 // G11 — modal visibility.
                 catalog_open: false,
+                // Phase 3 Sprint C1 — when the user clicks "+ Add to
+                // <zone>", we stash the zone code here so the
+                // CatalogPicker can pre-filter to the matching
+                // family group. Cleared by the top-level Browse
+                // Catalog button so it shows everything.
+                catalog_zone_filter: null,
             },
         });
         // Pre-bind handler methods to this. OWL's template compiler
@@ -2262,8 +2314,21 @@ class OrderBuilder extends Component {
     }
 
     _openCatalog() {
+        // Clear any zone pre-filter from a previous "+ Add to <zone>"
+        // click so a top-level Browse Catalog action sees everything.
+        this.state.ui.catalog_zone_filter = null;
         this.state.ui.catalog_open = true;
     }
+
+    // Phase 3 Sprint C1 — per-zone inline add-line entry point.
+    // Pre-filters the CatalogPicker to the matching family group when
+    // possible (base_run -> base/sink/corner, wall -> wall, tall ->
+    // tall/pantry, island -> base/island). Falls back to opening the
+    // full catalog when the zone has no clear family mapping.
+    _onAddToZone = (zoneCode) => {
+        this.state.ui.catalog_zone_filter = zoneCode || null;
+        this.state.ui.catalog_open = true;
+    };
 
     _closeCatalog() {
         if (!this.state.catalog_busy) {

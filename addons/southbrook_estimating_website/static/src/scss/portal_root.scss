@@ -553,6 +553,35 @@
     }
 }
 
+// Phase 3 Sprint C1 — per-zone inline "+ Add to <zone>" CTA.
+.o_owl_zone_add {
+    margin-top: 4px;
+    padding: 6px 12px;
+    text-align: center;
+}
+
+.o_owl_zone_add_btn {
+    background: transparent;
+    border: 1px dashed var(--sb-rule);
+    color: var(--sb-walnut);
+    padding: 6px 18px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+
+    &:hover {
+        background: var(--sb-linen);
+        border-color: var(--sb-walnut);
+        border-style: solid;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-walnut);
+        outline-offset: 2px;
+    }
+}
+
 // Phase 3 Sprint C3 — version-history chain timeline.
 .o_owl_history_chain {
     list-style: none;
