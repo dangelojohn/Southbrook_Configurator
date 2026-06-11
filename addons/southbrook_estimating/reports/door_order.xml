@@ -41,12 +41,19 @@
                   <th>Series</th>
                   <th>Door Style</th>
                   <th>Finish</th>
-                  <th>Qty</th>
-                  <th>Width</th>
-                  <th>Height</th>
+                  <th>Hinge</th>
+                  <th class="sb-right">Doors</th>
+                  <th class="sb-right">W (mm)</th>
+                  <th class="sb-right">H (mm)</th>
                 </tr>
               </thead>
               <tbody>
+                <!-- Phase 4 Sprint 4 — door order rows now use the
+                     B2 sb_width_mm + sb_door_count fields on the line
+                     for accurate door specs even on demo orders without
+                     a configurator session. Height comes from a small
+                     family heuristic since the door height equals the
+                     cabinet inside height minus reveals. -->
                 <tr t-foreach="o.order_line" t-as="line">
                   <td t-out="line.product_id.display_name or line.name"/>
                   <td>
@@ -67,15 +74,29 @@
                           lambda v: v.attribute_id.name == 'Finish')"/>
                     <span t-out="fn[:1].name or '—'"/>
                   </td>
-                  <td t-out="line.product_uom_qty"/>
                   <td>
-                    <t t-set="w"
+                    <t t-set="hs"
                        t-value="line.product_id.product_template_attribute_value_ids.filtered(
-                          lambda v: v.attribute_id.name == 'Width')"/>
-                    <span t-out="w[:1].name or '—'"/>
+                          lambda v: v.attribute_id.name == 'Hinge Side')"/>
+                    <span t-out="hs[:1].name or '—'"/>
                   </td>
-                  <td class="sb-muted">
-                    Variable
+                  <td class="sb-right" t-out="line.sb_door_count or 0"/>
+                  <td class="sb-right">
+                    <t t-if="line.sb_width_mm">
+                      <span t-out="'%.0f' % line.sb_width_mm"/>
+                    </t>
+                    <t t-else=""><span class="sb-muted">—</span></t>
+                  </td>
+                  <td class="sb-right">
+                    <!-- Heuristic family→height: base=720, wall=760,
+                         tall=2100. The B2 derivation picks the matching
+                         default; we re-derive here from line.name since
+                         the height isn't a separate field on the line. -->
+                    <t t-set="nm" t-value="(line.name or '').lower()"/>
+                    <t t-if="'wall' in nm"><span>760</span></t>
+                    <t t-elif="'tall' in nm or 'pantry' in nm"><span>2100</span></t>
+                    <t t-elif="line.sb_width_mm"><span>720</span></t>
+                    <t t-else=""><span class="sb-muted">—</span></t>
                   </td>
                 </tr>
               </tbody>
@@ -83,10 +104,37 @@
 
             <hr class="sb-rule"/>
 
+            <!-- Phase 4 Sprint 4 — series totals footer for batched
+                 supplier ordering. The supplier groups by series since
+                 each series has its own door catalog + ordering form. -->
+            <t t-set="series_totals" t-value="{}"/>
+            <t t-foreach="o.order_line" t-as="ln">
+              <t t-set="sv"
+                 t-value="ln.product_id.product_template_attribute_value_ids.filtered(
+                    lambda v: v.attribute_id.name == 'Series')[:1].name or 'Unknown'"/>
+              <t t-set="cur" t-value="series_totals.get(sv, 0)"/>
+              <t t-set="series_totals" t-value="dict(series_totals, **{sv: cur + (ln.sb_door_count or 0)})"/>
+            </t>
+
+            <h3>Doors by Series</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Series</th>
+                  <th class="sb-right">Total Doors</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr t-foreach="series_totals.items()" t-as="row">
+                  <td t-out="row[0]"/>
+                  <td class="sb-right" t-out="row[1]"/>
+                </tr>
+              </tbody>
+            </table>
+
             <p class="sb-muted">
-              Door Order data is per-SO in Phase 1. Multi-order aggregation
-              (the original workbook's batched supplier-ordering pattern)
-              becomes a separate report or wizard in Phase 2.
+              Per-SO scope. Multi-order aggregation across all open
+              SOs (batched supplier ordering) is a separate report.
             </p>
           </div>
         </t>
