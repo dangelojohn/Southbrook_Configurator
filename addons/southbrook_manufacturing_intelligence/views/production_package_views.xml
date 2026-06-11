@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sb_production_package_form_mi" model="ir.ui.view">
+        <field name="name">sb.production.package.form.manufacturing.intelligence</field>
+        <field name="model">sb.production.package</field>
+        <field name="inherit_id" ref="southbrook_kitchen_mrp.view_sb_production_package_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group[1]" position="after">
+                <notebook>
+                    <page name="manufacturing_intelligence" string="Intelligence">
+                        <button name="action_recompute_manufacturing_intelligence"
+                                string="Recompute Intelligence"
+                                type="object"
+                                class="btn-primary"/>
+                        <group>
+                            <group>
+                                <field name="x_mi_status"
+                                       widget="badge"
+                                       decoration-success="x_mi_status == 'ok'"
+                                       decoration-warning="x_mi_status == 'review'"
+                                       decoration-danger="x_mi_status == 'blocked'"/>
+                                <field name="x_mi_next_action"/>
+                                <field name="x_mi_install_warning_count"/>
+                            </group>
+                            <group>
+                                <field name="x_mi_blocker_count"/>
+                                <field name="x_mi_warning_count"/>
+                                <field name="x_mi_yield_pct"/>
+                                <field name="x_mi_waste_area_m2"/>
+                                <field name="x_mi_edge_band_m"/>
+                            </group>
+                        </group>
+                        <field name="x_mi_check_ids" readonly="1">
+                            <list>
+                                <field name="severity"/>
+                                <field name="category"/>
+                                <field name="name"/>
+                                <field name="message"/>
+                                <field name="recommendation"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+</odoo>
