@@ -216,6 +216,38 @@ class TestManufacturingIntelligenceEngine(TransactionCase):
         self.assertEqual(batch[0]["severity"], "info")
         self.assertEqual(batch[0]["category"], "cut")
 
+    def test_edgeband_checks_warn_on_malformed_edge_config(self):
+        Engine = self.env["southbrook.mi.engine"]
+        checks = Engine._edgeband_checks_from_panels(
+            [
+                {
+                    "panel_name": "Door",
+                    "qty": 1,
+                    "length_mm": 700,
+                    "width_mm": 400,
+                    "thickness_mm": 19,
+                    "edge_banding_config": "{bad json",
+                }
+            ],
+            {"edge_band_m": 2.2},
+        )
+        malformed = [
+            check for check in checks if check["name"] == "Edge banding config review"
+        ]
+        self.assertEqual(len(malformed), 1)
+        self.assertEqual(malformed[0]["stage"], "edgeband")
+        self.assertEqual(malformed[0]["severity"], "warning")
+
+    def test_edgeband_checks_info_for_high_edge_band_length(self):
+        Engine = self.env["southbrook.mi.engine"]
+        checks = Engine._edgeband_checks_from_panels([], {"edge_band_m": 45.0})
+        staging = [
+            check for check in checks if check["name"] == "Edge band material staging"
+        ]
+        self.assertEqual(len(staging), 1)
+        self.assertEqual(staging[0]["stage"], "edgeband")
+        self.assertEqual(staging[0]["severity"], "info")
+
     def test_assembly_checks_from_panels(self):
         Engine = self.env["southbrook.mi.engine"]
         checks = Engine._assembly_checks_from_panels(

@@ -166,6 +166,47 @@ class SouthbrookMiEngine(models.AbstractModel):
         return total
 
     @api.model
+    def _edge_config_needs_review(self, config):
+        if not config:
+            return False
+        if isinstance(config, str):
+            try:
+                json.loads(config)
+            except json.JSONDecodeError:
+                return True
+        return False
+
+    @api.model
+    def _edgeband_checks_from_panels(self, panels, summary):
+        checks = []
+        for panel in panels:
+            if self._edge_config_needs_review(panel.get("edge_banding_config")):
+                checks.append(
+                    {
+                        **self._stage_values("edgeband", 30),
+                        "name": "Edge banding config review",
+                        "severity": "warning",
+                        "category": "cut",
+                        "message": "%s has malformed edge-banding data."
+                        % (panel.get("panel_name") or "Panel"),
+                        "recommendation": "Confirm required edges before running the edgebander.",
+                    }
+                )
+        edge_band_m = (summary or {}).get("edge_band_m") or 0.0
+        if edge_band_m >= 40.0:
+            checks.append(
+                {
+                    **self._stage_values("edgeband", 30, is_gate=False),
+                    "name": "Edge band material staging",
+                    "severity": "info",
+                    "category": "cut",
+                    "message": "Package requires %.1f m of edge banding." % edge_band_m,
+                    "recommendation": "Stage matching banding coil, adhesive, and cleanup before edgebanding.",
+                }
+            )
+        return checks
+
+    @api.model
     def _cut_checks_from_panels(self, panels, summary):
         checks = []
         sheet_width, sheet_height = self._sheet_dimensions_mm()
@@ -542,6 +583,9 @@ class SouthbrookMiEngine(models.AbstractModel):
                 check["production_package_id"] = package.id
                 self._create_check(check)
             for check in self._cut_batching_checks_from_summary(summary):
+                check["production_package_id"] = package.id
+                self._create_check(check)
+            for check in self._edgeband_checks_from_panels(panels, summary):
                 check["production_package_id"] = package.id
                 self._create_check(check)
             for check in self._assembly_checks_from_panels(panels):
