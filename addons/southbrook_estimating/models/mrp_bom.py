@@ -53,6 +53,41 @@ TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity"})
 class MrpBom(models.Model):
     _inherit = "mrp.bom"
 
+    # ------------------------------------------------------------------
+    # Cut-spec seam (PLM hook point).
+    #
+    # southbrook_plm.mrp_bom._get_cut_constants overrides this method
+    # to read the active southbrook.cut.spec record. When no spec is
+    # active, super() (this method) returns the NF14 baseline that
+    # ships with the estimating addon — keeping the spec-less install
+    # behaving exactly as it did pre-PLM.
+    #
+    # Per memory southbrook_plm_deploy, this is load-bearing
+    # infrastructure: removing the seam causes
+    # `AttributeError: 'super' object has no attribute '_get_cut_constants'`
+    # on every BoM operation in any DB with southbrook_plm installed.
+    # Restored 2026-06-11 after a refactor in a parallel session
+    # silently dropped the method.
+    # ------------------------------------------------------------------
+    @api.model
+    def _get_cut_constants(self):
+        """Return the geometric constants used by panel-dimension math.
+
+        Keys match the NF14 baseline + the southbrook.cut.spec model's
+        constants_dict() output. Floats throughout (mm units except the
+        last shelf gap pair which are already in mm).
+        """
+        return {
+            "box_th": BOX_TH,
+            "back_th": BACK_TH,
+            "rabbet": RABBET,
+            "door_th": DOOR_TH,
+            "door_reveal": DOOR_REVEAL,
+            "shelf_tol": SHELF_TOL,
+            "shelf_vent_gap": SHELF_VENT_GAP,
+            "toekick_h": TOEKICK_H,
+        }
+
     southbrook_lead_time_extra = fields.Float(
         string="Southbrook Lead-Time Extra (days)",
         compute="_compute_southbrook_lead_time_extra",
@@ -183,20 +218,35 @@ class MrpBom(models.Model):
               'hinge_pair_count', 'handle_count', 'drawer_slide_pair_count': integers
               'edge_banding_length_mm': integer, Phase-1 scalar perimeter sum
         """
-        inside_width = width_mm - 2 * BOX_TH
+        # Phase-3 follow-up — read constants via the seam method so
+        # southbrook_plm's active cut-spec flows into the math.
+        # Without this indirection, ECO-applied spec changes (e.g.
+        # DOOR_REVEAL 3.0 -> 5.0) leave the panel dimensions stuck at
+        # the module-level defaults. The seam is contractual per
+        # [[southbrook_plm_deploy]]; this resolves the test gap.
+        c = self._get_cut_constants()
+        box_th = c["box_th"]
+        back_th = c["back_th"]
+        rabbet = c["rabbet"]
+        door_th = c["door_th"]
+        door_reveal = c["door_reveal"]
+        shelf_tol = c["shelf_tol"]
+        shelf_vent_gap = c["shelf_vent_gap"]
+
+        inside_width = width_mm - 2 * box_th
 
         # ---- Side panels (L and R) — full height + depth.
-        side_L = (height_mm, depth_mm, BOX_TH)
-        side_R = (height_mm, depth_mm, BOX_TH)
+        side_L = (height_mm, depth_mm, box_th)
+        side_R = (height_mm, depth_mm, box_th)
 
         # ---- Top + bottom panels — capture between sides (frameless).
-        top = (inside_width, depth_mm, BOX_TH)
-        bottom = (inside_width, depth_mm, BOX_TH)
+        top = (inside_width, depth_mm, box_th)
+        bottom = (inside_width, depth_mm, box_th)
 
         # ---- Back panel — captures into rabbet on side/top/bottom.
-        back_l = inside_width + 2 * RABBET
-        back_w = (height_mm - 2 * BOX_TH) + 2 * RABBET
-        back = (back_l, back_w, BACK_TH)
+        back_l = inside_width + 2 * rabbet
+        back_w = (height_mm - 2 * box_th) + 2 * rabbet
+        back = (back_l, back_w, back_th)
 
         # ---- Shelf — quantity from height heuristic per NF14.
         if height_mm <= 600:
@@ -205,22 +255,22 @@ class MrpBom(models.Model):
             shelf_count = 2
         else:
             shelf_count = 3
-        shelf_l = inside_width - SHELF_TOL
-        shelf_w = depth_mm - BACK_TH - RABBET - SHELF_VENT_GAP
-        shelf = (shelf_l, shelf_w, BOX_TH) if shelf_count > 0 else None
+        shelf_l = inside_width - shelf_tol
+        shelf_w = depth_mm - back_th - rabbet - shelf_vent_gap
+        shelf = (shelf_l, shelf_w, box_th) if shelf_count > 0 else None
 
         # ---- Door — sized from door_count and reveal.
         if door_count == 1:
             door = (
-                height_mm - 2 * DOOR_REVEAL,
-                width_mm - 2 * DOOR_REVEAL,
-                DOOR_TH,
+                height_mm - 2 * door_reveal,
+                width_mm - 2 * door_reveal,
+                door_th,
             )
         elif door_count == 2:
             door = (
-                height_mm - 2 * DOOR_REVEAL,
-                (width_mm - 3 * DOOR_REVEAL) / 2,
-                DOOR_TH,
+                height_mm - 2 * door_reveal,
+                (width_mm - 3 * door_reveal) / 2,
+                door_th,
             )
         else:
             door = None
