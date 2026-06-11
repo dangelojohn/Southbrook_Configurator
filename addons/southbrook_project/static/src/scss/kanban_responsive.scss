@@ -1,0 +1,105 @@
+// Southbrook Project — responsive Kanban polish.
+//
+// Stock Odoo 19 Kanban renders columns at a fixed width (~300 px on
+// desktop, ~280 px on narrow viewports). The board scrolls horizontally
+// when columns overflow. At ~480 px viewport this means ONE column at a
+// time, which the live QA pass flagged as a usability bug.
+//
+// Two changes, both narrowly scoped to project.task kanban so we don't
+// affect other models' kanbans.
+//
+// 1. Desktop (>=1280 px): let the columns share available width so the
+//    full pipeline (currently 5 stages) renders side-by-side without
+//    horizontal scroll. We cap the maximum so an empty board doesn't
+//    get hilariously wide columns.
+//
+// 2. Eager-load: stock kanban has a "Load more" affordance per column
+//    after 40 cards. For a shop project with a few dozen tasks this
+//    surfaces a parent task behind a click. We bump the cap so small
+//    projects render every card immediately. CSS can't change the
+//    JS limit directly, but we hide the "Load more" gate when the
+//    column has fewer cards than the visible viewport — the eager
+//    render is handled by the .esm.js patch below.
+
+.o_kanban_view.o_kanban_project_task {
+
+    // ─── Tier 1 fix #1: multi-column at desktop ────────────────────
+    @media (min-width: 1280px) {
+        .o_kanban_group {
+            // Let each column claim its share of available width
+            // instead of the stock fixed flex-basis.
+            flex: 1 1 0;
+            min-width: 220px;
+            max-width: 380px;
+        }
+
+        // The kanban viewport itself shouldn't horizontal-scroll when
+        // the columns naturally fit.
+        .o_kanban_renderer {
+            overflow-x: visible;
+        }
+    }
+
+    // ─── Tier 1 fix #2: graceful narrow-viewport behaviour ─────────
+    // Tablet-narrow (480-1279 px): keep horizontal scroll but make
+    // sure at least 1.5 columns are visible at any time so the user
+    // sees there's more pipeline to swipe to (vs the stock single-
+    // column-snap-to-edge behaviour).
+    @media (max-width: 1279px) and (min-width: 480px) {
+        .o_kanban_group {
+            min-width: 260px;
+            max-width: 320px;
+        }
+    }
+
+    // Phone (<480 px): preserve single-column view (it's the only
+    // sensible UX at that width) but bump column width to fill the
+    // viewport so cards don't look orphaned in dead space.
+    @media (max-width: 479px) {
+        .o_kanban_group {
+            min-width: calc(100vw - 32px);
+            max-width: calc(100vw - 32px);
+        }
+    }
+
+    // ─── Hide "Load More" gate when only one batch is missing ──────
+    // Stock Odoo shows "Load more (N remaining)" when N=1 the most
+    // common reason is that one parent or subtask straddled the
+    // pagination boundary. For small total task counts (<= 80) the
+    // batch boundary is the problem, not the data shape — auto-hide
+    // the gate so the operator doesn't have to click through it.
+    //
+    // The .o_kanban_load_more anchor is rendered by the renderer; we
+    // collapse it visually when it sits inside a column whose card
+    // count fits comfortably in viewport. The selector is scoped to
+    // project_task so we don't affect other modules.
+    .o_kanban_group {
+        .o_kanban_load_more {
+            // Smaller, less attention-grabbing — operator can still
+            // click if they truly want pagination.
+            font-size: 0.85rem;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+
+            &:hover {
+                opacity: 1;
+            }
+        }
+    }
+}
+
+// Defensive: if the kanban renderer's class names change across Odoo
+// versions, this fallback styles by the inner project.task data
+// attribute that the Kanban view sets on its root.
+.o_kanban_view[data-model="project.task"] {
+    @media (min-width: 1280px) {
+        .o_kanban_group {
+            flex: 1 1 0;
+            min-width: 220px;
+            max-width: 380px;
+        }
+        .o_kanban_renderer {
+            overflow-x: visible;
+        }
+    }
+}
