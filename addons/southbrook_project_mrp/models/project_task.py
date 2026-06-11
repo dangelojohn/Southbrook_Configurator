@@ -87,6 +87,24 @@ class ProjectTask(models.Model):
     stage_mo_note = fields.Char(
         string="Stage/MO Note", compute="_compute_stage_coherence")
 
+    # --- TASK 4: Crew indicator --------------------------------------------
+    crew_summary = fields.Char(
+        string="Crew (from MOs + WOs)",
+        compute="_compute_crew",
+        help="Unique users assigned across the job's MOs (Responsible) "
+             "and work orders (working_user_ids / last_working_user_id). "
+             "Read-only; no auto-assignment.")
+    unassigned_mo_count = fields.Integer(
+        string="# Unassigned MOs", compute="_compute_crew",
+        help="MOs whose user_id (Responsible) is blank.")
+    unassigned_workorder_count = fields.Integer(
+        string="# Unassigned WOs", compute="_compute_crew",
+        help="Work orders with no working_user_ids AND no "
+             "last_working_user_id — i.e. nobody has ever touched them.")
+    crew_gap = fields.Boolean(
+        string="Crew Gap", compute="_compute_crew",
+        help="At least one MO or WO has no operator assigned.")
+
     # --- TASK 3: Work-center load summary ----------------------------------
     workcenter_load_summary = fields.Text(
         string="Workcenter Load",
@@ -261,6 +279,35 @@ class ProjectTask(models.Model):
             else:
                 task.workorder_summary = (
                     "%d WOs / %d not scheduled" % (len(wos), len(unscheduled)))
+
+    # --- TASK 4: Crew compute ----------------------------------------------
+    @api.depends("production_ids", "production_ids.user_id",
+                 "production_ids.workorder_ids",
+                 "production_ids.workorder_ids.working_user_ids",
+                 "production_ids.workorder_ids.last_working_user_id")
+    def _compute_crew(self):
+        for task in self:
+            mos = task.production_ids
+            wos = mos.mapped("workorder_ids")
+            crew = self.env["res.users"]
+            crew |= mos.mapped("user_id")
+            crew |= wos.mapped("working_user_ids")
+            crew |= wos.mapped("last_working_user_id")
+            # Filter to active internal users only (no bots / no portal).
+            crew = crew.filtered(
+                lambda u: u and not u.share and u.active)
+            unassigned_mos = mos.filtered(lambda m: not m.user_id)
+            unassigned_wos = wos.filtered(
+                lambda w: not w.working_user_ids
+                and not w.last_working_user_id)
+            task.unassigned_mo_count = len(unassigned_mos)
+            task.unassigned_workorder_count = len(unassigned_wos)
+            task.crew_gap = bool(unassigned_mos or unassigned_wos)
+            if not crew:
+                task.crew_summary = "" if not mos else "(no crew assigned)"
+            else:
+                task.crew_summary = ", ".join(
+                    sorted(crew.mapped("name")))
 
     # --- TASK 3: Work-center load compute ----------------------------------
     @api.depends("production_ids.workorder_ids.workcenter_id",

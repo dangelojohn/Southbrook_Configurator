@@ -114,6 +114,15 @@
                                nolabel="1" readonly="1"
                                widget="text"/>
                     </group>
+                    <!-- TASK 4: Crew indicator — who's assigned across MOs +
+                         WOs; flag any gaps. Read-only, no auto-assignment. -->
+                    <group string="Crew">
+                        <field name="crew_summary" readonly="1"/>
+                        <field name="crew_gap"
+                               widget="boolean_toggle" readonly="1"/>
+                        <field name="unassigned_mo_count" readonly="1"/>
+                        <field name="unassigned_workorder_count" readonly="1"/>
+                    </group>
                     <button type="object" name="action_view_workorders"
                             string="Open Work Orders View" class="btn-primary"/>
                     <field name="workorder_ids" readonly="1">
