@@ -87,6 +87,39 @@ class ProjectTask(models.Model):
     stage_mo_note = fields.Char(
         string="Stage/MO Note", compute="_compute_stage_coherence")
 
+    # --- TASK 5: Waste / variance rollup -----------------------------------
+    # All sums read from the existing x_sbk_* Kitchen Metrics fields on
+    # mrp.workorder. No costing engine — just aggregation across the
+    # job's WOs.
+    job_expected_min = fields.Float(
+        string="Expected (min)", compute="_compute_kitchen_metrics_rollup")
+    job_variance_min = fields.Float(
+        string="Duration Variance (min)",
+        compute="_compute_kitchen_metrics_rollup",
+        help="Σ x_sbk_variance_min across the job's work orders.")
+    job_actual_cost = fields.Monetary(
+        string="Actual Cost (from WOs)",
+        compute="_compute_kitchen_metrics_rollup",
+        currency_field="company_currency_id")
+    job_cost_variance = fields.Monetary(
+        string="Cost Variance",
+        compute="_compute_kitchen_metrics_rollup",
+        currency_field="company_currency_id")
+    job_rework_count = fields.Integer(
+        string="Rework Count",
+        compute="_compute_kitchen_metrics_rollup")
+    job_rework_cost = fields.Monetary(
+        string="Rework Cost",
+        compute="_compute_kitchen_metrics_rollup",
+        currency_field="company_currency_id")
+    job_downtime_min = fields.Float(
+        string="Downtime (min)",
+        compute="_compute_kitchen_metrics_rollup")
+    job_downtime_cost = fields.Monetary(
+        string="Downtime Cost",
+        compute="_compute_kitchen_metrics_rollup",
+        currency_field="company_currency_id")
+
     # --- TASK 4: Crew indicator --------------------------------------------
     crew_summary = fields.Char(
         string="Crew (from MOs + WOs)",
@@ -279,6 +312,35 @@ class ProjectTask(models.Model):
             else:
                 task.workorder_summary = (
                     "%d WOs / %d not scheduled" % (len(wos), len(unscheduled)))
+
+    # --- TASK 5: Kitchen Metrics rollup compute ----------------------------
+    # NB: The x_sbk_* Kitchen Metrics fields are added by a downstream
+    # module (southbrook_kitchen_workspace), which this bridge does NOT
+    # hard-depend on. @api.depends can only reference fields that exist
+    # at registry-build time; listing them here would fail to upgrade
+    # this bridge alone. Depend only on the workorder relation + state
+    # — the metrics get written when WOs finish, which also flips state,
+    # so the rollup re-fires at the right moments without a direct dep.
+    @api.depends("production_ids.workorder_ids",
+                 "production_ids.workorder_ids.state",
+                 "production_ids.workorder_ids.duration")
+    def _compute_kitchen_metrics_rollup(self):
+        for task in self:
+            wos = task.production_ids.mapped("workorder_ids")
+            # Defensive sums using getattr — the x_sbk_* metric fields are
+            # added by southbrook_kitchen_workspace; if uninstalled, the
+            # rollup degrades cleanly to 0 rather than crashing the form.
+            def _sum(field):
+                return sum(
+                    (getattr(w, field, 0.0) or 0.0) for w in wos)
+            task.job_expected_min = _sum("x_sbk_kitchen_expected_min")
+            task.job_variance_min = _sum("x_sbk_variance_min")
+            task.job_actual_cost = _sum("x_sbk_actual_cost")
+            task.job_cost_variance = _sum("x_sbk_cost_variance")
+            task.job_rework_count = int(_sum("x_sbk_rework_count"))
+            task.job_rework_cost = _sum("x_sbk_rework_cost")
+            task.job_downtime_min = _sum("x_sbk_downtime_min")
+            task.job_downtime_cost = _sum("x_sbk_downtime_cost")
 
     # --- TASK 4: Crew compute ----------------------------------------------
     @api.depends("production_ids", "production_ids.user_id",

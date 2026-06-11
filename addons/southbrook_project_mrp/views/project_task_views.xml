@@ -123,6 +123,24 @@
                         <field name="unassigned_mo_count" readonly="1"/>
                         <field name="unassigned_workorder_count" readonly="1"/>
                     </group>
+                    <!-- TASK 5: Waste / variance — read-only sums of the
+                         work-order Kitchen Metrics. No costing engine; just
+                         aggregation of fields the shop floor already
+                         records. -->
+                    <group string="Waste &amp; Variance (Σ across WOs)">
+                        <group>
+                            <field name="job_expected_min" readonly="1"/>
+                            <field name="job_variance_min" readonly="1"/>
+                            <field name="job_actual_cost" readonly="1"/>
+                            <field name="job_cost_variance" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="job_rework_count" readonly="1"/>
+                            <field name="job_rework_cost" readonly="1"/>
+                            <field name="job_downtime_min" readonly="1"/>
+                            <field name="job_downtime_cost" readonly="1"/>
+                        </group>
+                    </group>
                     <button type="object" name="action_view_workorders"
                             string="Open Work Orders View" class="btn-primary"/>
                     <field name="workorder_ids" readonly="1">
