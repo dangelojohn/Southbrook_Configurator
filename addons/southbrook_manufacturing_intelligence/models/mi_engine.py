@@ -10,6 +10,17 @@ class SouthbrookMiEngine(models.AbstractModel):
     _description = "Southbrook Manufacturing Intelligence Engine"
 
     @api.model
+    def _stage_values(self, stage, sequence, is_gate=True, workcenter=False):
+        values = {
+            "stage": stage,
+            "sequence": sequence,
+            "is_gate": is_gate,
+        }
+        if workcenter:
+            values["workcenter_id"] = workcenter.id
+        return values
+
+    @api.model
     def _status_from_severities(self, severities):
         if "blocker" in severities:
             return "blocked"

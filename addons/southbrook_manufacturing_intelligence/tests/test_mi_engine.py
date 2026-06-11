@@ -13,6 +13,20 @@ class TestManufacturingIntelligenceEngine(TransactionCase):
             Engine._status_from_severities(["warning", "blocker"]), "blocked"
         )
 
+    def test_stage_values_include_stage_gate_sequence_and_workcenter(self):
+        Engine = self.env["southbrook.mi.engine"]
+        workcenter = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        values = Engine._stage_values(
+            "saw",
+            10,
+            is_gate=True,
+            workcenter=workcenter,
+        )
+        self.assertEqual(values["stage"], "saw")
+        self.assertEqual(values["sequence"], 10)
+        self.assertTrue(values["is_gate"])
+        self.assertEqual(values["workcenter_id"], workcenter.id)
+
     def test_cut_summary(self):
         Engine = self.env["southbrook.mi.engine"]
         summary = Engine._compute_cut_summary(
