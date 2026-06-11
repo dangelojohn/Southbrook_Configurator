@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sbk_material_mrp_user,southbrook.kitchen.material mrp user,model_southbrook_kitchen_material,mrp.group_mrp_user,1,0,0,0
+access_sbk_material_mrp_manager,southbrook.kitchen.material mrp manager,model_southbrook_kitchen_material,mrp.group_mrp_manager,1,1,1,1
+access_sbk_finish_mrp_user,southbrook.kitchen.finish mrp user,model_southbrook_kitchen_finish,mrp.group_mrp_user,1,0,0,0
+access_sbk_finish_mrp_manager,southbrook.kitchen.finish mrp manager,model_southbrook_kitchen_finish,mrp.group_mrp_manager,1,1,1,1

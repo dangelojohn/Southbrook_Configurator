@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Two phases here.
+
+        1.  noupdate="0" block — APPLY kitchen-specific configuration
+            to the 12 existing Southbrook work centers shipped by
+            southbrook_mrp_pm. These records target by xml_id, so
+            re-running with noupdate=0 picks up the kitchen fields
+            cleanly without disturbing the upstream module's defaults
+            (name / code / capacity / cost are NOT overwritten).
+
+        2.  noupdate="1" block — CREATE the two new work centers the
+            brief calls out as missing (ENG01 + CNC02). noupdate=1 so
+            ops can edit them in the UI without the next install
+            stomping changes.
+
+        For each existing center we set station_type + bottleneck flag
+        + a few capability tags. We deliberately DO NOT set machine
+        codes / supported materials in this seed — those are PM
+        configuration concerns that vary per shop floor.
+    -->
+
+    <data noupdate="0">
+
+        <!-- Engineering / Design Review — NEW -->
+        <record id="wc_engineering" model="mrp.workcenter">
+            <field name="name">Design Review / Production Engineering</field>
+            <field name="code">ENG01</field>
+            <field name="active">True</field>
+            <field name="time_efficiency">100</field>
+            <field name="x_sbk_station_type">engineering</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+            <field name="x_sbk_active_for_kitchen" eval="True"/>
+            <field name="x_sbk_planning_notes">Validates CAD drawings, cutting lists, BoM readiness, and production notes before an MO is released. Owns the gate between sb.kitchen.project state 'approved' and 'in_production'.</field>
+        </record>
+
+        <!-- Backup CNC Router — NEW -->
+        <record id="wc_cnc_router_02" model="mrp.workcenter">
+            <field name="name">CNC Router 02 (Backup)</field>
+            <field name="code">CNC02</field>
+            <field name="active">True</field>
+            <field name="time_efficiency">100</field>
+            <field name="x_sbk_station_type">cnc</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="False"/>
+            <field name="x_sbk_active_for_kitchen" eval="True"/>
+            <field name="alternative_workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_cnc_bore')])]"/>
+            <field name="x_sbk_planning_notes">Alternative for CNC Boring (SB-CNC-BORE). Brought online when the primary is in changeover or maintenance.</field>
+        </record>
+
+        <!-- Apply kitchen station_type + bottleneck flags to the 12 existing -->
+
+        <record id="southbrook_mrp_pm.workcenter_saw" model="mrp.workcenter">
+            <field name="x_sbk_station_type">cutting</field>
+            <field name="x_sbk_is_bottleneck" eval="True"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="False"/>
+        </record>
+        <record id="southbrook_mrp_pm.workcenter_edge" model="mrp.workcenter">
+            <field name="x_sbk_station_type">edge_banding</field>
+            <field name="x_sbk_is_bottleneck" eval="True"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="False"/>
+        </record>
+        <record id="southbrook_mrp_pm.workcenter_cnc_bore" model="mrp.workcenter">
+            <field name="x_sbk_station_type">cnc</field>
+            <field name="x_sbk_is_bottleneck" eval="True"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="False"/>
+            <field name="alternative_workcenter_ids" eval="[(6, 0, [ref('wc_cnc_router_02')])]"/>
+        </record>
+        <record id="southbrook_mrp_pm.workcenter_assy" model="mrp.workcenter">
+            <field name="x_sbk_station_type">assembly</field>
+            <field name="x_sbk_is_bottleneck" eval="True"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+        </record>
+        <record id="southbrook_mrp_pm.workcenter_door" model="mrp.workcenter">
+            <field name="x_sbk_station_type">assembly</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+            <field name="x_sbk_planning_notes">Door hanging is treated as an assembly sub-station — separate from the carcass bay so the door / paint branch can converge here without blocking carcass throughput.</field>
+        </record>
+        <record id="southbrook_mrp_pm.workcenter_hw" model="mrp.workcenter">
+            <field name="x_sbk_station_type">hardware</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+        </record>
+        <record id="southbrook_mrp_pm.workcenter_qc" model="mrp.workcenter">
+            <field name="x_sbk_station_type">quality</field>
+            <field name="x_sbk_is_bottleneck" eval="True"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="False"/>
+        </record>
+        <record id="southbrook_mrp_pm.workcenter_pack" model="mrp.workcenter">
+            <field name="x_sbk_station_type">packing</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+        </record>
+        <record id="southbrook_mrp_pm.wc_door_shop" model="mrp.workcenter">
+            <field name="x_sbk_station_type">cnc</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+            <field name="x_sbk_planning_notes">Door Shop runs CNC profiling (raised-panel / shaker frames) on plywood and solid-wood blanks. Materially the 'CNC' station type even though it's branded as the door shop.</field>
+        </record>
+        <record id="southbrook_mrp_pm.wc_sand" model="mrp.workcenter">
+            <field name="x_sbk_station_type">sanding</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+        </record>
+        <record id="southbrook_mrp_pm.wc_paint" model="mrp.workcenter">
+            <field name="x_sbk_station_type">finishing</field>
+            <field name="x_sbk_is_bottleneck" eval="True"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="False"/>
+            <field name="x_sbk_planning_notes">Paint colour changeover is the dominant scheduling constraint — group like-colours into runs whenever possible. Cure / Dry Room (CURE) absorbs flow time post-booth.</field>
+        </record>
+        <record id="southbrook_mrp_pm.wc_cure" model="mrp.workcenter">
+            <field name="x_sbk_station_type">finishing</field>
+            <field name="x_sbk_is_bottleneck" eval="False"/>
+            <field name="x_sbk_allows_parallel_jobs" eval="True"/>
+            <field name="x_sbk_planning_notes">Cure / Dry Room is high-capacity by design — many panels in flight at once. Finish.cure_time_buffer_min drives how long each part stays here.</field>
+        </record>
+
+    </data>
+</odoo>

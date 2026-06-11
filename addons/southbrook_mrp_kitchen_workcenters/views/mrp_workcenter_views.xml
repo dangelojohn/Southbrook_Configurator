@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Extends the standard mrp.workcenter form with a "Kitchen
+        Configuration" notebook page. Existing x_mi_* and southbrook_pm_*
+        tiles shipped by upstream Southbrook modules stay where they
+        are; we add a separate tab so each module owns its own surface.
+    -->
+
+    <record id="view_mrp_workcenter_form_inherit_sbk" model="ir.ui.view">
+        <field name="name">mrp.workcenter.form.sbk.kitchen</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="inherit_id" ref="mrp.mrp_workcenter_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <notebook>
+                    <page string="Kitchen Configuration" name="sbk_kitchen">
+                        <group>
+                            <group string="Identity + Capability">
+                                <field name="x_sbk_station_type"/>
+                                <field name="x_sbk_machine_brand"/>
+                                <field name="x_sbk_machine_code"/>
+                                <field name="x_sbk_active_for_kitchen"/>
+                            </group>
+                            <group string="Constraint Posture">
+                                <field name="x_sbk_is_bottleneck"/>
+                                <field name="x_sbk_allows_parallel_jobs"/>
+                                <field name="x_sbk_oee_target" widget="percentage"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="Capacity Envelope">
+                                <field name="x_sbk_max_panel_length_mm"/>
+                                <field name="x_sbk_max_panel_width_mm"/>
+                                <field name="x_sbk_default_setup_time_min"/>
+                                <field name="x_sbk_changeover_time_min"/>
+                            </group>
+                            <group string="Capability Sets">
+                                <field name="x_sbk_supported_material_ids" widget="many2many_tags"/>
+                                <field name="x_sbk_supported_finish_ids" widget="many2many_tags"/>
+                                <field name="x_sbk_required_skill_ids" widget="many2many_tags"/>
+                            </group>
+                        </group>
+                        <group string="Planning Notes">
+                            <field name="x_sbk_planning_notes" nolabel="1"/>
+                        </group>
+                        <group string="Shop-Floor Notes">
+                            <field name="x_sbk_shop_floor_notes" nolabel="1"/>
+                        </group>
+                        <group string="Quality Notes">
+                            <field name="x_sbk_quality_notes" nolabel="1"/>
+                        </group>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_mrp_workcenter_list_inherit_sbk" model="ir.ui.view">
+        <field name="name">mrp.workcenter.list.sbk.kitchen</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="inherit_id" ref="mrp.mrp_workcenter_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="code" position="after">
+                <field name="x_sbk_station_type" optional="show"/>
+                <field name="x_sbk_is_bottleneck" optional="show"/>
+                <field name="x_sbk_active_for_kitchen" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_mrp_workcenter_search_inherit_sbk" model="ir.ui.view">
+        <field name="name">mrp.workcenter.search.sbk.kitchen</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="inherit_id" ref="mrp.view_mrp_workcenter_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <filter name="filter_sbk_active_for_kitchen" string="Kitchen Active"
+                        domain="[('x_sbk_active_for_kitchen', '=', True)]"/>
+                <filter name="filter_sbk_bottleneck" string="Bottlenecks"
+                        domain="[('x_sbk_is_bottleneck', '=', True)]"/>
+                <separator/>
+                <filter name="groupby_sbk_station_type" string="Station Type"
+                        context="{'group_by': 'x_sbk_station_type'}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

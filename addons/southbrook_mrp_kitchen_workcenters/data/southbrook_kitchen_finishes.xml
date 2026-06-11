@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        9 finish recipes Southbrook routes through the paint + cure
+        cycle. cure_time_buffer_min is how many minutes Cure / Dry Room
+        (workcenter CURE) holds the part after the booth. Painted
+        finishes need ~120 min flash-off + 240 min cure (~6 hrs total
+        through the booth + cure). Lacquered slightly less. Stained +
+        clear varies by clear-coat type — using the conservative 360 min
+        single-pass baseline.
+    -->
+
+    <record id="finish_raw" model="southbrook.kitchen.finish">
+        <field name="name">Raw / Unfinished</field>
+        <field name="code">raw</field>
+        <field name="sequence">10</field>
+        <field name="requires_sanding" eval="False"/>
+        <field name="requires_paint_booth" eval="False"/>
+        <field name="cure_time_buffer_min">0</field>
+        <field name="note">Shop-supply, customer finishes on-site. Skips sanding + paint entirely.</field>
+    </record>
+    <record id="finish_melamine" model="southbrook.kitchen.finish">
+        <field name="name">Melamine (Pre-Finished)</field>
+        <field name="code">melamine</field>
+        <field name="sequence">20</field>
+        <field name="requires_sanding" eval="False"/>
+        <field name="requires_paint_booth" eval="False"/>
+        <field name="cure_time_buffer_min">0</field>
+        <field name="note">Pre-laminated panel. No shop finishing — straight from cutting to edge banding to assembly.</field>
+    </record>
+    <record id="finish_laminate" model="southbrook.kitchen.finish">
+        <field name="name">Laminate (Pre-Finished)</field>
+        <field name="code">laminate</field>
+        <field name="sequence">30</field>
+        <field name="requires_sanding" eval="False"/>
+        <field name="requires_paint_booth" eval="False"/>
+        <field name="cure_time_buffer_min">0</field>
+        <field name="note">HPL applied at cutting or as a sheet, then edge-banded. No shop paint.</field>
+    </record>
+    <record id="finish_painted" model="southbrook.kitchen.finish">
+        <field name="name">Painted</field>
+        <field name="code">painted</field>
+        <field name="sequence">40</field>
+        <field name="requires_sanding" eval="True"/>
+        <field name="requires_paint_booth" eval="True"/>
+        <field name="cure_time_buffer_min">360</field>
+        <field name="finish_complexity_factor">1.0</field>
+        <field name="note">Primer + 2 colour coats. Sand between coats. ~6 hr cure post-final coat.</field>
+    </record>
+    <record id="finish_lacquered" model="southbrook.kitchen.finish">
+        <field name="name">Lacquered</field>
+        <field name="code">lacquered</field>
+        <field name="sequence">50</field>
+        <field name="requires_sanding" eval="True"/>
+        <field name="requires_paint_booth" eval="True"/>
+        <field name="cure_time_buffer_min">300</field>
+        <field name="finish_complexity_factor">1.3</field>
+        <field name="note">Lacquer faster cure than waterborne paint, but more coats — net longer in booth.</field>
+    </record>
+    <record id="finish_stained" model="southbrook.kitchen.finish">
+        <field name="name">Stained + Clear</field>
+        <field name="code">stained</field>
+        <field name="sequence">60</field>
+        <field name="requires_sanding" eval="True"/>
+        <field name="requires_paint_booth" eval="True"/>
+        <field name="cure_time_buffer_min">240</field>
+        <field name="finish_complexity_factor">1.2</field>
+        <field name="note">Stain (with wipe-off) + clear top coat. Sand pre-stain, sand between clears.</field>
+    </record>
+    <record id="finish_veneer_clear" model="southbrook.kitchen.finish">
+        <field name="name">Veneer (Clear Coat)</field>
+        <field name="code">veneer_clear</field>
+        <field name="sequence">70</field>
+        <field name="requires_sanding" eval="True"/>
+        <field name="requires_paint_booth" eval="True"/>
+        <field name="cure_time_buffer_min">240</field>
+        <field name="finish_complexity_factor">1.1</field>
+        <field name="note">Visible wood veneer with clear protective coat. Light sanding between coats.</field>
+    </record>
+    <record id="finish_high_gloss" model="southbrook.kitchen.finish">
+        <field name="name">High Gloss</field>
+        <field name="code">high_gloss</field>
+        <field name="sequence">80</field>
+        <field name="requires_sanding" eval="True"/>
+        <field name="requires_paint_booth" eval="True"/>
+        <field name="cure_time_buffer_min">480</field>
+        <field name="finish_complexity_factor">1.5</field>
+        <field name="note">Highest defect-rejection rate finish. Extra sanding passes + 3-coat lacquer + buff. Defect-rework loop is highest here.</field>
+    </record>
+    <record id="finish_matte" model="southbrook.kitchen.finish">
+        <field name="name">Matte</field>
+        <field name="code">matte</field>
+        <field name="sequence">90</field>
+        <field name="requires_sanding" eval="True"/>
+        <field name="requires_paint_booth" eval="True"/>
+        <field name="cure_time_buffer_min">360</field>
+        <field name="finish_complexity_factor">1.1</field>
+        <field name="note">Matte / satin paint or lacquer — forgives surface prep slightly; modest cure buffer.</field>
+    </record>
+</odoo>

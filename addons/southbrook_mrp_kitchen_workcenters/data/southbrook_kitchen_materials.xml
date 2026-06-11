@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        10 substrate materials Southbrook routinely sees on the kitchen
+        shop floor. The seed only covers materials whose treatment
+        DIFFERS at one of the work centers (a CNC handles MDF, plywood,
+        and particle board differently; the edge bander handles
+        melamine/laminate/veneer differently; stone/quartz/solid surface
+        go subcontract).
+    -->
+
+    <record id="material_mdf" model="southbrook.kitchen.material">
+        <field name="name">MDF</field>
+        <field name="code">mdf</field>
+        <field name="sequence">10</field>
+        <field name="requires_finishing" eval="True"/>
+        <field name="note">Medium-density fiberboard. Paint-grade substrate; always needs sanding + paint/lacquer after cutting.</field>
+    </record>
+    <record id="material_plywood" model="southbrook.kitchen.material">
+        <field name="name">Plywood</field>
+        <field name="code">plywood</field>
+        <field name="sequence">20</field>
+        <field name="note">Birch / maple / oak plywood. Can be left exposed at edges with visible-grade veneer.</field>
+    </record>
+    <record id="material_particle_board" model="southbrook.kitchen.material">
+        <field name="name">Particle Board</field>
+        <field name="code">particle_board</field>
+        <field name="sequence">30</field>
+        <field name="note">Lower-density chip board. Carcass-grade; always covered by melamine or laminate before exposure.</field>
+    </record>
+    <record id="material_melamine" model="southbrook.kitchen.material">
+        <field name="name">Melamine</field>
+        <field name="code">melamine</field>
+        <field name="sequence">40</field>
+        <field name="note">Pre-laminated panel (typically over particle board). White / oak / walnut / etc. surface; carcass interior standard.</field>
+    </record>
+    <record id="material_laminate" model="southbrook.kitchen.material">
+        <field name="name">Laminate</field>
+        <field name="code">laminate</field>
+        <field name="sequence">50</field>
+        <field name="note">High-pressure decorative laminate (Formica-style). Cold-pressed to substrate; needs PVC or ABS edge band.</field>
+    </record>
+    <record id="material_veneer" model="southbrook.kitchen.material">
+        <field name="name">Veneer</field>
+        <field name="code">veneer</field>
+        <field name="sequence">60</field>
+        <field name="note">Real wood veneer over plywood or MDF. Needs finishing (stain + clear) — sanding mandatory.</field>
+    </record>
+    <record id="material_solid_wood" model="southbrook.kitchen.material">
+        <field name="name">Solid Wood</field>
+        <field name="code">solid_wood</field>
+        <field name="sequence">70</field>
+        <field name="can_be_edge_banded" eval="False"/>
+        <field name="requires_finishing" eval="True"/>
+        <field name="note">Solid maple / oak / walnut / cherry / alder. Doors and face frames. Profiled rather than edge-banded.</field>
+    </record>
+    <record id="material_quartz" model="southbrook.kitchen.material">
+        <field name="name">Quartz</field>
+        <field name="code">quartz</field>
+        <field name="sequence">80</field>
+        <field name="can_be_edge_banded" eval="False"/>
+        <field name="is_subcontract_default" eval="True"/>
+        <field name="note">Engineered quartz countertop (Caesarstone / Silestone / Cambria). Always subcontract — template ships dimensions + cut-outs to fabricator.</field>
+    </record>
+    <record id="material_stone" model="southbrook.kitchen.material">
+        <field name="name">Stone</field>
+        <field name="code">stone</field>
+        <field name="sequence">90</field>
+        <field name="can_be_edge_banded" eval="False"/>
+        <field name="is_subcontract_default" eval="True"/>
+        <field name="note">Natural stone (granite / marble / soapstone). Subcontract — vendor cuts, polishes, and templates on-site.</field>
+    </record>
+    <record id="material_solid_surface" model="southbrook.kitchen.material">
+        <field name="name">Solid Surface</field>
+        <field name="code">solid_surface</field>
+        <field name="sequence">100</field>
+        <field name="can_be_edge_banded" eval="False"/>
+        <field name="is_subcontract_default" eval="True"/>
+        <field name="note">Corian / Hi-Macs / thermoformable acrylic. Subcontract for seamless joints; in-house only for simple straight runs.</field>
+    </record>
+</odoo>

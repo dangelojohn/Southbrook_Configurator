@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Menu structure mirrors the brief §16. M1 ships the
+        Configuration > Southbrook Kitchen branch; M2-M4 layer in the
+        Operations and Reporting branches.
+    -->
+
+    <menuitem id="menu_sbk_config_root"
+              name="Southbrook Kitchen"
+              parent="mrp.menu_mrp_configuration"
+              sequence="50"/>
+
+    <menuitem id="menu_sbk_config_materials"
+              name="Kitchen Materials"
+              parent="menu_sbk_config_root"
+              action="action_sbk_material"
+              sequence="10"/>
+
+    <menuitem id="menu_sbk_config_finishes"
+              name="Kitchen Finishes"
+              parent="menu_sbk_config_root"
+              action="action_sbk_finish"
+              sequence="20"/>
+
+    <!-- Skills reuses Odoo's hr.skill; no new menu needed. -->
+
+    <!-- M2 will add: Kitchen Operation Templates -->
+    <!-- Existing mrp.workcenter menu already covers Work Centers -->
+</odoo>
