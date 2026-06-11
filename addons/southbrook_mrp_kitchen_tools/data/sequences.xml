@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sequences used across the module:
+
+    sbk.tool.asset           SBK-TA/0001       commit 2
+    sbk.tool.issue           SBK-TI/2026/0001  commit 4
+    sbk.tool.checkout        SBK-TC/2026/0001  commit 4
+    sbk.tool.maint.request   SBK-TM/2026/0001  commit 4
+    sbk.tool.usage.log       SBK-TU/2026/0001  commit 5
+    sbk.workorder.tool.cons  SBK-TWC/2026/0001 commit 5
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="seq_tool_asset" model="ir.sequence">
+            <field name="name">Tool Asset</field>
+            <field name="code">sbk.tool.asset</field>
+            <field name="prefix">SBK-TA/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_tool_issue" model="ir.sequence">
+            <field name="name">Tool Issue</field>
+            <field name="code">sbk.tool.issue</field>
+            <field name="prefix">SBK-TI/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_tool_checkout" model="ir.sequence">
+            <field name="name">Tool Checkout</field>
+            <field name="code">sbk.tool.checkout</field>
+            <field name="prefix">SBK-TC/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_tool_maintenance" model="ir.sequence">
+            <field name="name">Tool Maintenance Request</field>
+            <field name="code">sbk.tool.maintenance.request</field>
+            <field name="prefix">SBK-TM/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_tool_usage_log" model="ir.sequence">
+            <field name="name">Tool Usage Log</field>
+            <field name="code">sbk.tool.usage.log</field>
+            <field name="prefix">SBK-TU/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_workorder_tool_consumption" model="ir.sequence">
+            <field name="name">Work Order Tool Consumption</field>
+            <field name="code">sbk.workorder.tool.consumption</field>
+            <field name="prefix">SBK-TWC/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

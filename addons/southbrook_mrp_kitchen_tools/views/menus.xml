@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Menu structure mirrors the build brief §21 — three top-level menus
+  under Manufacturing (Configuration / Operations / Reporting) and one
+  under Inventory (Products).
+
+  Commit 1 lands only the Configuration → Tool Categories entry plus
+  the Inventory → Southbrook Tools and Consumables product list. The
+  remaining entries (Tool Assets / Cribs / Kits / Requirements /
+  Checkouts / Issues / Maintenance / Usage / Consumption / Reports) get
+  their menus in commits 2-6 as the corresponding models land.
+-->
+<odoo>
+
+    <!-- ─── Manufacturing → Configuration → Southbrook Kitchen ─────── -->
+    <menuitem id="menu_southbrook_tools_config_root"
+              name="Southbrook Kitchen"
+              parent="mrp.menu_mrp_configuration"
+              sequence="80"/>
+
+    <menuitem id="menu_southbrook_tools_categories"
+              name="Tool Categories"
+              parent="menu_southbrook_tools_config_root"
+              action="action_tool_category"
+              sequence="10"/>
+
+    <!-- ─── Inventory → Products → Southbrook Tools and Consumables ─ -->
+    <menuitem id="menu_southbrook_tools_products"
+              name="Southbrook Tools &amp; Consumables"
+              parent="stock.menu_stock_inventory_control"
+              action="action_product_southbrook_tools"
+              sequence="80"/>
+
+</odoo>

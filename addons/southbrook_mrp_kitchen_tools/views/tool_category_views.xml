@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_tool_category_list" model="ir.ui.view">
+        <field name="name">southbrook.tool.category.list</field>
+        <field name="model">southbrook.tool.category</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="not active">
+                <field name="complete_name"/>
+                <field name="code"/>
+                <field name="tool_family" widget="badge"/>
+                <field name="directness" widget="badge"/>
+                <field name="reusable" widget="boolean_toggle"/>
+                <field name="consumable" widget="boolean_toggle"/>
+                <field name="requires_sharpening" optional="hide"/>
+                <field name="requires_calibration" optional="hide"/>
+                <field name="has_expiry_date" optional="hide"/>
+                <field name="hazardous" optional="hide"/>
+                <field name="product_count"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tool_category_search" model="ir.ui.view">
+        <field name="name">southbrook.tool.category.search</field>
+        <field name="model">southbrook.tool.category</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="tool_family"/>
+                <field name="parent_id"/>
+                <filter name="reusable" string="Reusable" domain="[('reusable', '=', True)]"/>
+                <filter name="consumable" string="Consumable" domain="[('consumable', '=', True)]"/>
+                <filter name="direct_tool" string="Direct Production Tool"
+                        domain="[('directness', '=', 'direct_production_tool')]"/>
+                <filter name="direct_consumable" string="Direct Consumable"
+                        domain="[('directness', '=', 'direct_consumable')]"/>
+                <filter name="indirect" string="Indirect"
+                        domain="[('directness', 'in', ('indirect_tool', 'indirect_consumable'))]"/>
+                <filter name="maintenance_supply" string="Maintenance Supply"
+                        domain="[('directness', '=', 'maintenance_supply')]"/>
+                <filter name="safety_supply" string="Safety Supply"
+                        domain="[('directness', '=', 'safety_supply')]"/>
+                <separator/>
+                <filter name="requires_sharpening" string="Requires Sharpening"
+                        domain="[('requires_sharpening', '=', True)]"/>
+                <filter name="requires_calibration" string="Requires Calibration"
+                        domain="[('requires_calibration', '=', True)]"/>
+                <filter name="has_expiry" string="Has Expiry Date"
+                        domain="[('has_expiry_date', '=', True)]"/>
+                <filter name="hazardous" string="Hazardous"
+                        domain="[('hazardous', '=', True)]"/>
+                <group>
+                    <filter name="group_family" string="Tool Family"
+                            context="{'group_by': 'tool_family'}"/>
+                    <filter name="group_directness" string="Directness"
+                            context="{'group_by': 'directness'}"/>
+                    <filter name="group_parent" string="Parent Category"
+                            context="{'group_by': 'parent_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_tool_category_form" model="ir.ui.view">
+        <field name="name">southbrook.tool.category.form</field>
+        <field name="model">southbrook.tool.category</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_products" type="object"
+                                class="oe_stat_button" icon="fa-cubes">
+                            <field name="product_count" widget="statinfo"
+                                   string="Products"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived"
+                            bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Category name..."/></h1>
+                        <h3 class="text-muted">
+                            <field name="complete_name" readonly="1"/>
+                        </h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="parent_id"
+                                   options="{'no_create_edit': True}"/>
+                            <field name="tool_family"/>
+                            <field name="directness"/>
+                        </group>
+                        <group>
+                            <field name="reusable"/>
+                            <field name="consumable"/>
+                            <field name="requires_stock"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Policy" name="policy">
+                            <group>
+                                <group string="Tracking">
+                                    <field name="requires_lot_tracking"/>
+                                    <field name="requires_serial_tracking"/>
+                                </group>
+                                <group string="Maintenance">
+                                    <field name="requires_maintenance"/>
+                                    <field name="requires_sharpening"/>
+                                    <field name="requires_calibration"/>
+                                    <field name="requires_cleaning"/>
+                                </group>
+                            </group>
+                            <group>
+                                <group string="Expiry / Hazard">
+                                    <field name="has_expiry_date"/>
+                                    <field name="hazardous"/>
+                                    <field name="msds_required"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Replenishment Defaults" name="replenishment">
+                            <group>
+                                <group>
+                                    <field name="default_uom_id"
+                                           options="{'no_create_edit': True}"/>
+                                    <field name="default_issue_uom_id"
+                                           options="{'no_create_edit': True}"/>
+                                </group>
+                                <group>
+                                    <field name="default_reorder_min_qty"/>
+                                    <field name="default_reorder_max_qty"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Linkage Defaults" name="linkage">
+                            <field name="default_workcenter_ids"
+                                   widget="many2many_tags"
+                                   options="{'no_create_edit': True}"/>
+                        </page>
+                        <page string="Sub-categories" name="children">
+                            <field name="child_ids" readonly="1">
+                                <list>
+                                    <field name="complete_name"/>
+                                    <field name="code"/>
+                                    <field name="tool_family" widget="badge"/>
+                                    <field name="product_count"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_tool_category" model="ir.actions.act_window">
+        <field name="name">Tool Categories</field>
+        <field name="res_model">southbrook.tool.category</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_tool_category_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Southbrook tool category
+            </p>
+            <p>
+                Categories classify saw blades, CNC bits, drill bits,
+                screws, glues, abrasives, finishing materials,
+                measuring tools, clamps, jigs, hand and power tools,
+                maintenance supplies, PPE, and packing consumables.
+            </p>
+        </field>
+    </record>
+
+</odoo>

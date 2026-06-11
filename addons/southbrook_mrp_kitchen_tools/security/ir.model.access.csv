@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+# ─── Tool categories — all operators read, crib manager + system admin write
+access_tool_category_user,Tool category read for MRP users,model_southbrook_tool_category,mrp.group_mrp_user,1,0,0,0
+access_tool_category_operator,Tool category read for tool operators,model_southbrook_tool_category,group_tool_operator,1,0,0,0
+access_tool_category_crib,Tool category CRUD for crib manager,model_southbrook_tool_category,group_tool_crib_manager,1,1,1,1
+access_tool_category_admin,Tool category CRUD for system admin,model_southbrook_tool_category,base.group_system,1,1,1,1

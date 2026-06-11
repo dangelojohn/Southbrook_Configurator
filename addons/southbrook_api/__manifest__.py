@@ -38,12 +38,15 @@ remains live for at least one Phase cycle per the contract §6.
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.1.0",
+    "version": "19.0.1.0.0",
     "depends": [
         "base",
         "mail",
         "southbrook_kitchen_workspace",
         "southbrook_ai_design",
+        # Phase 4 Sprint 1 — Accucutt cut-list bridge endpoints
+        # (/api/v1/cutlist/<id>/envelope + /nesting-result) read sb.cutlist.
+        "southbrook_kitchen_mrp",
     ],
     "data": [
         "security/ir.model.access.csv",

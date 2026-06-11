@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_product_template_form_inherit_tools" model="ir.ui.view">
+        <field name="name">product.template.form.inherit.southbrook.tools</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Southbrook Tool Control"
+                      name="page_southbrook_tools">
+                    <group>
+                        <group string="Classification">
+                            <field name="x_southbrook_is_tool"/>
+                            <field name="x_southbrook_tool_category_id"
+                                   invisible="not x_southbrook_is_tool"
+                                   options="{'no_create_edit': True}"/>
+                            <field name="x_southbrook_tool_family"
+                                   invisible="not x_southbrook_is_tool"/>
+                            <field name="x_southbrook_directness"
+                                   invisible="not x_southbrook_is_tool"/>
+                            <field name="x_southbrook_tool_lifecycle_state"
+                                   invisible="not x_southbrook_is_tool"/>
+                        </group>
+                        <group string="Type"
+                               invisible="not x_southbrook_is_tool">
+                            <field name="x_southbrook_is_reusable_tool"/>
+                            <field name="x_southbrook_is_consumable_tool"/>
+                            <field name="x_southbrook_is_indirect_tool"/>
+                            <field name="x_southbrook_is_maintenance_supply"/>
+                        </group>
+                    </group>
+                    <notebook invisible="not x_southbrook_is_tool">
+                        <page string="Cutting / Bit Geometry" name="cutting">
+                            <group>
+                                <group>
+                                    <field name="x_southbrook_cutting_diameter_mm"/>
+                                    <field name="x_southbrook_shank_diameter_mm"/>
+                                    <field name="x_southbrook_cutting_length_mm"/>
+                                    <field name="x_southbrook_overall_length_mm"/>
+                                    <field name="x_southbrook_tooth_count"/>
+                                    <field name="x_southbrook_blade_diameter_mm"/>
+                                    <field name="x_southbrook_kerf_width_mm"/>
+                                    <field name="x_southbrook_bore_size_mm"/>
+                                </group>
+                                <group>
+                                    <field name="x_southbrook_rotation_speed_min"/>
+                                    <field name="x_southbrook_rotation_speed_max"/>
+                                    <field name="x_southbrook_feed_rate_min"/>
+                                    <field name="x_southbrook_feed_rate_max"/>
+                                    <field name="x_southbrook_material_grade"/>
+                                    <field name="x_southbrook_coating"/>
+                                    <field name="x_southbrook_grit"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Fastener / Screw Geometry" name="fastener">
+                            <group>
+                                <group>
+                                    <field name="x_southbrook_screw_size"/>
+                                    <field name="x_southbrook_screw_length_mm"/>
+                                </group>
+                                <group>
+                                    <field name="x_southbrook_head_type"/>
+                                    <field name="x_southbrook_drive_type"/>
+                                    <field name="x_southbrook_thread_type"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Chemical / Glue / Consumable" name="chemical">
+                            <group>
+                                <group>
+                                    <field name="x_southbrook_glue_type"/>
+                                    <field name="x_southbrook_open_time_min"/>
+                                    <field name="x_southbrook_cure_time_min"/>
+                                    <field name="x_southbrook_shelf_life_days"/>
+                                </group>
+                                <group string="Safety">
+                                    <field name="x_southbrook_expiry_required"/>
+                                    <field name="x_southbrook_hazardous"/>
+                                    <field name="x_southbrook_msds_required"/>
+                                    <field name="x_southbrook_flammable"/>
+                                    <field name="x_southbrook_requires_ventilation"/>
+                                    <field name="x_southbrook_ppe_required"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Linkage" name="linkage">
+                            <group>
+                                <field name="x_southbrook_default_workcenter_ids"
+                                       widget="many2many_tags"
+                                       options="{'no_create_edit': True}"/>
+                                <field name="x_southbrook_required_for_workcenter_ids"
+                                       widget="many2many_tags"
+                                       options="{'no_create_edit': True}"/>
+                            </group>
+                            <group>
+                                <field name="x_southbrook_compatible_material_ids"
+                                       widget="many2many_tags"
+                                       options="{'no_create_edit': True}"/>
+                                <field name="x_southbrook_compatible_finish_ids"
+                                       widget="many2many_tags"
+                                       options="{'no_create_edit': True}"/>
+                                <field name="x_southbrook_compatible_machine_ids"
+                                       widget="many2many_tags"
+                                       options="{'no_create_edit': True}"/>
+                            </group>
+                        </page>
+                        <page string="Replenishment &amp; Life" name="replenishment">
+                            <group>
+                                <group string="Replenishment">
+                                    <field name="x_southbrook_preferred_vendor_id"
+                                           options="{'no_create_edit': True}"/>
+                                    <field name="x_southbrook_vendor_sku"/>
+                                    <field name="x_southbrook_min_stock_qty"/>
+                                    <field name="x_southbrook_max_stock_qty"/>
+                                    <field name="x_southbrook_reorder_multiple"/>
+                                    <field name="x_southbrook_issue_uom_id"
+                                           options="{'no_create_edit': True}"/>
+                                </group>
+                                <group string="Life Tracking">
+                                    <field name="x_southbrook_estimated_life_qty"/>
+                                    <field name="x_southbrook_estimated_life_unit"/>
+                                    <field name="x_southbrook_sharpening_interval_qty"/>
+                                    <field name="x_southbrook_calibration_interval_days"/>
+                                    <field name="x_southbrook_inspection_interval_days"/>
+                                    <field name="x_southbrook_cleaning_required_after_use"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes_sbk">
+                            <group>
+                                <field name="x_southbrook_notes_for_operator"/>
+                                <field name="x_southbrook_storage_instructions"/>
+                                <field name="x_southbrook_storage_temperature_notes"/>
+                                <field name="x_southbrook_safety_notes"/>
+                                <field name="x_southbrook_disposal_notes"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ─── Search filters on product.template ─────────────────────── -->
+    <record id="view_product_template_search_inherit_tools" model="ir.ui.view">
+        <field name="name">product.template.search.inherit.southbrook.tools</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <filter name="is_southbrook_tool" string="Southbrook Tool"
+                        domain="[('x_southbrook_is_tool', '=', True)]"/>
+                <filter name="reusable_tool" string="Reusable Tool"
+                        domain="[('x_southbrook_is_reusable_tool', '=', True)]"/>
+                <filter name="consumable_tool" string="Consumable Tool"
+                        domain="[('x_southbrook_is_consumable_tool', '=', True)]"/>
+                <filter name="indirect_tool" string="Indirect Tool"
+                        domain="[('x_southbrook_is_indirect_tool', '=', True)]"/>
+                <filter name="maintenance_supply" string="Maintenance Supply"
+                        domain="[('x_southbrook_is_maintenance_supply', '=', True)]"/>
+                <filter name="hazardous" string="Hazardous"
+                        domain="[('x_southbrook_hazardous', '=', True)]"/>
+                <filter name="msds_required" string="MSDS Required"
+                        domain="[('x_southbrook_msds_required', '=', True)]"/>
+                <filter name="expiry_required" string="Expiry Required"
+                        domain="[('x_southbrook_expiry_required', '=', True)]"/>
+                <group>
+                    <filter name="group_tool_family"
+                            string="Tool Family"
+                            context="{'group_by': 'x_southbrook_tool_family'}"/>
+                    <filter name="group_tool_category"
+                            string="Tool Category"
+                            context="{'group_by': 'x_southbrook_tool_category_id'}"/>
+                    <filter name="group_directness"
+                            string="Directness"
+                            context="{'group_by': 'x_southbrook_directness'}"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ─── Action: Southbrook Tools and Consumables product list ──── -->
+    <record id="action_product_southbrook_tools" model="ir.actions.act_window">
+        <field name="name">Southbrook Tools &amp; Consumables</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('x_southbrook_is_tool', '=', True)]</field>
+        <field name="context">{'search_default_is_southbrook_tool': 1}</field>
+    </record>
+
+</odoo>

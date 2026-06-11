@@ -376,8 +376,85 @@ class SouthbrookApi(http.Controller):
         })
 
     # ==================================================================
+    # §3.9 — GET /api/v1/cutlist/<id>/envelope  (Phase 4 Sprint 1)
+    #
+    # Returns the deterministic JSON envelope the Accucutt nesting
+    # service consumes. The cutlist must be reachable by the API
+    # user's record-rules (typically: manufacturing-role users only).
+    # ==================================================================
+    @http.route(
+        "/api/v1/cutlist/<int:cutlist_id>/envelope",
+        type="http", auth="public", methods=["GET"], csrf=False,
+    )
+    @requires_api_key
+    def cutlist_envelope(self, cutlist_id, **_):
+        cutlist = self._fetch_cutlist_or_404(cutlist_id)
+        if not isinstance(cutlist, http.Response):
+            envelope = cutlist.to_nesting_envelope()
+            # Top-level envelope already has its own schema field
+            # ("southbrook.nesting.v1"); _json's default
+            # "southbrook.flutter.api.v1" stays out of its way via
+            # setdefault.
+            return _json({"envelope": envelope, "schema": envelope["schema"]})
+        return cutlist
+
+    # ==================================================================
+    # §3.10 — POST /api/v1/cutlist/<id>/nesting-result  (Phase 4 Sprint 1)
+    #
+    # Accucutt POSTs the nesting result back here. The handler validates
+    # the schema, persists the JSON to sb.cutlist.nesting_result_json,
+    # and advances state to 'nested'. Idempotent via Idempotency-Key.
+    # ==================================================================
+    @http.route(
+        "/api/v1/cutlist/<int:cutlist_id>/nesting-result",
+        type="http", auth="public", methods=["POST"], csrf=False,
+    )
+    @requires_api_key
+    @supports_idempotency
+    def cutlist_nesting_result(self, cutlist_id, **_):
+        cutlist = self._fetch_cutlist_or_404(cutlist_id)
+        if isinstance(cutlist, http.Response):
+            return cutlist
+        try:
+            payload = json.loads(request.httprequest.data or b"{}")
+        except json.JSONDecodeError:
+            return _error("bad_json", "Request body is not JSON.", 400)
+        if not isinstance(payload, dict):
+            return _error("bad_json",
+                          "Body must be a JSON object.", 400)
+        try:
+            cutlist.from_nesting_result(payload)
+        except Exception as exc:                              # noqa: BLE001
+            return _error("nesting_rejected", str(exc), 422)
+        return _json({
+            "ok": True,
+            "cutlist_id": cutlist.id,
+            "state": cutlist.state,
+        })
+
+    # ==================================================================
     # Helpers
     # ==================================================================
+    def _fetch_cutlist_or_404(self, cutlist_id):
+        """Return the cutlist record if the API user can read it, or
+        an error response. Phase 4 Sprint 1 — Accucutt nesting bridge."""
+        try:
+            cutlist = request.env["sb.cutlist"].browse(
+                cutlist_id).exists()
+        except Exception:                                     # noqa: BLE001
+            return _error("not_found",
+                          "Unknown cutlist id.", 404)
+        if not cutlist:
+            return _error("not_found",
+                          "Unknown cutlist id.", 404)
+        # Touch a field to provoke any AccessError record-rule.
+        try:
+            _ = cutlist.name
+        except Exception:                                     # noqa: BLE001
+            return _error("forbidden",
+                          "Cutlist not accessible.", 403)
+        return cutlist
+
     def _fetch_project_or_404(self, project_id):
         """Return the project IF the current API user owns it, else
         an error response. Mirrors the customer-portal pattern so we

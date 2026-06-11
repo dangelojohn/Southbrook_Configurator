@@ -1,0 +1,1176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hierarchical tool / consumable category tree — sections A..K from
+  the build brief.
+
+  noupdate="0" so admins can extend the tree without surgical XML
+  edits, but renaming a record's xmlid in this file would orphan
+  prior references. The leaf XML IDs follow ``cat_<family>_<subtype>``
+  so future commits can ``env.ref('southbrook_mrp_kitchen_tools.cat_blade_panel')``
+  cleanly.
+
+  Three policy flag conventions:
+    * Cutting edges (blades, bits, countersinks) — reusable + sharpening + maintenance
+    * Fasteners / glues / consumables — consumable + lot tracking where shelf life applies
+    * Spray equipment + measuring tools — reusable + cleaning / calibration
+    * Maintenance / safety / packing — indirect_consumable + min/max replenishment
+-->
+<odoo>
+    <data noupdate="0">
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             A. CUTTING TOOLS
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_cutting_tools" model="southbrook.tool.category">
+            <field name="name">Cutting Tools</field>
+            <field name="code">CUTTING</field>
+            <field name="directness">direct_production_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_stock">True</field>
+            <field name="requires_maintenance">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+
+        <!-- A.1 Saw Blades -->
+        <record id="cat_saw_blades" model="southbrook.tool.category">
+            <field name="name">Saw Blades</field>
+            <field name="code">SAW-BLADE</field>
+            <field name="parent_id" ref="cat_cutting_tools"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="directness">direct_production_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_maintenance">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_panel" model="southbrook.tool.category">
+            <field name="name">Panel Saw Blades</field>
+            <field name="code">SAW-BLADE-PANEL</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_table" model="southbrook.tool.category">
+            <field name="name">Table Saw Blades</field>
+            <field name="code">SAW-BLADE-TABLE</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_miter" model="southbrook.tool.category">
+            <field name="name">Miter Saw Blades</field>
+            <field name="code">SAW-BLADE-MITER</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_scoring" model="southbrook.tool.category">
+            <field name="name">Scoring Blades</field>
+            <field name="code">SAW-BLADE-SCORING</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_laminate" model="southbrook.tool.category">
+            <field name="name">Laminate Blades</field>
+            <field name="code">SAW-BLADE-LAM</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_melamine" model="southbrook.tool.category">
+            <field name="name">Melamine Blades</field>
+            <field name="code">SAW-BLADE-MEL</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_plywood" model="southbrook.tool.category">
+            <field name="name">Plywood Blades</field>
+            <field name="code">SAW-BLADE-PLY</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_rip" model="southbrook.tool.category">
+            <field name="name">Solid Wood Rip Blades</field>
+            <field name="code">SAW-BLADE-RIP</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_crosscut" model="southbrook.tool.category">
+            <field name="name">Solid Wood Crosscut Blades</field>
+            <field name="code">SAW-BLADE-XCUT</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_blade_aluminum" model="southbrook.tool.category">
+            <field name="name">Aluminum / Extrusion Blades</field>
+            <field name="code">SAW-BLADE-ALU</field>
+            <field name="parent_id" ref="cat_saw_blades"/>
+            <field name="tool_family">saw_blade</field>
+            <field name="reusable">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+
+        <!-- A.2 CNC Router Bits -->
+        <record id="cat_cnc_bits" model="southbrook.tool.category">
+            <field name="name">CNC Router Bits</field>
+            <field name="code">CNC-BIT</field>
+            <field name="parent_id" ref="cat_cutting_tools"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+            <field name="requires_maintenance">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_cnc_compression" model="southbrook.tool.category">
+            <field name="name">Compression Bits</field>
+            <field name="code">CNC-COMPRESSION</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_upcut" model="southbrook.tool.category">
+            <field name="name">Upcut Bits</field>
+            <field name="code">CNC-UPCUT</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_downcut" model="southbrook.tool.category">
+            <field name="name">Downcut Bits</field>
+            <field name="code">CNC-DOWNCUT</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_straight" model="southbrook.tool.category">
+            <field name="name">Straight Bits</field>
+            <field name="code">CNC-STRAIGHT</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_spiral" model="southbrook.tool.category">
+            <field name="name">Spiral Bits</field>
+            <field name="code">CNC-SPIRAL</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_vgroove" model="southbrook.tool.category">
+            <field name="name">V-Groove Bits</field>
+            <field name="code">CNC-VGROOVE</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_roundover" model="southbrook.tool.category">
+            <field name="name">Roundover Bits</field>
+            <field name="code">CNC-ROUNDOVER</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_chamfer" model="southbrook.tool.category">
+            <field name="name">Chamfer Bits</field>
+            <field name="code">CNC-CHAMFER</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_rabbet" model="southbrook.tool.category">
+            <field name="name">Rabbeting Bits</field>
+            <field name="code">CNC-RABBET</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_dado" model="southbrook.tool.category">
+            <field name="name">Dado / Groove Bits</field>
+            <field name="code">CNC-DADO</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_door_profile" model="southbrook.tool.category">
+            <field name="name">Door Profile Bits</field>
+            <field name="code">CNC-DOOR-PROFILE</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_flush_trim" model="southbrook.tool.category">
+            <field name="name">Flush Trim Bits</field>
+            <field name="code">CNC-FLUSH-TRIM</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_spoilboard" model="southbrook.tool.category">
+            <field name="name">Spoilboard Surfacing Bits</field>
+            <field name="code">CNC-SPOILBOARD-BIT</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_cnc_engraving" model="southbrook.tool.category">
+            <field name="name">Engraving Bits</field>
+            <field name="code">CNC-ENGRAVING</field>
+            <field name="parent_id" ref="cat_cnc_bits"/>
+            <field name="tool_family">cnc_router_bit</field>
+            <field name="reusable">True</field>
+        </record>
+
+        <!-- A.3 Drill / Boring Bits -->
+        <record id="cat_drill_bits" model="southbrook.tool.category">
+            <field name="name">Drill and Boring Bits</field>
+            <field name="code">DRILL-BIT</field>
+            <field name="parent_id" ref="cat_cutting_tools"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+            <field name="requires_maintenance">True</field>
+            <field name="requires_sharpening">True</field>
+        </record>
+        <record id="cat_drill_bradpoint" model="southbrook.tool.category">
+            <field name="name">Brad Point Bits</field>
+            <field name="code">DRILL-BRADPOINT</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_twist" model="southbrook.tool.category">
+            <field name="name">Twist Drill Bits</field>
+            <field name="code">DRILL-TWIST</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_hinge_35" model="southbrook.tool.category">
+            <field name="name">Hinge Boring Bits 35mm</field>
+            <field name="code">DRILL-HINGE-35</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">boring_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_shelf_5" model="southbrook.tool.category">
+            <field name="name">Shelf Pin Bits 5mm</field>
+            <field name="code">DRILL-SHELF-5</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">boring_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_confirmat" model="southbrook.tool.category">
+            <field name="name">Confirmat Screw Bits</field>
+            <field name="code">DRILL-CONFIRMAT</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_countersink" model="southbrook.tool.category">
+            <field name="name">Countersink Bits</field>
+            <field name="code">DRILL-COUNTERSINK</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">countersink</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_counterbore" model="southbrook.tool.category">
+            <field name="name">Counterbore Bits</field>
+            <field name="code">DRILL-COUNTERBORE</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_plug_cutter" model="southbrook.tool.category">
+            <field name="name">Plug Cutters</field>
+            <field name="code">DRILL-PLUG</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_forstner" model="southbrook.tool.category">
+            <field name="name">Forstner Bits</field>
+            <field name="code">DRILL-FORSTNER</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">boring_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_step" model="southbrook.tool.category">
+            <field name="name">Step Bits</field>
+            <field name="code">DRILL-STEP</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_drill_pilot" model="southbrook.tool.category">
+            <field name="name">Pilot Drill Bits</field>
+            <field name="code">DRILL-PILOT</field>
+            <field name="parent_id" ref="cat_drill_bits"/>
+            <field name="tool_family">drill_bit</field>
+            <field name="reusable">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             B. FASTENERS AND ASSEMBLY CONSUMABLES
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_fasteners_assembly" model="southbrook.tool.category">
+            <field name="name">Fasteners and Assembly Consumables</field>
+            <field name="code">FASTENERS</field>
+            <field name="directness">direct_consumable</field>
+            <field name="consumable">True</field>
+            <field name="requires_stock">True</field>
+        </record>
+
+        <record id="cat_screws" model="southbrook.tool.category">
+            <field name="name">Screws</field>
+            <field name="code">SCREW</field>
+            <field name="parent_id" ref="cat_fasteners_assembly"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_cabinet" model="southbrook.tool.category">
+            <field name="name">Cabinet Assembly Screws</field>
+            <field name="code">SCREW-CAB</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_confirmat" model="southbrook.tool.category">
+            <field name="name">Confirmat Screws</field>
+            <field name="code">SCREW-CONFIRMAT</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_euro" model="southbrook.tool.category">
+            <field name="name">Euro Screws</field>
+            <field name="code">SCREW-EURO</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_wood" model="southbrook.tool.category">
+            <field name="name">Wood Screws</field>
+            <field name="code">SCREW-WOOD</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_drawer" model="southbrook.tool.category">
+            <field name="name">Drawer Slide Screws</field>
+            <field name="code">SCREW-DRAWER</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_hinge" model="southbrook.tool.category">
+            <field name="name">Hinge Screws</field>
+            <field name="code">SCREW-HINGE</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_handle" model="southbrook.tool.category">
+            <field name="name">Handle Screws</field>
+            <field name="code">SCREW-HANDLE</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_pocket" model="southbrook.tool.category">
+            <field name="name">Pocket Hole Screws</field>
+            <field name="code">SCREW-POCKET</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_faceframe" model="southbrook.tool.category">
+            <field name="name">Face Frame Screws</field>
+            <field name="code">SCREW-FACEFRAME</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_screw_countertop" model="southbrook.tool.category">
+            <field name="name">Countertop Connector Screws</field>
+            <field name="code">SCREW-COUNTERTOP</field>
+            <field name="parent_id" ref="cat_screws"/>
+            <field name="tool_family">screw</field>
+            <field name="consumable">True</field>
+        </record>
+
+        <record id="cat_fasteners" model="southbrook.tool.category">
+            <field name="name">Fasteners</field>
+            <field name="code">FASTENER</field>
+            <field name="parent_id" ref="cat_fasteners_assembly"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_dowels" model="southbrook.tool.category">
+            <field name="name">Dowels</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_biscuits" model="southbrook.tool.category">
+            <field name="name">Biscuits</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_cam_locks" model="southbrook.tool.category">
+            <field name="name">Cam Locks</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_connector_bolts" model="southbrook.tool.category">
+            <field name="name">Connector Bolts</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_kd_fittings" model="southbrook.tool.category">
+            <field name="name">Knockdown Fittings</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_shelf_pins" model="southbrook.tool.category">
+            <field name="name">Shelf Pins</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_brackets" model="southbrook.tool.category">
+            <field name="name">Brackets</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_corner_blocks" model="southbrook.tool.category">
+            <field name="name">Corner Blocks</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_staples" model="southbrook.tool.category">
+            <field name="name">Staples</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_brad_nails" model="southbrook.tool.category">
+            <field name="name">Brad Nails</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_pins" model="southbrook.tool.category">
+            <field name="name">Pins</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_inserts" model="southbrook.tool.category">
+            <field name="name">Inserts</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_anchors" model="southbrook.tool.category">
+            <field name="name">Anchors</field>
+            <field name="parent_id" ref="cat_fasteners"/>
+            <field name="tool_family">fastener</field>
+            <field name="consumable">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             C. ADHESIVES, GLUES, SEALANTS
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_adhesives" model="southbrook.tool.category">
+            <field name="name">Adhesives, Glues, Sealants</field>
+            <field name="code">ADHESIVE</field>
+            <field name="tool_family">adhesive</field>
+            <field name="directness">direct_consumable</field>
+            <field name="consumable">True</field>
+            <field name="requires_lot_tracking">True</field>
+            <field name="has_expiry_date">True</field>
+            <field name="hazardous">True</field>
+            <field name="msds_required">True</field>
+        </record>
+        <record id="cat_glue_wood" model="southbrook.tool.category">
+            <field name="name">Wood Glue</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">glue</field>
+            <field name="consumable">True</field>
+            <field name="has_expiry_date">True</field>
+        </record>
+        <record id="cat_glue_pva" model="southbrook.tool.category">
+            <field name="name">PVA Glue</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">glue</field>
+            <field name="consumable">True</field>
+            <field name="has_expiry_date">True</field>
+        </record>
+        <record id="cat_glue_pur" model="southbrook.tool.category">
+            <field name="name">PUR Glue</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">glue</field>
+            <field name="consumable">True</field>
+            <field name="has_expiry_date">True</field>
+            <field name="hazardous">True</field>
+            <field name="msds_required">True</field>
+        </record>
+        <record id="cat_glue_contact" model="southbrook.tool.category">
+            <field name="name">Contact Cement</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">adhesive</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+            <field name="msds_required">True</field>
+        </record>
+        <record id="cat_glue_eva" model="southbrook.tool.category">
+            <field name="name">EVA Hot Melt Glue Pellets</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">glue</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_glue_pur_hot" model="southbrook.tool.category">
+            <field name="name">PUR Hot Melt Glue</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">glue</field>
+            <field name="consumable">True</field>
+            <field name="has_expiry_date">True</field>
+            <field name="hazardous">True</field>
+        </record>
+        <record id="cat_adh_laminate" model="southbrook.tool.category">
+            <field name="name">Laminate Adhesive</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">adhesive</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_adh_construction" model="southbrook.tool.category">
+            <field name="name">Construction Adhesive</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">adhesive</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_seal_silicone" model="southbrook.tool.category">
+            <field name="name">Silicone Sealant</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">adhesive</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_seal_caulk" model="southbrook.tool.category">
+            <field name="name">Caulk</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">adhesive</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_adh_epoxy" model="southbrook.tool.category">
+            <field name="name">Epoxy</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">adhesive</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+        </record>
+        <record id="cat_adh_spray" model="southbrook.tool.category">
+            <field name="name">Spray Adhesive</field>
+            <field name="parent_id" ref="cat_adhesives"/>
+            <field name="tool_family">adhesive</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             D. ABRASIVES AND SURFACE PREPARATION
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_abrasives" model="southbrook.tool.category">
+            <field name="name">Abrasives and Surface Preparation</field>
+            <field name="code">ABRASIVE</field>
+            <field name="tool_family">abrasive</field>
+            <field name="directness">direct_consumable</field>
+            <field name="consumable">True</field>
+            <field name="requires_stock">True</field>
+        </record>
+        <record id="cat_abr_belt" model="southbrook.tool.category">
+            <field name="name">Sanding Belts</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">sanding_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_abr_disc" model="southbrook.tool.category">
+            <field name="name">Sanding Discs</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">sanding_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_abr_sheet" model="southbrook.tool.category">
+            <field name="name">Sanding Sheets</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">sanding_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_abr_sponge" model="southbrook.tool.category">
+            <field name="name">Sanding Sponges</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">sanding_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_abr_pad" model="southbrook.tool.category">
+            <field name="name">Abrasive Pads</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">sanding_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_abr_tack" model="southbrook.tool.category">
+            <field name="name">Tack Cloth</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">sanding_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_abr_filler" model="southbrook.tool.category">
+            <field name="name">Wood / Grain Filler</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">finishing_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_abr_scraper" model="southbrook.tool.category">
+            <field name="name">Scrapers and Putty Knives</field>
+            <field name="parent_id" ref="cat_abrasives"/>
+            <field name="tool_family">hand_tool</field>
+            <field name="reusable">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             E. FINISHING AND PAINT TOOLS
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_finishing" model="southbrook.tool.category">
+            <field name="name">Finishing and Paint Tools</field>
+            <field name="code">FINISH</field>
+            <field name="tool_family">finishing_tool</field>
+            <field name="directness">direct_production_tool</field>
+            <field name="requires_cleaning">True</field>
+        </record>
+        <record id="cat_spray_gun" model="southbrook.tool.category">
+            <field name="name">Spray Guns</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">spray_equipment</field>
+            <field name="reusable">True</field>
+            <field name="requires_cleaning">True</field>
+            <field name="requires_maintenance">True</field>
+        </record>
+        <record id="cat_spray_tip" model="southbrook.tool.category">
+            <field name="name">Spray Gun Tips / Nozzles</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">spray_equipment</field>
+            <field name="reusable">True</field>
+            <field name="requires_cleaning">True</field>
+        </record>
+        <record id="cat_paint_strainer" model="southbrook.tool.category">
+            <field name="name">Paint Strainers</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">finishing_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_paint_mask_tape" model="southbrook.tool.category">
+            <field name="name">Masking Tape</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">finishing_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_paint_mask_paper" model="southbrook.tool.category">
+            <field name="name">Masking Paper / Plastic</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">finishing_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_paint_lacquer" model="southbrook.tool.category">
+            <field name="name">Lacquer / Paint / Primer</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">finishing_consumable</field>
+            <field name="consumable">True</field>
+            <field name="has_expiry_date">True</field>
+            <field name="hazardous">True</field>
+            <field name="msds_required">True</field>
+        </record>
+        <record id="cat_paint_thinner" model="southbrook.tool.category">
+            <field name="name">Thinner / Reducer / Catalyst</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">finishing_consumable</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+            <field name="msds_required">True</field>
+        </record>
+        <record id="cat_paint_booth_filter" model="southbrook.tool.category">
+            <field name="name">Booth Filters</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">maintenance_supply</field>
+            <field name="directness">indirect_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_paint_degreaser" model="southbrook.tool.category">
+            <field name="name">Degreaser / Surface Cleaner</field>
+            <field name="parent_id" ref="cat_finishing"/>
+            <field name="tool_family">cleaning_supply</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             F. MEASURING, LAYOUT, AND QUALITY TOOLS
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_measuring" model="southbrook.tool.category">
+            <field name="name">Measuring, Layout, and Quality Tools</field>
+            <field name="code">MEASURE</field>
+            <field name="tool_family">measuring_tool</field>
+            <field name="directness">direct_production_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_calibration">True</field>
+        </record>
+        <record id="cat_meas_tape" model="southbrook.tool.category">
+            <field name="name">Tape Measures</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_meas_rule" model="southbrook.tool.category">
+            <field name="name">Steel Rules</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_meas_square" model="southbrook.tool.category">
+            <field name="name">Squares</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">layout_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_meas_caliper" model="southbrook.tool.category">
+            <field name="name">Calipers (Digital)</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_calibration">True</field>
+        </record>
+        <record id="cat_meas_micrometer" model="southbrook.tool.category">
+            <field name="name">Micrometers</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_calibration">True</field>
+        </record>
+        <record id="cat_meas_moisture" model="southbrook.tool.category">
+            <field name="name">Moisture Meters</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_calibration">True</field>
+        </record>
+        <record id="cat_meas_level" model="southbrook.tool.category">
+            <field name="name">Levels</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_meas_laser" model="southbrook.tool.category">
+            <field name="name">Laser Measure</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_calibration">True</field>
+        </record>
+        <record id="cat_meas_gauge" model="southbrook.tool.category">
+            <field name="name">Feeler / Gap Gauges</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">measuring_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_meas_finish_samples" model="southbrook.tool.category">
+            <field name="name">Finish / Color Samples</field>
+            <field name="parent_id" ref="cat_measuring"/>
+            <field name="tool_family">layout_tool</field>
+            <field name="reusable">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             G. CLAMPS, JIGS, AND FIXTURES
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_clamps_jigs" model="southbrook.tool.category">
+            <field name="name">Clamps, Jigs, and Fixtures</field>
+            <field name="code">CLAMP-JIG</field>
+            <field name="directness">direct_production_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_clamp_bar" model="southbrook.tool.category">
+            <field name="name">Bar Clamps</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">clamp</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_clamp_parallel" model="southbrook.tool.category">
+            <field name="name">Parallel Clamps</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">clamp</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_clamp_corner" model="southbrook.tool.category">
+            <field name="name">Corner Clamps</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">clamp</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_clamp_face_frame" model="southbrook.tool.category">
+            <field name="name">Face Frame Clamps</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">clamp</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_clamp_vacuum_pods" model="southbrook.tool.category">
+            <field name="name">Vacuum Pods</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_cnc" model="southbrook.tool.category">
+            <field name="name">CNC Fixtures</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_drilling" model="southbrook.tool.category">
+            <field name="name">Drilling Jigs</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_hinge" model="southbrook.tool.category">
+            <field name="name">Hinge Jigs</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_drawer" model="southbrook.tool.category">
+            <field name="name">Drawer Slide Jigs</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_handle" model="southbrook.tool.category">
+            <field name="name">Handle Drilling Templates</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_assembly" model="southbrook.tool.category">
+            <field name="name">Assembly Fixtures</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_door_squaring" model="southbrook.tool.category">
+            <field name="name">Door Squaring Fixtures</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_jig_countertop" model="southbrook.tool.category">
+            <field name="name">Countertop Templates</field>
+            <field name="parent_id" ref="cat_clamps_jigs"/>
+            <field name="tool_family">jig_fixture</field>
+            <field name="reusable">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             H. HAND, POWER, AND PNEUMATIC TOOLS
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_hand_tools" model="southbrook.tool.category">
+            <field name="name">Hand, Power, and Pneumatic Tools</field>
+            <field name="code">TOOL-HANDPOWER</field>
+            <field name="directness">direct_production_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_hand_screwdriver" model="southbrook.tool.category">
+            <field name="name">Screwdrivers and Driver Bits</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">hand_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_hand_hex" model="southbrook.tool.category">
+            <field name="name">Hex / Allen / Torx Keys</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">hand_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_hand_torque" model="southbrook.tool.category">
+            <field name="name">Torque Drivers</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">power_tool</field>
+            <field name="reusable">True</field>
+            <field name="requires_calibration">True</field>
+        </record>
+        <record id="cat_power_cordless" model="southbrook.tool.category">
+            <field name="name">Cordless Drills / Impact Drivers</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">power_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_power_router" model="southbrook.tool.category">
+            <field name="name">Routers / Laminate Trimmers</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">power_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_power_sander" model="southbrook.tool.category">
+            <field name="name">Sanders</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">power_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_pneu_nailer" model="southbrook.tool.category">
+            <field name="name">Nailers / Staplers</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">pneumatic_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_pneu_airgun" model="southbrook.tool.category">
+            <field name="name">Air Guns / Heat Guns / Glue Guns</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">pneumatic_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_hand_misc" model="southbrook.tool.category">
+            <field name="name">Hand Tools — Knives, Pliers, Wrenches</field>
+            <field name="parent_id" ref="cat_hand_tools"/>
+            <field name="tool_family">hand_tool</field>
+            <field name="reusable">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             I. MACHINE MAINTENANCE SUPPLIES
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_maintenance" model="southbrook.tool.category">
+            <field name="name">Machine Maintenance Supplies</field>
+            <field name="code">MAINT</field>
+            <field name="tool_family">maintenance_supply</field>
+            <field name="directness">maintenance_supply</field>
+            <field name="consumable">True</field>
+            <field name="requires_stock">True</field>
+        </record>
+        <record id="cat_maint_grease" model="southbrook.tool.category">
+            <field name="name">Grease (Bearing / Rail)</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">grease</field>
+            <field name="consumable">True</field>
+            <field name="has_expiry_date">True</field>
+        </record>
+        <record id="cat_maint_oil_gear" model="southbrook.tool.category">
+            <field name="name">Gear / Hydraulic Oil</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">oil</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+        </record>
+        <record id="cat_maint_oil_pneumatic" model="southbrook.tool.category">
+            <field name="name">Pneumatic / Compressor Oil</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">oil</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+        </record>
+        <record id="cat_maint_lube" model="southbrook.tool.category">
+            <field name="name">Lubricating Oil / Chain Oil</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">lubricant</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_maint_coolant" model="southbrook.tool.category">
+            <field name="name">Cutting Lubricant / Coolant</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">lubricant</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+        </record>
+        <record id="cat_maint_antirust" model="southbrook.tool.category">
+            <field name="name">Anti-Rust / Cleaning Spray</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">cleaning_supply</field>
+            <field name="consumable">True</field>
+            <field name="hazardous">True</field>
+        </record>
+        <record id="cat_maint_air_filter" model="southbrook.tool.category">
+            <field name="name">Air / Dust Collector Filters</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">maintenance_supply</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_maint_belt_bearing" model="southbrook.tool.category">
+            <field name="name">Belts, Bearings, Seals</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">spare_part</field>
+            <field name="directness">spare_part</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_maint_cnc_collet" model="southbrook.tool.category">
+            <field name="name">Tool Holders / Collets</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">spare_part</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_maint_cnc_spoilboard" model="southbrook.tool.category">
+            <field name="name">CNC Spoilboard / Vacuum Gasket</field>
+            <field name="parent_id" ref="cat_maintenance"/>
+            <field name="tool_family">spare_part</field>
+            <field name="consumable">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             J. SAFETY AND PPE
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_safety" model="southbrook.tool.category">
+            <field name="name">Safety and PPE</field>
+            <field name="code">PPE</field>
+            <field name="tool_family">safety_ppe</field>
+            <field name="directness">safety_supply</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_ppe_glasses" model="southbrook.tool.category">
+            <field name="name">Safety Glasses</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_ppe_hearing" model="southbrook.tool.category">
+            <field name="name">Hearing Protection</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_ppe_dust_mask" model="southbrook.tool.category">
+            <field name="name">Dust Masks</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_ppe_respirator" model="southbrook.tool.category">
+            <field name="name">Respirators</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="reusable">True</field>
+            <field name="requires_cleaning">True</field>
+        </record>
+        <record id="cat_ppe_respirator_filter" model="southbrook.tool.category">
+            <field name="name">Respirator Filters</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_ppe_gloves" model="southbrook.tool.category">
+            <field name="name">Gloves (Nitrile / Cut Resistant)</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_ppe_apron" model="southbrook.tool.category">
+            <field name="name">Aprons / Face Shields</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_ppe_first_aid" model="southbrook.tool.category">
+            <field name="name">First Aid Supplies</field>
+            <field name="parent_id" ref="cat_safety"/>
+            <field name="tool_family">safety_ppe</field>
+            <field name="consumable">True</field>
+            <field name="has_expiry_date">True</field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             K. PACKING AND DISPATCH TOOLS / CONSUMABLES
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <record id="cat_packing" model="southbrook.tool.category">
+            <field name="name">Packing and Dispatch Tools / Consumables</field>
+            <field name="code">PACKING</field>
+            <field name="directness">direct_consumable</field>
+            <field name="consumable">True</field>
+            <field name="requires_stock">True</field>
+        </record>
+        <record id="cat_pack_knife" model="southbrook.tool.category">
+            <field name="name">Carton Knives</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_pack_label_printer" model="southbrook.tool.category">
+            <field name="name">Label Printers</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_tool</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_pack_labels" model="southbrook.tool.category">
+            <field name="name">Labels / Barcode Labels</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_pack_stretch" model="southbrook.tool.category">
+            <field name="name">Stretch / Shrink Wrap</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_pack_foam" model="southbrook.tool.category">
+            <field name="name">Foam Wrap</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_pack_corner" model="southbrook.tool.category">
+            <field name="name">Cardboard Corners / Edge Protectors</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_pack_blanket" model="southbrook.tool.category">
+            <field name="name">Moving Blankets</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_consumable</field>
+            <field name="reusable">True</field>
+        </record>
+        <record id="cat_pack_tape" model="southbrook.tool.category">
+            <field name="name">Packing Tape / Dispensers</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+        <record id="cat_pack_pallet" model="southbrook.tool.category">
+            <field name="name">Pallets / Strapping</field>
+            <field name="parent_id" ref="cat_packing"/>
+            <field name="tool_family">packaging_consumable</field>
+            <field name="consumable">True</field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Three Southbrook tool-control groups:
+
+    group_tool_operator         shop-floor operator: read tool requirements,
+                                report tool issues, log usage, check
+                                out / return tools assigned to them.
+                                Inherits the standard MRP user group.
+
+    group_tool_crib_manager     tool crib lead: full CRUD on tool assets,
+                                tool kits, cribs, checkouts, and the
+                                replenishment defaults. Inherits operator.
+
+    group_maintenance_technician  technician: full CRUD on tool maintenance
+                                requests, usage logs, and the asset
+                                lifecycle / condition fields.
+
+  Existing southbrook_mrp_pm.group_floor_manager picks up read access on
+  the new tool-readiness fields in commit 4 via ir.model.access.csv;
+  no group definition needed here.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="module_category_southbrook_tools" model="ir.module.category">
+            <field name="name">Southbrook Tool Control</field>
+            <field name="description">
+                Shop-floor tool, consumable, and maintenance-supply
+                control for the Southbrook kitchen / cabinet shop.
+            </field>
+            <field name="sequence">22</field>
+        </record>
+
+        <record id="group_tool_operator" model="res.groups">
+            <field name="name">Tool Operator</field>
+            <field name="comment">
+                Shop-floor operator. Reads tool requirements, reports
+                tool issues, logs usage, checks out / returns tools.
+            </field>
+            <field name="implied_ids"
+                   eval="[(4, ref('mrp.group_mrp_user'))]"/>
+        </record>
+
+        <record id="group_tool_crib_manager" model="res.groups">
+            <field name="name">Tool Crib Manager</field>
+            <field name="comment">
+                Tool crib lead. Full CRUD on tool assets, kits, cribs,
+                checkouts, and replenishment policy.
+            </field>
+            <field name="implied_ids"
+                   eval="[(4, ref('group_tool_operator')),
+                          (4, ref('stock.group_stock_user'))]"/>
+        </record>
+
+        <record id="group_maintenance_technician" model="res.groups">
+            <field name="name">Tool Maintenance Technician</field>
+            <field name="comment">
+                Maintenance technician. Full CRUD on tool maintenance
+                requests, usage logs, and asset lifecycle / condition.
+            </field>
+            <field name="implied_ids"
+                   eval="[(4, ref('group_tool_operator')),
+                          (4, ref('maintenance.group_equipment_manager'))]"/>
+        </record>
+
+    </data>
+</odoo>
