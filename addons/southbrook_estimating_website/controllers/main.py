@@ -1476,6 +1476,47 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "redirect_url": f"/report/pdf/{report_xml_id}/{order_id}",
             }
 
+        if action_code == "print_door_order":
+            # Phase 4 Sprint 7 — Door Order QWeb PDF surfacing.
+            # Same pattern as print: return URL, OWL opens in new tab.
+            # Dealer-facing report; the door supplier consumes the PDF
+            # to fill the actual door order.
+            return {
+                "ok": True,
+                "redirect_url": (
+                    f"/report/pdf/"
+                    f"southbrook_estimating.action_report_door_order/"
+                    f"{order_id}"
+                ),
+            }
+
+        if action_code == "print_shop_copy":
+            # Phase 4 Sprint 7 — Shop Copy QWeb PDF.
+            # Shop Copy binds to mrp.production. We find the
+            # earliest MO tied to this order (by origin = order.name)
+            # and print that one. Returns wrong_state if no MO
+            # exists yet so the OWL component can surface a clear
+            # message instead of a 404.
+            mo = request.env["mrp.production"].sudo().search(
+                [("origin", "=", order.name)], limit=1, order="id",
+            )
+            if not mo:
+                return {
+                    "error": "no_mo",
+                    "message": (
+                        "No manufacturing order exists for this sale "
+                        "order yet. Use 'Send to Manufacturing' first."
+                    ),
+                }
+            return {
+                "ok": True,
+                "redirect_url": (
+                    f"/report/pdf/"
+                    f"southbrook_estimating.action_report_shop_copy/"
+                    f"{mo.id}"
+                ),
+            }
+
         return {"error": "unknown_action", "message": str(action_code)}
 
     # Phase 2.5 commit 1 — portal kitchen-3d payload.

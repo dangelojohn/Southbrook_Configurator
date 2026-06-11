@@ -279,6 +279,28 @@ class FooterActions extends Component {
                     <t t-else="">Customer Print (PDF)</t>
                 </button>
 
+                <!-- Phase 4 Sprint 7 — Dealer-only: Print Door Order
+                     (per-order door schedule, used by the door
+                     supplier directly). -->
+                <button t-if="props.mode !== 'customer'"
+                        class="o_owl_btn o_owl_btn_secondary"
+                        t-on-click="() => props.onAction('print_door_order')"
+                        t-att-disabled="props.busy">
+                    Print Door Order
+                </button>
+
+                <!-- Phase 4 Sprint 7 — Dealer-only: Print Shop Copy.
+                     Surfaces only when an MO exists for this order
+                     (after Send-to-Manufacturing fires). The server
+                     returns no_mo when no MO is tied, and the OWL
+                     component shows the message inline. -->
+                <button t-if="props.mode !== 'customer' and props.order?.state === 'sale'"
+                        class="o_owl_btn o_owl_btn_secondary"
+                        t-on-click="() => props.onAction('print_shop_copy')"
+                        t-att-disabled="props.busy">
+                    Print Shop Copy
+                </button>
+
                 <!-- Dealer-only: Duplicate as Draft. Customers don't
                      duplicate their own orders — that's a sales-rep
                      iteration tool (NF6 Image Floor pattern). -->
@@ -2726,6 +2748,8 @@ class OrderBuilder extends Component {
                     }
                     break;
                 case "print":
+                case "print_door_order":
+                case "print_shop_copy":
                     if (res.redirect_url) {
                         window.open(res.redirect_url, "_blank");
                     }
