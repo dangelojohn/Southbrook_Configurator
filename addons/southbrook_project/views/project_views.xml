@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  project.project form inherit — surface the corrected
+  southbrook_top_level_task_count next to the stock task count so
+  operators see real customer-job count, not subtask-inflated totals.
+
+  Stock open_task_count stays put for backwards-compatibility with
+  any module that already reads it (Tasks Analysis, Burndown, etc.).
+-->
+<odoo>
+
+    <record id="view_project_form_inherit_southbrook"
+            model="ir.ui.view">
+        <field name="name">project.project.form.inherit.southbrook</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.edit_project"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button class="oe_stat_button"
+                        type="object"
+                        icon="fa-briefcase"
+                        name="action_view_tasks">
+                    <field name="southbrook_top_level_task_count"
+                           widget="statinfo"
+                           string="Customer Jobs"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

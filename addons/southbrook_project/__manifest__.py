@@ -50,6 +50,7 @@ These are flagged in the README for a human operator.
     "data": [
         "data/project_tags.xml",
         "views/project_task_views.xml",
+        "views/project_views.xml",
     ],
     "post_init_hook": "post_init_backfill_project_1",
     "assets": {
