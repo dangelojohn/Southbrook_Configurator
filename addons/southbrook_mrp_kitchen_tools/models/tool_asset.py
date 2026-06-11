@@ -344,3 +344,36 @@ class SouthbrookToolAsset(models.Model):
         for rec in self:
             rec.lifecycle_state = "scrapped"
             rec.active = False
+
+    # ──────────────────────────────────────────────────────────────────
+    # Cron — daily sweep for overdue sharpening / calibration
+    # ──────────────────────────────────────────────────────────────────
+    @api.model
+    def _cron_maintenance_sweep(self):
+        """Flip assets whose next_sharpening_due_date / next_calibration_due_date
+        is on or before today into the corresponding needs_* state.
+
+        Conservative: only flips assets currently in available / in_use —
+        don't stomp manual states (under_maintenance, broken, retired,
+        scrapped).
+        """
+        today = fields.Date.context_today(self)
+        Asset = self.with_context(active_test=True)
+
+        sharpen_domain = [
+            ("active", "=", True),
+            ("lifecycle_state", "in", ("available", "in_use")),
+            ("next_sharpening_due_date", "!=", False),
+            ("next_sharpening_due_date", "<=", today),
+        ]
+        for a in Asset.search(sharpen_domain):
+            a.lifecycle_state = "needs_sharpening"
+
+        calibrate_domain = [
+            ("active", "=", True),
+            ("lifecycle_state", "in", ("available", "in_use")),
+            ("next_calibration_due_date", "!=", False),
+            ("next_calibration_due_date", "<=", today),
+        ]
+        for a in Asset.search(calibrate_domain):
+            a.lifecycle_state = "needs_calibration"

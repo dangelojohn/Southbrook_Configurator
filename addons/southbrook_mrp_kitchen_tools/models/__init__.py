@@ -15,3 +15,5 @@ from . import mrp_routing_workcenter
 from . import mrp_workorder
 # Commit 5 — consumption, cost, usage
 from . import workorder_tool_consumption
+# Commit 6 — QC + downtime + reports + demo + docs
+from . import mrp_production

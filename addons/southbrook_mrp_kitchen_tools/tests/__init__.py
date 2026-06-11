@@ -10,3 +10,5 @@ from . import test_requirements
 from . import test_readiness
 # Commit 5 — consumption, cost, usage
 from . import test_consumption
+# Commit 6 — production rollup + cron + demo
+from . import test_production_cost

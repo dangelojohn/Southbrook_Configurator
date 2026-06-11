@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Three demo tool kits covering the most common station-level pulls
+  the shop floor batches together:
+
+    * Door Hardware Kit — hinge jig, hinge bit, torque driver
+    * Cutting Setup Kit — melamine blade, 6mm compression bit, caliper
+    * QC Inspection Kit — caliper
+
+  Operators check out a whole kit in one click in commit 4's workflow.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="kit_door_hardware" model="southbrook.tool.kit">
+            <field name="code">KIT-DOOR-HARDWARE</field>
+            <field name="name">Door Hardware Installation Kit</field>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_hw"/>
+            <field name="tool_crib_id" ref="crib_hardware"/>
+            <field name="notes">Standard kit for fitting hinges and handles to cabinet doors. Pulled together at the start of every door-hardware run.</field>
+        </record>
+
+        <record id="kit_door_hardware_line_jig"
+                model="southbrook.tool.kit.line">
+            <field name="kit_id" ref="kit_door_hardware"/>
+            <field name="tool_category_id" ref="cat_jig_hinge"/>
+            <field name="quantity">1</field>
+        </record>
+
+        <record id="kit_door_hardware_line_bit"
+                model="southbrook.tool.kit.line">
+            <field name="kit_id" ref="kit_door_hardware"/>
+            <field name="tool_category_id" ref="cat_drill_hinge_35"/>
+            <field name="quantity">1</field>
+        </record>
+
+        <record id="kit_door_hardware_line_torque"
+                model="southbrook.tool.kit.line">
+            <field name="kit_id" ref="kit_door_hardware"/>
+            <field name="tool_category_id" ref="cat_hand_torque"/>
+            <field name="quantity">1</field>
+        </record>
+
+        <record id="kit_cutting_setup" model="southbrook.tool.kit">
+            <field name="code">KIT-CUTTING-SETUP</field>
+            <field name="name">Panel Cutting Setup Kit</field>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="tool_crib_id" ref="crib_cut"/>
+        </record>
+
+        <record id="kit_cutting_setup_line_blade"
+                model="southbrook.tool.kit.line">
+            <field name="kit_id" ref="kit_cutting_setup"/>
+            <field name="tool_category_id" ref="cat_blade_melamine"/>
+            <field name="quantity">1</field>
+        </record>
+
+        <record id="kit_cutting_setup_line_caliper"
+                model="southbrook.tool.kit.line">
+            <field name="kit_id" ref="kit_cutting_setup"/>
+            <field name="tool_category_id" ref="cat_meas_caliper"/>
+            <field name="quantity">1</field>
+        </record>
+
+        <record id="kit_qc_inspection" model="southbrook.tool.kit">
+            <field name="code">KIT-QC-INSPECTION</field>
+            <field name="name">QC Inspection Kit</field>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_qc"/>
+            <field name="tool_crib_id" ref="crib_qc"/>
+        </record>
+
+        <record id="kit_qc_inspection_line_caliper"
+                model="southbrook.tool.kit.line">
+            <field name="kit_id" ref="kit_qc_inspection"/>
+            <field name="tool_category_id" ref="cat_meas_caliper"/>
+            <field name="quantity">1</field>
+        </record>
+
+    </data>
+</odoo>

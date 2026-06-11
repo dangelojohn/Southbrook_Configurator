@@ -65,6 +65,7 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
         "security/ir.model.access.csv",
         "data/sequences.xml",
         "data/tool_categories_seed.xml",
+        "data/crons.xml",
         "views/tool_category_views.xml",
         "views/product_template_views.xml",
         "views/tool_crib_views.xml",
@@ -78,6 +79,8 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
     "demo": [
         "demo/tool_cribs_demo.xml",
         "demo/tool_assets_demo.xml",
+        "demo/tool_kits_demo.xml",
+        "demo/requirements_demo.xml",
     ],
     "installable": True,
     "application": False,

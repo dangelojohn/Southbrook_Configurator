@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Workcenter requirements — what each cell needs to be considered ready.
+  Refs the southbrook_mrp_pm workcenter xmlids and the c1 categories.
+
+  These rows drive commit 4's readiness check: an MO targeting the saw
+  cell will be BLOCKED if no available melamine blade asset exists; an
+  MO at the CNC bore cell will be BLOCKED if no available hinge bit
+  asset exists.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="req_saw_blade"
+                model="southbrook.workcenter.tool.requirement">
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="tool_category_id" ref="cat_saw_blades"/>
+            <field name="quantity">1</field>
+            <field name="is_mandatory" eval="True"/>
+            <field name="notes">Saw cell needs at least one available blade in any sub-category to start a cutting work order.</field>
+        </record>
+
+        <record id="req_saw_cnc_bit"
+                model="southbrook.workcenter.tool.requirement">
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="tool_category_id" ref="cat_cnc_bits"/>
+            <field name="quantity">1</field>
+            <field name="is_mandatory" eval="False"/>
+            <field name="notes">Optional — CNC bit only required when the cut list includes routed grooves / cope+stick.</field>
+        </record>
+
+        <record id="req_drill_hinge_bit"
+                model="southbrook.workcenter.tool.requirement">
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_cnc_bore"/>
+            <field name="tool_category_id" ref="cat_drill_hinge_35"/>
+            <field name="quantity">1</field>
+            <field name="is_mandatory" eval="True"/>
+        </record>
+
+        <record id="req_qc_caliper"
+                model="southbrook.workcenter.tool.requirement">
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_qc"/>
+            <field name="tool_category_id" ref="cat_meas_caliper"/>
+            <field name="quantity">1</field>
+            <field name="is_mandatory" eval="True"/>
+            <field name="notes">QC inspection needs at least one calibrated caliper.</field>
+        </record>
+
+        <record id="req_hardware_torque"
+                model="southbrook.workcenter.tool.requirement">
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_hw"/>
+            <field name="tool_category_id" ref="cat_hand_torque"/>
+            <field name="quantity">1</field>
+            <field name="is_mandatory" eval="True"/>
+        </record>
+
+    </data>
+</odoo>
