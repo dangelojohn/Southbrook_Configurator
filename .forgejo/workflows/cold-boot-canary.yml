@@ -1,0 +1,72 @@
+name: cold-boot-canary
+
+# WHY THIS EXISTS
+# A long-running Odoo serves the site from a WARM in-memory registry and can
+# keep working even when the code on disk would FAIL a cold load. The break
+# only surfaces on the next container restart, which then crash-loops and
+# takes the live site down (exactly the 2026-06-11
+# mrp.workorder.x_sbk_estimated_cost incident).
+#
+# This canary performs that cold load on a schedule, so a latent break is
+# caught QUIETLY (a failed Actions run) instead of LOUDLY (a production outage
+# at the next restart).
+#
+# PREREQUISITES / NOTES
+#  - Scheduled triggers only fire for workflows on the DEFAULT branch, so this
+#    must be merged to `main` before the cron runs. Until then, test it with
+#    the "Run workflow" button (workflow_dispatch).
+#  - The runner (label linux-amd64) must be able to reach the QNAP
+#    system-docker daemon, i.e. `docker exec southbrook-odoo ...` works from a
+#    job. The runner is already set up with the system-docker socket so jobs
+#    can drive the prod containers; if `docker` can't see southbrook-odoo,
+#    uncomment DOCKER_HOST below and point it at the mounted socket.
+#  - SAFE BY DESIGN: a plain `--stop-after-init` load (NO -u/-i) does not bump
+#    the registry signal, so the live workers are not disturbed. Run it once
+#    manually and confirm the site stays healthy before trusting the schedule.
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'      # every 6 hours, at :23
+  workflow_dispatch: {}          # manual "Run workflow" button
+
+jobs:
+  cold-load-southbrook:
+    runs-on: linux-amd64
+    env:
+      CONTAINER: southbrook-odoo
+      DB: southbrook
+      # If `docker` in the job can't see the prod containers, point it at the
+      # system-docker socket the runner mounts:
+      # DOCKER_HOST: unix:///var/run/system-docker.sock
+    steps:
+      - name: Cold-load the registry (what a restart would do)
+        run: |
+          set +e   # capture exit code + classify ourselves
+          docker exec "$CONTAINER" odoo -d "$DB" \
+            --stop-after-init --no-http --max-cron-threads=0 \
+            --logfile=/dev/stderr > cold.log 2>&1
+          rc=$?
+          echo "----- cold-load output (tail) -----"
+          tail -30 cold.log
+          echo "-----------------------------------"
+          fail() {
+            echo "::error::$1"
+            echo "  -> A restart of $CONTAINER would crash-loop the live site."
+            echo "  -> Do NOT restart/deploy $CONTAINER until the registry cold-loads cleanly."
+            exit 1
+          }
+          [ "$rc" -eq 0 ] || fail "cold registry load exited $rc"
+          if grep -qE 'Failed to load registry|CRITICAL|AssertionError|Traceback \(most recent' cold.log; then
+            fail "cold registry load hit a load error (see tail above)"
+          fi
+          grep -q 'Modules loaded' cold.log || fail "cold load did not reach 'Modules loaded'"
+          echo "Cold load clean — a restart of $CONTAINER is safe."
+
+      # OPTIONAL — ping a chat/webhook when the canary fails. Add a repo secret
+      # CANARY_WEBHOOK_URL, then uncomment:
+      # - name: Alert on failure
+      #   if: failure()
+      #   run: |
+      #     curl -fsS -X POST "${{ secrets.CANARY_WEBHOOK_URL }}" \
+      #       -H 'Content-Type: application/json' \
+      #       --data '{"text":"southbrook cold-boot canary FAILED — the registry will not cold-load. Do NOT restart southbrook-odoo until fixed."}'
