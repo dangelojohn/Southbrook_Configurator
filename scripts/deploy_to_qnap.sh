@@ -127,11 +127,27 @@ try: u.urlopen('http://localhost:8069/web/login', timeout=10); print(200)
 except u.HTTPError as e: print(e.code)
 except Exception: print('boot')\"" 2>/dev/null || true
 }
+# Poll for a 200 rather than a single shot: a `-u` signals the live workers to
+# reload their registry, so the server is briefly unavailable mid-deploy and a
+# one-shot check false-fails (it returned 'boot' and aborted a healthy deploy).
+wait_healthy() {
+  local tries="${1:-20}" i
+  for ((i = 1; i <= tries; i++)); do
+    [[ "$(health_check)" == "200" ]] && { log "live /web/login → 200 (after $i check(s))"; return 0; }
+    sleep 6
+  done
+  return 1
+}
+
 if [[ "$DRY_RUN" != "1" ]]; then
-  log "verifying live server health (/web/login)…"
-  h="$(health_check)"
-  [[ "$h" == "200" ]] || fail "live /web/login returned '$h' (expected 200) — deploy may have left the site unhealthy; investigate $CONTAINER."
-  log "live /web/login → 200 ✓"
+  if [[ "${RESTART:-0}" == "1" ]]; then
+    # We're about to hard-restart, which re-gates health definitively below.
+    # Running this gate now only catches the transient `-u` reload — skip it.
+    log "health gate deferred to the post-restart check (RESTART=1)."
+  else
+    log "verifying live server health (/web/login)…"
+    wait_healthy || fail "live /web/login never returned 200 — deploy may have left the site unhealthy; investigate $CONTAINER."
+  fi
 fi
 
 # ---- optional hard restart (controller/Python changes need it) --------
@@ -143,12 +159,7 @@ if [[ "${RESTART:-0}" == "1" && "$DRY_RUN" != "1" ]]; then
   log "RESTART=1 → hard stop+start $CONTAINER (loads new Python code)…"
   ssh "$QNAP_HOST" "$QNAP_DOCKER stop $CONTAINER && $QNAP_DOCKER start $CONTAINER"
   log "waiting for /web/login 200…"
-  ok=0
-  for i in $(seq 1 30); do
-    [[ "$(health_check)" == "200" ]] && { ok=1; log "live /web/login → 200 after $i checks ✓"; break; }
-    sleep 6
-  done
-  [[ "$ok" == "1" ]] || fail "after restart, $CONTAINER never returned 200 on /web/login — site may be DOWN. Roll back / investigate now."
+  wait_healthy 30 || fail "after restart, $CONTAINER never returned 200 on /web/login — site may be DOWN. Roll back / investigate now."
 fi
 
 # ---- post-flight inventory (informational ONLY — not a success signal) -
