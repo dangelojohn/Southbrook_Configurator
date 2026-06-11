@@ -38,6 +38,19 @@ class ProjectTask(models.Model):
              "costing module when installed; never re-entered here).")
     company_currency_id = fields.Many2one(
         related="company_id.currency_id", string="Company Currency")
+    # Surfaced read-only from the MO's other custom tabs (CAD / Intelligence /
+    # Shop-Floor) when those modules are installed — soft-referenced, never a
+    # hard dependency, so the bridge cold-installs standalone.
+    job_install_due = fields.Date(
+        string="Earliest Install Due", compute="_compute_mrp_status",
+        help="Soonest install date across the job's MOs (install/site info "
+             "lives on the MO; surfaced here so the PM sees it on the job).")
+    job_cad_status = fields.Char(
+        string="CAD Status", compute="_compute_mrp_status",
+        help="CAD-artifact status across the job's MOs (CAD Artifacts tab).")
+    job_next_action = fields.Char(
+        string="Next Action", compute="_compute_mrp_status",
+        help="Next manufacturing-intelligence action on a job MO, if any.")
 
     @api.depends("production_ids",
                  "production_ids.state",
@@ -52,6 +65,9 @@ class ProjectTask(models.Model):
                 task.mo_state_summary = ""
                 task.components_available = "none"
                 task.job_industrial_cost = 0.0
+                task.job_install_due = False
+                task.job_cad_status = ""
+                task.job_next_action = ""
                 continue
 
             task.mo_reference = ", ".join(mos.mapped("name"))
@@ -73,6 +89,17 @@ class ProjectTask(models.Model):
             # Cost roll-up — pull from the costing module's field if present.
             task.job_industrial_cost = sum(
                 (getattr(m, "industrial_cost", 0.0) or 0.0) for m in mos)
+
+            # Soft pulls from the MO's CAD / Intelligence / Shop-Floor tabs.
+            install = [d for d in
+                       (getattr(m, "x_sbk_install_due_date", False) for m in mos)
+                       if d]
+            task.job_install_due = min(install) if install else False
+            cad = {getattr(m, "x_cad_status", False) for m in mos} - {False, ""}
+            task.job_cad_status = ", ".join(sorted(str(c) for c in cad))
+            actions = [a for a in
+                       (getattr(m, "x_mi_next_action", False) for m in mos) if a]
+            task.job_next_action = actions[0] if actions else ""
 
     # --- actions --------------------------------------------------------------
     def action_view_productions(self):

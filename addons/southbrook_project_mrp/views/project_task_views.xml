@@ -34,6 +34,12 @@
                 <field name="job_industrial_cost"
                        invisible="production_count == 0"/>
                 <field name="company_currency_id" column_invisible="1"/>
+                <field name="job_install_due"
+                       invisible="not job_install_due"/>
+                <field name="job_cad_status"
+                       invisible="not job_cad_status"/>
+                <field name="job_next_action"
+                       invisible="not job_next_action"/>
             </xpath>
 
             <!-- Manufacturing page: the job's MOs + the manual link action. -->
