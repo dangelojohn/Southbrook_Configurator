@@ -584,14 +584,58 @@ class BoMPreview extends Component {
                 </tbody>
             </table>
 
+            <!-- Phase 4 Sprint 3 — per-line BoM breakdown.
+                 Each line gets its decomposition: width, panel count,
+                 door count. Reads the B2 sb_panel_count / sb_door_count /
+                 sb_width_mm fields surfaced into the line payload. -->
+            <h4 t-if="(props.lines || []).length"
+                class="o_owl_bom_section">
+                Per Line
+            </h4>
+            <table t-if="(props.lines || []).length"
+                   class="o_owl_bom_table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Cabinet</th>
+                        <th class="o_owl_th_right">Width</th>
+                        <th class="o_owl_th_right">Panels</th>
+                        <th class="o_owl_th_right">Doors</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="props.lines || []" t-as="line"
+                        t-key="line.id">
+                        <td class="mono"
+                            t-esc="line.sequence || line_index + 1"/>
+                        <td t-esc="line.product_name || line.product_sku || 'Line'"/>
+                        <td class="mono o_owl_th_right">
+                            <t t-if="line.sb_width_mm">
+                                <t t-esc="_fmtMm(line.sb_width_mm)"/>
+                            </t>
+                            <t t-else="">—</t>
+                        </td>
+                        <td class="mono o_owl_th_right"
+                            t-esc="line.sb_panel_count || '—'"/>
+                        <td class="mono o_owl_th_right"
+                            t-esc="line.sb_door_count || '—'"/>
+                    </tr>
+                </tbody>
+            </table>
+
             <p class="o_owl_bom_foot">
-                Phase 3 polish adds per-line BoM breakdown (collapsible),
-                cut diagrams, and the Accucutt nest JSON export.
+                Panel counts derive from variant attribute values when
+                a configurator session is wired; otherwise they parse
+                from the line name (B2 live-compute fallback).
             </p>
         </div>
     `;
     static props = {
         rollup: Object,
+        // Phase 4 Sprint 3 — per-line array. Default empty so the
+        // panel still renders cleanly on demo orders that haven't
+        // been re-loaded since B2 shipped.
+        lines: { type: Array, optional: true },
     };
 
     _totalPanels() {
@@ -615,6 +659,23 @@ class BoMPreview extends Component {
     _fmtMeters(mm) {
         if (!mm) return "0";
         return (mm / 1000).toFixed(2);
+    }
+
+    // Phase 4 Sprint 3 — format width as inches OR mm based on
+    // size. Cabinet widths are quoted in inches in North America;
+    // mm in Europe. Below 100 the value is in inches; above, mm.
+    // Heuristic — 100mm < any cabinet < 100" is the safe zone.
+    _fmtMm(mm) {
+        if (!mm) return "—";
+        if (mm < 100) {
+            // Already in inches (parsed from 24" pattern).
+            return `${mm.toFixed(0)}"`;
+        }
+        const inches = mm / 25.4;
+        if (Math.abs(inches - Math.round(inches)) < 0.05) {
+            return `${Math.round(inches)}" (${mm.toFixed(0)} mm)`;
+        }
+        return `${mm.toFixed(0)} mm`;
     }
 }
 
@@ -2111,7 +2172,7 @@ const TEMPLATE = xml`
                  class="o_owl_tab_panel o_owl_panel_bom"
                  role="tabpanel" aria-labelledby="o_owl_tab_bom"
                  tabindex="0">
-                <BoMPreview rollup="state.bom_rollup"/>
+                <BoMPreview rollup="state.bom_rollup" lines="state.lines"/>
             </div>
             <div t-elif="state.ui.current_tab === 'validation'"
                  class="o_owl_tab_panel o_owl_panel_validation"

@@ -1713,6 +1713,19 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 # Phase 3 polish wires the rule engine output per-line; for
                 # now nothing is rule-blocked at payload time.
                 "rule_blocked": False,
+                # Phase 4 Sprint 3 — per-line BoM breakdown payload.
+                # The fields are the B2 live-compute on sale.order.line
+                # (sb_panel_count / sb_door_count / sb_width_mm) that
+                # derive from variant attrs or parse from line.name.
+                # The OWL BoMPreview "Per Line" section reads these to
+                # surface panel/door counts at line resolution rather
+                # than only at order total.
+                "sb_panel_count": int(
+                    getattr(line, "sb_panel_count", 0) or 0),
+                "sb_door_count": int(
+                    getattr(line, "sb_door_count", 0) or 0),
+                "sb_width_mm": float(
+                    getattr(line, "sb_width_mm", 0.0) or 0.0),
             }
             lines.append(line_payload)
 
