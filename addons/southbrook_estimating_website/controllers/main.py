@@ -306,11 +306,30 @@ class SouthbrookKitchenPlanner(http.Controller):
             # will round to at confirm. Guarded — any exception or
             # missing prereq falls back to tmpl.list_price (retail).
             channel_price = tmpl.list_price
-            if channel_pricelist and base_variant:
+            if channel_pricelist:
+                # Cabinet templates use create_variant='dynamic' so
+                # no product.product variants exist until a customer
+                # configures one. The catalog endpoint can't force
+                # variant creation just to preview a price, so we
+                # fall back to pricing against the template itself —
+                # which _get_product_price accepts per its docstring
+                # ("product record (product.product/product.template)").
+                priceable = base_variant or tmpl
                 try:
-                    channel_price = channel_pricelist._get_product_price(
-                        base_variant, 1.0, partner,
-                    )
+                    # Odoo 19: _compute_price_rule signature changed
+                    # to (products, quantity, *, currency, uom, date,
+                    # compute_price, **kwargs) — currency is keyword-
+                    # only after *. The legacy call _get_product_price(
+                    # variant, 1.0, partner) was passing partner as a
+                    # third positional, which raised TypeError that
+                    # the broad except swallowed — every cabinet fell
+                    # back to list_price and the Tradesperson Tier 3
+                    # discount never reached the catalog.
+                    # Partner context for partner-specific rules is
+                    # carried via with_context(partner_id=...).
+                    channel_price = channel_pricelist.with_context(
+                        partner_id=partner.id if partner else None,
+                    )._get_product_price(priceable, 1.0)
                 except Exception:                       # noqa: BLE001
                     _logger.warning(
                         "kitchen_planner_state: pricelist %s could not "
@@ -318,7 +337,7 @@ class SouthbrookKitchenPlanner(http.Controller):
                         "to list_price for display.",
                         channel_pricelist.display_name,
                         sku or tmpl.name,
-                        base_variant.id,
+                        base_variant.id if base_variant else None,
                         exc_info=True,
                     )
             # Round to website currency precision (same path list_price
