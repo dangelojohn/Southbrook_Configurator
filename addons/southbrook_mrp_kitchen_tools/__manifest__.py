@@ -67,7 +67,13 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
         "data/tool_categories_seed.xml",
         "views/tool_category_views.xml",
         "views/product_template_views.xml",
+        "views/tool_crib_views.xml",
+        "views/tool_asset_views.xml",
         "views/menus.xml",
+    ],
+    "demo": [
+        "demo/tool_cribs_demo.xml",
+        "demo/tool_assets_demo.xml",
     ],
     "installable": True,
     "application": False,

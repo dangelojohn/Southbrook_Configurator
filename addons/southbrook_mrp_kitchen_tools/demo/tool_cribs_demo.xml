@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  12 tool cribs mirroring the build brief §8 — one per work-center
+  station plus the main central crib + maintenance + packing stores.
+
+  workcenter_ids reference both the SB-* cabinet seed
+  (southbrook_mrp_pm/data/workcenters.xml) and the extended
+  PAINT/SAND/DOOR/CURE rows (workcenters_extended.xml). Refs are
+  defensive — if a workcenter xmlid is absent on a given install,
+  Odoo silently omits it from the m2m write.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="crib_main" model="southbrook.tool.crib">
+            <field name="code">MAIN-TOOLCRIB</field>
+            <field name="name">Main Tool Crib</field>
+            <field name="notes">Central crib for blades, bits, measuring tools, and other reusable assets shared across stations.</field>
+        </record>
+
+        <record id="crib_cut" model="southbrook.tool.crib">
+            <field name="code">CUT-TOOL</field>
+            <field name="name">Cabinet Cutting Tool Cabinet</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_saw')])]"/>
+        </record>
+
+        <record id="crib_cnc" model="southbrook.tool.crib">
+            <field name="code">CNC-TOOL</field>
+            <field name="name">CNC Tool Cabinet</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_saw')])]"/>
+        </record>
+
+        <record id="crib_edge" model="southbrook.tool.crib">
+            <field name="code">EDGE-TOOL</field>
+            <field name="name">Edge Bander Tool Shelf</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_edge')])]"/>
+        </record>
+
+        <record id="crib_drill" model="southbrook.tool.crib">
+            <field name="code">DRILL-TOOL</field>
+            <field name="name">Drilling / Boring Tool Cabinet</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_cnc_bore')])]"/>
+        </record>
+
+        <record id="crib_sand" model="southbrook.tool.crib">
+            <field name="code">SAND-TOOL</field>
+            <field name="name">Sanding Consumable Rack</field>
+        </record>
+
+        <record id="crib_paint" model="southbrook.tool.crib">
+            <field name="code">PAINT-TOOL</field>
+            <field name="name">Paint Booth Tool Cabinet</field>
+        </record>
+
+        <record id="crib_assy" model="southbrook.tool.crib">
+            <field name="code">ASSY-TOOL</field>
+            <field name="name">Assembly Tool Bench</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_assy')])]"/>
+        </record>
+
+        <record id="crib_hardware" model="southbrook.tool.crib">
+            <field name="code">HARD-TOOL</field>
+            <field name="name">Hardware Fitting Tool Cabinet</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_hw')])]"/>
+        </record>
+
+        <record id="crib_qc" model="southbrook.tool.crib">
+            <field name="code">QC-TOOL</field>
+            <field name="name">QC Measurement Cabinet</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_qc')])]"/>
+        </record>
+
+        <record id="crib_maint" model="southbrook.tool.crib">
+            <field name="code">MAINT-STORE</field>
+            <field name="name">Maintenance Supplies Store</field>
+            <field name="notes">Grease, oils, filters, belts, bearings — picked by the maintenance technician.</field>
+        </record>
+
+        <record id="crib_pack" model="southbrook.tool.crib">
+            <field name="code">PACK-STORE</field>
+            <field name="name">Packing Supplies Store</field>
+            <field name="workcenter_ids" eval="[(6, 0, [ref('southbrook_mrp_pm.workcenter_pack')])]"/>
+        </record>
+
+    </data>
+</odoo>

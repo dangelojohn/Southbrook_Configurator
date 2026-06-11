@@ -87,6 +87,52 @@
               </tbody>
             </table>
 
+            <!-- Phase 4 Sprint 4 — panel cut list with dimensions.
+                 Pulls from the sb.production.package.cutlist_id that
+                 generate_from_mo() spawns at MO confirm. Falls back
+                 gracefully when the package hasn't been built yet
+                 (paranoid manual-MO and demo-fixture paths). -->
+            <!-- env.get is safe — returns None when southbrook_kitchen_mrp
+                 isn't installed. The Panel Cut List section then no-ops. -->
+            <t t-set="PkgModel" t-value="env.get('sb.production.package')"/>
+            <t t-set="pkg" t-value="PkgModel.sudo().search([('mo_id', '=', mo.id)], limit=1) if PkgModel is not None else False"/>
+            <t t-if="pkg and pkg.cutlist_id">
+              <h2>Panel Cut List (mm)</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Panel</th>
+                    <th class="sb-right">Qty</th>
+                    <th class="sb-right">L (mm)</th>
+                    <th class="sb-right">W (mm)</th>
+                    <th class="sb-right">Thk (mm)</th>
+                    <th>Substrate</th>
+                    <th>Grain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr t-foreach="pkg.cutlist_id.line_ids" t-as="ln">
+                    <td t-out="dict(ln._fields['panel_name'].selection).get(ln.panel_name, ln.panel_name)"/>
+                    <td class="sb-right" t-out="ln.qty"/>
+                    <td class="sb-right" t-out="'%.1f' % ln.length_mm"/>
+                    <td class="sb-right" t-out="'%.1f' % ln.width_mm"/>
+                    <td class="sb-right" t-out="'%.2f' % ln.thickness_mm"/>
+                    <td t-out="dict(ln._fields['substrate'].selection).get(ln.substrate, '-') if ln.substrate else '-'"/>
+                    <td t-out="dict(ln._fields['grain_dir'].selection).get(ln.grain_dir, '-') if ln.grain_dir else '-'"/>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="sb-muted" t-if="pkg.hardware_package_id">
+                Hardware package
+                <strong t-out="pkg.hardware_package_id.name"/>
+                covers <span t-out="len(pkg.hardware_package_id.line_ids)"/>
+                SKU rows.
+                <span t-if="pkg.hardware_package_id.has_pricing_pending">
+                  Some SKUs have pending pricing.
+                </span>
+              </p>
+            </t>
+
             <p class="sb-muted">
               Shop Copy data is MO-driven (mrp.production). All panel
               dimensions and hardware counts derive from

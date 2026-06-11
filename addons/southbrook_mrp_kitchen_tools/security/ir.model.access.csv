@@ -3,3 +3,12 @@ access_tool_category_user,Tool category read for MRP users,model_southbrook_tool
 access_tool_category_operator,Tool category read for tool operators,model_southbrook_tool_category,group_tool_operator,1,0,0,0
 access_tool_category_crib,Tool category CRUD for crib manager,model_southbrook_tool_category,group_tool_crib_manager,1,1,1,1
 access_tool_category_admin,Tool category CRUD for system admin,model_southbrook_tool_category,base.group_system,1,1,1,1
+access_tool_crib_user,Tool crib read for MRP users,model_southbrook_tool_crib,mrp.group_mrp_user,1,0,0,0
+access_tool_crib_operator,Tool crib read for tool operators,model_southbrook_tool_crib,group_tool_operator,1,0,0,0
+access_tool_crib_manager,Tool crib CRUD for crib manager,model_southbrook_tool_crib,group_tool_crib_manager,1,1,1,1
+access_tool_crib_admin,Tool crib CRUD for system admin,model_southbrook_tool_crib,base.group_system,1,1,1,1
+access_tool_asset_user,Tool asset read for MRP users,model_southbrook_tool_asset,mrp.group_mrp_user,1,0,0,0
+access_tool_asset_operator,Tool asset read+write for tool operators,model_southbrook_tool_asset,group_tool_operator,1,1,0,0
+access_tool_asset_crib,Tool asset CRUD for crib manager,model_southbrook_tool_asset,group_tool_crib_manager,1,1,1,1
+access_tool_asset_maintenance,Tool asset CRUD for maintenance tech,model_southbrook_tool_asset,group_maintenance_technician,1,1,1,0
+access_tool_asset_admin,Tool asset CRUD for system admin,model_southbrook_tool_asset,base.group_system,1,1,1,1

@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~20 demo tool assets covering the realistic Southbrook shop floor:
+
+    * 3 saw blades (1 in use, 1 dull/needs sharpening, 1 available)
+    * 4 CNC bits (compression / downcut / upcut / vgroove)
+    * 3 boring bits (35mm hinge / 5mm shelf pin / confirmat)
+    * 2 spray guns (1 available + 1 needs cleaning)
+    * 2 measuring tools (digital caliper, moisture meter) with
+      calibration dates
+    * 1 torque driver
+    * 4 jigs (hinge / handle / drawer / door squaring)
+
+  The demo scenarios in commit 6 reference these xmlids so e.g.
+  "CNC blocked because 3mm downcut bit is under maintenance" can
+  set asset_cnc_bit_downcut_3.lifecycle_state.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <!-- ─── Tool products (created first; tool assets reference them) ── -->
+
+        <record id="tool_prod_blade_mel_305_96t" model="product.product">
+            <field name="name">305mm 96T Melamine Panel Saw Blade</field>
+            <field name="default_code">SBK-TOOL-BLADE-MEL-305-96T</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="cat_blade_melamine"/>
+            <field name="x_southbrook_tool_family">saw_blade</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_blade_diameter_mm">305</field>
+            <field name="x_southbrook_tooth_count">96</field>
+            <field name="x_southbrook_bore_size_mm">30</field>
+            <field name="x_southbrook_estimated_life_qty">800</field>
+            <field name="x_southbrook_estimated_life_unit">cuts</field>
+            <field name="x_southbrook_sharpening_interval_qty">700</field>
+        </record>
+
+        <record id="tool_prod_cnc_comp_6mm" model="product.product">
+            <field name="name">6mm Compression Router Bit</field>
+            <field name="default_code">SBK-TOOL-CNC-COMP-6MM</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="cat_cnc_compression"/>
+            <field name="x_southbrook_tool_family">cnc_router_bit</field>
+            <field name="x_southbrook_cutting_diameter_mm">6.0</field>
+            <field name="x_southbrook_shank_diameter_mm">6.0</field>
+            <field name="x_southbrook_estimated_life_qty">600</field>
+            <field name="x_southbrook_estimated_life_unit">minutes</field>
+        </record>
+
+        <record id="tool_prod_cnc_down_3mm" model="product.product">
+            <field name="name">3mm Downcut Router Bit</field>
+            <field name="default_code">SBK-TOOL-CNC-DOWN-3MM</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="cat_cnc_downcut"/>
+            <field name="x_southbrook_tool_family">cnc_router_bit</field>
+            <field name="x_southbrook_cutting_diameter_mm">3.0</field>
+            <field name="x_southbrook_shank_diameter_mm">6.0</field>
+            <field name="x_southbrook_estimated_life_qty">400</field>
+            <field name="x_southbrook_estimated_life_unit">minutes</field>
+        </record>
+
+        <record id="tool_prod_drill_hinge_35mm" model="product.product">
+            <field name="name">35mm Hinge Boring Bit</field>
+            <field name="default_code">SBK-TOOL-DRILL-HINGE-35MM</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="cat_drill_hinge_35"/>
+            <field name="x_southbrook_tool_family">boring_bit</field>
+            <field name="x_southbrook_cutting_diameter_mm">35.0</field>
+            <field name="x_southbrook_shank_diameter_mm">10.0</field>
+            <field name="x_southbrook_estimated_life_qty">5000</field>
+            <field name="x_southbrook_estimated_life_unit">holes</field>
+        </record>
+
+        <record id="tool_prod_spray_gun_hvlp" model="product.product">
+            <field name="name">HVLP Spray Gun</field>
+            <field name="default_code">SBK-TOOL-SPRAY-GUN-HVLP</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id" ref="cat_spray_gun"/>
+            <field name="x_southbrook_tool_family">spray_equipment</field>
+            <field name="x_southbrook_cleaning_required_after_use">True</field>
+        </record>
+
+        <record id="tool_prod_caliper_digital" model="product.product">
+            <field name="name">Digital Caliper</field>
+            <field name="default_code">SBK-TOOL-CALIPER-DIGITAL</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id" ref="cat_meas_caliper"/>
+            <field name="x_southbrook_tool_family">measuring_tool</field>
+            <field name="x_southbrook_calibration_interval_days">180</field>
+        </record>
+
+        <record id="tool_prod_torque_driver" model="product.product">
+            <field name="name">Torque Screwdriver</field>
+            <field name="default_code">SBK-TOOL-TORQUE-DRIVER</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id" ref="cat_hand_torque"/>
+            <field name="x_southbrook_tool_family">power_tool</field>
+            <field name="x_southbrook_calibration_interval_days">365</field>
+        </record>
+
+        <record id="tool_prod_jig_hinge" model="product.product">
+            <field name="name">Hinge Drilling Jig</field>
+            <field name="default_code">SBK-TOOL-JIG-HINGE</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id" ref="cat_jig_hinge"/>
+            <field name="x_southbrook_tool_family">jig_fixture</field>
+        </record>
+
+        <!-- ─── Tool assets (instances of the products above) ─────── -->
+
+        <record id="asset_blade_mel_01" model="southbrook.tool.asset">
+            <field name="name">305mm 96T Melamine Blade #01</field>
+            <field name="product_id" ref="tool_prod_blade_mel_305_96t"/>
+            <field name="tool_crib_id" ref="crib_cut"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="remaining_life_qty">600</field>
+            <field name="estimated_life_qty">800</field>
+            <field name="life_unit">cuts</field>
+        </record>
+
+        <record id="asset_blade_mel_02" model="southbrook.tool.asset">
+            <field name="name">305mm 96T Melamine Blade #02 (dull)</field>
+            <field name="product_id" ref="tool_prod_blade_mel_305_96t"/>
+            <field name="tool_crib_id" ref="crib_cut"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="lifecycle_state">needs_sharpening</field>
+            <field name="condition">dull</field>
+            <field name="remaining_life_qty">50</field>
+            <field name="estimated_life_qty">800</field>
+            <field name="life_unit">cuts</field>
+            <field name="notes">Scheduled for sharpening service this week. Demo asset for the cutting work order quality scenario.</field>
+        </record>
+
+        <record id="asset_blade_mel_03" model="southbrook.tool.asset">
+            <field name="name">305mm 96T Melamine Blade #03 (in use)</field>
+            <field name="product_id" ref="tool_prod_blade_mel_305_96t"/>
+            <field name="tool_crib_id" ref="crib_cut"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="lifecycle_state">in_use</field>
+            <field name="condition">good</field>
+            <field name="remaining_life_qty">450</field>
+            <field name="estimated_life_qty">800</field>
+            <field name="life_unit">cuts</field>
+        </record>
+
+        <record id="asset_cnc_comp_6mm_01" model="southbrook.tool.asset">
+            <field name="name">6mm Compression Bit #01</field>
+            <field name="product_id" ref="tool_prod_cnc_comp_6mm"/>
+            <field name="tool_crib_id" ref="crib_cnc"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="remaining_life_qty">450</field>
+            <field name="estimated_life_qty">600</field>
+            <field name="life_unit">minutes</field>
+        </record>
+
+        <record id="asset_cnc_down_3mm_01" model="southbrook.tool.asset">
+            <field name="name">3mm Downcut Bit #01 (under maintenance)</field>
+            <field name="product_id" ref="tool_prod_cnc_down_3mm"/>
+            <field name="tool_crib_id" ref="crib_cnc"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+            <field name="lifecycle_state">under_maintenance</field>
+            <field name="condition">damaged</field>
+            <field name="remaining_life_qty">100</field>
+            <field name="estimated_life_qty">400</field>
+            <field name="life_unit">minutes</field>
+            <field name="notes">Demo asset for "CNC work order blocked because the required 3mm downcut bit is under maintenance" scenario in commit 6.</field>
+        </record>
+
+        <record id="asset_drill_hinge_35mm_01" model="southbrook.tool.asset">
+            <field name="name">35mm Hinge Bit #01</field>
+            <field name="product_id" ref="tool_prod_drill_hinge_35mm"/>
+            <field name="tool_crib_id" ref="crib_drill"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_cnc_bore"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="remaining_life_qty">3800</field>
+            <field name="estimated_life_qty">5000</field>
+            <field name="life_unit">holes</field>
+        </record>
+
+        <record id="asset_spray_gun_hvlp_01" model="southbrook.tool.asset">
+            <field name="name">HVLP Spray Gun #01</field>
+            <field name="product_id" ref="tool_prod_spray_gun_hvlp"/>
+            <field name="tool_crib_id" ref="crib_paint"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+        </record>
+
+        <record id="asset_spray_gun_hvlp_02" model="southbrook.tool.asset">
+            <field name="name">HVLP Spray Gun #02 (needs cleaning)</field>
+            <field name="product_id" ref="tool_prod_spray_gun_hvlp"/>
+            <field name="tool_crib_id" ref="crib_paint"/>
+            <field name="lifecycle_state">needs_cleaning</field>
+            <field name="condition">good</field>
+            <field name="notes">Demo asset showing the post-paint cleaning workflow.</field>
+        </record>
+
+        <record id="asset_caliper_01" model="southbrook.tool.asset">
+            <field name="name">Digital Caliper #01</field>
+            <field name="product_id" ref="tool_prod_caliper_digital"/>
+            <field name="tool_crib_id" ref="crib_qc"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_qc"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">excellent</field>
+            <field name="last_calibrated_date">2026-04-01</field>
+            <field name="next_calibration_due_date">2026-09-28</field>
+        </record>
+
+        <record id="asset_torque_01" model="southbrook.tool.asset">
+            <field name="name">Torque Driver #01</field>
+            <field name="product_id" ref="tool_prod_torque_driver"/>
+            <field name="tool_crib_id" ref="crib_hardware"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_hw"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="last_calibrated_date">2026-01-15</field>
+            <field name="next_calibration_due_date">2027-01-15</field>
+        </record>
+
+        <record id="asset_jig_hinge_01" model="southbrook.tool.asset">
+            <field name="name">Hinge Drilling Jig #01</field>
+            <field name="product_id" ref="tool_prod_jig_hinge"/>
+            <field name="tool_crib_id" ref="crib_hardware"/>
+            <field name="workcenter_id" ref="southbrook_mrp_pm.workcenter_hw"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+        </record>
+
+    </data>
+</odoo>

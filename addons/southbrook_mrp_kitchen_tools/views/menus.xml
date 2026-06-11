@@ -24,6 +24,24 @@
               action="action_tool_category"
               sequence="10"/>
 
+    <menuitem id="menu_southbrook_tools_cribs"
+              name="Tool Cribs"
+              parent="menu_southbrook_tools_config_root"
+              action="action_tool_crib"
+              sequence="20"/>
+
+    <!-- ─── Manufacturing → Operations → Tool Assets ─────────────── -->
+    <menuitem id="menu_southbrook_tools_operations_root"
+              name="Southbrook Tools"
+              parent="mrp.menu_mrp_manufacturing"
+              sequence="80"/>
+
+    <menuitem id="menu_southbrook_tools_assets"
+              name="Tool Assets"
+              parent="menu_southbrook_tools_operations_root"
+              action="action_tool_asset"
+              sequence="10"/>
+
     <!-- ─── Inventory → Products → Southbrook Tools and Consumables ─ -->
     <menuitem id="menu_southbrook_tools_products"
               name="Southbrook Tools &amp; Consumables"
