@@ -11,3 +11,5 @@ from . import operation_tool_requirement
 from . import tool_kit
 from . import mrp_workcenter
 from . import mrp_routing_workcenter
+# Commit 4 — workorder readiness gate
+from . import mrp_workorder

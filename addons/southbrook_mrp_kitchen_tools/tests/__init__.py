@@ -6,3 +6,5 @@ from . import test_tool_crib
 from . import test_tool_asset
 # Commit 3 — requirements & kits
 from . import test_requirements
+# Commit 4 — workorder readiness gate
+from . import test_readiness

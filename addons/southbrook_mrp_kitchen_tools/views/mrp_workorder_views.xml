@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Inherit the mrp.workorder form to surface the readiness banner
+         + a manual "check readiness" button. -->
+    <record id="view_mrp_workorder_form_inherit_kt"
+            model="ir.ui.view">
+        <field name="name">mrp.workorder.form.inherit.kt</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_form_view_inherit"/>
+        <field name="arch" type="xml">
+            <header position="inside">
+                <button name="action_check_tool_readiness"
+                        type="object"
+                        string="Check Tool Readiness"
+                        class="btn-secondary"
+                        groups="southbrook_mrp_kitchen_tools.group_tool_operator"/>
+                <field name="southbrook_tool_readiness_state"
+                       widget="statusbar"
+                       options="{'clickable': '0'}"
+                       statusbar_visible="not_checked,ready,warning,blocked"
+                       statusbar_colors='{"ready": "success", "warning": "warning", "blocked": "danger"}'/>
+            </header>
+            <sheet position="inside">
+                <group string="Southbrook Tool Readiness"
+                       name="southbrook_tool_readiness"
+                       invisible="southbrook_tool_readiness_state == 'not_checked'">
+                    <field name="southbrook_tool_readiness_msg" nolabel="1"
+                           readonly="1"/>
+                </group>
+            </sheet>
+        </field>
+    </record>
+
+</odoo>
