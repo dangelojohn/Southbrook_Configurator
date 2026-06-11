@@ -12,6 +12,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -32,7 +33,13 @@ class SouthbrookApiClient {
   final Uri baseUri;
   String? apiKey;
 
-  SouthbrookApiClient(this.baseUri, {this.apiKey});
+  /// Invoked once when any authenticated request comes back 401 (stale /
+  /// revoked key). Set on post-login clients to drive SessionGuard; left
+  /// null on the pre-login client so a bad-credentials 401 during login is
+  /// handled by the login screen itself, not a redirect loop.
+  void Function()? onUnauthorized;
+
+  SouthbrookApiClient(this.baseUri, {this.apiKey, this.onUnauthorized});
 
   Map<String, String> _headers({String? idempotencyKey, bool requireKey = true}) {
     final h = <String, String>{
@@ -58,12 +65,25 @@ class SouthbrookApiClient {
     try {
       body = jsonDecode(resp.body) as Map<String, dynamic>;
     } on FormatException {
+      developer.log(
+        'malformed response (${resp.statusCode}) for ${resp.request?.url}',
+        name: 'SouthbrookApiClient',
+      );
       throw ApiException(resp.statusCode, 'malformed_response', resp.body);
     }
     if (resp.statusCode >= 400) {
+      final code = body['error'] as String? ?? 'unknown_error';
+      developer.log(
+        'API error ${resp.statusCode} $code for ${resp.request?.url}: '
+        '${body['message'] ?? ''}',
+        name: 'SouthbrookApiClient',
+      );
+      if (resp.statusCode == 401) {
+        onUnauthorized?.call();
+      }
       throw ApiException(
         resp.statusCode,
-        body['error'] as String? ?? 'unknown_error',
+        code,
         body['message'] as String? ?? '',
       );
     }

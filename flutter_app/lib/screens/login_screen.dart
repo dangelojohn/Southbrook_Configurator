@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../build_env.dart';
 import '../services/auth_storage.dart';
+import '../session_guard.dart';
 import '../theme.dart';
 import 'project_list_screen.dart';
 
@@ -70,6 +71,8 @@ class _LoginScreenState extends State<LoginScreen> {
         apiKey: client.apiKey!,
         email: _email.text.trim(),
       );
+      // Now that we're authenticated, route any later 401 back to login.
+      client.onUnauthorized = () => SessionGuard.expire(widget.storage);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => ProjectListScreen(
