@@ -357,7 +357,10 @@ class TestCustomerFlowEndpoints(TransactionCase):
         redesigned CatalogPicker reads to render search, filter pills,
         thumbnails, and dimension callouts.
         """
-        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        # kitchen_planner_state lives on SouthbrookKitchenPlanner
+        # (the public-facing catalog controller), not on the
+        # OrderBuilder portal controller.
+        controller = ctrl_main.SouthbrookKitchenPlanner()
         with stubbed_request(self.env, user=self.user_customer):
             result = controller.kitchen_planner_state()
         catalog = result["catalog"]
@@ -385,7 +388,10 @@ class TestCustomerFlowEndpoints(TransactionCase):
         CatalogPicker's filter pills render: Wall / Base / Drawer /
         Tall / Vanity / Extras.
         """
-        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        # kitchen_planner_state lives on SouthbrookKitchenPlanner
+        # (the public-facing catalog controller), not on the
+        # OrderBuilder portal controller.
+        controller = ctrl_main.SouthbrookKitchenPlanner()
         with stubbed_request(self.env, user=self.user_customer):
             result = controller.kitchen_planner_state()
         categories = {item["category"] for item in result["catalog"]}
@@ -468,16 +474,21 @@ class TestCustomerFlowEndpoints(TransactionCase):
         cabinet — the OWL CatalogPicker's hasChannelDiscount() returns
         false and the card renders a single price.
         """
-        # The test partner created in setUpClass has no channel set,
-        # which resolves to retail by default in _resolve_channel_pricelist.
-        # Ensure that's still the case (explicit assertion of the
-        # precondition makes the test self-documenting).
-        self.assertFalse(
-            self.partner_customer.channel,
-            "Test partner should have no channel set (retail default)",
+        # The test partner created in setUpClass has either no channel
+        # set or 'retail' (a parallel-session change set retail as the
+        # default value rather than null). Either resolves to the
+        # retail pricelist downstream in _resolve_channel_pricelist;
+        # this assertion documents the precondition without pinning
+        # the storage representation.
+        self.assertIn(
+            self.partner_customer.channel or "retail", ("retail", False, None),
+            "Test partner should be on the retail channel (default)",
         )
 
-        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        # kitchen_planner_state lives on SouthbrookKitchenPlanner
+        # (the public-facing catalog controller), not on the
+        # OrderBuilder portal controller.
+        controller = ctrl_main.SouthbrookKitchenPlanner()
         with stubbed_request(self.env, user=self.user_customer):
             result = controller.kitchen_planner_state()
 
@@ -511,7 +522,10 @@ class TestCustomerFlowEndpoints(TransactionCase):
             "tradesperson_tier": "3",
         })
 
-        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        # kitchen_planner_state lives on SouthbrookKitchenPlanner
+        # (the public-facing catalog controller), not on the
+        # OrderBuilder portal controller.
+        controller = ctrl_main.SouthbrookKitchenPlanner()
         with stubbed_request(self.env, user=self.user_customer):
             result = controller.kitchen_planner_state()
 
@@ -560,7 +574,10 @@ class TestCustomerFlowEndpoints(TransactionCase):
         Without both, an `ilike` substring match silently drops the
         row.
         """
-        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        # kitchen_planner_state lives on SouthbrookKitchenPlanner
+        # (the public-facing catalog controller), not on the
+        # OrderBuilder portal controller.
+        controller = ctrl_main.SouthbrookKitchenPlanner()
         with stubbed_request(self.env, user=self.user_customer):
             result = controller.kitchen_planner_state()
         for item in result["catalog"]:
@@ -581,7 +598,10 @@ class TestCustomerFlowEndpoints(TransactionCase):
         carry a non-empty string category for the pill row to be
         complete.
         """
-        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        # kitchen_planner_state lives on SouthbrookKitchenPlanner
+        # (the public-facing catalog controller), not on the
+        # OrderBuilder portal controller.
+        controller = ctrl_main.SouthbrookKitchenPlanner()
         with stubbed_request(self.env, user=self.user_customer):
             result = controller.kitchen_planner_state()
         for item in result["catalog"]:

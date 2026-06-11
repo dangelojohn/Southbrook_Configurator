@@ -108,19 +108,21 @@ class SouthbrookHardwareImport(models.TransientModel):
         # rolls back only itself, not the whole import.
         for idx, row in enumerate(rows, start=2):  # row 1 is the header
             try:
+                # Check existence BEFORE _process_row mutates state.
+                # The post-row search-back pattern this replaces always
+                # found the freshly-created product and counted every
+                # row as "updated" — created_count stayed at 0 and the
+                # wizard misreported a happy path as a no-op.
+                sku = (row.get("marathon_sku") or "").strip()
+                pre_existing = Product.search(
+                    [("x_marathon_sku", "=", sku)], limit=1)
                 self._process_row(row, brand_by_code, Product, idx,
                                   dry_run=self.dry_run)
-                # Determine action by re-checking whether the SKU was
-                # already present at the start of the savepoint.
-                sku = (row.get("marathon_sku") or "").strip()
-                existing_now = Product.search(
-                    [("x_marathon_sku", "=", sku)], limit=1)
-                if not existing_now:
-                    # Dry-run will not create; count it as 'would create'.
+                if not pre_existing:
+                    # Either created live, OR in dry-run "would create".
                     created += 1
                     log_lines.append(f"row {idx}: created {sku}")
                 else:
-                    # Either updated, or in dry-run "would update".
                     updated += 1
                     log_lines.append(f"row {idx}: updated {sku}")
             except (UserError, ValidationError, KeyError, ValueError) as exc:
