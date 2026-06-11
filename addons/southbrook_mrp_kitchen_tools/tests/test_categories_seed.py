@@ -3,7 +3,7 @@
 present, each top-level root carries the right tool_family / directness,
 the parent / child hierarchy resolves, and complete_name computes.
 """
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -94,8 +94,10 @@ class TestCategoriesSeed(TransactionCase):
     # Constraints
     # ──────────────────────────────────────────────────────────────────
     def test_no_self_parent_recursion(self):
+        # Odoo 19's _parent_store_update raises UserError on self-cycle
+        # — it intercepts before our @api.constrains can fire.
         cat = self._ref("cat_saw_blades")
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(UserError):
             cat.parent_id = cat
 
     def test_reusable_xor_consumable(self):

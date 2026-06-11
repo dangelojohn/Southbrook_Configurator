@@ -223,7 +223,7 @@ class SouthbrookToolCategory(models.Model):
 
     @api.constrains("parent_id")
     def _check_no_recursion(self):
-        if not self._check_recursion():
+        if self._has_cycle():
             raise ValidationError(_(
                 "You cannot create recursive tool categories."))
 

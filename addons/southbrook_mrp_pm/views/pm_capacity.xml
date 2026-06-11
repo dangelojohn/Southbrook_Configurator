@@ -3,14 +3,14 @@
   M18 — weekly capacity planning grid.
 
   Pivot view on mrp.workorder: rows=workcenter, columns=day of
-  date_planned_start_wo, measure=SUM(duration_expected). Tells the
+  date_start, measure=SUM(duration_expected). Tells the
   PM 'how many minutes is each station committed to per day
   this week, and where's the headroom'.
 
   Default filter:
     - state in pending/waiting/ready/progress (in-flight; done
       orders don't consume future capacity)
-    - date_planned_start_wo in next 7 days (default search filter
+    - date_start in next 7 days (default search filter
       via context)
 
   Pairs with a graph view (bar chart, stacked by state) for the
@@ -35,7 +35,7 @@
       <field name="arch" type="xml">
         <pivot string="Capacity (minutes)" sample="1">
           <field name="workcenter_id" type="row"/>
-          <field name="date_planned_start_wo" type="col" interval="day"/>
+          <field name="date_start" type="col" interval="day"/>
           <field name="duration_expected" type="measure"/>
         </pivot>
       </field>
@@ -52,7 +52,7 @@
       <field name="arch" type="xml">
         <graph string="Capacity (minutes)" type="bar" stacked="1"
                sample="1">
-          <field name="date_planned_start_wo" interval="day"/>
+          <field name="date_start" interval="day"/>
           <field name="workcenter_id"/>
           <field name="duration_expected" type="measure"/>
         </graph>

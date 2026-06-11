@@ -345,8 +345,13 @@ class ProductTemplate(models.Model):
             # Inherit family + directness when blank.
             if not rec.x_southbrook_tool_family and cat.tool_family:
                 rec.x_southbrook_tool_family = cat.tool_family
-            if not rec.x_southbrook_directness and cat.directness:
-                rec.x_southbrook_directness = cat.directness
+            if not rec.x_southbrook_directness:
+                if cat.directness:
+                    rec.x_southbrook_directness = cat.directness
+                elif cat.consumable:
+                    rec.x_southbrook_directness = "direct_consumable"
+                elif cat.reusable:
+                    rec.x_southbrook_directness = "direct_production_tool"
             # Inherit reusable / consumable flags.
             rec.x_southbrook_is_reusable_tool = cat.reusable
             rec.x_southbrook_is_consumable_tool = cat.consumable
