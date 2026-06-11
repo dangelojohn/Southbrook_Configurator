@@ -3,3 +3,4 @@ from . import test_customer_flow_endpoints
 from . import test_vendored_fonts
 from . import test_send_to_manufacturing
 from . import test_bom_payload_per_line
+from . import test_multi_currency

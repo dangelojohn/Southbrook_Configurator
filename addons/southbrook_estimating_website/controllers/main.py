@@ -340,15 +340,60 @@ class SouthbrookKitchenPlanner(http.Controller):
                         base_variant.id if base_variant else None,
                         exc_info=True,
                     )
-            # Round to website currency precision (same path list_price
-            # would be formatted through downstream).
+            # Phase 4 Sprint 5 — multi-currency awareness.
+            # Convert list_price + channel_price from the source
+            # currency (template's currency_id, typically the company
+            # currency) to the display currency (website.currency_id).
+            # When the two match, _convert is a no-op so this is a
+            # zero-cost change for single-currency installs.
+            display_list = tmpl.list_price
+            tmpl_currency = (
+                tmpl.currency_id
+                or request.env.company.currency_id
+            )
+            if currency and tmpl_currency and currency != tmpl_currency:
+                try:
+                    display_list = tmpl_currency._convert(
+                        tmpl.list_price,
+                        currency,
+                        request.env.company,
+                        fields.Date.today(),
+                    )
+                    if channel_price != tmpl.list_price:
+                        # channel_price came from the pricelist engine
+                        # which already prices in the pricelist's
+                        # currency; convert IT only if the pricelist's
+                        # currency differs from the display currency.
+                        pl_currency = (
+                            channel_pricelist and channel_pricelist.currency_id
+                        )
+                        if pl_currency and pl_currency != currency:
+                            channel_price = pl_currency._convert(
+                                channel_price,
+                                currency,
+                                request.env.company,
+                                fields.Date.today(),
+                            )
+                except Exception:                       # noqa: BLE001
+                    # Conversion fails on missing exchange rate; fall
+                    # back to the raw source values so the card still
+                    # renders something rather than 500'ing.
+                    _logger.warning(
+                        "kitchen_planner_state: currency conversion "
+                        "%s -> %s failed for cabinet %s; using raw "
+                        "source values.",
+                        tmpl_currency.name, currency.name,
+                        sku or tmpl.name,
+                        exc_info=True,
+                    )
             if currency:
+                display_list = currency.round(display_list)
                 channel_price = currency.round(channel_price)
             catalog.append({
                 "id": tmpl.id,
                 "sku": sku,
                 "name": tmpl.name,
-                "list_price": tmpl.list_price,
+                "list_price": display_list,
                 "channel_price": channel_price,
                 "family": self._family_from_sku(sku),
                 "category": (
