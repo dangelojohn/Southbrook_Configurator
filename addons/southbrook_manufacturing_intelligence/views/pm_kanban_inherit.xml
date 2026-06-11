@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_pm_kanban_mi" model="ir.ui.view">
+        <field name="name">mrp.workcenter.kanban.southbrook_pm.manufacturing.intelligence</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="inherit_id" ref="southbrook_mrp_pm.view_southbrook_pm_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//kanban/field[@name='southbrook_pm_equipment_alerts']" position="after">
+                <field name="x_mi_workcenter_blocker_count"/>
+                <field name="x_mi_workcenter_warning_count"/>
+            </xpath>
+            <xpath expr="//header[hasclass('o_sb_pm_dash_card_h')]" position="after">
+                <div class="o_sb_mi_chip_row">
+                    <t t-if="record.x_mi_workcenter_blocker_count.raw_value">
+                        <span class="o_sb_mi_chip o_sb_mi_chip_blocker">
+                            <field name="x_mi_workcenter_blocker_count"/> MI Blocked
+                        </span>
+                    </t>
+                    <t t-if="record.x_mi_workcenter_warning_count.raw_value">
+                        <span class="o_sb_mi_chip o_sb_mi_chip_warning">
+                            <field name="x_mi_workcenter_warning_count"/> MI Warnings
+                        </span>
+                    </t>
+                    <t t-if="!record.x_mi_workcenter_blocker_count.raw_value and !record.x_mi_workcenter_warning_count.raw_value">
+                        <span class="o_sb_mi_chip o_sb_mi_chip_clear">MI Clear</span>
+                    </t>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sbk_finish_list" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.finish.list</field>
+        <field name="model">southbrook.kitchen.finish</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="requires_sanding"/>
+                <field name="requires_paint_booth"/>
+                <field name="cure_time_buffer_min"/>
+                <field name="finish_complexity_factor"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sbk_finish_form" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.finish.form</field>
+        <field name="model">southbrook.kitchen.finish</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="requires_sanding"/>
+                            <field name="requires_paint_booth"/>
+                            <field name="cure_time_buffer_min"/>
+                            <field name="finish_complexity_factor"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="note" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sbk_finish" model="ir.actions.act_window">
+        <field name="name">Kitchen Finishes</field>
+        <field name="res_model">southbrook.kitchen.finish</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

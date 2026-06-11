@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sbk_downtime_list" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.workcenter.downtime.list</field>
+        <field name="model">southbrook.kitchen.workcenter.downtime</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="date_start"/>
+                <field name="workcenter_id"/>
+                <field name="reason"/>
+                <field name="duration_min" sum="Total min"/>
+                <field name="downtime_cost" sum="Total cost"/>
+                <field name="state" widget="badge"/>
+                <field name="responsible_id" optional="hide"/>
+                <field name="workorder_id" optional="hide"/>
+                <field name="production_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sbk_downtime_form" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.workcenter.downtime.form</field>
+        <field name="model">southbrook.kitchen.workcenter.downtime</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_start" type="object"
+                            string="Start" class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_close" type="object"
+                            string="Close" class="oe_highlight"
+                            invisible="state != 'active'"/>
+                    <button name="action_cancel" type="object"
+                            string="Cancel"
+                            invisible="state in ('closed', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,active,closed"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="workcenter_id"/>
+                            <field name="reason"/>
+                            <field name="responsible_id"/>
+                        </group>
+                        <group>
+                            <field name="workorder_id"/>
+                            <field name="production_id" readonly="1"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="duration_min"/>
+                            <field name="downtime_cost"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sbk_downtime_search" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.workcenter.downtime.search</field>
+        <field name="model">southbrook.kitchen.workcenter.downtime</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="workcenter_id"/>
+                <field name="reason"/>
+                <field name="workorder_id"/>
+                <field name="production_id"/>
+                <filter name="filter_active" string="Active Now"
+                        domain="[('state', '=', 'active')]"/>
+                <filter name="filter_today" string="Started Today"
+                        domain="[('date_start', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <separator/>
+                <filter name="groupby_workcenter" string="Work Center"
+                        context="{'group_by': 'workcenter_id'}"/>
+                <filter name="groupby_reason" string="Reason"
+                        context="{'group_by': 'reason'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sbk_downtime" model="ir.actions.act_window">
+        <field name="name">Work Center Downtime</field>
+        <field name="res_model">southbrook.kitchen.workcenter.downtime</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

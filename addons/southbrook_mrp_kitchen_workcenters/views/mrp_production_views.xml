@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        mrp.production form — adds a "Kitchen" tab carrying the
+        sb.kitchen.project linkage, room/cabinet labels, install due
+        date, complexity factor, kitchen priority, and the rolled-up
+        estimated/actual/variance totals.
+    -->
+
+    <record id="view_mrp_production_form_sbk_kitchen" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk.kitchen</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Kitchen" name="sbk_kitchen">
+                    <group>
+                        <group string="Project Linkage">
+                            <field name="x_sbk_kitchen_project_id"
+                                   options="{'no_create': True}"/>
+                            <field name="x_sbk_kitchen_room"/>
+                            <field name="x_sbk_cabinet_code"/>
+                            <field name="x_sbk_install_due_date"/>
+                            <field name="x_sbk_priority_level"/>
+                        </group>
+                        <group string="Complexity &amp; Totals">
+                            <field name="x_sbk_complexity_factor"/>
+                            <field name="x_sbk_total_estimated_min"
+                                   readonly="1"/>
+                            <field name="x_sbk_total_actual_min"
+                                   readonly="1"/>
+                            <field name="x_sbk_total_variance_min"
+                                   readonly="1"/>
+                            <button name="action_sbk_recalc_all_workorder_durations"
+                                    type="object"
+                                    string="Recalc All Kitchen Durations"
+                                    class="oe_highlight"
+                                    colspan="2"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- List view — surface kitchen project + install due so planners
+         can sort by what's coming up. -->
+    <record id="view_mrp_production_tree_sbk_kitchen" model="ir.ui.view">
+        <field name="name">mrp.production.tree.sbk.kitchen</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='date_start']" position="after">
+                <field name="x_sbk_install_due_date" optional="show"/>
+                <field name="x_sbk_kitchen_project_id" optional="show"/>
+                <field name="x_sbk_cabinet_code" optional="hide"/>
+                <field name="x_sbk_priority_level" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

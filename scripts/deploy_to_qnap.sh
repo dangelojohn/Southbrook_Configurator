@@ -31,6 +31,13 @@ QNAP_DOCKER="${QNAP_DOCKER:-/share/CACHEDEV3_DATA/.qpkg/container-station/bin/sy
 CONTAINER="${CONTAINER:-southbrook-odoo}"
 DB="${DB:-southbrook}"
 DRY_RUN="${DRY_RUN:-0}"
+# Serialize concurrent upgrades. Two parallel `odoo -u` runs against the
+# same DB race on ir_module_module_dependency and one of them dies with
+# `psycopg2.errors.LockNotAvailable: canceling statement due to lock
+# timeout`. flock lives inside the container (util-linux is present in
+# the Odoo image — QNAP busybox host doesn't have it).
+LOCK_PATH="${LOCK_PATH:-/tmp/southbrook-odoo-upgrade.lock}"
+LOCK_WAIT_SEC="${LOCK_WAIT_SEC:-600}"
 
 MODULES_ARG="${1:-southbrook_estimating,southbrook_configurator_ux}"
 
@@ -72,20 +79,34 @@ for mod in "${MODULES[@]}"; do
     "$src/" "$QNAP_HOST:$QNAP_ADDONS_DIR/$mod/"
 done
 
-# ---- run the upgrade (a COLD registry load — validate it!) ------------
+# ---- run the upgrade (COLD registry load, serialized by flock) --------
 # `-u --stop-after-init` loads the FULL registry in a fresh process. If it
-# fails, a later live restart will ALSO crash-loop. This failure was once
-# masked here (`| grep ... || true`) and a restart took the site down, so we
-# now FAIL LOUDLY unless we see a clean 'Modules loaded' with no load errors.
-log "upgrading $MODULES_ARG on $CONTAINER (db=$DB)"
-upgrade_cmd="$QNAP_DOCKER exec $CONTAINER odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
+# fails, a later live restart will ALSO crash-loop — so we FAIL LOUDLY below
+# unless we see a clean 'Modules loaded' with no load errors (this failure was
+# once masked by `| grep ... || true` and a restart took the site down).
+# We also wrap odoo -u in flock INSIDE the container so concurrent upgrade
+# attempts queue instead of racing; `-E 75` makes a lock timeout return exit
+# 75 (surfaced explicitly below) rather than silently "succeeding".
+log "upgrading $MODULES_ARG on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
+inner_cmd="flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
+upgrade_cmd="$QNAP_DOCKER exec $CONTAINER bash -c \"$inner_cmd\""
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"
   log "DRY: (would then assert cold-load success + live /web/login 200)"
 else
-  log "running cold upgrade (this validates a future restart will boot)…"
-  ssh "$QNAP_HOST" "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1 || true"
+  log "running cold upgrade under flock (validates a future restart will boot)…"
+  set +e
+  ssh "$QNAP_HOST" "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1"
+  rc=$?
+  set -e
   upgrade_log="$(ssh "$QNAP_HOST" 'cat /tmp/deploy_upgrade.log' 2>/dev/null || true)"
+  # A flock timeout surfaces as exit 75 — surface it so the deploy doesn't
+  # silently "succeed" on lock contention (the historical || true bug).
+  if [[ "$rc" == "75" ]]; then
+    fail "another odoo -u is holding $LOCK_PATH inside $CONTAINER — \
+waited ${LOCK_WAIT_SEC}s. Find it with: ssh $QNAP_HOST '$QNAP_DOCKER \
+exec $CONTAINER ps -ef | grep \"odoo.*-u\"'"
+  fi
   printf '%s\n' "$upgrade_log" \
     | grep -E 'Modules loaded|Registry loaded|ParseError|CRITICAL|ValidationError|AssertionError|Failed to load registry|Traceback' \
     | sed 's/^/[odoo] /' >&2 || true
@@ -96,7 +117,7 @@ else
     log "tail of upgrade log:"; printf '%s\n' "$upgrade_log" | tail -20 >&2
     fail "cold upgrade did not reach 'Modules loaded' — treat as FAILED."
   fi
-  log "cold upgrade OK — registry loads cleanly."
+  log "cold upgrade OK — registry loads cleanly (no lock contention)."
 fi
 
 # ---- health gate: the LIVE server must actually serve -----------------
