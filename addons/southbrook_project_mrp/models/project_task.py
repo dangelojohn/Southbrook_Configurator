@@ -129,8 +129,17 @@ class ProjectTask(models.Model):
                 task.components_available = "waiting"
 
             # Cost: actual (industrial) + estimated (standard cost × qty).
+            # B2 fix (2026-06-11): industrial_cost reads 0.0 across all MOs
+            # on Odoo 19 CE; the field carrying the "Full Direct" total the
+            # operator sees on the Production Costs tab is planned_direct_cost
+            # (e.g. $80.17 on WH/MO/00085, $674.42 across task #182's 6 MOs).
+            # Prefer it; fall back to industrial_cost so any future costing
+            # module that populates it isn't ignored.
             task.job_industrial_cost = sum(
-                (getattr(m, "industrial_cost", 0.0) or 0.0) for m in mos)
+                (getattr(m, "planned_direct_cost", 0.0)
+                 or getattr(m, "industrial_cost", 0.0)
+                 or 0.0)
+                for m in mos)
             task.job_estimated_cost = sum(
                 (m.product_id.standard_price or 0.0) * (m.product_qty or 0.0)
                 for m in mos)
@@ -153,10 +162,15 @@ class ProjectTask(models.Model):
                 and m.reservation_state != "assigned")
             if waiting:
                 reasons.append("%d MO(s) waiting on components" % len(waiting))
+            # FIX 1 (2026-06-11): mrp.production.date_deadline is a Datetime;
+            # `today` is a Date — the bare `<` raised TypeError and broke
+            # the WHOLE form (task #182 returned Odoo Server Error and
+            # wouldn't open). Convert datetime → date before comparing, and
+            # null-guard against MOs with no deadline set.
             late = mos.filtered(
                 lambda m: m.state not in ("done", "cancel")
-                and getattr(m, "date_deadline", False)
-                and m.date_deadline < today)
+                and m.date_deadline
+                and m.date_deadline.date() < today)
             if late:
                 reasons.append("%d MO(s) past deadline" % len(late))
             task.job_risk_reason = "; ".join(reasons)
