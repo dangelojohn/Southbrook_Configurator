@@ -29,12 +29,145 @@ M3 + M7 of the Manufacturing PM JTBD gap analysis (2026-06-01):
 """
 from datetime import timedelta
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+
+PRODUCTION_APPROVAL_SELECTION = [
+    ("none", "Not Requested"),
+    ("pending", "Pending Approval"),
+    ("approved", "Approved"),
+    ("rejected", "Rejected"),
+]
 
 
 class SaleOrder(models.Model):
     _inherit = "sale.order"
+
+    # ──────────────────────────────────────────────────────────────────
+    # Production approval state machine
+    # (referenced by views/order_form.xml via the
+    #  view_order_form_production_approval inheritance, which has been
+    #  live in the DB for some time without backing fields — Tier 0
+    #  blocker fix.)
+    # ──────────────────────────────────────────────────────────────────
+    production_approval_state = fields.Selection(
+        PRODUCTION_APPROVAL_SELECTION,
+        string="Production Approval",
+        default="none",
+        required=True,
+        copy=False,
+        tracking=True,
+        help="Gate between a confirmed sale order and the manufacturing "
+             "queue. The sales rep requests production; a Production "
+             "Approver reviews and approves (which fires "
+             "action_send_to_production) or rejects (with a reason). "
+             "Idempotent — re-confirming or re-quoting doesn't reset.",
+    )
+    production_requested_by = fields.Many2one(
+        "res.users",
+        string="Production Requested By",
+        readonly=True, copy=False,
+    )
+    production_requested_date = fields.Datetime(
+        string="Production Requested On",
+        readonly=True, copy=False,
+    )
+    production_approved_by = fields.Many2one(
+        "res.users",
+        string="Production Approved By",
+        readonly=True, copy=False,
+        help="The user who approved or rejected — populated for both "
+             "approve and reject paths so the audit trail is complete.",
+    )
+    production_approved_date = fields.Datetime(
+        string="Production Decision Date",
+        readonly=True, copy=False,
+    )
+    production_reject_reason = fields.Text(
+        string="Rejection Reason",
+        copy=False,
+        help="Required when rejecting; surfaces back to the requester "
+             "in the production-approval tab on the sale order.",
+    )
+
+    # ──────────────────────────────────────────────────────────────────
+    # State-transition actions (referenced by the order form view's
+    # Request / Approve / Reject buttons).
+    # ──────────────────────────────────────────────────────────────────
+    def action_request_production(self):
+        """Move the order's approval state to 'pending'. Allowed from
+        'none' or 'rejected' (re-request after a fix)."""
+        for so in self:
+            if so.state != "sale":
+                raise UserError(_(
+                    "Order %s must be confirmed (sale state) before "
+                    "requesting production. Current state: %s."
+                ) % (so.name, so.state))
+            if so.production_approval_state not in ("none", "rejected"):
+                raise UserError(_(
+                    "Order %s is already %s — cannot re-request."
+                ) % (so.name, so.production_approval_state))
+            so.write({
+                "production_approval_state": "pending",
+                "production_requested_by": self.env.user.id,
+                "production_requested_date": fields.Datetime.now(),
+                # Clear prior rejection trail when re-requesting.
+                "production_reject_reason": False,
+            })
+            so.message_post(body=_(
+                "Production requested by %s."
+            ) % self.env.user.display_name)
+        return True
+
+    def action_approve_production(self):
+        """Move 'pending' → 'approved' AND fire MO creation. The two
+        side-effects are bundled because the original view exposed
+        only an Approve button — the operator's mental model is
+        'approve = manufacture starts'."""
+        created = self.env["mrp.production"]
+        for so in self:
+            if so.production_approval_state != "pending":
+                raise UserError(_(
+                    "Order %s is not pending approval (state: %s)."
+                ) % (so.name, so.production_approval_state))
+            so.write({
+                "production_approval_state": "approved",
+                "production_approved_by": self.env.user.id,
+                "production_approved_date": fields.Datetime.now(),
+            })
+            mos = so.action_send_to_production()
+            created |= mos
+            mo_names = ", ".join(mos.mapped("name")) or _("none — no "
+                "lines had a matching BoM")
+            so.message_post(body=_(
+                "Production approved by %s. Manufacturing orders: %s."
+            ) % (self.env.user.display_name, mo_names))
+        return created
+
+    def action_reject_production(self):
+        """Move 'pending' → 'rejected'. production_reject_reason must
+        be set before calling this — surfaced as a UserError if blank
+        so the requester always gets context."""
+        for so in self:
+            if so.production_approval_state != "pending":
+                raise UserError(_(
+                    "Order %s is not pending approval (state: %s)."
+                ) % (so.name, so.production_approval_state))
+            if not (so.production_reject_reason or "").strip():
+                raise UserError(_(
+                    "Provide a rejection reason in the Production "
+                    "Approval tab before rejecting %s."
+                ) % so.name)
+            so.write({
+                "production_approval_state": "rejected",
+                "production_approved_by": self.env.user.id,
+                "production_approved_date": fields.Datetime.now(),
+            })
+            so.message_post(body=_(
+                "Production rejected by %s: %s"
+            ) % (self.env.user.display_name, so.production_reject_reason))
+        return True
 
     def action_send_to_production(self):
         """Create one mrp.production per order line that has a

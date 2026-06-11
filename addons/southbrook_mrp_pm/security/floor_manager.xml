@@ -39,5 +39,26 @@
       </field>
     </record>
 
+    <!--
+      Production Approver — gates the Sale → MO transition. The
+      existing `view_order_form_production_approval` view (declared
+      in this module) restricts the Approve / Reject buttons to
+      members of this group; the state machine itself lives on
+      sale.order.production_approval_state (added in the same
+      Tier-0-fix commit). Internal-user implied so an approver also
+      has read on partners + sale orders by default.
+    -->
+    <record id="group_southbrook_production_approver" model="res.groups">
+      <field name="name">Southbrook Production Approver</field>
+      <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+      <field name="comment">
+        Members can approve or reject a confirmed sale order's
+        request to manufacture. Approving fires action_send_to_production,
+        which materialises one mrp.production per BoM-matched line and
+        (when southbrook_project is installed) links the new MOs to a
+        project.task in the production-tracking project.
+      </field>
+    </record>
+
   </data>
 </odoo>

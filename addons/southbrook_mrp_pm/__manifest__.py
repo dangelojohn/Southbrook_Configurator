@@ -96,6 +96,11 @@ analysis. Layered build:
         # M18 — weekly capacity planning (pivot + graph on
         # mrp.workorder, 'Capacity' menu entry).
         "views/pm_capacity.xml",
+        # Tier 0 fix (2026-06-11) — Sale Order form inherit shipping
+        # the Production Approval header buttons + tab. Was orphaned
+        # in the DB without a tracked file; re-shipping properly so
+        # the model + view stay in sync.
+        "views/sale_order_production_approval.xml",
     ],
     "assets": {
         "web.assets_frontend": [
