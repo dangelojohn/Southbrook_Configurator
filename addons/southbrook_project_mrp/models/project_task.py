@@ -87,6 +87,20 @@ class ProjectTask(models.Model):
     stage_mo_note = fields.Char(
         string="Stage/MO Note", compute="_compute_stage_coherence")
 
+    # --- TASK 3: Work-center load summary ----------------------------------
+    workcenter_load_summary = fields.Text(
+        string="Workcenter Load",
+        compute="_compute_workcenter_load",
+        help="Per-work-center booked minutes across the job's work orders, "
+             "compared against the work center's daily capacity proxy "
+             "(resource_calendar hours/day × 60). Operators read this to "
+             "spot bottlenecks without opening a Gantt.")
+    workcenter_over_capacity = fields.Boolean(
+        string="WC Over Capacity",
+        compute="_compute_workcenter_load",
+        help="True when any work center's booked minutes exceed its "
+             "daily capacity proxy.")
+
     # --- TASK 2: Work-order rollup -----------------------------------------
     workorder_ids = fields.Many2many(
         "mrp.workorder",
@@ -247,6 +261,49 @@ class ProjectTask(models.Model):
             else:
                 task.workorder_summary = (
                     "%d WOs / %d not scheduled" % (len(wos), len(unscheduled)))
+
+    # --- TASK 3: Work-center load compute ----------------------------------
+    @api.depends("production_ids.workorder_ids.workcenter_id",
+                 "production_ids.workorder_ids.duration_expected")
+    def _compute_workcenter_load(self):
+        for task in self:
+            wos = task.production_ids.mapped("workorder_ids")
+            if not wos:
+                task.workcenter_load_summary = ""
+                task.workcenter_over_capacity = False
+                continue
+            # Aggregate booked minutes per workcenter.
+            booked = {}
+            for wo in wos:
+                wc = wo.workcenter_id
+                if not wc:
+                    continue
+                booked.setdefault(wc, 0.0)
+                booked[wc] += wo.duration_expected or 0.0
+            lines = []
+            any_over = False
+            for wc, minutes in sorted(
+                    booked.items(), key=lambda kv: -kv[1]):
+                # Daily capacity proxy: resource_calendar hours/day × 60
+                # multiplied by time_efficiency (stock Odoo's standard
+                # capacity model — both are already on mrp.workcenter,
+                # no rebuild). Fall back gracefully if absent.
+                cap_min = 0.0
+                cal = wc.resource_calendar_id
+                hpd = getattr(cal, "hours_per_day", 0.0) or 0.0
+                eff = (wc.time_efficiency or 100.0) / 100.0
+                cap_min = hpd * 60.0 * eff
+                if cap_min and minutes > cap_min:
+                    any_over = True
+                    flag = " ⚠ OVER"
+                elif cap_min:
+                    flag = " (%d min cap)" % int(cap_min)
+                else:
+                    flag = ""
+                lines.append("%s: %d min booked%s" % (
+                    wc.name, int(minutes), flag))
+            task.workcenter_load_summary = "\n".join(lines)
+            task.workcenter_over_capacity = any_over
 
     # --- actions ------------------------------------------------------------
     def action_view_workorders(self):

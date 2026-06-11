@@ -105,6 +105,15 @@
                         <field name="workorder_summary" readonly="1"/>
                         <field name="unscheduled_workorder_count" readonly="1"/>
                     </group>
+                    <!-- TASK 3: Work-center load summary — per-WC booked
+                         minutes vs daily capacity. Read-only; no scheduler. -->
+                    <group string="Work-center Load (vs Daily Capacity)">
+                        <field name="workcenter_over_capacity"
+                               widget="boolean_toggle" readonly="1"/>
+                        <field name="workcenter_load_summary"
+                               nolabel="1" readonly="1"
+                               widget="text"/>
+                    </group>
                     <button type="object" name="action_view_workorders"
                             string="Open Work Orders View" class="btn-primary"/>
                     <field name="workorder_ids" readonly="1">
