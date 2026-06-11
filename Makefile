@@ -18,7 +18,14 @@ PG_PASS = $(shell grep '^POSTGRES_PASSWORD=' .env 2>/dev/null | cut -d= -f2)
 # All 9 SAMI addons that have @tagged southbrook tests. Comma-separated,
 # no spaces (Odoo's -u/-i parser splits strictly on comma; spaces become
 # extra positional args and crash the parser).
-MODULES = southbrook_freecad_bridge,southbrook_hardware_catalog,southbrook_kitchen_workspace,southbrook_kitchen_mrp,southbrook_ai_design,southbrook_config_engine,southbrook_customer_portal,southbrook_dealer_portal,southbrook_api
+# CI must cold-install everything that runs in production, or it can't catch a
+# break in a module it never loads (this is how the x_sbk_estimated_cost outage
+# slipped through — its module wasn't in this list). This now mirrors the prod
+# install set, EXCEPT two modules whose source is not yet on main:
+#   - southbrook_mrp_kitchen_workcenters  (lives on feature/mrp-kitchen-workcenters)
+#   - southbrook_manufacturing_intelligence
+# Both are deployed to prod but off-main — add them here the moment they merge.
+MODULES = southbrook_freecad_bridge,southbrook_hardware_catalog,southbrook_kitchen_workspace,southbrook_kitchen_mrp,southbrook_mrp_pm,southbrook_ai_design,southbrook_config_engine,southbrook_configurator_ux,southbrook_estimating,southbrook_estimating_website,southbrook_customer_portal,southbrook_dealer_portal,southbrook_api,southbrook_plm,southbrook_plm_productgraph
 
 # Odoo flags every command needs. The 8899/8902 port dodge is mandatory —
 # --no-http alone does not stop the gevent worker from binding 8072.
