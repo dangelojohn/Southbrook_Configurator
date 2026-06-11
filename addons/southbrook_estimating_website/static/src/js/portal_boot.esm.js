@@ -301,6 +301,18 @@ class FooterActions extends Component {
                     Cancel Order
                 </button>
 
+                <!-- Phase 4 Sprint 2 — Send to Manufacturing.
+                     Only visible once the order is in 'sale' state
+                     (i.e. Confirmed). Dealer-only — customers don't
+                     fire MOs. Click triggers a confirm() prompt
+                     because creating MOs is hard to undo. -->
+                <button t-if="_canSendToMfg()"
+                        class="o_owl_btn o_owl_btn_primary"
+                        t-on-click="_onSendToMfgClick"
+                        t-att-disabled="props.busy">
+                    Send to Manufacturing
+                </button>
+
                 <!-- Confirm vs Request a Price.
                      Step 5 (2026-06-01): dealer mode now opens a
                      confirmation modal before firing the irreversible
@@ -441,6 +453,27 @@ class FooterActions extends Component {
             return;
         }
         this.props.onAction("cancel");
+    };
+
+    // Phase 4 Sprint 2 — Send to Manufacturing availability.
+    // Only post-confirm + dealer mode (customers don't fire MOs).
+    // Server enforces the same gate; this hides the button at rest.
+    _canSendToMfg() {
+        if (this.props.mode === "customer") return false;
+        return this.props.order?.state === "sale";
+    }
+
+    _onSendToMfgClick = () => {
+        if (!this._canSendToMfg()) return;
+        const msg = "Send all cabinets in this order to manufacturing? "
+                  + "This creates an MO for every cabinet line with a "
+                  + "BoM. Existing MOs (e.g. from a prior Send) are "
+                  + "reused — nothing is duplicated.";
+        if (typeof window !== "undefined" && window.confirm
+            && !window.confirm(msg)) {
+            return;
+        }
+        this.props.onAction("send_to_manufacturing");
     };
 
     _confirmAction() {
@@ -2600,6 +2633,29 @@ class OrderBuilder extends Component {
                 case "confirm":
                     await this._loadOrder();
                     this.state.action_message = "Order confirmed.";
+                    break;
+                case "send_to_manufacturing":
+                    // Phase 4 Sprint 2 — show the dealer how many MOs
+                    // were created vs reused, then refresh the order
+                    // (chatter post updates the history feed).
+                    await this._loadOrder();
+                    this.state.action_message = (
+                        `Sent to manufacturing — ${res.mo_count || 0} `
+                        + `MO(s): ${res.new_count || 0} new, `
+                        + `${res.existing_count || 0} existing.`
+                    );
+                    break;
+                case "cancel":
+                    await this._loadOrder();
+                    this.state.action_message = "Order cancelled.";
+                    break;
+                case "request_price":
+                    await this._loadOrder();
+                    this.state.action_message = (
+                        res.already_submitted
+                        ? "Already submitted for pricing review."
+                        : "Submitted for pricing review."
+                    );
                     break;
                 case "duplicate":
                     if (res.redirect_url) {

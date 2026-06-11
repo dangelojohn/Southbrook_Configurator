@@ -1205,6 +1205,80 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             order_su.action_confirm()
             return {"ok": True, "new_state": order.state}
 
+        if action_code == "send_to_manufacturing":
+            # Phase 4 Sprint 2 — explicit Send-to-Manufacturing
+            # button. Distinct from action_confirm so dealers can
+            # review the confirmed order before kicking off MOs.
+            # State-guarded: only confirmed (sale) orders can fire.
+            if order.state != "sale":
+                return {
+                    "error": "wrong_state",
+                    "message": (
+                        "Order must be confirmed (sale state) before "
+                        "sending to manufacturing — current "
+                        + str(order.state)
+                    ),
+                }
+            mo_ids = []
+            already_existed = []
+            new_created = []
+            for line in order.order_line:
+                if not line.product_id:
+                    continue
+                # Standard Odoo sale-stock-mrp routing already creates
+                # MOs at confirm-time when a product has a BoM. Find
+                # existing MOs tied to this line; create one if absent
+                # and the product has a BoM.
+                existing = request.env["mrp.production"].sudo().search([
+                    ("origin", "=", order.name),
+                    ("product_id", "=", line.product_id.id),
+                ], limit=1)
+                if existing:
+                    mo_ids.append(existing.id)
+                    already_existed.append(existing.id)
+                    continue
+                bom = request.env["mrp.bom"].sudo()._bom_find(
+                    products=line.product_id,
+                )[line.product_id]
+                if not bom:
+                    # No BoM yet — skip silently. The dealer can wire
+                    # one in the backend if they want this cabinet on
+                    # the shop floor.
+                    continue
+                # Odoo 19 renamed sale.order.line.product_uom to
+                # product_uom_id (matching mrp.production's field
+                # name). Use it directly.
+                mo = request.env["mrp.production"].sudo().create({
+                    "product_id": line.product_id.id,
+                    "product_qty": line.product_uom_qty or 1.0,
+                    "product_uom_id": line.product_uom_id.id,
+                    "bom_id": bom.id,
+                    "origin": order.name,
+                })
+                mo_ids.append(mo.id)
+                new_created.append(mo.id)
+            try:
+                order.sudo().message_post(
+                    body=(
+                        "<strong>Sent to manufacturing</strong>"
+                        " — {} MOs ({} new, {} existing)."
+                        .format(len(mo_ids), len(new_created),
+                                len(already_existed))
+                    ),
+                    subject="Sent to manufacturing",
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            return {
+                "ok": True,
+                "mo_count": len(mo_ids),
+                "mo_ids": mo_ids,
+                "new_count": len(new_created),
+                "existing_count": len(already_existed),
+            }
+
         if action_code == "request_price":
             # G14 + G16 + G17 (2026-06-01): real customer-side submit
             # path. Previously this just called action_confirm() —
