@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        15 operation templates covering the brief §8 catalog (Design
+        Review through Packing). Minutes_per_unit values are realistic
+        first-pass numbers from the original Manufacturing PM analysis;
+        the planner can tune them in the UI once shop-floor data lands.
+
+        Conventions:
+          - default_workcenter_id targets a stable xml_id from
+            southbrook_mrp_pm or from this module (ENG01 / CNC02).
+          - alternative_workcenter_ids list overflow options where the
+            shop actually has them.
+          - sequence: 10/20/30/...  ordered by the typical flow.
+          - quantity_driver_type matches the dominant scaling dimension
+            for that operation (sheet_count for cutting, edge_meters
+            for edge banding, hinge_count for drilling, etc).
+    -->
+
+    <!-- ================ ENGINEERING ================ -->
+
+    <record id="op_template_design_review" model="southbrook.kitchen.operation.template">
+        <field name="name">Design Review</field>
+        <field name="code">DESIGN_REVIEW</field>
+        <field name="sequence">10</field>
+        <field name="operation_category">engineering</field>
+        <field name="default_workcenter_id" ref="wc_engineering"/>
+        <field name="default_setup_time_min">0</field>
+        <field name="quantity_driver_type">fixed</field>
+        <field name="requires_qc" eval="False"/>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="default_changeover_time_min">30</field>
+        <field name="required_documents">CAD drawing rev; customer-approved layout; site measurements.</field>
+        <field name="shop_floor_instruction">Validate dimensions against site measurements; verify customer-approved drawing rev; check appliance cut-outs are clearable; release for cutting list.</field>
+    </record>
+
+    <record id="op_template_cutting_list" model="southbrook.kitchen.operation.template">
+        <field name="name">Generate / Validate Cutting List</field>
+        <field name="code">CUT_LIST</field>
+        <field name="sequence">20</field>
+        <field name="operation_category">engineering</field>
+        <field name="default_workcenter_id" ref="wc_engineering"/>
+        <field name="quantity_driver_type">fixed</field>
+        <field name="default_setup_time_min">20</field>
+        <field name="requires_qc" eval="False"/>
+        <field name="required_documents">Approved CAD; cut-list spreadsheet template.</field>
+        <field name="shop_floor_instruction">Run sb.cutlist.generate_from_mo; reconcile against shared.southbrook_dims output; flag duplicates; release to nesting.</field>
+    </record>
+
+    <!-- ================ CUTTING ================ -->
+
+    <record id="op_template_cut_panels" model="southbrook.kitchen.operation.template">
+        <field name="name">Cut Panels</field>
+        <field name="code">CUT_PANELS</field>
+        <field name="sequence">30</field>
+        <field name="operation_category">cutting</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_saw"/>
+        <field name="quantity_driver_type">sheet_count</field>
+        <field name="default_setup_time_min">15</field>
+        <field name="default_changeover_time_min">10</field>
+        <field name="minutes_per_unit">6.0</field>
+        <field name="material_adjustment_factor">1.0</field>
+        <field name="complexity_factor">1.0</field>
+        <field name="supported_material_ids" eval="[(6, 0, [
+            ref('material_mdf'),
+            ref('material_plywood'),
+            ref('material_particle_board'),
+            ref('material_melamine'),
+            ref('material_laminate'),
+            ref('material_veneer'),
+        ])]"/>
+        <field name="requires_qc" eval="True"/>
+        <field name="qc_checklist">- Sheet dimensions match cut list (±0.5mm)
+- Grain direction respected on visible-grade panels
+- No edge tear-out
+- No saw burn</field>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="required_documents">Cut list; nesting plan; substrate inventory pick list.</field>
+        <field name="shop_floor_instruction">Verify substrate code matches cut list before each sheet; cut to sequence; stack with grain orientation labels; route to edge banding when cart full.</field>
+    </record>
+
+    <!-- ================ CNC ================ -->
+
+    <record id="op_template_cnc_routing" model="southbrook.kitchen.operation.template">
+        <field name="name">CNC Routing</field>
+        <field name="code">CNC_ROUTING</field>
+        <field name="sequence">40</field>
+        <field name="operation_category">cnc</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_cnc_bore"/>
+        <field name="alternative_workcenter_ids" eval="[(6, 0, [ref('wc_cnc_router_02')])]"/>
+        <field name="quantity_driver_type">panel_count</field>
+        <field name="default_setup_time_min">20</field>
+        <field name="default_changeover_time_min">15</field>
+        <field name="minutes_per_unit">8.0</field>
+        <field name="complexity_factor">1.0</field>
+        <field name="supported_material_ids" eval="[(6, 0, [
+            ref('material_mdf'),
+            ref('material_plywood'),
+            ref('material_particle_board'),
+            ref('material_melamine'),
+            ref('material_solid_wood'),
+        ])]"/>
+        <field name="requires_qc" eval="True"/>
+        <field name="qc_checklist">- Hinge cup positions within tolerance (±0.5mm)
+- Hole depths correct per spec
+- Sink/hob cut-out matches template
+- No tool tear-out</field>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="required_documents">CNC G-code file; CAD reference; tool change list.</field>
+        <field name="shop_floor_instruction">Load program; verify tool offsets; dry-run first part of new program; check first part with template before running batch.</field>
+    </record>
+
+    <!-- ================ EDGE BANDING ================ -->
+
+    <record id="op_template_edge_banding" model="southbrook.kitchen.operation.template">
+        <field name="name">Edge Banding</field>
+        <field name="code">EDGE_BANDING</field>
+        <field name="sequence">50</field>
+        <field name="operation_category">edge_banding</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_edge"/>
+        <field name="quantity_driver_type">edge_meters</field>
+        <field name="default_setup_time_min">15</field>
+        <field name="default_changeover_time_min">20</field>
+        <field name="minutes_per_unit">0.5</field>
+        <field name="material_adjustment_factor">1.0</field>
+        <field name="supported_material_ids" eval="[(6, 0, [
+            ref('material_mdf'),
+            ref('material_plywood'),
+            ref('material_particle_board'),
+            ref('material_melamine'),
+            ref('material_laminate'),
+            ref('material_veneer'),
+        ])]"/>
+        <field name="requires_qc" eval="True"/>
+        <field name="qc_checklist">- Edge band adhesion uniform — no lifting
+- Color match to face — no contrast strips
+- Trimming flush — no over/undertrim
+- Glue squeeze-out cleaned</field>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="required_documents">Cut list with edge-band color spec; edge-band material pick list.</field>
+        <field name="shop_floor_instruction">Verify edge color matches face on each batch; bring edge-band reel to temperature before first run; trim and clean before stacking.</field>
+    </record>
+
+    <!-- ================ DRILLING ================ -->
+
+    <record id="op_template_drilling" model="southbrook.kitchen.operation.template">
+        <field name="name">Drilling / Boring</field>
+        <field name="code">DRILLING</field>
+        <field name="sequence">60</field>
+        <field name="operation_category">drilling</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_cnc_bore"/>
+        <field name="alternative_workcenter_ids" eval="[(6, 0, [ref('wc_cnc_router_02')])]"/>
+        <field name="quantity_driver_type">hinge_count</field>
+        <field name="default_setup_time_min">10</field>
+        <field name="default_changeover_time_min">10</field>
+        <field name="minutes_per_unit">2.0</field>
+        <field name="requires_qc" eval="True"/>
+        <field name="qc_checklist">- Hinge holes at 32mm system pitch (±0.5mm)
+- Shelf-pin row centered (±1mm)
+- Drawer-runner pre-holes match runner spec</field>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="required_documents">Drilling pattern; runner spec sheet; hinge model reference.</field>
+        <field name="shop_floor_instruction">Bring jig to part — never the other way around. Check first part of each run with calipers before batching.</field>
+    </record>
+
+    <!-- ================ SANDING ================ -->
+
+    <record id="op_template_sanding" model="southbrook.kitchen.operation.template">
+        <field name="name">Sanding / Surface Prep</field>
+        <field name="code">SANDING</field>
+        <field name="sequence">70</field>
+        <field name="operation_category">sanding</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.wc_sand"/>
+        <field name="quantity_driver_type">surface_area_m2</field>
+        <field name="default_setup_time_min">5</field>
+        <field name="minutes_per_unit">8.0</field>
+        <field name="material_adjustment_factor">1.0</field>
+        <field name="finish_adjustment_factor">1.0</field>
+        <field name="supported_finish_ids" eval="[(6, 0, [
+            ref('finish_painted'),
+            ref('finish_lacquered'),
+            ref('finish_stained'),
+            ref('finish_veneer_clear'),
+            ref('finish_high_gloss'),
+            ref('finish_matte'),
+        ])]"/>
+        <field name="requires_qc" eval="False"/>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="shop_floor_instruction">Sand to 220 grit for paint, 320 for lacquer, 400 for high-gloss. Check by hand AND under raking light.</field>
+    </record>
+
+    <!-- ================ FINISHING ================ -->
+
+    <record id="op_template_paint_lacquer" model="southbrook.kitchen.operation.template">
+        <field name="name">Paint / Lacquer / Cure</field>
+        <field name="code">PAINT_LACQUER</field>
+        <field name="sequence">80</field>
+        <field name="operation_category">finishing</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.wc_paint"/>
+        <field name="quantity_driver_type">surface_area_m2</field>
+        <field name="default_setup_time_min">30</field>
+        <field name="default_changeover_time_min">45</field>
+        <field name="minutes_per_unit">10.0</field>
+        <field name="finish_adjustment_factor">1.0</field>
+        <field name="complexity_factor">1.0</field>
+        <field name="supported_finish_ids" eval="[(6, 0, [
+            ref('finish_painted'),
+            ref('finish_lacquered'),
+            ref('finish_stained'),
+            ref('finish_high_gloss'),
+            ref('finish_matte'),
+            ref('finish_veneer_clear'),
+        ])]"/>
+        <field name="requires_qc" eval="True"/>
+        <field name="qc_checklist">- Color match to spec (compare to swatch in booth daylight)
+- Even sheen — no orange-peel or runs
+- Even coverage — no light coats
+- No dust contamination</field>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="required_documents">Paint code; coat count; cure schedule; booth log sheet.</field>
+        <field name="shop_floor_instruction">Group like-colors into runs. After final coat, hand off to Cure / Dry Room with finish.cure_time_buffer_min on the traveler.</field>
+    </record>
+
+    <!-- ================ COUNTERTOP ================ -->
+
+    <record id="op_template_countertop_fab" model="southbrook.kitchen.operation.template">
+        <field name="name">Countertop Fabrication / Subcontract Prep</field>
+        <field name="code">COUNTERTOP_FAB</field>
+        <field name="sequence">90</field>
+        <field name="operation_category">countertop</field>
+        <!-- Engineering coordinates the countertop subcontract handoff
+             when the material is stone/quartz/solid surface; in-house
+             laminate routes through SB-SAW. Defaulting to ENG01
+             since the engineering bay owns the spec packaging. -->
+        <field name="default_workcenter_id" ref="wc_engineering"/>
+        <field name="quantity_driver_type">cabinet_count</field>
+        <field name="default_setup_time_min">30</field>
+        <field name="minutes_per_unit">25.0</field>
+        <field name="supported_material_ids" eval="[(6, 0, [
+            ref('material_laminate'),
+            ref('material_quartz'),
+            ref('material_stone'),
+            ref('material_solid_surface'),
+        ])]"/>
+        <field name="requires_qc" eval="True"/>
+        <field name="qc_checklist">- Overhang match spec (1.5in front, 1in side)
+- Sink/hob cut-outs correct
+- Edge profile per spec
+- Backsplash height per spec</field>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="required_documents">Site template; cabinet layout; sink/cooktop model + cut-out spec.</field>
+        <field name="shop_floor_instruction">For laminate tops: in-house. For quartz/stone/solid-surface: package the site-template + dimensions + cut-outs for the subcontractor and update the MO to subcontract route.</field>
+    </record>
+
+    <!-- ================ ASSEMBLY ================ -->
+
+    <record id="op_template_carcass_assembly" model="southbrook.kitchen.operation.template">
+        <field name="name">Cabinet Carcass Assembly</field>
+        <field name="code">CARCASS_ASSEMBLY</field>
+        <field name="sequence">100</field>
+        <field name="operation_category">assembly</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_assy"/>
+        <field name="quantity_driver_type">panel_count</field>
+        <field name="default_setup_time_min">10</field>
+        <field name="minutes_per_unit">3.5</field>
+        <field name="complexity_factor">1.0</field>
+        <field name="requires_qc" eval="True"/>
+        <field name="qc_checklist">- Carcass is square (diagonal measurement within ±2mm)
+- All panels seated flush
+- All cam-lock joints engaged
+- Back panel set true into rabbet</field>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="required_documents">Assembly diagram; hardware kit pick list.</field>
+        <field name="shop_floor_instruction">Lay carcass face-down on assembly mat; assemble sides → bottom → top; insert back; check square before glue-up.</field>
+    </record>
+
+    <record id="op_template_drawer_assembly" model="southbrook.kitchen.operation.template">
+        <field name="name">Drawer Assembly</field>
+        <field name="code">DRAWER_ASSEMBLY</field>
+        <field name="sequence">110</field>
+        <field name="operation_category">assembly</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_assy"/>
+        <field name="quantity_driver_type">drawer_count</field>
+        <field name="default_setup_time_min">5</field>
+        <field name="minutes_per_unit">12.0</field>
+        <field name="requires_qc" eval="True"/>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="qc_checklist">- Drawer box is square
+- Joint type per spec (dovetail / dado / dowel)
+- Bottom captured in groove
+- Runner pre-holes align with runners</field>
+        <field name="shop_floor_instruction">Assemble box sides + front + back; capture bottom; check square; transfer to runner-fitting cart.</field>
+    </record>
+
+    <record id="op_template_door_fitting" model="southbrook.kitchen.operation.template">
+        <field name="name">Door Fitting</field>
+        <field name="code">DOOR_FITTING</field>
+        <field name="sequence">120</field>
+        <field name="operation_category">assembly</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_door"/>
+        <field name="quantity_driver_type">hinge_count</field>
+        <field name="default_setup_time_min">5</field>
+        <field name="minutes_per_unit">4.5</field>
+        <field name="requires_qc" eval="True"/>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="qc_checklist">- Door gap consistent — 2mm all around
+- Door swings cleanly — no rub on neighbor
+- Hinge close action is consistent (soft-close engages)
+- Door alignment with adjacent doors</field>
+        <field name="shop_floor_instruction">Mount hinges to door first, then mount plate to carcass; adjust 3D hinge for gap. Tighten with door closed.</field>
+    </record>
+
+    <!-- ================ HARDWARE ================ -->
+
+    <record id="op_template_hardware_fitting" model="southbrook.kitchen.operation.template">
+        <field name="name">Hardware Fitting</field>
+        <field name="code">HARDWARE_FITTING</field>
+        <field name="sequence">130</field>
+        <field name="operation_category">hardware</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_hw"/>
+        <field name="quantity_driver_type">hardware_count</field>
+        <field name="default_setup_time_min">5</field>
+        <field name="minutes_per_unit">3.0</field>
+        <field name="requires_qc" eval="True"/>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="qc_checklist">- Handle/knob centered on rail
+- Handle/knob screws not over-tightened
+- Soft-close engagement consistent
+- Drawer runner extension full + smooth</field>
+        <field name="required_documents">Hardware kit pick list; handle/knob orientation spec; runner spec.</field>
+        <field name="shop_floor_instruction">Verify hardware from kit matches Marathon pick list; mount pulls last (no scratches on finish from screws); cycle each drawer/door before move to QC.</field>
+    </record>
+
+    <!-- ================ QUALITY ================ -->
+
+    <record id="op_template_final_qc" model="southbrook.kitchen.operation.template">
+        <field name="name">Final Quality Control</field>
+        <field name="code">FINAL_QC</field>
+        <field name="sequence">140</field>
+        <field name="operation_category">quality</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_qc"/>
+        <field name="quantity_driver_type">cabinet_count</field>
+        <field name="default_setup_time_min">2</field>
+        <field name="minutes_per_unit">8.0</field>
+        <field name="finish_adjustment_factor">1.0</field>
+        <field name="requires_qc" eval="True"/>
+        <field name="creates_rework_allowed" eval="True"/>
+        <field name="qc_checklist">- Dimensions match drawing (±2mm)
+- Squareness within tolerance
+- Finish defect-free under raking light
+- All hardware present + cycled
+- Labels match MO and customer + room
+- Packing instructions present</field>
+        <field name="required_documents">Final QC sheet (printable); customer drawing rev; project + room labels.</field>
+        <field name="shop_floor_instruction">Inspect under raking light; cycle every drawer + door; weigh-check against expected if scale available; sign + photo any defect.</field>
+    </record>
+
+    <!-- ================ PACKING ================ -->
+
+    <record id="op_template_packing" model="southbrook.kitchen.operation.template">
+        <field name="name">Packing by Project / Room</field>
+        <field name="code">PACKING</field>
+        <field name="sequence">150</field>
+        <field name="operation_category">packing</field>
+        <field name="default_workcenter_id" ref="southbrook_mrp_pm.workcenter_pack"/>
+        <field name="quantity_driver_type">cabinet_count</field>
+        <field name="default_setup_time_min">5</field>
+        <field name="minutes_per_unit">6.0</field>
+        <field name="complexity_factor">1.0</field>
+        <field name="requires_qc" eval="False"/>
+        <field name="creates_rework_allowed" eval="False"/>
+        <field name="qc_checklist">- Each cabinet wrapped in shrink film
+- Corner protectors on all 4 corners
+- Label visible: project / room / cabinet code
+- Hardware kits taped to cabinet
+- Delivery batch sticker applied</field>
+        <field name="required_documents">Packing list grouped by project/room; delivery batch sticker template; carrier paperwork.</field>
+        <field name="shop_floor_instruction">Group cabinets by room first, by delivery batch second. Heavy / bottom-stack items load first on the truck.</field>
+    </record>
+</odoo>

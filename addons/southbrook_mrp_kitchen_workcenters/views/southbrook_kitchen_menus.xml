@@ -25,6 +25,11 @@
 
     <!-- Skills reuses Odoo's hr.skill; no new menu needed. -->
 
-    <!-- M2 will add: Kitchen Operation Templates -->
+    <menuitem id="menu_sbk_config_operation_templates"
+              name="Kitchen Operation Templates"
+              parent="menu_sbk_config_root"
+              action="action_sbk_operation_template"
+              sequence="30"/>
+
     <!-- Existing mrp.workcenter menu already covers Work Centers -->
 </odoo>

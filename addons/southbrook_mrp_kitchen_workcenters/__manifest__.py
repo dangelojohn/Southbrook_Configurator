@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -60,9 +60,13 @@ southbrook_kitchen_workspace) without duplicating their models.
         "data/southbrook_kitchen_finishes.xml",
         # Workcenter seeds: 2 new + station_type apply to 12 existing.
         "data/mrp_workcenter_seed.xml",
+        # M2: 15 operation templates with duration formulas. Must load
+        # AFTER workcenter seed since templates reference work centers.
+        "data/southbrook_kitchen_operation_template.xml",
         # Views.
         "views/southbrook_kitchen_material_views.xml",
         "views/southbrook_kitchen_finish_views.xml",
+        "views/southbrook_kitchen_operation_template_views.xml",
         "views/mrp_workcenter_views.xml",
         "views/southbrook_kitchen_menus.xml",
     ],
