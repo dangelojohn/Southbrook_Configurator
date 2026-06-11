@@ -789,18 +789,43 @@ class ConfigDrawer extends Component {
                    t-esc="state.attrError"/>
             </div>
 
+            <!-- Phase 3 Sprint C2 — line-scoped validation hints.
+                 Lists any hard/soft/info validation issues tied to
+                 this line so the dealer can see at-a-glance which
+                 combinations are flagged before clicking through
+                 the picker. Issues are produced by B1's rule
+                 inspector and passed in as the lineIssues prop. -->
+            <div t-if="(props.lineIssues || []).length"
+                 class="o_owl_drawer_validation">
+                <div class="o_owl_drawer_validation_head">
+                    Rule notes for this line
+                </div>
+                <ul class="o_owl_drawer_validation_list">
+                    <li t-foreach="props.lineIssues || []"
+                        t-as="iss" t-key="iss_index"
+                        t-att-class="'o_owl_drawer_validation_item o_owl_dv_' + iss.severity">
+                        <span class="o_owl_dv_sev mono"
+                              t-esc="iss.severity.toUpperCase()"/>
+                        <span class="o_owl_dv_msg" t-esc="iss.message"/>
+                    </li>
+                </ul>
+            </div>
+
             <p class="o_owl_drawer_foot">
-                Phase 3 polish opens the full attribute picker (Family /
-                Width / Series / Door Style / Finish / Hinge / Finished
-                Sides / Accessories). The autosave path proven here
-                carries through unchanged — only the editable surface
-                widens.
+                The picker above swaps the line's variant on each
+                change and re-prices it. Hard-rule violations surface
+                inline as a Rule Notes block above; soft suggestions
+                stay there as recommendations.
             </p>
         </div>
     `;
     static props = {
         line: Object,
         onSaved: Function,
+        // Phase 3 Sprint C2 — per-line validation issues forwarded
+        // from the OrderBuilder's state.validation array, filtered
+        // to those tied to this line.id. Default empty.
+        lineIssues: { type: Array, optional: true },
     };
 
     setup() {
@@ -1033,6 +1058,7 @@ class ZoneGroup extends Component {
                          spanning all 8 columns of the parent grid. -->
                     <ConfigDrawer t-if="line.id === props.selectedLineId"
                                   line="line"
+                                  lineIssues="props.issuesForLine(line.id)"
                                   onSaved="props.onLineSaved"/>
                 </t>
                 <!-- Phase 3 Sprint C1 — per-zone inline add-line.
@@ -1058,6 +1084,9 @@ class ZoneGroup extends Component {
         onSelectLine: Function,
         onLineSaved: Function,
         onAddToZone: Function,
+        // Phase 3 Sprint C2 — issuesForLine(line_id) -> Array of
+        // validation issues filtered to the given line.
+        issuesForLine: Function,
     };
 
     setup() {
@@ -2033,7 +2062,8 @@ const TEMPLATE = xml`
                                selectedLineId="state.ui.selected_line_id"
                                onSelectLine="_setSelectedLine"
                                onLineSaved="_onLineSaved"
-                               onAddToZone="_onAddToZone"/>
+                               onAddToZone="_onAddToZone"
+                               issuesForLine="_issuesForLine"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
@@ -2516,6 +2546,15 @@ class OrderBuilder extends Component {
     _linesForZone(zoneCode) {
         return this.state.lines.filter((l) => l.zone === zoneCode);
     }
+
+    // Phase 3 Sprint C2 — filter the order's validation issue list
+    // down to those tied to a given line.id. Passed into ZoneGroup
+    // so each ConfigDrawer can read its own slice without each
+    // drawer having to filter the whole array.
+    _issuesForLine = (lineId) => {
+        return (this.state.validation || [])
+            .filter((iss) => iss && iss.line_id === lineId);
+    };
 
     _setSelectedLine = (lineId) => {
         // Toggle: clicking the already-selected line clears the

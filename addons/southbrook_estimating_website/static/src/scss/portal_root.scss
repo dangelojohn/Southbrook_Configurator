@@ -553,6 +553,41 @@
     }
 }
 
+// Phase 3 Sprint C2 — line-scoped validation hints in ConfigDrawer.
+.o_owl_drawer_validation {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    background: rgba(245, 240, 220, 0.45);
+    border-left: 3px solid var(--sb-walnut);
+    border-radius: 0 4px 4px 0;
+}
+.o_owl_drawer_validation_head {
+    font-weight: 500;
+    margin-bottom: 6px;
+    font-size: 0.9em;
+}
+.o_owl_drawer_validation_list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.o_owl_drawer_validation_item {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 0.85em;
+}
+.o_owl_dv_sev {
+    flex: 0 0 50px;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.05em;
+}
+.o_owl_dv_hard .o_owl_dv_sev { color: #983b3b; }
+.o_owl_dv_soft .o_owl_dv_sev { color: #b07a1f; }
+.o_owl_dv_info .o_owl_dv_sev { color: #4a6b3d; }
+.o_owl_dv_msg { flex: 1; }
+
 // Phase 3 Sprint C1 — per-zone inline "+ Add to <zone>" CTA.
 .o_owl_zone_add {
     margin-top: 4px;
