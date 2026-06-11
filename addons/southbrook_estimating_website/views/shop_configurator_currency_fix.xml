@@ -26,7 +26,17 @@
 <odoo>
   <data>
 
+    <!-- priority=1 so this applies BEFORE southbrook_configurator_ux's
+         product_configurator_v2_body (default priority 16), which REPLACES the
+         whole #unique_product_configurator section and thus removes the
+         config_product_price span. Without this, a cold install where
+         configurator_ux applies first leaves the span gone and this xpath
+         fails ("cannot be located in parent view"). Applying first means the
+         span still exists when we patch it (and configurator_ux's later
+         replace is unaffected). Also keeps the fix working if configurator_ux
+         is ever absent. -->
     <template id="config_form_currency_fix"
+              priority="1"
               inherit_id="website_product_configurator.product_configurator"
               name="Southbrook · configurator price currency fix">
       <xpath expr="//span[hasclass('config_product_price')]"
