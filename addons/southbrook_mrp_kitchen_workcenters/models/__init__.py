@@ -2,4 +2,7 @@
 from . import southbrook_kitchen_material
 from . import southbrook_kitchen_finish
 from . import southbrook_kitchen_operation_template
+from . import southbrook_kitchen_workcenter_downtime
 from . import mrp_workcenter
+from . import southbrook_mi_check
+from . import mrp_workorder

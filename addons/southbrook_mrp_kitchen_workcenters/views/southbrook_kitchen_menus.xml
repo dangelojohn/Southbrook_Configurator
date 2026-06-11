@@ -31,5 +31,17 @@
               action="action_sbk_operation_template"
               sequence="30"/>
 
+    <!-- M3: Operations branch — downtime log -->
+    <menuitem id="menu_sbk_ops_root"
+              name="Southbrook Kitchen"
+              parent="mrp.menu_mrp_manufacturing"
+              sequence="50"/>
+
+    <menuitem id="menu_sbk_ops_downtime"
+              name="Work Center Downtime"
+              parent="menu_sbk_ops_root"
+              action="action_sbk_downtime"
+              sequence="40"/>
+
     <!-- Existing mrp.workcenter menu already covers Work Centers -->
 </odoo>
