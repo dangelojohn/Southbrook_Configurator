@@ -19,6 +19,12 @@
                         invisible="eco_count == 0">
                     <field name="eco_count" widget="statinfo" string="ECOs"/>
                 </button>
+                <!-- TASK 2: WO smart button -->
+                <button class="oe_stat_button" type="object"
+                        name="action_view_workorders" icon="fa-cogs"
+                        invisible="workorder_count == 0">
+                    <field name="workorder_count" widget="statinfo" string="WOs"/>
+                </button>
             </xpath>
 
             <!-- B3/B4/B5: risk / spec-change / stage-divergence banners -->
@@ -83,6 +89,38 @@
                             <field name="reservation_state" widget="badge"
                                    optional="show"/>
                             <field name="date_deadline" optional="show"/>
+                        </list>
+                    </field>
+                </page>
+
+                <!-- TASK 2: Work Orders page — per-WC duration + planned
+                     start + state. Operators see what's "Not scheduled" at a
+                     glance; the button above the list opens the WOs filtered
+                     to this job so the scheduler can set start dates in the
+                     native Work Orders view. -->
+                <page name="job_workorders" string="Work Orders"
+                      groups="mrp.group_mrp_user"
+                      invisible="workorder_count == 0">
+                    <group>
+                        <field name="workorder_summary" readonly="1"/>
+                        <field name="unscheduled_workorder_count" readonly="1"/>
+                    </group>
+                    <button type="object" name="action_view_workorders"
+                            string="Open Work Orders View" class="btn-primary"/>
+                    <field name="workorder_ids" readonly="1">
+                        <list create="false" edit="false">
+                            <field name="name"/>
+                            <field name="workcenter_id"/>
+                            <field name="duration_expected"
+                                   string="Expected (min)"/>
+                            <field name="date_start"
+                                   string="Planned Start"
+                                   widget="datetime"/>
+                            <field name="state" widget="badge"
+                                   decoration-info="state == 'ready'"
+                                   decoration-muted="state == 'pending'"
+                                   decoration-warning="state == 'waiting'"
+                                   decoration-success="state == 'done'"/>
                         </list>
                     </field>
                 </page>

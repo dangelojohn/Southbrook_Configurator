@@ -87,6 +87,22 @@ class ProjectTask(models.Model):
     stage_mo_note = fields.Char(
         string="Stage/MO Note", compute="_compute_stage_coherence")
 
+    # --- TASK 2: Work-order rollup -----------------------------------------
+    workorder_ids = fields.Many2many(
+        "mrp.workorder",
+        compute="_compute_workorder_rollup",
+        string="Work Orders",
+        help="Every work order across the job's linked MOs.")
+    workorder_count = fields.Integer(
+        string="# Work Orders", compute="_compute_workorder_rollup")
+    unscheduled_workorder_count = fields.Integer(
+        string="# Not Scheduled", compute="_compute_workorder_rollup",
+        help="Work orders with no planned start date — the MRP scheduler "
+             "needs to set these in the Work Orders view.")
+    workorder_summary = fields.Char(
+        string="Work Orders Summary", compute="_compute_workorder_rollup",
+        help="One-line summary, e.g. '47 WOs / 47 not scheduled'.")
+
     # ------------------------------------------------------------------------
     @api.depends("production_ids", "production_ids.state",
                  "production_ids.reservation_state", "production_ids.date_deadline")
@@ -211,7 +227,42 @@ class ProjectTask(models.Model):
                         "Stage '%s' but no MO has started production."
                         % task.stage_id.name)
 
+    # --- TASK 2: Work-order rollup compute ---------------------------------
+    @api.depends("production_ids", "production_ids.workorder_ids",
+                 "production_ids.workorder_ids.date_start",
+                 "production_ids.workorder_ids.state")
+    def _compute_workorder_rollup(self):
+        for task in self:
+            wos = task.production_ids.mapped("workorder_ids")
+            task.workorder_ids = wos
+            task.workorder_count = len(wos)
+            # "Not scheduled" = no planned/actual start date set yet. The
+            # scheduler needs to set these in the Work Orders view.
+            unscheduled = wos.filtered(lambda w: not w.date_start)
+            task.unscheduled_workorder_count = len(unscheduled)
+            if not wos:
+                task.workorder_summary = ""
+            elif not unscheduled:
+                task.workorder_summary = "%d WOs all scheduled" % len(wos)
+            else:
+                task.workorder_summary = (
+                    "%d WOs / %d not scheduled" % (len(wos), len(unscheduled)))
+
     # --- actions ------------------------------------------------------------
+    def action_view_workorders(self):
+        """Open the Work Orders list filtered to this job's WOs so the
+        MRP scheduler can set planned start dates in the native view."""
+        self.ensure_one()
+        wos = self.production_ids.mapped("workorder_ids")
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Work Orders — %s" % (self.name or self.display_name),
+            "res_model": "mrp.workorder",
+            "domain": [("id", "in", wos.ids)],
+            "view_mode": "list,form,gantt,calendar",
+            "context": {"create": False},
+        }
+
     def action_view_productions(self):
         self.ensure_one()
         return {
