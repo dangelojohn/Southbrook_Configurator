@@ -48,3 +48,34 @@ class TestManufacturingIntelligenceViews(TransactionCase):
             "southbrook_manufacturing_intelligence.action_southbrook_mi_packages",
         ]:
             self.assertTrue(self.env.ref(xmlid, raise_if_not_found=False), xmlid)
+
+        checks_action = self.env.ref(
+            "southbrook_manufacturing_intelligence.action_southbrook_mi_checks"
+        )
+        self.assertEqual(checks_action.view_mode, "list")
+        self.assertTrue(checks_action.search_view_id)
+
+        check_list = self.env.ref(
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_check_list"
+        )
+        self.assertIn('field name="stage"', check_list.arch_db)
+        self.assertIn('field name="is_gate"', check_list.arch_db)
+        self.assertIn('field name="workcenter_id"', check_list.arch_db)
+
+        check_search = self.env.ref(
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_check_search"
+        )
+        for marker in [
+            "stage_saw",
+            "stage_install",
+            "gate_checks",
+            "group_stage",
+            "group_workcenter",
+        ]:
+            self.assertIn(marker, check_search.arch_db)
+
+        package_list = self.env.ref(
+            "southbrook_manufacturing_intelligence.view_southbrook_mi_package_list"
+        )
+        self.assertIn("x_mi_blocked_stage", package_list.arch_db)
+        self.assertIn("x_mi_next_stage_action", package_list.arch_db)

@@ -8,11 +8,15 @@
                   decoration-danger="severity == 'blocker'"
                   decoration-warning="severity == 'warning'"
                   decoration-info="severity == 'info'">
+                <field name="sequence"/>
+                <field name="stage"/>
                 <field name="severity"/>
+                <field name="is_gate"/>
                 <field name="category"/>
                 <field name="name"/>
                 <field name="production_package_id"/>
                 <field name="production_id"/>
+                <field name="workcenter_id"/>
                 <field name="message"/>
                 <field name="recommendation"/>
             </list>
@@ -25,19 +29,24 @@
         <field name="arch" type="xml">
             <search string="Manufacturing Intelligence">
                 <field name="name"/>
+                <field name="stage"/>
                 <field name="severity"/>
-                <field name="category"/>
                 <filter name="blockers" string="Blockers" domain="[('severity','=','blocker')]"/>
                 <filter name="warnings" string="Warnings" domain="[('severity','=','warning')]"/>
+                <filter name="gate_checks" string="Gate Checks" domain="[('is_gate','=',True)]"/>
                 <separator/>
-                <filter name="category_cut" string="Cut" domain="[('category','=','cut')]"/>
-                <filter name="category_production" string="Production" domain="[('category','=','production')]"/>
-                <filter name="category_assembly" string="Assembly" domain="[('category','=','assembly')]"/>
-                <filter name="category_install" string="Install" domain="[('category','=','install')]"/>
+                <filter name="stage_saw" string="Saw" domain="[('stage','=','saw')]"/>
+                <filter name="stage_cnc" string="CNC" domain="[('stage','=','cnc')]"/>
+                <filter name="stage_edgeband" string="Edgeband" domain="[('stage','=','edgeband')]"/>
+                <filter name="stage_assembly" string="Assembly" domain="[('stage','=','assembly')]"/>
+                <filter name="stage_finish_qc" string="Finish / QC" domain="[('stage','=','finish_qc')]"/>
+                <filter name="stage_delivery" string="Delivery" domain="[('stage','=','delivery')]"/>
+                <filter name="stage_install" string="Install" domain="[('stage','=','install')]"/>
                 <group>
-                    <filter name="group_category" string="Category" context="{'group_by':'category'}"/>
+                    <filter name="group_stage" string="Stage" context="{'group_by':'stage'}"/>
                     <filter name="group_severity" string="Severity" context="{'group_by':'severity'}"/>
                     <filter name="group_package" string="Package" context="{'group_by':'production_package_id'}"/>
+                    <filter name="group_workcenter" string="Work Center" context="{'group_by':'workcenter_id'}"/>
                 </group>
             </search>
         </field>
@@ -55,9 +64,10 @@
                 <field name="mo_id"/>
                 <field name="state"/>
                 <field name="x_mi_status"/>
+                <field name="x_mi_blocked_stage"/>
                 <field name="x_mi_blocker_count"/>
                 <field name="x_mi_warning_count"/>
-                <field name="x_mi_next_action"/>
+                <field name="x_mi_next_stage_action"/>
             </list>
         </field>
     </record>
@@ -65,9 +75,9 @@
     <record id="action_southbrook_mi_checks" model="ir.actions.act_window">
         <field name="name">Manufacturing Intelligence Checks</field>
         <field name="res_model">southbrook.mi.check</field>
-        <field name="view_mode">list,search</field>
+        <field name="view_mode">list</field>
         <field name="search_view_id" ref="view_southbrook_mi_check_search"/>
-        <field name="context">{'search_default_blockers': 1, 'search_default_group_category': 1}</field>
+        <field name="context">{'search_default_blockers': 1, 'search_default_group_stage': 1}</field>
     </record>
 
     <record id="action_southbrook_mi_packages" model="ir.actions.act_window">
