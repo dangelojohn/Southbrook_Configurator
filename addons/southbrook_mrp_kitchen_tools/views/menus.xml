@@ -42,6 +42,12 @@
               action="action_tool_asset"
               sequence="10"/>
 
+    <menuitem id="menu_southbrook_tools_consumption"
+              name="Tool Consumption Log"
+              parent="menu_southbrook_tools_operations_root"
+              action="action_workorder_tool_consumption"
+              sequence="20"/>
+
     <menuitem id="menu_southbrook_tools_kits"
               name="Tool Kits"
               parent="menu_southbrook_tools_config_root"

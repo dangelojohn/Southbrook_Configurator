@@ -13,3 +13,5 @@ from . import mrp_workcenter
 from . import mrp_routing_workcenter
 # Commit 4 — workorder readiness gate
 from . import mrp_workorder
+# Commit 5 — consumption, cost, usage
+from . import workorder_tool_consumption

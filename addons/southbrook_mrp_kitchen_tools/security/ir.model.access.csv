@@ -28,3 +28,7 @@ access_tool_kit_line_user,Tool kit line read for MRP users,model_southbrook_tool
 access_tool_kit_line_operator,Tool kit line read for tool operators,model_southbrook_tool_kit_line,group_tool_operator,1,0,0,0
 access_tool_kit_line_crib,Tool kit line CRUD for crib manager,model_southbrook_tool_kit_line,group_tool_crib_manager,1,1,1,1
 access_tool_kit_line_admin,Tool kit line CRUD for system admin,model_southbrook_tool_kit_line,base.group_system,1,1,1,1
+access_wo_consumption_user,WO consumption read for MRP users,model_southbrook_workorder_tool_consumption,mrp.group_mrp_user,1,0,0,0
+access_wo_consumption_operator,WO consumption CRUD for tool operators,model_southbrook_workorder_tool_consumption,group_tool_operator,1,1,1,0
+access_wo_consumption_crib,WO consumption CRUD for crib manager,model_southbrook_workorder_tool_consumption,group_tool_crib_manager,1,1,1,1
+access_wo_consumption_admin,WO consumption CRUD for system admin,model_southbrook_workorder_tool_consumption,base.group_system,1,1,1,1

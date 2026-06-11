@@ -8,3 +8,5 @@ from . import test_tool_asset
 from . import test_requirements
 # Commit 4 — workorder readiness gate
 from . import test_readiness
+# Commit 5 — consumption, cost, usage
+from . import test_consumption
