@@ -173,46 +173,44 @@ class MrpWorkorder(models.Model):
     # ------------------------------------------------------------------
 
     def action_sbk_recalc_kitchen_duration(self):
-        """Per brief §9 — a button that recomputes the kitchen-formula
-        expected duration. Reads the operation_template tied to the WO
-        and calls compute_expected_duration().
-
-        Wiring of WHICH template ties to this WO lives in M4 (mrp.bom
-        operation gets a southbrook_operation_template_id field then).
-        For now the method exists on the model so the button can hook
-        in without another migration.
+        """Recompute x_sbk_kitchen_expected_min from the operation
+        template bound to this WO's BoM operation. No-op when no
+        template is bound — Odoo's native duration_expected still
+        carries an estimate, the planner can fall back to that.
         """
         for wo in self:
             template = wo._sbk_kitchen_operation_template()
             if not template:
                 continue
             driver = wo._sbk_kitchen_driver_value(template)
+            complexity = (
+                wo.production_id.x_sbk_complexity_factor or 1.0
+                if wo.production_id else 1.0
+            )
             wo.x_sbk_kitchen_expected_min = template.compute_expected_duration(
                 driver_value=driver,
+                complexity_factor=complexity,
             )
         return True
 
     def _sbk_kitchen_operation_template(self):
-        """Resolve the operation template for this WO. Default
-        implementation looks at the BoM operation; M4 wires the link.
-        Returns False when no template is bound."""
+        """Resolve the operation template bound to this WO's BoM
+        operation. Returns False when nothing is bound."""
         self.ensure_one()
-        # Look for a southbrook_operation_template_id on the BoM
-        # operation. The field is added in M4 — until then this
-        # method returns False so the button is a no-op.
-        op = self.operation_id  # mrp.routing.workcenter on the WO
-        if op and hasattr(op, "x_sbk_operation_template_id"):
-            return op.x_sbk_operation_template_id
-        return False
+        op = self.operation_id
+        return op.x_sbk_operation_template_id if op else False
 
     def _sbk_kitchen_driver_value(self, template):
-        """Pull the appropriate quantity from the MO for this template's
-        quantity_driver_type. M4 lifts the inputs from
-        sb.production.package / sb.cutlist where they're already
-        computed. For now reads only product_qty as the safe default."""
+        """Pull the quantity driver for the template. Honours an
+        explicit override on the routing operation, otherwise reads
+        product_qty for per-unit templates and 0 for fixed-mode."""
         self.ensure_one()
-        if template.quantity_driver_type == "product_qty":
-            return self.production_id.product_qty or 0.0
+        override = (
+            self.operation_id.x_sbk_driver_override
+            if self.operation_id else 0.0
+        )
+        if override:
+            return override
         if template.quantity_driver_type == "fixed":
             return 0.0
         return self.production_id.product_qty or 0.0

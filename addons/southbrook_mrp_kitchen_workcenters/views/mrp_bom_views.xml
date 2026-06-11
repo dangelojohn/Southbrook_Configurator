@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Adds the operation-template binding to the routing-workcenter
+        list view. Inheriting the base mrp_routing_workcenter_tree_view
+        rather than the inline list inside the BoM form, because the
+        BoM form references this view via list_view_ref — the inline
+        list isn't in the same file.
+    -->
+
+    <record id="view_mrp_routing_workcenter_tree_sbk_kitchen" model="ir.ui.view">
+        <field name="name">mrp.routing.workcenter.list.sbk.kitchen</field>
+        <field name="model">mrp.routing.workcenter</field>
+        <field name="inherit_id" ref="mrp.mrp_routing_workcenter_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='time_cycle']" position="after">
+                <field name="x_sbk_operation_template_id" optional="show"/>
+                <field name="x_sbk_driver_override" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Also light up the standalone routing form -->
+    <record id="view_mrp_routing_workcenter_form_sbk_kitchen" model="ir.ui.view">
+        <field name="name">mrp.routing.workcenter.form.sbk.kitchen</field>
+        <field name="model">mrp.routing.workcenter</field>
+        <field name="inherit_id" ref="mrp.mrp_routing_workcenter_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='workorder']" position="inside">
+                <field name="x_sbk_operation_template_id"/>
+                <field name="x_sbk_driver_override"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

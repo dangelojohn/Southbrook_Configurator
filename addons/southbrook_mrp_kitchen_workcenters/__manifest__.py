@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.3.0.0",
+    "version": "19.0.4.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -51,6 +51,7 @@ southbrook_kitchen_workspace) without duplicating their models.
         "southbrook_mrp_pm",
         "southbrook_manufacturing_intelligence",
         "southbrook_kitchen_mrp",
+        "southbrook_kitchen_workspace",
     ],
     "data": [
         "security/ir.model.access.csv",
@@ -69,7 +70,14 @@ southbrook_kitchen_workspace) without duplicating their models.
         "views/southbrook_kitchen_operation_template_views.xml",
         "views/southbrook_kitchen_workcenter_downtime_views.xml",
         "views/mrp_workcenter_views.xml",
+        "views/mrp_production_views.xml",
+        "views/mrp_workorder_views.xml",
+        "views/mrp_bom_views.xml",
         "views/southbrook_kitchen_menus.xml",
+        # Demo data — loaded only when demo flag is set.
+    ],
+    "demo": [
+        "demo/southbrook_kitchen_workcenters_demo.xml",
     ],
     "installable": True,
     "application": False,

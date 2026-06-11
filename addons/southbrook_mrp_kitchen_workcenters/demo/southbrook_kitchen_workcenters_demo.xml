@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Minimal demo — one kitchen project so the planner can see
+        the linkage on the production form. We avoid seeding an MO
+        because the full chain (product → routing → BoM with
+        operation_template) requires Southbrook product fixtures
+        which the estimating module owns; M4 demo data stays at the
+        layer this module is responsible for.
+    -->
+
+    <record id="demo_kitchen_project" model="sb.kitchen.project">
+        <field name="name">Demo - Smith Residence Kitchen</field>
+        <field name="code">DEMO-SMITH</field>
+    </record>
+</odoo>
