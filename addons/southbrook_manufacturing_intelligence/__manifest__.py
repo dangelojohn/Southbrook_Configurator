@@ -5,7 +5,7 @@
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "depends": [
         "mrp",
         "southbrook_estimating",
@@ -18,6 +18,7 @@
         "security/ir.model.access.csv",
         "views/mrp_production_views.xml",
         "views/production_package_views.xml",
+        "views/manager_dashboard_views.xml",
         "views/pm_kanban_inherit.xml",
     ],
     "installable": True,
