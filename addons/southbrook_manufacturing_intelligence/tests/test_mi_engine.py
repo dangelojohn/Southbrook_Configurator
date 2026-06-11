@@ -27,6 +27,49 @@ class TestManufacturingIntelligenceEngine(TransactionCase):
         self.assertTrue(values["is_gate"])
         self.assertEqual(values["workcenter_id"], workcenter.id)
 
+    def test_stage_rollup_uses_first_blocked_stage_by_sequence(self):
+        Engine = self.env["southbrook.mi.engine"]
+        Check = self.env["southbrook.mi.check"]
+        install = Check.create(
+            {
+                "name": "Install blocker",
+                "severity": "blocker",
+                "category": "install",
+                "stage": "install",
+                "sequence": 70,
+                "message": "Install blocked",
+                "recommendation": "Fix install",
+            }
+        )
+        saw = Check.create(
+            {
+                "name": "Saw blocker",
+                "severity": "blocker",
+                "category": "cut",
+                "stage": "saw",
+                "sequence": 10,
+                "message": "Saw blocked",
+                "recommendation": "Fix saw",
+            }
+        )
+        warning = Check.create(
+            {
+                "name": "Assembly warning",
+                "severity": "warning",
+                "category": "assembly",
+                "stage": "assembly",
+                "sequence": 40,
+                "message": "Assembly review",
+                "recommendation": "Review assembly",
+            }
+        )
+        rollup = Engine._stage_rollup_from_checks(install | saw | warning)
+        self.assertEqual(rollup["x_mi_blocked_stage"], "saw")
+        self.assertEqual(rollup["x_mi_next_stage_action"], "Fix saw")
+        self.assertEqual(rollup["x_mi_saw_blocker_count"], 1)
+        self.assertEqual(rollup["x_mi_install_blocker_count"], 1)
+        self.assertEqual(rollup["x_mi_assembly_blocker_count"], 0)
+
     def test_cut_summary(self):
         Engine = self.env["southbrook.mi.engine"]
         summary = Engine._compute_cut_summary(

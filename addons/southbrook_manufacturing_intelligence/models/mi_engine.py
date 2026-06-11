@@ -21,6 +21,46 @@ class SouthbrookMiEngine(models.AbstractModel):
         return values
 
     @api.model
+    def _stage_rollup_from_checks(self, checks):
+        stages = [
+            "saw",
+            "cnc",
+            "edgeband",
+            "assembly",
+            "finish_qc",
+            "delivery",
+            "install",
+        ]
+        rollup = {
+            "x_mi_blocked_stage": False,
+            "x_mi_next_stage_action": False,
+        }
+        for stage in stages:
+            rollup["x_mi_%s_blocker_count" % stage] = len(
+                checks.filtered(
+                    lambda c, stage=stage: c.stage == stage
+                    and c.severity == "blocker"
+                )
+            )
+        blocker = checks.filtered(lambda c: c.severity == "blocker").sorted(
+            key=lambda c: (c.sequence or 100, c.id)
+        )[:1]
+        if blocker:
+            rollup["x_mi_blocked_stage"] = blocker.stage
+            rollup["x_mi_next_stage_action"] = (
+                blocker.recommendation or blocker.message
+            )
+            return rollup
+        warning = checks.filtered(lambda c: c.severity == "warning").sorted(
+            key=lambda c: (c.sequence or 100, c.id)
+        )[:1]
+        if warning:
+            rollup["x_mi_next_stage_action"] = (
+                warning.recommendation or warning.message
+            )
+        return rollup
+
+    @api.model
     def _status_from_severities(self, severities):
         if "blocker" in severities:
             return "blocked"
