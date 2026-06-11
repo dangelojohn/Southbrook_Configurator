@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API key duration policy
+  =======================
+
+  The ProductGraph MCP sidecar (product-graph-mcp container, deployed
+  on the QNAP southbrook stack) authenticates to Odoo as the
+  `mcp-bot@southbrookcabinetry.local` service user using a personal
+  API key (Decision D6, ~/product_graph_v19/CLAUDE.md).
+
+  Odoo 19's res.users.apikeys._check_expiration_date caps the
+  expiration date of a minted key by the max api_key_duration across
+  the requesting user's groups. The Odoo default for base.group_user
+  is 90 days — fine for human users who rotate keys interactively,
+  too short for an unattended service account.
+
+  This raises the cap to 5 years (1825 days) so service accounts can
+  mint long-lived keys without group elevation. Side-effect: every
+  internal user in this DB can now mint keys up to 5 years. That's
+  acceptable for the Southbrook deployment because all internal
+  users on this instance are direct employees + the mcp-bot service.
+
+  noupdate="1" so an admin can lower the cap back via Settings →
+  General Settings → API Keys without it being reverted on the next
+  module upgrade. This file only sets a sensible default at install
+  time.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="base.group_user" model="res.groups">
+            <field name="api_key_duration">1825</field>
+        </record>
+    </data>
+</odoo>
