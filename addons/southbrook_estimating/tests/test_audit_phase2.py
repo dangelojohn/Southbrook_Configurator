@@ -346,7 +346,27 @@ class TestAuditPhase2PriceExtras(SouthbrookTestCase):
     def test_02_premium_audit_values_carry_non_zero_price_extra(self):
         """Premium audit values should have non-zero price_extra so
         users see meaningful price movement. (Baseline values like
-        'None' / 'Square' / 'Particleboard' stay at $0 by design.)"""
+        'None' / 'Square' / 'Particleboard' stay at $0 by design.)
+
+        The price_extra writes live in southbrook_configurator_ux's
+        tactical_price_seed.backfill_demo_price_extras, triggered by
+        that module's data XML load. When THIS test runs via
+        `-u southbrook_estimating`, the configurator_ux load isn't
+        triggered — so we invoke the backfill ourselves to guarantee
+        the deltas are written before asserting.
+        """
+        # Trigger the backfill if southbrook_configurator_ux is
+        # installed. When it isn't, every premium price_extra stays
+        # at 0 by design — those deltas LIVE in configurator_ux, not
+        # in this base addon — so the test would be assertively
+        # checking absent infrastructure. Skip instead.
+        seed_model = self.env.get("southbrook.configurator_ux.tactical_seed")
+        if seed_model is None:
+            self.skipTest(
+                "southbrook_configurator_ux not installed; premium "
+                "price_extras live in that module's tactical_price_seed"
+            )
+        seed_model.sudo().backfill_demo_price_extras()
         PTAV = self.env["product.template.attribute.value"]
         premium_xmlids = (
             "value_overlay_inset",         # +$35
