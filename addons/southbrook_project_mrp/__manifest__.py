@@ -37,6 +37,11 @@ rather than duplicating them — material/BoM/cost are pulled FROM the linked MO
         "views/mrp_production_views.xml",
         "views/project_task_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "southbrook_project_mrp/static/src/scss/kanban_pipeline.scss",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,
