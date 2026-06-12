@@ -381,3 +381,51 @@ class TestMrpCommandCenter(TransactionCase):
             task.action_southbrook_release_to_production()
         self.assertIn("Cannot release", str(err.exception))
         self.assertIn("production package", str(err.exception).lower())
+
+    def test_blocked_release_does_not_call_sale_release_action(self):
+        task, sale = self._new_sale_order_task()
+        sale.action_confirm()
+        self._new_mo_for_task(task)
+        calls = []
+        Sale = type(sale)
+        original = getattr(Sale, "action_send_to_production", None)
+
+        def fake_action_send_to_production(recordset):
+            calls.append(recordset)
+            return recordset.env["mrp.production"]
+
+        Sale.action_send_to_production = fake_action_send_to_production
+        try:
+            with self.assertRaises(UserError):
+                task.action_southbrook_release_to_production()
+        finally:
+            if original:
+                Sale.action_send_to_production = original
+            else:
+                delattr(Sale, "action_send_to_production")
+
+        self.assertFalse(calls)
+
+    def test_successful_release_returns_mo_action_dict(self):
+        task, sale = self._new_sale_order_task()
+        mo = self._new_mo_for_task(task)
+        self._new_package_for_mo(mo)
+        Sale = type(sale)
+        original = getattr(Sale, "action_send_to_production", None)
+
+        def fake_action_send_to_production(recordset):
+            return recordset.env["mrp.production"].browse(mo.id)
+
+        Sale.action_send_to_production = fake_action_send_to_production
+        try:
+            action = task.action_southbrook_release_to_production()
+        finally:
+            if original:
+                Sale.action_send_to_production = original
+            else:
+                delattr(Sale, "action_send_to_production")
+
+        self.assertIsInstance(action, dict)
+        self.assertEqual(action["type"], "ir.actions.act_window")
+        self.assertEqual(action["res_model"], "mrp.production")
+        self.assertEqual(action["res_id"], mo.id)

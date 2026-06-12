@@ -222,6 +222,10 @@ class ProjectTask(models.Model):
         self.ensure_one()
         return self.x_southbrook_sale_order_id.sudo()
 
+    def _southbrook_release_sale_order(self):
+        self.ensure_one()
+        return self.x_southbrook_sale_order_id
+
     def _southbrook_related_company(self, sale=False):
         self.ensure_one()
         company = False
@@ -264,6 +268,42 @@ class ProjectTask(models.Model):
             return self.env["mrp.workorder"]
         return productions.mapped("workorder_ids")
 
+    def _southbrook_notification_action(self):
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Ready for Production"),
+                "message": _("All release gates are ready."),
+                "type": "success",
+                "sticky": False,
+            },
+        }
+
+    def _southbrook_mo_action(self, productions):
+        if isinstance(productions, dict):
+            return productions
+        if not productions:
+            return self._southbrook_notification_action()
+        productions.check_access_rights("read")
+        productions.check_access_rule("read")
+        action = {
+            "type": "ir.actions.act_window",
+            "name": _("Manufacturing Orders"),
+            "res_model": "mrp.production",
+        }
+        if len(productions) == 1:
+            action.update({
+                "view_mode": "form",
+                "res_id": productions.id,
+            })
+        else:
+            action.update({
+                "view_mode": "tree,form",
+                "domain": [("id", "in", productions.ids)],
+            })
+        return action
+
     def action_southbrook_recompute_mrp_readiness(self):
         for task in self:
             productions = task._southbrook_related_productions()
@@ -294,19 +334,15 @@ class ProjectTask(models.Model):
                 "job": self.display_name,
                 "summary": summary,
             })
-        sale = self._southbrook_related_sale_order()
+        sale = self._southbrook_release_sale_order()
         if sale and hasattr(sale, "action_send_to_production"):
-            return sale.action_send_to_production()
-        return {
-            "type": "ir.actions.client",
-            "tag": "display_notification",
-            "params": {
-                "title": _("Ready for Production"),
-                "message": _("All release gates are ready."),
-                "type": "success",
-                "sticky": False,
-            },
-        }
+            sale.check_access_rights("read")
+            sale.check_access_rule("read")
+            sale.check_access_rights("write")
+            sale.check_access_rule("write")
+            productions = sale.action_send_to_production()
+            return self._southbrook_mo_action(productions)
+        return self._southbrook_notification_action()
 
     def _southbrook_related_mi_checks(self, productions=False, packages=False):
         Check = self.env["southbrook.mi.check"].sudo()
