@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 import json
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
@@ -68,56 +68,53 @@ class ProjectTask(models.Model):
 
     x_southbrook_readiness_score = fields.Integer(
         string="MRP Readiness Score",
-        compute="_compute_southbrook_mrp_readiness",
-        store=False,
+        default=0,
+        copy=False,
     )
     x_southbrook_readiness_state = fields.Selection(
         READINESS_STATES,
         string="MRP Readiness",
-        compute="_compute_southbrook_mrp_readiness",
-        store=False,
+        default="at_risk",
+        index=True,
+        copy=False,
     )
     x_southbrook_blocking_gate = fields.Selection(
         [(key, label) for key, label in GATE_LABELS.items()],
         string="Blocking Gate",
-        compute="_compute_southbrook_mrp_readiness",
-        store=False,
+        index=True,
+        copy=False,
     )
     x_southbrook_blocker_summary = fields.Text(
         string="Blocker Summary",
-        compute="_compute_southbrook_mrp_readiness",
-        store=False,
+        copy=False,
     )
     x_southbrook_next_action = fields.Text(
         string="Next Action",
-        compute="_compute_southbrook_mrp_readiness",
-        store=False,
+        copy=False,
     )
     x_southbrook_gate_json = fields.Text(
         string="MRP Gate Detail",
-        compute="_compute_southbrook_mrp_readiness",
-        store=False,
+        copy=False,
     )
 
-    @api.depends(
-        "x_southbrook_sale_order_id",
-        "x_southbrook_sale_order_id.state",
-    )
-    def _compute_southbrook_mrp_readiness(self):
+    def action_southbrook_refresh_mrp_readiness_snapshot(self):
         for task in self:
             gates = task._southbrook_collect_readiness_gates()
             score, state, blocked_gate, summary, next_action = (
                 task._southbrook_score_from_gates(gates)
             )
-            task.x_southbrook_readiness_score = score
-            task.x_southbrook_readiness_state = state
-            task.x_southbrook_blocking_gate = blocked_gate
-            task.x_southbrook_blocker_summary = summary
-            task.x_southbrook_next_action = next_action
-            task.x_southbrook_gate_json = json.dumps(
-                task._southbrook_gate_rows(gates),
-                sort_keys=True,
-            )
+            task.write({
+                "x_southbrook_readiness_score": score,
+                "x_southbrook_readiness_state": state,
+                "x_southbrook_blocking_gate": blocked_gate,
+                "x_southbrook_blocker_summary": summary,
+                "x_southbrook_next_action": next_action,
+                "x_southbrook_gate_json": json.dumps(
+                    task._southbrook_gate_rows(gates),
+                    sort_keys=True,
+                ),
+            })
+        return True
 
     def _southbrook_default_gate(self, gate, state="ready", message=False,
                                  action=False, blocking=False):
@@ -358,21 +355,18 @@ class ProjectTask(models.Model):
             for workorder in workorders:
                 if hasattr(workorder, "action_check_tool_readiness"):
                     workorder.action_check_tool_readiness()
+        self.action_southbrook_refresh_mrp_readiness_snapshot()
         return True
 
     def action_southbrook_release_to_production(self):
         self.ensure_one()
         self.action_southbrook_recompute_mrp_readiness()
-        gates = self._southbrook_collect_readiness_gates()
-        score, state, blocked_gate, summary, next_action = (
-            self._southbrook_score_from_gates(gates)
-        )
-        if state == "blocked":
+        if self.x_southbrook_readiness_state == "blocked":
             raise UserError(_(
                 "Cannot release %(job)s. %(summary)s"
             ) % {
                 "job": self.display_name,
-                "summary": summary,
+                "summary": self.x_southbrook_blocker_summary,
             })
         sale = self._southbrook_release_sale_order()
         if sale and hasattr(sale, "action_send_to_production"):

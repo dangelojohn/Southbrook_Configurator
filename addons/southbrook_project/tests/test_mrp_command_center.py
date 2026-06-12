@@ -196,8 +196,10 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertIn("Unknown gate state 'deferred'", summary)
         self.assertIn("Unknown gate state 'deferred'", next_action)
 
-    def test_unlinked_task_computes_at_risk_missing_mrp_context(self):
+    def test_unlinked_task_refreshes_at_risk_missing_mrp_context(self):
         task = self._new_task()
+        task.action_southbrook_refresh_mrp_readiness_snapshot()
+
         self.assertEqual(task.x_southbrook_readiness_state, "at_risk")
         self.assertFalse(task.x_southbrook_blocking_gate)
         self.assertIn(
@@ -216,6 +218,7 @@ class TestMrpCommandCenter(TransactionCase):
 
     def test_computed_gate_json_has_expected_shape(self):
         task = self._new_task()
+        task.action_southbrook_refresh_mrp_readiness_snapshot()
 
         rows = json.loads(task.x_southbrook_gate_json)
         self.assertEqual(len(rows), 11)
@@ -271,6 +274,18 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertEqual(blocked_gate, "bom_cutlist")
         self.assertIn("production package", summary.lower())
         self.assertIn("production package", next_action.lower())
+
+    def test_blocked_jobs_domain_finds_blocked_task(self):
+        task, sale = self._new_sale_order_task()
+        self._new_mo_for_task(task)
+
+        task.action_southbrook_refresh_mrp_readiness_snapshot()
+        blocked_tasks = self.env["project.task"].search([
+            ("x_southbrook_readiness_state", "=", "blocked"),
+        ])
+
+        self.assertIn(task, blocked_tasks)
+        self.assertEqual(task.x_southbrook_blocking_gate, "bom_cutlist")
 
     def test_partial_packages_block_bom_cutlist_gate(self):
         task, sale = self._new_sale_order_task()
