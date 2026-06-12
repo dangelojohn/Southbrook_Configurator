@@ -195,29 +195,34 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertIn("Unknown gate state 'deferred'", summary)
         self.assertIn("Unknown gate state 'deferred'", next_action)
 
-    def test_computed_fields_include_gate_json(self):
+    def test_unlinked_task_computes_at_risk_missing_mrp_context(self):
         task = self._new_task()
-        self.assertEqual(task.x_southbrook_readiness_score, 100)
-        self.assertEqual(task.x_southbrook_readiness_state, "ready")
+        self.assertEqual(task.x_southbrook_readiness_state, "at_risk")
         self.assertFalse(task.x_southbrook_blocking_gate)
-        self.assertEqual(
+        self.assertIn(
+            "No originating quote or sales order is linked.",
             task.x_southbrook_blocker_summary,
-            "All release gates are ready.",
         )
-        self.assertFalse(task.x_southbrook_next_action)
+        self.assertLessEqual(task.x_southbrook_readiness_score, 89)
 
         rows = json.loads(task.x_southbrook_gate_json)
         self.assertEqual(len(rows), 11)
         self.assertEqual(rows[0]["gate"], "estimate")
         self.assertEqual(rows[0]["label"], "Estimate")
+        self.assertEqual(rows[0]["state"], "warning")
+        self.assertEqual(rows[8]["gate"], "schedule")
+        self.assertEqual(rows[8]["state"], "warning")
+
+    def test_computed_gate_json_has_expected_shape(self):
+        task = self._new_task()
+
+        rows = json.loads(task.x_southbrook_gate_json)
+        self.assertEqual(len(rows), 11)
         for row in rows:
             self.assertEqual(
                 set(row),
                 {"gate", "label", "state", "message", "action", "blocking"},
             )
-            self.assertEqual(row["state"], "ready")
-            self.assertFalse(row["action"])
-            self.assertFalse(row["blocking"])
 
     def _new_mo_for_task(self, task):
         product = self.env["product.product"].create({
@@ -239,7 +244,11 @@ class TestMrpCommandCenter(TransactionCase):
             "name": "MRP Command Customer",
         })
         sale = self.env["sale.order"].create({"partner_id": partner.id})
+        sale.write({"state": "sale"})
         return self._new_task(x_southbrook_sale_order_id=sale.id), sale
+
+    def _new_package_for_mo(self, mo):
+        return self.env["sb.production.package"].create({"mo_id": mo.id})
 
     def test_missing_package_blocks_bom_cutlist_gate(self):
         task, sale = self._new_sale_order_task()
@@ -251,10 +260,19 @@ class TestMrpCommandCenter(TransactionCase):
             "production package",
             gates["bom_cutlist"]["message"].lower(),
         )
+        score, state, blocked_gate, summary, next_action = (
+            task._southbrook_score_from_gates(gates)
+        )
+        self.assertLessEqual(score, 69)
+        self.assertEqual(state, "blocked")
+        self.assertEqual(blocked_gate, "bom_cutlist")
+        self.assertIn("production package", summary.lower())
+        self.assertIn("production package", next_action.lower())
 
     def test_tool_readiness_blocker_blocks_tooling_gate(self):
         task, sale = self._new_sale_order_task()
         mo = self._new_mo_for_task(task)
+        self._new_package_for_mo(mo)
         workcenter = self.env["mrp.workcenter"].create({
             "name": "MRP Command CNC",
             "code": "MCC-CNC",
@@ -270,3 +288,37 @@ class TestMrpCommandCenter(TransactionCase):
         gates = task._southbrook_collect_readiness_gates()
         self.assertEqual(gates["tooling"]["state"], "blocked")
         self.assertIn("compression bit", gates["tooling"]["message"])
+        score, state, blocked_gate, summary, next_action = (
+            task._southbrook_score_from_gates(gates)
+        )
+        self.assertLessEqual(score, 69)
+        self.assertEqual(state, "blocked")
+        self.assertEqual(blocked_gate, "tooling")
+        self.assertIn("compression bit", summary)
+        self.assertEqual(next_action, "Clear mandatory tool readiness before release.")
+
+    def test_unscheduled_workorder_sets_schedule_warning(self):
+        task, sale = self._new_sale_order_task()
+        mo = self._new_mo_for_task(task)
+        self._new_package_for_mo(mo)
+        workcenter = self.env["mrp.workcenter"].create({
+            "name": "MRP Command Assembly",
+            "code": "MCC-ASM",
+        })
+        workorder = self.env["mrp.workorder"].create({
+            "name": "Assembly",
+            "production_id": mo.id,
+            "workcenter_id": workcenter.id,
+            "state": "ready",
+        })
+        workorder.write({"date_start": False})
+        gates = task._southbrook_collect_readiness_gates()
+        self.assertEqual(gates["schedule"]["state"], "warning")
+        self.assertIn("not scheduled", gates["schedule"]["message"])
+        score, state, blocked_gate, summary, next_action = (
+            task._southbrook_score_from_gates(gates)
+        )
+        self.assertLessEqual(score, 89)
+        self.assertEqual(state, "at_risk")
+        self.assertFalse(blocked_gate)
+        self.assertIn("not scheduled", summary)
