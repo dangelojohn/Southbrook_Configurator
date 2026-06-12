@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_southbrook_project_readiness_line_user,southbrook.project.readiness.line user,model_southbrook_project_readiness_line,base.group_user,1,0,0,0
+access_southbrook_project_readiness_line_admin,southbrook.project.readiness.line admin,model_southbrook_project_readiness_line,base.group_system,1,1,1,1

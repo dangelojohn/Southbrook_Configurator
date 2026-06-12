@@ -174,3 +174,21 @@ class ProjectProject(models.Model):
                 "search_default_manufacturing_blocked": 1,
             },
         }
+
+    def action_southbrook_open_material_risk_jobs(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search(
+            [("project_id", "=", self.id)]).filtered(
+                lambda task: task.production_count > 0
+                and task.material_at_risk)
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Material Risk Jobs - %s" % self.display_name,
+            "res_model": "project.task",
+            "domain": [("id", "in", tasks.ids)],
+            "view_mode": "list,form,kanban",
+            "context": {
+                "create": False,
+                "search_default_manufacturing_blocked": 1,
+            },
+        }

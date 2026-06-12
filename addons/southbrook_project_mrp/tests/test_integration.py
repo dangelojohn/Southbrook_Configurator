@@ -394,6 +394,110 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertTrue(task.top_blocker)
         self.assertRegex(task.next_best_action, r"(Resolve|Schedule|Assign|Approve)")
 
+    def test_phase2_readiness_lines_explain_unscheduled_job(self):
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": self.fp.id,
+                "product_uom_qty": 1.0,
+            })],
+        })
+        task = self.env["project.task"].create({
+            "name": "Evidence Job",
+            "project_id": self.project.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        task.invalidate_recordset()
+        task.action_recompute_readiness_lines()
+
+        scheduling = task.readiness_line_ids.filtered(
+            lambda line: line.check_key == "scheduling")
+        self.assertEqual(len(scheduling), 1)
+        self.assertEqual(scheduling.status, "blocked")
+        self.assertEqual(scheduling.severity, "blocker")
+        self.assertIn("not scheduled", scheduling.reason)
+        self.assertIn("1 WOs / 1 not scheduled", scheduling.evidence)
+        self.assertIn("Schedule", scheduling.recommended_action)
+
+    def test_phase2_score_caps_unscheduled_job(self):
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": self.fp.id,
+                "product_uom_qty": 1.0,
+            })],
+        })
+        task = self.env["project.task"].create({
+            "name": "Capped Job",
+            "project_id": self.project.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        task.invalidate_recordset()
+
+        self.assertEqual(task.manufacturing_readiness_state, "blocked")
+        self.assertLessEqual(task.manufacturing_readiness_score, 55)
+        self.assertLessEqual(task.readiness_score, 55)
+
+    def test_phase2_no_linked_mos_caps_score_and_blocks(self):
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": self.fp.id,
+                "product_uom_qty": 1.0,
+            })],
+        })
+        task = self.env["project.task"].create({
+            "name": "No MO Job",
+            "project_id": self.project.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+
+        task.invalidate_recordset()
+        task.action_recompute_readiness_lines()
+
+        self.assertEqual(task.manufacturing_readiness_state, "blocked")
+        self.assertLessEqual(task.manufacturing_readiness_score, 40)
+        mrp_line = task.readiness_line_ids.filtered(
+            lambda line: line.check_key == "mrp")
+        self.assertEqual(len(mrp_line), 1)
+        self.assertEqual(mrp_line.status, "blocked")
+        self.assertIn("No linked manufacturing orders", mrp_line.reason)
+
+    def test_phase2_readiness_line_action_opens_evidence(self):
+        task = self.env["project.task"].create({
+            "name": "Evidence Action Job",
+            "project_id": self.project.id,
+        })
+
+        action = task.action_view_readiness_lines()
+
+        self.assertEqual(action["res_model"], "southbrook.project.readiness.line")
+        self.assertEqual(action["domain"], [("task_id", "=", task.id)])
+        self.assertTrue(task.readiness_line_ids)
+        view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        self.assertIn("action_view_readiness_lines", view.arch_db)
+        self.assertIn("readiness_line_ids", view.arch_db)
+
     def test_project_form_has_readiness_job_actions(self):
         task = self.env["project.task"].create({
             "name": "Blocked Readiness Job",
@@ -448,3 +552,13 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn(
             "action_southbrook_open_unscheduled_manufacturing_jobs", view.arch_db)
         self.assertIn("southbrook_unscheduled_job_count", view.arch_db)
+
+    def test_project_form_has_material_risk_action(self):
+        view = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+
+        self.assertTrue(
+            hasattr(self.project, "action_southbrook_open_material_risk_jobs"))
+        self.assertIn(
+            "action_southbrook_open_material_risk_jobs", view.arch_db)
+        self.assertIn("southbrook_material_risk_count", view.arch_db)

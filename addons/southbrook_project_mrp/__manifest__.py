@@ -34,6 +34,7 @@ rather than duplicating them — material/BoM/cost are pulled FROM the linked MO
     # repo) — its cost fields are read defensively via getattr.
     "depends": ["southbrook_project", "sale_mrp", "purchase_mrp", "maintenance"],
     "data": [
+        "security/ir.model.access.csv",
         "views/mrp_production_views.xml",
         "views/project_task_views.xml",
     ],

@@ -9,6 +9,26 @@ _STARTED_STAGE_HINTS = ("cutting", "machining", "assembly", "finishing")
 _DELIVERY_STAGE_HINTS = ("delivery", "install")
 # mrp.production states that mean the MO has actually started.
 _MO_STARTED_STATES = ("progress", "to_close", "done")
+_FAMILY_BY_PREFIX = {
+    "SB-WALL": "Wall",
+    "SB-BASE": "Base",
+    "SB-DRAWER": "Drawer",
+    "SB-SINK": "Sink Base",
+    "SB-TALL": "Tall",
+    "SB-CORNER": "Corner",
+    "SB-VANITY": "Vanity",
+    "SB-ACCESSORY": "Accessory",
+    "SB-WORKTOP": "Worktop",
+}
+
+
+def _first_meaningful_line(*texts):
+    for text in texts:
+        for line in (text or "").splitlines():
+            line = line.strip()
+            if line and not line.lower().startswith("no "):
+                return line
+    return ""
 
 
 class ProjectTask(models.Model):
@@ -71,6 +91,137 @@ class ProjectTask(models.Model):
         string="CAD Status", compute="_compute_mrp_status")
     job_next_action = fields.Char(
         string="Next Action", compute="_compute_mrp_status")
+
+    # --- Phase 1: command-center context aliases ---------------------------
+    # These fields intentionally reuse existing Southbrook/Odoo sources. They
+    # provide stable names for the 9/10 Project command-center views without
+    # introducing a parallel job model.
+    source_order_id = fields.Many2one(
+        "sale.order",
+        string="Source Sales Order",
+        compute="_compute_phase1_job_context",
+        store=True,
+        readonly=True,
+        index=True,
+    )
+    source_order_name = fields.Char(
+        string="Source",
+        compute="_compute_phase1_job_context",
+        store=True,
+        readonly=True,
+        index=True,
+    )
+    customer_id = fields.Many2one(
+        "res.partner",
+        string="Customer",
+        compute="_compute_phase1_job_context",
+        store=True,
+        readonly=True,
+        index=True,
+    )
+    pm_phase = fields.Char(
+        string="PM Phase",
+        compute="_compute_phase1_job_context",
+        store=True,
+        readonly=True,
+    )
+    install_due_date = fields.Date(
+        string="Install Due",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    manufacturing_reality = fields.Char(
+        string="Manufacturing Reality",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    readiness_decision = fields.Selection(
+        [
+            ("ready", "Ready"),
+            ("review", "Review"),
+            ("blocked", "Blocked"),
+            ("info", "Info"),
+        ],
+        string="Readiness Decision",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    readiness_score = fields.Integer(
+        string="Readiness Score",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    risk_level = fields.Selection(
+        [
+            ("low", "Low"),
+            ("medium", "Medium"),
+            ("high", "High"),
+            ("critical", "Critical"),
+        ],
+        string="Risk",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    risk_reason = fields.Char(
+        string="Risk Reason",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    top_blocker = fields.Char(
+        string="Top Blocker",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    next_best_action = fields.Char(
+        string="Next Best Action",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    linked_mo_count = fields.Integer(
+        string="MOs",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    linked_wo_count = fields.Integer(
+        string="WOs",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    unscheduled_wo_count = fields.Integer(
+        string="Unscheduled WOs",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    unassigned_wo_count = fields.Integer(
+        string="Unassigned WOs",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    current_bottleneck_workcenter_id = fields.Many2one(
+        "mrp.workcenter",
+        string="Current Bottleneck Work Center",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    cabinet_family_summary = fields.Char(
+        string="Cabinet Family Mix",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
+    job_type = fields.Selection(
+        [
+            ("full_kitchen", "Full Kitchen"),
+            ("vanity", "Vanity"),
+            ("pantry", "Pantry"),
+            ("repair", "Repair"),
+            ("warranty", "Warranty / Remake"),
+            ("single_cabinet", "Custom Single Cabinet"),
+            ("worktop", "Worktop"),
+        ],
+        string="Job Type",
+        default="full_kitchen",
+        tracking=True,
+    )
 
     # --- B4: ECO visibility -------------------------------------------------
     eco_count = fields.Integer(
@@ -191,6 +342,17 @@ class ProjectTask(models.Model):
     manufacturing_info_summary = fields.Text(
         string="Efficiency Prompts",
         compute="_compute_manufacturing_readiness")
+    readiness_line_ids = fields.One2many(
+        "southbrook.project.readiness.line",
+        "task_id",
+        string="Readiness Evidence",
+        readonly=True,
+        copy=False,
+        help="Deterministic readiness checks with reason, evidence, and the "
+             "recommended PM action.")
+    readiness_line_count = fields.Integer(
+        string="# Readiness Checks",
+        compute="_compute_readiness_line_count")
 
     # --- TASK 6: Material / procurement readiness ----------------------------
     material_ready_count = fields.Integer(
@@ -318,6 +480,457 @@ class ProjectTask(models.Model):
             task.job_risk_reason = "; ".join(reasons)
             task.job_at_risk = bool(reasons)
 
+    @api.depends(
+        "x_southbrook_sale_order_id",
+        "x_southbrook_sale_order_id.name",
+        "x_southbrook_sale_order_id.partner_id",
+        "partner_id",
+        "stage_id",
+        "stage_id.name",
+    )
+    def _compute_phase1_job_context(self):
+        for task in self:
+            order = task.x_southbrook_sale_order_id
+            task.source_order_id = order
+            task.source_order_name = order.name or ""
+            task.customer_id = order.partner_id or task.partner_id
+            task.pm_phase = task.stage_id.name or ""
+
+    @api.depends(
+        "production_ids",
+        "production_ids.name",
+        "production_ids.product_id",
+        "production_ids.product_id.default_code",
+        "production_ids.state",
+        "production_ids.workorder_ids",
+        "production_ids.workorder_ids.workcenter_id",
+        "production_ids.workorder_ids.duration_expected",
+        "production_count",
+        "mo_state_summary",
+        "workorder_summary",
+        "workorder_count",
+        "unscheduled_workorder_count",
+        "unassigned_workorder_count",
+        "manufacturing_readiness_state",
+        "manufacturing_readiness_score",
+        "manufacturing_blocker_summary",
+        "manufacturing_warning_summary",
+        "manufacturing_info_summary",
+        "job_install_due",
+        "job_cad_status",
+        "job_at_risk",
+        "job_risk_reason",
+        "material_at_risk",
+        "crew_gap",
+        "equipment_blocked",
+        "workcenter_over_capacity",
+        "stage_mo_divergence",
+        "stage_mo_note",
+        "source_order_id",
+        "customer_id",
+    )
+    def _compute_phase1_operational_context(self):
+        for task in self:
+            task.install_due_date = task.job_install_due
+            task.readiness_decision = task.manufacturing_readiness_state or "info"
+            task.readiness_score = task.manufacturing_readiness_score or 0
+            task.linked_mo_count = task.production_count
+            task.linked_wo_count = task.workorder_count
+            task.unscheduled_wo_count = task.unscheduled_workorder_count
+            task.unassigned_wo_count = task.unassigned_workorder_count
+            task.manufacturing_reality = task._southbrook_manufacturing_reality()
+            task.top_blocker = _first_meaningful_line(
+                task.manufacturing_blocker_summary,
+                task.manufacturing_warning_summary,
+                task.manufacturing_info_summary,
+            )
+            task.current_bottleneck_workcenter_id = (
+                task._southbrook_current_bottleneck_workcenter()
+            )
+            task.cabinet_family_summary = task._southbrook_cabinet_family_summary()
+            task.risk_level, task.risk_reason = task._southbrook_risk()
+            task.next_best_action = task._southbrook_next_best_action()
+
+    def _southbrook_manufacturing_reality(self):
+        self.ensure_one()
+        if not self.production_count:
+            return "No linked manufacturing orders."
+        parts = []
+        if self.mo_state_summary:
+            parts.append(self.mo_state_summary)
+        if self.workorder_summary:
+            parts.append(self.workorder_summary)
+        if self.stage_mo_divergence and self.stage_mo_note:
+            parts.append(self.stage_mo_note)
+        return "; ".join(parts) or "%d linked MO(s)" % self.production_count
+
+    def _southbrook_current_bottleneck_workcenter(self):
+        self.ensure_one()
+        totals = {}
+        for wo in self.production_ids.mapped("workorder_ids"):
+            wc = wo.workcenter_id
+            if not wc:
+                continue
+            totals.setdefault(wc, 0.0)
+            totals[wc] += wo.duration_expected or 0.0
+        if not totals:
+            return self.env["mrp.workcenter"]
+        return max(totals.items(), key=lambda item: item[1])[0]
+
+    def _southbrook_cabinet_family_summary(self):
+        self.ensure_one()
+        counts = Counter()
+        for product in self.production_ids.mapped("product_id"):
+            code = (
+                product.default_code
+                or product.name
+                or product.display_name
+                or ""
+            )
+            for prefix, family in _FAMILY_BY_PREFIX.items():
+                if code.startswith(prefix):
+                    counts[family] += 1
+                    break
+        if not counts:
+            return ""
+        return ", ".join(
+            "%s: %d" % (family, count)
+            for family, count in sorted(counts.items())
+        )
+
+    def _southbrook_risk(self):
+        self.ensure_one()
+        if self.equipment_blocked:
+            return "critical", self.top_blocker or "Equipment/tooling is blocking production."
+        if self.material_at_risk:
+            return "critical", self.top_blocker or "Components or procurement are blocking production."
+        if self.stage_mo_divergence:
+            return "high", self.stage_mo_note
+        if self.job_at_risk:
+            return "high", self.job_risk_reason or self.top_blocker
+        if self.manufacturing_readiness_state == "blocked":
+            return "high", self.top_blocker or "Production readiness is blocked."
+        if (
+            self.manufacturing_readiness_state == "review"
+            or self.crew_gap
+            or self.workcenter_over_capacity
+            or not self.job_install_due
+        ):
+            return "medium", (
+                self.top_blocker
+                or self.job_risk_reason
+                or "Manager review is required before release."
+            )
+        return "low", "No current production risk."
+
+    def _southbrook_next_best_action(self):
+        self.ensure_one()
+        if not self.customer_id or not self.source_order_id:
+            return "Add the customer and source sales order before releasing this job."
+        if not self.production_count:
+            return "Link or create manufacturing orders for this kitchen job."
+        cad_status = (self.job_cad_status or "").lower()
+        if cad_status and "done" not in cad_status:
+            return "Approve CAD/cutlist before releasing production."
+        if self.material_at_risk:
+            return "Resolve component shortages or linked procurement before release."
+        if self.unscheduled_workorder_count:
+            return (
+                "Schedule %d work order(s) before advancing this job."
+                % self.unscheduled_workorder_count
+            )
+        if self.crew_gap:
+            return "Assign or reserve crew for unassigned MOs/work orders."
+        if self.equipment_blocked:
+            return "Resolve equipment/tooling maintenance blockers before release."
+        if self.workcenter_over_capacity:
+            return "Review overloaded work-center capacity before committing the schedule."
+        if not self.job_install_due:
+            return "Confirm install date and site readiness."
+        if self.stage_mo_divergence:
+            return "Review the PM phase against the actual manufacturing state."
+        return "Release or advance the job."
+
+    def _southbrook_readiness_line_values(self):
+        self.ensure_one()
+        values = []
+
+        def severity(status):
+            if status == "blocked":
+                return "blocker"
+            if status == "review":
+                return "warning"
+            return "info"
+
+        def line(check_key, name, status, reason, evidence="", action=""):
+            values.append({
+                "task_id": self.id,
+                "sequence": len(values) * 10 + 10,
+                "check_key": check_key,
+                "name": name,
+                "status": status,
+                "severity": severity(status),
+                "reason": reason,
+                "evidence": evidence or "",
+                "recommended_action": action or "",
+            })
+
+        missing_data = []
+        if not self.customer_id:
+            missing_data.append("customer")
+        if not self.source_order_id:
+            missing_data.append("source sales order")
+        if missing_data:
+            line(
+                "data",
+                "Data Completeness",
+                "blocked",
+                "Missing %s." % ", ".join(missing_data),
+                self.name or "",
+                "Add the missing job context before releasing this job.",
+            )
+        else:
+            line(
+                "data",
+                "Data Completeness",
+                "ready",
+                "Customer and source sales order are linked.",
+                "%s / %s" % (self.customer_id.display_name, self.source_order_name),
+                "No action required.",
+            )
+
+        if not self.production_count:
+            line(
+                "mrp",
+                "MRP Link",
+                "blocked",
+                "No linked manufacturing orders.",
+                self.name or "",
+                "Link or create manufacturing orders for this kitchen job.",
+            )
+        else:
+            line(
+                "mrp",
+                "MRP Link",
+                "ready",
+                "%d linked MO(s)." % self.production_count,
+                self.mo_reference or "",
+                "No action required.",
+            )
+
+        cad_status = self.job_cad_status or ""
+        if cad_status and "done" not in cad_status.lower():
+            line(
+                "engineering",
+                "Engineering / CAD",
+                "review",
+                "CAD/cutlist needs review.",
+                cad_status,
+                "Approve CAD/cutlist before releasing production.",
+            )
+        else:
+            line(
+                "engineering",
+                "Engineering / CAD",
+                "ready",
+                "No open CAD issue surfaced.",
+                cad_status or "No CAD blocker on linked MOs.",
+                "No action required.",
+            )
+
+        if self.material_at_risk:
+            line(
+                "materials",
+                "Materials / Purchasing",
+                "blocked",
+                "Components or procurement are not production-ready.",
+                self.material_readiness_summary or self.procurement_summary or "",
+                "Resolve component shortages or linked procurement before release.",
+            )
+        elif self.procurement_count:
+            line(
+                "materials",
+                "Materials / Purchasing",
+                "review",
+                "%d linked procurement order(s) need review." % self.procurement_count,
+                self.procurement_summary or "",
+                "Confirm open procurement is not blocking production.",
+            )
+        else:
+            line(
+                "materials",
+                "Materials / Purchasing",
+                "ready",
+                "Components and procurement are clear.",
+                self.material_readiness_summary or self.procurement_summary or "",
+                "No action required.",
+            )
+
+        if self.unscheduled_workorder_count:
+            line(
+                "scheduling",
+                "Scheduling",
+                "blocked",
+                "%d work order(s) are not scheduled." % self.unscheduled_workorder_count,
+                self.workorder_summary or "",
+                "Schedule work orders before advancing this job.",
+            )
+        else:
+            line(
+                "scheduling",
+                "Scheduling",
+                "ready",
+                "Work orders are scheduled.",
+                self.workorder_summary or "No unscheduled work orders surfaced.",
+                "No action required.",
+            )
+
+        if self.crew_gap:
+            line(
+                "crew",
+                "Crew",
+                "review",
+                "Crew assignment or reservation is incomplete.",
+                self.crew_summary or "(no crew assigned)",
+                "Assign or reserve crew for unassigned MOs/work orders.",
+            )
+        else:
+            line(
+                "crew",
+                "Crew",
+                "ready",
+                "Crew assignment is clear.",
+                self.crew_summary or "No crew gap surfaced.",
+                "No action required.",
+            )
+
+        if self.equipment_blocked:
+            line(
+                "equipment",
+                "Equipment / Tooling",
+                "blocked",
+                "Open equipment/tooling maintenance condition.",
+                self.equipment_readiness_summary or "",
+                "Resolve equipment/tooling maintenance blockers before release.",
+            )
+        else:
+            line(
+                "equipment",
+                "Equipment / Tooling",
+                "ready",
+                "Equipment/tooling is clear.",
+                self.equipment_readiness_summary or "No equipment blocker surfaced.",
+                "No action required.",
+            )
+
+        if self.workcenter_over_capacity:
+            line(
+                "capacity",
+                "Production Capacity",
+                "review",
+                "Work-center load is over daily capacity.",
+                self.workcenter_load_summary or "",
+                "Review overloaded work-center capacity before committing the schedule.",
+            )
+        elif self.job_at_risk:
+            line(
+                "capacity",
+                "Production Capacity",
+                "review",
+                self.job_risk_reason or "Job is at risk.",
+                self.mo_state_summary or "",
+                "Review capacity, deadlines, and late manufacturing orders.",
+            )
+        else:
+            line(
+                "capacity",
+                "Production Capacity",
+                "ready",
+                "No capacity or deadline risk surfaced.",
+                self.workcenter_load_summary or self.mo_state_summary or "",
+                "No action required.",
+            )
+
+        if not self.job_install_due:
+            line(
+                "install",
+                "Delivery / Install",
+                "info",
+                "No install due date surfaced.",
+                self.source_order_name or self.name or "",
+                "Confirm install date and site readiness.",
+            )
+        else:
+            line(
+                "install",
+                "Delivery / Install",
+                "ready",
+                "Install due date is known.",
+                str(self.job_install_due),
+                "No action required.",
+            )
+
+        if not self.manufacturing_calculation_count:
+            line(
+                "calculations",
+                "Calculations",
+                "info",
+                "Manufacturing Intelligence checks have not run for this job.",
+                self.mo_reference or "",
+                "Run or review Manufacturing Intelligence calculations.",
+            )
+        else:
+            line(
+                "calculations",
+                "Calculations",
+                "ready",
+                "%d calculation/check record(s) are linked."
+                % self.manufacturing_calculation_count,
+                self.mo_reference or "",
+                "No action required.",
+            )
+
+        if self.stage_mo_divergence:
+            line(
+                "stage_mismatch",
+                "PM Phase / Manufacturing Reality",
+                "review",
+                self.stage_mo_note or "PM phase and manufacturing reality disagree.",
+                self.manufacturing_reality or "",
+                "Review the PM phase against the actual manufacturing state.",
+            )
+        else:
+            line(
+                "stage_mismatch",
+                "PM Phase / Manufacturing Reality",
+                "ready",
+                "PM phase and manufacturing reality are aligned.",
+                self.manufacturing_reality or "",
+                "No action required.",
+            )
+
+        return values
+
+    @api.depends(
+        "production_count",
+        "job_cad_status",
+        "material_at_risk",
+        "procurement_count",
+        "unscheduled_workorder_count",
+        "crew_gap",
+        "equipment_blocked",
+        "workcenter_over_capacity",
+        "job_at_risk",
+        "job_install_due",
+        "manufacturing_calculation_count",
+        "stage_mo_divergence",
+        "customer_id",
+        "source_order_id",
+    )
+    def _compute_readiness_line_count(self):
+        for task in self:
+            task.readiness_line_count = len(task._southbrook_readiness_line_values())
+
     @api.depends("production_ids", "production_ids.bom_id")
     def _compute_eco(self):
         has_eco = "southbrook.eco" in self.env
@@ -397,6 +1010,10 @@ class ProjectTask(models.Model):
         "job_risk_reason",
         "job_install_due",
         "manufacturing_calculation_count",
+        "stage_mo_divergence",
+        "stage_mo_note",
+        "customer_id",
+        "source_order_id",
     )
     def _compute_manufacturing_readiness(self):
         for task in self:
@@ -407,6 +1024,26 @@ class ProjectTask(models.Model):
 
             def gate(name, state, note):
                 gates.append("%s: %s - %s" % (name, state, note))
+
+            missing_data = []
+            if not task.customer_id:
+                missing_data.append("customer")
+            if not task.source_order_id:
+                missing_data.append("source sales order")
+            if missing_data:
+                gate(
+                    "Data Completeness",
+                    "BLOCKED",
+                    "missing %s" % ", ".join(missing_data),
+                )
+                blockers.append(
+                    "Data Completeness: missing %s" % ", ".join(missing_data))
+            else:
+                gate(
+                    "Data Completeness",
+                    "READY",
+                    "customer and source sales order linked",
+                )
 
             if not task.production_count:
                 gate("MRP Link", "BLOCKED", "no linked manufacturing orders")
@@ -476,8 +1113,36 @@ class ProjectTask(models.Model):
                 gate("Delivery / Install", "READY", "install due %s" % task.job_install_due)
 
             if not task.manufacturing_calculation_count:
+                gate(
+                    "Calculations",
+                    "INFO",
+                    "no Manufacturing Intelligence checks linked",
+                )
                 infos.append(
                     "Calculations: run/review Manufacturing Intelligence checks")
+            else:
+                gate(
+                    "Calculations",
+                    "READY",
+                    "%d linked calculation/check record(s)"
+                    % task.manufacturing_calculation_count,
+                )
+
+            if task.stage_mo_divergence:
+                gate(
+                    "PM Phase / Manufacturing Reality",
+                    "REVIEW",
+                    task.stage_mo_note
+                    or "PM phase and manufacturing reality disagree",
+                )
+                warnings.append(
+                    "PM Phase / Manufacturing Reality: review stage mismatch")
+            else:
+                gate(
+                    "PM Phase / Manufacturing Reality",
+                    "READY",
+                    "stage matches manufacturing reality",
+                )
 
             task.manufacturing_waterfall_summary = "\n".join(gates)
             task.manufacturing_blocker_summary = (
@@ -489,8 +1154,24 @@ class ProjectTask(models.Model):
             task.manufacturing_readiness_state = (
                 "blocked" if blockers else ("review" if warnings else "ready"))
             penalty = len(blockers) * 25 + len(warnings) * 10
-            task.manufacturing_readiness_score = max(
-                0, min(100, 100 - penalty))
+            score = max(0, min(100, 100 - penalty))
+            caps = []
+            if not task.production_count:
+                caps.append(40)
+            cad_status = (task.job_cad_status or "").lower()
+            if cad_status and "done" not in cad_status:
+                caps.append(55)
+            if task.material_at_risk:
+                caps.append(60)
+            if task.unscheduled_workorder_count:
+                caps.append(55)
+            if task.equipment_blocked:
+                caps.append(65)
+            if not task.job_install_due:
+                caps.append(80)
+            if caps:
+                score = min([score] + caps)
+            task.manufacturing_readiness_score = score
 
     def _search_manufacturing_readiness_state(self, operator, value):
         if operator not in ("=", "!=", "in", "not in"):
@@ -719,6 +1400,27 @@ class ProjectTask(models.Model):
                 "create": False,
                 "search_default_group_category": 1,
             },
+        }
+
+    def action_recompute_readiness_lines(self):
+        Line = self.env["southbrook.project.readiness.line"].sudo()
+        for task in self:
+            Line.search([("task_id", "=", task.id)]).unlink()
+            values = task._southbrook_readiness_line_values()
+            if values:
+                Line.create(values)
+        return True
+
+    def action_view_readiness_lines(self):
+        self.ensure_one()
+        self.action_recompute_readiness_lines()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Readiness Evidence - %s" % (self.name or self.display_name),
+            "res_model": "southbrook.project.readiness.line",
+            "domain": [("task_id", "=", self.id)],
+            "view_mode": "list,form",
+            "context": {"create": False, "edit": False},
         }
 
     def action_view_procurement_orders(self):
