@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 import json
 
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -401,6 +401,41 @@ class TestMrpCommandCenter(TransactionCase):
         finally:
             if original:
                 Sale.action_send_to_production = original
+            else:
+                delattr(Sale, "action_send_to_production")
+
+        self.assertFalse(calls)
+
+    def test_release_requires_mrp_create_rights_before_sale_action(self):
+        task, sale = self._new_sale_order_task()
+        calls = []
+        Sale = type(sale)
+        Production = type(self.env["mrp.production"])
+        original_sale_action = getattr(Sale, "action_send_to_production", None)
+        original_check_access_rights = Production.check_access_rights
+
+        def fake_action_send_to_production(recordset):
+            calls.append(recordset)
+            return recordset.env["mrp.production"]
+
+        def fake_check_access_rights(
+            recordset, operation, raise_exception=True
+        ):
+            if operation == "create":
+                raise AccessError("No MRP create rights")
+            return original_check_access_rights(
+                recordset, operation, raise_exception=raise_exception
+            )
+
+        Sale.action_send_to_production = fake_action_send_to_production
+        Production.check_access_rights = fake_check_access_rights
+        try:
+            with self.assertRaises(AccessError):
+                task.action_southbrook_release_to_production()
+        finally:
+            Production.check_access_rights = original_check_access_rights
+            if original_sale_action:
+                Sale.action_send_to_production = original_sale_action
             else:
                 delattr(Sale, "action_send_to_production")
 

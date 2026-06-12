@@ -276,6 +276,15 @@ class ProjectTask(models.Model):
         user_records.check_access_rule(operation)
         return user_records
 
+    def _southbrook_check_release_permissions(self, sale):
+        sale.check_access_rights("read")
+        sale.check_access_rule("read")
+        sale.check_access_rights("write")
+        sale.check_access_rule("write")
+        Production = self.env["mrp.production"]
+        Production.check_access_rights("create")
+        Production.check_access_rights("write")
+
     def _southbrook_notification_action(self):
         return {
             "type": "ir.actions.client",
@@ -352,10 +361,7 @@ class ProjectTask(models.Model):
             })
         sale = self._southbrook_release_sale_order()
         if sale and hasattr(sale, "action_send_to_production"):
-            sale.check_access_rights("read")
-            sale.check_access_rule("read")
-            sale.check_access_rights("write")
-            sale.check_access_rule("write")
+            self._southbrook_check_release_permissions(sale)
             productions = sale.action_send_to_production()
             return self._southbrook_mo_action(productions)
         return self._southbrook_notification_action()
