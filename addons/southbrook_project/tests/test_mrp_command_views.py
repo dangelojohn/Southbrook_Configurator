@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+from lxml import etree
+
 from odoo.tests import TransactionCase, tagged
 
 
@@ -55,3 +57,25 @@ class TestMrpCommandViews(TransactionCase):
             "group_readiness_state",
         ]:
             self.assertIn(marker, search.arch_db)
+
+    def test_mrp_command_readiness_fields_are_readonly_in_views(self):
+        readonly_fields = [
+            "x_southbrook_readiness_score",
+            "x_southbrook_readiness_state",
+            "x_southbrook_blocking_gate",
+            "x_southbrook_next_action",
+        ]
+        views = [
+            self.env.ref("southbrook_project.view_project_task_form_inherit_southbrook"),
+            self.env.ref("southbrook_project.view_project_task_list_mrp_command"),
+            self.env.ref("southbrook_project.view_project_task_kanban_mrp_command"),
+        ]
+        for view in views:
+            arch = etree.fromstring(view.arch_db.encode())
+            for field_name in readonly_fields:
+                nodes = arch.xpath(".//field[@name='%s']" % field_name)
+                self.assertTrue(nodes, "%s missing from %s" % (field_name, view.name))
+                self.assertTrue(
+                    all(node.get("readonly") == "1" for node in nodes),
+                    "%s editable in %s" % (field_name, view.name),
+                )

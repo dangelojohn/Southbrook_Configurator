@@ -44,14 +44,18 @@
                       name="southbrook_mrp_command">
                     <group>
                         <group string="Readiness">
-                            <field name="x_southbrook_readiness_score"/>
+                            <field name="x_southbrook_readiness_score"
+                                   readonly="1"/>
                             <field name="x_southbrook_readiness_state"
                                    widget="badge"
+                                   readonly="1"
                                    decoration-success="x_southbrook_readiness_state == 'ready'"
                                    decoration-warning="x_southbrook_readiness_state == 'at_risk'"
                                    decoration-danger="x_southbrook_readiness_state == 'blocked'"/>
-                            <field name="x_southbrook_blocking_gate"/>
-                            <field name="x_southbrook_next_action"/>
+                            <field name="x_southbrook_blocking_gate"
+                                   readonly="1"/>
+                            <field name="x_southbrook_next_action"
+                                   readonly="1"/>
                         </group>
                         <group string="Source Links">
                             <field name="x_southbrook_sale_order_id"
@@ -87,6 +91,7 @@
                         invisible="x_southbrook_readiness_state == 'blocked'"/>
                 <field name="x_southbrook_readiness_state"
                        widget="badge"
+                       readonly="1"
                        decoration-success="x_southbrook_readiness_state == 'ready'"
                        decoration-warning="x_southbrook_readiness_state == 'at_risk'"
                        decoration-danger="x_southbrook_readiness_state == 'blocked'"/>

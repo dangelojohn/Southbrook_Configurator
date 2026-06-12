@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 import json
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -62,6 +62,30 @@ GATE_WEIGHTS = {
     "install": 6,
 }
 
+READINESS_SNAPSHOT_FIELDS = {
+    "x_southbrook_readiness_score",
+    "x_southbrook_readiness_state",
+    "x_southbrook_blocking_gate",
+    "x_southbrook_blocker_summary",
+    "x_southbrook_next_action",
+    "x_southbrook_gate_json",
+}
+
+TASK_READINESS_SOURCE_FIELDS = {
+    "name",
+    "project_id",
+    "company_id",
+    "x_southbrook_sale_order_id",
+}
+
+
+def _southbrook_refresh_task_snapshots(tasks):
+    tasks = tasks.exists()
+    if tasks:
+        tasks.sudo().with_context(
+            southbrook_skip_readiness_refresh=True,
+        ).action_southbrook_refresh_mrp_readiness_snapshot()
+
 
 class ProjectTask(models.Model):
     _inherit = "project.task"
@@ -69,6 +93,7 @@ class ProjectTask(models.Model):
     x_southbrook_readiness_score = fields.Integer(
         string="MRP Readiness Score",
         default=0,
+        readonly=True,
         copy=False,
     )
     x_southbrook_readiness_state = fields.Selection(
@@ -76,26 +101,48 @@ class ProjectTask(models.Model):
         string="MRP Readiness",
         default="at_risk",
         index=True,
+        readonly=True,
         copy=False,
     )
     x_southbrook_blocking_gate = fields.Selection(
         [(key, label) for key, label in GATE_LABELS.items()],
         string="Blocking Gate",
         index=True,
+        readonly=True,
         copy=False,
     )
     x_southbrook_blocker_summary = fields.Text(
         string="Blocker Summary",
+        readonly=True,
         copy=False,
     )
     x_southbrook_next_action = fields.Text(
         string="Next Action",
+        readonly=True,
         copy=False,
     )
     x_southbrook_gate_json = fields.Text(
         string="MRP Gate Detail",
+        readonly=True,
         copy=False,
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        tasks = super().create(vals_list)
+        if not self.env.context.get("southbrook_skip_readiness_refresh"):
+            _southbrook_refresh_task_snapshots(tasks)
+        return tasks
+
+    def write(self, vals):
+        res = super().write(vals)
+        if (
+            not self.env.context.get("southbrook_skip_readiness_refresh")
+            and TASK_READINESS_SOURCE_FIELDS.intersection(vals)
+            and not set(vals).issubset(READINESS_SNAPSHOT_FIELDS)
+        ):
+            _southbrook_refresh_task_snapshots(self)
+        return res
 
     def action_southbrook_refresh_mrp_readiness_snapshot(self):
         for task in self:
@@ -103,7 +150,7 @@ class ProjectTask(models.Model):
             score, state, blocked_gate, summary, next_action = (
                 task._southbrook_score_from_gates(gates)
             )
-            task.write({
+            task.with_context(southbrook_skip_readiness_refresh=True).write({
                 "x_southbrook_readiness_score": score,
                 "x_southbrook_readiness_state": state,
                 "x_southbrook_blocking_gate": blocked_gate,
@@ -372,6 +419,7 @@ class ProjectTask(models.Model):
         if sale and hasattr(sale, "action_send_to_production"):
             self._southbrook_check_release_permissions(sale)
             productions = sale.action_send_to_production()
+            self.action_southbrook_refresh_mrp_readiness_snapshot()
             return self._southbrook_mo_action(productions)
         return self._southbrook_notification_action()
 
@@ -542,3 +590,167 @@ class ProjectTask(models.Model):
             )
 
         return gates
+
+
+class SaleOrder(models.Model):
+    _inherit = "sale.order"
+
+    def _southbrook_project_tasks_for_snapshot(self):
+        return self.env["project.task"].sudo().search([
+            ("x_southbrook_sale_order_id", "in", self.ids),
+        ])
+
+    def write(self, vals):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().write(vals)
+        if {"name", "state", "company_id"}.intersection(vals):
+            tasks |= self._southbrook_project_tasks_for_snapshot()
+            _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+
+class MrpProduction(models.Model):
+    _inherit = "mrp.production"
+
+    def _southbrook_project_tasks_for_snapshot(self):
+        origins = [origin for origin in self.mapped("origin") if origin]
+        if not origins:
+            return self.env["project.task"]
+        Task = self.env["project.task"].sudo()
+        Sale = self.env["sale.order"].sudo()
+        sales = Sale.search([("name", "in", origins)])
+        if sales:
+            return Task.search([
+                "|",
+                ("x_southbrook_sale_order_id", "in", sales.ids),
+                ("name", "in", origins),
+            ])
+        return Task.search([("name", "in", origins)])
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        productions = super().create(vals_list)
+        _southbrook_refresh_task_snapshots(
+            productions._southbrook_project_tasks_for_snapshot()
+        )
+        return productions
+
+    def write(self, vals):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().write(vals)
+        if {"origin", "company_id", "state", "date_start"}.intersection(vals):
+            tasks |= self._southbrook_project_tasks_for_snapshot()
+            _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+    def unlink(self):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().unlink()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+
+class ProductionPackage(models.Model):
+    _inherit = "sb.production.package"
+
+    def _southbrook_project_tasks_for_snapshot(self):
+        return self.mapped("mo_id")._southbrook_project_tasks_for_snapshot()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        packages = super().create(vals_list)
+        _southbrook_refresh_task_snapshots(
+            packages._southbrook_project_tasks_for_snapshot()
+        )
+        return packages
+
+    def write(self, vals):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().write(vals)
+        if {"mo_id", "x_mi_status", "x_mi_next_action",
+                "x_mi_next_stage_action"}.intersection(vals):
+            tasks |= self._southbrook_project_tasks_for_snapshot()
+            _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+    def unlink(self):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().unlink()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+
+class MrpWorkorder(models.Model):
+    _inherit = "mrp.workorder"
+
+    def _southbrook_project_tasks_for_snapshot(self):
+        return self.mapped("production_id")._southbrook_project_tasks_for_snapshot()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        workorders = super().create(vals_list)
+        _southbrook_refresh_task_snapshots(
+            workorders._southbrook_project_tasks_for_snapshot()
+        )
+        return workorders
+
+    def write(self, vals):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().write(vals)
+        if {
+            "production_id",
+            "date_start",
+            "southbrook_tool_readiness_state",
+            "southbrook_tool_readiness_msg",
+            "state",
+        }.intersection(vals):
+            tasks |= self._southbrook_project_tasks_for_snapshot()
+            _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+    def unlink(self):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().unlink()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+
+class SouthbrookMiCheck(models.Model):
+    _inherit = "southbrook.mi.check"
+
+    def _southbrook_project_tasks_for_snapshot(self):
+        productions = self.mapped("production_id")
+        productions |= self.mapped("production_package_id.mo_id")
+        return productions._southbrook_project_tasks_for_snapshot()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        checks = super().create(vals_list)
+        _southbrook_refresh_task_snapshots(
+            checks._southbrook_project_tasks_for_snapshot()
+        )
+        return checks
+
+    def write(self, vals):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().write(vals)
+        if {
+            "production_id",
+            "production_package_id",
+            "is_gate",
+            "severity",
+            "stage",
+            "category",
+            "message",
+            "recommendation",
+            "sequence",
+        }.intersection(vals):
+            tasks |= self._southbrook_project_tasks_for_snapshot()
+            _southbrook_refresh_task_snapshots(tasks)
+        return res
+
+    def unlink(self):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().unlink()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res

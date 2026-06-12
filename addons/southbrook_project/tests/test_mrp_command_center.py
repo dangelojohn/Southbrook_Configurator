@@ -287,6 +287,17 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertIn(task, blocked_tasks)
         self.assertEqual(task.x_southbrook_blocking_gate, "bom_cutlist")
 
+    def test_mrp_source_changes_refresh_task_snapshot(self):
+        task, sale = self._new_sale_order_task()
+
+        mo = self._new_mo_for_task(task)
+        self.assertEqual(task.x_southbrook_readiness_state, "blocked")
+        self.assertEqual(task.x_southbrook_blocking_gate, "bom_cutlist")
+
+        self._new_package_for_mo(mo)
+        self.assertEqual(task.x_southbrook_readiness_state, "ready")
+        self.assertFalse(task.x_southbrook_blocking_gate)
+
     def test_partial_packages_block_bom_cutlist_gate(self):
         task, sale = self._new_sale_order_task()
         packaged_mo = self._new_mo_for_task(task)
@@ -571,6 +582,8 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertEqual(action["type"], "ir.actions.act_window")
         self.assertEqual(action["res_model"], "mrp.production")
         self.assertEqual(action["view_mode"], "form")
+        self.assertEqual(task.x_southbrook_readiness_state, "blocked")
+        self.assertEqual(task.x_southbrook_blocking_gate, "bom_cutlist")
         self.assertTrue(access_env_su)
         self.assertFalse(any(access_env_su))
 
