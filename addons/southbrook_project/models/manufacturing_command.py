@@ -2,6 +2,7 @@
 import json
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 READINESS_STATES = [
@@ -262,6 +263,50 @@ class ProjectTask(models.Model):
         if not productions:
             return self.env["mrp.workorder"]
         return productions.mapped("workorder_ids")
+
+    def action_southbrook_recompute_mrp_readiness(self):
+        for task in self:
+            productions = task._southbrook_related_productions()
+            for production in productions:
+                if hasattr(production, "action_recompute_manufacturing_intelligence"):
+                    production.action_recompute_manufacturing_intelligence()
+            packages = task._southbrook_related_packages(productions)
+            for package in packages:
+                if hasattr(package, "action_recompute_manufacturing_intelligence"):
+                    package.action_recompute_manufacturing_intelligence()
+            workorders = task._southbrook_related_workorders(productions)
+            for workorder in workorders:
+                if hasattr(workorder, "action_check_tool_readiness"):
+                    workorder.action_check_tool_readiness()
+        return True
+
+    def action_southbrook_release_to_production(self):
+        self.ensure_one()
+        self.action_southbrook_recompute_mrp_readiness()
+        gates = self._southbrook_collect_readiness_gates()
+        score, state, blocked_gate, summary, next_action = (
+            self._southbrook_score_from_gates(gates)
+        )
+        if state == "blocked":
+            raise UserError(_(
+                "Cannot release %(job)s. %(summary)s"
+            ) % {
+                "job": self.display_name,
+                "summary": summary,
+            })
+        sale = self._southbrook_related_sale_order()
+        if sale and hasattr(sale, "action_send_to_production"):
+            return sale.action_send_to_production()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Ready for Production"),
+                "message": _("All release gates are ready."),
+                "type": "success",
+                "sticky": False,
+            },
+        }
 
     def _southbrook_related_mi_checks(self, productions=False, packages=False):
         Check = self.env["southbrook.mi.check"].sudo()

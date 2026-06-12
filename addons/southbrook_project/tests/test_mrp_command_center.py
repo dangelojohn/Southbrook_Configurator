@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 import json
 
+from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -371,3 +372,12 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertEqual(state, "at_risk")
         self.assertFalse(blocked_gate)
         self.assertIn("not scheduled", summary)
+
+    def test_release_to_production_raises_with_blocker_summary(self):
+        task, sale = self._new_sale_order_task()
+        sale.action_confirm()
+        self._new_mo_for_task(task)
+        with self.assertRaises(UserError) as err:
+            task.action_southbrook_release_to_production()
+        self.assertIn("Cannot release", str(err.exception))
+        self.assertIn("production package", str(err.exception).lower())
