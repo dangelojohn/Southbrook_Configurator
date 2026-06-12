@@ -291,3 +291,15 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("manufacturing_readiness_score", arch)
         self.assertIn("manufacturing_waterfall_summary", arch)
         self.assertIn("manufacturing_blocker_summary", arch)
+
+    def test_project_task_readiness_list_and_search_views(self):
+        list_view = self.env.ref(
+            "southbrook_project_mrp.project_task_list_readiness")
+        search_view = self.env.ref(
+            "southbrook_project_mrp.project_task_search_readiness")
+
+        self.assertIn("manufacturing_readiness_state", list_view.arch_db)
+        self.assertIn("manufacturing_readiness_score", list_view.arch_db)
+        self.assertIn("manufacturing_blocked", search_view.arch_db)
+        self.assertIn("manufacturing_review", search_view.arch_db)
+        self.assertIn("manufacturing_ready", search_view.arch_db)

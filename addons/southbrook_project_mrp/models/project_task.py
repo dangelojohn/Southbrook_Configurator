@@ -177,7 +177,8 @@ class ProjectTask(models.Model):
     manufacturing_readiness_state = fields.Selection(
         [("ready", "Ready"), ("review", "Review"), ("blocked", "Blocked")],
         string="Readiness Decision",
-        compute="_compute_manufacturing_readiness")
+        compute="_compute_manufacturing_readiness",
+        search="_search_manufacturing_readiness_state")
     manufacturing_waterfall_summary = fields.Text(
         string="Waterfall Readiness",
         compute="_compute_manufacturing_readiness")
@@ -490,6 +491,18 @@ class ProjectTask(models.Model):
             penalty = len(blockers) * 25 + len(warnings) * 10
             task.manufacturing_readiness_score = max(
                 0, min(100, 100 - penalty))
+
+    def _search_manufacturing_readiness_state(self, operator, value):
+        if operator not in ("=", "!=", "in", "not in"):
+            return [("id", "=", 0)]
+        values = value if operator in ("in", "not in") else [value]
+        values = set(values)
+        tasks = self.with_context(active_test=False).search([])
+        matching = tasks.filtered(
+            lambda task: task.manufacturing_readiness_state in values)
+        if operator in ("=", "in"):
+            return [("id", "in", matching.ids)]
+        return [("id", "not in", matching.ids)]
 
     # --- TASK 5: Kitchen Metrics rollup compute ----------------------------
     # NB: The x_sbk_* Kitchen Metrics fields are added by a downstream

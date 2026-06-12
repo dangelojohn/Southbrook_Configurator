@@ -254,6 +254,53 @@
         </field>
     </record>
 
+    <record id="project_task_list_readiness" model="ir.ui.view">
+        <field name="name">project.task.list.southbrook.readiness</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_tree2"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='stage_id']" position="after">
+                <field name="manufacturing_readiness_state"
+                       widget="badge"
+                       decoration-success="manufacturing_readiness_state == 'ready'"
+                       decoration-warning="manufacturing_readiness_state == 'review'"
+                       decoration-danger="manufacturing_readiness_state == 'blocked'"
+                       optional="show"/>
+                <field name="manufacturing_readiness_score"
+                       optional="show"/>
+                <field name="unscheduled_workorder_count"
+                       optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="project_task_search_readiness" model="ir.ui.view">
+        <field name="name">project.task.search.southbrook.readiness</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_search_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='message_needaction']"
+                   position="before">
+                <separator/>
+                <filter name="manufacturing_blocked"
+                        string="Manufacturing Blocked"
+                        domain="[('manufacturing_readiness_state', '=', 'blocked')]"/>
+                <filter name="manufacturing_review"
+                        string="Manufacturing Review"
+                        domain="[('manufacturing_readiness_state', '=', 'review')]"/>
+                <filter name="manufacturing_ready"
+                        string="Manufacturing Ready"
+                        domain="[('manufacturing_readiness_state', '=', 'ready')]"/>
+                <separator/>
+            </xpath>
+            <xpath expr="//group" position="inside">
+                <filter name="group_manufacturing_readiness"
+                        string="Manufacturing Readiness"
+                        context="{'group_by': 'manufacturing_readiness_state'}"/>
+            </xpath>
+        </field>
+    </record>
+
     <!-- B3 (ideal): flag at-risk / ECO jobs on the Kanban card. -->
     <record id="project_task_kanban_mrp" model="ir.ui.view">
         <field name="name">project.task.kanban.southbrook.mrp</field>
