@@ -1,4 +1,163 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data/>
+  <data>
+    <record id="view_project_task_list_mrp_command" model="ir.ui.view">
+      <field name="name">project.task.list.mrp.command</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <list string="MRP Command Center"
+              decoration-danger="x_southbrook_readiness_state == 'blocked'"
+              decoration-warning="x_southbrook_readiness_state == 'at_risk'"
+              decoration-success="x_southbrook_readiness_state == 'ready'">
+          <field name="name"/>
+          <field name="project_id"/>
+          <field name="x_southbrook_sale_order_id"/>
+          <field name="x_southbrook_readiness_score"/>
+          <field name="x_southbrook_readiness_state" widget="badge"/>
+          <field name="x_southbrook_blocking_gate"/>
+          <field name="x_southbrook_next_action"/>
+          <field name="date_deadline"/>
+          <field name="user_ids" widget="many2many_tags"/>
+        </list>
+      </field>
+    </record>
+
+    <record id="view_project_task_search_mrp_command" model="ir.ui.view">
+      <field name="name">project.task.search.mrp.command</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <search string="MRP Command Center">
+          <field name="name"/>
+          <field name="project_id"/>
+          <field name="x_southbrook_sale_order_id"/>
+          <field name="x_southbrook_readiness_state"/>
+          <field name="x_southbrook_blocking_gate"/>
+          <filter name="readiness_blocked"
+                  string="Blocked"
+                  domain="[('x_southbrook_readiness_state','=','blocked')]"/>
+          <filter name="readiness_at_risk"
+                  string="At Risk"
+                  domain="[('x_southbrook_readiness_state','=','at_risk')]"/>
+          <filter name="readiness_ready"
+                  string="Ready"
+                  domain="[('x_southbrook_readiness_state','=','ready')]"/>
+          <separator/>
+          <filter name="gate_bom"
+                  string="BOM / Cutlist"
+                  domain="[('x_southbrook_blocking_gate','=','bom_cutlist')]"/>
+          <filter name="gate_purchasing"
+                  string="Purchasing"
+                  domain="[('x_southbrook_blocking_gate','=','purchasing')]"/>
+          <filter name="gate_tooling"
+                  string="Tooling"
+                  domain="[('x_southbrook_blocking_gate','=','tooling')]"/>
+          <filter name="gate_equipment"
+                  string="Equipment"
+                  domain="[('x_southbrook_blocking_gate','=','equipment')]"/>
+          <group>
+            <filter name="group_readiness_state"
+                    string="Readiness"
+                    context="{'group_by':'x_southbrook_readiness_state'}"/>
+            <filter name="group_blocking_gate"
+                    string="Blocking Gate"
+                    context="{'group_by':'x_southbrook_blocking_gate'}"/>
+            <filter name="group_project"
+                    string="Project"
+                    context="{'group_by':'project_id'}"/>
+          </group>
+        </search>
+      </field>
+    </record>
+
+    <record id="view_project_task_kanban_mrp_command" model="ir.ui.view">
+      <field name="name">project.task.kanban.mrp.command</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <kanban class="o_kanban_small_column">
+          <field name="name"/>
+          <field name="x_southbrook_readiness_score"/>
+          <field name="x_southbrook_readiness_state"/>
+          <field name="x_southbrook_blocking_gate"/>
+          <field name="x_southbrook_next_action"/>
+          <templates>
+            <t t-name="card">
+              <div class="oe_kanban_card oe_kanban_global_click">
+                <strong><field name="name"/></strong>
+                <div>
+                  <span>Score </span>
+                  <field name="x_southbrook_readiness_score"/>
+                </div>
+                <div>
+                  <field name="x_southbrook_readiness_state" widget="badge"/>
+                </div>
+                <div>
+                  <field name="x_southbrook_blocking_gate"/>
+                </div>
+                <small>
+                  <field name="x_southbrook_next_action"/>
+                </small>
+              </div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+
+    <record id="action_mrp_command_daily_meeting" model="ir.actions.act_window">
+      <field name="name">Daily Production Meeting</field>
+      <field name="res_model">project.task</field>
+      <field name="view_mode">kanban,list,form</field>
+      <field name="view_id" ref="view_project_task_kanban_mrp_command"/>
+      <field name="search_view_id" ref="view_project_task_search_mrp_command"/>
+      <field name="context">{'search_default_group_readiness_state': 1}</field>
+    </record>
+
+    <record id="action_mrp_command_blocked_jobs" model="ir.actions.act_window">
+      <field name="name">Blocked Jobs</field>
+      <field name="res_model">project.task</field>
+      <field name="view_mode">list,form</field>
+      <field name="view_id" ref="view_project_task_list_mrp_command"/>
+      <field name="search_view_id" ref="view_project_task_search_mrp_command"/>
+      <field name="domain">[('x_southbrook_readiness_state','=','blocked')]</field>
+    </record>
+
+    <record id="action_mrp_command_at_risk_jobs" model="ir.actions.act_window">
+      <field name="name">At-Risk Jobs</field>
+      <field name="res_model">project.task</field>
+      <field name="view_mode">list,form</field>
+      <field name="view_id" ref="view_project_task_list_mrp_command"/>
+      <field name="search_view_id" ref="view_project_task_search_mrp_command"/>
+      <field name="domain">[('x_southbrook_readiness_state','=','at_risk')]</field>
+    </record>
+
+    <record id="action_mrp_command_ready_jobs" model="ir.actions.act_window">
+      <field name="name">Ready to Release</field>
+      <field name="res_model">project.task</field>
+      <field name="view_mode">list,form</field>
+      <field name="view_id" ref="view_project_task_list_mrp_command"/>
+      <field name="search_view_id" ref="view_project_task_search_mrp_command"/>
+      <field name="domain">[('x_southbrook_readiness_state','=','ready')]</field>
+    </record>
+
+    <menuitem id="menu_mrp_command_daily_meeting"
+              parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+              name="Daily Meeting"
+              action="action_mrp_command_daily_meeting"
+              sequence="3"/>
+    <menuitem id="menu_mrp_command_blocked_jobs"
+              parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+              name="Blocked Jobs"
+              action="action_mrp_command_blocked_jobs"
+              sequence="4"/>
+    <menuitem id="menu_mrp_command_ready_jobs"
+              parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+              name="Ready to Release"
+              action="action_mrp_command_ready_jobs"
+              sequence="8"/>
+    <menuitem id="menu_mrp_command_at_risk_jobs"
+              parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+              name="At-Risk Jobs"
+              action="action_mrp_command_at_risk_jobs"
+              sequence="9"/>
+  </data>
 </odoo>
