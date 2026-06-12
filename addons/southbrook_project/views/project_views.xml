@@ -77,6 +77,7 @@
         <field name="name">project.project.kanban.inherit.southbrook</field>
         <field name="model">project.project</field>
         <field name="inherit_id" ref="project.view_project_kanban"/>
+        <field name="active" eval="False"/>
         <field name="arch" type="xml">
             <xpath expr="//templates" position="before">
                 <field name="southbrook_top_level_task_count"/>
