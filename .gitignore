@@ -43,6 +43,9 @@ docs/drafts/*
 !docs/drafts/RULE_ENCODING_NOTES.md
 !docs/drafts/PHASE_1_FIRST_5_COMMITS.md
 
+# Superpowers visual companion runtime state.
+.superpowers/
+
 # --- Build / dist (future) ---
 build/
 dist/

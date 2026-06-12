@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Southbrook MRP Command Center Mockup</title>
+  <style>
+    :root {
+      --ink: #17201d;
+      --muted: #5f6b67;
+      --line: #d7ddd8;
+      --panel: #ffffff;
+      --bg: #f4f6f2;
+      --green: #2e6b4f;
+      --amber: #b87516;
+      --red: #a33a31;
+      --blue: #2d5b7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: start;
+      padding: 20px 24px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfa;
+    }
+    h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0; }
+    .sub { margin-top: 5px; color: var(--muted); font-size: 13px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: end; }
+    button {
+      border: 1px solid var(--line);
+      background: white;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-weight: 650;
+      font-size: 13px;
+    }
+    button.primary { background: var(--green); color: white; border-color: var(--green); }
+    main {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr) 360px;
+      gap: 14px;
+      padding: 14px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-width: 0;
+    }
+    .panel-h {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 750;
+      font-size: 14px;
+    }
+    .panel-b { padding: 12px 14px; }
+    .score {
+      display: grid;
+      grid-template-columns: 84px 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .score-ring {
+      display: grid;
+      place-items: center;
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      border: 10px solid var(--amber);
+      font-size: 24px;
+      font-weight: 800;
+    }
+    .status {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 750;
+      color: white;
+      background: var(--amber);
+    }
+    .gate {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #eef1ee;
+      font-size: 13px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+    .dot.warn { background: var(--amber); }
+    .dot.block { background: var(--red); }
+    .tag { color: var(--muted); font-size: 12px; }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+      background: #fbfcfa;
+    }
+    .kpi strong { display: block; font-size: 23px; line-height: 1; margin-bottom: 6px; }
+    .kpi span { color: var(--muted); font-size: 12px; }
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(78px, 1fr));
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .phase {
+      min-height: 86px;
+      border: 1px solid var(--line);
+      border-top: 5px solid var(--green);
+      border-radius: 7px;
+      padding: 8px;
+      background: white;
+      font-size: 12px;
+    }
+    .phase.warn { border-top-color: var(--amber); }
+    .phase.block { border-top-color: var(--red); }
+    .phase b { display: block; margin-bottom: 5px; font-size: 13px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 120px repeat(5, minmax(92px, 1fr));
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      overflow: hidden;
+      font-size: 12px;
+    }
+    .cell {
+      min-height: 48px;
+      padding: 8px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: white;
+    }
+    .cell.h { background: #eef3ef; font-weight: 750; }
+    .job {
+      display: block;
+      border-radius: 5px;
+      padding: 5px 6px;
+      color: white;
+      background: var(--blue);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .job.warn { background: var(--amber); }
+    .job.block { background: var(--red); }
+    .blocker {
+      border-left: 4px solid var(--red);
+      padding: 10px;
+      background: #fff7f5;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    .blocker.warn { border-left-color: var(--amber); background: #fffaf0; }
+    .blocker b { display: block; margin-bottom: 4px; }
+    .queue-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eef1ee;
+      font-size: 13px;
+    }
+    @media (max-width: 1080px) {
+      main { grid-template-columns: 1fr; }
+      header { grid-template-columns: 1fr; }
+      .actions { justify-content: start; }
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MRP Command Center · SO24091 Kitchen A</h1>
+      <div class="sub">Senior PM view: one screen to release, block, reschedule, escalate, and prepare production.</div>
+    </div>
+    <div class="actions">
+      <button>Request Purchasing</button>
+      <button>Assign Crew</button>
+      <button>Reschedule</button>
+      <button class="primary">Release to Production</button>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="panel-h">Readiness <span class="status">At Risk</span></div>
+      <div class="panel-b">
+        <div class="score">
+          <div class="score-ring">72</div>
+          <div>
+            <b>Cannot release yet</b>
+            <div class="sub">Missing edge band PO and CNC tooling signoff. Engineering and BOM are complete.</div>
+          </div>
+        </div>
+        <div class="gate"><span class="dot"></span><b>Estimate</b><span class="tag">Done</span></div>
+        <div class="gate"><span class="dot"></span><b>Engineering</b><span class="tag">Approved</span></div>
+        <div class="gate"><span class="dot"></span><b>BOM / Cutlist</b><span class="tag">Ready</span></div>
+        <div class="gate"><span class="dot warn"></span><b>Purchasing</b><span class="tag">1 late PO</span></div>
+        <div class="gate"><span class="dot block"></span><b>Tooling</b><span class="tag">CNC blocked</span></div>
+        <div class="gate"><span class="dot"></span><b>Labor</b><span class="tag">Assigned</span></div>
+        <div class="gate"><span class="dot warn"></span><b>Equipment</b><span class="tag">Edgebander watch</span></div>
+        <div class="gate"><span class="dot"></span><b>Install Package</b><span class="tag">Not due</span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="panel-h">Schedule + Capacity <span class="tag">Next 5 shop days</span></div>
+      <div class="panel-b">
+        <div class="kpis">
+          <div class="kpi"><strong>3</strong><span>Blocked Jobs</span></div>
+          <div class="kpi"><strong>91%</strong><span>CNC Load Tue</span></div>
+          <div class="kpi"><strong>6h</strong><span>Assembly Headroom</span></div>
+          <div class="kpi"><strong>2</strong><span>Late POs</span></div>
+        </div>
+        <div class="timeline">
+          <div class="phase"><b>Engineering</b>Approved<br>Rev C drawings</div>
+          <div class="phase"><b>Purchasing</b>Core boards in<br>Banding pending</div>
+          <div class="phase block"><b>CNC</b>Blocked<br>Tool kit missing</div>
+          <div class="phase warn"><b>Edgeband</b>Watch<br>Machine condition</div>
+          <div class="phase"><b>Assembly</b>Thu AM<br>Crew assigned</div>
+          <div class="phase"><b>Finish/QC</b>Fri PM<br>Capacity open</div>
+          <div class="phase"><b>Delivery</b>Mon<br>Truck open</div>
+          <div class="phase"><b>Install</b>Tue<br>Package pending</div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="grid">
+          <div class="cell h">Work Center</div><div class="cell h">Mon</div><div class="cell h">Tue</div><div class="cell h">Wed</div><div class="cell h">Thu</div><div class="cell h">Fri</div>
+          <div class="cell h">CNC</div><div class="cell"><span class="job">SO24088</span></div><div class="cell"><span class="job block">SO24091</span><span class="job">SO24092</span></div><div class="cell"><span class="job">SO24093</span></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell h">Edgeband</div><div class="cell"></div><div class="cell"><span class="job warn">SO24088</span></div><div class="cell"><span class="job warn">SO24091</span></div><div class="cell"><span class="job">SO24092</span></div><div class="cell"></div>
+          <div class="cell h">Assembly</div><div class="cell"></div><div class="cell"></div><div class="cell"><span class="job">SO24088</span></div><div class="cell"><span class="job">SO24091</span></div><div class="cell"><span class="job">SO24092</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="panel-h">Blockers + Queues</div>
+      <div class="panel-b">
+        <div class="blocker">
+          <b>CNC cannot start Tuesday</b>
+          Required 6 mm compression bit is unavailable. Tool crib has 0 ready, 1 needs sharpening.
+        </div>
+        <div class="blocker warn">
+          <b>Purchasing exception</b>
+          Edge band PO 00452 due after planned edgebanding start.
+        </div>
+        <div class="blocker warn">
+          <b>Equipment watch</b>
+          Edgebander condition is Watch. Lead hand approval required before release.
+        </div>
+        <div class="queue-row"><b>Purchasing Actions</b><span class="tag">4</span></div>
+        <div class="queue-row"><b>Engineering Approvals</b><span class="tag">1</span></div>
+        <div class="queue-row"><b>Tooling Gaps</b><span class="tag">3</span></div>
+        <div class="queue-row"><b>Labor Gaps</b><span class="tag">2</span></div>
+        <div class="queue-row"><b>Install Readiness</b><span class="tag">5</span></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
