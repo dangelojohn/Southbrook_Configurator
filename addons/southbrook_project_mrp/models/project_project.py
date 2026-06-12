@@ -11,6 +11,10 @@ class ProjectProject(models.Model):
         string="Active MOs", compute="_compute_southbrook_mission_control")
     southbrook_ready_job_count = fields.Integer(
         string="Ready Jobs", compute="_compute_southbrook_mission_control")
+    southbrook_blocked_job_count = fields.Integer(
+        string="Blocked Jobs", compute="_compute_southbrook_mission_control")
+    southbrook_review_job_count = fields.Integer(
+        string="Review Jobs", compute="_compute_southbrook_mission_control")
     southbrook_at_risk_job_count = fields.Integer(
         string="At-Risk Jobs", compute="_compute_southbrook_mission_control")
     southbrook_material_risk_count = fields.Integer(
@@ -65,6 +69,10 @@ class ProjectProject(models.Model):
                 and not task.material_at_risk
                 and not task.equipment_blocked
             ))
+            project.southbrook_blocked_job_count = len(tasks.filtered(
+                lambda task: task.manufacturing_readiness_state == "blocked"))
+            project.southbrook_review_job_count = len(tasks.filtered(
+                lambda task: task.manufacturing_readiness_state == "review"))
             project.southbrook_at_risk_job_count = len(tasks.filtered("job_at_risk"))
             project.southbrook_material_risk_count = len(tasks.filtered("material_at_risk"))
             project.southbrook_unscheduled_wo_count = sum(
@@ -114,3 +122,33 @@ class ProjectProject(models.Model):
             "view_mode": "kanban,list,form",
             "context": {"create": False},
         }
+
+    def _southbrook_readiness_action(self, state, label):
+        self.ensure_one()
+        tasks = self.env["project.task"].search([
+            ("project_id", "=", self.id),
+            ("manufacturing_readiness_state", "=", state),
+        ]).filtered(lambda task: task.production_count > 0)
+        return {
+            "type": "ir.actions.act_window",
+            "name": "%s - %s" % (label, self.display_name),
+            "res_model": "project.task",
+            "domain": [("id", "in", tasks.ids)],
+            "view_mode": "list,form,kanban",
+            "context": {
+                "create": False,
+                "search_default_group_manufacturing_readiness": 1,
+            },
+        }
+
+    def action_southbrook_open_blocked_manufacturing_jobs(self):
+        return self._southbrook_readiness_action(
+            "blocked", "Blocked Manufacturing Jobs")
+
+    def action_southbrook_open_review_manufacturing_jobs(self):
+        return self._southbrook_readiness_action(
+            "review", "Manufacturing Jobs Needing Review")
+
+    def action_southbrook_open_ready_manufacturing_jobs(self):
+        return self._southbrook_readiness_action(
+            "ready", "Ready Manufacturing Jobs")

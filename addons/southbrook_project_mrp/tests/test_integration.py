@@ -153,6 +153,7 @@ class TestProjectMrpIntegration(TransactionCase):
             {"name": "WO Schedule Job", "project_id": self.project.id})
         wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
         mo = self._make_mo()
+        mo.action_confirm()
         mo.project_task_id = task.id
         wo = self.env["mrp.workorder"].create({
             "name": "Cut panels",
@@ -303,3 +304,119 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("manufacturing_blocked", search_view.arch_db)
         self.assertIn("manufacturing_review", search_view.arch_db)
         self.assertIn("manufacturing_ready", search_view.arch_db)
+        self.assertIn("customer_id", list_view.arch_db)
+        self.assertIn("install_due_date", list_view.arch_db)
+        self.assertIn("risk_level", list_view.arch_db)
+        self.assertIn("top_blocker", list_view.arch_db)
+        self.assertIn("next_best_action", list_view.arch_db)
+
+    def test_project_task_form_has_phase1_command_center_fields(self):
+        view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        arch = view.arch_db
+        self.assertIn("readiness_decision", arch)
+        self.assertIn("readiness_score", arch)
+        self.assertIn("risk_level", arch)
+        self.assertIn("top_blocker", arch)
+        self.assertIn("next_best_action", arch)
+        self.assertIn("manufacturing_reality", arch)
+
+    def test_phase1_context_fields_reuse_existing_job_sources(self):
+        stage = self.env["project.task.type"].create({
+            "name": "Assembly",
+            "project_ids": [(4, self.project.id)],
+        })
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": self.fp.id,
+                "product_uom_qty": 1.0,
+            })],
+        })
+        task = self.env["project.task"].create({
+            "name": "Context Job",
+            "project_id": self.project.id,
+            "stage_id": stage.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 45.0,
+        })
+
+        task.invalidate_recordset()
+
+        self.assertEqual(task.source_order_id, so)
+        self.assertEqual(task.source_order_name, so.name)
+        self.assertEqual(task.customer_id, self.partner)
+        self.assertEqual(task.pm_phase, "Assembly")
+        self.assertEqual(task.linked_mo_count, 1)
+        self.assertEqual(task.linked_wo_count, 1)
+        self.assertEqual(task.unscheduled_wo_count, 1)
+        self.assertEqual(task.current_bottleneck_workcenter_id, wc)
+        self.assertEqual(task.readiness_decision, task.manufacturing_readiness_state)
+        self.assertEqual(task.readiness_score, task.manufacturing_readiness_score)
+        self.assertIn("Confirmed", task.manufacturing_reality)
+        self.assertIn("1 WOs / 1 not scheduled", task.manufacturing_reality)
+        self.assertIn("base", task.cabinet_family_summary.lower())
+
+    def test_phase1_risk_blocker_and_next_action_are_plain_language(self):
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": self.fp.id,
+                "product_uom_qty": 1.0,
+            })],
+        })
+        task = self.env["project.task"].create({
+            "name": "Action Job",
+            "project_id": self.project.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "CNC Nesting"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Nest panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 30.0,
+        })
+
+        task.invalidate_recordset()
+
+        self.assertIn(task.risk_level, ("high", "critical"))
+        self.assertTrue(task.risk_reason)
+        self.assertTrue(task.top_blocker)
+        self.assertRegex(task.next_best_action, r"(Resolve|Schedule|Assign|Approve)")
+
+    def test_project_form_has_readiness_job_actions(self):
+        task = self.env["project.task"].create({
+            "name": "Blocked Readiness Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        self.project.invalidate_recordset()
+        self.assertEqual(self.project.southbrook_blocked_job_count, 1)
+
+        action = self.project.action_southbrook_open_blocked_manufacturing_jobs()
+
+        self.assertEqual(action["res_model"], "project.task")
+        self.assertEqual(action["domain"], [("id", "in", [task.id])])
+        view = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+        self.assertIn("action_southbrook_open_blocked_manufacturing_jobs", view.arch_db)
+        self.assertIn("southbrook_blocked_job_count", view.arch_db)
