@@ -121,7 +121,7 @@ test-bridge: .check-env
 
 test-mrp-command: .check-env
 	docker exec sami-odoo odoo -d $(DB) -u southbrook_project \
-	  --test-enable --test-tags=/southbrook_project:mrp_command $(ODOO_FLAGS)
+	  --test-enable --test-tags=mrp_command/southbrook_project $(ODOO_FLAGS)
 
 # ---------------------------------------------------------------------------
 # Playwright E2E

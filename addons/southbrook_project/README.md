@@ -167,7 +167,7 @@ make test-mrp-command
 ```
 
 That target upgrades `southbrook_project` and runs only
-`/southbrook_project:mrp_command` against the configured Docker Odoo
+`mrp_command/southbrook_project` against the configured Docker Odoo
 database.
 
 ## License
