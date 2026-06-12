@@ -105,29 +105,48 @@ body.project_task_kanban {
 // keeps the discussion/history in the natural review position at the bottom.
 // Scope this to Project screens only so Sales, MRP, Purchase, etc. keep their
 // stock chatter behavior.
-[data-model="project.task"].o_form_view,
-.o_form_view[data-model="project.task"],
-[data-model="project.project"].o_form_view,
-.o_form_view[data-model="project.project"] {
-    .o_form_renderer,
-    .o_form_view_container {
-        flex-direction: column !important;
-    }
+// The inherited Project forms add this explicit class. Odoo 19 does not
+// consistently expose data-model on the form root, so class-based scoping is
+// the reliable hook for forcing Project chatter below the form.
+.o_form_renderer:has(.o_southbrook_project_chatter_bottom),
+.o_southbrook_project_chatter_bottom .o_form_renderer,
+.o_southbrook_project_chatter_bottom .o_form_view_container {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    overflow: auto !important;
+}
 
-    .o_form_sheet_bg,
-    .o_form_sheet {
-        max-width: none !important;
-    }
+.o_form_renderer:has(.o_southbrook_project_chatter_bottom) .o_form_sheet_bg,
+.o_southbrook_project_chatter_bottom .o_form_sheet_bg {
+    order: 1 !important;
+    flex: 1 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+}
 
-    .o-mail-Form-chatter,
-    .o-mail-Chatter,
-    .o_Chatter {
-        flex: 0 0 auto !important;
-        width: 100% !important;
-        max-width: none !important;
-        min-width: 0 !important;
-        border-left: 0 !important;
-        border-top: 1px solid var(--border-color, #dee2e6);
-        margin-top: 1rem;
-    }
+.o_form_renderer:has(.o_southbrook_project_chatter_bottom) .o_form_sheet,
+.o_southbrook_project_chatter_bottom .o_form_sheet {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.o_form_renderer:has(.o_southbrook_project_chatter_bottom) .o-mail-Form-chatter,
+.o_form_renderer:has(.o_southbrook_project_chatter_bottom) .o-mail-Chatter,
+.o_form_renderer:has(.o_southbrook_project_chatter_bottom) .o_Chatter,
+.o_southbrook_project_chatter_bottom .o-mail-Form-chatter,
+.o_southbrook_project_chatter_bottom .o-mail-Chatter,
+.o_southbrook_project_chatter_bottom .o_Chatter {
+    order: 2 !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    border-left: 0 !important;
+    border-top: 1px solid var(--border-color, #dee2e6);
+    margin-top: 1rem;
 }

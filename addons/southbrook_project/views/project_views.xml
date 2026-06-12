@@ -15,6 +15,10 @@
         <field name="model">project.project</field>
         <field name="inherit_id" ref="project.edit_project"/>
         <field name="arch" type="xml">
+            <xpath expr="//form" position="attributes">
+                <attribute name="class" add="o_southbrook_project_chatter_bottom" separator=" "/>
+            </xpath>
+
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button class="oe_stat_button"
                         type="object"
@@ -24,6 +28,30 @@
                            widget="statinfo"
                            string="Customer Jobs"/>
                 </button>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_project_form_simplified_chatter_bottom_southbrook"
+            model="ir.ui.view">
+        <field name="name">project.project.form.simplified.chatter.bottom.southbrook</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.project_project_view_form_simplified"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="attributes">
+                <attribute name="class" add="o_southbrook_project_chatter_bottom" separator=" "/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_project_update_form_chatter_bottom_southbrook"
+            model="ir.ui.view">
+        <field name="name">project.update.form.chatter.bottom.southbrook</field>
+        <field name="model">project.update</field>
+        <field name="inherit_id" ref="project.project_update_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="attributes">
+                <attribute name="class" add="o_southbrook_project_chatter_bottom" separator=" "/>
             </xpath>
         </field>
     </record>
