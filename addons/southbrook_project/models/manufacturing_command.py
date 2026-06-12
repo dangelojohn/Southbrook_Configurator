@@ -312,6 +312,11 @@ class ProjectTask(models.Model):
             ))
         if not productions:
             return self._southbrook_notification_action()
+        if productions._name != "mrp.production":
+            return self._southbrook_notification_action(_(
+                "Production release completed, but no safe manufacturing "
+                "order action is available."
+            ))
         productions = self._southbrook_release_records(productions, "read")
         if not productions:
             return self._southbrook_notification_action()

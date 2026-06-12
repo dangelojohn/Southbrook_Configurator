@@ -591,6 +591,33 @@ class TestMrpCommandCenter(TransactionCase):
             "order action is available.",
         )
 
+    def test_release_non_mo_recordset_returns_neutral_notification(self):
+        task, sale = self._new_sale_order_task()
+        Sale = type(sale)
+        original = getattr(Sale, "action_send_to_production", None)
+
+        def fake_action_send_to_production(recordset):
+            return sale.partner_id
+
+        Sale.action_send_to_production = fake_action_send_to_production
+        try:
+            action = task.action_southbrook_release_to_production()
+        finally:
+            if original:
+                Sale.action_send_to_production = original
+            else:
+                delattr(Sale, "action_send_to_production")
+
+        self.assertIsInstance(action, dict)
+        self.assertEqual(action["type"], "ir.actions.client")
+        self.assertEqual(action["tag"], "display_notification")
+        self.assertNotEqual(action.get("res_model"), "mrp.production")
+        self.assertEqual(
+            action["params"]["message"],
+            "Production release completed, but no safe manufacturing "
+            "order action is available.",
+        )
+
     def test_release_without_sale_returns_neutral_notification(self):
         task = self._new_task()
 
