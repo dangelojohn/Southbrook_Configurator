@@ -358,6 +358,18 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertEqual(task.x_southbrook_readiness_state, "ready")
         self.assertFalse(task.x_southbrook_blocking_gate)
 
+    def test_unlinking_sale_order_refreshes_task_snapshot(self):
+        task, sale = self._new_sale_order_task()
+        self.assertEqual(task.x_southbrook_readiness_state, "ready")
+
+        sale.unlink()
+        self.assertFalse(task.x_southbrook_sale_order_id)
+        self.assertEqual(task.x_southbrook_readiness_state, "at_risk")
+        self.assertIn(
+            "No originating quote or sales order is linked.",
+            task.x_southbrook_blocker_summary,
+        )
+
     def test_partial_packages_block_bom_cutlist_gate(self):
         task, sale = self._new_sale_order_task()
         packaged_mo = self._new_mo_for_task(task)

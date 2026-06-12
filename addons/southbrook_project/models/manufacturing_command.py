@@ -638,6 +638,12 @@ class SaleOrder(models.Model):
             _southbrook_refresh_task_snapshots(tasks)
         return res
 
+    def unlink(self):
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        res = super().unlink()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res
+
 
 class MrpProduction(models.Model):
     _inherit = "mrp.production"
