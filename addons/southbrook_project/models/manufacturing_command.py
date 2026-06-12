@@ -217,9 +217,184 @@ class ProjectTask(models.Model):
             )
         return score, "ready", False, _("All release gates are ready."), False
 
+    def _southbrook_related_sale_order(self):
+        self.ensure_one()
+        return self.x_southbrook_sale_order_id
+
+    def _southbrook_related_productions(self):
+        self.ensure_one()
+        sale = self._southbrook_related_sale_order()
+        domain = []
+        if sale:
+            domain = [("origin", "=", sale.name)]
+        else:
+            domain = [("origin", "=", self.name)]
+        return self.env["mrp.production"].sudo().search(domain)
+
+    def _southbrook_related_packages(self, productions=False):
+        productions = productions or self._southbrook_related_productions()
+        if not productions:
+            return self.env["sb.production.package"]
+        return self.env["sb.production.package"].sudo().search([
+            ("mo_id", "in", productions.ids),
+        ])
+
+    def _southbrook_related_workorders(self, productions=False):
+        productions = productions or self._southbrook_related_productions()
+        if not productions:
+            return self.env["mrp.workorder"]
+        return productions.mapped("workorder_ids")
+
+    def _southbrook_related_mi_checks(self, productions=False, packages=False):
+        Check = self.env["southbrook.mi.check"].sudo()
+        domains = []
+        if productions:
+            domains.append(("production_id", "in", productions.ids))
+        if packages:
+            domains.append(("production_package_id", "in", packages.ids))
+        if not domains:
+            return Check
+        if len(domains) == 1:
+            return Check.search([domains[0]])
+        return Check.search(["|", domains[0], domains[1]])
+
+    def _southbrook_gate_from_checks(self, gate, checks, fallback_ready):
+        blockers = checks.filtered(lambda check: check.severity == "blocker")
+        warnings = checks.filtered(lambda check: check.severity == "warning")
+        if blockers:
+            first = blockers.sorted(key=lambda c: (c.sequence or 100, c.id))[0]
+            return self._southbrook_default_gate(
+                gate,
+                state="blocked",
+                message=first.message or first.name,
+                action=first.recommendation or first.message,
+                blocking=True,
+            )
+        if warnings:
+            first = warnings.sorted(key=lambda c: (c.sequence or 100, c.id))[0]
+            return self._southbrook_default_gate(
+                gate,
+                state="warning",
+                message=first.message or first.name,
+                action=first.recommendation or first.message,
+                blocking=False,
+            )
+        return fallback_ready
+
     def _southbrook_collect_readiness_gates(self):
         self.ensure_one()
-        return {
+        gates = {
             gate: self._southbrook_default_gate(gate)
             for gate in GATE_SEQUENCE
         }
+        sale = self._southbrook_related_sale_order()
+        productions = self._southbrook_related_productions()
+        packages = self._southbrook_related_packages(productions)
+        workorders = self._southbrook_related_workorders(productions)
+        checks = self._southbrook_related_mi_checks(productions, packages)
+
+        has_manufacturing_context = bool(sale or productions)
+
+        if has_manufacturing_context:
+            if not sale:
+                gates["estimate"] = self._southbrook_default_gate(
+                    "estimate",
+                    state="warning",
+                    message=_("No originating quote or sales order is linked."),
+                    action=_("Link the project task to its originating sales order."),
+                )
+            elif sale.state not in ("sale", "done"):
+                gates["estimate"] = self._southbrook_default_gate(
+                    "estimate",
+                    state="blocked",
+                    message=_("Sales order is not confirmed."),
+                    action=_("Confirm the sales order before release."),
+                    blocking=True,
+                )
+
+            if not productions:
+                gates["schedule"] = self._southbrook_default_gate(
+                    "schedule",
+                    state="warning",
+                    message=_("No manufacturing orders exist for this job yet."),
+                    action=_("Release the job to create manufacturing orders."),
+                )
+            elif not packages:
+                gates["bom_cutlist"] = self._southbrook_default_gate(
+                    "bom_cutlist",
+                    state="blocked",
+                    message=_(
+                        "No production package is linked to the manufacturing order."
+                    ),
+                    action=_(
+                        "Create or recompute the production package and cutlist."
+                    ),
+                    blocking=True,
+                )
+            else:
+                package_blockers = packages.filtered(
+                    lambda package: package.x_mi_status == "blocked"
+                )
+                if package_blockers:
+                    first = package_blockers[0]
+                    gates["bom_cutlist"] = self._southbrook_default_gate(
+                        "bom_cutlist",
+                        state="blocked",
+                        message=first.x_mi_next_stage_action
+                        or first.x_mi_next_action
+                        or _("Production package has blockers."),
+                        action=first.x_mi_next_stage_action
+                        or first.x_mi_next_action
+                        or _("Open the production package intelligence checks."),
+                        blocking=True,
+                    )
+
+        tooling_blockers = workorders.filtered(
+            lambda wo: getattr(wo, "southbrook_tool_readiness_state", False)
+            == "blocked"
+        )
+        tooling_warnings = workorders.filtered(
+            lambda wo: getattr(wo, "southbrook_tool_readiness_state", False)
+            == "warning"
+        )
+        if tooling_blockers:
+            first = tooling_blockers[0]
+            gates["tooling"] = self._southbrook_default_gate(
+                "tooling",
+                state="blocked",
+                message=first.southbrook_tool_readiness_msg
+                or _("A work order is blocked by missing tooling."),
+                action=_("Clear mandatory tool readiness before release."),
+                blocking=True,
+            )
+        elif tooling_warnings:
+            first = tooling_warnings[0]
+            gates["tooling"] = self._southbrook_default_gate(
+                "tooling",
+                state="warning",
+                message=first.southbrook_tool_readiness_msg
+                or _("A work order has tooling warnings."),
+                action=_("Review optional tooling before release."),
+            )
+
+        equipment_checks = checks.filtered(lambda check: check.stage in (
+            "cnc", "edgeband", "assembly", "finish_qc"
+        ) and check.category in ("production", "assembly"))
+        gates["equipment"] = self._southbrook_gate_from_checks(
+            "equipment", equipment_checks, gates["equipment"]
+        )
+
+        install_checks = checks.filtered(lambda check: check.stage == "install")
+        gates["install"] = self._southbrook_gate_from_checks(
+            "install", install_checks, gates["install"]
+        )
+
+        if workorders and any(not wo.date_start for wo in workorders):
+            gates["schedule"] = self._southbrook_default_gate(
+                "schedule",
+                state="warning",
+                message=_("One or more work orders are not scheduled."),
+                action=_("Plan work orders before the daily production meeting."),
+            )
+
+        return gates

@@ -218,3 +218,55 @@ class TestMrpCommandCenter(TransactionCase):
             self.assertEqual(row["state"], "ready")
             self.assertFalse(row["action"])
             self.assertFalse(row["blocking"])
+
+    def _new_mo_for_task(self, task):
+        product = self.env["product.product"].create({
+            "name": "MRP Command Cabinet",
+            "type": "consu",
+            "is_storable": True,
+        })
+        mo = self.env["mrp.production"].create({
+            "product_id": product.id,
+            "product_uom_id": product.uom_id.id,
+            "product_qty": 1.0,
+            "origin": task.x_southbrook_sale_order_id.name
+            if task.x_southbrook_sale_order_id else task.name,
+        })
+        return mo
+
+    def _new_sale_order_task(self):
+        partner = self.env["res.partner"].create({
+            "name": "MRP Command Customer",
+        })
+        sale = self.env["sale.order"].create({"partner_id": partner.id})
+        return self._new_task(x_southbrook_sale_order_id=sale.id), sale
+
+    def test_missing_package_blocks_bom_cutlist_gate(self):
+        task, sale = self._new_sale_order_task()
+        self._new_mo_for_task(task)
+        gates = task._southbrook_collect_readiness_gates()
+        self.assertEqual(gates["bom_cutlist"]["state"], "blocked")
+        self.assertTrue(gates["bom_cutlist"]["blocking"])
+        self.assertIn(
+            "production package",
+            gates["bom_cutlist"]["message"].lower(),
+        )
+
+    def test_tool_readiness_blocker_blocks_tooling_gate(self):
+        task, sale = self._new_sale_order_task()
+        mo = self._new_mo_for_task(task)
+        workcenter = self.env["mrp.workcenter"].create({
+            "name": "MRP Command CNC",
+            "code": "MCC-CNC",
+        })
+        workorder = self.env["mrp.workorder"].create({
+            "name": "CNC",
+            "production_id": mo.id,
+            "workcenter_id": workcenter.id,
+            "state": "ready",
+            "southbrook_tool_readiness_state": "blocked",
+            "southbrook_tool_readiness_msg": "Blocked: need compression bit",
+        })
+        gates = task._southbrook_collect_readiness_gates()
+        self.assertEqual(gates["tooling"]["state"], "blocked")
+        self.assertIn("compression bit", gates["tooling"]["message"])
