@@ -297,3 +297,121 @@ class ProjectProject(models.Model):
                 "search_default_manufacturing_blocked": 1,
             },
         }
+
+    def _southbrook_data_quality_line(self, issue_key, severity, record, reason,
+                                      recommended_action):
+        return {
+            "issue_key": issue_key,
+            "severity": severity,
+            "model_name": record._name,
+            "record_ref": record.display_name,
+            "reason": reason,
+            "recommended_action": recommended_action,
+        }
+
+    def action_southbrook_data_quality_dry_run(self):
+        self.ensure_one()
+        Report = self.env["southbrook.project.data.quality.report"]
+        Line = self.env["southbrook.project.data.quality.line"]
+        Task = self.env["project.task"]
+        Production = self.env["mrp.production"]
+
+        tasks = Task.search([("project_id", "=", self.id)])
+        manufacturing_tasks = tasks.filtered(lambda task: task.production_count > 0)
+        lines = []
+
+        orphan_mos = Production.search([
+            ("project_task_id", "=", False),
+            ("state", "not in", ("done", "cancel")),
+        ])
+        for mo in orphan_mos:
+            lines.append(self._southbrook_data_quality_line(
+                "blank_kitchen_project",
+                "warning",
+                mo,
+                "Manufacturing order has no linked kitchen job.",
+                "Link the MO to the correct Project kitchen job; do not delete it.",
+            ))
+
+        for task in manufacturing_tasks:
+            if not task.job_install_due:
+                lines.append(self._southbrook_data_quality_line(
+                    "missing_install_due",
+                    "warning",
+                    task,
+                    "Kitchen job has linked MOs but no surfaced install due date.",
+                    "Confirm the install due date on the source MO/order data.",
+                ))
+            if not task.job_estimated_cost:
+                lines.append(self._southbrook_data_quality_line(
+                    "placeholder_estimated_cost",
+                    "info",
+                    task,
+                    "Estimated job cost is 0.00.",
+                    "Review product standard costs or costing setup before using cost reports.",
+                ))
+            if (
+                task.manufacturing_readiness_state == "ready"
+                and (task.job_at_risk or task.material_at_risk
+                     or task.equipment_blocked)
+            ):
+                lines.append(self._southbrook_data_quality_line(
+                    "queue_overlap",
+                    "blocker",
+                    task,
+                    "Job appears ready while risk/blocker flags are active.",
+                    "Review readiness rules and the underlying job blockers.",
+                ))
+            if task.equipment_blocked != bool(task.maintenance_request_count):
+                lines.append(self._southbrook_data_quality_line(
+                    "equipment_count_mismatch",
+                    "warning",
+                    task,
+                    "Equipment blocked flag and maintenance count disagree.",
+                    "Recompute equipment readiness and inspect work-center equipment links.",
+                ))
+
+        if "stock.scrap" in self.env:
+            Scrap = self.env["stock.scrap"]
+            for scrap in Scrap.search([]).filtered(
+                lambda rec: "REF" in (rec.display_name or "").upper()):
+                lines.append(self._southbrook_data_quality_line(
+                    "demo_scrap_unbuild",
+                    "info",
+                    scrap,
+                    "Scrap record looks like demo/reference data.",
+                    "Archive, tag, or exclude confirmed demo data; do not delete by default.",
+                ))
+
+        if "mrp.unbuild" in self.env:
+            Unbuild = self.env["mrp.unbuild"]
+            for unbuild in Unbuild.search([]).filtered(
+                lambda rec: "REF" in (rec.display_name or "").upper()):
+                lines.append(self._southbrook_data_quality_line(
+                    "demo_scrap_unbuild",
+                    "info",
+                    unbuild,
+                    "Unbuild/remake record looks like demo/reference data.",
+                    "Archive, tag, or exclude confirmed demo data; do not delete by default.",
+                ))
+
+        report = Report.create({
+            "project_id": self.id,
+            "summary": (
+                "Dry run found %d data-quality issue(s). No production data "
+                "was changed." % len(lines)
+            ),
+        })
+        for values in lines:
+            values["report_id"] = report.id
+        if lines:
+            Line.create(lines)
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Southbrook Data Quality Dry Run",
+            "res_model": "southbrook.project.data.quality.report",
+            "res_id": report.id,
+            "view_mode": "form",
+            "target": "current",
+            "context": {"create": False, "edit": False},
+        }

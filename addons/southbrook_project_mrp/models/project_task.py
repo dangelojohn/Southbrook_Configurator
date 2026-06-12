@@ -215,6 +215,11 @@ class ProjectTask(models.Model):
         compute="_compute_phase1_operational_context",
         readonly=True,
     )
+    southbrook_cabinet_family_progress = fields.Text(
+        string="Cabinet Family Progress",
+        compute="_compute_phase1_operational_context",
+        readonly=True,
+    )
     job_type = fields.Selection(
         [
             ("full_kitchen", "Full Kitchen"),
@@ -227,6 +232,12 @@ class ProjectTask(models.Model):
         ],
         string="Job Type",
         default="full_kitchen",
+        tracking=True,
+    )
+    southbrook_job_template_id = fields.Many2one(
+        "southbrook.project.job.template",
+        string="Job Template",
+        domain="[('active', '=', True)]",
         tracking=True,
     )
     southbrook_door_style = fields.Selection(
@@ -288,6 +299,33 @@ class ProjectTask(models.Model):
         search="_search_southbrook_specs_complete",
         readonly=True,
     )
+    southbrook_release_cad_approved = fields.Boolean(
+        string="CAD Approved", tracking=True)
+    southbrook_release_cutlist_approved = fields.Boolean(
+        string="Cutlist Approved", tracking=True)
+    southbrook_release_bom_verified = fields.Boolean(
+        string="BoM Verified", tracking=True)
+    southbrook_release_crew_reserved = fields.Boolean(
+        string="Crew Assigned / Reserved", tracking=True)
+    southbrook_release_equipment_available = fields.Boolean(
+        string="Critical Equipment Available", tracking=True)
+    southbrook_production_release_state = fields.Selection(
+        [
+            ("ready", "Ready"),
+            ("review", "Review"),
+            ("blocked", "Blocked"),
+            ("info", "Info"),
+        ],
+        string="Production Release",
+        compute="_compute_southbrook_production_release",
+        search="_search_southbrook_production_release_state",
+        readonly=True,
+    )
+    southbrook_production_release_reason = fields.Char(
+        string="Production Release Reason",
+        compute="_compute_southbrook_production_release",
+        readonly=True,
+    )
     cad_cutlist_review_required = fields.Boolean(
         string="Needs CAD / Cutlist",
         compute="_compute_phase3_queue_flags",
@@ -318,6 +356,67 @@ class ProjectTask(models.Model):
         string="Site Access Notes")
     southbrook_install_deficiency_notes = fields.Text(
         string="Install Deficiency / Punch Notes")
+    southbrook_quality_issue_summary = fields.Text(
+        string="Quality / Remake Summary",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_remake_task_ids = fields.Many2many(
+        "project.task",
+        "southbrook_project_mrp_remake_task_rel",
+        "task_id",
+        "remake_task_id",
+        string="Warranty / Remake Tasks",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_remake_task_count = fields.Integer(
+        string="Warranty / Remake Tasks",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_rework_workorder_ids = fields.Many2many(
+        "mrp.workorder",
+        "southbrook_project_mrp_rework_wo_rel",
+        "task_id",
+        "workorder_id",
+        string="Rework Work Orders",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_rework_workorder_count = fields.Integer(
+        string="Rework WOs",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_scrap_ids = fields.Many2many(
+        "stock.scrap",
+        "southbrook_project_mrp_scrap_rel",
+        "task_id",
+        "scrap_id",
+        string="Scrap Records",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_scrap_count = fields.Integer(
+        string="Scrap",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_unbuild_ids = fields.Many2many(
+        "mrp.unbuild",
+        "southbrook_project_mrp_unbuild_rel",
+        "task_id",
+        "unbuild_id",
+        string="Unbuild / Remake Records",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
+    southbrook_unbuild_count = fields.Integer(
+        string="Unbuilds",
+        compute="_compute_southbrook_quality_visibility",
+        readonly=True,
+    )
     southbrook_pack_label_complete = fields.Boolean(
         string="Pack / Label Complete", tracking=True)
     southbrook_qc_complete = fields.Boolean(
@@ -632,7 +731,10 @@ class ProjectTask(models.Model):
         "production_ids.product_id",
         "production_ids.product_id.default_code",
         "production_ids.state",
+        "production_ids.date_deadline",
         "production_ids.workorder_ids",
+        "production_ids.workorder_ids.state",
+        "production_ids.workorder_ids.date_start",
         "production_ids.workorder_ids.workcenter_id",
         "production_ids.workorder_ids.duration_expected",
         "production_count",
@@ -659,6 +761,8 @@ class ProjectTask(models.Model):
         "source_order_id",
         "customer_id",
         "southbrook_specs_complete",
+        "southbrook_production_release_state",
+        "southbrook_production_release_reason",
         "southbrook_install_readiness_state",
         "southbrook_install_readiness_reason",
     )
@@ -681,6 +785,9 @@ class ProjectTask(models.Model):
                 task._southbrook_current_bottleneck_workcenter()
             )
             task.cabinet_family_summary = task._southbrook_cabinet_family_summary()
+            task.southbrook_cabinet_family_progress = (
+                task._southbrook_cabinet_family_progress()
+            )
             task.risk_level, task.risk_reason = task._southbrook_risk()
             task.next_best_action = task._southbrook_next_best_action()
 
@@ -714,22 +821,75 @@ class ProjectTask(models.Model):
         self.ensure_one()
         counts = Counter()
         for product in self.production_ids.mapped("product_id"):
-            code = (
-                product.default_code
-                or product.name
-                or product.display_name
-                or ""
-            )
-            for prefix, family in _FAMILY_BY_PREFIX.items():
-                if code.startswith(prefix):
-                    counts[family] += 1
-                    break
+            family = self._southbrook_product_family(product)
+            if family:
+                counts[family] += 1
         if not counts:
             return ""
         return ", ".join(
             "%s: %d" % (family, count)
             for family, count in sorted(counts.items())
         )
+
+    def _southbrook_product_family(self, product):
+        code = (
+            product.default_code
+            or product.name
+            or product.display_name
+            or ""
+        )
+        for prefix, family in _FAMILY_BY_PREFIX.items():
+            if code.startswith(prefix):
+                return family
+        return ""
+
+    def _southbrook_cabinet_family_progress(self):
+        self.ensure_one()
+        families = {}
+        today = fields.Date.context_today(self)
+        for mo in self.production_ids:
+            family = self._southbrook_product_family(mo.product_id) or "Other"
+            families.setdefault(family, self.env["mrp.production"])
+            families[family] |= mo
+        lines = []
+        for family, mos in sorted(families.items()):
+            wos = mos.mapped("workorder_ids")
+            wo_done = len(wos.filtered(lambda wo: wo.state in ("done", "cancel")))
+            active_wos = wos.filtered(lambda wo: wo.state not in ("done", "cancel"))
+            current_station = active_wos[:1].workcenter_id.display_name or "None"
+            late = any(
+                mo.date_deadline
+                and fields.Date.to_date(mo.date_deadline) < today
+                and mo.state not in ("done", "cancel")
+                for mo in mos
+            )
+            blocker = "None"
+            if any(mo.reservation_state != "assigned" for mo in mos):
+                blocker = "Components available"
+            if not wos:
+                blocker = "WOs generated"
+            elif any(getattr(wo, "southbrook_not_scheduled", False) for wo in wos):
+                blocker = "Schedule work orders"
+            if late:
+                blocker = "Late MO" if blocker == "None" else "%s; Late MO" % blocker
+            qty = sum(mo.product_qty or 0.0 for mo in mos)
+            completed_mos = len(mos.filtered(lambda mo: mo.state in ("done", "cancel")))
+            lines.append(
+                "%s: qty %s, MOs %d (%d complete), WOs %d/%d complete, "
+                "current station %s, blocker %s, late %s"
+                % (
+                    family,
+                    int(qty) if qty == int(qty) else qty,
+                    len(mos),
+                    completed_mos,
+                    wo_done,
+                    len(wos),
+                    current_station,
+                    blocker,
+                    "Yes" if late else "No",
+                )
+            )
+        return "\n".join(lines)
 
     def _southbrook_risk(self):
         self.ensure_one()
@@ -767,6 +927,8 @@ class ProjectTask(models.Model):
             return "Approve CAD/cutlist before releasing production."
         if not self.southbrook_specs_complete:
             return "Confirm cabinet specs before releasing production."
+        if self.southbrook_production_release_state != "ready":
+            return self._southbrook_production_release_next_action()
         if self.material_at_risk:
             return "Resolve component shortages or linked procurement before release."
         if self.unscheduled_workorder_count:
@@ -877,6 +1039,27 @@ class ProjectTask(models.Model):
                 "ready",
                 "%d linked MO(s)." % self.production_count,
                 self.mo_reference or "",
+                "No action required.",
+            )
+
+        release_state = self.southbrook_production_release_state or "info"
+        if release_state != "ready":
+            line(
+                "production_release",
+                "Production Release Checklist",
+                release_state,
+                self.southbrook_production_release_reason
+                or "Production release checklist needs review.",
+                self._southbrook_production_release_evidence(),
+                self._southbrook_production_release_next_action(),
+            )
+        else:
+            line(
+                "production_release",
+                "Production Release Checklist",
+                "ready",
+                "Production release checklist is complete.",
+                self._southbrook_production_release_evidence(),
                 "No action required.",
             )
 
@@ -1094,6 +1277,121 @@ class ProjectTask(models.Model):
             task.southbrook_specs_complete = not bool(
                 task._southbrook_missing_cabinet_specs())
 
+    def _southbrook_missing_production_release_items(self):
+        self.ensure_one()
+        missing = []
+        cad_status = (self.job_cad_status or "").lower()
+        cad_done_from_mos = bool(cad_status and "done" in cad_status)
+        if self.southbrook_site_measurement_status not in ("received", "waived"):
+            missing.append("Final site measurements")
+        if not (self.southbrook_release_cad_approved or cad_done_from_mos):
+            missing.append("CAD approved")
+        if not self.southbrook_release_cutlist_approved:
+            missing.append("Cutlist approved")
+        if not self.southbrook_specs_complete:
+            missing.append("Door/finish/hardware specs")
+        if not self.southbrook_release_bom_verified:
+            missing.append("BoM verified")
+        if not self.production_count:
+            missing.append("Linked MOs")
+        if self.components_available != "ready":
+            missing.append("Components available")
+        if not self.workorder_count:
+            missing.append("WOs generated")
+        elif self.unscheduled_workorder_count:
+            missing.append("Schedule work orders")
+        if self.crew_gap and not self.southbrook_release_crew_reserved:
+            missing.append("Crew assigned/reserved")
+        if self.equipment_blocked or not self.southbrook_release_equipment_available:
+            missing.append("Critical equipment available")
+        if not self.job_install_due:
+            missing.append("Install due date confirmed")
+        return missing
+
+    def _southbrook_production_release_evidence(self):
+        self.ensure_one()
+        return "\n".join(
+            part for part in (
+                "Site measurement: %s"
+                % (self.southbrook_site_measurement_status or "pending"),
+                "CAD: %s"
+                % ("approved" if self.southbrook_release_cad_approved
+                   else (self.job_cad_status or "not confirmed")),
+                "Cutlist: %s"
+                % ("approved" if self.southbrook_release_cutlist_approved
+                   else "not confirmed"),
+                "Specs: %s"
+                % ("complete" if self.southbrook_specs_complete else "missing"),
+                "BoM: %s"
+                % ("verified" if self.southbrook_release_bom_verified
+                   else "not verified"),
+                "Components: %s" % (self.components_available or "unknown"),
+                "MOs: %d" % self.production_count,
+                "WOs: %d total / %d unscheduled"
+                % (self.workorder_count, self.unscheduled_workorder_count),
+                "Crew: %s"
+                % ("reserved" if self.southbrook_release_crew_reserved
+                   else ("gap" if self.crew_gap else "clear")),
+                "Equipment: %s"
+                % ("blocked" if self.equipment_blocked
+                   else ("available" if self.southbrook_release_equipment_available
+                         else "not confirmed")),
+                "Install due: %s" % (self.job_install_due or "missing"),
+            )
+            if part
+        )
+
+    def _southbrook_production_release_next_action(self):
+        self.ensure_one()
+        missing = self._southbrook_missing_production_release_items()
+        if not missing:
+            return "Release or advance the job."
+        first = missing[0]
+        actions = {
+            "Final site measurements": "Confirm final site measurements before release.",
+            "CAD approved": "Approve CAD before releasing production.",
+            "Cutlist approved": "Approve the cutlist before releasing production.",
+            "Door/finish/hardware specs": "Confirm cabinet specs before releasing production.",
+            "BoM verified": "Verify the BoM against the released cutlist.",
+            "Linked MOs": "Link or create manufacturing orders for this kitchen job.",
+            "Components available": "Resolve component shortages before release.",
+            "WOs generated": "Generate work orders from the linked MOs.",
+            "Schedule work orders": "Schedule work orders before advancing this job.",
+            "Crew assigned/reserved": "Assign or reserve crew for critical operations.",
+            "Critical equipment available": "Confirm critical equipment is available.",
+            "Install due date confirmed": "Confirm the install due date before release.",
+        }
+        return actions.get(first, "Complete production release checklist.")
+
+    @api.depends(
+        "southbrook_site_measurement_status",
+        "southbrook_release_cad_approved",
+        "southbrook_release_cutlist_approved",
+        "southbrook_release_bom_verified",
+        "southbrook_release_crew_reserved",
+        "southbrook_release_equipment_available",
+        "job_cad_status",
+        "southbrook_specs_complete",
+        "production_count",
+        "components_available",
+        "workorder_count",
+        "unscheduled_workorder_count",
+        "crew_gap",
+        "equipment_blocked",
+        "job_install_due",
+    )
+    def _compute_southbrook_production_release(self):
+        for task in self:
+            missing = task._southbrook_missing_production_release_items()
+            if missing:
+                task.southbrook_production_release_state = "blocked"
+                task.southbrook_production_release_reason = (
+                    "Missing %s." % ", ".join(missing))
+            else:
+                task.southbrook_production_release_state = "ready"
+                task.southbrook_production_release_reason = (
+                    "Production release checklist is complete.")
+
     def _southbrook_missing_install_items(self):
         self.ensure_one()
         missing = []
@@ -1155,6 +1453,84 @@ class ProjectTask(models.Model):
                     "Install readiness checklist is complete.")
 
     @api.depends(
+        "southbrook_install_deficiency_notes",
+        "child_ids",
+        "child_ids.name",
+        "child_ids.job_type",
+        "production_ids",
+        "production_ids.name",
+        "production_ids.workorder_ids",
+        "production_ids.workorder_ids.name",
+        "production_ids.workorder_ids.state",
+        "job_rework_count",
+        "job_rework_cost",
+    )
+    def _compute_southbrook_quality_visibility(self):
+        Scrap = self.env["stock.scrap"] if "stock.scrap" in self.env else None
+        Unbuild = self.env["mrp.unbuild"] if "mrp.unbuild" in self.env else None
+        for task in self:
+            wos = task.production_ids.mapped("workorder_ids")
+            rework_wos = wos.filtered(
+                lambda wo: bool(getattr(wo, "x_sbk_rework_count", 0))
+                or "rework" in (wo.name or "").lower())
+            remake_tasks = task.child_ids.filtered(
+                lambda child: child.job_type == "warranty"
+                or any(
+                    token in (child.name or "").lower()
+                    for token in ("remake", "warranty", "deficiency", "punch")
+                ))
+            scraps = task._southbrook_linked_scrap_records(Scrap)
+            unbuilds = task._southbrook_linked_unbuild_records(Unbuild)
+
+            task.southbrook_rework_workorder_ids = rework_wos
+            task.southbrook_rework_workorder_count = len(rework_wos)
+            task.southbrook_remake_task_ids = remake_tasks
+            task.southbrook_remake_task_count = len(remake_tasks)
+            task.southbrook_scrap_ids = scraps
+            task.southbrook_scrap_count = len(scraps)
+            task.southbrook_unbuild_ids = unbuilds
+            task.southbrook_unbuild_count = len(unbuilds)
+
+            parts = []
+            if task.southbrook_install_deficiency_notes:
+                parts.append("Deficiency notes recorded")
+            if task.job_rework_count:
+                parts.append(
+                    "%d rework check(s), %s rework cost"
+                    % (task.job_rework_count, task.job_rework_cost or 0.0))
+            if rework_wos:
+                parts.append("%d rework WO(s)" % len(rework_wos))
+            if remake_tasks:
+                parts.append(
+                    "%d warranty/remake task(s)" % len(remake_tasks))
+            if scraps:
+                parts.append("%d scrap record(s)" % len(scraps))
+            if unbuilds:
+                parts.append("%d unbuild/remake record(s)" % len(unbuilds))
+            task.southbrook_quality_issue_summary = (
+                "; ".join(parts) or "No quality, remake, or deficiency issues surfaced."
+            )
+
+    def _southbrook_linked_scrap_records(self, Scrap):
+        self.ensure_one()
+        if not Scrap or not self.production_ids:
+            return self.env["stock.scrap"]
+        if "production_id" in Scrap._fields:
+            return Scrap.search([("production_id", "in", self.production_ids.ids)])
+        return self.env["stock.scrap"]
+
+    def _southbrook_linked_unbuild_records(self, Unbuild):
+        self.ensure_one()
+        if not Unbuild or not self.production_ids:
+            return self.env["mrp.unbuild"]
+        if "mo_id" in Unbuild._fields:
+            return Unbuild.search([("mo_id", "in", self.production_ids.ids)])
+        if "production_id" in Unbuild._fields:
+            return Unbuild.search([
+                ("production_id", "in", self.production_ids.ids)])
+        return self.env["mrp.unbuild"]
+
+    @api.depends(
         "production_count",
         "job_cad_status",
         "material_at_risk",
@@ -1173,6 +1549,7 @@ class ProjectTask(models.Model):
         "x_southbrook_hardware_specs",
         "southbrook_door_style",
         "southbrook_finish",
+        "southbrook_production_release_state",
         "southbrook_install_readiness_state",
     )
     def _compute_readiness_line_count(self):
@@ -1255,6 +1632,10 @@ class ProjectTask(models.Model):
     def _search_southbrook_install_readiness_state(self, operator, value):
         return self._search_selection_compute(
             "southbrook_install_readiness_state", operator, value)
+
+    def _search_southbrook_production_release_state(self, operator, value):
+        return self._search_selection_compute(
+            "southbrook_production_release_state", operator, value)
 
     def _search_job_at_risk(self, operator, value):
         return self._search_boolean_compute("job_at_risk", operator, value)
@@ -1360,6 +1741,8 @@ class ProjectTask(models.Model):
         "customer_id",
         "source_order_id",
         "southbrook_specs_complete",
+        "southbrook_production_release_state",
+        "southbrook_production_release_reason",
         "southbrook_install_readiness_state",
         "southbrook_install_readiness_reason",
     )
@@ -1404,6 +1787,24 @@ class ProjectTask(models.Model):
                     "Cabinet Specs: confirm %s" % ", ".join(missing_specs))
             else:
                 gate("Cabinet Specs", "READY", "required specs complete")
+
+            if task.southbrook_production_release_state != "ready":
+                gate(
+                    "Production Release Checklist",
+                    "BLOCKED",
+                    task.southbrook_production_release_reason
+                    or "production release checklist incomplete",
+                )
+                blockers.append(
+                    "Production Release: %s"
+                    % (task.southbrook_production_release_reason
+                       or "checklist incomplete"))
+            else:
+                gate(
+                    "Production Release Checklist",
+                    "READY",
+                    "release checklist complete",
+                )
 
             if not task.production_count:
                 gate("MRP Link", "BLOCKED", "no linked manufacturing orders")
@@ -1534,6 +1935,8 @@ class ProjectTask(models.Model):
             if task.unscheduled_workorder_count:
                 caps.append(55)
             if task.equipment_blocked:
+                caps.append(65)
+            if task.southbrook_production_release_state != "ready":
                 caps.append(65)
             if not task.job_install_due:
                 caps.append(80)
@@ -1760,6 +2163,56 @@ class ProjectTask(models.Model):
             "context": {"create": False},
         }
 
+    def action_view_southbrook_rework_workorders(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Rework Work Orders - %s" % (self.name or self.display_name),
+            "res_model": "mrp.workorder",
+            "domain": [("id", "in", self.southbrook_rework_workorder_ids.ids)],
+            "view_mode": "list,form,gantt,calendar",
+            "context": {"create": False},
+        }
+
+    def action_view_southbrook_remake_tasks(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Warranty / Remake Tasks - %s"
+                    % (self.name or self.display_name),
+            "res_model": "project.task",
+            "domain": [("id", "in", self.southbrook_remake_task_ids.ids)],
+            "view_mode": "list,form,kanban",
+            "context": {
+                "default_project_id": self.project_id.id,
+                "default_parent_id": self.id,
+                "default_job_type": "warranty",
+            },
+        }
+
+    def action_view_southbrook_scrap_records(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Scrap Records - %s" % (self.name or self.display_name),
+            "res_model": "stock.scrap",
+            "domain": [("id", "in", self.southbrook_scrap_ids.ids)],
+            "view_mode": "list,form",
+            "context": {"create": False},
+        }
+
+    def action_view_southbrook_unbuild_records(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Unbuild / Remake Records - %s"
+                    % (self.name or self.display_name),
+            "res_model": "mrp.unbuild",
+            "domain": [("id", "in", self.southbrook_unbuild_ids.ids)],
+            "view_mode": "list,form",
+            "context": {"create": False},
+        }
+
     def action_view_manufacturing_calculations(self):
         self.ensure_one()
         if "southbrook.mi.check" not in self.env:
@@ -1834,6 +2287,33 @@ class ProjectTask(models.Model):
             "domain": [("id", "in", self.production_ids.ids)],
             "view_mode": "list,form", "context": {"create": False},
         }
+
+    def action_apply_southbrook_job_template(self):
+        Task = self.env["project.task"]
+        Template = self.env["southbrook.project.job.template"]
+        for task in self:
+            template = task.southbrook_job_template_id
+            if not template and task.job_type:
+                template = Template.search([
+                    ("job_type", "=", task.job_type),
+                    ("active", "=", True),
+                ], limit=1)
+            if not template:
+                raise UserError(
+                    "Select a Southbrook job template or set a job type.")
+            existing_names = set(task.child_ids.mapped("name"))
+            for line in template.line_ids:
+                if line.name in existing_names:
+                    continue
+                Task.create({
+                    "name": line.name,
+                    "project_id": task.project_id.id,
+                    "parent_id": task.id,
+                    "description": line.description or False,
+                })
+                existing_names.add(line.name)
+            task.southbrook_job_template_id = template.id
+        return True
 
     def action_view_ecos(self):
         self.ensure_one()

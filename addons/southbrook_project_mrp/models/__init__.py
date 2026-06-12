@@ -1,5 +1,7 @@
+from . import data_quality_report
 from . import mrp_production
 from . import mrp_workorder
+from . import project_job_template
 from . import project_project
 from . import project_readiness_line
 from . import project_task

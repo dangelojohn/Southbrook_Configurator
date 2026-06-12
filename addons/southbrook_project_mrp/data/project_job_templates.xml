@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="job_template_full_kitchen" model="southbrook.project.job.template">
+        <field name="name">Full Kitchen</field>
+        <field name="sequence">10</field>
+        <field name="job_type">full_kitchen</field>
+        <field name="typical_cabinet_families">Base, Wall, Tall, Drawer, Sink Base, Corner, Accessory, Worktop</field>
+        <field name="required_specs">Door style, material/species, finish, hardware, drawer slide, hinge, final measurement notes, CAD package, cutlist reference.</field>
+        <field name="release_checklist">Final site measurements, CAD approved, cutlist approved, BoM verified, components available, WOs generated, WOs scheduled, crew reserved, equipment available, install due confirmed.</field>
+    </record>
+    <record id="job_template_full_kitchen_line_cad" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_full_kitchen"/>
+        <field name="sequence">10</field>
+        <field name="name">CAD / Cutlist Release</field>
+    </record>
+    <record id="job_template_full_kitchen_line_release" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_full_kitchen"/>
+        <field name="sequence">20</field>
+        <field name="name">Production Release Checklist</field>
+    </record>
+    <record id="job_template_full_kitchen_line_install" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_full_kitchen"/>
+        <field name="sequence">30</field>
+        <field name="name">Install Readiness</field>
+    </record>
+
+    <record id="job_template_vanity" model="southbrook.project.job.template">
+        <field name="name">Vanity</field>
+        <field name="sequence">20</field>
+        <field name="job_type">vanity</field>
+        <field name="typical_cabinet_families">Vanity, Drawer, Worktop</field>
+        <field name="required_specs">Door style, material/species, finish, hardware, drawer slide, hinge, worktop dependency.</field>
+        <field name="release_checklist">CAD approved, cutlist approved, BoM verified, components available, WOs scheduled, install due confirmed.</field>
+    </record>
+    <record id="job_template_vanity_line_cad" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_vanity"/>
+        <field name="sequence">10</field>
+        <field name="name">CAD / Cutlist Release</field>
+    </record>
+    <record id="job_template_vanity_line_release" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_vanity"/>
+        <field name="sequence">20</field>
+        <field name="name">Production Release Checklist</field>
+    </record>
+
+    <record id="job_template_pantry" model="southbrook.project.job.template">
+        <field name="name">Pantry</field>
+        <field name="sequence">30</field>
+        <field name="job_type">pantry</field>
+        <field name="typical_cabinet_families">Tall, Drawer, Accessory</field>
+        <field name="required_specs">Door style, material/species, finish, hardware, hinge, final measurement notes.</field>
+        <field name="release_checklist">Final site measurements, CAD approved, cutlist approved, BoM verified, components available, WOs scheduled.</field>
+    </record>
+    <record id="job_template_pantry_line_cad" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_pantry"/>
+        <field name="sequence">10</field>
+        <field name="name">CAD / Cutlist Release</field>
+    </record>
+    <record id="job_template_pantry_line_release" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_pantry"/>
+        <field name="sequence">20</field>
+        <field name="name">Production Release Checklist</field>
+    </record>
+
+    <record id="job_template_repair" model="southbrook.project.job.template">
+        <field name="name">Repair</field>
+        <field name="sequence">40</field>
+        <field name="job_type">repair</field>
+        <field name="typical_cabinet_families">Accessory, Other</field>
+        <field name="required_specs">Deficiency notes, material/species, finish, hardware.</field>
+        <field name="release_checklist">Scope confirmed, material available, work scheduled, crew reserved.</field>
+    </record>
+    <record id="job_template_repair_line_scope" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_repair"/>
+        <field name="sequence">10</field>
+        <field name="name">Repair Scope Confirmed</field>
+    </record>
+    <record id="job_template_repair_line_release" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_repair"/>
+        <field name="sequence">20</field>
+        <field name="name">Production Release Checklist</field>
+    </record>
+
+    <record id="job_template_warranty_remake" model="southbrook.project.job.template">
+        <field name="name">Warranty / Remake</field>
+        <field name="sequence">50</field>
+        <field name="job_type">warranty</field>
+        <field name="typical_cabinet_families">Base, Wall, Tall, Drawer, Accessory, Other</field>
+        <field name="required_specs">Original job reference, deficiency notes, material/species, finish, hardware, remake scope.</field>
+        <field name="release_checklist">Remake scope confirmed, CAD/cutlist approved if required, BoM verified, components available, WOs scheduled.</field>
+    </record>
+    <record id="job_template_warranty_line_scope" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_warranty_remake"/>
+        <field name="sequence">10</field>
+        <field name="name">Remake / Deficiency Scope</field>
+    </record>
+    <record id="job_template_warranty_line_release" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_warranty_remake"/>
+        <field name="sequence">20</field>
+        <field name="name">Production Release Checklist</field>
+    </record>
+
+    <record id="job_template_single_cabinet" model="southbrook.project.job.template">
+        <field name="name">Custom Single Cabinet</field>
+        <field name="sequence">60</field>
+        <field name="job_type">single_cabinet</field>
+        <field name="typical_cabinet_families">Base, Wall, Tall, Drawer, Sink Base, Corner, Accessory</field>
+        <field name="required_specs">Door style, material/species, finish, hardware, hinge, cutlist reference.</field>
+        <field name="release_checklist">CAD/cutlist approved, BoM verified, components available, WOs scheduled.</field>
+    </record>
+    <record id="job_template_single_cabinet_line_cad" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_single_cabinet"/>
+        <field name="sequence">10</field>
+        <field name="name">CAD / Cutlist Release</field>
+    </record>
+    <record id="job_template_single_cabinet_line_release" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_single_cabinet"/>
+        <field name="sequence">20</field>
+        <field name="name">Production Release Checklist</field>
+    </record>
+
+    <record id="job_template_worktop" model="southbrook.project.job.template">
+        <field name="name">Worktop</field>
+        <field name="sequence">70</field>
+        <field name="job_type">worktop</field>
+        <field name="typical_cabinet_families">Worktop</field>
+        <field name="required_specs">Material/species, finish, worktop dependency, final measurement notes, cutlist reference.</field>
+        <field name="release_checklist">Final measurement confirmed, cutlist approved, BoM verified, components available, WOs scheduled, install due confirmed.</field>
+    </record>
+    <record id="job_template_worktop_line_measure" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_worktop"/>
+        <field name="sequence">10</field>
+        <field name="name">Final Measurement Confirmed</field>
+    </record>
+    <record id="job_template_worktop_line_release" model="southbrook.project.job.template.line">
+        <field name="template_id" ref="job_template_worktop"/>
+        <field name="sequence">20</field>
+        <field name="name">Production Release Checklist</field>
+    </record>
+
+</odoo>

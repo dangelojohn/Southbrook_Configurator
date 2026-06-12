@@ -19,6 +19,7 @@ class SouthbrookProjectReadinessLine(models.Model):
         [
             ("data", "Data Completeness"),
             ("cabinet_specs", "Cabinet Specs"),
+            ("production_release", "Production Release Checklist"),
             ("mrp", "MRP Link"),
             ("engineering", "Engineering / CAD"),
             ("materials", "Materials / Purchasing"),

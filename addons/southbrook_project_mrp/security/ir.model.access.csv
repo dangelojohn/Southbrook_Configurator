@@ -1,3 +1,9 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_southbrook_project_readiness_line_user,southbrook.project.readiness.line user,model_southbrook_project_readiness_line,base.group_user,1,0,0,0
 access_southbrook_project_readiness_line_admin,southbrook.project.readiness.line admin,model_southbrook_project_readiness_line,base.group_system,1,1,1,1
+access_southbrook_project_job_template_user,southbrook.project.job.template user,model_southbrook_project_job_template,base.group_user,1,0,0,0
+access_southbrook_project_job_template_admin,southbrook.project.job.template admin,model_southbrook_project_job_template,base.group_system,1,1,1,1
+access_southbrook_project_job_template_line_user,southbrook.project.job.template.line user,model_southbrook_project_job_template_line,base.group_user,1,0,0,0
+access_southbrook_project_job_template_line_admin,southbrook.project.job.template.line admin,model_southbrook_project_job_template_line,base.group_system,1,1,1,1
+access_southbrook_project_data_quality_report_user,southbrook.project.data.quality.report user,model_southbrook_project_data_quality_report,base.group_user,1,1,1,1
+access_southbrook_project_data_quality_line_user,southbrook.project.data.quality.line user,model_southbrook_project_data_quality_line,base.group_user,1,1,1,1

@@ -48,6 +48,34 @@
                         invisible="maintenance_request_count == 0">
                     <field name="maintenance_request_count" widget="statinfo" string="Maint."/>
                 </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_view_southbrook_rework_workorders"
+                        icon="fa-repeat"
+                        invisible="southbrook_rework_workorder_count == 0">
+                    <field name="southbrook_rework_workorder_count"
+                           widget="statinfo" string="Rework WOs"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_view_southbrook_remake_tasks"
+                        icon="fa-life-ring"
+                        invisible="southbrook_remake_task_count == 0">
+                    <field name="southbrook_remake_task_count"
+                           widget="statinfo" string="Remakes"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_view_southbrook_scrap_records"
+                        icon="fa-trash"
+                        invisible="southbrook_scrap_count == 0">
+                    <field name="southbrook_scrap_count"
+                           widget="statinfo" string="Scrap"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_view_southbrook_unbuild_records"
+                        icon="fa-undo"
+                        invisible="southbrook_unbuild_count == 0">
+                    <field name="southbrook_unbuild_count"
+                           widget="statinfo" string="Unbuilds"/>
+                </button>
             </xpath>
 
             <!-- B3/B4/B5: risk / spec-change / stage-divergence banners -->
@@ -143,7 +171,14 @@
                     <group string="Cabinet Mix">
                         <field name="current_bottleneck_workcenter_id" readonly="1"/>
                         <field name="cabinet_family_summary" readonly="1"/>
+                        <field name="southbrook_cabinet_family_progress"
+                               readonly="1" nolabel="1"/>
                         <field name="job_type"/>
+                        <field name="southbrook_job_template_id"/>
+                        <button type="object"
+                                name="action_apply_southbrook_job_template"
+                                string="Apply Template"
+                                class="btn-secondary"/>
                     </group>
                 </group>
             </xpath>
@@ -226,6 +261,35 @@
                     </group>
                 </page>
 
+                <page name="southbrook_project_mrp_production_release"
+                      string="Production Release">
+                    <group>
+                        <group string="Release Decision">
+                            <field name="southbrook_production_release_state"
+                                   widget="badge"
+                                   decoration-success="southbrook_production_release_state == 'ready'"
+                                   decoration-warning="southbrook_production_release_state == 'review'"
+                                   decoration-danger="southbrook_production_release_state == 'blocked'"
+                                   decoration-info="southbrook_production_release_state == 'info'"
+                                   readonly="1"/>
+                            <field name="southbrook_production_release_reason"
+                                   readonly="1"/>
+                            <field name="job_install_due"/>
+                            <field name="components_available"/>
+                            <field name="workorder_count"/>
+                            <field name="unscheduled_workorder_count"/>
+                        </group>
+                        <group string="Manual Confirmations">
+                            <field name="southbrook_site_measurement_status"/>
+                            <field name="southbrook_release_cad_approved"/>
+                            <field name="southbrook_release_cutlist_approved"/>
+                            <field name="southbrook_release_bom_verified"/>
+                            <field name="southbrook_release_crew_reserved"/>
+                            <field name="southbrook_release_equipment_available"/>
+                        </group>
+                    </group>
+                </page>
+
                 <page name="southbrook_project_mrp_install_readiness"
                       string="Install Readiness">
                     <group>
@@ -258,6 +322,53 @@
                             <field name="southbrook_install_deficiency_notes"
                                    nolabel="1"/>
                         </group>
+                    </group>
+                </page>
+
+                <page name="southbrook_project_mrp_quality_rework"
+                      string="Quality / Rework">
+                    <group>
+                        <group string="Summary">
+                            <field name="southbrook_quality_issue_summary"
+                                   readonly="1" nolabel="1"/>
+                            <field name="southbrook_remake_task_count" readonly="1"/>
+                            <field name="southbrook_rework_workorder_count"
+                                   readonly="1"/>
+                            <field name="southbrook_scrap_count" readonly="1"/>
+                            <field name="southbrook_unbuild_count" readonly="1"/>
+                        </group>
+                        <group string="Actions">
+                            <button type="object"
+                                    name="action_view_southbrook_remake_tasks"
+                                    string="Open Warranty / Remake Tasks"
+                                    class="btn-secondary"/>
+                            <button type="object"
+                                    name="action_view_southbrook_rework_workorders"
+                                    string="Open Rework Work Orders"
+                                    class="btn-secondary"/>
+                            <button type="object"
+                                    name="action_view_southbrook_scrap_records"
+                                    string="Open Scrap Records"
+                                    class="btn-secondary"/>
+                            <button type="object"
+                                    name="action_view_southbrook_unbuild_records"
+                                    string="Open Unbuild / Remake Records"
+                                    class="btn-secondary"/>
+                        </group>
+                    </group>
+                    <group string="Deficiency / Punch Notes">
+                        <field name="southbrook_install_deficiency_notes"
+                               nolabel="1"/>
+                    </group>
+                    <group>
+                        <field name="southbrook_remake_task_ids" readonly="1">
+                            <list create="false" edit="false">
+                                <field name="name"/>
+                                <field name="stage_id"/>
+                                <field name="user_ids"/>
+                                <field name="date_deadline"/>
+                            </list>
+                        </field>
                     </group>
                 </page>
 
@@ -507,6 +618,13 @@
                     <field name="southbrook_ready_job_count"
                            widget="statinfo" string="Ready"/>
                 </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_data_quality_dry_run"
+                        icon="fa-search">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Data QA</span>
+                    </div>
+                </button>
             </xpath>
         </field>
     </record>
@@ -554,6 +672,12 @@
                        widget="boolean_toggle" optional="hide"/>
                 <field name="southbrook_specs_complete"
                        widget="boolean_toggle" optional="hide"/>
+                <field name="southbrook_production_release_state"
+                       widget="badge"
+                       decoration-success="southbrook_production_release_state == 'ready'"
+                       decoration-warning="southbrook_production_release_state == 'review'"
+                       decoration-danger="southbrook_production_release_state == 'blocked'"
+                       optional="show"/>
                 <field name="southbrook_door_style" optional="hide"/>
                 <field name="southbrook_finish" optional="hide"/>
                 <field name="southbrook_install_readiness_state"
@@ -569,6 +693,7 @@
                 <field name="unscheduled_wo_count" optional="hide"/>
                 <field name="current_bottleneck_workcenter_id" optional="hide"/>
                 <field name="cabinet_family_summary" optional="hide"/>
+                <field name="southbrook_cabinet_family_progress" optional="hide"/>
             </xpath>
         </field>
     </record>
@@ -623,6 +748,9 @@
                 <filter name="missing_cabinet_specs"
                         string="Missing Cabinet Specs"
                         domain="[('southbrook_specs_complete', '=', False)]"/>
+                <filter name="production_release_blocked"
+                        string="Production Release Blocked"
+                        domain="[('southbrook_production_release_state', '=', 'blocked')]"/>
                 <separator/>
             </xpath>
             <xpath expr="//group" position="inside">
@@ -647,6 +775,9 @@
                 <filter name="group_install_readiness"
                         string="Install Readiness"
                         context="{'group_by': 'southbrook_install_readiness_state'}"/>
+                <filter name="group_production_release"
+                        string="Production Release"
+                        context="{'group_by': 'southbrook_production_release_state'}"/>
             </xpath>
         </field>
     </record>

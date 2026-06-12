@@ -885,3 +885,183 @@ class TestProjectMrpIntegration(TransactionCase):
         ):
             self.assertIn(token, form_view.arch_db)
         self.assertIn("install_readiness_review", search_view.arch_db)
+
+    def test_phase5_production_release_checklist_blocks_incomplete_jobs(self):
+        task = self.env["project.task"].create({
+            "name": "Release Checklist Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        task.action_recompute_readiness_lines()
+
+        self.assertEqual(task.southbrook_production_release_state, "blocked")
+        self.assertIn(
+            "CAD approved", task.southbrook_production_release_reason)
+        self.assertIn(
+            "BoM verified", task.southbrook_production_release_reason)
+        release_line = task.readiness_line_ids.filtered(
+            lambda line: line.check_key == "production_release")
+        self.assertEqual(len(release_line), 1)
+        self.assertEqual(release_line.status, "blocked")
+        self.assertIn("Schedule work orders", release_line.reason)
+
+    def test_phase5_production_release_checklist_is_on_command_center_views(self):
+        form_view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        search_view = self.env.ref(
+            "southbrook_project_mrp.project_task_search_readiness")
+
+        for token in (
+            "southbrook_project_mrp_production_release",
+            "southbrook_production_release_state",
+            "southbrook_release_cad_approved",
+            "southbrook_release_cutlist_approved",
+            "southbrook_release_bom_verified",
+            "southbrook_release_crew_reserved",
+            "southbrook_release_equipment_available",
+        ):
+            self.assertIn(token, form_view.arch_db)
+        self.assertIn("production_release_blocked", search_view.arch_db)
+
+    def test_phase5_cabinet_family_progress_summarizes_mo_and_wo_state(self):
+        task = self.env["project.task"].create({
+            "name": "Family Progress Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        task.invalidate_recordset()
+
+        self.assertIn("Base", task.southbrook_cabinet_family_progress)
+        self.assertIn("MOs 1", task.southbrook_cabinet_family_progress)
+        self.assertIn("WOs 0/1 complete", task.southbrook_cabinet_family_progress)
+        self.assertIn("Panel Saw", task.southbrook_cabinet_family_progress)
+        self.assertIn("Schedule work orders", task.southbrook_cabinet_family_progress)
+
+    def test_phase5_cabinet_family_progress_is_on_command_center_views(self):
+        form_view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        list_view = self.env.ref("southbrook_project_mrp.project_task_list_readiness")
+
+        self.assertIn("southbrook_cabinet_family_progress", form_view.arch_db)
+        self.assertIn("southbrook_cabinet_family_progress", list_view.arch_db)
+
+    def test_phase5_job_template_creates_cabinet_specific_subtasks(self):
+        template = self.env.ref(
+            "southbrook_project_mrp.job_template_full_kitchen")
+        task = self.env["project.task"].create({
+            "name": "Template Job",
+            "project_id": self.project.id,
+            "job_type": "full_kitchen",
+            "southbrook_job_template_id": template.id,
+        })
+
+        task.action_apply_southbrook_job_template()
+        child_names = set(task.child_ids.mapped("name"))
+
+        self.assertIn("CAD / Cutlist Release", child_names)
+        self.assertIn("Production Release Checklist", child_names)
+        self.assertIn("Install Readiness", child_names)
+
+        task.action_apply_southbrook_job_template()
+        self.assertEqual(
+            len(task.child_ids.filtered(
+                lambda child: child.name == "CAD / Cutlist Release")),
+            1,
+        )
+
+    def test_phase5_job_templates_are_loaded_and_visible_on_task_form(self):
+        for xml_id in (
+            "job_template_full_kitchen",
+            "job_template_vanity",
+            "job_template_pantry",
+            "job_template_repair",
+            "job_template_warranty_remake",
+            "job_template_single_cabinet",
+            "job_template_worktop",
+        ):
+            self.assertTrue(self.env.ref("southbrook_project_mrp.%s" % xml_id))
+
+        form_view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        self.assertIn("southbrook_job_template_id", form_view.arch_db)
+        self.assertIn("action_apply_southbrook_job_template", form_view.arch_db)
+
+    def test_phase5_quality_summary_surfaces_deficiency_and_remake_tasks(self):
+        task = self.env["project.task"].create({
+            "name": "Quality Visibility Job",
+            "project_id": self.project.id,
+            "southbrook_install_deficiency_notes": "Replace damaged drawer front.",
+        })
+        self.env["project.task"].create({
+            "name": "Remake drawer front",
+            "project_id": self.project.id,
+            "parent_id": task.id,
+            "job_type": "warranty",
+        })
+
+        task.invalidate_recordset()
+
+        self.assertEqual(task.southbrook_remake_task_count, 1)
+        self.assertIn("Deficiency notes", task.southbrook_quality_issue_summary)
+        self.assertIn("1 warranty/remake task", task.southbrook_quality_issue_summary)
+
+        action = task.action_view_southbrook_remake_tasks()
+        self.assertEqual(action["res_model"], "project.task")
+        self.assertEqual(action["domain"], [("id", "in", task.child_ids.ids)])
+
+    def test_phase5_quality_and_remake_visibility_is_on_command_center_views(self):
+        form_view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+
+        for token in (
+            "southbrook_project_mrp_quality_rework",
+            "southbrook_quality_issue_summary",
+            "southbrook_remake_task_count",
+            "action_view_southbrook_remake_tasks",
+            "action_view_southbrook_rework_workorders",
+            "action_view_southbrook_scrap_records",
+            "action_view_southbrook_unbuild_records",
+        ):
+            self.assertIn(token, form_view.arch_db)
+
+    def test_phase6_data_quality_dry_run_reports_missing_install_and_zero_cost(self):
+        task = self.env["project.task"].create({
+            "name": "Cleanup Pilot Job",
+            "project_id": self.project.id,
+        })
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+
+        action = self.project.action_southbrook_data_quality_dry_run()
+        report = self.env["southbrook.project.data.quality.report"].browse(
+            action["res_id"])
+        issue_keys = set(report.line_ids.mapped("issue_key"))
+
+        self.assertIn("missing_install_due", issue_keys)
+        self.assertIn("placeholder_estimated_cost", issue_keys)
+        self.assertIn("Dry run", report.summary)
+        self.assertEqual(action["res_model"], "southbrook.project.data.quality.report")
+
+    def test_phase6_data_quality_report_views_are_available(self):
+        project_form = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+        report_form = self.env.ref(
+            "southbrook_project_mrp.data_quality_report_form")
+
+        self.assertIn("action_southbrook_data_quality_dry_run", project_form.arch_db)
+        self.assertIn("line_ids", report_form.arch_db)
+        self.assertIn("recommended_action", report_form.arch_db)
