@@ -313,6 +313,13 @@
                            widget="statinfo" string="Blocked"/>
                 </button>
                 <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_unscheduled_manufacturing_jobs"
+                        icon="fa-calendar"
+                        invisible="southbrook_unscheduled_job_count == 0">
+                    <field name="southbrook_unscheduled_job_count"
+                           widget="statinfo" string="Schedule"/>
+                </button>
+                <button class="oe_stat_button" type="object"
                         name="action_southbrook_open_review_manufacturing_jobs"
                         icon="fa-exclamation-triangle"
                         invisible="southbrook_review_job_count == 0">

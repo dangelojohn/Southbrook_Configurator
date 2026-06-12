@@ -153,7 +153,6 @@ class TestProjectMrpIntegration(TransactionCase):
             {"name": "WO Schedule Job", "project_id": self.project.id})
         wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
         mo = self._make_mo()
-        mo.action_confirm()
         mo.project_task_id = task.id
         wo = self.env["mrp.workorder"].create({
             "name": "Cut panels",
@@ -221,6 +220,7 @@ class TestProjectMrpIntegration(TransactionCase):
         })
         wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
         mo = self._make_mo()
+        mo.action_confirm()
         mo.project_task_id = task.id
         self.env["mrp.workorder"].create({
             "name": "Cut panels",
@@ -420,3 +420,31 @@ class TestProjectMrpIntegration(TransactionCase):
             "southbrook_project_mrp.project_project_form_readiness_actions")
         self.assertIn("action_southbrook_open_blocked_manufacturing_jobs", view.arch_db)
         self.assertIn("southbrook_blocked_job_count", view.arch_db)
+
+    def test_project_form_has_scheduling_queue_action(self):
+        task = self.env["project.task"].create({
+            "name": "Scheduling Queue Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        self.project.invalidate_recordset()
+        self.assertEqual(self.project.southbrook_unscheduled_job_count, 1)
+
+        action = self.project.action_southbrook_open_unscheduled_manufacturing_jobs()
+
+        self.assertEqual(action["res_model"], "project.task")
+        self.assertEqual(action["domain"], [("id", "in", [task.id])])
+        view = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+        self.assertIn(
+            "action_southbrook_open_unscheduled_manufacturing_jobs", view.arch_db)
+        self.assertIn("southbrook_unscheduled_job_count", view.arch_db)

@@ -21,6 +21,8 @@ class ProjectProject(models.Model):
         string="Material Risk", compute="_compute_southbrook_mission_control")
     southbrook_unscheduled_wo_count = fields.Integer(
         string="Unscheduled WOs", compute="_compute_southbrook_mission_control")
+    southbrook_unscheduled_job_count = fields.Integer(
+        string="Unscheduled Jobs", compute="_compute_southbrook_mission_control")
     southbrook_crew_gap_count = fields.Integer(
         string="Crew Gaps", compute="_compute_southbrook_mission_control")
     southbrook_equipment_blocked_count = fields.Integer(
@@ -77,6 +79,8 @@ class ProjectProject(models.Model):
             project.southbrook_material_risk_count = len(tasks.filtered("material_at_risk"))
             project.southbrook_unscheduled_wo_count = sum(
                 tasks.mapped("unscheduled_workorder_count"))
+            project.southbrook_unscheduled_job_count = len(tasks.filtered(
+                lambda task: task.unscheduled_workorder_count > 0))
             project.southbrook_crew_gap_count = len(tasks.filtered("crew_gap"))
             project.southbrook_equipment_blocked_count = len(tasks.filtered("equipment_blocked"))
             project.southbrook_over_capacity_count = len(tasks.filtered("workcenter_over_capacity"))
@@ -152,3 +156,21 @@ class ProjectProject(models.Model):
     def action_southbrook_open_ready_manufacturing_jobs(self):
         return self._southbrook_readiness_action(
             "ready", "Ready Manufacturing Jobs")
+
+    def action_southbrook_open_unscheduled_manufacturing_jobs(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search(
+            [("project_id", "=", self.id)]).filtered(
+                lambda task: task.production_count > 0
+                and task.unscheduled_workorder_count > 0)
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Scheduling Queue - %s" % self.display_name,
+            "res_model": "project.task",
+            "domain": [("id", "in", tasks.ids)],
+            "view_mode": "list,form,kanban",
+            "context": {
+                "create": False,
+                "search_default_manufacturing_blocked": 1,
+            },
+        }
