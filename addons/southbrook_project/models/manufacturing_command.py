@@ -221,15 +221,33 @@ class ProjectTask(models.Model):
         self.ensure_one()
         return self.x_southbrook_sale_order_id.sudo()
 
+    def _southbrook_related_company(self, sale=False):
+        self.ensure_one()
+        company = False
+        if sale and "company_id" in sale._fields:
+            company = sale.company_id
+        if not company and "company_id" in self._fields:
+            company = self.company_id
+        if (
+            not company
+            and self.project_id
+            and "company_id" in self.project_id._fields
+        ):
+            company = self.project_id.company_id
+        return company or self.env.company
+
     def _southbrook_related_productions(self):
         self.ensure_one()
         sale = self._southbrook_related_sale_order()
-        domain = []
+        Production = self.env["mrp.production"].sudo()
         if sale:
             domain = [("origin", "=", sale.name)]
         else:
             domain = [("origin", "=", self.name)]
-        return self.env["mrp.production"].sudo().search(domain)
+        company = self._southbrook_related_company(sale)
+        if company and "company_id" in Production._fields:
+            domain.append(("company_id", "=", company.id))
+        return Production.search(domain)
 
     def _southbrook_related_packages(self, productions=False):
         productions = productions or self._southbrook_related_productions()
@@ -255,8 +273,12 @@ class ProjectTask(models.Model):
         if not domains:
             return Check
         if len(domains) == 1:
-            return Check.search([domains[0]])
-        return Check.search(["|", domains[0], domains[1]])
+            checks = Check.search([domains[0]])
+        else:
+            checks = Check.search(["|", domains[0], domains[1]])
+        if "is_gate" in Check._fields:
+            checks = checks.filtered(lambda check: check.is_gate)
+        return checks
 
     def _southbrook_gate_from_checks(self, gate, checks, fallback_ready):
         blockers = checks.filtered(lambda check: check.severity == "blocker")
@@ -327,10 +349,25 @@ class ProjectTask(models.Model):
                 blocking=True,
             )
         else:
+            packaged_production_ids = set(packages.mapped("mo_id").ids)
+            missing_package_productions = productions.filtered(
+                lambda production: production.id not in packaged_production_ids
+            )
+            if missing_package_productions:
+                gates["bom_cutlist"] = self._southbrook_default_gate(
+                    "bom_cutlist",
+                    state="blocked",
+                    message=_(
+                        "No production package is linked to one or more "
+                        "manufacturing orders."
+                    ),
+                    action=_("Create or recompute the production package and cutlist."),
+                    blocking=True,
+                )
             package_blockers = packages.filtered(
                 lambda package: package.x_mi_status == "blocked"
             )
-            if package_blockers:
+            if not missing_package_productions and package_blockers:
                 first = package_blockers[0]
                 gates["bom_cutlist"] = self._southbrook_default_gate(
                     "bom_cutlist",

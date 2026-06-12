@@ -224,19 +224,21 @@ class TestMrpCommandCenter(TransactionCase):
                 {"gate", "label", "state", "message", "action", "blocking"},
             )
 
-    def _new_mo_for_task(self, task):
+    def _new_mo_for_task(self, task, **vals):
         product = self.env["product.product"].create({
             "name": "MRP Command Cabinet",
             "type": "consu",
             "is_storable": True,
         })
-        mo = self.env["mrp.production"].create({
+        mo_vals = {
             "product_id": product.id,
             "product_uom_id": product.uom_id.id,
             "product_qty": 1.0,
             "origin": task.x_southbrook_sale_order_id.name
             if task.x_southbrook_sale_order_id else task.name,
-        })
+        }
+        mo_vals.update(vals)
+        mo = self.env["mrp.production"].create(mo_vals)
         return mo
 
     def _new_sale_order_task(self):
@@ -268,6 +270,53 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertEqual(blocked_gate, "bom_cutlist")
         self.assertIn("production package", summary.lower())
         self.assertIn("production package", next_action.lower())
+
+    def test_partial_packages_block_bom_cutlist_gate(self):
+        task, sale = self._new_sale_order_task()
+        packaged_mo = self._new_mo_for_task(task)
+        unpackaged_mo = self._new_mo_for_task(task)
+        self._new_package_for_mo(packaged_mo)
+
+        gates = task._southbrook_collect_readiness_gates()
+
+        self.assertEqual(gates["bom_cutlist"]["state"], "blocked")
+        self.assertTrue(gates["bom_cutlist"]["blocking"])
+        self.assertIn(
+            "production package",
+            gates["bom_cutlist"]["message"].lower(),
+        )
+        score, state, blocked_gate, summary, next_action = (
+            task._southbrook_score_from_gates(gates)
+        )
+        self.assertLessEqual(score, 69)
+        self.assertEqual(state, "blocked")
+        self.assertEqual(blocked_gate, "bom_cutlist")
+        self.assertIn("production package", summary.lower())
+        self.assertIn("production package", next_action.lower())
+        self.assertIn(unpackaged_mo, task._southbrook_related_productions())
+
+    def test_related_productions_are_scoped_to_sale_company(self):
+        task, sale = self._new_sale_order_task()
+        production_model = self.env["mrp.production"]
+        if "company_id" not in production_model._fields:
+            self.skipTest("mrp.production has no company_id field")
+
+        sale_company_mo = self._new_mo_for_task(
+            task,
+            company_id=sale.company_id.id,
+        )
+        other_company = self.env["res.company"].create({
+            "name": "MRP Command Other Company",
+        })
+        other_company_mo = self._new_mo_for_task(
+            task,
+            company_id=other_company.id,
+        )
+
+        productions = task._southbrook_related_productions()
+
+        self.assertIn(sale_company_mo, productions)
+        self.assertNotIn(other_company_mo, productions)
 
     def test_tool_readiness_blocker_blocks_tooling_gate(self):
         task, sale = self._new_sale_order_task()
