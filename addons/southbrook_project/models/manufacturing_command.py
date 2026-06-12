@@ -2,7 +2,6 @@
 import json
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
 
 
 READINESS_STATES = [
@@ -18,6 +17,7 @@ GATE_STATES = [
     ("blocked", "Blocked"),
     ("waived", "Waived"),
 ]
+GATE_STATE_KEYS = {key for key, _label in GATE_STATES}
 
 GATE_SEQUENCE = [
     "estimate",
@@ -130,12 +130,40 @@ class ProjectTask(models.Model):
         }
 
     def _southbrook_gate_rows(self, gates):
+        gates = gates or {}
         rows = []
         for gate in GATE_SEQUENCE:
-            value = dict(gates.get(gate) or self._southbrook_default_gate(gate))
-            value.setdefault("gate", gate)
-            value.setdefault("label", GATE_LABELS[gate])
-            rows.append(value)
+            explicit = gate in gates
+            value = self._southbrook_default_gate(gate)
+            value.update(dict(gates.get(gate) or {}))
+            value["gate"] = gate
+            value["label"] = GATE_LABELS[gate]
+            if explicit and not value.get("state"):
+                value["state"] = "not_started"
+            elif not value.get("state"):
+                value["state"] = "ready"
+            if value["state"] not in GATE_STATE_KEYS:
+                state = value["state"]
+                message = _("Unknown gate state '%s' for %s.") % (
+                    state,
+                    GATE_LABELS[gate],
+                )
+                value["state"] = "warning"
+                value["message"] = message
+                value["action"] = value.get("action") or message
+            value["message"] = (
+                value.get("message") or _("%s ready.") % GATE_LABELS[gate]
+            )
+            value["action"] = value.get("action") or False
+            value["blocking"] = bool(value.get("blocking"))
+            rows.append({
+                "gate": value["gate"],
+                "label": value["label"],
+                "state": value["state"],
+                "message": value["message"],
+                "action": value["action"],
+                "blocking": value["blocking"],
+            })
         return rows
 
     def _southbrook_score_from_gates(self, gates):
@@ -143,7 +171,7 @@ class ProjectTask(models.Model):
         total_weight = sum(GATE_WEIGHTS.values())
         earned = 0
         blockers = []
-        warnings = []
+        risks = []
         for row in rows:
             gate = row["gate"]
             state = row.get("state") or "not_started"
@@ -152,9 +180,11 @@ class ProjectTask(models.Model):
                 earned += weight
             elif state == "warning":
                 earned += int(weight * 0.5)
-                warnings.append(row)
+                risks.append(row)
             elif state == "blocked":
                 blockers.append(row)
+            else:
+                risks.append(row)
         score = int(round((earned / float(total_weight)) * 100.0))
         if blockers:
             score = min(score, 69)
@@ -170,12 +200,12 @@ class ProjectTask(models.Model):
                 summary,
                 first.get("action") or first.get("message") or False,
             )
-        if warnings:
+        if risks:
             score = min(score, 89)
-            first = warnings[0]
+            first = risks[0]
             summary = "; ".join(
                 (row.get("message") or GATE_LABELS[row["gate"]])
-                for row in warnings[:3]
+                for row in risks[:3]
             )
             return (
                 score,
