@@ -835,3 +835,53 @@ class TestProjectMrpIntegration(TransactionCase):
         ):
             self.assertIn(token, form_view.arch_db)
         self.assertIn("missing_cabinet_specs", search_view.arch_db)
+
+    def test_phase5_install_readiness_checklist_explains_missing_data(self):
+        task = self.env["project.task"].create({
+            "name": "Install Readiness Job",
+            "project_id": self.project.id,
+        })
+
+        task.invalidate_recordset()
+        task.action_recompute_readiness_lines()
+
+        self.assertEqual(task.southbrook_install_readiness_state, "review")
+        self.assertIn("Install due date", task.southbrook_install_readiness_reason)
+        install_line = task.readiness_line_ids.filtered(
+            lambda line: line.check_key == "install")
+        self.assertEqual(len(install_line), 1)
+        self.assertEqual(install_line.status, "review")
+        self.assertIn("Install due date", install_line.reason)
+        self.assertIn("Confirm install readiness", install_line.recommended_action)
+
+        task.write({
+            "southbrook_site_measurement_status": "received",
+            "southbrook_delivery_address": "123 Job Site Road",
+            "southbrook_install_contact": "Site Contact 555-0100",
+            "southbrook_pack_label_complete": True,
+            "southbrook_qc_complete": True,
+            "southbrook_delivery_staged": True,
+        })
+        task.invalidate_recordset()
+
+        if task.job_install_due:
+            self.assertEqual(task.southbrook_install_readiness_state, "ready")
+        else:
+            self.assertEqual(task.southbrook_install_readiness_state, "review")
+            self.assertIn("Install due date", task.southbrook_install_readiness_reason)
+
+    def test_phase5_install_readiness_is_on_command_center_views(self):
+        form_view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        search_view = self.env.ref(
+            "southbrook_project_mrp.project_task_search_readiness")
+
+        for token in (
+            "southbrook_project_mrp_install_readiness",
+            "southbrook_install_readiness_state",
+            "southbrook_site_measurement_status",
+            "southbrook_pack_label_complete",
+            "southbrook_qc_complete",
+            "southbrook_delivery_staged",
+        ):
+            self.assertIn(token, form_view.arch_db)
+        self.assertIn("install_readiness_review", search_view.arch_db)

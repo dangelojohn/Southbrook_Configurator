@@ -300,6 +300,47 @@ class ProjectTask(models.Model):
         search="_search_install_date_missing",
         readonly=True,
     )
+    southbrook_site_measurement_status = fields.Selection(
+        [
+            ("pending", "Pending"),
+            ("received", "Received"),
+            ("waived", "Waived"),
+        ],
+        string="Site Measurement",
+        default="pending",
+        tracking=True,
+    )
+    southbrook_delivery_address = fields.Char(
+        string="Delivery Address")
+    southbrook_install_contact = fields.Char(
+        string="Install Contact")
+    southbrook_site_access_notes = fields.Text(
+        string="Site Access Notes")
+    southbrook_install_deficiency_notes = fields.Text(
+        string="Install Deficiency / Punch Notes")
+    southbrook_pack_label_complete = fields.Boolean(
+        string="Pack / Label Complete", tracking=True)
+    southbrook_qc_complete = fields.Boolean(
+        string="QC Complete", tracking=True)
+    southbrook_delivery_staged = fields.Boolean(
+        string="Delivery Staged", tracking=True)
+    southbrook_install_readiness_state = fields.Selection(
+        [
+            ("ready", "Ready"),
+            ("review", "Review"),
+            ("blocked", "Blocked"),
+            ("info", "Info"),
+        ],
+        string="Install Readiness",
+        compute="_compute_southbrook_install_readiness",
+        search="_search_southbrook_install_readiness_state",
+        readonly=True,
+    )
+    southbrook_install_readiness_reason = fields.Char(
+        string="Install Readiness Reason",
+        compute="_compute_southbrook_install_readiness",
+        readonly=True,
+    )
     pm_stage_mismatch = fields.Boolean(
         string="PM Stage Mismatch",
         compute="_compute_phase3_queue_flags",
@@ -618,6 +659,8 @@ class ProjectTask(models.Model):
         "source_order_id",
         "customer_id",
         "southbrook_specs_complete",
+        "southbrook_install_readiness_state",
+        "southbrook_install_readiness_reason",
     )
     def _compute_phase1_operational_context(self):
         for task in self:
@@ -737,8 +780,8 @@ class ProjectTask(models.Model):
             return "Resolve equipment/tooling maintenance blockers before release."
         if self.workcenter_over_capacity:
             return "Review overloaded work-center capacity before committing the schedule."
-        if not self.job_install_due:
-            return "Confirm install date and site readiness."
+        if self.southbrook_install_readiness_state != "ready":
+            return "Confirm install readiness before delivery."
         if self.stage_mo_divergence:
             return "Review the PM phase against the actual manufacturing state."
         return "Release or advance the job."
@@ -970,22 +1013,24 @@ class ProjectTask(models.Model):
                 "No action required.",
             )
 
-        if not self.job_install_due:
+        install_state = self.southbrook_install_readiness_state or "info"
+        if install_state != "ready":
             line(
                 "install",
                 "Delivery / Install",
-                "info",
-                "No install due date surfaced.",
-                self.source_order_name or self.name or "",
-                "Confirm install date and site readiness.",
+                install_state,
+                self.southbrook_install_readiness_reason
+                or "Install readiness needs review.",
+                self._southbrook_install_readiness_evidence(),
+                "Confirm install readiness before delivery.",
             )
         else:
             line(
                 "install",
                 "Delivery / Install",
                 "ready",
-                "Install due date is known.",
-                str(self.job_install_due),
+                "Install readiness checklist is complete.",
+                self._southbrook_install_readiness_evidence(),
                 "No action required.",
             )
 
@@ -1049,6 +1094,66 @@ class ProjectTask(models.Model):
             task.southbrook_specs_complete = not bool(
                 task._southbrook_missing_cabinet_specs())
 
+    def _southbrook_missing_install_items(self):
+        self.ensure_one()
+        missing = []
+        if not self.job_install_due:
+            missing.append("Install due date")
+        if self.southbrook_site_measurement_status not in ("received", "waived"):
+            missing.append("Site measurement")
+        if not self.southbrook_delivery_address:
+            missing.append("Delivery address")
+        if not self.southbrook_install_contact:
+            missing.append("Install contact")
+        if not self.southbrook_pack_label_complete:
+            missing.append("Pack/label complete")
+        if not self.southbrook_qc_complete:
+            missing.append("QC complete")
+        if not self.southbrook_delivery_staged:
+            missing.append("Delivery staged")
+        return missing
+
+    def _southbrook_install_readiness_evidence(self):
+        self.ensure_one()
+        return "\n".join(
+            part for part in (
+                "Install due: %s" % (self.job_install_due or "missing"),
+                "Site measurement: %s"
+                % (self.southbrook_site_measurement_status or "pending"),
+                "Delivery address: %s"
+                % (self.southbrook_delivery_address or "missing"),
+                "Install contact: %s"
+                % (self.southbrook_install_contact or "missing"),
+                "Pack/label: %s"
+                % ("complete" if self.southbrook_pack_label_complete else "missing"),
+                "QC: %s" % ("complete" if self.southbrook_qc_complete else "missing"),
+                "Delivery staged: %s"
+                % ("yes" if self.southbrook_delivery_staged else "no"),
+            )
+            if part
+        )
+
+    @api.depends(
+        "job_install_due",
+        "southbrook_site_measurement_status",
+        "southbrook_delivery_address",
+        "southbrook_install_contact",
+        "southbrook_pack_label_complete",
+        "southbrook_qc_complete",
+        "southbrook_delivery_staged",
+    )
+    def _compute_southbrook_install_readiness(self):
+        for task in self:
+            missing = task._southbrook_missing_install_items()
+            if missing:
+                task.southbrook_install_readiness_state = "review"
+                task.southbrook_install_readiness_reason = (
+                    "Missing %s." % ", ".join(missing))
+            else:
+                task.southbrook_install_readiness_state = "ready"
+                task.southbrook_install_readiness_reason = (
+                    "Install readiness checklist is complete.")
+
     @api.depends(
         "production_count",
         "job_cad_status",
@@ -1068,6 +1173,7 @@ class ProjectTask(models.Model):
         "x_southbrook_hardware_specs",
         "southbrook_door_style",
         "southbrook_finish",
+        "southbrook_install_readiness_state",
     )
     def _compute_readiness_line_count(self):
         for task in self:
@@ -1134,6 +1240,21 @@ class ProjectTask(models.Model):
     def _search_southbrook_specs_complete(self, operator, value):
         return self._search_boolean_compute(
             "southbrook_specs_complete", operator, value)
+
+    def _search_selection_compute(self, field_name, operator, value):
+        if operator not in ("=", "!=", "in", "not in"):
+            return [("id", "=", 0)]
+        values = value if operator in ("in", "not in") else [value]
+        values = set(values)
+        tasks = self.with_context(active_test=False).search([]).filtered(
+            lambda task: task[field_name] in values)
+        if operator in ("=", "in"):
+            return [("id", "in", tasks.ids)]
+        return [("id", "not in", tasks.ids)]
+
+    def _search_southbrook_install_readiness_state(self, operator, value):
+        return self._search_selection_compute(
+            "southbrook_install_readiness_state", operator, value)
 
     def _search_job_at_risk(self, operator, value):
         return self._search_boolean_compute("job_at_risk", operator, value)
@@ -1239,6 +1360,8 @@ class ProjectTask(models.Model):
         "customer_id",
         "source_order_id",
         "southbrook_specs_complete",
+        "southbrook_install_readiness_state",
+        "southbrook_install_readiness_reason",
     )
     def _compute_manufacturing_readiness(self):
         for task in self:
@@ -1342,12 +1465,20 @@ class ProjectTask(models.Model):
             else:
                 gate("Production Capacity", "READY", "no capacity/risk flag")
 
-            if not task.job_install_due:
-                gate("Delivery / Install", "INFO", "no install due date surfaced")
-                infos.append(
-                    "Delivery / Install: confirm install date and site readiness")
+            if task.southbrook_install_readiness_state != "ready":
+                gate(
+                    "Delivery / Install",
+                    "REVIEW",
+                    task.southbrook_install_readiness_reason
+                    or "install readiness needs review",
+                )
+                warnings.append(
+                    "Delivery / Install: confirm install readiness")
             else:
-                gate("Delivery / Install", "READY", "install due %s" % task.job_install_due)
+                gate(
+                    "Delivery / Install",
+                    "READY",
+                    "install readiness checklist complete")
 
             if not task.manufacturing_calculation_count:
                 gate(

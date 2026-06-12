@@ -226,6 +226,41 @@
                     </group>
                 </page>
 
+                <page name="southbrook_project_mrp_install_readiness"
+                      string="Install Readiness">
+                    <group>
+                        <group string="Checklist">
+                            <field name="southbrook_install_readiness_state"
+                                   widget="badge"
+                                   decoration-success="southbrook_install_readiness_state == 'ready'"
+                                   decoration-warning="southbrook_install_readiness_state == 'review'"
+                                   decoration-danger="southbrook_install_readiness_state == 'blocked'"
+                                   decoration-info="southbrook_install_readiness_state == 'info'"
+                                   readonly="1"/>
+                            <field name="southbrook_install_readiness_reason"
+                                   readonly="1"/>
+                            <field name="job_install_due"/>
+                            <field name="southbrook_site_measurement_status"/>
+                        </group>
+                        <group string="Site">
+                            <field name="southbrook_delivery_address"/>
+                            <field name="southbrook_install_contact"/>
+                            <field name="southbrook_site_access_notes"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Shop Release">
+                            <field name="southbrook_pack_label_complete"/>
+                            <field name="southbrook_qc_complete"/>
+                            <field name="southbrook_delivery_staged"/>
+                        </group>
+                        <group string="Deficiencies">
+                            <field name="southbrook_install_deficiency_notes"
+                                   nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+
                 <page name="manufacturing" string="Manufacturing"
                       groups="mrp.group_mrp_user">
                     <field name="x_southbrook_sale_order_id" invisible="1"/>
@@ -521,6 +556,12 @@
                        widget="boolean_toggle" optional="hide"/>
                 <field name="southbrook_door_style" optional="hide"/>
                 <field name="southbrook_finish" optional="hide"/>
+                <field name="southbrook_install_readiness_state"
+                       widget="badge"
+                       decoration-success="southbrook_install_readiness_state == 'ready'"
+                       decoration-warning="southbrook_install_readiness_state == 'review'"
+                       decoration-danger="southbrook_install_readiness_state == 'blocked'"
+                       optional="hide"/>
                 <field name="linked_mo_count" optional="show"/>
                 <field name="linked_wo_count" optional="show"/>
                 <field name="unscheduled_workorder_count"
@@ -570,6 +611,9 @@
                 <filter name="install_date_missing"
                         string="Install Date Missing"
                         domain="[('install_date_missing', '=', True)]"/>
+                <filter name="install_readiness_review"
+                        string="Install Readiness Review"
+                        domain="[('southbrook_install_readiness_state', '!=', 'ready')]"/>
                 <filter name="late_at_risk"
                         string="Late / At Risk"
                         domain="[('job_at_risk', '=', True)]"/>
@@ -600,6 +644,9 @@
                 <filter name="group_finish"
                         string="Finish"
                         context="{'group_by': 'southbrook_finish'}"/>
+                <filter name="group_install_readiness"
+                        string="Install Readiness"
+                        context="{'group_by': 'southbrook_install_readiness_state'}"/>
             </xpath>
         </field>
     </record>
