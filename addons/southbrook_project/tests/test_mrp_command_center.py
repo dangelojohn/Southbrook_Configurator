@@ -222,6 +222,7 @@ class TestMrpCommandCenter(TransactionCase):
 
         rows = json.loads(task.x_southbrook_gate_json)
         self.assertEqual(len(rows), 11)
+        self.assertEqual(task.readiness_line_count, 11)
         for row in rows:
             self.assertEqual(
                 set(row),

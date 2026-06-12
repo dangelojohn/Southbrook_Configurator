@@ -63,6 +63,7 @@ GATE_WEIGHTS = {
 }
 
 READINESS_SNAPSHOT_FIELDS = {
+    "readiness_line_count",
     "x_southbrook_readiness_score",
     "x_southbrook_readiness_state",
     "x_southbrook_blocking_gate",
@@ -92,6 +93,13 @@ def _southbrook_refresh_task_snapshots(tasks):
 class ProjectTask(models.Model):
     _inherit = "project.task"
 
+    readiness_line_count = fields.Integer(
+        string="Readiness Lines",
+        default=0,
+        readonly=True,
+        copy=False,
+        help="Compatibility count for deployed readiness views.",
+    )
     x_southbrook_readiness_score = fields.Integer(
         string="MRP Readiness Score",
         default=0,
@@ -161,6 +169,7 @@ class ProjectTask(models.Model):
             score, state, blocked_gate, summary, next_action = (
                 task._southbrook_score_from_gates(gates)
             )
+            gate_rows = task._southbrook_gate_rows(gates)
             task.env.cr.execute(
                 """
                 UPDATE project_task
@@ -169,7 +178,8 @@ class ProjectTask(models.Model):
                        x_southbrook_blocking_gate = %s,
                        x_southbrook_blocker_summary = %s,
                        x_southbrook_next_action = %s,
-                       x_southbrook_gate_json = %s
+                       x_southbrook_gate_json = %s,
+                       readiness_line_count = %s
                  WHERE id = %s
                 """,
                 (
@@ -178,7 +188,8 @@ class ProjectTask(models.Model):
                     blocked_gate or None,
                     summary or None,
                     next_action or None,
-                    json.dumps(task._southbrook_gate_rows(gates), sort_keys=True),
+                    json.dumps(gate_rows, sort_keys=True),
+                    len(gate_rows),
                     task.id,
                 ),
             )

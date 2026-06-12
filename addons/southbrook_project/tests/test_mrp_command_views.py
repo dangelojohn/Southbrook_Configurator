@@ -23,6 +23,9 @@ class TestMrpCommandViews(TransactionCase):
         ]:
             self.assertIn(marker, arch)
 
+    def test_legacy_readiness_line_count_field_exists_for_deployed_views(self):
+        self.assertIn("readiness_line_count", self.env["project.task"]._fields)
+
     def test_mrp_command_center_actions_load(self):
         xmlids = [
             "southbrook_project.view_project_task_list_mrp_command",
