@@ -78,6 +78,9 @@
         <field name="model">project.project</field>
         <field name="inherit_id" ref="project.view_project_kanban"/>
         <field name="arch" type="xml">
+            <xpath expr="//templates" position="before">
+                <field name="southbrook_top_level_task_count"/>
+            </xpath>
             <xpath expr="//field[@name='open_task_count']"
                    position="replace">
                 <field name="southbrook_top_level_task_count"
