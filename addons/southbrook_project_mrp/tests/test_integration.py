@@ -204,3 +204,34 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn(request, task.maintenance_request_ids)
         self.assertTrue(task.equipment_blocked)
         self.assertIn("BLOCKED", task.equipment_readiness_summary)
+
+    def test_project_manufacturing_summary_empty_project(self):
+        project = self.env["project.project"].create({"name": "Empty Plant Board"})
+        self.assertEqual(project.southbrook_job_count, 0)
+        self.assertEqual(project.southbrook_active_mo_count, 0)
+        self.assertEqual(project.southbrook_unscheduled_wo_count, 0)
+        self.assertEqual(project.southbrook_intelligence_severity, "neutral")
+        self.assertEqual(project.southbrook_intelligence_prompt, "No manufacturing jobs yet")
+
+    def test_project_manufacturing_summary_from_job_tasks(self):
+        task = self.env["project.task"].create({
+            "name": "Mission Control Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        self.project.invalidate_recordset()
+        self.assertEqual(self.project.southbrook_job_count, 1)
+        self.assertEqual(self.project.southbrook_active_mo_count, 1)
+        self.assertEqual(self.project.southbrook_unscheduled_wo_count, 1)
+        self.assertEqual(self.project.southbrook_crew_gap_count, 1)
+        self.assertEqual(self.project.southbrook_intelligence_severity, "warning")
+        self.assertIn("planned start", self.project.southbrook_intelligence_prompt)
