@@ -25,12 +25,27 @@ class TestMrpCommandViews(TransactionCase):
             "southbrook_project.view_project_task_search_mrp_command",
             "southbrook_project.view_project_task_kanban_mrp_command",
             "southbrook_project.action_mrp_command_daily_meeting",
+            "southbrook_project.action_mrp_command_daily_meeting_kanban_view",
+            "southbrook_project.action_mrp_command_daily_meeting_list_view",
             "southbrook_project.action_mrp_command_blocked_jobs",
             "southbrook_project.action_mrp_command_ready_jobs",
             "southbrook_project.action_mrp_command_at_risk_jobs",
+            "southbrook_project.menu_mrp_command_daily_meeting",
+            "southbrook_project.menu_mrp_command_blocked_jobs",
+            "southbrook_project.menu_mrp_command_ready_jobs",
+            "southbrook_project.menu_mrp_command_at_risk_jobs",
         ]
         for xmlid in xmlids:
             self.assertTrue(self.env.ref(xmlid, raise_if_not_found=False), xmlid)
+        action = self.env.ref("southbrook_project.action_mrp_command_daily_meeting")
+        self.assertIn(
+            self.env.ref("southbrook_project.view_project_task_kanban_mrp_command"),
+            action.view_ids.mapped("view_id"),
+        )
+        self.assertIn(
+            self.env.ref("southbrook_project.view_project_task_list_mrp_command"),
+            action.view_ids.mapped("view_id"),
+        )
         search = self.env.ref("southbrook_project.view_project_task_search_mrp_command")
         for marker in [
             "readiness_blocked",
