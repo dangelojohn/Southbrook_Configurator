@@ -298,12 +298,104 @@ class ProjectProject(models.Model):
             },
         }
 
+    def action_southbrook_open_pm_control_queue(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search([
+            ("project_id", "=", self.id),
+        ]).filtered(lambda task: task.production_count > 0)
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "MRP PM Control Queue",
+            {
+                "create": False,
+                "search_default_manufacturing_blocked": 1,
+                "search_default_group_manufacturing_readiness": 1,
+            },
+        )
+
+    def action_southbrook_open_shop_lead_queue(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search([
+            ("project_id", "=", self.id),
+        ]).filtered(lambda task: task.production_count > 0)
+        workorders = tasks.mapped("workorder_ids").filtered(
+            "southbrook_can_start_today")
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Shop Lead - Can Start Today - %s" % self.display_name,
+            "res_model": "mrp.workorder",
+            "domain": [("id", "in", workorders.ids)],
+            "view_mode": "list,form,gantt,calendar",
+            "context": {
+                "create": False,
+                "search_default_southbrook_can_start_today": 1,
+            },
+        }
+
+    def action_southbrook_open_designer_queue(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search([
+            ("project_id", "=", self.id),
+        ]).filtered(
+            lambda task: task.production_count > 0
+            and (task.cad_cutlist_review_required
+                 or not task.southbrook_specs_complete)
+        )
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Designer / Engineering Queue",
+            {
+                "create": False,
+                "search_default_needs_cad_cutlist": 1,
+                "search_default_missing_cabinet_specs": 1,
+            },
+        )
+
+    def action_southbrook_open_installer_queue(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search([
+            ("project_id", "=", self.id),
+        ]).filtered(
+            lambda task: task.production_count > 0
+            and (task.install_date_missing
+                 or task.southbrook_install_readiness_state != "ready")
+        )
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Install Coordinator Queue",
+            {
+                "create": False,
+                "search_default_install_readiness_review": 1,
+                "search_default_install_date_missing": 1,
+            },
+        )
+
+    def action_southbrook_open_executive_queue(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search([
+            ("project_id", "=", self.id),
+        ]).filtered(
+            lambda task: task.production_count > 0
+            and task.risk_level in ("critical", "high", "medium")
+        )
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Executive Risk Queue",
+            {
+                "create": False,
+                "search_default_late_at_risk": 1,
+                "search_default_group_manufacturing_readiness": 1,
+            },
+        )
+
     def _southbrook_data_quality_line(self, issue_key, severity, record, reason,
                                       recommended_action):
         return {
             "issue_key": issue_key,
             "severity": severity,
             "model_name": record._name,
+            "res_model": record._name,
+            "res_id": record.id,
             "record_ref": record.display_name,
             "reason": reason,
             "recommended_action": recommended_action,
@@ -374,7 +466,8 @@ class ProjectProject(models.Model):
         if "stock.scrap" in self.env:
             Scrap = self.env["stock.scrap"]
             for scrap in Scrap.search([]).filtered(
-                lambda rec: "REF" in (rec.display_name or "").upper()):
+                lambda rec: "REF" in (rec.display_name or "").upper()
+                and not getattr(rec, "southbrook_exclude_from_pm_reports", False)):
                 lines.append(self._southbrook_data_quality_line(
                     "demo_scrap_unbuild",
                     "info",
@@ -386,7 +479,8 @@ class ProjectProject(models.Model):
         if "mrp.unbuild" in self.env:
             Unbuild = self.env["mrp.unbuild"]
             for unbuild in Unbuild.search([]).filtered(
-                lambda rec: "REF" in (rec.display_name or "").upper()):
+                lambda rec: "REF" in (rec.display_name or "").upper()
+                and not getattr(rec, "southbrook_exclude_from_pm_reports", False)):
                 lines.append(self._southbrook_data_quality_line(
                     "demo_scrap_unbuild",
                     "info",

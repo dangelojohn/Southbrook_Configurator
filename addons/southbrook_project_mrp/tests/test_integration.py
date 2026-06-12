@@ -1065,3 +1065,94 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("action_southbrook_data_quality_dry_run", project_form.arch_db)
         self.assertIn("line_ids", report_form.arch_db)
         self.assertIn("recommended_action", report_form.arch_db)
+
+    def test_phase6_safe_cleanup_marks_unsupported_findings_manual(self):
+        report = self.env["southbrook.project.data.quality.report"].create({
+            "project_id": self.project.id,
+            "summary": "Dry run test.",
+        })
+        line = self.env["southbrook.project.data.quality.line"].create({
+            "report_id": report.id,
+            "issue_key": "missing_install_due",
+            "severity": "warning",
+            "model_name": "project.task",
+            "res_model": "project.task",
+            "res_id": self.project.id,
+            "record_ref": self.project.display_name,
+            "reason": "Missing install due date.",
+            "recommended_action": "Confirm the install date at the source.",
+        })
+
+        line.action_apply_safe_cleanup()
+
+        self.assertEqual(line.cleanup_state, "skipped")
+        self.assertIn("Manual review", line.cleanup_note)
+
+    def test_phase6_safe_cleanup_fields_and_actions_are_available(self):
+        self.assertIn(
+            "southbrook_exclude_from_pm_reports",
+            self.env["stock.scrap"]._fields,
+        )
+        self.assertIn(
+            "southbrook_exclude_from_pm_reports",
+            self.env["mrp.unbuild"]._fields,
+        )
+
+        report_form = self.env.ref(
+            "southbrook_project_mrp.data_quality_report_form")
+        self.assertIn("action_apply_safe_cleanup", report_form.arch_db)
+        self.assertIn("cleanup_state", report_form.arch_db)
+        self.assertIn("cleanup_note", report_form.arch_db)
+
+    def test_phase7_role_based_queue_actions_route_to_expected_models(self):
+        task = self.env["project.task"].create({
+            "name": "Role Queue Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Role Queue Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        wo = self.env["mrp.workorder"].create({
+            "name": "Role Queue Cut",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        self.assertEqual(
+            self.project.action_southbrook_open_pm_control_queue()["res_model"],
+            "project.task",
+        )
+        self.assertEqual(
+            self.project.action_southbrook_open_shop_lead_queue()["res_model"],
+            "mrp.workorder",
+        )
+        self.assertEqual(
+            self.project.action_southbrook_open_designer_queue()["res_model"],
+            "project.task",
+        )
+        self.assertEqual(
+            self.project.action_southbrook_open_installer_queue()["res_model"],
+            "project.task",
+        )
+        self.assertEqual(
+            self.project.action_southbrook_open_executive_queue()["res_model"],
+            "project.task",
+        )
+
+        shop_action = self.project.action_southbrook_open_shop_lead_queue()
+        self.assertEqual(shop_action["domain"], [("id", "in", [wo.id])]
+                         if wo.southbrook_can_start_today else [("id", "in", [])])
+
+    def test_phase7_role_based_queue_buttons_are_on_project_form(self):
+        project_form = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+
+        for token in (
+            "action_southbrook_open_pm_control_queue",
+            "action_southbrook_open_shop_lead_queue",
+            "action_southbrook_open_designer_queue",
+            "action_southbrook_open_installer_queue",
+            "action_southbrook_open_executive_queue",
+        ):
+            self.assertIn(token, project_form.arch_db)

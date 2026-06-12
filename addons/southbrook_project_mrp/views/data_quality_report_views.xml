@@ -24,9 +24,21 @@
                                    decoration-info="severity == 'info'"/>
                             <field name="issue_key"/>
                             <field name="model_name"/>
+                            <field name="res_model" optional="hide"/>
+                            <field name="res_id" optional="hide"/>
                             <field name="record_ref"/>
                             <field name="reason"/>
                             <field name="recommended_action"/>
+                            <field name="cleanup_state" widget="badge"
+                                   decoration-success="cleanup_state == 'applied'"
+                                   decoration-warning="cleanup_state == 'skipped'"
+                                   decoration-info="cleanup_state == 'pending'"/>
+                            <field name="cleanup_note" optional="show"/>
+                            <button name="action_apply_safe_cleanup"
+                                    type="object"
+                                    string="Safe Cleanup"
+                                    class="btn-secondary"
+                                    invisible="cleanup_state != 'pending'"/>
                         </list>
                     </field>
                 </sheet>
