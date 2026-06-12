@@ -40,6 +40,35 @@
                                placeholder="Hinges: Blum 110° soft-close (qty 4)&#10;Handles: 5 1/16&quot; brushed nickel bar pull (qty 6)&#10;Drawer slides: Blum Tandem Plus full-extension (qty 3 pair)"/>
                     </group>
                 </page>
+                <page string="Manufacturing Command"
+                      name="southbrook_mrp_command">
+                    <group>
+                        <group string="Readiness">
+                            <field name="x_southbrook_readiness_score"/>
+                            <field name="x_southbrook_readiness_state"
+                                   widget="badge"
+                                   decoration-success="x_southbrook_readiness_state == 'ready'"
+                                   decoration-warning="x_southbrook_readiness_state == 'at_risk'"
+                                   decoration-danger="x_southbrook_readiness_state == 'blocked'"/>
+                            <field name="x_southbrook_blocking_gate"/>
+                            <field name="x_southbrook_next_action"/>
+                        </group>
+                        <group string="Source Links">
+                            <field name="x_southbrook_sale_order_id"
+                                   options="{'no_create': True, 'no_open': False}"/>
+                        </group>
+                    </group>
+                    <group string="Blocker Summary">
+                        <field name="x_southbrook_blocker_summary"
+                               nolabel="1"
+                               readonly="1"/>
+                    </group>
+                    <group string="Gate Detail">
+                        <field name="x_southbrook_gate_json"
+                               nolabel="1"
+                               readonly="1"/>
+                    </group>
+                </page>
             </xpath>
 
             <!-- Add the Southbrook priority + originating-SO to the
@@ -47,6 +76,20 @@
                  the Cabinetry Specs tab. The stock priority star
                  stays put — this just augments it. -->
             <xpath expr="//header" position="inside">
+                <button name="action_southbrook_recompute_mrp_readiness"
+                        string="Recompute Readiness"
+                        type="object"
+                        class="btn-secondary"/>
+                <button name="action_southbrook_release_to_production"
+                        string="Release to Production"
+                        type="object"
+                        class="btn-primary"
+                        invisible="x_southbrook_readiness_state == 'blocked'"/>
+                <field name="x_southbrook_readiness_state"
+                       widget="badge"
+                       decoration-success="x_southbrook_readiness_state == 'ready'"
+                       decoration-warning="x_southbrook_readiness_state == 'at_risk'"
+                       decoration-danger="x_southbrook_readiness_state == 'blocked'"/>
                 <field name="x_southbrook_priority"
                        widget="badge"
                        decoration-info="x_southbrook_priority == 'standard'"
