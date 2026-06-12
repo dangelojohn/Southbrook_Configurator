@@ -287,6 +287,18 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertIn(task, blocked_tasks)
         self.assertEqual(task.x_southbrook_blocking_gate, "bom_cutlist")
 
+    def test_snapshot_fields_reject_manual_writes(self):
+        task = self._new_task()
+
+        with self.assertRaises(AccessError):
+            task.write({"x_southbrook_readiness_state": "ready"})
+        with self.assertRaises(AccessError):
+            self.env["project.task"].create({
+                "name": "Forged Ready Job",
+                "project_id": task.project_id.id,
+                "x_southbrook_readiness_state": "ready",
+            })
+
     def test_mrp_source_changes_refresh_task_snapshot(self):
         task, sale = self._new_sale_order_task()
 

@@ -2,7 +2,7 @@
 import json
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 READINESS_STATES = [
@@ -131,17 +131,32 @@ class ProjectTask(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if (
+            not self.env.context.get("southbrook_skip_readiness_refresh")
+            and any(READINESS_SNAPSHOT_FIELDS.intersection(vals) for vals in vals_list)
+        ):
+            raise AccessError(_(
+                "MRP readiness snapshots are calculated fields. Use "
+                "Recompute Readiness to update them."
+            ))
         tasks = super().create(vals_list)
         if not self.env.context.get("southbrook_skip_readiness_refresh"):
             _southbrook_refresh_task_snapshots(tasks)
         return tasks
 
     def write(self, vals):
+        if (
+            READINESS_SNAPSHOT_FIELDS.intersection(vals)
+            and not self.env.context.get("southbrook_skip_readiness_refresh")
+        ):
+            raise AccessError(_(
+                "MRP readiness snapshots are calculated fields. Use "
+                "Recompute Readiness to update them."
+            ))
         res = super().write(vals)
         if (
             not self.env.context.get("southbrook_skip_readiness_refresh")
             and TASK_READINESS_SOURCE_FIELDS.intersection(vals)
-            and not set(vals).issubset(READINESS_SNAPSHOT_FIELDS)
         ):
             _southbrook_refresh_task_snapshots(self)
         return res
@@ -424,7 +439,9 @@ class ProjectTask(models.Model):
         sale = self._southbrook_release_sale_order()
         if sale and hasattr(sale, "action_send_to_production"):
             self._southbrook_check_release_permissions(sale)
-            productions = sale.action_send_to_production()
+            productions = sale.with_context(
+                southbrook_defer_readiness_refresh=True,
+            ).action_send_to_production()
             self.action_southbrook_refresh_mrp_readiness_snapshot()
             return self._southbrook_mo_action(productions)
         return self._southbrook_notification_action()
@@ -633,6 +650,16 @@ class MrpProduction(models.Model):
             ])
         return Task.search([("name", "in", origins)])
 
+    def action_recompute_manufacturing_intelligence(self):
+        if self.env.context.get("southbrook_defer_readiness_refresh"):
+            return super().action_recompute_manufacturing_intelligence()
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        records = self.with_context(southbrook_defer_readiness_refresh=True)
+        res = super(MrpProduction, records).action_recompute_manufacturing_intelligence()
+        tasks |= self._southbrook_project_tasks_for_snapshot()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res
+
     @api.model_create_multi
     def create(self, vals_list):
         productions = super().create(vals_list)
@@ -661,6 +688,19 @@ class ProductionPackage(models.Model):
 
     def _southbrook_project_tasks_for_snapshot(self):
         return self.mapped("mo_id")._southbrook_project_tasks_for_snapshot()
+
+    def action_recompute_manufacturing_intelligence(self):
+        if self.env.context.get("southbrook_defer_readiness_refresh"):
+            return super().action_recompute_manufacturing_intelligence()
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        records = self.with_context(southbrook_defer_readiness_refresh=True)
+        res = super(
+            ProductionPackage,
+            records,
+        ).action_recompute_manufacturing_intelligence()
+        tasks |= self._southbrook_project_tasks_for_snapshot()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -691,6 +731,16 @@ class MrpWorkorder(models.Model):
 
     def _southbrook_project_tasks_for_snapshot(self):
         return self.mapped("production_id")._southbrook_project_tasks_for_snapshot()
+
+    def action_check_tool_readiness(self):
+        if self.env.context.get("southbrook_defer_readiness_refresh"):
+            return super().action_check_tool_readiness()
+        tasks = self._southbrook_project_tasks_for_snapshot()
+        records = self.with_context(southbrook_defer_readiness_refresh=True)
+        res = super(MrpWorkorder, records).action_check_tool_readiness()
+        tasks |= self._southbrook_project_tasks_for_snapshot()
+        _southbrook_refresh_task_snapshots(tasks)
+        return res
 
     @api.model_create_multi
     def create(self, vals_list):
