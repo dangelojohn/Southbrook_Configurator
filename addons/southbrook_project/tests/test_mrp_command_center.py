@@ -298,6 +298,28 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertEqual(task.x_southbrook_readiness_state, "ready")
         self.assertFalse(task.x_southbrook_blocking_gate)
 
+    def test_archiving_mi_check_refreshes_task_snapshot(self):
+        task, sale = self._new_sale_order_task()
+        mo = self._new_mo_for_task(task)
+        self._new_package_for_mo(mo)
+
+        check = self.env["southbrook.mi.check"].create({
+            "production_id": mo.id,
+            "name": "CNC offline",
+            "severity": "blocker",
+            "category": "production",
+            "stage": "cnc",
+            "message": "CNC workcenter is offline.",
+            "recommendation": "Move the job or repair CNC before release.",
+            "is_gate": True,
+        })
+        self.assertEqual(task.x_southbrook_readiness_state, "blocked")
+        self.assertEqual(task.x_southbrook_blocking_gate, "equipment")
+
+        check.write({"active": False})
+        self.assertEqual(task.x_southbrook_readiness_state, "ready")
+        self.assertFalse(task.x_southbrook_blocking_gate)
+
     def test_partial_packages_block_bom_cutlist_gate(self):
         task, sale = self._new_sale_order_task()
         packaged_mo = self._new_mo_for_task(task)

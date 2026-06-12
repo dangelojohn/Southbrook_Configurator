@@ -80,6 +80,8 @@ TASK_READINESS_SOURCE_FIELDS = {
 
 
 def _southbrook_refresh_task_snapshots(tasks):
+    if tasks.env.context.get("southbrook_defer_readiness_refresh"):
+        return
     tasks = tasks.exists()
     if tasks:
         tasks.sudo().with_context(
@@ -388,13 +390,17 @@ class ProjectTask(models.Model):
             for production in productions:
                 if hasattr(production, "action_recompute_manufacturing_intelligence"):
                     task._southbrook_check_mi_recompute_permissions()
-                    production.action_recompute_manufacturing_intelligence()
+                    production.with_context(
+                        southbrook_defer_readiness_refresh=True,
+                    ).action_recompute_manufacturing_intelligence()
             related_packages = task._southbrook_related_packages(related_productions)
             packages = task._southbrook_release_records(related_packages)
             for package in packages:
                 if hasattr(package, "action_recompute_manufacturing_intelligence"):
                     task._southbrook_check_mi_recompute_permissions()
-                    package.action_recompute_manufacturing_intelligence()
+                    package.with_context(
+                        southbrook_defer_readiness_refresh=True,
+                    ).action_recompute_manufacturing_intelligence()
             related_workorders = task._southbrook_related_workorders(
                 related_productions
             )
@@ -744,6 +750,7 @@ class SouthbrookMiCheck(models.Model):
             "message",
             "recommendation",
             "sequence",
+            "active",
         }.intersection(vals):
             tasks |= self._southbrook_project_tasks_for_snapshot()
             _southbrook_refresh_task_snapshots(tasks)
