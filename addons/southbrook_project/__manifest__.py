@@ -38,13 +38,22 @@ These are flagged in the README for a human operator.
     "author": "Southbrook Cabinetry / OdooIQ",
     "license": "LGPL-3",
     "category": "Services/Project",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "depends": [
         "project",
+        "sale_management",
+        "purchase",
+        "mrp",
+        "maintenance",
+        "southbrook_mrp_pm",
+        "southbrook_mrp_kitchen_tools",
+        "southbrook_kitchen_mrp",
+        "southbrook_manufacturing_intelligence",
     ],
     "data": [
         "data/project_tags.xml",
         "views/project_task_views.xml",
+        "views/mrp_command_center_views.xml",
     ],
     "post_init_hook": "post_init_backfill_project_1",
     "assets": {
