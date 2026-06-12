@@ -168,6 +168,43 @@ class ProjectTask(models.Model):
         string="Work Orders Summary", compute="_compute_workorder_rollup",
         help="One-line summary, e.g. '47 WOs / 47 not scheduled'.")
 
+    # --- TASK 6: Material / procurement readiness ----------------------------
+    material_ready_count = fields.Integer(
+        string="# MOs Available", compute="_compute_material_readiness")
+    material_partial_count = fields.Integer(
+        string="# MOs Partially Available",
+        compute="_compute_material_readiness")
+    material_unavailable_count = fields.Integer(
+        string="# MOs Unavailable", compute="_compute_material_readiness")
+    material_at_risk = fields.Boolean(
+        string="Material At Risk", compute="_compute_material_readiness",
+        help="At least one linked MO is not fully component-available.")
+    material_readiness_summary = fields.Text(
+        string="Material Readiness", compute="_compute_material_readiness")
+    procurement_order_ids = fields.Many2many(
+        "purchase.order",
+        compute="_compute_material_readiness",
+        string="Related Procurement",
+        help="Purchase orders linked to this job's MOs or component moves.")
+    procurement_count = fields.Integer(
+        string="# Procurement Orders", compute="_compute_material_readiness")
+    procurement_summary = fields.Text(
+        string="Procurement Coverage", compute="_compute_material_readiness")
+
+    # --- TASK 7: Tooling / equipment readiness -------------------------------
+    maintenance_request_ids = fields.Many2many(
+        "maintenance.request",
+        compute="_compute_equipment_readiness",
+        string="Open Maintenance Requests",
+        help="Open maintenance requests on equipment attached to this job's "
+             "work centers.")
+    maintenance_request_count = fields.Integer(
+        string="# Open Maintenance", compute="_compute_equipment_readiness")
+    equipment_blocked = fields.Boolean(
+        string="Equipment Blocked", compute="_compute_equipment_readiness")
+    equipment_readiness_summary = fields.Text(
+        string="Equipment Readiness", compute="_compute_equipment_readiness")
+
     # ------------------------------------------------------------------------
     @api.depends("production_ids", "production_ids.state",
                  "production_ids.reservation_state", "production_ids.date_deadline")
@@ -414,6 +451,84 @@ class ProjectTask(models.Model):
             task.workcenter_load_summary = "\n".join(lines)
             task.workcenter_over_capacity = any_over
 
+    @api.depends("production_ids",
+                 "production_ids.components_availability_state",
+                 "production_ids.reservation_state",
+                 "production_ids.purchase_order_count")
+    def _compute_material_readiness(self):
+        PurchaseLine = self.env["purchase.order.line"]
+        StockMove = self.env["stock.move"]
+        for task in self:
+            mos = task.production_ids
+            ready = partial = unavailable = 0
+            lines = []
+            for mo in mos.sorted("name"):
+                state = (
+                    getattr(mo, "components_availability_state", False)
+                    or getattr(mo, "reservation_state", False)
+                    or "unknown"
+                )
+                label = getattr(mo, "components_availability", False) or state
+                if state in ("available", "assigned"):
+                    ready += 1
+                elif state in ("partially_available", "partial", "waiting"):
+                    partial += 1
+                else:
+                    unavailable += 1
+                lines.append("%s: %s" % (mo.name, label))
+
+            po_lines = PurchaseLine.search([("production_id", "in", mos.ids)])
+            raw_moves = mos.mapped("move_raw_ids")
+            if raw_moves:
+                po_lines |= raw_moves.mapped("created_purchase_line_ids")
+                po_lines |= raw_moves.mapped("purchase_line_id")
+                move_po_lines = PurchaseLine.search(
+                    [("move_dest_ids", "in", raw_moves.ids)])
+                po_lines |= move_po_lines
+                related_moves = StockMove.search([
+                    ("id", "in", raw_moves.mapped("move_orig_ids").ids),
+                    ("purchase_line_id", "!=", False),
+                ])
+                po_lines |= related_moves.mapped("purchase_line_id")
+            open_pos = po_lines.mapped("order_id").filtered(
+                lambda po: po.state not in ("cancel", "done"))
+
+            task.material_ready_count = ready
+            task.material_partial_count = partial
+            task.material_unavailable_count = unavailable
+            task.material_at_risk = bool(partial or unavailable)
+            task.material_readiness_summary = "\n".join(lines)
+            task.procurement_order_ids = open_pos
+            task.procurement_count = len(open_pos)
+            if open_pos:
+                task.procurement_summary = "\n".join(
+                    "%s: %s" % (po.name, po.state) for po in open_pos.sorted("name"))
+            else:
+                task.procurement_summary = "No open linked procurement."
+
+    @api.depends("production_ids.workorder_ids.workcenter_id")
+    def _compute_equipment_readiness(self):
+        Request = self.env["maintenance.request"]
+        for task in self:
+            workcenters = task.production_ids.mapped(
+                "workorder_ids.workcenter_id")
+            requests = Request
+            lines = []
+            for wc in workcenters.sorted("name"):
+                equipment = wc.equipment_ids
+                wc_requests = equipment.mapped("maintenance_ids").filtered(
+                    lambda req: not req.stage_id.done)
+                requests |= wc_requests
+                if wc_requests:
+                    lines.append("%s: BLOCKED - %d open maintenance request(s)" %
+                                 (wc.name, len(wc_requests)))
+                else:
+                    lines.append("%s: Ready" % wc.name)
+            task.maintenance_request_ids = requests
+            task.maintenance_request_count = len(requests)
+            task.equipment_blocked = bool(requests)
+            task.equipment_readiness_summary = "\n".join(lines)
+
     # --- actions ------------------------------------------------------------
     def action_view_workorders(self):
         """Open the Work Orders list filtered to this job's WOs so the
@@ -426,6 +541,28 @@ class ProjectTask(models.Model):
             "res_model": "mrp.workorder",
             "domain": [("id", "in", wos.ids)],
             "view_mode": "list,form,gantt,calendar",
+            "context": {"create": False},
+        }
+
+    def action_view_procurement_orders(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Procurement — %s" % (self.name or self.display_name),
+            "res_model": "purchase.order",
+            "domain": [("id", "in", self.procurement_order_ids.ids)],
+            "view_mode": "list,form",
+            "context": {"create": False},
+        }
+
+    def action_view_maintenance_requests(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Maintenance — %s" % (self.name or self.display_name),
+            "res_model": "maintenance.request",
+            "domain": [("id", "in", self.maintenance_request_ids.ids)],
+            "view_mode": "list,form",
             "context": {"create": False},
         }
 

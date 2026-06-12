@@ -147,3 +147,60 @@ class TestProjectMrpIntegration(TransactionCase):
         task.invalidate_recordset()
         self.assertTrue(task.stage_mo_divergence)
         self.assertIn("Finishing", task.stage_mo_note)
+
+    def test_workorder_not_scheduled_flag(self):
+        task = self.env["project.task"].create(
+            {"name": "WO Schedule Job", "project_id": self.project.id})
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        wo = self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+        task.invalidate_recordset()
+        self.assertTrue(wo.southbrook_not_scheduled)
+        self.assertEqual(task.unscheduled_workorder_count, 1)
+
+    def test_material_readiness_rollup(self):
+        task = self.env["project.task"].create(
+            {"name": "Material Job", "project_id": self.project.id})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        mo.invalidate_recordset()
+        task.invalidate_recordset()
+        self.assertEqual(task.production_count, 1)
+        self.assertTrue(task.material_readiness_summary)
+        self.assertEqual(
+            task.material_ready_count
+            + task.material_partial_count
+            + task.material_unavailable_count,
+            1,
+        )
+
+    def test_equipment_readiness_rollup(self):
+        task = self.env["project.task"].create(
+            {"name": "Equipment Job", "project_id": self.project.id})
+        wc = self.env["mrp.workcenter"].create({"name": "CNC Nesting"})
+        equipment = self.env["maintenance.equipment"].create({
+            "name": "CNC Router",
+            "workcenter_id": wc.id,
+        })
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Route parts",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 18.0,
+        })
+        request = self.env["maintenance.request"].create({
+            "name": "Spindle fault",
+            "equipment_id": equipment.id,
+        })
+        task.invalidate_recordset()
+        self.assertIn(request, task.maintenance_request_ids)
+        self.assertTrue(task.equipment_blocked)
+        self.assertIn("BLOCKED", task.equipment_readiness_summary)
