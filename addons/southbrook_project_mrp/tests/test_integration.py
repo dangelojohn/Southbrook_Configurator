@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+from odoo import fields
 from odoo.tests import TransactionCase, tagged
 
 
@@ -498,6 +499,122 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("action_view_readiness_lines", view.arch_db)
         self.assertIn("readiness_line_ids", view.arch_db)
 
+    def test_phase3_production_control_queue_filters(self):
+        search_view = self.env.ref(
+            "southbrook_project_mrp.project_task_search_readiness")
+        list_view = self.env.ref(
+            "southbrook_project_mrp.project_task_list_readiness")
+
+        for token in (
+            "needs_cad_cutlist",
+            "needs_scheduling",
+            "needs_crew",
+            "install_date_missing",
+            "late_at_risk",
+            "pm_stage_mismatch",
+            "needs_materials",
+            "equipment_blocked",
+            "over_capacity",
+            "group_customer",
+            "group_source_order",
+            "group_pm_phase",
+        ):
+            self.assertIn(token, search_view.arch_db)
+        self.assertIn("cad_cutlist_review_required", list_view.arch_db)
+        self.assertIn("install_date_missing", list_view.arch_db)
+        self.assertIn("pm_stage_mismatch", list_view.arch_db)
+
+    def test_phase3_queue_flags_surface_cad_install_and_stage_mismatch(self):
+        stage = self.env["project.task.type"].create({
+            "name": "Assembly",
+            "project_ids": [(4, self.project.id)],
+        })
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": self.fp.id,
+                "product_uom_qty": 1.0,
+            })],
+        })
+        task = self.env["project.task"].create({
+            "name": "Queue Flag Job",
+            "project_id": self.project.id,
+            "stage_id": stage.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        mo = self._make_mo()
+        mo.action_confirm()
+        if "x_cad_status" in mo._fields:
+            mo.x_cad_status = "pending"
+        mo.project_task_id = task.id
+
+        task.invalidate_recordset()
+
+        if "x_cad_status" in mo._fields:
+            self.assertTrue(task.cad_cutlist_review_required)
+        self.assertTrue(task.install_date_missing)
+        self.assertTrue(task.pm_stage_mismatch)
+
+    def test_phase4_workorder_can_start_today_requires_schedule_crew_and_components(self):
+        task = self.env["project.task"].create({
+            "name": "Today Work Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        mo.user_id = self.env.user.id
+        wo = self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "date_start": fields.Datetime.now(),
+            "duration_expected": 12.0,
+        })
+
+        task.invalidate_recordset()
+        wo.invalidate_recordset()
+
+        if mo.reservation_state != "assigned":
+            self.assertFalse(wo.southbrook_can_start_today)
+            self.assertIn("components", wo.southbrook_start_blocker.lower())
+        else:
+            self.assertTrue(wo.southbrook_can_start_today)
+            self.assertEqual(wo.southbrook_start_blocker, "")
+
+        wo.date_start = False
+        wo.invalidate_recordset()
+        self.assertFalse(wo.southbrook_can_start_today)
+        self.assertIn("scheduled", wo.southbrook_start_blocker.lower())
+
+    def test_phase4_project_action_opens_work_that_can_start_today(self):
+        task = self.env["project.task"].create({
+            "name": "Today Queue Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "CNC Nesting"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        mo.user_id = self.env.user.id
+        wo = self.env["mrp.workorder"].create({
+            "name": "Nest panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "date_start": fields.Datetime.now(),
+            "duration_expected": 30.0,
+        })
+
+        action = task.action_view_workorders_can_start_today()
+
+        self.assertEqual(action["res_model"], "mrp.workorder")
+        if wo.southbrook_can_start_today:
+            self.assertEqual(action["domain"], [("id", "in", [wo.id])])
+        else:
+            self.assertEqual(action["domain"], [("id", "in", [])])
+        view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        self.assertIn("action_view_workorders_can_start_today", view.arch_db)
+        self.assertIn("southbrook_can_start_today", view.arch_db)
+
     def test_project_form_has_readiness_job_actions(self):
         task = self.env["project.task"].create({
             "name": "Blocked Readiness Job",
@@ -562,3 +679,159 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn(
             "action_southbrook_open_material_risk_jobs", view.arch_db)
         self.assertIn("southbrook_material_risk_count", view.arch_db)
+
+    def test_phase4_project_form_has_can_start_today_queue(self):
+        task = self.env["project.task"].create({
+            "name": "Project Today Queue Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Edge Banding"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        mo.user_id = self.env.user.id
+        wo = self.env["mrp.workorder"].create({
+            "name": "Band edges",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "date_start": fields.Datetime.now(),
+            "duration_expected": 20.0,
+        })
+
+        self.project.invalidate_recordset()
+        action = self.project.action_southbrook_open_workorders_can_start_today()
+
+        self.assertEqual(action["res_model"], "mrp.workorder")
+        if wo.southbrook_can_start_today:
+            self.assertEqual(self.project.southbrook_can_start_today_wo_count, 1)
+            self.assertEqual(action["domain"], [("id", "in", [wo.id])])
+        else:
+            self.assertEqual(self.project.southbrook_can_start_today_wo_count, 0)
+            self.assertEqual(action["domain"], [("id", "in", [])])
+
+        view = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+        self.assertIn(
+            "action_southbrook_open_workorders_can_start_today", view.arch_db)
+        self.assertIn("southbrook_can_start_today_wo_count", view.arch_db)
+
+    def test_phase4_project_form_has_cad_crew_install_queues(self):
+        stage = self.env["project.task.type"].create({
+            "name": "Assembly",
+            "project_ids": [(4, self.project.id)],
+        })
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": self.fp.id,
+                "product_uom_qty": 1.0,
+            })],
+        })
+        task = self.env["project.task"].create({
+            "name": "Project Queue Job",
+            "project_id": self.project.id,
+            "stage_id": stage.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Assembly Bench"})
+        mo = self._make_mo()
+        mo.action_confirm()
+        if "x_cad_status" in mo._fields:
+            mo.x_cad_status = "pending"
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Assemble case",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 25.0,
+        })
+
+        self.project.invalidate_recordset()
+
+        cad_action = self.project.action_southbrook_open_cad_cutlist_jobs()
+        crew_action = self.project.action_southbrook_open_crew_gap_jobs()
+        install_action = self.project.action_southbrook_open_install_risk_jobs()
+
+        self.assertEqual(cad_action["res_model"], "project.task")
+        self.assertEqual(crew_action["res_model"], "project.task")
+        self.assertEqual(install_action["res_model"], "project.task")
+        if "x_cad_status" in mo._fields:
+            self.assertEqual(self.project.southbrook_cad_cutlist_job_count, 1)
+            self.assertEqual(cad_action["domain"], [("id", "in", [task.id])])
+        self.assertEqual(self.project.southbrook_crew_gap_count, 1)
+        self.assertEqual(crew_action["domain"], [("id", "in", [task.id])])
+        self.assertEqual(self.project.southbrook_install_risk_job_count, 1)
+        self.assertEqual(install_action["domain"], [("id", "in", [task.id])])
+
+        view = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+        for token in (
+            "action_southbrook_open_cad_cutlist_jobs",
+            "action_southbrook_open_crew_gap_jobs",
+            "action_southbrook_open_install_risk_jobs",
+            "southbrook_cad_cutlist_job_count",
+            "southbrook_crew_gap_count",
+            "southbrook_install_risk_job_count",
+        ):
+            self.assertIn(token, view.arch_db)
+
+    def test_phase4_project_form_has_equipment_and_capacity_queues(self):
+        view = self.env.ref(
+            "southbrook_project_mrp.project_project_form_readiness_actions")
+
+        equipment_action = self.project.action_southbrook_open_equipment_blocked_jobs()
+        capacity_action = self.project.action_southbrook_open_over_capacity_jobs()
+
+        self.assertEqual(equipment_action["res_model"], "project.task")
+        self.assertEqual(capacity_action["res_model"], "project.task")
+        for token in (
+            "action_southbrook_open_equipment_blocked_jobs",
+            "action_southbrook_open_over_capacity_jobs",
+            "southbrook_equipment_blocked_count",
+            "southbrook_over_capacity_count",
+        ):
+            self.assertIn(token, view.arch_db)
+
+    def test_phase5_cabinet_specs_participate_in_readiness(self):
+        task = self.env["project.task"].create({
+            "name": "Spec Readiness Job",
+            "project_id": self.project.id,
+        })
+
+        task.invalidate_recordset()
+        task.action_recompute_readiness_lines()
+
+        specs = task.readiness_line_ids.filtered(
+            lambda line: line.check_key == "cabinet_specs")
+        self.assertEqual(len(specs), 1)
+        self.assertEqual(specs.status, "review")
+        self.assertIn("Door style", specs.reason)
+        self.assertIn("Confirm cabinet specs", specs.recommended_action)
+        self.assertFalse(task.southbrook_specs_complete)
+
+        task.write({
+            "x_southbrook_material_species": "maple",
+            "x_southbrook_hardware_specs": "Blum soft-close hinges and slides",
+            "southbrook_door_style": "shaker",
+            "southbrook_finish": "painted",
+        })
+        task.invalidate_recordset()
+        task.action_recompute_readiness_lines()
+        specs = task.readiness_line_ids.filtered(
+            lambda line: line.check_key == "cabinet_specs")
+
+        self.assertEqual(specs.status, "ready")
+        self.assertTrue(task.southbrook_specs_complete)
+
+    def test_phase5_cabinet_specs_are_on_command_center_views(self):
+        form_view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        search_view = self.env.ref(
+            "southbrook_project_mrp.project_task_search_readiness")
+
+        for token in (
+            "southbrook_project_mrp_cabinet_specs",
+            "southbrook_door_style",
+            "southbrook_finish",
+            "southbrook_specs_complete",
+        ):
+            self.assertIn(token, form_view.arch_db)
+        self.assertIn("missing_cabinet_specs", search_view.arch_db)

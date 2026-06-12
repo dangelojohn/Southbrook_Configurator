@@ -18,6 +18,7 @@ class SouthbrookProjectReadinessLine(models.Model):
     check_key = fields.Selection(
         [
             ("data", "Data Completeness"),
+            ("cabinet_specs", "Cabinet Specs"),
             ("mrp", "MRP Link"),
             ("engineering", "Engineering / CAD"),
             ("materials", "Materials / Purchasing"),

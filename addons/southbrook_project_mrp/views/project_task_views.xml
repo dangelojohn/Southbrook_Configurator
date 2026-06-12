@@ -197,6 +197,35 @@
                     </field>
                 </page>
 
+                <page name="southbrook_project_mrp_cabinet_specs"
+                      string="Cabinet Specs">
+                    <group>
+                        <group string="Core Specs">
+                            <field name="southbrook_specs_complete"
+                                   widget="boolean_toggle" readonly="1"/>
+                            <field name="x_southbrook_material_species"/>
+                            <field name="southbrook_door_style"/>
+                            <field name="southbrook_finish"/>
+                        </group>
+                        <group string="Hardware">
+                            <field name="southbrook_hinge_type"/>
+                            <field name="southbrook_drawer_slide_type"/>
+                            <field name="x_southbrook_hardware_specs"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Engineering References">
+                            <field name="southbrook_cad_package_link"/>
+                            <field name="southbrook_cutlist_reference"/>
+                            <field name="southbrook_worktop_dependency"/>
+                        </group>
+                        <group string="Final Measurement">
+                            <field name="southbrook_final_measurement_notes"
+                                   nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+
                 <page name="manufacturing" string="Manufacturing"
                       groups="mrp.group_mrp_user">
                     <field name="x_southbrook_sale_order_id" invisible="1"/>
@@ -327,6 +356,10 @@
                     </group>
                     <button type="object" name="action_view_workorders"
                             string="Open Work Orders View" class="btn-primary"/>
+                    <button type="object"
+                            name="action_view_workorders_can_start_today"
+                            string="What Can Start Today"
+                            class="btn-secondary"/>
                     <field name="workorder_ids" readonly="1">
                         <list create="false" edit="false">
                             <field name="name"/>
@@ -339,6 +372,10 @@
                             <field name="southbrook_not_scheduled"
                                    string="Not Scheduled"
                                    widget="boolean_toggle"/>
+                            <field name="southbrook_can_start_today"
+                                   widget="boolean_toggle"/>
+                            <field name="southbrook_start_blocker"
+                                   optional="show"/>
                             <field name="state" widget="badge"
                                    decoration-info="state == 'ready'"
                                    decoration-muted="state == 'pending'"
@@ -373,11 +410,53 @@
                            widget="statinfo" string="Schedule"/>
                 </button>
                 <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_workorders_can_start_today"
+                        icon="fa-play"
+                        invisible="southbrook_can_start_today_wo_count == 0">
+                    <field name="southbrook_can_start_today_wo_count"
+                           widget="statinfo" string="Start Today"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_cad_cutlist_jobs"
+                        icon="fa-pencil"
+                        invisible="southbrook_cad_cutlist_job_count == 0">
+                    <field name="southbrook_cad_cutlist_job_count"
+                           widget="statinfo" string="CAD"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_crew_gap_jobs"
+                        icon="fa-users"
+                        invisible="southbrook_crew_gap_count == 0">
+                    <field name="southbrook_crew_gap_count"
+                           widget="statinfo" string="Crew"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_install_risk_jobs"
+                        icon="fa-truck"
+                        invisible="southbrook_install_risk_job_count == 0">
+                    <field name="southbrook_install_risk_job_count"
+                           widget="statinfo" string="Install"/>
+                </button>
+                <button class="oe_stat_button" type="object"
                         name="action_southbrook_open_material_risk_jobs"
                         icon="fa-cubes"
                         invisible="southbrook_material_risk_count == 0">
                     <field name="southbrook_material_risk_count"
                            widget="statinfo" string="Materials"/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_equipment_blocked_jobs"
+                        icon="fa-warning"
+                        invisible="southbrook_equipment_blocked_count == 0">
+                    <field name="southbrook_equipment_blocked_count"
+                           widget="statinfo" string="Equip."/>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_over_capacity_jobs"
+                        icon="fa-dashboard"
+                        invisible="southbrook_over_capacity_count == 0">
+                    <field name="southbrook_over_capacity_count"
+                           widget="statinfo" string="Capacity"/>
                 </button>
                 <button class="oe_stat_button" type="object"
                         name="action_southbrook_open_review_manufacturing_jobs"
@@ -424,6 +503,24 @@
                        optional="show"/>
                 <field name="top_blocker" optional="show"/>
                 <field name="next_best_action" optional="show"/>
+                <field name="cad_cutlist_review_required"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="install_date_missing"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="pm_stage_mismatch"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="material_at_risk"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="crew_gap"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="equipment_blocked"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="workcenter_over_capacity"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="southbrook_specs_complete"
+                       widget="boolean_toggle" optional="hide"/>
+                <field name="southbrook_door_style" optional="hide"/>
+                <field name="southbrook_finish" optional="hide"/>
                 <field name="linked_mo_count" optional="show"/>
                 <field name="linked_wo_count" optional="show"/>
                 <field name="unscheduled_workorder_count"
@@ -452,12 +549,57 @@
                 <filter name="manufacturing_ready"
                         string="Manufacturing Ready"
                         domain="[('manufacturing_readiness_state', '=', 'ready')]"/>
+                <filter name="needs_cad_cutlist"
+                        string="Needs CAD / Cutlist"
+                        domain="[('cad_cutlist_review_required', '=', True)]"/>
+                <filter name="needs_scheduling"
+                        string="Needs Scheduling"
+                        domain="[('unscheduled_workorder_count', '&gt;', 0)]"/>
+                <filter name="needs_crew"
+                        string="Needs Crew"
+                        domain="[('crew_gap', '=', True)]"/>
+                <filter name="needs_materials"
+                        string="Needs Materials"
+                        domain="[('material_at_risk', '=', True)]"/>
+                <filter name="equipment_blocked"
+                        string="Equipment Blocked"
+                        domain="[('equipment_blocked', '=', True)]"/>
+                <filter name="over_capacity"
+                        string="Over Capacity"
+                        domain="[('workcenter_over_capacity', '=', True)]"/>
+                <filter name="install_date_missing"
+                        string="Install Date Missing"
+                        domain="[('install_date_missing', '=', True)]"/>
+                <filter name="late_at_risk"
+                        string="Late / At Risk"
+                        domain="[('job_at_risk', '=', True)]"/>
+                <filter name="pm_stage_mismatch"
+                        string="PM Stage Mismatch"
+                        domain="[('pm_stage_mismatch', '=', True)]"/>
+                <filter name="missing_cabinet_specs"
+                        string="Missing Cabinet Specs"
+                        domain="[('southbrook_specs_complete', '=', False)]"/>
                 <separator/>
             </xpath>
             <xpath expr="//group" position="inside">
                 <filter name="group_manufacturing_readiness"
                         string="Manufacturing Readiness"
                         context="{'group_by': 'manufacturing_readiness_state'}"/>
+                <filter name="group_customer"
+                        string="Customer"
+                        context="{'group_by': 'customer_id'}"/>
+                <filter name="group_source_order"
+                        string="Source Sales Order"
+                        context="{'group_by': 'source_order_id'}"/>
+                <filter name="group_pm_phase"
+                        string="PM Phase"
+                        context="{'group_by': 'pm_phase'}"/>
+                <filter name="group_door_style"
+                        string="Door Style"
+                        context="{'group_by': 'southbrook_door_style'}"/>
+                <filter name="group_finish"
+                        string="Finish"
+                        context="{'group_by': 'southbrook_finish'}"/>
             </xpath>
         </field>
     </record>

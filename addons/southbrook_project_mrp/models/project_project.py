@@ -19,12 +19,21 @@ class ProjectProject(models.Model):
         string="At-Risk Jobs", compute="_compute_southbrook_mission_control")
     southbrook_material_risk_count = fields.Integer(
         string="Material Risk", compute="_compute_southbrook_mission_control")
+    southbrook_cad_cutlist_job_count = fields.Integer(
+        string="Needs CAD / Cutlist",
+        compute="_compute_southbrook_mission_control")
     southbrook_unscheduled_wo_count = fields.Integer(
         string="Unscheduled WOs", compute="_compute_southbrook_mission_control")
     southbrook_unscheduled_job_count = fields.Integer(
         string="Unscheduled Jobs", compute="_compute_southbrook_mission_control")
+    southbrook_can_start_today_wo_count = fields.Integer(
+        string="Can Start Today",
+        compute="_compute_southbrook_mission_control")
     southbrook_crew_gap_count = fields.Integer(
         string="Crew Gaps", compute="_compute_southbrook_mission_control")
+    southbrook_install_risk_job_count = fields.Integer(
+        string="Install Risk",
+        compute="_compute_southbrook_mission_control")
     southbrook_equipment_blocked_count = fields.Integer(
         string="Equipment Blocks", compute="_compute_southbrook_mission_control")
     southbrook_over_capacity_count = fields.Integer(
@@ -52,9 +61,12 @@ class ProjectProject(models.Model):
         "task_ids.components_available",
         "task_ids.workorder_count",
         "task_ids.unscheduled_workorder_count",
+        "task_ids.workorder_ids.southbrook_can_start_today",
         "task_ids.crew_gap",
         "task_ids.job_industrial_cost",
         "task_ids.material_at_risk",
+        "task_ids.cad_cutlist_review_required",
+        "task_ids.install_date_missing",
         "task_ids.equipment_blocked",
         "task_ids.workcenter_over_capacity",
     )
@@ -77,11 +89,18 @@ class ProjectProject(models.Model):
                 lambda task: task.manufacturing_readiness_state == "review"))
             project.southbrook_at_risk_job_count = len(tasks.filtered("job_at_risk"))
             project.southbrook_material_risk_count = len(tasks.filtered("material_at_risk"))
+            project.southbrook_cad_cutlist_job_count = len(tasks.filtered(
+                "cad_cutlist_review_required"))
             project.southbrook_unscheduled_wo_count = sum(
                 tasks.mapped("unscheduled_workorder_count"))
             project.southbrook_unscheduled_job_count = len(tasks.filtered(
                 lambda task: task.unscheduled_workorder_count > 0))
+            project.southbrook_can_start_today_wo_count = len(
+                tasks.mapped("workorder_ids").filtered(
+                    "southbrook_can_start_today"))
             project.southbrook_crew_gap_count = len(tasks.filtered("crew_gap"))
+            project.southbrook_install_risk_job_count = len(tasks.filtered(
+                "install_date_missing"))
             project.southbrook_equipment_blocked_count = len(tasks.filtered("equipment_blocked"))
             project.southbrook_over_capacity_count = len(tasks.filtered("workcenter_over_capacity"))
             project.southbrook_job_cost_total = sum(tasks.mapped("job_industrial_cost"))
@@ -174,6 +193,92 @@ class ProjectProject(models.Model):
                 "search_default_manufacturing_blocked": 1,
             },
         }
+
+    def action_southbrook_open_workorders_can_start_today(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search([
+            ("project_id", "=", self.id),
+        ]).filtered(lambda task: task.production_count > 0)
+        workorders = tasks.mapped("workorder_ids").filtered(
+            "southbrook_can_start_today")
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Can Start Today - %s" % self.display_name,
+            "res_model": "mrp.workorder",
+            "domain": [("id", "in", workorders.ids)],
+            "view_mode": "list,form,gantt,calendar",
+            "context": {"create": False},
+        }
+
+    def _southbrook_project_task_queue_action(self, tasks, label, context=None):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "%s - %s" % (label, self.display_name),
+            "res_model": "project.task",
+            "domain": [("id", "in", tasks.ids)],
+            "view_mode": "list,form,kanban",
+            "context": context or {"create": False},
+        }
+
+    def action_southbrook_open_cad_cutlist_jobs(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search(
+            [("project_id", "=", self.id)]).filtered(
+                lambda task: task.production_count > 0
+                and task.cad_cutlist_review_required)
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Needs CAD / Cutlist",
+            {"create": False, "search_default_needs_cad_cutlist": 1},
+        )
+
+    def action_southbrook_open_crew_gap_jobs(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search(
+            [("project_id", "=", self.id)]).filtered(
+                lambda task: task.production_count > 0 and task.crew_gap)
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Needs Crew",
+            {"create": False, "search_default_needs_crew": 1},
+        )
+
+    def action_southbrook_open_install_risk_jobs(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search(
+            [("project_id", "=", self.id)]).filtered(
+                lambda task: task.production_count > 0
+                and task.install_date_missing)
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Install Risk",
+            {"create": False, "search_default_install_date_missing": 1},
+        )
+
+    def action_southbrook_open_equipment_blocked_jobs(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search(
+            [("project_id", "=", self.id)]).filtered(
+                lambda task: task.production_count > 0
+                and task.equipment_blocked)
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Equipment Blocked",
+            {"create": False, "search_default_equipment_blocked": 1},
+        )
+
+    def action_southbrook_open_over_capacity_jobs(self):
+        self.ensure_one()
+        tasks = self.env["project.task"].search(
+            [("project_id", "=", self.id)]).filtered(
+                lambda task: task.production_count > 0
+                and task.workcenter_over_capacity)
+        return self._southbrook_project_task_queue_action(
+            tasks,
+            "Over Capacity",
+            {"create": False, "search_default_over_capacity": 1},
+        )
 
     def action_southbrook_open_material_risk_jobs(self):
         self.ensure_one()

@@ -20,6 +20,12 @@ _FAMILY_BY_PREFIX = {
     "SB-ACCESSORY": "Accessory",
     "SB-WORKTOP": "Worktop",
 }
+_REQUIRED_CABINET_SPEC_LABELS = {
+    "x_southbrook_material_species": "Material/species",
+    "x_southbrook_hardware_specs": "Hardware specs",
+    "southbrook_door_style": "Door style",
+    "southbrook_finish": "Finish",
+}
 
 
 def _first_meaningful_line(*texts):
@@ -65,6 +71,7 @@ class ProjectTask(models.Model):
         help="'All available' only when EVERY linked MO is fully reserved.")
     job_at_risk = fields.Boolean(
         string="At Risk", compute="_compute_mrp_status",
+        search="_search_job_at_risk",
         help="Job is behind or blocked (components waiting on a started MO, "
              "or an MO past its deadline).")
     job_risk_reason = fields.Char(
@@ -222,6 +229,83 @@ class ProjectTask(models.Model):
         default="full_kitchen",
         tracking=True,
     )
+    southbrook_door_style = fields.Selection(
+        [
+            ("shaker", "Shaker"),
+            ("slab", "Slab"),
+            ("raised_panel", "Raised Panel"),
+            ("recessed_panel", "Recessed Panel"),
+            ("custom", "Custom"),
+        ],
+        string="Door Style",
+        tracking=True,
+    )
+    southbrook_finish = fields.Selection(
+        [
+            ("painted", "Painted"),
+            ("stained", "Stained"),
+            ("clear", "Clear Coat"),
+            ("laminate", "Laminate / Melamine"),
+            ("unfinished", "Unfinished"),
+            ("custom", "Custom"),
+        ],
+        string="Finish",
+        tracking=True,
+    )
+    southbrook_drawer_slide_type = fields.Selection(
+        [
+            ("undermount_soft_close", "Undermount Soft-Close"),
+            ("side_mount_soft_close", "Side-Mount Soft-Close"),
+            ("side_mount_standard", "Side-Mount Standard"),
+            ("push_to_open", "Push-to-Open"),
+            ("custom", "Custom"),
+        ],
+        string="Drawer Slide Type",
+    )
+    southbrook_hinge_type = fields.Selection(
+        [
+            ("concealed_soft_close", "Concealed Soft-Close"),
+            ("concealed_standard", "Concealed Standard"),
+            ("inset", "Inset"),
+            ("specialty", "Specialty"),
+            ("custom", "Custom"),
+        ],
+        string="Hinge Type",
+    )
+    southbrook_worktop_dependency = fields.Char(
+        string="Counter / Worktop Dependency",
+        help="Countertop, worktop, sink, or template dependency that affects "
+             "release or install readiness.")
+    southbrook_final_measurement_notes = fields.Text(
+        string="Final Measurement Notes")
+    southbrook_cad_package_link = fields.Char(
+        string="CAD Package Link")
+    southbrook_cutlist_reference = fields.Char(
+        string="Cutlist Reference")
+    southbrook_specs_complete = fields.Boolean(
+        string="Cabinet Specs Complete",
+        compute="_compute_southbrook_specs_complete",
+        search="_search_southbrook_specs_complete",
+        readonly=True,
+    )
+    cad_cutlist_review_required = fields.Boolean(
+        string="Needs CAD / Cutlist",
+        compute="_compute_phase3_queue_flags",
+        search="_search_cad_cutlist_review_required",
+        readonly=True,
+    )
+    install_date_missing = fields.Boolean(
+        string="Install Date Missing",
+        compute="_compute_phase3_queue_flags",
+        search="_search_install_date_missing",
+        readonly=True,
+    )
+    pm_stage_mismatch = fields.Boolean(
+        string="PM Stage Mismatch",
+        compute="_compute_phase3_queue_flags",
+        search="_search_pm_stage_mismatch",
+        readonly=True,
+    )
 
     # --- B4: ECO visibility -------------------------------------------------
     eco_count = fields.Integer(
@@ -288,6 +372,7 @@ class ProjectTask(models.Model):
              "last_working_user_id — i.e. nobody has ever touched them.")
     crew_gap = fields.Boolean(
         string="Crew Gap", compute="_compute_crew",
+        search="_search_crew_gap",
         help="At least one MO or WO has no operator assigned.")
 
     # --- TASK 3: Work-center load summary ----------------------------------
@@ -301,6 +386,7 @@ class ProjectTask(models.Model):
     workcenter_over_capacity = fields.Boolean(
         string="WC Over Capacity",
         compute="_compute_workcenter_load",
+        search="_search_workcenter_over_capacity",
         help="True when any work center's booked minutes exceed its "
              "daily capacity proxy.")
 
@@ -314,6 +400,7 @@ class ProjectTask(models.Model):
         string="# Work Orders", compute="_compute_workorder_rollup")
     unscheduled_workorder_count = fields.Integer(
         string="# Not Scheduled", compute="_compute_workorder_rollup",
+        search="_search_unscheduled_workorder_count",
         help="Work orders with no planned start date — the MRP scheduler "
              "needs to set these in the Work Orders view.")
     workorder_summary = fields.Char(
@@ -364,6 +451,7 @@ class ProjectTask(models.Model):
         string="# MOs Unavailable", compute="_compute_material_readiness")
     material_at_risk = fields.Boolean(
         string="Material At Risk", compute="_compute_material_readiness",
+        search="_search_material_at_risk",
         help="At least one linked MO is not fully component-available.")
     material_readiness_summary = fields.Text(
         string="Material Readiness", compute="_compute_material_readiness")
@@ -387,7 +475,8 @@ class ProjectTask(models.Model):
     maintenance_request_count = fields.Integer(
         string="# Open Maintenance", compute="_compute_equipment_readiness")
     equipment_blocked = fields.Boolean(
-        string="Equipment Blocked", compute="_compute_equipment_readiness")
+        string="Equipment Blocked", compute="_compute_equipment_readiness",
+        search="_search_equipment_blocked")
     equipment_readiness_summary = fields.Text(
         string="Equipment Readiness", compute="_compute_equipment_readiness")
 
@@ -528,6 +617,7 @@ class ProjectTask(models.Model):
         "stage_mo_note",
         "source_order_id",
         "customer_id",
+        "southbrook_specs_complete",
     )
     def _compute_phase1_operational_context(self):
         for task in self:
@@ -632,6 +722,8 @@ class ProjectTask(models.Model):
         cad_status = (self.job_cad_status or "").lower()
         if cad_status and "done" not in cad_status:
             return "Approve CAD/cutlist before releasing production."
+        if not self.southbrook_specs_complete:
+            return "Confirm cabinet specs before releasing production."
         if self.material_at_risk:
             return "Resolve component shortages or linked procurement before release."
         if self.unscheduled_workorder_count:
@@ -696,6 +788,33 @@ class ProjectTask(models.Model):
                 "ready",
                 "Customer and source sales order are linked.",
                 "%s / %s" % (self.customer_id.display_name, self.source_order_name),
+                "No action required.",
+            )
+
+        missing_specs = self._southbrook_missing_cabinet_specs()
+        if missing_specs:
+            line(
+                "cabinet_specs",
+                "Cabinet Specs",
+                "review",
+                "Missing %s." % ", ".join(missing_specs),
+                self.name or "",
+                "Confirm cabinet specs before releasing production.",
+            )
+        else:
+            line(
+                "cabinet_specs",
+                "Cabinet Specs",
+                "ready",
+                "Required cabinet specs are complete.",
+                ", ".join(
+                    item for item in (
+                        self.x_southbrook_material_species or "",
+                        self.southbrook_door_style or "",
+                        self.southbrook_finish or "",
+                    )
+                    if item
+                ),
                 "No action required.",
             )
 
@@ -911,6 +1030,25 @@ class ProjectTask(models.Model):
 
         return values
 
+    def _southbrook_missing_cabinet_specs(self):
+        self.ensure_one()
+        missing = []
+        for field_name, label in _REQUIRED_CABINET_SPEC_LABELS.items():
+            if not self[field_name]:
+                missing.append(label)
+        return missing
+
+    @api.depends(
+        "x_southbrook_material_species",
+        "x_southbrook_hardware_specs",
+        "southbrook_door_style",
+        "southbrook_finish",
+    )
+    def _compute_southbrook_specs_complete(self):
+        for task in self:
+            task.southbrook_specs_complete = not bool(
+                task._southbrook_missing_cabinet_specs())
+
     @api.depends(
         "production_count",
         "job_cad_status",
@@ -926,10 +1064,96 @@ class ProjectTask(models.Model):
         "stage_mo_divergence",
         "customer_id",
         "source_order_id",
+        "x_southbrook_material_species",
+        "x_southbrook_hardware_specs",
+        "southbrook_door_style",
+        "southbrook_finish",
     )
     def _compute_readiness_line_count(self):
         for task in self:
             task.readiness_line_count = len(task._southbrook_readiness_line_values())
+
+    @api.depends("job_cad_status", "job_install_due", "stage_mo_divergence")
+    def _compute_phase3_queue_flags(self):
+        for task in self:
+            cad_status = (task.job_cad_status or "").lower()
+            task.cad_cutlist_review_required = bool(
+                cad_status and "done" not in cad_status)
+            task.install_date_missing = not bool(task.job_install_due)
+            task.pm_stage_mismatch = bool(task.stage_mo_divergence)
+
+    def _search_boolean_compute(self, field_name, operator, value):
+        if operator not in ("=", "!="):
+            return [("id", "=", 0)]
+        desired = bool(value)
+        if value in (False, 0, "0", "false", "False"):
+            desired = False
+        if operator == "!=":
+            desired = not desired
+        tasks = self.with_context(active_test=False).search([]).filtered(
+            lambda task: bool(task[field_name]) == desired)
+        return [("id", "in", tasks.ids)]
+
+    def _search_integer_compute(self, field_name, operator, value):
+        if operator not in ("=", "!=", ">", ">=", "<", "<="):
+            return [("id", "=", 0)]
+        try:
+            expected = float(value or 0)
+        except (TypeError, ValueError):
+            return [("id", "=", 0)]
+
+        def matches(actual):
+            actual = float(actual or 0)
+            if operator == "=":
+                return actual == expected
+            if operator == "!=":
+                return actual != expected
+            if operator == ">":
+                return actual > expected
+            if operator == ">=":
+                return actual >= expected
+            if operator == "<":
+                return actual < expected
+            return actual <= expected
+
+        tasks = self.with_context(active_test=False).search([]).filtered(
+            lambda task: matches(task[field_name]))
+        return [("id", "in", tasks.ids)]
+
+    def _search_cad_cutlist_review_required(self, operator, value):
+        return self._search_boolean_compute(
+            "cad_cutlist_review_required", operator, value)
+
+    def _search_install_date_missing(self, operator, value):
+        return self._search_boolean_compute(
+            "install_date_missing", operator, value)
+
+    def _search_pm_stage_mismatch(self, operator, value):
+        return self._search_boolean_compute("pm_stage_mismatch", operator, value)
+
+    def _search_southbrook_specs_complete(self, operator, value):
+        return self._search_boolean_compute(
+            "southbrook_specs_complete", operator, value)
+
+    def _search_job_at_risk(self, operator, value):
+        return self._search_boolean_compute("job_at_risk", operator, value)
+
+    def _search_material_at_risk(self, operator, value):
+        return self._search_boolean_compute("material_at_risk", operator, value)
+
+    def _search_crew_gap(self, operator, value):
+        return self._search_boolean_compute("crew_gap", operator, value)
+
+    def _search_equipment_blocked(self, operator, value):
+        return self._search_boolean_compute("equipment_blocked", operator, value)
+
+    def _search_workcenter_over_capacity(self, operator, value):
+        return self._search_boolean_compute(
+            "workcenter_over_capacity", operator, value)
+
+    def _search_unscheduled_workorder_count(self, operator, value):
+        return self._search_integer_compute(
+            "unscheduled_workorder_count", operator, value)
 
     @api.depends("production_ids", "production_ids.bom_id")
     def _compute_eco(self):
@@ -1014,6 +1238,7 @@ class ProjectTask(models.Model):
         "stage_mo_note",
         "customer_id",
         "source_order_id",
+        "southbrook_specs_complete",
     )
     def _compute_manufacturing_readiness(self):
         for task in self:
@@ -1044,6 +1269,18 @@ class ProjectTask(models.Model):
                     "READY",
                     "customer and source sales order linked",
                 )
+
+            if not task.southbrook_specs_complete:
+                missing_specs = task._southbrook_missing_cabinet_specs()
+                gate(
+                    "Cabinet Specs",
+                    "REVIEW",
+                    "missing %s" % ", ".join(missing_specs),
+                )
+                warnings.append(
+                    "Cabinet Specs: confirm %s" % ", ".join(missing_specs))
+            else:
+                gate("Cabinet Specs", "READY", "required specs complete")
 
             if not task.production_count:
                 gate("MRP Link", "BLOCKED", "no linked manufacturing orders")
@@ -1373,6 +1610,19 @@ class ProjectTask(models.Model):
         return {
             "type": "ir.actions.act_window",
             "name": "Work Orders — %s" % (self.name or self.display_name),
+            "res_model": "mrp.workorder",
+            "domain": [("id", "in", wos.ids)],
+            "view_mode": "list,form,gantt,calendar",
+            "context": {"create": False},
+        }
+
+    def action_view_workorders_can_start_today(self):
+        self.ensure_one()
+        wos = self.production_ids.mapped("workorder_ids").filtered(
+            "southbrook_can_start_today")
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Can Start Today - %s" % (self.name or self.display_name),
             "res_model": "mrp.workorder",
             "domain": [("id", "in", wos.ids)],
             "view_mode": "list,form,gantt,calendar",
