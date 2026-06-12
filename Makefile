@@ -5,6 +5,7 @@
 # you run `make test` on your laptop the same way.
 
 .PHONY: help up down logs install install-fresh test test-quick test-bridge \
+        test-mrp-command \
         bridge-build bridge-restart shell psql .check-env \
         e2e-install e2e e2e-prod e2e-smoke e2e-journey
 
@@ -60,6 +61,7 @@ help:
 	@echo "    make test         — full sweep (~30 s + 18 render-smoke renders)"
 	@echo "    make test-quick   — same minus the render smoke (~2 s)"
 	@echo "    make test-bridge  — just the bridge module's tests"
+	@echo "    make test-mrp-command — MRP command center readiness tests"
 	@echo ""
 	@echo "  Bridge"
 	@echo "    make bridge-build   — rebuild the freecad-bridge image"
@@ -116,6 +118,10 @@ test-quick: .check-env
 test-bridge: .check-env
 	docker exec sami-odoo odoo -d $(DB) -u southbrook_freecad_bridge \
 	  --test-enable --test-tags=southbrook_freecad_bridge $(ODOO_FLAGS)
+
+test-mrp-command: .check-env
+	docker exec sami-odoo odoo -d $(DB) -u southbrook_project \
+	  --test-enable --test-tags=/southbrook_project:mrp_command $(ODOO_FLAGS)
 
 # ---------------------------------------------------------------------------
 # Playwright E2E

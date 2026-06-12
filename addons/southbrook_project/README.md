@@ -108,8 +108,20 @@ Left as operator toggles in Settings:
 odoo -d <db> -i southbrook_project
 ```
 
-Depends only on `project` (already installed on every Southbrook
-Odoo). No other prerequisites.
+This addon now spans the project command-center surface and the MRP
+readiness read model. It depends on Project, Sales, Purchasing, MRP,
+Maintenance, the shop-floor MRP modules, kitchen tooling, kitchen
+production packages, and Manufacturing Intelligence:
+
+* `project`
+* `sale_management`
+* `purchase`
+* `mrp`
+* `maintenance`
+* `southbrook_mrp_pm`
+* `southbrook_mrp_kitchen_tools`
+* `southbrook_kitchen_mrp`
+* `southbrook_manufacturing_intelligence`
 
 ## What was deliberately deferred to a human
 
@@ -133,8 +145,8 @@ Odoo). No other prerequisites.
 
 ## Tests
 
-This commit ships no automated tests — the work is configuration +
-view inheritance, both verified by:
+The responsive Project configuration and view inheritance are verified
+by:
 
 * `odoo -i southbrook_project -d <db> --stop-after-init` (clean
   install with no ParseError).
@@ -144,6 +156,19 @@ view inheritance, both verified by:
   - Project 1's description / dates / dependencies / milestones
     fields are populated.
   - A new task shows the Cabinetry Specs tab + priority badge.
+
+The MRP command center readiness scoring and gate aggregation tests
+are intentionally exposed as a focused target because the full
+repository test sweep does not cold-install `southbrook_project` and
+its MI/tooling dependencies:
+
+```bash
+make test-mrp-command
+```
+
+That target upgrades `southbrook_project` and runs only
+`/southbrook_project:mrp_command` against the configured Docker Odoo
+database.
 
 ## License
 
