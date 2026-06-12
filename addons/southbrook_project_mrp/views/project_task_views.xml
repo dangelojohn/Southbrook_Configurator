@@ -246,4 +246,69 @@
         </field>
     </record>
 
+    <record id="project_project_kanban_mission_control" model="ir.ui.view">
+        <field name="name">project.project.kanban.southbrook.mission.control</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.view_project_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//templates" position="before">
+                <field name="southbrook_job_count"/>
+                <field name="southbrook_active_mo_count"/>
+                <field name="southbrook_ready_job_count"/>
+                <field name="southbrook_at_risk_job_count"/>
+                <field name="southbrook_material_risk_count"/>
+                <field name="southbrook_unscheduled_wo_count"/>
+                <field name="southbrook_crew_gap_count"/>
+                <field name="southbrook_equipment_blocked_count"/>
+                <field name="southbrook_over_capacity_count"/>
+                <field name="southbrook_job_cost_total"/>
+                <field name="southbrook_intelligence_prompt"/>
+                <field name="southbrook_intelligence_severity"/>
+            </xpath>
+            <xpath expr="//footer" position="before">
+                <div class="o_southbrook_project_mission mt-2"
+                     t-if="record.southbrook_job_count.raw_value">
+                    <div class="small fw-semibold mb-1">
+                        <field name="southbrook_intelligence_prompt"/>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1">
+                        <span class="badge text-bg-success"
+                              t-if="record.southbrook_ready_job_count.raw_value">
+                            <field name="southbrook_ready_job_count"/> ready
+                        </span>
+                        <span class="badge text-bg-danger"
+                              t-if="record.southbrook_at_risk_job_count.raw_value">
+                            <field name="southbrook_at_risk_job_count"/> at risk
+                        </span>
+                        <span class="badge text-bg-danger"
+                              t-if="record.southbrook_material_risk_count.raw_value">
+                            <field name="southbrook_material_risk_count"/> material
+                        </span>
+                        <span class="badge text-bg-warning"
+                              t-if="record.southbrook_unscheduled_wo_count.raw_value">
+                            <field name="southbrook_unscheduled_wo_count"/> unscheduled WO
+                        </span>
+                        <span class="badge text-bg-warning"
+                              t-if="record.southbrook_crew_gap_count.raw_value">
+                            <field name="southbrook_crew_gap_count"/> crew gap
+                        </span>
+                        <span class="badge text-bg-danger"
+                              t-if="record.southbrook_equipment_blocked_count.raw_value">
+                            <field name="southbrook_equipment_blocked_count"/> equipment
+                        </span>
+                        <span class="badge text-bg-warning"
+                              t-if="record.southbrook_over_capacity_count.raw_value">
+                            <field name="southbrook_over_capacity_count"/> capacity
+                        </span>
+                    </div>
+                    <a type="object"
+                       name="action_southbrook_open_manufacturing_jobs"
+                       class="btn btn-sm btn-outline-primary mt-2">
+                        Open Production Board
+                    </a>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
 </odoo>

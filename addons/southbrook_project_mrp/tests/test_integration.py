@@ -235,3 +235,12 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertEqual(self.project.southbrook_crew_gap_count, 1)
         self.assertEqual(self.project.southbrook_intelligence_severity, "warning")
         self.assertIn("planned start", self.project.southbrook_intelligence_prompt)
+
+    def test_project_kanban_has_mission_control_fields(self):
+        view = self.env.ref(
+            "southbrook_project_mrp.project_project_kanban_mission_control")
+        arch = view.arch_db
+        self.assertIn("southbrook_intelligence_prompt", arch)
+        self.assertIn("southbrook_unscheduled_wo_count", arch)
+        self.assertIn("southbrook_equipment_blocked_count", arch)
+        self.assertIn("action_southbrook_open_manufacturing_jobs", arch)
