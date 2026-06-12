@@ -293,7 +293,19 @@ class TestMrpCommandCenter(TransactionCase):
         with self.assertRaises(AccessError):
             task.write({"x_southbrook_readiness_state": "ready"})
         with self.assertRaises(AccessError):
+            task.with_context(southbrook_skip_readiness_refresh=True).write({
+                "x_southbrook_readiness_state": "ready",
+            })
+        with self.assertRaises(AccessError):
             self.env["project.task"].create({
+                "name": "Forged Ready Job",
+                "project_id": task.project_id.id,
+                "x_southbrook_readiness_state": "ready",
+            })
+        with self.assertRaises(AccessError):
+            self.env["project.task"].with_context(
+                southbrook_skip_readiness_refresh=True,
+            ).create({
                 "name": "Forged Ready Job",
                 "project_id": task.project_id.id,
                 "x_southbrook_readiness_state": "ready",

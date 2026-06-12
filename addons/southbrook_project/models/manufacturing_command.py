@@ -70,6 +70,7 @@ READINESS_SNAPSHOT_FIELDS = {
     "x_southbrook_next_action",
     "x_southbrook_gate_json",
 }
+READINESS_SNAPSHOT_WRITE_TOKEN = "southbrook_mrp_readiness_snapshot"
 
 TASK_READINESS_SOURCE_FIELDS = {
     "name",
@@ -86,6 +87,7 @@ def _southbrook_refresh_task_snapshots(tasks):
     if tasks:
         tasks.sudo().with_context(
             southbrook_skip_readiness_refresh=True,
+            southbrook_readiness_snapshot_token=READINESS_SNAPSHOT_WRITE_TOKEN,
         ).action_southbrook_refresh_mrp_readiness_snapshot()
 
 
@@ -132,7 +134,8 @@ class ProjectTask(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         if (
-            not self.env.context.get("southbrook_skip_readiness_refresh")
+            self.env.context.get("southbrook_readiness_snapshot_token")
+            != READINESS_SNAPSHOT_WRITE_TOKEN
             and any(READINESS_SNAPSHOT_FIELDS.intersection(vals) for vals in vals_list)
         ):
             raise AccessError(_(
@@ -147,7 +150,8 @@ class ProjectTask(models.Model):
     def write(self, vals):
         if (
             READINESS_SNAPSHOT_FIELDS.intersection(vals)
-            and not self.env.context.get("southbrook_skip_readiness_refresh")
+            and self.env.context.get("southbrook_readiness_snapshot_token")
+            != READINESS_SNAPSHOT_WRITE_TOKEN
         ):
             raise AccessError(_(
                 "MRP readiness snapshots are calculated fields. Use "
@@ -167,7 +171,10 @@ class ProjectTask(models.Model):
             score, state, blocked_gate, summary, next_action = (
                 task._southbrook_score_from_gates(gates)
             )
-            task.with_context(southbrook_skip_readiness_refresh=True).write({
+            task.with_context(
+                southbrook_skip_readiness_refresh=True,
+                southbrook_readiness_snapshot_token=READINESS_SNAPSHOT_WRITE_TOKEN,
+            ).write({
                 "x_southbrook_readiness_score": score,
                 "x_southbrook_readiness_state": state,
                 "x_southbrook_blocking_gate": blocked_gate,
@@ -422,7 +429,9 @@ class ProjectTask(models.Model):
             workorders = task._southbrook_release_records(related_workorders)
             for workorder in workorders:
                 if hasattr(workorder, "action_check_tool_readiness"):
-                    workorder.action_check_tool_readiness()
+                    workorder.with_context(
+                        southbrook_defer_readiness_refresh=True,
+                    ).action_check_tool_readiness()
         self.action_southbrook_refresh_mrp_readiness_snapshot()
         return True
 
