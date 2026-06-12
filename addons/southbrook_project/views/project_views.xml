@@ -85,6 +85,15 @@
                 <field name="milestone_count_reached"/>
                 <field name="last_update_status"/>
                 <field name="is_favorite"/>
+                <field name="activity_ids"/>
+                <field name="alias_email"/>
+                <field name="color"/>
+                <field name="date_start"/>
+                <field name="display_name"/>
+                <field name="partner_id"/>
+                <field name="rating_avg"/>
+                <field name="tag_ids"/>
+                <field name="user_id"/>
             </xpath>
             <xpath expr="//field[@name='open_task_count']"
                    position="replace">

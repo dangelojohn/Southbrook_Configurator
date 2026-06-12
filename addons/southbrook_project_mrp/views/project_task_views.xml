@@ -242,6 +242,21 @@
                 <field name="job_at_risk"/>
                 <field name="eco_pending_count"/>
                 <field name="components_available"/>
+                <field name="activity_ids"/>
+                <field name="color"/>
+                <field name="date_deadline"/>
+                <field name="displayed_image_id"/>
+                <field name="is_rotting"/>
+                <field name="milestone_id"/>
+                <field name="name"/>
+                <field name="parent_id"/>
+                <field name="partner_id"/>
+                <field name="priority"/>
+                <field name="project_id"/>
+                <field name="rotting_days"/>
+                <field name="tag_ids"/>
+                <field name="task_properties"/>
+                <field name="user_ids"/>
             </xpath>
             <xpath expr="//footer" position="inside">
                 <span class="badge text-bg-danger ms-1" t-if="record.job_at_risk.raw_value"
