@@ -38,7 +38,7 @@ These are flagged in the README for a human operator.
     "author": "Southbrook Cabinetry / OdooIQ",
     "license": "LGPL-3",
     "category": "Services/Project",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.4.0",
     "depends": [
         "project",
         "sale_management",
@@ -51,8 +51,13 @@ These are flagged in the README for a human operator.
         "southbrook_manufacturing_intelligence",
     ],
     "data": [
+        "security/groups.xml",
+        "security/ir.model.access.csv",
         "data/project_tags.xml",
+        "data/job_templates.xml",
         "views/project_task_views.xml",
+        "views/job_template_views.xml",
+        "views/data_quality_views.xml",
         "views/mrp_command_center_views.xml",
     ],
     "post_init_hook": "post_init_backfill_project_1",

@@ -12,6 +12,8 @@ class TestMrpCommandViews(TransactionCase):
         arch = view.arch_db
         for marker in [
             "southbrook_mrp_command",
+            "southbrook_release_checklist",
+            "southbrook_project.group_southbrook_pm",
             "x_southbrook_readiness_score",
             "x_southbrook_readiness_state",
             "x_southbrook_blocking_gate",
@@ -36,6 +38,21 @@ class TestMrpCommandViews(TransactionCase):
             "southbrook_project.menu_mrp_command_blocked_jobs",
             "southbrook_project.menu_mrp_command_ready_jobs",
             "southbrook_project.menu_mrp_command_at_risk_jobs",
+            "southbrook_project.view_southbrook_job_template_list",
+            "southbrook_project.view_southbrook_job_template_form",
+            "southbrook_project.action_southbrook_job_templates",
+            "southbrook_project.menu_southbrook_job_templates",
+            "southbrook_project.view_southbrook_data_quality_issue_list",
+            "southbrook_project.view_southbrook_data_quality_issue_form",
+            "southbrook_project.action_southbrook_data_quality_issues",
+            "southbrook_project.server_action_southbrook_data_quality_dry_run",
+            "southbrook_project.menu_southbrook_generate_data_quality_issues",
+            "southbrook_project.menu_southbrook_data_quality_issues",
+            "southbrook_project.group_southbrook_pm",
+            "southbrook_project.group_southbrook_shop_lead",
+            "southbrook_project.group_southbrook_designer",
+            "southbrook_project.group_southbrook_installer",
+            "southbrook_project.group_southbrook_executive",
         ]
         for xmlid in xmlids:
             self.assertTrue(self.env.ref(xmlid, raise_if_not_found=False), xmlid)
@@ -55,8 +72,17 @@ class TestMrpCommandViews(TransactionCase):
             "readiness_at_risk",
             "group_blocking_gate",
             "group_readiness_state",
+            "group_cabinet_family",
         ]:
             self.assertIn(marker, search.arch_db)
+        for menu_xmlid in [
+            "southbrook_project.menu_mrp_command_daily_meeting",
+            "southbrook_project.menu_mrp_command_blocked_jobs",
+            "southbrook_project.menu_mrp_command_ready_jobs",
+            "southbrook_project.menu_mrp_command_at_risk_jobs",
+        ]:
+            groups = self.env.ref(menu_xmlid).groups_id.get_external_id().values()
+            self.assertIn("southbrook_project.group_southbrook_pm", groups)
 
     def test_mrp_command_readiness_fields_are_readonly_in_views(self):
         readonly_fields = [

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="view_southbrook_job_template_list" model="ir.ui.view">
+      <field name="name">southbrook.job.template.list</field>
+      <field name="model">southbrook.job.template</field>
+      <field name="arch" type="xml">
+        <list string="Job Templates">
+          <field name="sequence" widget="handle"/>
+          <field name="name"/>
+          <field name="job_type"/>
+          <field name="cabinet_family"/>
+          <field name="material_species"/>
+          <field name="unit_count"/>
+          <field name="active"/>
+        </list>
+      </field>
+    </record>
+
+    <record id="view_southbrook_job_template_form" model="ir.ui.view">
+      <field name="name">southbrook.job.template.form</field>
+      <field name="model">southbrook.job.template</field>
+      <field name="arch" type="xml">
+        <form string="Job Template">
+          <header>
+            <button name="action_create_project_job"
+                    string="Start Job"
+                    type="object"
+                    class="btn-primary"/>
+          </header>
+          <sheet>
+            <group>
+              <group>
+                <field name="name"/>
+                <field name="sequence"/>
+                <field name="active"/>
+                <field name="job_type"/>
+              </group>
+              <group>
+                <field name="cabinet_family"/>
+                <field name="material_species"/>
+                <field name="unit_count"/>
+              </group>
+            </group>
+            <group string="Hardware / Specs">
+              <field name="hardware_specs" nolabel="1"/>
+            </group>
+            <field name="checklist_template_ids">
+              <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="gate"/>
+                <field name="required"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+
+    <record id="view_southbrook_job_template_search" model="ir.ui.view">
+      <field name="name">southbrook.job.template.search</field>
+      <field name="model">southbrook.job.template</field>
+      <field name="arch" type="xml">
+        <search string="Job Templates">
+          <field name="name"/>
+          <field name="job_type"/>
+          <field name="cabinet_family"/>
+          <filter name="active" string="Active" domain="[('active','=',True)]"/>
+          <group>
+            <filter name="group_job_type"
+                    string="Job Type"
+                    context="{'group_by':'job_type'}"/>
+            <filter name="group_family"
+                    string="Cabinet Family"
+                    context="{'group_by':'cabinet_family'}"/>
+          </group>
+        </search>
+      </field>
+    </record>
+
+    <record id="action_southbrook_job_templates" model="ir.actions.act_window">
+      <field name="name">Job Templates</field>
+      <field name="res_model">southbrook.job.template</field>
+      <field name="view_mode">list,form</field>
+      <field name="search_view_id" ref="view_southbrook_job_template_search"/>
+      <field name="context">{'search_default_active': 1}</field>
+    </record>
+
+    <menuitem id="menu_southbrook_job_templates"
+              parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+              name="Job Templates"
+              action="action_southbrook_job_templates"
+              groups="southbrook_project.group_southbrook_pm"
+              sequence="2"/>
+  </data>
+</odoo>

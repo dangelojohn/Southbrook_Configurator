@@ -22,6 +22,8 @@
                       name="southbrook_cabinetry_specs">
                     <group>
                         <group string="Material + Hardware">
+                            <field name="x_southbrook_job_type"/>
+                            <field name="x_southbrook_cabinet_family"/>
                             <field name="x_southbrook_material_species"/>
                             <field name="x_southbrook_unit_count"/>
                             <field name="x_southbrook_priority"
@@ -32,7 +34,13 @@
                         <group string="Linkage">
                             <field name="x_southbrook_sale_order_id"
                                    options="{'no_create': True, 'no_open': False}"/>
+                            <field name="x_southbrook_install_due_date"/>
                         </group>
+                    </group>
+                    <group string="Structured Spec Summary">
+                        <field name="x_southbrook_cabinet_spec_summary"
+                               nolabel="1"
+                               readonly="1"/>
                     </group>
                     <group string="Hardware Specs">
                         <field name="x_southbrook_hardware_specs"
@@ -56,11 +64,26 @@
                                    readonly="1"/>
                             <field name="x_southbrook_next_action"
                                    readonly="1"/>
+                            <field name="x_southbrook_checklist_state"
+                                   widget="badge"
+                                   readonly="1"
+                                   decoration-success="x_southbrook_checklist_state == 'ready'"
+                                   decoration-warning="x_southbrook_checklist_state == 'warning'"
+                                   decoration-danger="x_southbrook_checklist_state == 'blocked'"/>
                         </group>
                         <group string="Source Links">
                             <field name="x_southbrook_sale_order_id"
                                    options="{'no_create': True, 'no_open': False}"/>
+                            <field name="x_southbrook_pm_phase"/>
+                            <field name="x_southbrook_manufacturing_reality"
+                                   readonly="1"/>
                         </group>
+                    </group>
+                    <group string="Checklist Summary">
+                        <field name="x_southbrook_checklist_summary"
+                               nolabel="1"
+                               readonly="1"
+                               groups="southbrook_project.group_southbrook_pm,southbrook_project.group_southbrook_shop_lead,southbrook_project.group_southbrook_designer,southbrook_project.group_southbrook_installer,southbrook_project.group_southbrook_executive,base.group_system"/>
                     </group>
                     <group string="Blocker Summary">
                         <field name="x_southbrook_blocker_summary"
@@ -72,6 +95,24 @@
                                nolabel="1"
                                readonly="1"/>
                     </group>
+                </page>
+                <page string="Release Checklist"
+                      name="southbrook_release_checklist"
+                      groups="southbrook_project.group_southbrook_pm,southbrook_project.group_southbrook_shop_lead,southbrook_project.group_southbrook_designer,southbrook_project.group_southbrook_installer,southbrook_project.group_southbrook_executive,base.group_system">
+                    <field name="x_southbrook_checklist_item_ids">
+                        <list editable="bottom"
+                              decoration-success="done or waived"
+                              decoration-danger="required and not done and not waived"
+                              decoration-warning="not required and not done and not waived">
+                            <field name="sequence" widget="handle"/>
+                            <field name="name"/>
+                            <field name="gate"/>
+                            <field name="required"/>
+                            <field name="done"/>
+                            <field name="waived"/>
+                            <field name="note"/>
+                        </list>
+                    </field>
                 </page>
             </xpath>
 
@@ -89,6 +130,11 @@
                         type="object"
                         class="btn-primary"
                         invisible="x_southbrook_readiness_state == 'blocked'"/>
+                <button name="action_southbrook_open_family_progress"
+                        string="Family Progress"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="not x_southbrook_cabinet_family"/>
                 <field name="x_southbrook_readiness_state"
                        widget="badge"
                        readonly="1"

@@ -370,6 +370,144 @@ class TestMrpCommandCenter(TransactionCase):
             task.x_southbrook_blocker_summary,
         )
 
+    def test_job_template_creates_kitchen_job_with_checklist(self):
+        project = self.env["project.project"].create({
+            "name": "Kitchen Template Project",
+        })
+        template = self.env["southbrook.job.template"].create({
+            "name": "Kitchen Install Job",
+            "job_type": "kitchen",
+            "cabinet_family": "base",
+            "material_species": "maple",
+            "unit_count": 12,
+            "hardware_specs": "Blum hinges; nickel pulls",
+            "checklist_template_ids": [
+                (0, 0, {
+                    "name": "CAD approved",
+                    "gate": "engineering",
+                    "required": True,
+                    "sequence": 10,
+                }),
+                (0, 0, {
+                    "name": "Install package ready",
+                    "gate": "install",
+                    "required": True,
+                    "sequence": 20,
+                }),
+            ],
+        })
+
+        action = template.action_create_project_job(project.id)
+        task = self.env["project.task"].browse(action["res_id"])
+
+        self.assertEqual(task.project_id, project)
+        self.assertEqual(task.x_southbrook_job_type, "kitchen")
+        self.assertEqual(task.x_southbrook_cabinet_family, "base")
+        self.assertEqual(task.x_southbrook_material_species, "maple")
+        self.assertEqual(task.x_southbrook_unit_count, 12)
+        self.assertEqual(len(task.x_southbrook_checklist_item_ids), 2)
+        self.assertEqual(task.x_southbrook_checklist_state, "blocked")
+
+    def test_job_template_without_context_uses_named_kitchen_project(self):
+        arbitrary = self.env["project.project"].create({
+            "name": "AAA Arbitrary Project",
+        })
+        template = self.env["southbrook.job.template"].create({
+            "name": "Repair Job",
+            "job_type": "repair",
+            "cabinet_family": "accessory",
+            "unit_count": 1,
+        })
+
+        action = template.action_create_project_job()
+        task = self.env["project.task"].browse(action["res_id"])
+
+        self.assertNotEqual(task.project_id, arbitrary)
+        self.assertEqual(task.project_id.name, "Southbrook Kitchen Jobs")
+
+    def test_required_checklist_item_blocks_readiness_until_done(self):
+        task = self._new_task()
+        self.env["southbrook.job.checklist.item"].create({
+            "task_id": task.id,
+            "name": "CAD approved",
+            "gate": "engineering",
+            "required": True,
+        })
+
+        task.action_southbrook_refresh_mrp_readiness_snapshot()
+        self.assertEqual(task.x_southbrook_readiness_state, "blocked")
+        self.assertEqual(task.x_southbrook_blocking_gate, "engineering")
+        self.assertIn("required release checklist", task.x_southbrook_blocker_summary)
+
+        task.x_southbrook_checklist_item_ids.write({"done": True})
+        self.assertNotEqual(task.x_southbrook_checklist_state, "blocked")
+
+    def test_optional_checklist_warning_does_not_downgrade_mrp_blocker(self):
+        task, sale = self._new_sale_order_task()
+        self._new_mo_for_task(task)
+        self.env["southbrook.job.checklist.item"].create({
+            "task_id": task.id,
+            "name": "Optional cutlist review",
+            "gate": "bom_cutlist",
+            "required": False,
+        })
+
+        task.action_southbrook_refresh_mrp_readiness_snapshot()
+
+        self.assertEqual(task.x_southbrook_readiness_state, "blocked")
+        self.assertEqual(task.x_southbrook_blocking_gate, "bom_cutlist")
+        self.assertIn("production package", task.x_southbrook_blocker_summary.lower())
+
+    def test_install_due_warning_does_not_downgrade_install_blocker(self):
+        task, sale = self._new_sale_order_task()
+        mo = self._new_mo_for_task(task)
+        self._new_package_for_mo(mo)
+        task.write({
+            "x_southbrook_install_due_date": "2026-06-30",
+            "date_deadline": False,
+        })
+        self.env["southbrook.mi.check"].create({
+            "production_id": mo.id,
+            "name": "Installer not assigned",
+            "severity": "blocker",
+            "category": "install",
+            "stage": "install",
+            "message": "Install crew is not assigned.",
+            "recommendation": "Assign an installer before release.",
+            "is_gate": True,
+        })
+
+        task.action_southbrook_refresh_mrp_readiness_snapshot()
+
+        self.assertEqual(task.x_southbrook_readiness_state, "blocked")
+        self.assertEqual(task.x_southbrook_blocking_gate, "install")
+        self.assertIn("Install crew", task.x_southbrook_blocker_summary)
+        self.assertNotIn("deadline is blank", task.x_southbrook_blocker_summary)
+
+    def test_cabinet_specs_are_available_on_command_center(self):
+        task = self._new_task(
+            x_southbrook_job_type="vanity",
+            x_southbrook_cabinet_family="vanity",
+            x_southbrook_material_species="oak_white",
+            x_southbrook_unit_count=3,
+            x_southbrook_hardware_specs="Soft-close vanity drawers",
+        )
+
+        self.assertIn("Vanity", task.x_southbrook_cabinet_spec_summary)
+        self.assertIn("White Oak", task.x_southbrook_cabinet_spec_summary)
+        self.assertIn("3", task.x_southbrook_cabinet_spec_summary)
+        self.assertIn("Soft-close", task.x_southbrook_cabinet_spec_summary)
+
+    def test_cabinet_family_progress_action_is_drillable(self):
+        task = self._new_task(x_southbrook_cabinet_family="base")
+        family = self.env.ref("southbrook_mrp_pm.family_base")
+
+        action = task.action_southbrook_open_family_progress()
+
+        self.assertEqual(action["res_model"], "southbrook.cabinet.family")
+        self.assertEqual(action["res_id"], family.id)
+        self.assertEqual(action["view_mode"], "form")
+
     def test_partial_packages_block_bom_cutlist_gate(self):
         task, sale = self._new_sale_order_task()
         packaged_mo = self._new_mo_for_task(task)

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <record id="job_template_kitchen" model="southbrook.job.template">
+      <field name="name">Kitchen Job</field>
+      <field name="sequence">10</field>
+      <field name="job_type">kitchen</field>
+      <field name="cabinet_family">base</field>
+      <field name="material_species">maple</field>
+      <field name="unit_count">12</field>
+      <field name="hardware_specs">Confirm hinges, pulls, drawer slides, and install hardware from quote.</field>
+    </record>
+    <record id="job_template_kitchen_cad" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_kitchen"/>
+      <field name="name">CAD and shop drawings approved</field>
+      <field name="gate">engineering</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="job_template_kitchen_cutlist" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_kitchen"/>
+      <field name="name">BOM and cutlist released</field>
+      <field name="gate">bom_cutlist</field>
+      <field name="sequence">20</field>
+    </record>
+    <record id="job_template_kitchen_install" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_kitchen"/>
+      <field name="name">Install package and delivery date confirmed</field>
+      <field name="gate">install</field>
+      <field name="sequence">30</field>
+    </record>
+
+    <record id="job_template_vanity" model="southbrook.job.template">
+      <field name="name">Vanity Job</field>
+      <field name="sequence">20</field>
+      <field name="job_type">vanity</field>
+      <field name="cabinet_family">vanity</field>
+      <field name="material_species">mdf</field>
+      <field name="unit_count">1</field>
+      <field name="hardware_specs">Confirm drawer hardware, sink cutout, and finish schedule.</field>
+    </record>
+    <record id="job_template_vanity_measure" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_vanity"/>
+      <field name="name">Site measure and sink details confirmed</field>
+      <field name="gate">engineering</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="job_template_vanity_finish" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_vanity"/>
+      <field name="name">Finish color and hardware confirmed</field>
+      <field name="gate">materials</field>
+      <field name="sequence">20</field>
+    </record>
+
+    <record id="job_template_repair" model="southbrook.job.template">
+      <field name="name">Repair Job</field>
+      <field name="sequence">30</field>
+      <field name="job_type">repair</field>
+      <field name="cabinet_family">accessory</field>
+      <field name="unit_count">1</field>
+      <field name="hardware_specs">Document deficiency, replacement material, and customer appointment.</field>
+    </record>
+    <record id="job_template_repair_scope" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_repair"/>
+      <field name="name">Repair scope and photos attached</field>
+      <field name="gate">estimate</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="job_template_repair_parts" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_repair"/>
+      <field name="name">Replacement parts staged</field>
+      <field name="gate">materials</field>
+      <field name="sequence">20</field>
+    </record>
+
+    <record id="job_template_warranty" model="southbrook.job.template">
+      <field name="name">Warranty Job</field>
+      <field name="sequence">40</field>
+      <field name="job_type">warranty</field>
+      <field name="cabinet_family">accessory</field>
+      <field name="unit_count">1</field>
+      <field name="hardware_specs">Confirm warranty approval, root cause, and no-charge disposition.</field>
+    </record>
+    <record id="job_template_warranty_approval" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_warranty"/>
+      <field name="name">Warranty approval recorded</field>
+      <field name="gate">estimate</field>
+      <field name="sequence">10</field>
+    </record>
+    <record id="job_template_warranty_install" model="southbrook.job.template.line">
+      <field name="template_id" ref="job_template_warranty"/>
+      <field name="name">Service visit scheduled</field>
+      <field name="gate">install</field>
+      <field name="sequence">20</field>
+    </record>
+  </data>
+</odoo>

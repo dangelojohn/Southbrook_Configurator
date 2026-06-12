@@ -102,6 +102,61 @@ Left as operator toggles in Settings:
 * Search view: Rush / Urgent quick filters, search by SO + material,
   group-by priority + material.
 
+### Kitchen Job Command Center
+
+`models/manufacturing_command.py` and `models/job_command.py` turn
+Project into the PM command surface while MRP remains the backend
+system of record.
+
+* Readiness snapshots: stored score, state, blocking gate, blocker
+  summary, next action, and gate JSON so queues can search/group
+  reliably.
+* Release gate: `Release to Production` recomputes readiness and
+  blocks if required materials, checklist, tooling, MRP, or MI gates
+  are not ready.
+* Job templates: Kitchen, Vanity, Repair, and Warranty templates seed
+  structured specs and release checklist items.
+* Checklist readiness: unchecked required checklist items block the
+  mapped readiness gate; optional unchecked items warn.
+* Cabinet specs: job type, cabinet family, material/species, unit
+  count, hardware specs, install due, and spec summary are visible on
+  the task form and command queues.
+* Cabinet-family drilldown: the task header opens the existing
+  `southbrook.cabinet.family` progress surface.
+
+PM menu entries under `Southbrook PM`:
+
+* Job Templates
+* Daily Production Meeting
+* Blocked Jobs
+* Ready to Release
+* At-Risk Jobs
+* Data Quality Dry Run
+
+### Rollout Data Quality
+
+`models/data_quality.py` provides a dry-run report for rollout
+cleanup. It creates issue records only; it does not delete or mutate
+the source production records.
+
+The report flags:
+
+* blank Kitchen Project
+* blank Install Due
+* placeholder Southbrook product costs
+* demo scrap/unbuild records
+* queue overlap
+* equipment count mismatches
+
+Safe actions on the issue record:
+
+* `Exclude from PM Reporting` marks the issue excluded.
+* `Archive Issue` archives the issue record.
+
+Pilot documentation for `S00235` lives at:
+
+* `docs/SOUTHBROOK_PROJECT_ROLLOUT_PILOT.md`
+
 ## Install
 
 ```bash
