@@ -268,13 +268,23 @@ class ProjectTask(models.Model):
             return self.env["mrp.workorder"]
         return productions.mapped("workorder_ids")
 
+    def _southbrook_release_records(self, records, operation="write"):
+        if not records:
+            return records
+        user_records = self.env[records._name].browse(records.ids).exists()
+        user_records.check_access_rights(operation)
+        user_records.check_access_rule(operation)
+        return user_records
+
     def _southbrook_notification_action(self):
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
                 "title": _("Ready for Production"),
-                "message": _("All release gates are ready."),
+                "message": _(
+                    "No production release action is available for this task."
+                ),
                 "type": "success",
                 "sticky": False,
             },
@@ -285,8 +295,9 @@ class ProjectTask(models.Model):
             return productions
         if not productions:
             return self._southbrook_notification_action()
-        productions.check_access_rights("read")
-        productions.check_access_rule("read")
+        productions = self._southbrook_release_records(productions, "read")
+        if not productions:
+            return self._southbrook_notification_action()
         action = {
             "type": "ir.actions.act_window",
             "name": _("Manufacturing Orders"),
@@ -299,22 +310,27 @@ class ProjectTask(models.Model):
             })
         else:
             action.update({
-                "view_mode": "tree,form",
+                "view_mode": "list,form",
                 "domain": [("id", "in", productions.ids)],
             })
         return action
 
     def action_southbrook_recompute_mrp_readiness(self):
         for task in self:
-            productions = task._southbrook_related_productions()
+            related_productions = task._southbrook_related_productions()
+            productions = task._southbrook_release_records(related_productions)
             for production in productions:
                 if hasattr(production, "action_recompute_manufacturing_intelligence"):
                     production.action_recompute_manufacturing_intelligence()
-            packages = task._southbrook_related_packages(productions)
+            related_packages = task._southbrook_related_packages(related_productions)
+            packages = task._southbrook_release_records(related_packages)
             for package in packages:
                 if hasattr(package, "action_recompute_manufacturing_intelligence"):
                     package.action_recompute_manufacturing_intelligence()
-            workorders = task._southbrook_related_workorders(productions)
+            related_workorders = task._southbrook_related_workorders(
+                related_productions
+            )
+            workorders = task._southbrook_release_records(related_workorders)
             for workorder in workorders:
                 if hasattr(workorder, "action_check_tool_readiness"):
                     workorder.action_check_tool_readiness()

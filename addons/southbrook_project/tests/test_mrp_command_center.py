@@ -406,20 +406,59 @@ class TestMrpCommandCenter(TransactionCase):
 
         self.assertFalse(calls)
 
-    def test_successful_release_returns_mo_action_dict(self):
+    def test_release_recompute_rebrowses_productions_without_sudo(self):
         task, sale = self._new_sale_order_task()
         mo = self._new_mo_for_task(task)
-        self._new_package_for_mo(mo)
+        Production = type(mo)
+        original = getattr(
+            Production, "action_recompute_manufacturing_intelligence", None
+        )
+        recompute_env_su = []
+
+        def fake_recompute(recordset):
+            recompute_env_su.append(recordset.env.su)
+            return True
+
+        Production.action_recompute_manufacturing_intelligence = fake_recompute
+        try:
+            task.action_southbrook_recompute_mrp_readiness()
+        finally:
+            if original:
+                Production.action_recompute_manufacturing_intelligence = original
+            else:
+                delattr(
+                    Production,
+                    "action_recompute_manufacturing_intelligence",
+                )
+
+        self.assertTrue(recompute_env_su)
+        self.assertFalse(any(recompute_env_su))
+
+    def test_successful_release_returns_mo_action_dict(self):
+        task, sale = self._new_sale_order_task()
         Sale = type(sale)
+        Production = type(self.env["mrp.production"])
         original = getattr(Sale, "action_send_to_production", None)
+        original_check_access_rights = Production.check_access_rights
+        access_env_su = []
 
         def fake_action_send_to_production(recordset):
-            return recordset.env["mrp.production"].browse(mo.id)
+            return self._new_mo_for_task(task).sudo()
+
+        def fake_check_access_rights(
+            recordset, operation, raise_exception=True
+        ):
+            access_env_su.append(recordset.env.su)
+            return original_check_access_rights(
+                recordset, operation, raise_exception=raise_exception
+            )
 
         Sale.action_send_to_production = fake_action_send_to_production
+        Production.check_access_rights = fake_check_access_rights
         try:
             action = task.action_southbrook_release_to_production()
         finally:
+            Production.check_access_rights = original_check_access_rights
             if original:
                 Sale.action_send_to_production = original
             else:
@@ -428,4 +467,18 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertIsInstance(action, dict)
         self.assertEqual(action["type"], "ir.actions.act_window")
         self.assertEqual(action["res_model"], "mrp.production")
-        self.assertEqual(action["res_id"], mo.id)
+        self.assertEqual(action["view_mode"], "form")
+        self.assertTrue(access_env_su)
+        self.assertFalse(any(access_env_su))
+
+    def test_release_without_sale_returns_neutral_notification(self):
+        task = self._new_task()
+
+        action = task.action_southbrook_release_to_production()
+
+        self.assertEqual(action["type"], "ir.actions.client")
+        self.assertEqual(action["tag"], "display_notification")
+        self.assertEqual(
+            action["params"]["message"],
+            "No production release action is available for this task.",
+        )
