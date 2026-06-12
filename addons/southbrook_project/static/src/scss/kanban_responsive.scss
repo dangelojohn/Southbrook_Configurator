@@ -97,3 +97,37 @@
 body.project_task_kanban {
     @include southbrook-project-kanban-desktop;
 }
+
+// ─── Project chatter placement ─────────────────────────────────────
+// Odoo's wide-screen form layout moves chatter/messages to a right rail.
+// Southbrook uses Project as a production control surface; keeping the
+// messages underneath the form preserves full-width manufacturing panels and
+// keeps the discussion/history in the natural review position at the bottom.
+// Scope this to Project screens only so Sales, MRP, Purchase, etc. keep their
+// stock chatter behavior.
+[data-model="project.task"].o_form_view,
+.o_form_view[data-model="project.task"],
+[data-model="project.project"].o_form_view,
+.o_form_view[data-model="project.project"] {
+    .o_form_renderer,
+    .o_form_view_container {
+        flex-direction: column !important;
+    }
+
+    .o_form_sheet_bg,
+    .o_form_sheet {
+        max-width: none !important;
+    }
+
+    .o-mail-Form-chatter,
+    .o-mail-Chatter,
+    .o_Chatter {
+        flex: 0 0 auto !important;
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        border-left: 0 !important;
+        border-top: 1px solid var(--border-color, #dee2e6);
+        margin-top: 1rem;
+    }
+}
