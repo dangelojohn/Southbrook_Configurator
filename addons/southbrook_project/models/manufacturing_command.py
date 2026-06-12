@@ -70,7 +70,6 @@ READINESS_SNAPSHOT_FIELDS = {
     "x_southbrook_next_action",
     "x_southbrook_gate_json",
 }
-READINESS_SNAPSHOT_WRITE_TOKEN = "southbrook_mrp_readiness_snapshot"
 
 TASK_READINESS_SOURCE_FIELDS = {
     "name",
@@ -87,7 +86,6 @@ def _southbrook_refresh_task_snapshots(tasks):
     if tasks:
         tasks.sudo().with_context(
             southbrook_skip_readiness_refresh=True,
-            southbrook_readiness_snapshot_token=READINESS_SNAPSHOT_WRITE_TOKEN,
         ).action_southbrook_refresh_mrp_readiness_snapshot()
 
 
@@ -133,11 +131,7 @@ class ProjectTask(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        if (
-            self.env.context.get("southbrook_readiness_snapshot_token")
-            != READINESS_SNAPSHOT_WRITE_TOKEN
-            and any(READINESS_SNAPSHOT_FIELDS.intersection(vals) for vals in vals_list)
-        ):
+        if any(READINESS_SNAPSHOT_FIELDS.intersection(vals) for vals in vals_list):
             raise AccessError(_(
                 "MRP readiness snapshots are calculated fields. Use "
                 "Recompute Readiness to update them."
@@ -148,11 +142,7 @@ class ProjectTask(models.Model):
         return tasks
 
     def write(self, vals):
-        if (
-            READINESS_SNAPSHOT_FIELDS.intersection(vals)
-            and self.env.context.get("southbrook_readiness_snapshot_token")
-            != READINESS_SNAPSHOT_WRITE_TOKEN
-        ):
+        if READINESS_SNAPSHOT_FIELDS.intersection(vals):
             raise AccessError(_(
                 "MRP readiness snapshots are calculated fields. Use "
                 "Recompute Readiness to update them."
@@ -171,20 +161,28 @@ class ProjectTask(models.Model):
             score, state, blocked_gate, summary, next_action = (
                 task._southbrook_score_from_gates(gates)
             )
-            task.with_context(
-                southbrook_skip_readiness_refresh=True,
-                southbrook_readiness_snapshot_token=READINESS_SNAPSHOT_WRITE_TOKEN,
-            ).write({
-                "x_southbrook_readiness_score": score,
-                "x_southbrook_readiness_state": state,
-                "x_southbrook_blocking_gate": blocked_gate,
-                "x_southbrook_blocker_summary": summary,
-                "x_southbrook_next_action": next_action,
-                "x_southbrook_gate_json": json.dumps(
-                    task._southbrook_gate_rows(gates),
-                    sort_keys=True,
+            task.env.cr.execute(
+                """
+                UPDATE project_task
+                   SET x_southbrook_readiness_score = %s,
+                       x_southbrook_readiness_state = %s,
+                       x_southbrook_blocking_gate = %s,
+                       x_southbrook_blocker_summary = %s,
+                       x_southbrook_next_action = %s,
+                       x_southbrook_gate_json = %s
+                 WHERE id = %s
+                """,
+                (
+                    score,
+                    state,
+                    blocked_gate or None,
+                    summary or None,
+                    next_action or None,
+                    json.dumps(task._southbrook_gate_rows(gates), sort_keys=True),
+                    task.id,
                 ),
-            })
+            )
+            task.invalidate_recordset(list(READINESS_SNAPSHOT_FIELDS))
         return True
 
     def _southbrook_default_gate(self, gate, state="ready", message=False,
