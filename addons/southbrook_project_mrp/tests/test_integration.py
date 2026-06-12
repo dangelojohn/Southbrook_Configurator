@@ -244,3 +244,19 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("southbrook_unscheduled_wo_count", arch)
         self.assertIn("southbrook_equipment_blocked_count", arch)
         self.assertIn("action_southbrook_open_manufacturing_jobs", arch)
+
+    def test_project_task_exposes_manufacturing_calculations(self):
+        task = self.env["project.task"].create({
+            "name": "Calculation Job",
+            "project_id": self.project.id,
+        })
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+
+        action = task.action_view_manufacturing_calculations()
+
+        self.assertEqual(action["res_model"], "southbrook.mi.check")
+        self.assertEqual(action["domain"], [("production_id", "in", [mo.id])])
+        view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        self.assertIn("Calculations", view.arch_db)
+        self.assertIn("action_view_manufacturing_calculations", view.arch_db)

@@ -26,6 +26,13 @@
                     <field name="workorder_count" widget="statinfo" string="WOs"/>
                 </button>
                 <button class="oe_stat_button" type="object"
+                        name="action_view_manufacturing_calculations"
+                        icon="fa-calculator"
+                        invisible="production_count == 0">
+                    <field name="manufacturing_calculation_count"
+                           widget="statinfo" string="Calculations"/>
+                </button>
+                <button class="oe_stat_button" type="object"
                         name="action_view_procurement_orders" icon="fa-shopping-cart"
                         invisible="procurement_count == 0">
                     <field name="procurement_count" widget="statinfo" string="POs"/>

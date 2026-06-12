@@ -2,6 +2,7 @@
 from collections import Counter
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 # project.task.stage names (lowercased) that imply production has begun / finished.
 _STARTED_STAGE_HINTS = ("cutting", "machining", "assembly", "finishing")
@@ -167,6 +168,10 @@ class ProjectTask(models.Model):
     workorder_summary = fields.Char(
         string="Work Orders Summary", compute="_compute_workorder_rollup",
         help="One-line summary, e.g. '47 WOs / 47 not scheduled'.")
+    manufacturing_calculation_count = fields.Integer(
+        string="# Calculations",
+        compute="_compute_manufacturing_calculations",
+        help="Manufacturing Intelligence checks linked to this job's MOs.")
 
     # --- TASK 6: Material / procurement readiness ----------------------------
     material_ready_count = fields.Integer(
@@ -349,6 +354,16 @@ class ProjectTask(models.Model):
             else:
                 task.workorder_summary = (
                     "%d WOs / %d not scheduled" % (len(wos), len(unscheduled)))
+
+    @api.depends("production_ids")
+    def _compute_manufacturing_calculations(self):
+        Check = self.env["southbrook.mi.check"] if "southbrook.mi.check" in self.env else None
+        for task in self:
+            if not Check or not task.production_ids:
+                task.manufacturing_calculation_count = 0
+                continue
+            task.manufacturing_calculation_count = Check.search_count(
+                [("production_id", "in", task.production_ids.ids)])
 
     # --- TASK 5: Kitchen Metrics rollup compute ----------------------------
     # NB: The x_sbk_* Kitchen Metrics fields are added by a downstream
@@ -542,6 +557,29 @@ class ProjectTask(models.Model):
             "domain": [("id", "in", wos.ids)],
             "view_mode": "list,form,gantt,calendar",
             "context": {"create": False},
+        }
+
+    def action_view_manufacturing_calculations(self):
+        self.ensure_one()
+        if "southbrook.mi.check" not in self.env:
+            raise UserError(
+                "Manufacturing Intelligence is not installed on this database.")
+        mos = self.production_ids
+        for mo in mos:
+            recompute = getattr(
+                mo, "action_recompute_manufacturing_intelligence", None)
+            if recompute:
+                recompute()
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Calculations — %s" % (self.name or self.display_name),
+            "res_model": "southbrook.mi.check",
+            "domain": [("production_id", "in", mos.ids)],
+            "view_mode": "list,form",
+            "context": {
+                "create": False,
+                "search_default_group_category": 1,
+            },
         }
 
     def action_view_procurement_orders(self):
