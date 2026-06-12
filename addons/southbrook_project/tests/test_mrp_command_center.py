@@ -160,6 +160,22 @@ class TestMrpCommandCenter(TransactionCase):
         self.assertIn("Engineering not started", summary)
         self.assertEqual(next_action, "Start engineering.")
 
+    def test_partial_gate_without_state_sets_at_risk_state(self):
+        task = self._new_task()
+        gates = {
+            "engineering": {
+                "message": "Engineering pending",
+            },
+        }
+        score, state, blocked_gate, summary, next_action = (
+            task._southbrook_score_from_gates(gates)
+        )
+        self.assertLessEqual(score, 89)
+        self.assertEqual(state, "at_risk")
+        self.assertFalse(blocked_gate)
+        self.assertIn("Engineering pending", summary)
+        self.assertEqual(next_action, "Engineering pending")
+
     def test_unknown_gate_state_sets_at_risk_state(self):
         task = self._new_task()
         gates = {

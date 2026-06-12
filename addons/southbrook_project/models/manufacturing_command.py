@@ -134,11 +134,12 @@ class ProjectTask(models.Model):
         rows = []
         for gate in GATE_SEQUENCE:
             explicit = gate in gates
+            supplied = dict(gates.get(gate) or {})
             value = self._southbrook_default_gate(gate)
-            value.update(dict(gates.get(gate) or {}))
+            value.update(supplied)
             value["gate"] = gate
             value["label"] = GATE_LABELS[gate]
-            if explicit and not value.get("state"):
+            if explicit and not supplied.get("state"):
                 value["state"] = "not_started"
             elif not value.get("state"):
                 value["state"] = "ready"
