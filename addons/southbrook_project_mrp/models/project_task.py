@@ -172,6 +172,24 @@ class ProjectTask(models.Model):
         string="# Calculations",
         compute="_compute_manufacturing_calculations",
         help="Manufacturing Intelligence checks linked to this job's MOs.")
+    manufacturing_readiness_score = fields.Integer(
+        string="Readiness Score", compute="_compute_manufacturing_readiness")
+    manufacturing_readiness_state = fields.Selection(
+        [("ready", "Ready"), ("review", "Review"), ("blocked", "Blocked")],
+        string="Readiness Decision",
+        compute="_compute_manufacturing_readiness")
+    manufacturing_waterfall_summary = fields.Text(
+        string="Waterfall Readiness",
+        compute="_compute_manufacturing_readiness")
+    manufacturing_blocker_summary = fields.Text(
+        string="Start Blockers",
+        compute="_compute_manufacturing_readiness")
+    manufacturing_warning_summary = fields.Text(
+        string="Manager Review",
+        compute="_compute_manufacturing_readiness")
+    manufacturing_info_summary = fields.Text(
+        string="Efficiency Prompts",
+        compute="_compute_manufacturing_readiness")
 
     # --- TASK 6: Material / procurement readiness ----------------------------
     material_ready_count = fields.Integer(
@@ -364,6 +382,114 @@ class ProjectTask(models.Model):
                 continue
             task.manufacturing_calculation_count = Check.search_count(
                 [("production_id", "in", task.production_ids.ids)])
+
+    @api.depends(
+        "production_count",
+        "job_cad_status",
+        "material_at_risk",
+        "procurement_count",
+        "unscheduled_workorder_count",
+        "crew_gap",
+        "equipment_blocked",
+        "workcenter_over_capacity",
+        "job_at_risk",
+        "job_risk_reason",
+        "job_install_due",
+        "manufacturing_calculation_count",
+    )
+    def _compute_manufacturing_readiness(self):
+        for task in self:
+            gates = []
+            blockers = []
+            warnings = []
+            infos = []
+
+            def gate(name, state, note):
+                gates.append("%s: %s - %s" % (name, state, note))
+
+            if not task.production_count:
+                gate("MRP Link", "BLOCKED", "no linked manufacturing orders")
+                blockers.append("MRP Link: no linked manufacturing orders")
+            else:
+                gate("MRP Link", "READY", "%d linked MO(s)" % task.production_count)
+
+            cad_status = task.job_cad_status or ""
+            if cad_status and "done" not in cad_status.lower():
+                gate("Engineering / CAD", "REVIEW", cad_status)
+                warnings.append("Engineering / CAD: review CAD status")
+            else:
+                gate("Engineering / CAD", "READY", cad_status or "no open CAD issue")
+
+            if task.material_at_risk:
+                gate("Materials / Purchasing", "BLOCKED", "material is at risk")
+                blockers.append("Materials / Purchasing: material shortfall")
+            elif task.procurement_count:
+                gate(
+                    "Materials / Purchasing", "REVIEW",
+                    "%d procurement order(s)" % task.procurement_count)
+                warnings.append("Materials / Purchasing: review open procurement")
+            else:
+                gate("Materials / Purchasing", "READY", "components/procurement clear")
+
+            if task.unscheduled_workorder_count:
+                gate(
+                    "Scheduling", "BLOCKED",
+                    "%d work order(s) not scheduled" % task.unscheduled_workorder_count)
+                blockers.append(
+                    "Scheduling: %d work order(s) not scheduled"
+                    % task.unscheduled_workorder_count)
+            else:
+                gate("Scheduling", "READY", "work orders scheduled")
+
+            if task.crew_gap:
+                gate("Crew", "REVIEW", "operator assignment gap")
+                warnings.append("Crew: assign/reserve operators")
+            else:
+                gate("Crew", "READY", "crew assignment clear")
+
+            if task.equipment_blocked:
+                gate("Equipment / Tooling", "BLOCKED", "open maintenance condition")
+                blockers.append("Equipment / Tooling: maintenance block")
+            else:
+                gate("Equipment / Tooling", "READY", "equipment clear")
+
+            if task.workcenter_over_capacity:
+                gate(
+                    "Production Capacity", "REVIEW",
+                    "work-center load over daily capacity")
+                warnings.append(
+                    "Production Capacity: review overloaded work center")
+            elif task.job_at_risk:
+                gate(
+                    "Production Capacity", "REVIEW",
+                    task.job_risk_reason or "job at risk")
+                warnings.append("Production Capacity: review job risk")
+            else:
+                gate("Production Capacity", "READY", "no capacity/risk flag")
+
+            if not task.job_install_due:
+                gate("Delivery / Install", "INFO", "no install due date surfaced")
+                infos.append(
+                    "Delivery / Install: confirm install date and site readiness")
+            else:
+                gate("Delivery / Install", "READY", "install due %s" % task.job_install_due)
+
+            if not task.manufacturing_calculation_count:
+                infos.append(
+                    "Calculations: run/review Manufacturing Intelligence checks")
+
+            task.manufacturing_waterfall_summary = "\n".join(gates)
+            task.manufacturing_blocker_summary = (
+                "\n".join(blockers) or "No start blockers.")
+            task.manufacturing_warning_summary = (
+                "\n".join(warnings) or "No manager-review warnings.")
+            task.manufacturing_info_summary = (
+                "\n".join(infos) or "No efficiency prompts.")
+            task.manufacturing_readiness_state = (
+                "blocked" if blockers else ("review" if warnings else "ready"))
+            penalty = len(blockers) * 25 + len(warnings) * 10
+            task.manufacturing_readiness_score = max(
+                0, min(100, 100 - penalty))
 
     # --- TASK 5: Kitchen Metrics rollup compute ----------------------------
     # NB: The x_sbk_* Kitchen Metrics fields are added by a downstream

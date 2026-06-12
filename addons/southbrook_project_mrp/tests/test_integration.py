@@ -260,3 +260,34 @@ class TestProjectMrpIntegration(TransactionCase):
         view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
         self.assertIn("Calculations", view.arch_db)
         self.assertIn("action_view_manufacturing_calculations", view.arch_db)
+
+    def test_manufacturing_readiness_decision_blocks_unscheduled_job(self):
+        task = self.env["project.task"].create({
+            "name": "Readiness Job",
+            "project_id": self.project.id,
+        })
+        wc = self.env["mrp.workcenter"].create({"name": "Panel Saw"})
+        mo = self._make_mo()
+        mo.project_task_id = task.id
+        self.env["mrp.workorder"].create({
+            "name": "Cut panels",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+
+        task.invalidate_recordset()
+
+        self.assertEqual(task.manufacturing_readiness_state, "blocked")
+        self.assertLess(task.manufacturing_readiness_score, 100)
+        self.assertIn("Scheduling", task.manufacturing_blocker_summary)
+        self.assertIn("not scheduled", task.manufacturing_blocker_summary)
+        self.assertIn("Scheduling", task.manufacturing_waterfall_summary)
+
+    def test_project_task_form_has_manufacturing_readiness_panel(self):
+        view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
+        arch = view.arch_db
+        self.assertIn("Manufacturing Readiness", arch)
+        self.assertIn("manufacturing_readiness_score", arch)
+        self.assertIn("manufacturing_waterfall_summary", arch)
+        self.assertIn("manufacturing_blocker_summary", arch)

@@ -128,6 +128,28 @@
                 <page name="job_workorders" string="Work Orders"
                       groups="mrp.group_mrp_user"
                       invisible="workorder_count == 0">
+                    <group string="Manufacturing Readiness">
+                        <group>
+                            <field name="manufacturing_readiness_state"
+                                   widget="badge"
+                                   decoration-success="manufacturing_readiness_state == 'ready'"
+                                   decoration-warning="manufacturing_readiness_state == 'review'"
+                                   decoration-danger="manufacturing_readiness_state == 'blocked'"
+                                   readonly="1"/>
+                            <field name="manufacturing_readiness_score"
+                                   readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="manufacturing_blocker_summary"
+                                   nolabel="1" readonly="1" widget="text"/>
+                        </group>
+                        <field name="manufacturing_waterfall_summary"
+                               nolabel="1" readonly="1" widget="text"/>
+                        <field name="manufacturing_warning_summary"
+                               nolabel="1" readonly="1" widget="text"/>
+                        <field name="manufacturing_info_summary"
+                               nolabel="1" readonly="1" widget="text"/>
+                    </group>
                     <group>
                         <field name="workorder_summary" readonly="1"/>
                         <field name="unscheduled_workorder_count" readonly="1"/>
