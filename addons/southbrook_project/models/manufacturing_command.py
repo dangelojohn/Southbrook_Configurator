@@ -285,13 +285,18 @@ class ProjectTask(models.Model):
         Production.check_access_rights("create")
         Production.check_access_rights("write")
 
-    def _southbrook_notification_action(self):
+    def _southbrook_check_mi_recompute_permissions(self):
+        Check = self.env["southbrook.mi.check"]
+        for operation in ("read", "write", "create", "unlink"):
+            Check.check_access_rights(operation)
+
+    def _southbrook_notification_action(self, message=False):
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
                 "title": _("Ready for Production"),
-                "message": _(
+                "message": message or _(
                     "No production release action is available for this task."
                 ),
                 "type": "success",
@@ -301,7 +306,10 @@ class ProjectTask(models.Model):
 
     def _southbrook_mo_action(self, productions):
         if isinstance(productions, dict):
-            return productions
+            return self._southbrook_notification_action(_(
+                "Production release completed, but no safe manufacturing "
+                "order action is available."
+            ))
         if not productions:
             return self._southbrook_notification_action()
         productions = self._southbrook_release_records(productions, "read")
@@ -330,11 +338,13 @@ class ProjectTask(models.Model):
             productions = task._southbrook_release_records(related_productions)
             for production in productions:
                 if hasattr(production, "action_recompute_manufacturing_intelligence"):
+                    task._southbrook_check_mi_recompute_permissions()
                     production.action_recompute_manufacturing_intelligence()
             related_packages = task._southbrook_related_packages(related_productions)
             packages = task._southbrook_release_records(related_packages)
             for package in packages:
                 if hasattr(package, "action_recompute_manufacturing_intelligence"):
+                    task._southbrook_check_mi_recompute_permissions()
                     package.action_recompute_manufacturing_intelligence()
             related_workorders = task._southbrook_related_workorders(
                 related_productions
