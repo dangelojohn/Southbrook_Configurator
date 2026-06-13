@@ -13,12 +13,12 @@
                 <div class="o_sb_mi_chip_row">
                     <t t-if="record.x_mi_workcenter_blocker_count.raw_value">
                         <span class="o_sb_mi_chip o_sb_mi_chip_blocker">
-                            <field name="x_mi_workcenter_blocker_count"/> MI Blocked
+                            <t t-esc="record.x_mi_workcenter_blocker_count.value"/> MI Blocked
                         </span>
                     </t>
                     <t t-if="record.x_mi_workcenter_warning_count.raw_value">
                         <span class="o_sb_mi_chip o_sb_mi_chip_warning">
-                            <field name="x_mi_workcenter_warning_count"/> MI Warnings
+                            <t t-esc="record.x_mi_workcenter_warning_count.value"/> MI Warnings
                         </span>
                     </t>
                     <t t-if="!record.x_mi_workcenter_blocker_count.raw_value and !record.x_mi_workcenter_warning_count.raw_value">

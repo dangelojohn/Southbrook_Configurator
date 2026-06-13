@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+from lxml import etree
+
 from odoo.tests import TransactionCase, tagged
 
 
@@ -38,6 +40,22 @@ class TestManufacturingIntelligenceViews(TransactionCase):
         self.assertIn("o_sb_mi_chip", view.arch_db)
         self.assertIn("x_mi_workcenter_blocker_count", view.arch_db)
         self.assertIn("x_mi_workcenter_warning_count", view.arch_db)
+
+    def test_pm_kanban_intelligence_chips_use_record_values(self):
+        view = self.env.ref(
+            "southbrook_manufacturing_intelligence.view_southbrook_pm_kanban_mi"
+        )
+        arch = etree.fromstring(view.arch_db.encode())
+        rendered_field_nodes = arch.xpath(
+            ".//xpath[not(contains(@expr, '//kanban/field'))]//field"
+        )
+
+        self.assertFalse(
+            rendered_field_nodes,
+            "PM dashboard MI chips should avoid field widgets in the kanban "
+            "card template; they can break when archInfo.fieldNodes is stale "
+            "or incomplete.",
+        )
 
     def test_manager_dashboard_views_load(self):
         for xmlid in [

@@ -31,41 +31,41 @@
               <div class="o_sb_pm_dash_card oe_kanban_global_click">
                 <header class="o_sb_pm_dash_card_h">
                   <span class="o_sb_pm_dash_code">
-                    <field name="code"/>
+                    <t t-esc="record.code.value"/>
                   </span>
                   <span class="o_sb_pm_dash_name">
-                    <field name="name"/>
+                    <t t-esc="record.name.value"/>
                   </span>
                 </header>
                 <div class="o_sb_pm_dash_metrics">
                   <div class="o_sb_pm_dash_metric o_sb_pm_dash_inflight">
                     <div class="o_sb_pm_dash_label">In Queue</div>
                     <div class="o_sb_pm_dash_value">
-                      <field name="southbrook_pm_inflight_count"/>
+                      <t t-esc="record.southbrook_pm_inflight_count.value"/>
                     </div>
                   </div>
                   <div class="o_sb_pm_dash_metric o_sb_pm_dash_done">
                     <div class="o_sb_pm_dash_label">Done Today</div>
                     <div class="o_sb_pm_dash_value">
-                      <field name="southbrook_pm_throughput_today"/>
+                      <t t-esc="record.southbrook_pm_throughput_today.value"/>
                     </div>
                   </div>
                   <div class="o_sb_pm_dash_metric o_sb_pm_dash_late">
                     <div class="o_sb_pm_dash_label">Late</div>
                     <div class="o_sb_pm_dash_value">
-                      <field name="southbrook_pm_late_count"/>
+                      <t t-esc="record.southbrook_pm_late_count.value"/>
                     </div>
                   </div>
                   <div class="o_sb_pm_dash_metric o_sb_pm_dash_alerts">
                     <div class="o_sb_pm_dash_label">Equipment</div>
                     <div class="o_sb_pm_dash_value">
-                      <field name="southbrook_pm_equipment_alerts"/>
+                      <t t-esc="record.southbrook_pm_equipment_alerts.value"/>
                     </div>
                   </div>
                 </div>
                 <footer class="o_sb_pm_dash_card_f">
                   <span>OEE Target</span>
-                  <strong><field name="oee_target"/>%</strong>
+                  <strong><t t-esc="record.oee_target.value"/>%</strong>
                 </footer>
               </div>
             </t>
