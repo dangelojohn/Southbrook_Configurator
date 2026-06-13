@@ -38,7 +38,7 @@ These are flagged in the README for a human operator.
     "author": "Southbrook Cabinetry / OdooIQ",
     "license": "LGPL-3",
     "category": "Services/Project",
-    "version": "19.0.0.4.1",
+    "version": "19.0.0.4.2",
     "depends": [
         "project",
         "sale_management",

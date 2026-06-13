@@ -113,26 +113,26 @@
           <templates>
             <t t-name="card">
               <div class="oe_kanban_card oe_kanban_global_click">
-                <strong><field name="name"/></strong>
+                <strong><t t-esc="record.name.value"/></strong>
                 <div>
                   <span>Score </span>
-                  <field name="x_southbrook_readiness_score" readonly="1"/>
+                  <t t-esc="record.x_southbrook_readiness_score.value"/>
                 </div>
                 <div>
-                  <field name="x_southbrook_readiness_state"
-                         widget="badge"
-                         readonly="1"/>
+                  <span class="badge text-bg-secondary">
+                    <t t-esc="record.x_southbrook_readiness_state.value"/>
+                  </span>
                 </div>
                 <div>
-                  <field name="x_southbrook_blocking_gate" readonly="1"/>
+                  <t t-esc="record.x_southbrook_blocking_gate.value"/>
                 </div>
                 <div>
-                  <field name="x_southbrook_cabinet_family"/>
+                  <t t-esc="record.x_southbrook_cabinet_family.value"/>
                   <span> / </span>
-                  <field name="x_southbrook_checklist_state" readonly="1"/>
+                  <t t-esc="record.x_southbrook_checklist_state.value"/>
                 </div>
                 <small>
-                  <field name="x_southbrook_next_action" readonly="1"/>
+                  <t t-esc="record.x_southbrook_next_action.value"/>
                 </small>
               </div>
             </t>

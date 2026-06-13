@@ -108,3 +108,14 @@ class TestMrpCommandViews(TransactionCase):
                     all(node.get("readonly") == "1" for node in nodes),
                     "%s editable in %s" % (field_name, view.name),
                 )
+
+    def test_mrp_command_kanban_template_uses_record_values(self):
+        view = self.env.ref("southbrook_project.view_project_task_kanban_mrp_command")
+        arch = etree.fromstring(view.arch_db.encode())
+
+        self.assertFalse(
+            arch.xpath(".//templates//field"),
+            "Kanban card template should avoid field widgets; they can break "
+            "when archInfo.fieldNodes is stale or incomplete.",
+        )
+        self.assertTrue(arch.xpath(".//templates//t[contains(@t-esc, 'record.')]"))
