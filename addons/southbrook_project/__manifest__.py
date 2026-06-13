@@ -55,6 +55,7 @@ These are flagged in the README for a human operator.
     "post_init_hook": "post_init_backfill_project_1",
     "assets": {
         "web.assets_backend": [
+            "southbrook_project/static/src/js/kanban_template_field_ids.esm.js",
             "southbrook_project/static/src/scss/kanban_responsive.scss",
         ],
     },

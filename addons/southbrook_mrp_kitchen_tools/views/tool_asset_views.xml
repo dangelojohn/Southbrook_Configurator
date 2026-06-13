@@ -36,9 +36,13 @@
         <field name="model">southbrook.tool.asset</field>
         <field name="arch" type="xml">
             <kanban default_group_by="lifecycle_state" class="o_kanban_small_column">
+                <field name="code"/>
+                <field name="name"/>
                 <field name="lifecycle_state"/>
                 <field name="condition"/>
                 <field name="tool_family"/>
+                <field name="tool_crib_id"/>
+                <field name="assigned_employee_id"/>
                 <field name="remaining_life_qty"/>
                 <field name="life_unit"/>
                 <templates>
