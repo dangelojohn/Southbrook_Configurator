@@ -90,11 +90,13 @@ Safe Cleanup button:
 
 ## Role Checks
 
-- MRP PM: decision queues, readiness evidence, next best action.
-- Shop lead: executable WOs and crew/schedule blockers.
-- Designer/engineer: CAD/cutlist queue and cabinet specs.
-- Installer/coordinator: install readiness and site details.
-- Owner/executive: project-level risk and throughput buttons.
+- MRP PM: use PM Queue for decision queues, readiness evidence, and next best
+  action.
+- Shop lead: use Shop Lead for executable WOs that can start today.
+- Designer/engineer: use Design for CAD/cutlist and missing cabinet specs.
+- Installer/coordinator: use Install for install date and install-readiness
+  review.
+- Owner/executive: use Exec for high-risk jobs and project-level throughput.
 
 ## Before Production Use
 

@@ -542,6 +542,41 @@
         <field name="arch" type="xml">
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_pm_control_queue"
+                        icon="fa-tasks">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">PM Queue</span>
+                    </div>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_shop_lead_queue"
+                        icon="fa-play-circle">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Shop Lead</span>
+                    </div>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_designer_queue"
+                        icon="fa-pencil-square-o">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Design</span>
+                    </div>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_installer_queue"
+                        icon="fa-truck">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Install</span>
+                    </div>
+                </button>
+                <button class="oe_stat_button" type="object"
+                        name="action_southbrook_open_executive_queue"
+                        icon="fa-line-chart">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Exec</span>
+                    </div>
+                </button>
+                <button class="oe_stat_button" type="object"
                         name="action_southbrook_open_blocked_manufacturing_jobs"
                         icon="fa-ban"
                         invisible="southbrook_blocked_job_count == 0">

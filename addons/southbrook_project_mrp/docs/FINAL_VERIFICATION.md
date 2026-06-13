@@ -14,6 +14,36 @@ make test-quick MODULES=southbrook_project_mrp
 Expected result: Odoo starts, updates `southbrook_project_mrp`, and the focused
 Southbrook Project/MRP tests pass.
 
+## Local Docker / OrbStack Blocker
+
+If the focused test command fails before Odoo starts with:
+
+```text
+failed to connect to the docker API at
+unix:///Users/naadmin/.orbstack/run/docker.sock
+```
+
+verify the local Docker backend before debugging module code:
+
+```bash
+docker context ls
+orb status
+ls -l /Users/naadmin/.orbstack/run/docker.sock
+docker ps -a
+```
+
+Observed sandbox state on June 12, 2026:
+
+- Docker CLI exists and is using the `orbstack` context.
+- `/var/run/docker.sock` points to the OrbStack socket.
+- OrbStack is installed but `orb status` reports `Stopped`.
+- `orb start` fails before Docker starts with a VM/virtualization error.
+- `/Users/naadmin/.orbstack/run/docker.sock` is absent.
+
+This is an environment blocker, not an Odoo module test failure. Start or repair
+the local OrbStack/Docker backend outside the sandbox, then rerun the focused
+test command.
+
 Local static checks used during implementation:
 
 ```bash
@@ -61,7 +91,7 @@ The pilot job should remain blocked/review while these facts remain true:
 | Cabinet Manufacturing Fit | 9/10 | Cabinet specs, family progress, cabinet job templates, production release gates, quality/remake visibility, and rework/scrap/unbuild drill-through are surfaced from the job. |
 | PM Decision Support | 9/10 | Readiness decision, score caps, risk level/reason, top blocker, next best action, stage mismatch, and project-level queue actions support daily triage. |
 | Practical Intelligence | 9/10 | Readiness evidence lines explain each decision with status, reason, evidence, recommended action, and severity. Recommendations are deterministic and evidence-based. |
-| Rollout Readiness | 9/10 | Dry-run data-quality reporting, safe cleanup exclusion flags, S00235 pilot runbook, role checks, and focused tests make rollout trainable and auditable. |
+| Rollout Readiness | 9/10 | PM, Shop Lead, Design, Install, and Exec queues, dry-run data-quality reporting, safe cleanup exclusion flags, S00235 pilot runbook, role checks, and focused tests make rollout trainable and auditable. |
 
 ## Production Safety
 
