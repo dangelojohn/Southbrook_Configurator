@@ -436,8 +436,10 @@ class SouthbrookApi(http.Controller):
     # Helpers
     # ==================================================================
     def _fetch_cutlist_or_404(self, cutlist_id):
-        """Return the cutlist record if the API user can read it, or
-        an error response. Phase 4 Sprint 1 — Accucutt nesting bridge."""
+        """Return the cutlist record if the API user can read it, else
+        a uniform 404 response. Collapse-to-404 (vs distinguishing 403)
+        so the response does not leak existence of cutlists outside the
+        caller's tenant — mirrors _fetch_project_or_404 below."""
         try:
             cutlist = request.env["sb.cutlist"].browse(
                 cutlist_id).exists()
@@ -447,12 +449,16 @@ class SouthbrookApi(http.Controller):
         if not cutlist:
             return _error("not_found",
                           "Unknown cutlist id.", 404)
-        # Touch a field to provoke any AccessError record-rule.
         try:
             _ = cutlist.name
         except Exception:                                     # noqa: BLE001
-            return _error("forbidden",
-                          "Cutlist not accessible.", 403)
+            _logger.warning(
+                "API ACL: user %s attempted to access cutlist %s "
+                "without record-rule access — denied (404).",
+                request.env.user.id, cutlist.id,
+            )
+            return _error("not_found",
+                          "Unknown cutlist id.", 404)
         return cutlist
 
     def _fetch_project_or_404(self, project_id):

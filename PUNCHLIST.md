@@ -5,6 +5,75 @@
 
 ---
 
+## 2026-06-15 · Verification-and-fixes session — open items
+
+A 4-agent verification + targeted-fix sweep on `feature/premium-orchestration` produced these
+open items. The 5 high-severity items from code review were closed in this session (see
+`git diff origin/main`); the items below are what we **didn't** fix.
+
+### Backend test regression — 15 failures in `southbrook_configurator_ux`
+- `addons/southbrook_configurator_ux/tests/test_select_commit.py` — all 15 tests in
+  `TestConfiguratorSelectCommit` fail with `error='incomplete_configuration'` when the
+  test fixture expects `ok=True`. Root cause looks like fixture/engine drift on the
+  `/select` + `/commit` controller — the seeded `base_1dr` template + picks no longer
+  satisfy the configurator's completeness check. Not a security or contract issue, but
+  the module IS in the deployed set. Investigate before next deploy: bisect against
+  recent commits to `southbrook_configurator_ux/` (most recent: `2782164`,
+  `4316951`, `9bd8e13`, `e7dccdc`, `eb2924f`, `c4a39b5`, `4e44991`) and either
+  refresh the fixture or fix the regression on the controller side.
+
+### Code-review MED/LOW items — batched cleanup branch
+Deferred deliberately so the high-severity fixes land cleanly. Pick up in a follow-up:
+- `southbrook_api/controllers/main.py:414-433` — `cutlist_nesting_result` collapses
+  `AccessError`/`IntegrityError`/stack-leak strings to a single 422; differentiate.
+- `southbrook_api/controllers/main.py:33-39` — PIL import inside try-block returns 422
+  `invalid_image` when Pillow is missing; surface as 500 (ops misconfig).
+- `scripts/deploy_to_qnap.sh:102` — `cat /tmp/deploy_upgrade.log || true` swallows
+  log-fetch failure and the subsequent `grep` misdiagnoses an empty buffer.
+- `scripts/deploy_to_qnap.sh:128` — `health_check` swallows ssh failure as empty string;
+  `wait_healthy` polls until timeout, masking network blips as "site unhealthy."
+- `scripts/deploy_to_qnap.sh:142-150` — `wait_healthy` runs pre-RESTART even when a
+  `-u` is also reloading workers — race window.
+- `addons/southbrook_manufacturing_intelligence/models/mrp_workcenter.py:19-33` —
+  `_compute_southbrook_mi_kpis` is non-stored, only `depends_context("uid")`; kanban
+  chips go stale on cross-record state changes. Store, or document snapshot semantics.
+- `addons/southbrook_manufacturing_intelligence/models/mrp_production.py:26-28` —
+  `x_mi_bottleneck_workcenter_id` declared + rendered in form view but never written
+  by the engine. Dead field.
+- `addons/southbrook_manufacturing_intelligence/views/manager_dashboard_views.xml` —
+  actions defined and tested via `env.ref` but no `<menuitem>`; orphan unless wired
+  elsewhere.
+- `addons/southbrook_manufacturing_intelligence/views/pm_kanban_inherit.xml:24` —
+  uses JS-style `!record....raw_value` where the rest of the codebase uses Python
+  `not`. Aligns with the 2026-06-11 kanban-preamble incident class.
+- `addons/southbrook_manufacturing_intelligence/models/mi_check.py:8` —
+  `_order = "category, id"` buries blockers under category-alphabetical sort.
+- `addons/southbrook_api/controllers/main.py:84-100` — Idempotency-Key cache keyed by
+  `(api_key_hash, idempotency_key)` without route scope; two routes with the same key
+  collide.
+- `addons/southbrook_manufacturing_intelligence/tests/test_mi_views.py:23-29` — only
+  asserts strings in `arch_db`; doesn't actually render. Would not have caught the
+  2026-06-11 kanban-preamble blocker.
+- `docs/api_contracts/accucutt_nesting_contract.md:42-46` — contract promises
+  `mrp.group_mrp_user` enforcement for key issuance, but `controllers/main.py:172
+  issue_for_user` does not check group membership.
+
+### Deploy reliability — LOCK_PATH assumption
+- `scripts/deploy_to_qnap.sh:39` — new default `LOCK_PATH=/var/lib/odoo/.southbrook-odoo-upgrade.lock`
+  assumes the southbrook-odoo container bind-mounts /var/lib/odoo. **Verify on next
+  deploy**: `ssh admin@192.168.68.108 'system-docker exec southbrook-odoo ls -la /var/lib/odoo'`.
+  If not bind-mounted, override via `LOCK_PATH=…` env or fall back to a host bind path.
+
+### Live API — latent issues from black-box smoke
+- `southbrookcabinetry.space/api/v1/auth/login OPTIONS` returns 400 missing_credentials
+  instead of CORS 204 + `Access-Control-*` headers. Same-origin Flutter PWA masks it
+  today; will break any cross-origin client (mobile webview, partner integration).
+- `southbrookcabinetry.space/app/main.dart.js` returns `cf-cache-status: DYNAMIC`
+  — the 2.7 MB bundle is not edge-cached. Cloudflare Page Rule + Cache-Control on
+  `*/app/main.dart.js` is a material LCP/TTI win.
+
+---
+
 ## 2026-06-09 · v1.2 platform-expansion status (read first)
 
 The original punchlist below scopes the **Estimating Application surface**
