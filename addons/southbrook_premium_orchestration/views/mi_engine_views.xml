@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_southbrook_mi_engine_form" model="ir.ui.view">
+            <field name="name">southbrook.mi.engine.form</field>
+            <field name="model">southbrook.mi.engine</field>
+            <field name="arch" type="xml">
+                <form string="Manufacturing Intelligence Engine">
+                    <header>
+                        <button name="action_run_now"
+                                type="object"
+                                string="Run Engine Now"
+                                class="oe_highlight"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Last Run">
+                                <field name="last_run_at" readonly="1"/>
+                                <field name="last_run_duration_ms"
+                                       string="Duration (ms)"
+                                       readonly="1"/>
+                                <field name="last_run_check_count"
+                                       string="Evaluations"
+                                       readonly="1"/>
+                                <field name="last_run_blockers" readonly="1"/>
+                                <field name="last_run_warnings" readonly="1"/>
+                            </group>
+                            <group string="Current State">
+                                <field name="mo_in_flight_count"
+                                       string="MOs In Flight"/>
+                                <field name="rule_count"
+                                       string="Active Gate Rules"/>
+                            </group>
+                        </group>
+                        <div class="alert alert-info" role="alert">
+                            The MI engine refires every active gate check
+                            against every in-flight manufacturing order on
+                            an hourly schedule. Use
+                            <strong>Run Engine Now</strong> to trigger an
+                            immediate refire — useful after editing rules
+                            or releasing a new MO.
+                        </div>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_mi_engine_status" model="ir.actions.act_window">
+            <field name="name">MI Engine Status</field>
+            <field name="res_model">southbrook.mi.engine</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_southbrook_mi_engine_form"/>
+            <field name="target">current</field>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    The MI engine singleton will be created on first run.
+                </p>
+                <p>
+                    Click <strong>Run Engine Now</strong> in the header
+                    once the record is open to seed it immediately.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

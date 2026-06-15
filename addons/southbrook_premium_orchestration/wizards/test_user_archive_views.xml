@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form view: preview + archive button -->
+    <record id="view_test_user_archive_wizard_form" model="ir.ui.view">
+        <field name="name">test.user.archive.wizard.form</field>
+        <field name="model">test.user.archive.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Archive Test Users">
+                <header>
+                    <button name="action_archive"
+                            string="Archive"
+                            type="object"
+                            class="btn-danger"
+                            confirm="This will archive all matching share=True users. Continue?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Phase 1.5 cleanup tool.</strong>
+                        Archives synthetic test-pattern users created by Playwright/CI runs.
+                        Administrator (uid=2) is excluded by a hardcoded rule.
+                        A sanity cap of 500 users is enforced.
+                    </div>
+                    <group>
+                        <group string="Patterns">
+                            <field name="domain_pattern"/>
+                            <field name="include_southbrook_test_local"/>
+                            <field name="include_testcustomer"/>
+                        </group>
+                        <group string="Preview">
+                            <field name="preview_count"/>
+                        </group>
+                    </group>
+                    <group string="Safety Net">
+                        <field name="exclude_user_ids"
+                               widget="many2many_tags"
+                               options="{'no_create': True}"
+                               nolabel="1"/>
+                    </group>
+                    <group string="Sample Logins (first 10 alphabetical)">
+                        <field name="sample_logins" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: open the wizard -->
+    <record id="action_test_user_archive_wizard" model="ir.actions.act_window">
+        <field name="name">Archive Test Users</field>
+        <field name="res_model">test.user.archive.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

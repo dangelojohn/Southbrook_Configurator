@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cut_spec_override_list" model="ir.ui.view">
+        <field name="name">southbrook.cut.spec.override.list</field>
+        <field name="model">southbrook.cut.spec.override</field>
+        <field name="arch" type="xml">
+            <list string="Cut-Spec Overrides" decoration-info="eco_proposed_id" decoration-muted="not eco_proposed_id">
+                <field name="recorded_at"/>
+                <field name="workorder_id"/>
+                <field name="rule_key"/>
+                <field name="rule_default_value"/>
+                <field name="actual_applied_value"/>
+                <field name="reason_code"/>
+                <field name="operator_id"/>
+                <field name="eco_proposed_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cut_spec_override_form" model="ir.ui.view">
+        <field name="name">southbrook.cut.spec.override.form</field>
+        <field name="model">southbrook.cut.spec.override</field>
+        <field name="arch" type="xml">
+            <form string="Cut-Spec Override">
+                <header>
+                    <field name="eco_proposed_id" widget="statusbar" readonly="1" invisible="not eco_proposed_id"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="rule_key" readonly="eco_proposed_id"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Context">
+                            <field name="workorder_id" readonly="eco_proposed_id"/>
+                            <field name="production_id"/>
+                            <field name="operator_id" readonly="eco_proposed_id"/>
+                            <field name="recorded_at"/>
+                        </group>
+                        <group string="Deviation">
+                            <field name="rule_default_value" readonly="eco_proposed_id"/>
+                            <field name="actual_applied_value" readonly="eco_proposed_id"/>
+                            <field name="reason_code" readonly="eco_proposed_id"/>
+                            <field name="eco_proposed_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1" placeholder="Optional commentary from the operator (what they did differently and why)..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cut_spec_override_search" model="ir.ui.view">
+        <field name="name">southbrook.cut.spec.override.search</field>
+        <field name="model">southbrook.cut.spec.override</field>
+        <field name="arch" type="xml">
+            <search string="Cut-Spec Overrides">
+                <field name="workorder_id"/>
+                <field name="production_id"/>
+                <field name="operator_id"/>
+                <field name="rule_key"/>
+                <filter name="filter_width_door" string="Width → Door Count" domain="[('rule_key','=','width_to_door_count')]"/>
+                <filter name="filter_depth_drawer" string="Depth → Drawer Count" domain="[('rule_key','=','depth_to_drawer_count')]"/>
+                <filter name="filter_door_reveal" string="Door Reveal Offset" domain="[('rule_key','=','door_reveal_offset')]"/>
+                <filter name="filter_box_thickness" string="Box Thickness" domain="[('rule_key','=','box_thickness_override')]"/>
+                <filter name="filter_shelf_count" string="Shelf Count" domain="[('rule_key','=','shelf_count_override')]"/>
+                <filter name="filter_hardware_sub" string="Hardware Substitution" domain="[('rule_key','=','hardware_substitution')]"/>
+                <separator/>
+                <filter name="filter_customer_request" string="Customer Request" domain="[('reason_code','=','customer_request')]"/>
+                <filter name="filter_material_constraint" string="Material Constraint" domain="[('reason_code','=','material_constraint')]"/>
+                <filter name="filter_tooling_constraint" string="Tooling Constraint" domain="[('reason_code','=','tooling_constraint')]"/>
+                <filter name="filter_rework_preference" string="Rework Preference" domain="[('reason_code','=','rework_preference')]"/>
+                <filter name="filter_engineering_typo" string="Engineering Typo" domain="[('reason_code','=','engineering_typo')]"/>
+                <separator/>
+                <filter name="filter_with_eco" string="ECO Proposed" domain="[('eco_proposed_id','!=',False)]"/>
+                <filter name="filter_without_eco" string="No ECO Yet" domain="[('eco_proposed_id','=',False)]"/>
+                <separator/>
+                <filter name="filter_last_30" string="Last 30 Days" domain="[('recorded_at','>=',(context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_last_90" string="Last 90 Days" domain="[('recorded_at','>=',(context_today() - datetime.timedelta(days=90)).strftime('%Y-%m-%d'))]"/>
+                <group name="group_by">
+                    <filter name="group_rule_key" string="Rule Key" context="{'group_by':'rule_key'}"/>
+                    <filter name="group_reason_code" string="Reason Code" context="{'group_by':'reason_code'}"/>
+                    <filter name="group_operator" string="Operator" context="{'group_by':'operator_id'}"/>
+                    <filter name="group_recorded_month" string="Recorded Month" context="{'group_by':'recorded_at:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cut_spec_override_list" model="ir.actions.act_window">
+        <field name="name">Cut-Spec Overrides</field>
+        <field name="res_model">southbrook.cut.spec.override</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_cut_spec_override_search"/>
+        <field name="context">{'search_default_group_rule_key': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No cut-spec overrides recorded yet</p>
+            <p>Every manual deviation from a default construction rule is logged here. When a rule_key is overridden frequently, a daily cron auto-drafts an ECO so engineering can review and update the underlying default.</p>
+        </field>
+    </record>
+
+</odoo>

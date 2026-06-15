@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Kitchen Ops top-level menu — Phase 1.4.
+
+        The action references for MI Engine Status (action_mi_engine_status),
+        Cut-Spec Overrides (action_cut_spec_override_list), and the Test
+        User Archive wizard (action_test_user_archive_wizard) are defined
+        in sibling view files owned by other agents (B3, B8, B5). Odoo
+        resolves the action lookup at menuitem load time so as long as
+        those records exist by the time the manifest's `data:` list
+        finishes loading, the menu binds correctly.
+    -->
+    <menuitem id="menu_kitchen_ops_root"
+              name="Kitchen Ops"
+              sequence="20"
+              web_icon="southbrook_premium_orchestration,static/description/icon.png"/>
+
+    <menuitem id="menu_kitchen_ops_jobs"
+              name="Kitchen Jobs"
+              parent="menu_kitchen_ops_root"
+              action="action_kitchen_jobs_board"
+              sequence="10"/>
+
+    <menuitem id="menu_kitchen_ops_release_queue"
+              name="Production Release Queue"
+              parent="menu_kitchen_ops_root"
+              action="action_production_release_queue"
+              sequence="20"/>
+
+    <menuitem id="menu_kitchen_ops_install_risk"
+              name="Install Risk"
+              parent="menu_kitchen_ops_root"
+              action="action_install_risk_board"
+              sequence="30"/>
+
+    <menuitem id="menu_kitchen_ops_workcenter_bottleneck"
+              name="Workcenter Bottlenecks"
+              parent="menu_kitchen_ops_root"
+              action="action_workcenter_bottleneck_board"
+              sequence="40"/>
+
+    <menuitem id="menu_kitchen_ops_mi_engine"
+              name="MI Engine Status"
+              parent="menu_kitchen_ops_root"
+              action="action_mi_engine_status"
+              sequence="50"/>
+
+    <menuitem id="menu_kitchen_ops_tool_lifecycle"
+              name="Tool Lifecycle Board"
+              parent="menu_kitchen_ops_root"
+              action="action_tool_lifecycle_board"
+              sequence="60"/>
+
+    <menuitem id="menu_kitchen_ops_cut_spec_overrides"
+              name="Cut-Spec Overrides"
+              parent="menu_kitchen_ops_root"
+              action="action_cut_spec_override_list"
+              sequence="70"/>
+
+    <menuitem id="menu_kitchen_ops_archive_test_users"
+              name="Archive Test Users"
+              parent="menu_kitchen_ops_root"
+              action="action_test_user_archive_wizard"
+              sequence="80"
+              groups="base.group_system"/>
+
+</odoo>

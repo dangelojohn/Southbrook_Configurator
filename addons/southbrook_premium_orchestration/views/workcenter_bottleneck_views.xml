@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Workcenter Bottleneck board — surfaces mrp.workcenter load and
+        capacity to flag bottlenecks. Uses native Odoo workcenter
+        fields plus the kitchen-tools OEE target field.
+    -->
+
+    <record id="view_workcenter_bottleneck_kanban" model="ir.ui.view">
+        <field name="name">mrp.workcenter.bottleneck.kanban</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_small_column"
+                    sample="1">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="resource_calendar_id"/>
+                <field name="active"/>
+                <field name="capacity"/>
+                <field name="time_efficiency"/>
+                <field name="workcenter_load"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_record_top">
+                            <div class="o_kanban_record_headings">
+                                <strong>
+                                    <field name="name"/>
+                                </strong>
+                                <small class="text-muted" t-if="record.code.raw_value">
+                                    <field name="code"/>
+                                </small>
+                            </div>
+                        </div>
+                        <div class="o_kanban_record_body">
+                            <div>
+                                <span class="fw-bold">Load: </span>
+                                <field name="workcenter_load" widget="float_time"/>
+                            </div>
+                            <div>
+                                <span class="fw-bold">Capacity: </span>
+                                <field name="capacity"/>
+                            </div>
+                            <div>
+                                <span class="fw-bold">Efficiency: </span>
+                                <field name="time_efficiency"/>%
+                            </div>
+                            <div t-if="record.resource_calendar_id.raw_value">
+                                <span class="fw-bold">Calendar: </span>
+                                <field name="resource_calendar_id"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_workcenter_bottleneck_list" model="ir.ui.view">
+        <field name="name">mrp.workcenter.bottleneck.list</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <list string="Workcenter Bottlenecks">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="workcenter_load" widget="float_time"/>
+                <field name="capacity"/>
+                <field name="time_efficiency"/>
+                <field name="resource_calendar_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_workcenter_bottleneck_search" model="ir.ui.view">
+        <field name="name">mrp.workcenter.bottleneck.search</field>
+        <field name="model">mrp.workcenter</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <search string="Workcenter Bottlenecks">
+                <field name="name"/>
+                <field name="code"/>
+                <filter name="active"
+                        string="Active"
+                        domain="[('active','=',True)]"/>
+                <filter name="inactive"
+                        string="Archived"
+                        domain="[('active','=',False)]"/>
+                <group name="group_by_workcenter">
+                    <filter name="group_calendar"
+                            string="Working Schedule"
+                            context="{'group_by': 'resource_calendar_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_workcenter_bottleneck_board" model="ir.actions.act_window">
+        <field name="name">Workcenter Bottlenecks</field>
+        <field name="res_model">mrp.workcenter</field>
+        <field name="view_mode">kanban,list</field>
+        <field name="domain">[('active','=',True)]</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="search_view_id" ref="view_workcenter_bottleneck_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No active workcenters
+            </p>
+            <p>
+                Workcenters surface here with their load vs capacity so
+                the production team can spot bottlenecks before they
+                impact install dates.
+            </p>
+        </field>
+    </record>
+
+</odoo>
