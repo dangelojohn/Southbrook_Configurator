@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_kitchenforge_root"
+              name="KitchenForge"
+              sequence="6"
+              web_icon="kitchenforge_core,static/description/icon.png"
+              groups="group_kitchenforge_user"/>
+
+    <menuitem id="menu_kitchenforge_new_project"
+              name="New Kitchen Project"
+              parent="menu_kitchenforge_root"
+              action="action_kitchenforge_instantiate"
+              sequence="1"/>
+
+    <menuitem id="menu_kitchenforge_projects"
+              name="Active Projects"
+              parent="menu_kitchenforge_root"
+              action="action_kitchenforge_projects"
+              sequence="10"/>
+
+    <menuitem id="menu_kitchenforge_templates"
+              name="Templates"
+              parent="menu_kitchenforge_root"
+              action="action_kitchenforge_templates"
+              sequence="20"
+              groups="group_kitchenforge_manager"/>
+
+</odoo>

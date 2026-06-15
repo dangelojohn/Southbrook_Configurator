@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="default_channel_config" model="kitchenforge.marathon.channel.config">
+        <field name="enabled" eval="True"/>
+        <field name="branded" eval="False"/>
+        <field name="rebate_per_cabinet_usd">8.0</field>
+        <field name="minimum_rfq_amount">100.0</field>
+        <field name="marathon_partner_id"
+               ref="southbrook_hardware_catalog.partner_marathon_hardware"/>
+    </record>
+
+    <record id="cron_marathon_telemetry_flush" model="ir.cron">
+        <field name="name">KitchenForge / Marathon Telemetry Flush</field>
+        <field name="model_id" ref="model_kitchenforge_marathon_spec_event"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_flush_telemetry()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

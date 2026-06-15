@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Template kanban -->
+    <record id="view_kitchenforge_template_kanban" model="ir.ui.view">
+        <field name="name">kitchenforge.template.kanban</field>
+        <field name="model">project.project</field>
+        <field name="arch" type="xml">
+            <kanban string="Templates">
+                <field name="name"/>
+                <field name="kitchenforge_kind"/>
+                <field name="default_cabinet_zone_ids"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click o_kanban_record_has_image_fill">
+                            <div class="oe_kanban_details">
+                                <strong><field name="name"/></strong>
+                                <div>
+                                    <span class="badge text-bg-primary"><field name="kitchenforge_kind"/></span>
+                                </div>
+                                <div class="text-muted">
+                                    <span><field name="default_cabinet_zone_ids" widget="many2many_tags_avatar"/></span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Template form -->
+    <record id="view_kitchenforge_template_form" model="ir.ui.view">
+        <field name="name">kitchenforge.template.form</field>
+        <field name="model">project.project</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Template Name"/>
+                        <h1><field name="name" placeholder="e.g. Full Kitchen Build"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="is_template"/>
+                            <field name="kitchenforge_kind"/>
+                            <field name="template_so_product_id"/>
+                        </group>
+                        <group>
+                            <field name="cut_spec_id" readonly="1"/>
+                            <field name="bom_version_lock" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Default Cabinet Zones">
+                            <field name="default_cabinet_zone_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="product_tmpl_id"/>
+                                    <field name="quantity"/>
+                                    <field name="width_mm"/>
+                                    <field name="height_mm"/>
+                                    <field name="depth_mm"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Description">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: KitchenForge templates -->
+    <record id="action_kitchenforge_templates" model="ir.actions.act_window">
+        <field name="name">KitchenForge Templates</field>
+        <field name="res_model">project.project</field>
+        <field name="view_mode">kanban,form,list</field>
+        <field name="domain">[('is_template','=',True)]</field>
+        <field name="context">{'default_is_template': True}</field>
+    </record>
+
+    <!-- Action: KitchenForge projects (instantiated, not templates) -->
+    <record id="action_kitchenforge_projects" model="ir.actions.act_window">
+        <field name="name">KitchenForge Projects</field>
+        <field name="res_model">project.project</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('is_template','=',False),('instantiated_from_template_id','!=',False)]</field>
+    </record>
+
+    <!-- Filter templates out of the default project list -->
+    <record id="view_project_filter_hide_templates" model="ir.ui.view">
+        <field name="name">project.project.filter.hide_templates</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.view_project_project_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <filter name="kitchenforge_templates"
+                        string="KitchenForge Templates"
+                        domain="[('is_template','=',True)]"/>
+                <filter name="not_templates"
+                        string="Active Projects"
+                        domain="[('is_template','=',False)]"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

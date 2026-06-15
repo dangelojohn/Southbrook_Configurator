@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_kf_saas_root"
+              name="SaaS Control Plane"
+              parent="kitchenforge_core.menu_kitchenforge_root"
+              sequence="80"
+              groups="group_kitchenforge_saas_operator,group_kitchenforge_saas_billing"/>
+
+    <menuitem id="menu_kf_saas_tenants"
+              name="Tenants"
+              parent="menu_kf_saas_root"
+              action="action_kf_tenant"
+              sequence="10"/>
+
+    <menuitem id="menu_kf_saas_plans"
+              name="Plans"
+              parent="menu_kf_saas_root"
+              action="action_kf_subscription_plan"
+              sequence="20"/>
+
+    <menuitem id="menu_kf_saas_events"
+              name="Tenant Events"
+              parent="menu_kf_saas_root"
+              action="action_kf_tenant_event"
+              sequence="30"
+              groups="group_kitchenforge_saas_operator"/>
+
+</odoo>

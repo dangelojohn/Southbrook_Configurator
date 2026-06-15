@@ -1,0 +1,25 @@
+apiVersion: v2
+name: kitchenforge
+description: |
+  Helm chart for a single KitchenForge tenant on Kubernetes. Forward-looking —
+  not deployed yet. Models the current QNAP per-tenant docker-compose stack as
+  a Deployment (odoo) + StatefulSet (postgres) + Service + Ingress + Secret +
+  PVC, one tenant per release. Multi-tenancy expressed as multiple releases.
+
+  ArgoCD wiring (future): drop an Application CRD pointing at this chart with
+  per-release values files under `values/<tenant>.yaml`.
+
+type: application
+version: 0.1.0
+appVersion: "19.0"
+kubeVersion: ">=1.27.0"
+
+keywords:
+  - odoo
+  - erp
+  - kitchenforge
+  - manufacturing
+
+maintainers:
+  - name: KitchenForge platform
+    email: ops@southbrookcabinetry.space

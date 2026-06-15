@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_marathon_root"
+              name="Marathon Channel"
+              parent="kitchenforge_core.menu_kitchenforge_root"
+              sequence="50"
+              groups="kitchenforge_core.group_kitchenforge_manager"/>
+
+    <menuitem id="menu_marathon_config"
+              name="Channel Config"
+              parent="menu_marathon_root"
+              action="action_marathon_channel_config"
+              sequence="10"/>
+
+    <menuitem id="menu_marathon_spec_events"
+              name="Spec Events"
+              parent="menu_marathon_root"
+              action="action_marathon_spec_event"
+              sequence="20"/>
+
+    <menuitem id="menu_marathon_rebates"
+              name="Rebates"
+              parent="menu_marathon_root"
+              action="action_marathon_rebate"
+              sequence="30"/>
+
+</odoo>

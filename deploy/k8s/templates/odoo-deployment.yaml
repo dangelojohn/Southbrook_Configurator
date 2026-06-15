@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kitchenforge.fullname" . }}-odoo
+  labels:
+    {{- include "kitchenforge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: odoo
+spec:
+  replicas: {{ .Values.odoo.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "kitchenforge.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: odoo
+  template:
+    metadata:
+      labels:
+        {{- include "kitchenforge.labels" . | nindent 8 }}
+        app.kubernetes.io/component: odoo
+    spec:
+      containers:
+        - name: odoo
+          image: "{{ .Values.image.odoo.repository }}:{{ .Values.image.odoo.tag }}"
+          imagePullPolicy: {{ .Values.image.odoo.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8069
+          env:
+            - name: HOST
+              value: "{{ include "kitchenforge.fullname" . }}-pg"
+            - name: USER
+              value: "odoo"
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kitchenforge.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+            - name: ADMIN_PASSWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kitchenforge.fullname" . }}-secrets
+                  key: ADMIN_PASSWD
+          args:
+            - "--db_host=$(HOST)"
+            - "--db_user=$(USER)"
+            - "--db_password=$(PASSWORD)"
+            - "--dbfilter=^{{ .Values.tenant.slug }}$"
+            - "--proxy-mode"
+            - "--workers={{ .Values.odoo.workers }}"
+            - "--max-cron-threads={{ .Values.odoo.maxCronThreads }}"
+          volumeMounts:
+            - name: addons
+              mountPath: /mnt/extra-addons
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/odoo
+          resources:
+            {{- toYaml .Values.odoo.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /web/login
+              port: 8069
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /web/login
+              port: 8069
+            initialDelaySeconds: 120
+            periodSeconds: 30
+      volumes:
+        - name: addons
+          persistentVolumeClaim:
+            claimName: {{ .Values.odoo.addonsPVC }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "kitchenforge.fullname" . }}-odoo-data

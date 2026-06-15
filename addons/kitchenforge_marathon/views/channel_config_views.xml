@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_marathon_channel_config_form" model="ir.ui.view">
+        <field name="name">kitchenforge.marathon.channel.config.form</field>
+        <field name="model">kitchenforge.marathon.channel.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title"><h1>Marathon Channel Config</h1></div>
+                    <group>
+                        <group>
+                            <field name="enabled"/>
+                            <field name="branded"/>
+                            <field name="marathon_partner_id"/>
+                        </group>
+                        <group>
+                            <field name="rebate_per_cabinet_usd"/>
+                            <field name="minimum_rfq_amount"/>
+                            <field name="telemetry_webhook_url" widget="url"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_marathon_channel_config" model="ir.actions.act_window">
+        <field name="name">Channel Config</field>
+        <field name="res_model">kitchenforge.marathon.channel.config</field>
+        <field name="view_mode">form,list</field>
+    </record>
+
+</odoo>

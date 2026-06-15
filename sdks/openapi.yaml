@@ -1,0 +1,706 @@
+openapi: 3.1.0
+info:
+  title: KitchenForge Agent API
+  version: 1.0.0
+  summary: Filesystem-style + typed-tool surface for LLM agents on the KitchenForge MRP stack.
+  description: |
+    KitchenForge exposes an agent-friendly HTTP surface on top of the Odoo 19 CE
+    kitchen MRP platform. Two layers:
+
+    1. **Filesystem** (`/agent/v1/files/...`) — a magicpath.ai/files-style virtual
+       FS over templates, projects, catalog, and shop. GET to read, PUT to write,
+       HEAD for ETag-only.
+    2. **Typed tools** (`/agent/v1/tools/...`) — five workflow actions framed as
+       JSON-Schema'd tools suitable for direct Claude/GPT `tool_use` binding.
+
+    Plus Marathon telemetry/rebate read-only dashboards.
+
+    All endpoints require `X-Api-Key`. All writes accept `Idempotency-Key` for
+    safe retry. FS writes accept `If-Match` for ETag concurrency.
+  contact:
+    name: KitchenForge / Southbrook Cabinetry
+    url: https://southbrookcabinetry.space
+  license:
+    name: LGPL-3.0
+servers:
+  - url: https://southbrookcabinetry.space
+    description: Production
+  - url: http://localhost:8069
+    description: Local dev
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: filesystem
+    description: Virtual FS over Odoo records.
+  - name: tools
+    description: Typed workflow actions.
+  - name: manifest
+    description: Agent self-discovery.
+  - name: marathon
+    description: Marathon dealer telemetry.
+
+paths:
+  /.well-known/ai-agent.json:
+    get:
+      tags: [manifest]
+      summary: Agent self-discovery manifest
+      operationId: getAgentManifest
+      security: []
+      responses:
+        "200":
+          description: Discovery payload (auth scheme + fs base + tool catalog url)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentManifest"
+
+  /.well-known/kitchenforge-agent.json:
+    get:
+      tags: [manifest]
+      summary: Alias for the agent manifest
+      operationId: getKitchenForgeManifest
+      security: []
+      responses:
+        "200":
+          description: Same payload as /.well-known/ai-agent.json
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentManifest"
+
+  /agent/v1/files:
+    get:
+      tags: [filesystem]
+      summary: List the FS root
+      operationId: fsListRoot
+      responses:
+        "200":
+          description: Root directory listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FsDirListing"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /agent/v1/files/{path}:
+    parameters:
+      - $ref: "#/components/parameters/FsPath"
+    get:
+      tags: [filesystem]
+      summary: Read a directory listing or file payload
+      operationId: fsGet
+      responses:
+        "200":
+          description: Directory listing or file payload
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/FsDirListing"
+                  - $ref: "#/components/schemas/FsFile"
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Present on file payloads.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    put:
+      tags: [filesystem]
+      summary: Write a YAML/JSON-decoded payload to a file path
+      operationId: fsPut
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: New file representation with new ETag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FsFile"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405":
+          description: Path is read-only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    head:
+      tags: [filesystem]
+      summary: Existence + ETag-only check
+      operationId: fsHead
+      responses:
+        "200":
+          description: Path exists
+          headers:
+            ETag:
+              schema: { type: string }
+        "404":
+          description: Path does not exist
+
+  /agent/v1/tools:
+    get:
+      tags: [tools]
+      summary: Fetch the JSON-Schema tool catalog
+      description: |
+        Returns the LLM-consumable tool catalog. Each entry has `name`,
+        `description`, `input_schema` (JSON Schema), and `endpoint`. Feed
+        the array directly into Claude's `tools` parameter or convert per
+        OpenAI's function-calling shape.
+      operationId: listTools
+      responses:
+        "200":
+          description: Tool catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema:
+                    type: string
+                    const: kitchenforge.agent.tools.v1
+                  tools:
+                    type: array
+                    items: { $ref: "#/components/schemas/ToolDescriptor" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /agent/v1/tools/instantiate:
+    post:
+      tags: [tools]
+      summary: Create a project from a template
+      operationId: toolInstantiate
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InstantiateRequest" }
+            examples:
+              minimal:
+                summary: Full Kitchen template, customer 42
+                value:
+                  template_id: 7
+                  partner_id: 42
+                  dims:
+                    room_width_mm: 4200
+                    room_depth_mm: 3600
+                    ceiling_height_mm: 2700
+                  target_date: "2026-08-15"
+      responses:
+        "200":
+          description: Project created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InstantiateResult" }
+              examples:
+                ok:
+                  value:
+                    ok: true
+                    project_id: 137
+                    project_path: /projects/137.yaml
+                    sale_order_id: 412
+                    sale_order_name: S00412
+                    quote_path: /projects/137/quote.yaml
+                    schema: southbrook.flutter.api.v1
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /agent/v1/tools/add_zone:
+    post:
+      tags: [tools]
+      summary: Add a cabinet zone (sale.order.line) to a project quote
+      operationId: toolAddZone
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddZoneRequest" }
+      responses:
+        "200":
+          description: Zone added
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AddZoneResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /agent/v1/tools/confirm_quote:
+    post:
+      tags: [tools]
+      summary: Confirm the project's sale order
+      operationId: toolConfirmQuote
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfirmQuoteRequest" }
+      responses:
+        "200":
+          description: Quote confirmed (or already confirmed)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfirmQuoteResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /agent/v1/tools/release_mos:
+    post:
+      tags: [tools]
+      summary: Move project MOs from confirmed to assigned
+      operationId: toolReleaseMos
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReleaseMosRequest" }
+      responses:
+        "200":
+          description: Released manufacturing orders
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReleaseMosResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /agent/v1/tools/raise_eco:
+    post:
+      tags: [tools]
+      summary: Author a draft Engineering Change Order
+      operationId: toolRaiseEco
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RaiseEcoRequest" }
+      responses:
+        "200":
+          description: ECO created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RaiseEcoResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "501":
+          description: PLM addon not installed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /agent/v1/marathon/telemetry:
+    get:
+      tags: [marathon]
+      summary: Recent Marathon spec events (pull selections, finish, sizes)
+      operationId: marathonTelemetry
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 200
+            maximum: 1000
+      responses:
+        "200":
+          description: Recent spec events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarathonTelemetry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /agent/v1/marathon/rebates:
+    get:
+      tags: [marathon]
+      summary: Monthly rebate summary
+      operationId: marathonRebates
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: ISO month, e.g. 2026-05. Omit for current period.
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+      responses:
+        "200":
+          description: Rebate summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RebateSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: |
+        Per-user API key issued from Settings → Users → API Keys in the
+        KitchenForge backend. Verified against `southbrook.api.key`.
+
+  parameters:
+    FsPath:
+      name: path
+      in: path
+      required: true
+      description: Filesystem path under /agent/v1/files (no leading slash).
+      schema:
+        type: string
+        examples:
+          - templates
+          - templates/full-kitchen.yaml
+          - projects/137/quote.yaml
+          - catalog/attributes.yaml
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Caller-generated UUID for safe retry; identical request replays cached response.
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: ETag from a prior GET; write fails on mismatch.
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Missing or invalid X-Api-Key
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example:
+            error: invalid_api_key
+            message: Missing or invalid X-Api-Key header.
+            schema: southbrook.flutter.api.v1
+    NotFound:
+      description: Path or record not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    ServerError:
+      description: Internal error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error, message, schema]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code (e.g. "not_found", "tool_failed").
+        message:
+          type: string
+          description: Human-readable explanation.
+        schema:
+          type: string
+          const: southbrook.flutter.api.v1
+        details:
+          type: object
+          additionalProperties: true
+
+    FsEntry:
+      type: object
+      required: [name, kind, path]
+      properties:
+        name: { type: string }
+        kind:
+          type: string
+          enum: [dir, file]
+        path: { type: string }
+        id: { type: integer }
+        desc: { type: string }
+        label: { type: string }
+      additionalProperties: true
+
+    FsDirListing:
+      type: object
+      required: [kind, path, entries, schema]
+      properties:
+        kind:
+          type: string
+          const: dir
+        path: { type: string }
+        schema:
+          type: string
+          const: kitchenforge.agent.fs.v1
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/FsEntry" }
+
+    FsFile:
+      type: object
+      required: [kind, path, content, schema]
+      properties:
+        kind:
+          type: string
+          const: file
+        path: { type: string }
+        etag: { type: string }
+        schema:
+          type: string
+          const: kitchenforge.agent.fs.v1
+        content:
+          type: object
+          additionalProperties: true
+
+    ToolDescriptor:
+      type: object
+      required: [name, description, input_schema, endpoint]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        input_schema:
+          type: object
+          additionalProperties: true
+        endpoint: { type: string }
+
+    ToolResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        schema:
+          type: string
+          const: southbrook.flutter.api.v1
+      additionalProperties: true
+
+    InstantiateRequest:
+      type: object
+      required: [template_id, partner_id]
+      properties:
+        template_id:
+          type: integer
+          description: project.project id where is_template=True
+        partner_id:
+          type: integer
+          description: res.partner id of the end customer
+        dims:
+          type: object
+          properties:
+            room_width_mm: { type: integer }
+            room_depth_mm: { type: integer }
+            ceiling_height_mm: { type: integer }
+        target_date:
+          type: string
+          format: date
+
+    InstantiateResult:
+      allOf:
+        - $ref: "#/components/schemas/ToolResult"
+        - type: object
+          properties:
+            project_id: { type: integer }
+            project_path: { type: string }
+            sale_order_id: { type: integer }
+            sale_order_name: { type: string }
+            quote_path: { type: string }
+
+    Zone:
+      type: object
+      required: [product_id]
+      properties:
+        product_id: { type: integer }
+        quantity:
+          type: number
+          default: 1.0
+        width_mm:
+          type: integer
+          default: 600
+        height_mm:
+          type: integer
+          default: 720
+        depth_mm:
+          type: integer
+          default: 580
+        preselected_attribute_values:
+          type: object
+          additionalProperties: true
+
+    AddZoneRequest:
+      type: object
+      required: [project_id, zone]
+      properties:
+        project_id: { type: integer }
+        zone: { $ref: "#/components/schemas/Zone" }
+
+    AddZoneResult:
+      allOf:
+        - $ref: "#/components/schemas/ToolResult"
+        - type: object
+          properties:
+            project_id: { type: integer }
+            zones_path: { type: string }
+            line_count: { type: integer }
+
+    ConfirmQuoteRequest:
+      type: object
+      required: [project_id]
+      properties:
+        project_id: { type: integer }
+
+    ConfirmQuoteResult:
+      allOf:
+        - $ref: "#/components/schemas/ToolResult"
+        - type: object
+          properties:
+            sale_order: { type: string }
+            state: { type: string }
+            mo_path: { type: string }
+            already_confirmed: { type: boolean }
+
+    ReleaseMosRequest:
+      type: object
+      required: [project_id]
+      properties:
+        project_id: { type: integer }
+
+    ReleasedMo:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        state: { type: string }
+
+    ReleaseMosResult:
+      allOf:
+        - $ref: "#/components/schemas/ToolResult"
+        - type: object
+          properties:
+            released_count: { type: integer }
+            mos:
+              type: array
+              items: { $ref: "#/components/schemas/ReleasedMo" }
+
+    RaiseEcoRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        reason: { type: string }
+        project_id: { type: integer }
+        target_bom_id: { type: integer }
+
+    RaiseEcoResult:
+      allOf:
+        - $ref: "#/components/schemas/ToolResult"
+        - type: object
+          properties:
+            eco_id: { type: integer }
+            stage: { type: string, nullable: true }
+            requires_approver: { type: boolean }
+
+    AgentManifest:
+      type: object
+      required: [schema_version, name_for_model, auth, filesystem, tools_url]
+      properties:
+        schema_version: { type: string }
+        name_for_model: { type: string }
+        name_for_human: { type: string }
+        description_for_human: { type: string }
+        description_for_model: { type: string }
+        auth:
+          type: object
+          properties:
+            type: { type: string }
+            header_name: { type: string }
+            issuance: { type: string }
+        filesystem:
+          type: object
+          properties:
+            base_url: { type: string }
+            verbs:
+              type: array
+              items: { type: string }
+            namespaces:
+              type: array
+              items:
+                type: object
+                properties:
+                  path: { type: string }
+                  writable: { type: boolean }
+                  desc: { type: string }
+            etag_concurrency: { type: boolean }
+        tools_url: { type: string }
+      additionalProperties: true
+
+    Tenant:
+      type: object
+      properties:
+        dbname: { type: string }
+        host_url: { type: string }
+
+    SpecEvent:
+      type: object
+      required: [id, ts]
+      properties:
+        id: { type: integer }
+        ts: { type: string }
+        product_default_code: { type: string, nullable: true }
+        product_name: { type: string }
+        qty: { type: number }
+        cabinet_family: { type: string, nullable: true }
+        pull_finish: { type: string, nullable: true }
+        pull_size_mm: { type: integer, nullable: true }
+        sale_order: { type: string, nullable: true }
+
+    MarathonTelemetry:
+      type: object
+      required: [schema, tenant, count, events]
+      properties:
+        schema:
+          type: string
+          const: kitchenforge.marathon.telemetry.v1
+        tenant: { type: string }
+        count: { type: integer }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/SpecEvent" }
+
+    RebateSummary:
+      type: object
+      required: [schema, tenant, summary]
+      properties:
+        schema:
+          type: string
+          const: kitchenforge.marathon.rebates.v1
+        tenant: { type: string }
+        summary:
+          type: object
+          additionalProperties: true

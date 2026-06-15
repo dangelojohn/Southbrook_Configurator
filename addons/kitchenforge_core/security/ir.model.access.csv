@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_kf_template_line_user,kf template line user,model_kitchenforge_template_line,group_kitchenforge_user,1,0,0,0
+access_kf_template_line_manager,kf template line manager,model_kitchenforge_template_line,group_kitchenforge_manager,1,1,1,1
+access_kf_instantiate_wizard_user,kf instantiate wizard user,model_kitchenforge_instantiate_wizard,group_kitchenforge_user,1,1,1,1

@@ -1,0 +1,73 @@
+# KitchenForge — single-tenant Helm values.
+#
+# One release = one tenant. Override `tenant.slug` (and matching dbfilter) per
+# release. Designed to mirror the QNAP docker-compose tenant layout 1:1 so
+# migration is a lift-and-shift.
+
+tenant:
+  # slug must match the DB name AND the dbfilter regex in the Odoo config.
+  slug: southbrook
+  domain: southbrook.example.com
+  tier: direct                       # marathon_channel | direct | enterprise
+
+image:
+  odoo:
+    repository: odoo
+    tag: "19"
+    pullPolicy: IfNotPresent
+  postgres:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+
+odoo:
+  replicas: 1                        # >1 needs sticky sessions via Ingress
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  workers: 2
+  maxCronThreads: 1
+  # Addons mounted from a PVC populated by an init container that rsyncs from
+  # an OCI artifact (future) or a sidecar. For day-1, point at a hostPath PVC
+  # the operator maintains.
+  addonsPVC: kitchenforge-addons
+
+postgres:
+  storageClassName: standard
+  storage: 20Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  # POSTGRES_PASSWORD is sourced from the Secret (see templates/secret.yaml).
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "200m"
+  tls:
+    enabled: true
+    secretName: kitchenforge-tls
+
+# Bootstrap secrets — set via `helm install --set secrets.postgresPassword=...`
+# or (better) sealed-secrets / external-secrets-operator.
+secrets:
+  postgresPassword: ""               # required
+  adminPasswd: ""                    # required (Odoo master password)
+
+# Future:
+# argocd:
+#   enabled: false
+#   project: kitchenforge
+#   repoURL: https://forgejo.example.com/qnap/southbrook-v19cr.git
+#   path: deploy/k8s
+#   targetRevision: HEAD

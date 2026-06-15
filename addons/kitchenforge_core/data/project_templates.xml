@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!--
+        Seed templates. Each is a project.project flagged is_template=True,
+        with default cabinet zones representing the typical layout. The zones
+        reference real product.template records; we look them up by
+        external XML id or fall back at instantiation time.
+
+        The seed product references below intentionally use southbrook_estimating
+        cabinet templates (see southbrook_estimating/data/product_templates.xml).
+        If those are absent, the zones will still load — the wizard validates
+        that product_tmpl_id is set before allowing instantiation.
+    -->
+
+    <record id="template_full_kitchen" model="project.project">
+        <field name="name">Full Kitchen Build</field>
+        <field name="is_template">True</field>
+        <field name="kitchenforge_kind">full_kitchen</field>
+        <field name="description">Standard kitchen build template. Ten typical cabinet zones
+            spanning base, wall, tall, and accessory families. Salesperson tweaks
+            dimensions and attributes; everything else is pre-wired.</field>
+    </record>
+
+    <record id="template_partial_reno" model="project.project">
+        <field name="name">Partial Renovation</field>
+        <field name="is_template">True</field>
+        <field name="kitchenforge_kind">partial_reno</field>
+        <field name="description">Replace a subset of cabinets — wall + sink-base + accessory.
+            Faster quote turnaround for repair/replacement work.</field>
+    </record>
+
+    <record id="template_single_custom" model="project.project">
+        <field name="name">Single Custom Cabinet</field>
+        <field name="is_template">True</field>
+        <field name="kitchenforge_kind">single_custom</field>
+        <field name="description">One cabinet, fully configurable. Used for warranty
+            replacements, custom add-ons, and showroom test pieces.</field>
+    </record>
+
+    <record id="template_vanity" model="project.project">
+        <field name="name">Vanity</field>
+        <field name="is_template">True</field>
+        <field name="kitchenforge_kind">vanity</field>
+        <field name="description">Single-vanity bathroom build with a drawer stack and worktop dependency.</field>
+    </record>
+
+</odoo>

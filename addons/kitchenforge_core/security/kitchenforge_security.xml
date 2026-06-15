@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="module_category_kitchenforge" model="ir.module.category">
+        <field name="name">KitchenForge</field>
+        <field name="description">Kitchen MRP — project template spine + AI agent surface</field>
+        <field name="sequence">15</field>
+    </record>
+
+    <record id="group_kitchenforge_user" model="res.groups">
+        <field name="name">KitchenForge / Salesperson</field>
+        <field name="category_id" ref="module_category_kitchenforge"/>
+        <field name="comment">Can instantiate kitchen projects from templates and confirm quotes.</field>
+    </record>
+
+    <record id="group_kitchenforge_dealer" model="res.groups">
+        <field name="name">KitchenForge / Dealer</field>
+        <field name="category_id" ref="module_category_kitchenforge"/>
+        <field name="implied_ids" eval="[(4, ref('group_kitchenforge_user'))]"/>
+        <field name="comment">External dealer access — instantiate projects via API, read shop schedule.</field>
+    </record>
+
+    <record id="group_kitchenforge_manager" model="res.groups">
+        <field name="name">KitchenForge / Manager</field>
+        <field name="category_id" ref="module_category_kitchenforge"/>
+        <field name="implied_ids" eval="[(4, ref('group_kitchenforge_user'))]"/>
+        <field name="comment">Author and edit project templates, manage seed catalog data.</field>
+    </record>
+
+</odoo>

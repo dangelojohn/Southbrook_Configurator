@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="plan_marathon_channel" model="kitchenforge.subscription.plan">
+        <field name="name">Marathon Channel</field>
+        <field name="code">marathon_channel</field>
+        <field name="sequence">10</field>
+        <field name="monthly_usd">149.0</field>
+        <field name="annual_usd">1490.0</field>
+        <field name="max_seats">3</field>
+        <field name="max_active_projects">10</field>
+        <field name="marathon_rebate_eligible" eval="True"/>
+        <field name="description">Channel-partner tier for shops onboarded through Marathon Hardware. Subsidised pricing in exchange for default-spec'd Marathon SKUs + per-cabinet rebate participation.</field>
+    </record>
+
+    <record id="plan_direct" model="kitchenforge.subscription.plan">
+        <field name="name">Direct</field>
+        <field name="code">direct</field>
+        <field name="sequence">20</field>
+        <field name="monthly_usd">599.0</field>
+        <field name="annual_usd">5990.0</field>
+        <field name="max_seats">10</field>
+        <field name="max_active_projects">50</field>
+        <field name="marathon_rebate_eligible" eval="False"/>
+        <field name="description">Standalone subscription, no channel partner involvement. Full KitchenForge surface, all hardware vendors first-class.</field>
+    </record>
+
+    <record id="plan_enterprise" model="kitchenforge.subscription.plan">
+        <field name="name">Enterprise</field>
+        <field name="code">enterprise</field>
+        <field name="sequence">30</field>
+        <field name="monthly_usd">2500.0</field>
+        <field name="annual_usd">25000.0</field>
+        <field name="max_seats">0</field>
+        <field name="max_active_projects">0</field>
+        <field name="marathon_rebate_eligible" eval="False"/>
+        <field name="description">Unlimited seats + projects, dedicated provisioning, SLA, custom MRP integrations, white-label branding turned on by default.</field>
+    </record>
+
+</odoo>

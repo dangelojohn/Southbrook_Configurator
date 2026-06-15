@@ -1,0 +1,49 @@
+{
+  "name": "@kitchenforge/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the KitchenForge agent API (Odoo 19 kitchen MRP)",
+  "type": "module",
+  "license": "LGPL-3.0-only",
+  "author": "Southbrook Cabinetry <engineering@southbrookcabinetry.space>",
+  "homepage": "https://southbrookcabinetry.space",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dangelojohn/southbrook-v19cr"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "kitchenforge",
+    "odoo",
+    "mrp",
+    "agent",
+    "llm",
+    "tool-use",
+    "anthropic",
+    "openai"
+  ],
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

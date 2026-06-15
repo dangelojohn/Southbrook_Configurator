@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_kitchenforge_instantiate_wizard_form" model="ir.ui.view">
+        <field name="name">kitchenforge.instantiate.wizard.form</field>
+        <field name="model">kitchenforge.instantiate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Instantiate Kitchen Project">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="template_id" options="{'no_create': True}"/>
+                            <field name="partner_id"/>
+                            <field name="target_handover_date"/>
+                        </group>
+                        <group>
+                            <field name="room_width_mm"/>
+                            <field name="room_depth_mm"/>
+                            <field name="ceiling_height_mm"/>
+                            <field name="preview_zone_count" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_instantiate" type="object"
+                            string="Instantiate" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_kitchenforge_instantiate" model="ir.actions.act_window">
+        <field name="name">New Kitchen Project from Template</field>
+        <field name="res_model">kitchenforge.instantiate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

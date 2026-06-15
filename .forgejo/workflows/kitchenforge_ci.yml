@@ -1,0 +1,267 @@
+# KitchenForge CI — three-job pipeline for the kitchenforge_* addon family.
+#
+# Forgejo Actions notes (vs GitHub Actions, where it bites):
+#   - actions/checkout@v4 works, but Forgejo runs its own action registry by
+#     default; the runner config maps `actions/*` -> https://code.forgejo.org/actions.
+#     If a step says "action not found", check the runner's `act_runner.yaml`
+#     `[runner].fetch_timeout` / `[host].docker_action_registry`.
+#   - `${{ secrets.GITHUB_TOKEN }}` is `${{ secrets.FORGEJO_TOKEN }}` here; we
+#     don't need it for this workflow.
+#   - `if: github.event_name == 'push'` works; `github` namespace is mirrored.
+#   - No `permissions:` block needed — Forgejo doesn't enforce GH's permission
+#     model and warnings on unknown keys are non-fatal but noisy.
+#   - Job-level `container:` is supported but the runner needs DOOD socket
+#     access for the docker-in-docker `test` job. The QNAP `forgejo-runner`
+#     was registered with `--privileged` per qnap_forgejo_actions.md.
+#   - `runs-on` must literally match a runner label (`linux-amd64` per the
+#     QNAP install).
+
+name: KitchenForge CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/kitchenforge-**"
+      - "fix/kitchenforge-**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "addons/kitchenforge_core/**"
+      - "addons/kitchenforge_marathon/**"
+      - "addons/kitchenforge_saas/**"
+      - ".forgejo/workflows/kitchenforge_ci.yml"
+      - "deploy/**"
+
+concurrency:
+  group: kitchenforge-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ADDONS: kitchenforge_core,kitchenforge_marathon,kitchenforge_saas
+
+jobs:
+
+  # --------------------------------------------------------------------------
+  # Job 1: lint
+  # --------------------------------------------------------------------------
+  # Pure-Python — no docker. Validates manifests, Python AST, XML well-formed,
+  # CSV header sanity. Finishes in seconds; fails fast before the heavy `test`
+  # job spins up postgres + odoo.
+  lint:
+    runs-on: linux-amd64
+    container:
+      image: python:3.11-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install lint tooling
+        run: |
+          pip install --no-cache-dir flake8==7.1.1 pyflakes==3.2.0 lxml==5.3.0
+
+      - name: Python AST parse (every .py compiles)
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in $(find addons/kitchenforge_core addons/kitchenforge_marathon \
+                          addons/kitchenforge_saas -name '*.py'); do
+            python -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$f" \
+              || { echo "AST FAIL: $f"; fail=1; }
+          done
+          exit $fail
+
+      - name: Manifest parse (must be a valid dict literal)
+        run: |
+          set -euo pipefail
+          for m in addons/kitchenforge_core/__manifest__.py \
+                   addons/kitchenforge_marathon/__manifest__.py \
+                   addons/kitchenforge_saas/__manifest__.py; do
+            python -c "import ast; d=ast.literal_eval(open('$m').read()); \
+              assert 'depends' in d and 'version' in d, '$m missing required keys'"
+            echo "manifest OK: $m"
+          done
+
+      - name: flake8 (style — Odoo-friendly profile)
+        run: |
+          flake8 --max-line-length=120 \
+                 --extend-ignore=E501,W503,E203,E731 \
+                 --exclude=__pycache__,migrations \
+                 addons/kitchenforge_core addons/kitchenforge_marathon \
+                 addons/kitchenforge_saas
+
+      - name: XML well-formed (lxml parse)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sys, glob
+          from lxml import etree
+          fail = 0
+          for x in glob.glob('addons/kitchenforge_*/**/*.xml', recursive=True):
+              try:
+                  etree.parse(x)
+              except Exception as e:
+                  print(f"XML FAIL: {x}: {e}")
+                  fail = 1
+          sys.exit(fail)
+          PY
+
+      - name: CSV header sanity (security access files)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import csv, glob, sys
+          required = {'id', 'name', 'model_id:id', 'group_id:id',
+                      'perm_read', 'perm_write', 'perm_create', 'perm_unlink'}
+          fail = 0
+          for c in glob.glob('addons/kitchenforge_*/security/ir.model.access.csv'):
+              with open(c) as f:
+                  hdr = set(next(csv.reader(f)))
+              missing = required - hdr
+              if missing:
+                  print(f"CSV FAIL: {c} missing cols: {sorted(missing)}")
+                  fail = 1
+              else:
+                  print(f"CSV OK: {c}")
+          sys.exit(fail)
+          PY
+
+  # --------------------------------------------------------------------------
+  # Job 2: test
+  # --------------------------------------------------------------------------
+  # Spins up postgres:16 + odoo:19 via docker compose, installs the three
+  # kitchenforge addons + their transitive deps, then runs the test sweep with
+  # --test-tags=kitchenforge.
+  test:
+    runs-on: linux-amd64
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Compose env
+        # Re-use the SAMI .env scaffold so the docker-compose.yml in the repo
+        # root resolves (POSTGRES_PASSWORD etc.).
+        run: cp .env.example .env
+
+      - name: Build images
+        run: docker compose build odoo
+
+      - name: Bring up postgres
+        run: |
+          docker compose up -d db
+          for i in $(seq 1 30); do
+            STATE=$(docker inspect sami-postgres --format '{{.State.Health.Status}}' 2>/dev/null || echo none)
+            echo "postgres tick $i: $STATE"
+            [ "$STATE" = "healthy" ] && break
+            sleep 5
+          done
+
+      - name: Bring up Odoo
+        run: |
+          docker compose up -d odoo
+          for i in $(seq 1 36); do
+            STATE=$(docker inspect sami-odoo --format '{{.State.Health.Status}}' 2>/dev/null || echo none)
+            echo "odoo tick $i: $STATE"
+            [ "$STATE" = "healthy" ] && exit 0
+            sleep 10
+          done
+          docker compose logs odoo | tail -100
+          exit 1
+
+      - name: Install kitchenforge addons (cold init)
+        # `-i` against a fresh DB validates the install side; `-u` later would
+        # only validate the upgrade side.
+        run: |
+          docker exec sami-odoo odoo -d kitchenforge_ci \
+            -i ${ADDONS} \
+            --db_host=db --db_user=odoo --db_password="$(grep POSTGRES_PASSWORD .env | cut -d= -f2)" \
+            --stop-after-init --no-http \
+            --http-port=8899 --gevent-port=8902 \
+            --workers=0 --max-cron-threads=0
+
+      - name: Run kitchenforge test sweep
+        run: |
+          docker exec sami-odoo odoo -d kitchenforge_ci \
+            -u ${ADDONS} \
+            --test-enable --test-tags=kitchenforge \
+            --db_host=db --db_user=odoo --db_password="$(grep POSTGRES_PASSWORD .env | cut -d= -f2)" \
+            --stop-after-init --no-http \
+            --http-port=8899 --gevent-port=8902 \
+            --workers=0 --max-cron-threads=0
+
+      - name: Capture artifacts on failure
+        if: failure()
+        run: |
+          mkdir -p artifacts
+          docker compose logs odoo > artifacts/odoo.log || true
+          docker compose logs db   > artifacts/db.log   || true
+
+      - name: Upload artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kitchenforge-failure-${{ github.run_id }}
+          path: artifacts/
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  # --------------------------------------------------------------------------
+  # Job 3: deploy-staging
+  # --------------------------------------------------------------------------
+  # On push-to-main only. The runner lives on the QNAP itself, so it can ssh
+  # to the QNAP container host over the loopback / management IP and call the
+  # existing deploy/deploy_kitchenforge.sh wrapper. SSH key is mounted into
+  # the runner's working directory via the runner config (see
+  # qnap_forgejo_actions.md).
+  deploy-staging:
+    runs-on: linux-amd64
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Forgejo distinction: no `environment:` gating like GH Environments — if
+    # we want a manual approval gate later, switch to a `workflow_dispatch`
+    # event with `inputs.confirm`.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Configure ssh
+        # SSH_PRIVATE_KEY is a repo-level secret in Forgejo's `Settings →
+        # Secrets`. Same env-var injection model as GH.
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.QNAP_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 192.168.68.108 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to southbrook staging
+        env:
+          QNAP_HOST: admin@192.168.68.108
+        run: |
+          chmod +x deploy/deploy_kitchenforge.sh
+          ./deploy/deploy_kitchenforge.sh --tenant southbrook
+
+      - name: Post-deploy smoke
+        run: |
+          # Probe Caddy-fronted login over the LAN address. Cloudflare edge
+          # cache can lie for up to 4h (memory: southbrook_live_web_app_deploy)
+          # so we hit the origin directly.
+          for i in $(seq 1 10); do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' \
+              https://192.168.68.108:9443/web/login || true)
+            echo "probe $i: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 6
+          done
+          exit 1

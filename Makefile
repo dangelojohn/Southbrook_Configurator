@@ -6,7 +6,8 @@
 
 .PHONY: help up down logs install install-fresh test test-quick test-bridge \
         bridge-build bridge-restart shell psql .check-env \
-        e2e-install e2e e2e-prod e2e-smoke e2e-journey
+        e2e-install e2e e2e-prod e2e-smoke e2e-journey \
+        lint deploy-staging deploy-prod provision kf-test
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -144,3 +145,59 @@ bridge-build: .check-env
 
 bridge-restart: .check-env
 	docker compose restart freecad-bridge
+
+# ---------------------------------------------------------------------------
+# KitchenForge — CI parity targets
+# ---------------------------------------------------------------------------
+# These mirror the .forgejo/workflows/kitchenforge_ci.yml jobs so what runs
+# locally is what runs in CI. `make lint` and `make test` here are scoped to
+# the kitchenforge_* addon family — the SAMI-wide `test` target above is
+# unchanged.
+
+KF_ADDONS = kitchenforge_core,kitchenforge_marathon,kitchenforge_saas
+
+lint:
+	@echo "=== KitchenForge lint (mirrors CI lint job) ==="
+	@fail=0; \
+	for f in $$(find addons/kitchenforge_core addons/kitchenforge_marathon \
+	                addons/kitchenforge_saas -name '*.py'); do \
+	  python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" $$f \
+	    || { echo "AST FAIL: $$f"; fail=1; }; \
+	done; \
+	for m in addons/kitchenforge_core/__manifest__.py \
+	         addons/kitchenforge_marathon/__manifest__.py \
+	         addons/kitchenforge_saas/__manifest__.py; do \
+	  python3 -c "import ast; d=ast.literal_eval(open('$$m').read()); \
+	    assert 'depends' in d and 'version' in d, '$$m'" \
+	    || { echo "MANIFEST FAIL: $$m"; fail=1; }; \
+	done; \
+	python3 scripts/kitchenforge_xml_lint.py || fail=1; \
+	exit $$fail
+
+kf-test: .check-env
+	docker exec sami-odoo odoo -d $(DB) -u $(KF_ADDONS) \
+	  --test-enable --test-tags=kitchenforge $(ODOO_FLAGS)
+
+deploy-staging:
+	@echo "=== KitchenForge staging deploy (southbrook tenant) ==="
+	./deploy/deploy_kitchenforge.sh --tenant southbrook
+
+deploy-prod:
+	@echo "=== KitchenForge PRODUCTION deploy ==="
+	@echo "    target tenant: southbrook (override with TENANT=foo)"
+	@printf "type 'yes' to continue: "; \
+	read confirm; \
+	[ "$$confirm" = "yes" ] || { echo "aborted."; exit 1; }
+	./deploy/deploy_kitchenforge.sh --tenant $${TENANT:-southbrook}
+
+provision:
+	@test -n "$(SLUG)" || { echo "usage: make provision SLUG=<name> [ADMIN_EMAIL=...] [TIER=...]"; exit 2; }
+	@echo "NOTE: provision_tenant.sh must run ON the QNAP. This target just rsyncs the script up."
+	rsync -az deploy/provision_tenant.sh \
+	  $${QNAP_HOST:-admin@192.168.68.108}:/share/CACHEDEV3_DATA/scripts/provision_tenant.sh
+	ssh $${QNAP_HOST:-admin@192.168.68.108} \
+	  "chmod +x /share/CACHEDEV3_DATA/scripts/provision_tenant.sh && \
+	   /share/CACHEDEV3_DATA/scripts/provision_tenant.sh \
+	     --slug $(SLUG) \
+	     --admin-email $${ADMIN_EMAIL:-ops@$(SLUG).local} \
+	     --tier $${TIER:-direct}"

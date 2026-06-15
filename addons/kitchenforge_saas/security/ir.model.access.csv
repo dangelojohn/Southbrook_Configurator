@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_kf_tenant_operator,kf tenant operator,model_kitchenforge_tenant,group_kitchenforge_saas_operator,1,1,1,1
+access_kf_tenant_billing,kf tenant billing,model_kitchenforge_tenant,group_kitchenforge_saas_billing,1,0,0,0
+access_kf_tenant_event_operator,kf tenant event operator,model_kitchenforge_tenant_event,group_kitchenforge_saas_operator,1,1,1,1
+access_kf_tenant_event_billing,kf tenant event billing,model_kitchenforge_tenant_event,group_kitchenforge_saas_billing,1,0,0,0
+access_kf_subscription_plan_operator,kf subscription plan operator,model_kitchenforge_subscription_plan,group_kitchenforge_saas_operator,1,1,1,1
+access_kf_subscription_plan_billing,kf subscription plan billing,model_kitchenforge_subscription_plan,group_kitchenforge_saas_billing,1,1,1,0
+access_kf_subscription_plan_user,kf subscription plan user,model_kitchenforge_subscription_plan,kitchenforge_core.group_kitchenforge_user,1,0,0,0
