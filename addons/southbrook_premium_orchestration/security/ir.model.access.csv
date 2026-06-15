@@ -4,3 +4,7 @@ access_cut_spec_override_mfg,southbrook.cut.spec.override mfg,model_southbrook_c
 access_test_user_archive_wizard,test.user.archive.wizard,model_test_user_archive_wizard,base.group_system,1,1,1,1
 access_gemini_activation_wizard,gemini.activation.wizard,model_gemini_activation_wizard,base.group_system,1,1,1,1
 access_freecad_activation_wizard,freecad.activation.wizard,model_freecad_activation_wizard,base.group_system,1,1,1,1
+access_gemini_activator_system,southbrook.gemini.activator system,model_southbrook_gemini_activator,base.group_system,1,1,1,1
+access_gemini_activator_user_read,southbrook.gemini.activator read,model_southbrook_gemini_activator,base.group_user,1,0,0,0
+access_freecad_activator_system,southbrook.freecad.activator system,model_southbrook_freecad_activator,base.group_system,1,1,1,1
+access_freecad_activator_user_read,southbrook.freecad.activator read,model_southbrook_freecad_activator,base.group_user,1,0,0,0
