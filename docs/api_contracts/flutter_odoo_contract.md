@@ -227,12 +227,15 @@ Response if no concept selected: 409 'no_concept_selected'
 Response if wrong state:        409 'invalid_state'
 ```
 
-### 3.8 GET /api/v1/attachments/{id}
+### 3.8 GET /api/v1/attachments/{id}  *(reserved — not implemented in v1)*
 
-Stream the actual bytes. Auth + record-rule scoped (the customer can
-only download attachments on their own projects). For Three.js rendering
-the app pulls placement_data (§3.5) not raw STEP files — per init-doc
-D-FC-06 "do not serve STEP files for customer preview."
+Reserved for future binary delivery (e.g. the customer's final spec PDF
+once the approval flow needs a download URL). Not implemented in the v1
+controller — `/api/v1/attachments/<id>` returns 404. The Three.js
+preview pulls `placement_data` (§3.5) instead, per init-doc D-FC-06
+"do not serve STEP files for customer preview." Clients MUST NOT call
+this endpoint before its return shape is committed in a future
+contract revision.
 
 ---
 

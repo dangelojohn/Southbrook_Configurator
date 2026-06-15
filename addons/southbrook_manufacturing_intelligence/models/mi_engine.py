@@ -323,6 +323,13 @@ class SouthbrookMiEngine(models.AbstractModel):
                     "recommendation": "Create or link a production package with a cutlist.",
                 }
             )
+            # Without this reset, stale yield/waste from a previous
+            # cutlist persists after unlink — mirrors the zero-write
+            # _recompute_package does below.
+            production.write({
+                "x_mi_yield_pct": 0.0,
+                "x_mi_waste_area_m2": 0.0,
+            })
         else:
             summary = self._compute_cut_summary(self._panels_from_cutlist(cutlist))
             production.write(

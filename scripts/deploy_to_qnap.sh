@@ -36,7 +36,11 @@ DRY_RUN="${DRY_RUN:-0}"
 # `psycopg2.errors.LockNotAvailable: canceling statement due to lock
 # timeout`. flock lives inside the container (util-linux is present in
 # the Odoo image — QNAP busybox host doesn't have it).
-LOCK_PATH="${LOCK_PATH:-/tmp/southbrook-odoo-upgrade.lock}"
+#
+# Place the lock on a path under /var/lib/odoo (the bind-mounted Odoo
+# data dir) rather than /tmp — container tmpfs is wiped by the RESTART
+# block below, so a /tmp lock cannot serialize across the stop+start.
+LOCK_PATH="${LOCK_PATH:-/var/lib/odoo/.southbrook-odoo-upgrade.lock}"
 LOCK_WAIT_SEC="${LOCK_WAIT_SEC:-600}"
 
 MODULES_ARG="${1:-southbrook_estimating,southbrook_configurator_ux}"
@@ -88,7 +92,9 @@ done
 # attempts queue instead of racing; `-E 75` makes a lock timeout return exit
 # 75 (surfaced explicitly below) rather than silently "succeeding".
 log "upgrading $MODULES_ARG on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
-inner_cmd="flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
+# `: > $LOCK_PATH || true` makes sure the lock file exists (flock can't
+# create one against a missing parent dir on first run).
+inner_cmd="(: > $LOCK_PATH 2>/dev/null || true) && flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
 upgrade_cmd="$QNAP_DOCKER exec $CONTAINER bash -c \"$inner_cmd\""
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"
