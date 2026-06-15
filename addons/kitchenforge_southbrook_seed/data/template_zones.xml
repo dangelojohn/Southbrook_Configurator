@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!--
+        Full Kitchen Build — 10 zones laid out as a typical L-shape kitchen.
+        Cabinet xml_ids per ~/southbrook-v19cr/CLAUDE.md §3 locked decisions:
+        wall_1dr, wall_2dr, base_1dr, base_2dr, drawer_bank, sink_base,
+        tall_pantry, tall_oven, corner, vanity, accessory, worktop.
+    -->
+
+    <record id="fk_zone_01_wall_left" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">10</field>
+        <field name="name">W-01 Wall 30" Over Fridge</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.wall_1dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">760</field>
+        <field name="height_mm">300</field>
+        <field name="depth_mm">320</field>
+    </record>
+    <record id="fk_zone_02_wall_window" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">20</field>
+        <field name="name">W-02 Wall 24" Over Sink</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.wall_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">600</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">320</field>
+    </record>
+    <record id="fk_zone_03_wall_right" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">30</field>
+        <field name="name">W-03 Wall 36" Pantry-Side</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.wall_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">900</field>
+        <field name="height_mm">900</field>
+        <field name="depth_mm">320</field>
+    </record>
+
+    <record id="fk_zone_04_corner" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">40</field>
+        <field name="name">C-01 Corner Base Lazy-Susan</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.corner"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">900</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">900</field>
+    </record>
+
+    <record id="fk_zone_05_sink_base" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">50</field>
+        <field name="name">SB-01 Sink Base 36"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.sink_base"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">900</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">580</field>
+    </record>
+    <record id="fk_zone_06_drawer_bank" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">60</field>
+        <field name="name">DB-01 Drawer Bank 24"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.drawer_bank"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">600</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">580</field>
+    </record>
+    <record id="fk_zone_07_base_left" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">70</field>
+        <field name="name">B-02 Base 24" Left of Sink</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.base_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">600</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">580</field>
+    </record>
+    <record id="fk_zone_08_base_right" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">80</field>
+        <field name="name">B-03 Base 30" Right of Sink</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.base_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">760</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">580</field>
+    </record>
+
+    <record id="fk_zone_09_tall_pantry" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">90</field>
+        <field name="name">TP-01 Tall Pantry 24"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.tall_pantry"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">600</field>
+        <field name="height_mm">2100</field>
+        <field name="depth_mm">580</field>
+    </record>
+
+    <record id="fk_zone_10_worktop" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_full_kitchen"/>
+        <field name="sequence">100</field>
+        <field name="name">WT-01 Worktop Run</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.worktop"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">3600</field>
+        <field name="height_mm">40</field>
+        <field name="depth_mm">650</field>
+    </record>
+
+
+    <!-- Partial Renovation — 4 zones -->
+    <record id="pr_zone_01_wall" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_partial_reno"/>
+        <field name="sequence">10</field>
+        <field name="name">W-01 Wall 24"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.wall_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">600</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">320</field>
+    </record>
+    <record id="pr_zone_02_wall" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_partial_reno"/>
+        <field name="sequence">20</field>
+        <field name="name">W-02 Wall 30"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.wall_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">760</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">320</field>
+    </record>
+    <record id="pr_zone_03_sink_base" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_partial_reno"/>
+        <field name="sequence">30</field>
+        <field name="name">SB-01 Sink Base 30"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.sink_base"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">760</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">580</field>
+    </record>
+    <record id="pr_zone_04_base" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_partial_reno"/>
+        <field name="sequence">40</field>
+        <field name="name">B-01 Base 24"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.base_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">600</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">580</field>
+    </record>
+
+
+    <!-- Single Custom Cabinet — 1 zone placeholder -->
+    <record id="sc_zone_01_base" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_single_custom"/>
+        <field name="sequence">10</field>
+        <field name="name">Custom Cabinet</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.base_2dr"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">600</field>
+        <field name="height_mm">720</field>
+        <field name="depth_mm">580</field>
+    </record>
+
+
+    <!-- Vanity — 2 zones -->
+    <record id="vn_zone_01_vanity" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_vanity"/>
+        <field name="sequence">10</field>
+        <field name="name">V-01 Single Vanity 36"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.vanity"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">900</field>
+        <field name="height_mm">820</field>
+        <field name="depth_mm">560</field>
+    </record>
+    <record id="vn_zone_02_drawer" model="kitchenforge.template.line">
+        <field name="template_project_id" ref="kitchenforge_core.template_vanity"/>
+        <field name="sequence">20</field>
+        <field name="name">V-02 Vanity Drawer Bank 18"</field>
+        <field name="product_tmpl_id" ref="southbrook_estimating.drawer_bank"/>
+        <field name="quantity">1</field>
+        <field name="width_mm">450</field>
+        <field name="height_mm">820</field>
+        <field name="depth_mm">560</field>
+    </record>
+
+</odoo>
