@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Kitchen Jobs board — the PM-facing always-on view of every
+        project.task spawned by a confirmed sale.order. Solves the
+        "which task id was that kitchen?" problem by surfacing the
+        sale-order backlink, install date, and readiness telemetry
+        on a list-style kanban grouped by readiness_decision.
+    -->
+
+    <record id="view_kitchen_jobs_kanban" model="ir.ui.view">
+        <field name="name">project.task.kitchen.jobs.kanban</field>
+        <field name="model">project.task</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="readiness_decision"
+                    class="o_kanban_small_column"
+                    sample="1"
+                    js_class="kanban_view">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="x_southbrook_sale_order_id"/>
+                <field name="x_install_due_date"/>
+                <field name="readiness_decision"/>
+                <field name="readiness_score"/>
+                <field name="southbrook_unscheduled_wo_count"/>
+                <field name="southbrook_production_release_state"/>
+                <field name="job_at_risk"/>
+                <progressbar field="readiness_decision"
+                             colors='{"blocked":"danger","review":"warning","ready":"success"}'/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_record_top">
+                            <div class="o_kanban_record_headings">
+                                <strong class="o_kanban_record_title">
+                                    <field name="name"/>
+                                </strong>
+                                <small class="o_kanban_record_subtitle text-muted">
+                                    <field name="partner_id"/>
+                                </small>
+                            </div>
+                            <field name="readiness_decision"
+                                   widget="label_selection"
+                                   options="{'classes': {'blocked':'danger','review':'warning','ready':'success'}}"/>
+                        </div>
+                        <div class="o_kanban_record_body">
+                            <div t-if="record.x_southbrook_sale_order_id.raw_value">
+                                <span class="fw-bold">SO: </span>
+                                <field name="x_southbrook_sale_order_id"/>
+                            </div>
+                            <div t-if="record.x_install_due_date.raw_value">
+                                <span class="fw-bold">Install: </span>
+                                <field name="x_install_due_date"/>
+                            </div>
+                            <div>
+                                <span class="fw-bold">Readiness: </span>
+                                <field name="readiness_score"/> / 100
+                            </div>
+                            <div t-if="record.southbrook_unscheduled_wo_count.raw_value">
+                                <span class="badge text-bg-warning">
+                                    <field name="southbrook_unscheduled_wo_count"/> unscheduled WO
+                                </span>
+                            </div>
+                            <div>
+                                <field name="southbrook_production_release_state"
+                                       widget="label_selection"
+                                       options="{'classes': {'blocked':'danger','review':'warning','ready':'success'}}"/>
+                            </div>
+                            <div t-if="record.job_at_risk.raw_value">
+                                <span class="badge text-bg-danger">At Risk</span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_kitchen_jobs_list" model="ir.ui.view">
+        <field name="name">project.task.kitchen.jobs.list</field>
+        <field name="model">project.task</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <list string="Kitchen Jobs"
+                  decoration-danger="readiness_decision == 'blocked' or job_at_risk"
+                  decoration-warning="readiness_decision == 'review'"
+                  decoration-success="readiness_decision == 'ready'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="x_southbrook_sale_order_id"/>
+                <field name="x_install_due_date"/>
+                <field name="readiness_decision" widget="badge"
+                       decoration-danger="readiness_decision == 'blocked'"
+                       decoration-warning="readiness_decision == 'review'"
+                       decoration-success="readiness_decision == 'ready'"/>
+                <field name="readiness_score"/>
+                <field name="southbrook_unscheduled_wo_count"/>
+                <field name="southbrook_production_release_state"/>
+                <field name="job_at_risk" widget="boolean_toggle" readonly="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_kitchen_jobs_search" model="ir.ui.view">
+        <field name="name">project.task.kitchen.jobs.search</field>
+        <field name="model">project.task</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <search string="Kitchen Jobs">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="x_southbrook_sale_order_id"/>
+                <filter name="open"
+                        string="Open"
+                        domain="[('stage_id.fold','=',False)]"/>
+                <filter name="my_jobs"
+                        string="My Jobs"
+                        domain="[('user_ids','in',uid)]"/>
+                <separator/>
+                <filter name="blocked"
+                        string="Blocked"
+                        domain="[('readiness_decision','=','blocked')]"/>
+                <filter name="review"
+                        string="Needs Review"
+                        domain="[('readiness_decision','=','review')]"/>
+                <filter name="ready"
+                        string="Ready"
+                        domain="[('readiness_decision','=','ready')]"/>
+                <separator/>
+                <filter name="at_risk"
+                        string="At Risk"
+                        domain="[('job_at_risk','=',True)]"/>
+                <filter name="install_14_days"
+                        string="Install Within 14 Days"
+                        domain="[('x_install_due_date','&lt;=', (context_today() + relativedelta(days=14)).strftime('%Y-%m-%d')), ('x_install_due_date','&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group name="group_by_kitchen_jobs">
+                    <filter name="group_readiness"
+                            string="Readiness"
+                            context="{'group_by': 'readiness_decision'}"/>
+                    <filter name="group_release_state"
+                            string="Release State"
+                            context="{'group_by': 'southbrook_production_release_state'}"/>
+                    <filter name="group_partner"
+                            string="Customer"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_install_date"
+                            string="Install Date"
+                            context="{'group_by': 'x_install_due_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_kitchen_jobs_board" model="ir.actions.act_window">
+        <field name="name">Kitchen Jobs</field>
+        <field name="res_model">project.task</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('x_southbrook_sale_order_id','!=',False)]</field>
+        <field name="context">{'search_default_open': 1}</field>
+        <field name="search_view_id" ref="view_kitchen_jobs_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No kitchen jobs yet
+            </p>
+            <p>
+                Kitchen jobs are project tasks created automatically when a
+                sale order is confirmed. The board groups them by readiness
+                decision so PMs can see what's blocked, what needs review,
+                and what's ready to release.
+            </p>
+        </field>
+    </record>
+
+</odoo>

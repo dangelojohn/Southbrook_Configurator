@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form view: paste key, tick boxes, Apply -->
+    <record id="view_gemini_activation_wizard_form" model="ir.ui.view">
+        <field name="name">gemini.activation.wizard.form</field>
+        <field name="model">gemini.activation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Activate Gemini">
+                <header>
+                    <button name="action_apply"
+                            string="Apply"
+                            type="object"
+                            class="btn-primary"
+                            confirm="Save the API key, run the health check and flip use_mock=False. Continue?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Phase 3.1 generative go-live.</strong>
+                        Pastes the Gemini API key into <code>ir.config_parameter</code>,
+                        pings the model with a one-token request, and (on success) flips
+                        <code>gemini.use_mock</code> to <code>False</code>. Safe to re-run.
+                        Rollback: open this wizard, untick the flip; or use the
+                        activator's "Revert to Mock" action.
+                    </div>
+                    <group>
+                        <group string="Credentials">
+                            <field name="api_key" password="True"/>
+                            <field name="model_id"/>
+                        </group>
+                        <group string="Actions">
+                            <field name="run_health_check"/>
+                            <field name="enable_real_calls"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: open the wizard -->
+    <record id="action_gemini_activation_wizard" model="ir.actions.act_window">
+        <field name="name">Activate Gemini</field>
+        <field name="res_model">gemini.activation.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

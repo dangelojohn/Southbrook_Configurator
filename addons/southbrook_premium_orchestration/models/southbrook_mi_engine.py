@@ -1,0 +1,216 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+"""Phase 1.3 — Southbrook MI Engine body.
+
+Activates the southbrook.mi.engine model (currently a bare AbstractModel
+holding helper methods) into a singleton-backed orchestrator that records
+its own last-run telemetry and refires stage-gate mi.checks against in-flight
+manufacturing orders on an hourly cron schedule.
+
+The underlying southbrook_manufacturing_intelligence addon owns the model;
+we extend it via _inherit. Switching the base class from AbstractModel to
+Model promotes it to a stored model so the singleton + telemetry fields
+can persist across runs (the helper @api.model classmethods on the parent
+continue to function — they don't depend on a recordset).
+"""
+import logging
+import time
+
+from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
+
+
+class SouthbrookMiEngine(models.Model):
+    _inherit = "southbrook.mi.engine"
+    _description = "Southbrook Manufacturing Intelligence Engine"
+
+    name = fields.Char(
+        default="Southbrook Manufacturing Intelligence",
+        readonly=True,
+    )
+    last_run_at = fields.Datetime(
+        string="Last Run At",
+        readonly=True,
+        help="Timestamp of the most recent _cron_refire_gates execution.",
+    )
+    last_run_check_count = fields.Integer(
+        string="Last Run Evaluations",
+        readonly=True,
+        help="Number of (MO × check) evaluations attempted on the last run.",
+    )
+    last_run_blockers = fields.Integer(
+        string="Last Run Blockers",
+        readonly=True,
+    )
+    last_run_warnings = fields.Integer(
+        string="Last Run Warnings",
+        readonly=True,
+    )
+    last_run_duration_ms = fields.Integer(
+        string="Last Run Duration (ms)",
+        readonly=True,
+    )
+    mo_in_flight_count = fields.Integer(
+        string="MOs In Flight",
+        compute="_compute_mo_in_flight_count",
+    )
+    rule_count = fields.Integer(
+        string="Active Gate Rules",
+        compute="_compute_rule_count",
+    )
+
+    # ------------------------------------------------------------------
+    # Computes
+    # ------------------------------------------------------------------
+    def _compute_mo_in_flight_count(self):
+        Production = self.env["mrp.production"]
+        count = Production.search_count(
+            [("state", "in", ("confirmed", "progress"))]
+        )
+        for rec in self:
+            rec.mo_in_flight_count = count
+
+    def _compute_rule_count(self):
+        Check = self.env["southbrook.mi.check"]
+        # is_gate is owned by sibling agents; tolerate its absence so the
+        # compute never breaks the form view in cold-install gap scenarios.
+        if "is_gate" in Check._fields:
+            count = Check.search_count([("is_gate", "=", True)])
+        else:
+            count = Check.search_count([])
+        for rec in self:
+            rec.rule_count = count
+
+    # ------------------------------------------------------------------
+    # Singleton resolver
+    # ------------------------------------------------------------------
+    @api.model
+    def _get_singleton(self):
+        engine = self.search([], limit=1)
+        if not engine:
+            engine = self.create({})
+        return engine
+
+    # ------------------------------------------------------------------
+    # Evaluation dispatch
+    # ------------------------------------------------------------------
+    @api.model
+    def _evaluate_check_against_mo(self, check, mo):
+        """Dispatch to whatever evaluator the mi.check model exposes.
+
+        The mi.check API surface is owned by other agents and has shifted
+        across phases. Try the documented entry points in order and fall
+        back to None so the cron stays best-effort.
+        """
+        for method_name in ("_evaluate_against", "_evaluate_for_mo", "evaluate"):
+            method = getattr(check, method_name, None)
+            if callable(method):
+                return method(mo)
+        return None
+
+    @staticmethod
+    def _severity_of(result, check):
+        """Normalise a return value into ('blocker' | 'warning' | other)."""
+        sev = None
+        if isinstance(result, dict):
+            sev = result.get("severity") or result.get("status")
+        elif isinstance(result, str):
+            sev = result
+        if not sev and check is not None:
+            sev = getattr(check, "severity", None)
+        return (sev or "").lower()
+
+    # ------------------------------------------------------------------
+    # Hourly cron entry point
+    # ------------------------------------------------------------------
+    @api.model
+    def _cron_refire_gates(self):
+        """Refire every active gate check against every in-flight MO.
+
+        Never raises: a single misbehaving check must not stall the cron and
+        starve the rest of the run. Returns a summary dict for callers
+        (action_run_now uses it for the on-demand button feedback).
+        """
+        started_ms = int(time.time() * 1000)
+        engine = self._get_singleton()
+
+        mos = self.env["mrp.production"].search(
+            [("state", "in", ("confirmed", "progress"))]
+        )
+        Check = self.env["southbrook.mi.check"]
+        if "is_gate" in Check._fields:
+            checks = Check.search([("is_gate", "=", True)])
+        else:
+            checks = Check.search([])
+
+        evaluated = 0
+        blockers = 0
+        warnings = 0
+
+        for mo in mos:
+            for check in checks:
+                evaluated += 1
+                try:
+                    result = self._evaluate_check_against_mo(check, mo)
+                except Exception as err:  # noqa: BLE001 — cron must not raise
+                    _logger.warning(
+                        "MI engine: evaluation of check %s against MO %s "
+                        "raised %s; counted as a no-op.",
+                        check.id,
+                        mo.id,
+                        err,
+                    )
+                    continue
+                sev = self._severity_of(result, check)
+                if sev == "blocker":
+                    blockers += 1
+                elif sev == "warning":
+                    warnings += 1
+
+        duration_ms = int(time.time() * 1000) - started_ms
+        engine.write(
+            {
+                "last_run_at": fields.Datetime.now(),
+                "last_run_check_count": evaluated,
+                "last_run_blockers": blockers,
+                "last_run_warnings": warnings,
+                "last_run_duration_ms": duration_ms,
+            }
+        )
+        _logger.info(
+            "MI engine refire: %d MOs × %d checks = %d evaluations, "
+            "%d blockers, %d warnings, %d ms",
+            len(mos),
+            len(checks),
+            evaluated,
+            blockers,
+            warnings,
+            duration_ms,
+        )
+        return {
+            "checked": evaluated,
+            "blockers": blockers,
+            "warnings": warnings,
+            "duration_ms": duration_ms,
+        }
+
+    # ------------------------------------------------------------------
+    # Form button — on-demand kick
+    # ------------------------------------------------------------------
+    def action_run_now(self):
+        """Trigger _cron_refire_gates from the form view button."""
+        self.ensure_one()
+        summary = self._cron_refire_gates()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": "MI Engine",
+                "message": (
+                    "Refired %(checked)s evaluations in %(duration_ms)s ms "
+                    "(%(blockers)s blockers, %(warnings)s warnings)."
+                ) % summary,
+                "type": "success" if not summary["blockers"] else "warning",
+                "sticky": False,
+            },
+        }

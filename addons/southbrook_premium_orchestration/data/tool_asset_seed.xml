@@ -1,0 +1,644 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 2.1 — Tool Asset Seed
+  ============================
+  30 realistic shop-floor tool assets seeded as anchors for the
+  Manufacturing Intelligence cron (`_cron_maintenance_sweep`, daily),
+  the readiness check, and the tool-lifecycle board view.
+
+  Organized in 5 groups:
+    1. Panel Saw Blades   (6) — 3 in-service + 3 standby
+    2. CNC Router Bits    (8) — compression / straight / spiral / V-groove
+    3. Boring Bits        (6) — confirmat M6 + M8, hinge cup, drawer runner
+    4. Edge-Bander Hot-Melt Heads (4) — 3 in-service + 1 spare
+    5. Sanding Belts      (6) — 80 / 120 / 180 grit pairs
+
+  Field/value notes (verified against
+  southbrook_mrp_kitchen_tools/models/tool_asset.py):
+    * `lifecycle_state` selection: new / available / in_use /
+      needs_sharpening / needs_calibration / under_maintenance / etc.
+      Brief's "in_service" maps → "available"; "standby" → "new".
+    * `condition` selection: excellent / good / worn / dull / damaged /
+      unsafe. Brief's "fair" → "worn"; "new" → "excellent".
+    * `tool_category_id` is a *related, readonly* field driven by the
+      tool product's category. So we seed a minimal master product per
+      group and the category flows through.
+    * `sharpening_interval_days`, `calibration_interval_days`,
+      `estimated_unit_cost`, `replacement_cost` do NOT exist on the
+      v19 model — silently skipped per brief guidance ("skip rather
+      than crash the install").
+    * `code` is sequence-defaulted to "New"; left unset here.
+    * `noupdate="1"` so operators' manual edits to lifecycle / dates
+      survive subsequent `-u` runs.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <!-- ════════════════════════════════════════════════════════════
+             Master tool products (one per group)
+             ══════════════════════════════════════════════════════════════
+             tool.asset.product_id is required + domain-restricted to
+             x_southbrook_is_tool=True products. We seed minimal masters
+             here so the 30 asset records install cleanly via -i / -u
+             even when demo data is not loaded.
+        -->
+
+        <record id="tool_prod_panel_saw_blade" model="product.product">
+            <field name="name">Panel Saw Blade — Premium 305mm</field>
+            <field name="default_code">SBK-TOOL-PSB-305</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_blade_panel"/>
+            <field name="x_southbrook_tool_family">saw_blade</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">8000</field>
+            <field name="x_southbrook_estimated_life_unit">cuts</field>
+        </record>
+
+        <record id="tool_prod_cnc_compression_bit" model="product.product">
+            <field name="name">CNC Compression Router Bit — 6mm</field>
+            <field name="default_code">SBK-TOOL-CCB-6</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_cnc_compression"/>
+            <field name="x_southbrook_tool_family">cnc_router_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">600</field>
+            <field name="x_southbrook_estimated_life_unit">hours</field>
+        </record>
+
+        <record id="tool_prod_cnc_straight_bit" model="product.product">
+            <field name="name">CNC Straight Router Bit — 8mm</field>
+            <field name="default_code">SBK-TOOL-CSB-8</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_cnc_straight"/>
+            <field name="x_southbrook_tool_family">cnc_router_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">600</field>
+            <field name="x_southbrook_estimated_life_unit">hours</field>
+        </record>
+
+        <record id="tool_prod_cnc_spiral_bit" model="product.product">
+            <field name="name">CNC Spiral Router Bit — 6mm</field>
+            <field name="default_code">SBK-TOOL-CSP-6</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_cnc_spiral"/>
+            <field name="x_southbrook_tool_family">cnc_router_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">600</field>
+            <field name="x_southbrook_estimated_life_unit">hours</field>
+        </record>
+
+        <record id="tool_prod_cnc_vgroove_bit" model="product.product">
+            <field name="name">CNC V-Groove Router Bit — 90 degree</field>
+            <field name="default_code">SBK-TOOL-CVG-90</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_cnc_vgroove"/>
+            <field name="x_southbrook_tool_family">cnc_router_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">600</field>
+            <field name="x_southbrook_estimated_life_unit">hours</field>
+        </record>
+
+        <record id="tool_prod_confirmat_bit_m6" model="product.product">
+            <field name="name">Confirmat Boring Bit — M6 (5mm)</field>
+            <field name="default_code">SBK-TOOL-CFM-M6</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_drill_confirmat"/>
+            <field name="x_southbrook_tool_family">boring_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">4000</field>
+            <field name="x_southbrook_estimated_life_unit">holes</field>
+        </record>
+
+        <record id="tool_prod_confirmat_bit_m8" model="product.product">
+            <field name="name">Confirmat Boring Bit — M8 (7mm)</field>
+            <field name="default_code">SBK-TOOL-CFM-M8</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_drill_confirmat"/>
+            <field name="x_southbrook_tool_family">boring_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">4000</field>
+            <field name="x_southbrook_estimated_life_unit">holes</field>
+        </record>
+
+        <record id="tool_prod_hinge_cup_bit" model="product.product">
+            <field name="name">Hinge Cup Boring Bit — 35mm</field>
+            <field name="default_code">SBK-TOOL-HCB-35</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_drill_hinge_35"/>
+            <field name="x_southbrook_tool_family">boring_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">4000</field>
+            <field name="x_southbrook_estimated_life_unit">holes</field>
+        </record>
+
+        <record id="tool_prod_drawer_runner_bit" model="product.product">
+            <field name="name">Drawer-Runner Boring Bit — 5mm</field>
+            <field name="default_code">SBK-TOOL-DRB-5</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_drill_shelf_5"/>
+            <field name="x_southbrook_tool_family">boring_bit</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">4000</field>
+            <field name="x_southbrook_estimated_life_unit">holes</field>
+        </record>
+
+        <!-- Edge-bander hot-melt head: no exact category match in v19
+             taxonomy; fall back to the generic abrasives parent or omit.
+             We use a search="..." domain on the product's category so
+             the install does not break if the category is missing. -->
+        <record id="tool_prod_edge_bander_head" model="product.product">
+            <field name="name">Edge-Bander Hot-Melt Head Assembly</field>
+            <field name="default_code">SBK-TOOL-EBH-01</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">True</field>
+            <field name="x_southbrook_tool_category_id"
+                   search="[('name', '=ilike', '%edge%')]"/>
+            <field name="x_southbrook_tool_family">finishing_tool</field>
+            <field name="x_southbrook_directness">direct_production_tool</field>
+            <field name="x_southbrook_estimated_life_qty">2400</field>
+            <field name="x_southbrook_estimated_life_unit">meters</field>
+        </record>
+
+        <record id="tool_prod_sanding_belt" model="product.product">
+            <field name="name">Wide-Belt Sanding Belt — Cabinet Grade</field>
+            <field name="default_code">SBK-TOOL-SB-CAB</field>
+            <field name="type">consu</field>
+            <field name="x_southbrook_is_tool">True</field>
+            <field name="x_southbrook_is_reusable_tool">False</field>
+            <field name="x_southbrook_tool_category_id"
+                   ref="southbrook_mrp_kitchen_tools.cat_abr_belt"/>
+            <field name="x_southbrook_tool_family">sanding_consumable</field>
+            <field name="x_southbrook_directness">direct_consumable</field>
+            <field name="x_southbrook_estimated_life_qty">200</field>
+            <field name="x_southbrook_estimated_life_unit">uses</field>
+        </record>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Group 1 — Panel Saw Blades (6 records)
+             3 in-service + 3 standby spares
+             ══════════════════════════════════════════════════════════════ -->
+
+        <record id="tool_asset_psb_001" model="southbrook.tool.asset">
+            <field name="name">Panel Saw Blade #SB-PSB-001</field>
+            <field name="product_id" ref="tool_prod_panel_saw_blade"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">8000.0</field>
+            <field name="remaining_life_qty">5400.0</field>
+            <field name="total_usage_qty">2600.0</field>
+            <field name="life_unit">cuts</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=10)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=11)).strftime('%Y-%m-%d')"/>
+            <field name="last_calibrated_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=60)).strftime('%Y-%m-%d')"/>
+            <field name="next_calibration_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=120)).strftime('%Y-%m-%d')"/>
+            <field name="notes">Primary blade on the main panel saw. 85.00 estimated unit cost; 320.00 replacement.</field>
+        </record>
+
+        <record id="tool_asset_psb_002" model="southbrook.tool.asset">
+            <field name="name">Panel Saw Blade #SB-PSB-002</field>
+            <field name="product_id" ref="tool_prod_panel_saw_blade"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">8000.0</field>
+            <field name="remaining_life_qty">3200.0</field>
+            <field name="total_usage_qty">4800.0</field>
+            <field name="life_unit">cuts</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=25)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=4)).strftime('%Y-%m-%d')"/>
+            <field name="last_calibrated_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=90)).strftime('%Y-%m-%d')"/>
+            <field name="next_calibration_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=90)).strftime('%Y-%m-%d')"/>
+            <field name="notes">Sharpening overdue — MI cron should flip lifecycle on next sweep.</field>
+        </record>
+
+        <record id="tool_asset_psb_003" model="southbrook.tool.asset">
+            <field name="name">Panel Saw Blade #SB-PSB-003</field>
+            <field name="product_id" ref="tool_prod_panel_saw_blade"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">worn</field>
+            <field name="estimated_life_qty">8000.0</field>
+            <field name="remaining_life_qty">7800.0</field>
+            <field name="total_usage_qty">200.0</field>
+            <field name="life_unit">cuts</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=5)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=16)).strftime('%Y-%m-%d')"/>
+            <field name="last_calibrated_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')"/>
+            <field name="next_calibration_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=150)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_psb_004" model="southbrook.tool.asset">
+            <field name="name">Panel Saw Blade #SB-PSB-004</field>
+            <field name="product_id" ref="tool_prod_panel_saw_blade"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">8000.0</field>
+            <field name="remaining_life_qty">8000.0</field>
+            <field name="life_unit">cuts</field>
+            <field name="notes">Spare — full life remaining.</field>
+        </record>
+
+        <record id="tool_asset_psb_005" model="southbrook.tool.asset">
+            <field name="name">Panel Saw Blade #SB-PSB-005</field>
+            <field name="product_id" ref="tool_prod_panel_saw_blade"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">8000.0</field>
+            <field name="remaining_life_qty">8000.0</field>
+            <field name="life_unit">cuts</field>
+            <field name="notes">Spare — full life remaining.</field>
+        </record>
+
+        <record id="tool_asset_psb_006" model="southbrook.tool.asset">
+            <field name="name">Panel Saw Blade #SB-PSB-006</field>
+            <field name="product_id" ref="tool_prod_panel_saw_blade"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">8000.0</field>
+            <field name="remaining_life_qty">8000.0</field>
+            <field name="life_unit">cuts</field>
+            <field name="notes">Spare — full life remaining.</field>
+        </record>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Group 2 — CNC Router Bits (8 records)
+             5 in-service + 3 standby spares
+             ══════════════════════════════════════════════════════════════ -->
+
+        <record id="tool_asset_ccb_001" model="southbrook.tool.asset">
+            <field name="name">CNC Compression Bit #SB-CCB-001</field>
+            <field name="product_id" ref="tool_prod_cnc_compression_bit"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">380.0</field>
+            <field name="total_usage_qty">220.0</field>
+            <field name="life_unit">hours</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=7)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_ccb_002" model="southbrook.tool.asset">
+            <field name="name">CNC Compression Bit #SB-CCB-002</field>
+            <field name="product_id" ref="tool_prod_cnc_compression_bit"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">600.0</field>
+            <field name="life_unit">hours</field>
+            <field name="notes">Standby spare.</field>
+        </record>
+
+        <record id="tool_asset_csb_001" model="southbrook.tool.asset">
+            <field name="name">CNC Straight Bit #SB-CSB-001</field>
+            <field name="product_id" ref="tool_prod_cnc_straight_bit"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">420.0</field>
+            <field name="total_usage_qty">180.0</field>
+            <field name="life_unit">hours</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=3)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=11)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_csb_002" model="southbrook.tool.asset">
+            <field name="name">CNC Straight Bit #SB-CSB-002</field>
+            <field name="product_id" ref="tool_prod_cnc_straight_bit"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">worn</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">95.0</field>
+            <field name="total_usage_qty">505.0</field>
+            <field name="life_unit">hours</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=14)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today()).strftime('%Y-%m-%d')"/>
+            <field name="notes">Near end-of-life; sharpening due today.</field>
+        </record>
+
+        <record id="tool_asset_csp_001" model="southbrook.tool.asset">
+            <field name="name">CNC Spiral Bit #SB-CSP-001</field>
+            <field name="product_id" ref="tool_prod_cnc_spiral_bit"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">540.0</field>
+            <field name="total_usage_qty">60.0</field>
+            <field name="life_unit">hours</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=2)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=12)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_csp_002" model="southbrook.tool.asset">
+            <field name="name">CNC Spiral Bit #SB-CSP-002</field>
+            <field name="product_id" ref="tool_prod_cnc_spiral_bit"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">600.0</field>
+            <field name="life_unit">hours</field>
+            <field name="notes">Standby spare.</field>
+        </record>
+
+        <record id="tool_asset_cvg_001" model="southbrook.tool.asset">
+            <field name="name">CNC V-Groove Bit #SB-CVG-001</field>
+            <field name="product_id" ref="tool_prod_cnc_vgroove_bit"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">315.0</field>
+            <field name="total_usage_qty">285.0</field>
+            <field name="life_unit">hours</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=9)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=5)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_cvg_002" model="southbrook.tool.asset">
+            <field name="name">CNC V-Groove Bit #SB-CVG-002</field>
+            <field name="product_id" ref="tool_prod_cnc_vgroove_bit"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">600.0</field>
+            <field name="remaining_life_qty">600.0</field>
+            <field name="life_unit">hours</field>
+            <field name="notes">Standby spare.</field>
+        </record>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Group 3 — Boring Bits (6 records)
+             2 M6 confirmat + 2 M8 confirmat + 1 hinge cup + 1 drawer-runner
+             ══════════════════════════════════════════════════════════════ -->
+
+        <record id="tool_asset_cfm_m6_001" model="southbrook.tool.asset">
+            <field name="name">Confirmat M6 Boring Bit #SB-CFM6-001</field>
+            <field name="product_id" ref="tool_prod_confirmat_bit_m6"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">4000.0</field>
+            <field name="remaining_life_qty">2750.0</field>
+            <field name="total_usage_qty">1250.0</field>
+            <field name="life_unit">holes</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=15)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=15)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_cfm_m6_002" model="southbrook.tool.asset">
+            <field name="name">Confirmat M6 Boring Bit #SB-CFM6-002</field>
+            <field name="product_id" ref="tool_prod_confirmat_bit_m6"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">4000.0</field>
+            <field name="remaining_life_qty">4000.0</field>
+            <field name="life_unit">holes</field>
+            <field name="notes">Standby spare.</field>
+        </record>
+
+        <record id="tool_asset_cfm_m8_001" model="southbrook.tool.asset">
+            <field name="name">Confirmat M8 Boring Bit #SB-CFM8-001</field>
+            <field name="product_id" ref="tool_prod_confirmat_bit_m8"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">4000.0</field>
+            <field name="remaining_life_qty">3100.0</field>
+            <field name="total_usage_qty">900.0</field>
+            <field name="life_unit">holes</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=8)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=22)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_cfm_m8_002" model="southbrook.tool.asset">
+            <field name="name">Confirmat M8 Boring Bit #SB-CFM8-002</field>
+            <field name="product_id" ref="tool_prod_confirmat_bit_m8"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">worn</field>
+            <field name="estimated_life_qty">4000.0</field>
+            <field name="remaining_life_qty">480.0</field>
+            <field name="total_usage_qty">3520.0</field>
+            <field name="life_unit">holes</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=28)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=2)).strftime('%Y-%m-%d')"/>
+            <field name="notes">Sharpening overdue.</field>
+        </record>
+
+        <record id="tool_asset_hcb_001" model="southbrook.tool.asset">
+            <field name="name">Hinge Cup Boring Bit #SB-HCB-001</field>
+            <field name="product_id" ref="tool_prod_hinge_cup_bit"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">4000.0</field>
+            <field name="remaining_life_qty">2100.0</field>
+            <field name="total_usage_qty">1900.0</field>
+            <field name="life_unit">holes</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=12)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=18)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_drb_001" model="southbrook.tool.asset">
+            <field name="name">Drawer-Runner Boring Bit #SB-DRB-001</field>
+            <field name="product_id" ref="tool_prod_drawer_runner_bit"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">4000.0</field>
+            <field name="remaining_life_qty">3500.0</field>
+            <field name="total_usage_qty">500.0</field>
+            <field name="life_unit">holes</field>
+            <field name="last_sharpened_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=4)).strftime('%Y-%m-%d')"/>
+            <field name="next_sharpening_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=26)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Group 4 — Edge-Bander Hot-Melt Heads (4 records)
+             3 in-service + 1 spare
+             ══════════════════════════════════════════════════════════════ -->
+
+        <record id="tool_asset_ebh_001" model="southbrook.tool.asset">
+            <field name="name">Edge-Bander Hot-Melt Head #SB-EBH-001</field>
+            <field name="product_id" ref="tool_prod_edge_bander_head"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">2400.0</field>
+            <field name="remaining_life_qty">1850.0</field>
+            <field name="total_usage_qty">550.0</field>
+            <field name="life_unit">meters</field>
+            <field name="last_calibrated_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=20)).strftime('%Y-%m-%d')"/>
+            <field name="next_calibration_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=40)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_ebh_002" model="southbrook.tool.asset">
+            <field name="name">Edge-Bander Hot-Melt Head #SB-EBH-002</field>
+            <field name="product_id" ref="tool_prod_edge_bander_head"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">2400.0</field>
+            <field name="remaining_life_qty">1200.0</field>
+            <field name="total_usage_qty">1200.0</field>
+            <field name="life_unit">meters</field>
+            <field name="last_calibrated_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=45)).strftime('%Y-%m-%d')"/>
+            <field name="next_calibration_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=15)).strftime('%Y-%m-%d')"/>
+        </record>
+
+        <record id="tool_asset_ebh_003" model="southbrook.tool.asset">
+            <field name="name">Edge-Bander Hot-Melt Head #SB-EBH-003</field>
+            <field name="product_id" ref="tool_prod_edge_bander_head"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">worn</field>
+            <field name="estimated_life_qty">2400.0</field>
+            <field name="remaining_life_qty">320.0</field>
+            <field name="total_usage_qty">2080.0</field>
+            <field name="life_unit">meters</field>
+            <field name="last_calibrated_date"
+                   eval="(datetime.date.today() - datetime.timedelta(days=58)).strftime('%Y-%m-%d')"/>
+            <field name="next_calibration_due_date"
+                   eval="(datetime.date.today() + datetime.timedelta(days=2)).strftime('%Y-%m-%d')"/>
+            <field name="notes">Calibration due imminently; near end-of-life.</field>
+        </record>
+
+        <record id="tool_asset_ebh_004" model="southbrook.tool.asset">
+            <field name="name">Edge-Bander Hot-Melt Head #SB-EBH-004</field>
+            <field name="product_id" ref="tool_prod_edge_bander_head"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">2400.0</field>
+            <field name="remaining_life_qty">2400.0</field>
+            <field name="life_unit">meters</field>
+            <field name="notes">Spare hot-melt head — uncrated.</field>
+        </record>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Group 5 — Sanding Belts (6 records)
+             2 each at 80 / 120 / 180 grit; 1 in-service + 1 standby per grit
+             ══════════════════════════════════════════════════════════════ -->
+
+        <record id="tool_asset_sb_80_001" model="southbrook.tool.asset">
+            <field name="name">Sanding Belt 80-grit #SB-SB80-001</field>
+            <field name="product_id" ref="tool_prod_sanding_belt"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">good</field>
+            <field name="estimated_life_qty">200.0</field>
+            <field name="remaining_life_qty">140.0</field>
+            <field name="total_usage_qty">60.0</field>
+            <field name="life_unit">uses</field>
+            <field name="notes">80-grit coarse stage; consumable — no refurbishment path.</field>
+        </record>
+
+        <record id="tool_asset_sb_80_002" model="southbrook.tool.asset">
+            <field name="name">Sanding Belt 80-grit #SB-SB80-002</field>
+            <field name="product_id" ref="tool_prod_sanding_belt"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">200.0</field>
+            <field name="remaining_life_qty">200.0</field>
+            <field name="life_unit">uses</field>
+            <field name="notes">80-grit standby.</field>
+        </record>
+
+        <record id="tool_asset_sb_120_001" model="southbrook.tool.asset">
+            <field name="name">Sanding Belt 120-grit #SB-SB120-001</field>
+            <field name="product_id" ref="tool_prod_sanding_belt"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">worn</field>
+            <field name="estimated_life_qty">200.0</field>
+            <field name="remaining_life_qty">45.0</field>
+            <field name="total_usage_qty">155.0</field>
+            <field name="life_unit">uses</field>
+            <field name="notes">120-grit medium stage; near end-of-life.</field>
+        </record>
+
+        <record id="tool_asset_sb_120_002" model="southbrook.tool.asset">
+            <field name="name">Sanding Belt 120-grit #SB-SB120-002</field>
+            <field name="product_id" ref="tool_prod_sanding_belt"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">200.0</field>
+            <field name="remaining_life_qty">200.0</field>
+            <field name="life_unit">uses</field>
+            <field name="notes">120-grit standby.</field>
+        </record>
+
+        <record id="tool_asset_sb_180_001" model="southbrook.tool.asset">
+            <field name="name">Sanding Belt 180-grit #SB-SB180-001</field>
+            <field name="product_id" ref="tool_prod_sanding_belt"/>
+            <field name="lifecycle_state">available</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">200.0</field>
+            <field name="remaining_life_qty">175.0</field>
+            <field name="total_usage_qty">25.0</field>
+            <field name="life_unit">uses</field>
+            <field name="notes">180-grit finishing stage.</field>
+        </record>
+
+        <record id="tool_asset_sb_180_002" model="southbrook.tool.asset">
+            <field name="name">Sanding Belt 180-grit #SB-SB180-002</field>
+            <field name="product_id" ref="tool_prod_sanding_belt"/>
+            <field name="lifecycle_state">new</field>
+            <field name="condition">excellent</field>
+            <field name="estimated_life_qty">200.0</field>
+            <field name="remaining_life_qty">200.0</field>
+            <field name="life_unit">uses</field>
+            <field name="notes">180-grit standby.</field>
+        </record>
+
+    </data>
+</odoo>

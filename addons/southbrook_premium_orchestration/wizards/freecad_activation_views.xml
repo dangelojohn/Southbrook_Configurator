@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form view: URL + sequence toggles, Apply -->
+    <record id="view_freecad_activation_wizard_form" model="ir.ui.view">
+        <field name="name">freecad.activation.wizard.form</field>
+        <field name="model">freecad.activation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Activate FreeCAD Bridge">
+                <header>
+                    <button name="action_apply"
+                            string="Apply"
+                            type="object"
+                            class="btn-primary"
+                            confirm="Save the URL, run /health, flip freecad_bridge.enabled=True, and (optionally) render the first pending MO. Continue?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Phase 3.2 CAD bridge go-live.</strong>
+                        Pings the FreeCAD daemon, flips
+                        <code>freecad_bridge.enabled</code> to <code>True</code>,
+                        and (optionally) runs the first-MO render as an
+                        end-to-end acceptance test. The chain halts at the
+                        first failed step.
+                        Rollback: open this wizard, untick "Enable"; or use
+                        the activator's "Disable" action.
+                    </div>
+                    <group>
+                        <group string="Bridge">
+                            <field name="url"/>
+                        </group>
+                        <group string="Sequence">
+                            <field name="run_health_check"/>
+                            <field name="enable_after_check"/>
+                            <field name="render_first_mo"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: open the wizard -->
+    <record id="action_freecad_activation_wizard" model="ir.actions.act_window">
+        <field name="name">Activate FreeCAD</field>
+        <field name="res_model">freecad.activation.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

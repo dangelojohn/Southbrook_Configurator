@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Sale order form inherit — adds a "Kitchen Job" smart button
+        to the button_box that jumps to the linked project.task.
+        The backlink lives on project.task as x_southbrook_sale_order_id
+        (defined in southbrook_project) and on sale.order as
+        x_southbrook_project_task_id (defined in southbrook_project_mrp).
+    -->
+
+    <record id="view_sale_order_form_inherit_premium" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.southbrook.premium</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_kitchen_job"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-cubes"
+                        invisible="not x_southbrook_project_task_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Kitchen Job</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
