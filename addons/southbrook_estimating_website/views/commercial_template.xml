@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <template id="commercial_page_template" name="Southbrook Commercial Page">
+    <t t-call="website.layout">
+      <div id="wrap" class="oe_structure">
+        <main class="o_sb_home o_sb_commercial">
+
+          <section class="o_sb_hero">
+            <div class="container">
+              <div class="row align-items-center">
+                <div class="col-lg-7 o_sb_hero_text">
+                  <p class="o_sb_hero_meta">For commercial cabinet manufacturers</p>
+                  <h1 class="o_sb_hero_title">
+                    Make Odoo Projects the operating system for cabinet manufacturing.
+                  </h1>
+                  <p class="o_sb_hero_sub">
+                    Southbrook helps cabinet manufacturers use Odoo Projects as the
+                    shared project-management layer for quoting, engineering,
+                    purchasing, production, delivery, and customer approvals.
+                  </p>
+                  <p class="o_sb_hero_cta_row">
+                    <a href="#commercial-demo"
+                       class="o_sb_btn o_sb_btn_primary o_sb_btn_lg">
+                      Request commercial review
+                    </a>
+                    <a href="#odoo-projects"
+                       class="o_sb_btn o_sb_btn_ghost o_sb_btn_lg">
+                      See the workflow
+                    </a>
+                  </p>
+                  <p class="o_sb_hero_meta">
+                    Project-led manufacturing. Odoo-ready operations.
+                    Practical intelligence layer.
+                  </p>
+                </div>
+                <div class="col-lg-5 o_sb_hero_aside">
+                  <div class="o_sb_hero_card o_sb_commercial_card">
+                    <div class="o_sb_hero_card_label">Odoo Project</div>
+                    <div class="o_sb_hero_card_title">Hotel Tower A</div>
+                    <p class="o_sb_hero_card_body">
+                      Quote-to-production control for 142 suites, 6 production
+                      batches, active engineering flags, and material readiness.
+                    </p>
+                    <div class="o_sb_commercial_metrics">
+                      <span><strong>37</strong> active tasks</span>
+                      <span><strong>8</strong> open risks</span>
+                      <span><strong>3</strong> PO gaps</span>
+                      <span><strong>12</strong> ready lots</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="odoo-projects" class="o_sb_features">
+            <div class="container">
+              <div class="row mb-4">
+                <div class="col-lg-7">
+                  <p class="o_sb_hero_meta">Odoo Projects for manufacturing</p>
+                  <h2 class="o_sb_cta_strip_title">
+                    Run cabinet jobs as managed projects, not scattered handoffs.
+                  </h2>
+                  <p class="o_sb_cta_strip_sub">
+                    Commercial cabinet work fails when project knowledge lives in
+                    email, spreadsheets, and separate shop notes. Southbrook
+                    structures Odoo Projects around the real job path: quote,
+                    review, release, build, ship, and close.
+                  </p>
+                </div>
+              </div>
+              <div class="row g-4">
+                <div class="col-md-6 col-lg-3">
+                  <article class="o_sb_feature">
+                    <span class="o_sb_feature_icon fa fa-file-text-o"/>
+                    <h3 class="o_sb_feature_title">Quote to project</h3>
+                    <p class="o_sb_feature_body">
+                      Turn approved scopes into Odoo projects with job data,
+                      drawings, room counts, commitments, and milestones.
+                    </p>
+                  </article>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <article class="o_sb_feature">
+                    <span class="o_sb_feature_icon fa fa-search"/>
+                    <h3 class="o_sb_feature_title">Engineering review</h3>
+                    <p class="o_sb_feature_body">
+                      Route field dimensions, finish rules, material exceptions,
+                      and approval questions before purchasing or production.
+                    </p>
+                  </article>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <article class="o_sb_feature">
+                    <span class="o_sb_feature_icon fa fa-industry"/>
+                    <h3 class="o_sb_feature_title">Production release</h3>
+                    <p class="o_sb_feature_body">
+                      Trigger BOM checks, purchase requirements, cutlist
+                      readiness, work orders, and batch sequencing.
+                    </p>
+                  </article>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <article class="o_sb_feature">
+                    <span class="o_sb_feature_icon fa fa-check-square-o"/>
+                    <h3 class="o_sb_feature_title">Delivery closeout</h3>
+                    <p class="o_sb_feature_body">
+                      Track punch items, service work, installation notes, and
+                      customer signoff in the same operational record.
+                    </p>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="o_sb_commercial_band">
+            <div class="container">
+              <div class="row g-4 align-items-start">
+                <div class="col-lg-5">
+                  <p class="o_sb_hero_meta">Practical intelligence layer</p>
+                  <h2 class="o_sb_cta_strip_title">
+                    Use the knowledge your best people already apply under pressure.
+                  </h2>
+                  <p class="o_sb_cta_strip_sub">
+                    Southbrook turns project experience into visible signals:
+                    what needs review, what can wait, what blocks manufacturing,
+                    and what decision should happen next.
+                  </p>
+                </div>
+                <div class="col-lg-7">
+                  <div class="o_sb_commercial_signal_grid">
+                    <article>
+                      <strong>Constraint signals</strong>
+                      <span>Dimension conflicts, lead-time concerns, unusual option combinations.</span>
+                    </article>
+                    <article>
+                      <strong>Role-based work</strong>
+                      <span>Tasks routed to estimating, engineering, purchasing, production, install, or service.</span>
+                    </article>
+                    <article>
+                      <strong>Decision gates</strong>
+                      <span>Explicit release checks before jobs move into the factory.</span>
+                    </article>
+                    <article>
+                      <strong>Learning record</strong>
+                      <span>Decision history that helps the next project avoid the same investigation.</span>
+                    </article>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="commercial-demo" class="o_sb_cta_strip">
+            <div class="container">
+              <div class="row align-items-center">
+                <div class="col-lg-8">
+                  <p class="o_sb_hero_meta">Request a commercial workflow review</p>
+                  <h2 class="o_sb_cta_strip_title">
+                    Bring one real cabinet project. Leave with a clearer Odoo Projects path.
+                  </h2>
+                  <p class="o_sb_cta_strip_sub">
+                    We will review your quote-to-production process, identify
+                    where project data breaks down, and map an Odoo Projects
+                    workflow around the decisions your team already makes.
+                  </p>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                  <a href="/contactus?subject=Commercial%20workflow%20review"
+                     class="o_sb_btn o_sb_btn_primary o_sb_btn_lg">
+                    Request commercial review
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </main>
+      </div>
+    </t>
+  </template>
+
+</odoo>

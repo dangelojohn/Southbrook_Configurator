@@ -116,6 +116,20 @@ class SouthbrookKitchenPlanner(http.Controller):
     """Customer-facing /kitchen-planner one-page configurator route."""
 
     @http.route(
+        ["/commercial", "/commercial/"],
+        type="http",
+        auth="public",
+        website=True,
+        sitemap=True,
+    )
+    def commercial_page(self, **kw):
+        """Render the public commercial manufacturing page."""
+        return request.render(
+            "southbrook_estimating_website.commercial_page_template",
+            {"page_name": "southbrook_commercial"},
+        )
+
+    @http.route(
         "/kitchen-planner",
         type="http",
         auth="user",

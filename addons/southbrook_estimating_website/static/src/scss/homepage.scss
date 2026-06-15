@@ -236,6 +236,85 @@
   font-size: 16px;
 }
 
+// ---------------------------------------------------------------------
+// COMMERCIAL PAGE
+// ---------------------------------------------------------------------
+.o_sb_commercial_card {
+  .o_sb_hero_card_body {
+    margin-bottom: 20px;
+  }
+}
+
+.o_sb_commercial_metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+
+  span {
+    display: block;
+    padding: 12px;
+    border: 1px solid rgba(244, 237, 226, 0.28);
+    border-radius: 4px;
+    font-size: 12px;
+    color: rgba(244, 237, 226, 0.86);
+  }
+
+  strong {
+    display: block;
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-size: 24px;
+    line-height: 1;
+    color: var(--sb-linen, #f4ede2);
+    margin-bottom: 4px;
+  }
+}
+
+.o_sb_commercial_band {
+  padding: 72px 0;
+  background: var(--sb-walnut, #6b3f2a);
+  color: var(--sb-linen, #f4ede2);
+
+  .o_sb_hero_meta,
+  .o_sb_cta_strip_title,
+  .o_sb_cta_strip_sub {
+    color: var(--sb-linen, #f4ede2);
+  }
+}
+
+.o_sb_commercial_signal_grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+
+  article {
+    min-height: 148px;
+    padding: 20px;
+    border: 1px solid rgba(244, 237, 226, 0.24);
+    border-radius: 4px;
+    background: rgba(244, 237, 226, 0.06);
+  }
+
+  strong {
+    display: block;
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--sb-linen, #f4ede2);
+    margin-bottom: 10px;
+  }
+
+  span {
+    display: block;
+    font-size: 14px;
+    line-height: 1.5;
+    color: rgba(244, 237, 226, 0.86);
+  }
+}
+
 // =====================================================================
 // G6 — Branded auth chrome for /web/login, /web/signup, /web/reset_password
 // Override of stock web.login_layout (see views/auth_template.xml).
