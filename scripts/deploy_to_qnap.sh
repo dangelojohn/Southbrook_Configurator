@@ -23,9 +23,22 @@
 #   QNAP_HOST=admin@192.168.68.108 ./scripts/deploy_to_qnap.sh ...
 #   DB=southbrook DRY_RUN=1 ./scripts/deploy_to_qnap.sh ...
 #
+#   DEPLOY_VIA=tunnel ./scripts/deploy_to_qnap.sh ...
+#     Route SSH + rsync through `cloudflared access ssh --hostname %h`
+#     instead of going direct to the QNAP's LAN IP. Use this when the
+#     LAN-side route to the QNAP is unreachable but the cloudflared
+#     tunnel is healthy. Requires:
+#       - cloudflared CLI on this machine (`brew install cloudflared`)
+#       - an SSH ingress in the Cloudflare tunnel config that maps
+#         $QNAP_TUNNEL_HOST → ssh://localhost:22 on the QNAP host
+#     Override the tunnel hostname with QNAP_TUNNEL_HOST=... (default
+#     admin@ssh.southbrookcabinetry.space).
+#
 set -euo pipefail
 
+DEPLOY_VIA="${DEPLOY_VIA:-lan}"
 QNAP_HOST="${QNAP_HOST:-admin@192.168.68.108}"
+QNAP_TUNNEL_HOST="${QNAP_TUNNEL_HOST:-admin@ssh.southbrookcabinetry.space}"
 QNAP_ADDONS_DIR="${QNAP_ADDONS_DIR:-/share/CACHEDEV3_DATA/Container/southbrook/addons}"
 QNAP_DOCKER="${QNAP_DOCKER:-/share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker}"
 CONTAINER="${CONTAINER:-southbrook-odoo}"
@@ -63,7 +76,35 @@ run() {
 command -v rsync >/dev/null || fail "rsync not found"
 command -v ssh >/dev/null   || fail "ssh not found"
 
-log "target: $QNAP_HOST"
+# When DEPLOY_VIA=tunnel, swap the LAN host for the tunnel hostname and
+# require the cloudflared CLI (needed for the ProxyCommand path).
+if [[ "$DEPLOY_VIA" == "tunnel" ]]; then
+  command -v cloudflared >/dev/null \
+    || fail "DEPLOY_VIA=tunnel needs cloudflared CLI (brew install cloudflared)"
+  QNAP_HOST="$QNAP_TUNNEL_HOST"
+  log "tunnel mode: SSH routed through 'cloudflared access ssh --hostname %h'"
+elif [[ "$DEPLOY_VIA" != "lan" ]]; then
+  fail "DEPLOY_VIA must be 'lan' or 'tunnel' (got: $DEPLOY_VIA)"
+fi
+
+# Wrappers so every ssh/rsync invocation downstream picks up the right
+# transport for the selected mode without each callsite having to branch.
+_ssh() {
+  if [[ "$DEPLOY_VIA" == "tunnel" ]]; then
+    ssh -o ProxyCommand="cloudflared access ssh --hostname %h" "$@"
+  else
+    ssh "$@"
+  fi
+}
+_rsync() {
+  if [[ "$DEPLOY_VIA" == "tunnel" ]]; then
+    rsync -e 'ssh -o ProxyCommand="cloudflared access ssh --hostname %h"' "$@"
+  else
+    rsync "$@"
+  fi
+}
+
+log "target: $QNAP_HOST (via $DEPLOY_VIA)"
 log "modules: $MODULES_ARG"
 log "db: $DB"
 
@@ -78,7 +119,7 @@ for mod in "${MODULES[@]}"; do
   # --delete-during keeps the QNAP side identical to the checkout, so
   # deleted files (e.g. obsolete migration scripts) actually go away.
   # Exclude __pycache__ and *.pyc to avoid permission churn.
-  run rsync -az --delete-during \
+  run _rsync -az --delete-during \
     --exclude='__pycache__/' --exclude='*.pyc' --exclude='.DS_Store' \
     "$src/" "$QNAP_HOST:$QNAP_ADDONS_DIR/$mod/"
 done
@@ -102,10 +143,10 @@ if [[ "$DRY_RUN" == "1" ]]; then
 else
   log "running cold upgrade under flock (validates a future restart will boot)…"
   set +e
-  ssh "$QNAP_HOST" "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1"
+  _ssh "$QNAP_HOST" "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1"
   rc=$?
   set -e
-  upgrade_log="$(ssh "$QNAP_HOST" 'cat /tmp/deploy_upgrade.log' 2>/dev/null || true)"
+  upgrade_log="$(_ssh "$QNAP_HOST" 'cat /tmp/deploy_upgrade.log' 2>/dev/null || true)"
   # A flock timeout surfaces as exit 75 — surface it so the deploy doesn't
   # silently "succeed" on lock contention (the historical || true bug).
   if [[ "$rc" == "75" ]]; then
@@ -128,7 +169,7 @@ fi
 
 # ---- health gate: the LIVE server must actually serve -----------------
 health_check() {
-  ssh "$QNAP_HOST" "$QNAP_DOCKER exec $CONTAINER python3 -c \"import urllib.request as u
+  _ssh "$QNAP_HOST" "$QNAP_DOCKER exec $CONTAINER python3 -c \"import urllib.request as u
 try: u.urlopen('http://localhost:8069/web/login', timeout=10); print(200)
 except u.HTTPError as e: print(e.code)
 except Exception: print('boot')\"" 2>/dev/null || true
@@ -163,7 +204,7 @@ fi
 # stop+start. See memory: qnap-odoo-upgrade-cache-reset (warm-vs-cold trap).
 if [[ "${RESTART:-0}" == "1" && "$DRY_RUN" != "1" ]]; then
   log "RESTART=1 → hard stop+start $CONTAINER (loads new Python code)…"
-  ssh "$QNAP_HOST" "$QNAP_DOCKER stop $CONTAINER && $QNAP_DOCKER start $CONTAINER"
+  _ssh "$QNAP_HOST" "$QNAP_DOCKER stop $CONTAINER && $QNAP_DOCKER start $CONTAINER"
   log "waiting for /web/login 200…"
   wait_healthy 30 || fail "after restart, $CONTAINER never returned 200 on /web/login — site may be DOWN. Roll back / investigate now."
 fi
@@ -171,7 +212,7 @@ fi
 # ---- post-flight inventory (informational ONLY — not a success signal) -
 if [[ "$DRY_RUN" != "1" ]]; then
   log "post-deploy module versions (informational; success was gated above):"
-  ssh "$QNAP_HOST" "$QNAP_DOCKER exec southbrook-postgres psql -U odoo -d $DB -t -c \"
+  _ssh "$QNAP_HOST" "$QNAP_DOCKER exec southbrook-postgres psql -U odoo -d $DB -t -c \"
     SELECT name, latest_version
     FROM ir_module_module
     WHERE name = ANY (string_to_array('$MODULES_ARG', ','))
