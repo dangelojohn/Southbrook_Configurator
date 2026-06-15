@@ -34,6 +34,9 @@
             <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
+            <!-- Stagger first fire +2min from install to avoid co-firing with
+                 the other 3 high-frequency crons on a 2G Odoo container. -->
+            <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=2))"/>
         </record>
 
         <!-- ============================================================
@@ -55,6 +58,7 @@
             <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=5))"/>
         </record>
 
         <!-- ============================================================
@@ -76,6 +80,7 @@
             <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=10))"/>
         </record>
 
         <!-- ============================================================
