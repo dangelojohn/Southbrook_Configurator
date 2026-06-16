@@ -166,7 +166,12 @@ exec $CONTAINER ps -ef | grep \"odoo.*-u\"'"
   printf '%s\n' "$upgrade_log" \
     | grep -E 'Modules loaded|Registry loaded|ParseError|CRITICAL|ValidationError|AssertionError|Failed to load registry|Traceback' \
     | sed 's/^/[odoo] /' >&2 || true
-  if printf '%s\n' "$upgrade_log" | grep -qE 'Failed to load registry|CRITICAL|AssertionError|Traceback \(most recent'; then
+  # NOTE: don't fail on bare 'Traceback' — py.warnings prints a stack for
+  # every UserWarning, and a single benign 'should be searchable' warning
+  # in an unrelated module was killing every deploy verdict. The real
+  # failure markers (CRITICAL / AssertionError / Failed to load registry)
+  # plus the Modules loaded gate below catch genuine load errors.
+  if printf '%s\n' "$upgrade_log" | grep -qE 'Failed to load registry|CRITICAL|AssertionError'; then
     fail "cold upgrade hit a registry/load error (see [odoo] lines above). NOT trusting this deploy — a live restart would crash. Investigate before restarting $CONTAINER."
   fi
   if ! printf '%s\n' "$upgrade_log" | grep -q 'Modules loaded'; then

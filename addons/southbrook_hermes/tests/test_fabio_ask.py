@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+import unittest
+
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -6,6 +8,10 @@ from odoo.tests.common import TransactionCase, tagged
 class TestFabioAsk(TransactionCase):
 
     def test_internal_answer_lists_production_blockers(self):
+        if "southbrook.mi.check" not in self.env:
+            raise unittest.SkipTest(
+                "southbrook_manufacturing_intelligence not installed"
+            )
         self.env["southbrook.mi.check"].create({
             "name": "Missing cutlist",
             "severity": "blocker",

@@ -175,6 +175,11 @@ class SouthbrookHermesQuestion(models.Model):
         return "\n".join(lines)
 
     def _answer_mi_checks(self, severity):
+        if "southbrook.mi.check" not in self.env:
+            return _(
+                "Manufacturing intelligence checks aren't available on this "
+                "instance."
+            )
         label = dict(
             self.env["southbrook.mi.check"]._fields["severity"].selection
         ).get(severity, severity)
