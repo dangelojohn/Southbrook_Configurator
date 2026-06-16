@@ -290,15 +290,23 @@ jobs:
           done
           ls -la /host/southbrook-addons/ | grep kitchenforge
 
-      - name: Update addons in live Odoo (lock-protected)
+      - name: Install/upgrade addons in live Odoo (lock-protected)
         # flock pattern per memory southbrook_deploy_flock_lock.md — prevents
         # concurrent -u races. -E 75 raises a distinct exit code on lock wait
         # timeout so failures are recognizable.
+        #
+        # Both -i AND -u: -i installs any missing modules (first deploy), -u
+        # upgrades already-installed ones (subsequent deploys). Idempotent
+        # in both directions.
         run: |
           set -e
           docker exec southbrook-odoo bash -c "
             flock -E 75 -w 600 /tmp/southbrook-odoo-upgrade.lock \
-              odoo -d southbrook -u ${ADDON_LIST} --stop-after-init --no-http
+              odoo -d southbrook \
+                -i ${ADDON_LIST} \
+                -u ${ADDON_LIST} \
+                --stop-after-init --no-http \
+                --workers=0 --max-cron-threads=0
           "
 
       - name: Restart southbrook-odoo (clear worker ormcache)
