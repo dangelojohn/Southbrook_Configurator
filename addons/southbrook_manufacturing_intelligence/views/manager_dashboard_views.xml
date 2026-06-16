@@ -76,4 +76,20 @@
         <field name="view_mode">list,form</field>
         <field name="view_id" ref="view_southbrook_mi_package_list"/>
     </record>
+
+    <!-- Wire the two actions into the PM dashboard menu (provided by
+         southbrook_mrp_pm dep). Without these menuitems the actions
+         existed but had no entry point — plant managers had to know the
+         action xml_ids to reach the boards. -->
+    <menuitem id="menu_southbrook_mi_checks"
+              parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+              name="MI Checks"
+              action="action_southbrook_mi_checks"
+              sequence="10"/>
+
+    <menuitem id="menu_southbrook_mi_packages"
+              parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+              name="MI Production Board"
+              action="action_southbrook_mi_packages"
+              sequence="11"/>
 </odoo>

@@ -145,8 +145,17 @@ else
   set +e
   _ssh "$QNAP_HOST" "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1"
   rc=$?
+  # Capture the log AND distinguish "log fetched, empty" from "log fetch
+  # failed". Earlier we did `cat ... || true` which collapsed both into
+  # an empty buffer, and the grep below then misdiagnosed an ssh blip as
+  # "did not reach Modules loaded" — taking the next deploy down a fail
+  # path it shouldn't.
+  upgrade_log="$(_ssh "$QNAP_HOST" 'cat /tmp/deploy_upgrade.log' 2>/dev/null)"
+  log_fetch_rc=$?
   set -e
-  upgrade_log="$(_ssh "$QNAP_HOST" 'cat /tmp/deploy_upgrade.log' 2>/dev/null || true)"
+  if [[ "$log_fetch_rc" != "0" ]]; then
+    fail "could not fetch /tmp/deploy_upgrade.log from $QNAP_HOST (ssh rc=$log_fetch_rc). Cold upgrade exit was $rc; can't tell if it loaded or crashed. Investigate before restarting $CONTAINER."
+  fi
   # A flock timeout surfaces as exit 75 — surface it so the deploy doesn't
   # silently "succeed" on lock contention (the historical || true bug).
   if [[ "$rc" == "75" ]]; then
@@ -168,19 +177,42 @@ exec $CONTAINER ps -ef | grep \"odoo.*-u\"'"
 fi
 
 # ---- health gate: the LIVE server must actually serve -----------------
+# Print one of: '200' (live), an HTTP error code (3xx/4xx/5xx),
+# 'boot' (server not accepting yet — transient), or 'ssh_err' (couldn't
+# reach the QNAP at all). Earlier we collapsed 'ssh_err' into '' via a
+# silent `|| true`, and wait_healthy spent its budget polling against
+# what was actually a network blip — masking infra problems as "site
+# unhealthy". Distinguishing them lets the caller decide whether to
+# retry, escalate, or abort.
 health_check() {
-  _ssh "$QNAP_HOST" "$QNAP_DOCKER exec $CONTAINER python3 -c \"import urllib.request as u
+  set +e
+  local out rc
+  out="$(_ssh "$QNAP_HOST" "$QNAP_DOCKER exec $CONTAINER python3 -c \"import urllib.request as u
 try: u.urlopen('http://localhost:8069/web/login', timeout=10); print(200)
 except u.HTTPError as e: print(e.code)
-except Exception: print('boot')\"" 2>/dev/null || true
+except Exception: print('boot')\"" 2>/dev/null)"
+  rc=$?
+  set -e
+  if [[ "$rc" != "0" ]]; then
+    printf 'ssh_err'
+  else
+    printf '%s' "$out"
+  fi
 }
 # Poll for a 200 rather than a single shot: a `-u` signals the live workers to
 # reload their registry, so the server is briefly unavailable mid-deploy and a
 # one-shot check false-fails (it returned 'boot' and aborted a healthy deploy).
 wait_healthy() {
-  local tries="${1:-20}" i
+  local tries="${1:-20}" i status
   for ((i = 1; i <= tries; i++)); do
-    [[ "$(health_check)" == "200" ]] && { log "live /web/login → 200 (after $i check(s))"; return 0; }
+    status="$(health_check)"
+    if [[ "$status" == "200" ]]; then
+      log "live /web/login → 200 (after $i check(s))"; return 0
+    fi
+    # Surface the LAST observed status on each tick so a log scrape can
+    # tell at a glance whether we were stuck on 'boot' (server reloading,
+    # benign) versus 'ssh_err' (LAN gone) versus a real HTTP error code.
+    log "health: $status (attempt $i/$tries)"
     sleep 6
   done
   return 1

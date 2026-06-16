@@ -35,16 +35,22 @@ prefix (`/api/v2/cutlist/...`) per the Flutter contract §6.
 ## 2. Auth
 
 Both endpoints require the standard `X-Api-Key` header. The Accucutt
-operator generates a key by hitting `/api/v1/auth/login` with a
-manufacturing-role user's credentials (`mrp.group_mrp_user`); the
-key is stored in the cutting-service config alongside the Odoo URL.
+operator generates a key by hitting `/api/v1/auth/login` with the
+credentials of a user whose role grants access to `sb.cutlist`
+(typically `mrp.group_mrp_user`, but the controller does NOT enforce
+group membership at key-issuance time — the gate is the cut list's
+own record rules). The key is stored in the cutting-service config
+alongside the Odoo URL.
 
 Missing or invalid → `401 {"error":"invalid_api_key", ...}`.
 
 The cut list itself is record-rule scoped to the authenticated user.
-A key issued for a partner without manufacturing access can still
-hit the endpoint but the cut list resolves to an `AccessError` →
-`403 {"error":"forbidden", ...}`.
+A key issued for a user without `sb.cutlist` access resolves to a
+**404 `{"error":"not_found", ...}`** rather than 403 — collapse-to-404
+prevents the response from leaking the existence of cut lists outside
+the caller's tenant. (Earlier drafts of this contract said 403
+`forbidden`; that was the helper's behavior pre-2026-06-15. The 404
+shape matches `_fetch_cutlist_or_404` in `southbrook_api.controllers.main`.)
 
 ---
 

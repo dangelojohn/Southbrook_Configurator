@@ -19,7 +19,11 @@
                                    decoration-warning="x_mi_status == 'review'"
                                    decoration-danger="x_mi_status == 'blocked'"/>
                             <field name="x_mi_next_action"/>
-                            <field name="x_mi_bottleneck_workcenter_id"/>
+                            <!-- x_mi_bottleneck_workcenter_id is reserved
+                                 for a future MI engine extension and is
+                                 not written by _recompute_production yet;
+                                 hidden until that lands so users don't
+                                 see a perpetually empty field. -->
                         </group>
                         <group>
                             <field name="x_mi_blocker_count"/>

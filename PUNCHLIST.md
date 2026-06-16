@@ -13,14 +13,18 @@ open items. The 5 high-severity items from code review were closed in this sessi
 
 ### Backend test regression — 15 failures in `southbrook_configurator_ux`
 - `addons/southbrook_configurator_ux/tests/test_select_commit.py` — all 15 tests in
-  `TestConfiguratorSelectCommit` fail with `error='incomplete_configuration'` when the
-  test fixture expects `ok=True`. Root cause looks like fixture/engine drift on the
-  `/select` + `/commit` controller — the seeded `base_1dr` template + picks no longer
-  satisfy the configurator's completeness check. Not a security or contract issue, but
-  the module IS in the deployed set. Investigate before next deploy: bisect against
-  recent commits to `southbrook_configurator_ux/` (most recent: `2782164`,
-  `4316951`, `9bd8e13`, `e7dccdc`, `eb2924f`, `c4a39b5`, `4e44991`) and either
-  refresh the fixture or fix the regression on the controller side.
+  `TestConfiguratorSelectCommit` fail with `error='incomplete_configuration'`.
+  **Root cause identified 2026-06-15:** the test helper `_complete_pick_set` picks
+  the FIRST value of every multi-value attribute_line on the `base_1dr` template,
+  but `Door Overlay` (and sometimes `Door Style`, `Interior Storage`) get
+  rule-rejected by `update_config` silently — `_complete_via_select` doesn't
+  assert `r["ok"]`, so the session ends up with N-3 picks while the completeness
+  check counts all multi-value attributes. Result: `missing_attributes: [Door Overlay]`
+  (or [Door Style, Door Overlay, Interior Storage] for the explicit-multi-value test).
+  Fix path: rewrite `_complete_pick_set` to iterate through each line's values
+  until `values_available` confirms acceptance, OR seed a hard-coded known-valid
+  combination as a constant in the test. Pre-existing breakage from a
+  base_1dr template expansion, not from this session's fixes.
 
 ### Code-review MED/LOW items — batched cleanup branch
 Deferred deliberately so the high-severity fixes land cleanly. Pick up in a follow-up:
@@ -59,10 +63,10 @@ Deferred deliberately so the high-severity fixes land cleanly. Pick up in a foll
   issue_for_user` does not check group membership.
 
 ### Deploy reliability — LOCK_PATH assumption
-- `scripts/deploy_to_qnap.sh:39` — new default `LOCK_PATH=/var/lib/odoo/.southbrook-odoo-upgrade.lock`
-  assumes the southbrook-odoo container bind-mounts /var/lib/odoo. **Verify on next
-  deploy**: `ssh admin@192.168.68.108 'system-docker exec southbrook-odoo ls -la /var/lib/odoo'`.
-  If not bind-mounted, override via `LOCK_PATH=…` env or fall back to a host bind path.
+- ✅ **VERIFIED 2026-06-15** — first deploy under the new `LOCK_PATH=/var/lib/odoo/.southbrook-odoo-upgrade.lock`
+  default landed cleanly through the Cloudflare tunnel (`DEPLOY_VIA=tunnel`).
+  flock acquired the lock, cold upgrade completed in 47.6s, RESTART=1 stop+start succeeded,
+  /web/login returned 200 after 3 health checks. Bind-mount assumption confirmed.
 
 ### Live API — latent issues from black-box smoke
 - `southbrookcabinetry.space/api/v1/auth/login OPTIONS` returns 400 missing_credentials
