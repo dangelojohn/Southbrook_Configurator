@@ -23,9 +23,12 @@ recommendation.
         "southbrook_kitchen_workspace",
         "southbrook_os",
     ],
-    "external_dependencies": {
-        "python": ["jwt"],
-    },
+    # PyJWT (`import jwt`) is needed at RUNTIME for any /hermes/* or
+    # /api/hermes/* endpoint that mints or verifies a token, but the helper
+    # in utils/jwt_helper.py degrades to a clear RuntimeError when missing —
+    # so we don't gate install on it. Install in the container before
+    # exposing any of the Hermes controllers: docker exec southbrook-odoo
+    # pip install PyJWT (or bake into the image).
     "data": [
         "data/fabio_partner.xml",
         "data/ir_config_parameter.xml",
