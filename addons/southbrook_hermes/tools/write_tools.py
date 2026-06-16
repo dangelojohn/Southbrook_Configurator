@@ -74,3 +74,49 @@ def schedule_followup_activity(env, order_id: int, summary: str, due_date: str):
         "user_id": env.user.id,
     })
     return {"ok": True, "activity_id": activity.id}
+
+
+# Trade-partner intents — encoded as the recommendation's payload `intent`
+# key. The actual southbrook.hermes.recommendation.recommendation_type
+# selection (`task`/`risk`/`note`/`followup`) is set conservatively to
+# `task` so the existing approve→apply pipeline creates a project.task
+# for a Southbrook user to action.
+_TRADE_PARTNER_INTENTS = (
+    "request_revision",
+    "request_install_reschedule",
+    "request_clarification",
+)
+
+
+@hermes_tool(
+    personas=["trade_partner", "sales_rep", "mfg_manager"],
+    tier="T2", scope="own",
+    description=(
+        "Create a draft southbrook.hermes.recommendation for human review. "
+        "The actual business mutation only happens when an approver clicks "
+        "Approve. For trade-partner persona, only request_revision, "
+        "request_install_reschedule, and request_clarification intents "
+        "are allowed."),
+)
+def propose_recommendation(env, partner_id: int, intent: str, payload: dict,
+                            summary: str, persona: str = "trade_partner",
+                            name: str = None):
+    import json
+    if persona == "trade_partner" and intent not in _TRADE_PARTNER_INTENTS:
+        raise UserError(
+            f"Trade partners cannot propose '{intent}' recommendations. "
+            f"Allowed intents: {', '.join(_TRADE_PARTNER_INTENTS)}.")
+    Rec = env["southbrook.hermes.recommendation"]
+    # Encode the intent + caller payload in payload_json so the approve→
+    # apply pipeline preserves what the partner asked for.
+    full_payload = {"intent": intent, "data": payload or {}}
+    rec = Rec.sudo().create({
+        "name": name or f"Hermes/{intent}/{summary[:48]}",
+        "summary": summary,
+        "recommendation_type": "task",
+        "payload_json": json.dumps(full_payload, default=str),
+        "source_model": "res.partner",
+        "source_res_id": partner_id,
+        "state": "draft",
+    })
+    return {"ok": True, "rec_id": rec.id, "summary": summary, "intent": intent}

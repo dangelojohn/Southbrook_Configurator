@@ -52,3 +52,41 @@ class TestWriteTools(TransactionCase):
             self.tools.schedule_followup_activity(
                 self.env, order_id=self.order.id,
                 summary="X", due_date=past)
+
+
+@tagged("post_install", "-at_install", "southbrook", "hermes")
+class TestProposeRecommendation(TransactionCase):
+    def setUp(self):
+        super().setUp()
+        self.partner = self.env["res.partner"].create({
+            "name": "T2 Test Partner",
+        })
+        from odoo.addons.southbrook_hermes.tools import write_tools  # noqa
+        self.tools = write_tools
+
+    def test_propose_recommendation_creates_draft(self):
+        Rec = self.env["southbrook.hermes.recommendation"]
+        before = Rec.search_count([])
+        result = self.tools.propose_recommendation(
+            self.env, partner_id=self.partner.id,
+            intent="request_revision",
+            payload={"order_id": 1, "change": "swap door style"},
+            summary="Test draft recommendation",
+        )
+        self.assertTrue(result["ok"])
+        after = Rec.search_count([])
+        self.assertEqual(after, before + 1)
+        rec = Rec.browse(result["rec_id"])
+        self.assertEqual(rec.state, "draft")
+        self.assertEqual(rec.recommendation_type, "task")
+        self.assertEqual(rec.source_model, "res.partner")
+        self.assertEqual(rec.source_res_id, self.partner.id)
+
+    def test_propose_recommendation_rejects_disallowed_intent_for_trade_partner(self):
+        with self.assertRaises(Exception):
+            self.tools.propose_recommendation(
+                self.env, partner_id=self.partner.id,
+                intent="apply_cut_spec_override",
+                payload={}, summary="Force a cut-spec change",
+                persona="trade_partner",
+            )
