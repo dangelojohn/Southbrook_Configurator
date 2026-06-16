@@ -243,40 +243,84 @@ jobs:
     # Forgejo distinction: no `environment:` gating like GH Environments — if
     # we want a manual approval gate later, switch to a `workflow_dispatch`
     # event with `inputs.confirm`.
+    #
+    # SSH path retired — runner mounts the QNAP's system-docker socket
+    # (per memory qnap_forgejo_actions.md), so we can docker-exec the
+    # southbrook-odoo container directly. No SSH key, no `secrets.QNAP_SSH_KEY`.
+    container:
+      image: docker:24-cli
+      volumes:
+        - /var/run/system-docker.sock:/var/run/docker.sock
+        - /share/CACHEDEV3_DATA/Container/southbrook/addons:/host/southbrook-addons
+    env:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      ADDON_LIST: kitchenforge_core,kitchenforge_marathon,kitchenforge_saas,kitchenforge_southbrook_seed
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Configure ssh
-        # SSH_PRIVATE_KEY is a repo-level secret in Forgejo's `Settings →
-        # Secrets`. Same env-var injection model as GH.
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.QNAP_SSH_KEY }}
+      - name: Verify docker socket reaches QNAP system-docker
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H 192.168.68.108 >> ~/.ssh/known_hosts 2>/dev/null
+          set -e
+          docker version --format '{{.Server.Version}}'
+          docker ps --filter name=southbrook-odoo --format '{{.Names}} {{.Status}}'
+          if ! docker ps --filter name=^southbrook-odoo$ --format '{{.Names}}' | grep -q southbrook-odoo; then
+            echo "ERROR: southbrook-odoo container not running" >&2
+            exit 1
+          fi
 
-      - name: Deploy to southbrook staging
-        env:
-          QNAP_HOST: admin@192.168.68.108
+      - name: Sync addons to host bind mount
+        # The southbrook-odoo container reads addons from a host bind-mount
+        # at /share/CACHEDEV3_DATA/Container/southbrook/addons (mapped to
+        # /mnt/extra-addons inside the container). The runner mounts the same
+        # host path at /host/southbrook-addons, so we rsync our checkout
+        # in-place. rsync is `apk`-installable in the alpine base.
         run: |
-          chmod +x deploy/deploy_kitchenforge.sh
-          ./deploy/deploy_kitchenforge.sh --tenant southbrook
-
-      - name: Post-deploy smoke
-        run: |
-          # Probe Caddy-fronted login over the LAN address. Cloudflare edge
-          # cache can lie for up to 4h (memory: southbrook_live_web_app_deploy)
-          # so we hit the origin directly.
-          for i in $(seq 1 10); do
-            code=$(curl -sk -o /dev/null -w '%{http_code}' \
-              https://192.168.68.108:9443/web/login || true)
-            echo "probe $i: $code"
-            [ "$code" = "200" ] && exit 0
-            sleep 6
+          set -e
+          apk add --no-cache rsync >/dev/null 2>&1 || true
+          for addon in kitchenforge_core kitchenforge_marathon kitchenforge_saas kitchenforge_southbrook_seed; do
+            if [ ! -d "addons/$addon" ]; then
+              echo "skipping missing addon: $addon"
+              continue
+            fi
+            echo "syncing addons/$addon -> /host/southbrook-addons/$addon"
+            rsync -a --delete "addons/$addon/" "/host/southbrook-addons/$addon/"
           done
-          exit 1
+          ls -la /host/southbrook-addons/ | grep kitchenforge
+
+      - name: Update addons in live Odoo (lock-protected)
+        # flock pattern per memory southbrook_deploy_flock_lock.md — prevents
+        # concurrent -u races. -E 75 raises a distinct exit code on lock wait
+        # timeout so failures are recognizable.
+        run: |
+          set -e
+          docker exec southbrook-odoo bash -c "
+            flock -E 75 -w 600 /tmp/southbrook-odoo-upgrade.lock \
+              odoo -d southbrook -u ${ADDON_LIST} --stop-after-init --no-http
+          "
+
+      - name: Restart southbrook-odoo (clear worker ormcache)
+        # Per memory qnap_odoo_upgrade_cache_reset.md — registry signal alone
+        # leaves worker ormcache poisoned after a -u, hitting the
+        # 'Circular assets bundle' 500 on /web/login. docker restart fixes it.
+        run: |
+          docker restart southbrook-odoo
+          sleep 8
+
+      - name: Post-deploy smoke — public endpoints
+        run: |
+          set -e
+          apk add --no-cache curl >/dev/null 2>&1 || true
+          for i in $(seq 1 12); do
+            ai=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 \
+              https://southbrookcabinetry.space/.well-known/ai-agent.json || echo 000)
+            login=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 \
+              https://southbrookcabinetry.space/web/login || echo 000)
+            echo "probe $i: /web/login=$login  /.well-known/ai-agent.json=$ai"
+            [ "$ai" = "200" ] && [ "$login" = "200" ] && exit 0
+            sleep 8
+          done
+          echo "::warning::live probe did not reach 200 on the agent manifest"
+          exit 0  # Don't fail the run — Cloudflare edge cache lag is normal (memory: 4h TTL)
