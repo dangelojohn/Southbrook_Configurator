@@ -197,9 +197,17 @@ class SouthbrookApi(http.Controller):
     # ==================================================================
     @http.route(
         "/api/v1/auth/login", type="http", auth="public",
-        methods=["POST"], csrf=False,
+        methods=["POST", "OPTIONS"], csrf=False,
     )
     def auth_login(self, **_):
+        if request.httprequest.method == "OPTIONS":
+            # Cross-origin preflight — must return 2xx + CORS headers
+            # so the browser then sends the actual POST. The wildcard
+            # OPTIONS route earlier in this class is meant to cover
+            # this, but Odoo's router prefers the path-specific route
+            # even on method mismatch, so we handle preflight in-line
+            # for endpoints clients will call cross-origin.
+            return _cors_preflight()
         try:
             payload = json.loads(request.httprequest.data or b"{}")
         except json.JSONDecodeError:
