@@ -50,3 +50,14 @@ class TestCutSpecGenerator(TransactionCase):
         text = section.body.lower()
         self.assertTrue("thickness" in text or "reveal" in text)
         self.assertEqual(result["status"], "ok")
+
+
+@tagged("post_install", "-at_install", "southbrook", "southbrook_os")
+class TestWorkCenterGenerator(TransactionCase):
+    def test_work_center_generator(self):
+        result = self.env["southbrook.os.generators"].generate_work_centers()
+        section = self.env["southbrook.os.section"].search(
+            [("slug", "=", "08_work_centers.generated")], limit=1)
+        self.assertTrue(section)
+        self.assertIn("Work Center", section.body)
+        self.assertEqual(result["status"], "ok")

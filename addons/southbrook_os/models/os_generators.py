@@ -129,6 +129,42 @@ class OsGenerators(models.AbstractModel):
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
+    # Work Centers
+    # ------------------------------------------------------------------
+    @api.model
+    def generate_work_centers(self):
+        body = self._render_work_centers_md()
+        return self._upsert_generated(
+            "08_work_centers.generated", "Work Centers (live)", body)
+
+    def _render_work_centers_md(self):
+        WC = self.env["mrp.workcenter"]
+        centers = WC.search([("active", "=", True)], order="sequence, name")
+        lines = [
+            "---", "slug: 08_work_centers.generated",
+            "title: Work Centers (live)", "source: generated", "---", "",
+            "# Work Centers (live)", "",
+            "Rebuilt from `mrp.workcenter`.", "",
+            "| Work Center | OEE Target | Capacity |", "|---|---|---|",
+        ]
+        for c in centers:
+            oee = getattr(c, "oee_target", "—")
+            capacity = getattr(c, "default_capacity", "—")
+            lines.append(f"| {c.name} | {oee} | {capacity} |")
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Generate all (convenience for the cron + manual button)
+    # ------------------------------------------------------------------
+    @api.model
+    def generate_all(self):
+        results = []
+        for fn in ("generate_catalog", "generate_attributes",
+                   "generate_cut_spec", "generate_work_centers"):
+            results.append(getattr(self, fn)())
+        return results
+
+    # ------------------------------------------------------------------
     # Shared upsert with hash-based no-op detection
     # ------------------------------------------------------------------
     def _upsert_generated(self, slug, name, body):
