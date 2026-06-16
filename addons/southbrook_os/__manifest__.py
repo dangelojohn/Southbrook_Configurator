@@ -31,7 +31,7 @@ Consumers: Hermes (RAG grounding), public viewer (v1.1), Overseer (v1.x).
         "data/ir_cron.xml",
     ],
     "external_dependencies": {
-        "python": ["markdown", "yaml"],
+        "python": ["yaml"],
     },
     "post_init_hook": "_post_init_load_canonical",
     "installable": True,

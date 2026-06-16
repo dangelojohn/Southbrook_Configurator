@@ -1,7 +1,32 @@
 # SPDX-License-Identifier: LGPL-3.0-only
-import markdown
+import html
+import re
+
+try:
+    import markdown as _markdown_lib
+    _HAS_MARKDOWN = True
+except ImportError:  # pragma: no cover
+    _markdown_lib = None
+    _HAS_MARKDOWN = False
 
 from odoo import _, api, fields, models
+
+
+def _render_markdown(text: str) -> str:
+    """Convert markdown text to HTML. Falls back to simple paragraph wrapping
+    when the *markdown* package is not installed in the Odoo environment."""
+    if not text:
+        return ""
+    if _HAS_MARKDOWN:
+        return _markdown_lib.markdown(
+            text,
+            extensions=["fenced_code", "tables", "toc"],
+        )
+    # Minimal fallback: escape HTML, then wrap blank-line-delimited
+    # paragraphs in <p> tags so the text is at least readable.
+    escaped = html.escape(text)
+    paragraphs = re.split(r"\n{2,}", escaped)
+    return "\n".join(f"<p>{p.replace(chr(10), '<br>')}</p>" for p in paragraphs if p.strip())
 
 
 class OsSection(models.Model):
@@ -28,10 +53,7 @@ class OsSection(models.Model):
     @api.depends("body")
     def _compute_body_html(self):
         for rec in self:
-            rec.body_html = markdown.markdown(
-                rec.body or "",
-                extensions=["fenced_code", "tables", "toc"],
-            )
+            rec.body_html = _render_markdown(rec.body or "")
 
     def bump_version(self, body=None):
         """Apply a new version of this section. Used by OSRO apply + generators."""
