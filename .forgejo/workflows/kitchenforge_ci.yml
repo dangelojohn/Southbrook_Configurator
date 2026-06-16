@@ -252,7 +252,11 @@ jobs:
     # NO `container:` block — that would nest a second container layer
     # where workflow-level `volumes:` aren't honored by the runner config.
     env:
-      ADDON_LIST: kitchenforge_core,kitchenforge_marathon,kitchenforge_saas,kitchenforge_southbrook_seed
+      # ISOLATED: only kitchenforge_core for this run. Once we confirm it
+      # installs cleanly we re-enable the full list. The dependency chain
+      # of marathon/saas/seed is intentionally NOT exercised yet — we need
+      # to know whether even the simplest addon registers first.
+      ADDON_LIST: kitchenforge_core
       ADDON_HOST_DIR: /share/CACHEDEV3_DATA/Container/southbrook/addons
     steps:
       - name: Checkout
@@ -306,22 +310,30 @@ jobs:
           echo "addon_path=$PATH_DETECTED" >> "$GITHUB_OUTPUT"
           echo "Detected addon path: $PATH_DETECTED"
 
-      - name: Sync addons via docker cp into detected path
+      - name: Sync kitchenforge_core via docker cp into detected path
         run: |
           set -euo pipefail
           TARGET="${{ steps.paths.outputs.addon_path }}"
           echo "Target addon dir in container: $TARGET"
-          for addon in kitchenforge_core kitchenforge_marathon kitchenforge_saas kitchenforge_southbrook_seed; do
-            if [ ! -d "addons/$addon" ]; then
-              echo "skipping missing local addon: $addon"
-              continue
-            fi
-            docker exec southbrook-odoo bash -c "rm -rf '$TARGET/$addon'" || true
-            echo "docker cp addons/$addon -> southbrook-odoo:$TARGET/$addon"
-            docker cp "addons/$addon" "southbrook-odoo:$TARGET/$addon"
-          done
-          echo "--- addons now in container's $TARGET: ---"
-          docker exec southbrook-odoo bash -c "ls -1 '$TARGET' | grep -E '^kitchenforge' || (echo 'NONE FOUND'; exit 1)"
+
+          if [ ! -d "addons/kitchenforge_core" ]; then
+            echo "FATAL: addons/kitchenforge_core missing from checkout — wrong branch?" >&2
+            ls addons/ | head -20
+            exit 1
+          fi
+
+          docker exec southbrook-odoo bash -c "rm -rf '$TARGET/kitchenforge_core'" || true
+          echo "docker cp addons/kitchenforge_core -> southbrook-odoo:$TARGET/"
+          docker cp "addons/kitchenforge_core" "southbrook-odoo:$TARGET/"
+
+          echo "--- HARD ASSERT: kitchenforge_core/__manifest__.py exists in container ---"
+          if ! docker exec southbrook-odoo bash -c "[ -f '$TARGET/kitchenforge_core/__manifest__.py' ]"; then
+            echo "FATAL: docker cp ran but file not present in container" >&2
+            docker exec southbrook-odoo bash -c "ls -la '$TARGET/' | head -30"
+            exit 1
+          fi
+          echo "  ✓ manifest visible at $TARGET/kitchenforge_core/__manifest__.py"
+          docker exec southbrook-odoo bash -c "ls -la '$TARGET/kitchenforge_core/' | head -20"
 
       - name: Install/upgrade addons in live Odoo (lock-protected, FAIL-LOUD)
         # flock pattern per memory southbrook_deploy_flock_lock.md.
@@ -353,13 +365,35 @@ jobs:
           rm -f "$LOG"
           exit $ODOO_RC
 
+      - name: HARD ASSERT — kitchenforge_core is now in 'installed' state
+        # Read the registry directly via psql. If the install step succeeded
+        # but the module isn't actually installed, surface that immediately.
+        run: |
+          set -euo pipefail
+          STATE=$(docker exec southbrook-odoo bash -c "
+            psql -h localhost -U odoo -d southbrook -tA -c \\
+              \"SELECT state FROM ir_module_module WHERE name = 'kitchenforge_core';\"
+          " | tr -d '[:space:]')
+          echo "kitchenforge_core registry state: '$STATE'"
+          if [ "$STATE" != "installed" ]; then
+            echo "FATAL: kitchenforge_core is in state '$STATE', expected 'installed'" >&2
+            echo "=== full state of all kitchenforge_* in DB ==="
+            docker exec southbrook-odoo bash -c "
+              psql -h localhost -U odoo -d southbrook -c \\
+                \"SELECT name, state FROM ir_module_module WHERE name LIKE 'kitchenforge%' OR name = 'southbrook_api' ORDER BY name;\"
+            " || true
+            echo "=== last 60 lines of odoo log ==="
+            docker logs southbrook-odoo --tail 60 2>&1 || true
+            exit 1
+          fi
+
       - name: Restart southbrook-odoo (clear worker ormcache)
         # Per memory qnap_odoo_upgrade_cache_reset.md — registry signal alone
         # leaves worker ormcache poisoned after a -u, hitting the
         # 'Circular assets bundle' 500 on /web/login. docker restart fixes it.
         run: |
           docker restart southbrook-odoo
-          sleep 8
+          sleep 12  # bumped — Odoo cold-init can take ~10s after restart
 
       - name: Collect diagnostics (always)
         if: always()
