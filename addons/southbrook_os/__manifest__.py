@@ -33,6 +33,7 @@ Consumers: Hermes (RAG grounding), public viewer (v1.1), Overseer (v1.x).
     "external_dependencies": {
         "python": ["markdown", "yaml"],
     },
+    "post_init_hook": "_post_init_load_canonical",
     "installable": True,
     "application": False,
     "auto_install": False,
