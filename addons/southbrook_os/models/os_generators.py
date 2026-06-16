@@ -45,6 +45,38 @@ class OsGenerators(models.AbstractModel):
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
+    # Attributes
+    # ------------------------------------------------------------------
+    @api.model
+    def generate_attributes(self):
+        body = self._render_attributes_md()
+        return self._upsert_generated(
+            "03_attributes.generated", "Attributes (live)", body)
+
+    def _render_attributes_md(self):
+        Attr = self.env["product.attribute"]
+        attrs = Attr.search([], order="sequence, name")
+        lines = [
+            "---",
+            "slug: 03_attributes.generated",
+            "title: Attributes (live)",
+            "source: generated",
+            "---",
+            "",
+            "# Attributes (live)",
+            "",
+            "Rebuilt from `product.attribute` and `product.attribute.value`.",
+            "",
+        ]
+        for a in attrs:
+            lines.append(f"## {a.name}")
+            lines.append("")
+            for v in a.value_ids.sorted("sequence"):
+                lines.append(f"- {v.name}")
+            lines.append("")
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
     # Shared upsert with hash-based no-op detection
     # ------------------------------------------------------------------
     def _upsert_generated(self, slug, name, body):

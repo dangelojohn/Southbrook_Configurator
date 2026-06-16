@@ -26,3 +26,14 @@ class TestCatalogGenerator(TransactionCase):
         # Unchanged content should not bump version twice
         self.assertEqual(section.version, first["new_version"])
         self.assertEqual(section.version, second["new_version"])
+
+
+@tagged("post_install", "-at_install", "southbrook", "southbrook_os")
+class TestAttributeGenerator(TransactionCase):
+    def test_attribute_generator_lists_attributes(self):
+        result = self.env["southbrook.os.generators"].generate_attributes()
+        section = self.env["southbrook.os.section"].search(
+            [("slug", "=", "03_attributes.generated")], limit=1)
+        self.assertTrue(section)
+        self.assertIn("attribute", section.body.lower())
+        self.assertEqual(result["status"], "ok")
