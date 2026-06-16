@@ -40,6 +40,12 @@ product_configurator_*, southbrook_api, southbrook_hardware_catalog, southbrook_
     "data": [
         "security/kitchenforge_security.xml",
         "security/ir.model.access.csv",
+        # post_install_acl.xml uses <field name="model_id" search="..."/>
+        # to resolve ir.model lookups at apply-time, AFTER Python class
+        # registration. Required for base_import_module install path
+        # where external ids like model_kitchenforge_template_line aren't
+        # in ir.model.data until upgrade processing completes.
+        "security/post_install_acl.xml",
         "data/ir_sequence.xml",
         "data/project_templates.xml",
         "views/project_views.xml",
