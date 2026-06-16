@@ -24,6 +24,9 @@ on:
       - main
       - "feature/kitchenforge-**"
       - "fix/kitchenforge-**"
+      - "feature/premium-orchestration"
+      - "feature/premium-orchestration-only"
+      - "feature/premium-orchestration-**"
   pull_request:
     branches:
       - main
@@ -31,8 +34,11 @@ on:
       - "addons/kitchenforge_core/**"
       - "addons/kitchenforge_marathon/**"
       - "addons/kitchenforge_saas/**"
+      - "addons/kitchenforge_southbrook_seed/**"
       - ".forgejo/workflows/kitchenforge_ci.yml"
       - "deploy/**"
+  # Manual trigger — handy for re-running deploys without a push.
+  workflow_dispatch: {}
 
 concurrency:
   group: kitchenforge-${{ github.ref }}
