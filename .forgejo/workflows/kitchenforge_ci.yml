@@ -230,7 +230,16 @@ jobs:
   deploy-staging:
     runs-on: linux-amd64
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Deploy from main OR the active premium-orchestration branches (so
+    # kitchenforge feature-branch pushes reach staging while we're pre-merge).
+    # Tighten back to main-only after the first prod merge.
+    if: >
+      github.event_name == 'push' && (
+        github.ref == 'refs/heads/main' ||
+        github.ref == 'refs/heads/feature/premium-orchestration' ||
+        github.ref == 'refs/heads/feature/premium-orchestration-only' ||
+        startsWith(github.ref, 'refs/heads/feature/kitchenforge-')
+      )
     # Forgejo distinction: no `environment:` gating like GH Environments — if
     # we want a manual approval gate later, switch to a `workflow_dispatch`
     # event with `inputs.confirm`.
