@@ -152,6 +152,12 @@ class ProjectTask(models.Model):
         string="Readiness Decision",
         compute="_compute_phase1_operational_context",
         readonly=True,
+        # Odoo 19 view validation rejects non-stored computed fields in
+        # domains/filters at -u time, and premium_orchestration's
+        # kitchen_jobs_views.xml filters by this field. store=True both
+        # appeases the validator and lets the search index hit the
+        # filter without a sequential compute scan.
+        store=True,
     )
     readiness_score = fields.Integer(
         string="Readiness Score",
