@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+  <t t-name="southbrook_hermes.HermesChat" owl="1">
+    <div class="o_hermes_chat">
+      <div class="o_hermes_chat__header">
+        <span class="o_hermes_chat__title">Ask Hermes</span>
+        <span class="o_hermes_chat__subtitle" t-if="props.orderId">
+          · Order #<t t-esc="props.orderId"/>
+        </span>
+      </div>
+
+      <div class="o_hermes_chat__scroll" t-ref="scroll">
+        <t t-if="state.messages.length === 0">
+          <div class="o_hermes_chat__placeholder">
+            Ask about your order, the configurator, or anything in the
+            Southbrook OS. Try: "where is my kitchen?" or "what attributes
+            can I configure?"
+          </div>
+        </t>
+        <t t-foreach="state.messages" t-as="m" t-key="m_index">
+          <div t-attf-class="o_hermes_chat__msg o_hermes_chat__msg--{{ m.role }}">
+            <div class="o_hermes_chat__msg-content" t-esc="m.content"/>
+            <span class="o_hermes_chat__cursor" t-if="m.streaming">▍</span>
+          </div>
+        </t>
+      </div>
+
+      <div class="o_hermes_chat__error" t-if="state.error">
+        <t t-esc="state.error"/>
+      </div>
+
+      <div class="o_hermes_chat__input">
+        <textarea
+          t-ref="input"
+          t-model="state.inputValue"
+          t-on-keydown="onKeydown"
+          rows="2"
+          placeholder="Ask Hermes a question…"
+          t-att-disabled="state.sending"/>
+        <button
+          t-on-click="submit"
+          t-att-disabled="state.sending or not state.inputValue.trim()">
+          <t t-if="state.sending">…</t>
+          <t t-else="">Ask</t>
+        </button>
+      </div>
+    </div>
+  </t>
+
+</templates>
