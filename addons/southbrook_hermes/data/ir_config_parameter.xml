@@ -11,5 +11,13 @@
       <field name="key">southbrook_hermes.sidecar_url</field>
       <field name="value">https://hermes.southbrookcabinetry.space</field>
     </record>
+    <!-- Explicit on/off so deploying the addon doesn't accidentally
+         start calling a sidecar before one is deployed. Flip to "true"
+         via Settings → Technical → System Parameters once the Vercel
+         sidecar is live at sidecar_url. -->
+    <record id="hermes_sidecar_enabled" model="ir.config_parameter">
+      <field name="key">southbrook_hermes.sidecar_enabled</field>
+      <field name="value">false</field>
+    </record>
   </data>
 </odoo>
