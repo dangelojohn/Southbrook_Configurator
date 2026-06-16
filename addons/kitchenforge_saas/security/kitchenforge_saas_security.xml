@@ -3,14 +3,12 @@
 
     <record id="group_kitchenforge_saas_operator" model="res.groups">
         <field name="name">KitchenForge SaaS / Operator</field>
-        <field name="category_id" ref="kitchenforge_core.module_category_kitchenforge"/>
         <field name="implied_ids" eval="[(4, ref('kitchenforge_core.group_kitchenforge_manager'))]"/>
         <field name="comment">Full control-plane access: provision, suspend, resume, cancel tenants; sees every tenant on the platform.</field>
     </record>
 
     <record id="group_kitchenforge_saas_billing" model="res.groups">
         <field name="name">KitchenForge SaaS / Billing</field>
-        <field name="category_id" ref="kitchenforge_core.module_category_kitchenforge"/>
         <field name="implied_ids" eval="[(4, ref('kitchenforge_core.group_kitchenforge_user'))]"/>
         <field name="comment">Read-only on tenants + plans, read/write on subscription_plan and Stripe customer ids. Cannot lifecycle a tenant.</field>
     </record>

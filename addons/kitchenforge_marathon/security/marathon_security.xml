@@ -3,7 +3,6 @@
 
     <record id="group_kitchenforge_marathon_manager" model="res.groups">
         <field name="name">KitchenForge × Marathon / Manager</field>
-        <field name="category_id" ref="kitchenforge_core.module_category_kitchenforge"/>
         <field name="implied_ids" eval="[(4, ref('kitchenforge_core.group_kitchenforge_manager'))]"/>
         <field name="comment">Edit Marathon channel config + reconcile rebates.</field>
     </record>
