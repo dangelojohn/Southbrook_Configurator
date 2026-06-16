@@ -4,3 +4,4 @@ from . import test_fabio_ask
 from . import test_fabio_labels
 from . import test_fabio_identity
 from . import test_recommendation_workflow
+from . import test_jwt_helper
