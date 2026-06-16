@@ -26,8 +26,8 @@ class TestHermesRecommendationWorkflow(TransactionCase):
                 "description": "Check the latest plans and pricing notes.",
             }),
             "agent_run_id": "test-run-001",
-            "model_provider": "openai",
-            "model_name": "gpt-5",
+            "model_provider": "google",
+            "model_name": "gemini-3.5-flash",
         }
         vals.update(extra)
         return self.env["southbrook.hermes.recommendation"].create(vals)

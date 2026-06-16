@@ -6,6 +6,7 @@
 
 .PHONY: help up down logs install install-fresh test test-quick test-bridge \
         bridge-build bridge-restart shell psql .check-env \
+        hermes-build hermes-restart hermes-logs hermes-check hermes-recommend-test \
         e2e-install e2e e2e-prod e2e-smoke e2e-journey
 
 # ---------------------------------------------------------------------------
@@ -63,6 +64,13 @@ help:
 	@echo "  Bridge"
 	@echo "    make bridge-build   — rebuild the freecad-bridge image"
 	@echo "    make bridge-restart — restart freecad-bridge"
+	@echo ""
+	@echo "  Hermes / Fabio"
+	@echo "    make hermes-build          — rebuild the Hermes sidecar image"
+	@echo "    make hermes-restart        — restart Hermes sidecar"
+	@echo "    make hermes-logs           — tail Hermes sidecar logs"
+	@echo "    make hermes-check          — validate Hermes runtime config"
+	@echo "    make hermes-recommend-test — create one draft Fabio smoke recommendation"
 	@echo ""
 
 # ---------------------------------------------------------------------------
@@ -144,3 +152,24 @@ bridge-build: .check-env
 
 bridge-restart: .check-env
 	docker compose restart freecad-bridge
+
+# ---------------------------------------------------------------------------
+# Hermes / Fabio
+# ---------------------------------------------------------------------------
+hermes-build: .check-env
+	docker compose build hermes-agent
+
+hermes-restart: .check-env
+	docker compose up -d --build hermes-agent
+
+hermes-logs: .check-env
+	docker compose logs -f hermes-agent
+
+hermes-check: .check-env
+	docker compose exec hermes-agent python -m hermes_agent.main check
+
+hermes-recommend-test: .check-env
+	docker compose exec hermes-agent python -m hermes_agent.main recommend \
+	  --name "Fabio QNAP smoke test" \
+	  --summary "Hermes sidecar can reach Odoo and create a draft recommendation for human review." \
+	  --type note

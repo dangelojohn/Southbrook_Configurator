@@ -50,8 +50,8 @@ class TestHermesApi(HttpCase):
             "proposed_action": "Open a review task if the mismatch is real.",
             "payload": {"source": "unit-test"},
             "agent_run_id": "api-run-001",
-            "model_provider": "openai",
-            "model_name": "gpt-5",
+            "model_provider": "google",
+            "model_name": "gemini-3.5-flash",
         }, api_key=self.api_key)
 
         self.assertEqual(resp.status_code, 200, resp.text)

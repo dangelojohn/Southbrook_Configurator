@@ -1,13 +1,15 @@
 # SAMI / Southbrook AI Kitchen Platform — local dev compose.
 #
-# Brings up Odoo 19 CE + Postgres 16 + the FreeCAD bridge skeleton with the
-# full southbrook-v19cr addons tree mounted (custom addons + OCA configurator).
+# Brings up Odoo 19 CE + Postgres 16 + the FreeCAD bridge + Hermes/Fabio
+# sidecar with the full southbrook-v19cr addons tree mounted (custom addons
+# + OCA configurator).
 #
 # Quick start:
 #   cp .env.example .env       # then edit secrets
 #   docker compose up -d
 #   open http://localhost:8169  # Odoo login (db: southbrook)
 #   curl http://localhost:8001/health  # FreeCAD bridge health
+#   docker compose exec hermes-agent python -m hermes_agent.main check
 #
 # Port note: Odoo defaults to 8169/8172 (not the canonical 8069/8072) to
 # coexist with the OCA-only dev clone at ~/Downloads/Official/V19C/ which
@@ -99,6 +101,24 @@ services:
       - ./freecad_templates:/srv/freecad_templates:ro
     ports:
       - "8001:8000"
+    restart: unless-stopped
+
+  hermes-agent:
+    build:
+      context: ./services/hermes_agent
+      dockerfile: Dockerfile
+    container_name: sami-hermes-agent
+    depends_on:
+      odoo:
+        condition: service_started
+    environment:
+      HERMES_ODOO_BASE_URL: http://odoo:8069
+      HERMES_ODOO_API_KEY: ${HERMES_ODOO_API_KEY:?HERMES_ODOO_API_KEY must be set in .env}
+      HERMES_MODEL_PROVIDER: ${HERMES_MODEL_PROVIDER:-google}
+      HERMES_MODEL: ${HERMES_MODEL:-gemini-3.5-flash}
+      HERMES_TIMEOUT_SECONDS: ${HERMES_TIMEOUT_SECONDS:-30}
+      HERMES_SERVICE_INTERVAL_SECONDS: ${HERMES_SERVICE_INTERVAL_SECONDS:-300}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
     restart: unless-stopped
 
 volumes:

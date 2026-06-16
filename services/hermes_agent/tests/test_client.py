@@ -29,6 +29,27 @@ class TestHermesAgentClient(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 load_config()
 
+    def test_load_config_defaults_to_free_gemini_testing_model(self):
+        env = {
+            "HERMES_ODOO_BASE_URL": "https://southbrookcabinetry.space",
+            "HERMES_ODOO_API_KEY": "secret-key",
+        }
+
+        cfg = load_config(env)
+
+        self.assertEqual(cfg.model_provider, "google")
+        self.assertEqual(cfg.model_name, "gemini-3.5-flash")
+
+    def test_load_config_defaults_passive_service_interval(self):
+        env = {
+            "HERMES_ODOO_BASE_URL": "https://southbrookcabinetry.space",
+            "HERMES_ODOO_API_KEY": "secret-key",
+        }
+
+        cfg = load_config(env)
+
+        self.assertEqual(cfg.service_interval_seconds, 300)
+
     def test_build_recommendation_payload_defaults_to_draft_safe_shape(self):
         payload = build_recommendation_payload(
             name="Review commercial estimate",
@@ -37,8 +58,8 @@ class TestHermesAgentClient(unittest.TestCase):
             proposed_action="Ask an estimator to review the discrepancy.",
             payload={"project_id": 7, "task_name": "Review estimate"},
             agent_run_id="run-123",
-            model_provider="openai",
-            model_name="gpt-5",
+            model_provider="google",
+            model_name="gemini-3.5-flash",
         )
 
         self.assertEqual(payload["name"], "Review commercial estimate")
@@ -51,8 +72,8 @@ class TestHermesAgentClient(unittest.TestCase):
         cfg = HermesConfig(
             odoo_base_url="https://southbrookcabinetry.space",
             odoo_api_key="secret-key",
-            model_provider="openai",
-            model_name="gpt-5",
+            model_provider="google",
+            model_name="gemini-3.5-flash",
         )
         client = HermesOdooClient(cfg, transport=transport)
         payload = build_recommendation_payload(

@@ -5,4 +5,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY hermes_agent ./hermes_agent
 
-CMD ["python", "-m", "hermes_agent.main", "--name", "HERMES heartbeat", "--summary", "HERMES sidecar is configured. Human approval is still required."]
+HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["python", "-m", "hermes_agent.main", "check"]
+
+CMD ["python", "-m", "hermes_agent.main", "serve"]

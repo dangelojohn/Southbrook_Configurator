@@ -73,6 +73,17 @@ The host still needs normal operational controls: outbound HTTPS for model
 providers, secret injection through environment variables, container restart
 policy, logs, and backups for the Odoo database.
 
+The QNAP sidecar runs passively by default. Container startup validates
+configuration and keeps the process alive, but it does not create
+recommendations automatically and does not poll Odoo on a schedule. Test or
+operator-triggered recommendations use an explicit CLI command. Scheduled
+agent behavior should be added later as a separate, reviewed feature after the
+draft recommendation queue is stable.
+
+For testing, the default model route is `google` / `gemini-3.5-flash`, selected
+because it is free-tier capable and suitable for agent/coding-style checks.
+Free-tier prompts must not include confidential production data.
+
 ## Out Of Scope
 
 - Local GPU model hosting.
