@@ -361,10 +361,46 @@ jobs:
           docker restart southbrook-odoo
           sleep 8
 
+      - name: Collect diagnostics (always)
+        if: always()
+        run: |
+          set +e
+          mkdir -p _kf_diag
+          echo "=== HEAD info ===" > _kf_diag/00_meta.txt
+          echo "ref: $GITHUB_REF" >> _kf_diag/00_meta.txt
+          echo "sha: $GITHUB_SHA" >> _kf_diag/00_meta.txt
+          echo "run: $GITHUB_RUN_ID" >> _kf_diag/00_meta.txt
+          date >> _kf_diag/00_meta.txt
+          echo "=== docker ps ===" > _kf_diag/01_docker_ps.txt
+          docker ps -a 2>&1 >> _kf_diag/01_docker_ps.txt
+          echo "=== southbrook-odoo addons dir ===" > _kf_diag/02_addons_dir.txt
+          for p in /mnt/extra-addons /opt/odoo/addons /var/lib/odoo/addons /etc/odoo/addons; do
+            echo "--- $p ---" >> _kf_diag/02_addons_dir.txt
+            docker exec southbrook-odoo bash -c "[ -d '$p' ] && ls -la '$p' || echo '(missing)'" 2>&1 >> _kf_diag/02_addons_dir.txt
+          done
+          echo "=== odoo conf ===" > _kf_diag/03_odoo_conf.txt
+          docker exec southbrook-odoo bash -c "cat /etc/odoo/odoo.conf 2>/dev/null || cat /etc/odoo.conf 2>/dev/null || echo '(no conf)'" 2>&1 >> _kf_diag/03_odoo_conf.txt
+          echo "=== module state check (raw psql) ===" > _kf_diag/04_modules.txt
+          docker exec southbrook-odoo bash -c "
+            psql -h localhost -U odoo -d southbrook -c \"SELECT name, state FROM ir_module_module WHERE name LIKE 'kitchenforge%' OR name = 'southbrook_api' ORDER BY name;\" 2>&1
+          " >> _kf_diag/04_modules.txt
+          echo "=== odoo log tail ===" > _kf_diag/05_odoo_log.txt
+          docker logs southbrook-odoo --tail 200 2>&1 >> _kf_diag/05_odoo_log.txt
+          tar -czf kf-deploy-diagnostics-$GITHUB_RUN_ID.tgz _kf_diag/
+          ls -la kf-deploy-diagnostics-*.tgz
+
+      - name: Upload diagnostic artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kf-deploy-diagnostics-${{ github.run_id }}
+          path: kf-deploy-diagnostics-*.tgz
+          retention-days: 7
+
       - name: Post-deploy smoke — public endpoints
         run: |
           set -e
-          apk add --no-cache curl >/dev/null 2>&1 || true
+          which curl >/dev/null 2>&1 || apk add --no-cache curl >/dev/null 2>&1 || true
           for i in $(seq 1 12); do
             ai=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 \
               https://southbrookcabinetry.space/.well-known/ai-agent.json || echo 000)
