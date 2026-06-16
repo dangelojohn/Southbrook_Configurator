@@ -14,6 +14,85 @@
         </xpath>
     </template>
 
+    <template id="portal_my_home_fabio"
+              name="Portal Home — Fabio"
+              inherit_id="portal.portal_my_home" priority="41">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Ask Fabio</t>
+                <t t-set="url" t-value="'/my/fabio'"/>
+                <t t-set="placeholder_count" t-value="'fabio_question_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_fabio_ask" name="Portal — Ask Fabio">
+        <t t-call="portal.portal_layout">
+            <h2>Ask Fabio</h2>
+            <form action="/my/fabio/ask" method="post" class="mb-4">
+                <input type="hidden" name="csrf_token"
+                       t-att-value="request.csrf_token()"/>
+                <div class="mb-3">
+                    <label for="fabio_project_id" class="form-label">Kitchen Project</label>
+                    <select id="fabio_project_id" name="project_id" class="form-select">
+                        <option value="">All my kitchen projects</option>
+                        <option t-foreach="projects" t-as="project"
+                                t-att-value="project.id">
+                            <t t-out="project.code"/> — <t t-out="project.name"/>
+                        </option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="fabio_question" class="form-label">Question</label>
+                    <textarea id="fabio_question" name="question"
+                              class="form-control" rows="4"
+                              placeholder="Ask about status, approvals, production, or next steps."
+                              required="required"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Ask Fabio</button>
+            </form>
+
+            <t t-if="selected_question">
+                <div class="alert alert-secondary">
+                    <h3 class="h5">Fabio Answer</h3>
+                    <p><strong>Question:</strong> <span t-field="selected_question.question"/></p>
+                    <div style="white-space: pre-wrap;" t-field="selected_question.answer"/>
+                </div>
+            </t>
+
+            <h3 class="h5">Recent Questions</h3>
+            <t t-if="not questions">
+                <p class="text-muted">No Fabio questions yet.</p>
+            </t>
+            <t t-if="questions">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Question</th>
+                            <th>Project</th>
+                            <th>State</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="questions" t-as="question">
+                            <td><span t-field="question.question"/></td>
+                            <td>
+                                <span t-if="question.project_id" t-field="question.project_id.name"/>
+                                <span t-if="not question.project_id">All projects</span>
+                            </td>
+                            <td><span t-field="question.state"/></td>
+                            <td>
+                                <a t-attf-href="/my/fabio?question_id=#{question.id}"
+                                   class="btn btn-sm btn-outline-primary">View</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+        </t>
+    </template>
+
     <!-- ============ List page ============ -->
     <template id="portal_kitchen_projects_list" name="Portal — Kitchen Projects List">
         <t t-call="portal.portal_layout">

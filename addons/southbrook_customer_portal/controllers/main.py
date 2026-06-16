@@ -12,6 +12,51 @@ _logger = logging.getLogger(__name__)
 class KitchenPortal(http.Controller):
 
     # ------------------------------------------------------------------
+    # Fabio Ask
+    # ------------------------------------------------------------------
+    @http.route(
+        ["/my/fabio"], type="http", auth="user",
+        website=True, methods=["GET"],
+    )
+    def fabio_ask(self, question_id=None, **kw):
+        partner = request.env.user.partner_id
+        questions = self._fabio_questions_for_partner(partner)
+        selected_question = request.env["southbrook.hermes.question"].sudo()
+        if question_id:
+            try:
+                selected_id = int(question_id)
+            except (TypeError, ValueError):
+                selected_id = 0
+            selected_question = questions.filtered(lambda q: q.id == selected_id)[:1]
+        return request.render(
+            "southbrook_customer_portal.portal_fabio_ask",
+            {
+                "projects": self._kitchen_projects_for_partner(partner),
+                "questions": questions[:10],
+                "selected_question": selected_question,
+                "page_name": "fabio",
+            },
+        )
+
+    @http.route(
+        ["/my/fabio/ask"], type="http", auth="user",
+        website=True, methods=["POST"], csrf=True,
+    )
+    def fabio_ask_submit(self, **post):
+        question_text = (post.get("question") or "").strip()
+        if not question_text:
+            raise UserError(_("Type a question for Fabio."))
+        partner = request.env.user.partner_id
+        project = self._optional_project_for_user(post.get("project_id"))
+        question = request.env["southbrook.hermes.question"].ask_customer(
+            partner,
+            question_text,
+            project=project,
+            user=request.env.user,
+        )
+        return request.redirect(f"/my/fabio?question_id={question.id}")
+
+    # ------------------------------------------------------------------
     # List
     # ------------------------------------------------------------------
     @http.route(
@@ -19,12 +64,8 @@ class KitchenPortal(http.Controller):
         website=True, methods=["GET"],
     )
     def kitchen_projects_list(self, **kw):
-        Project = request.env["sb.kitchen.project"]
         partner = request.env.user.partner_id
-        projects = Project.sudo().search(
-            [("partner_id", "=", partner.id)],
-            order="date_created desc",
-        )
+        projects = self._kitchen_projects_for_partner(partner)
         return request.render(
             "southbrook_customer_portal.portal_kitchen_projects_list",
             {"projects": projects, "page_name": "kitchen_projects"},
@@ -114,3 +155,24 @@ class KitchenPortal(http.Controller):
             )
             raise MissingError(_("Project not found."))
         return project
+
+    def _optional_project_for_user(self, project_id):
+        if not project_id:
+            return request.env["sb.kitchen.project"].sudo()
+        try:
+            project_id = int(project_id)
+        except (TypeError, ValueError) as exc:
+            raise MissingError(_("Project not found.")) from exc
+        return self._fetch_project_for_user(project_id)
+
+    def _kitchen_projects_for_partner(self, partner):
+        return request.env["sb.kitchen.project"].sudo().search(
+            [("partner_id", "=", partner.id)],
+            order="date_created desc, id desc",
+        )
+
+    def _fabio_questions_for_partner(self, partner):
+        return request.env["southbrook.hermes.question"].sudo().search([
+            ("scope", "=", "customer"),
+            ("partner_id", "=", partner.id),
+        ], order="create_date desc, id desc")

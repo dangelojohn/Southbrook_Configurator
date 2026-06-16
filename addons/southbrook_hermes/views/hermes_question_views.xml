@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_hermes_question_search" model="ir.ui.view">
+        <field name="name">southbrook.hermes.question.search</field>
+        <field name="model">southbrook.hermes.question</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="question"/>
+                <field name="answer"/>
+                <field name="partner_id"/>
+                <field name="project_id"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="answered" string="Answered" domain="[('state', '=', 'answered')]"/>
+                <separator/>
+                <filter name="internal" string="Internal" domain="[('scope', '=', 'internal')]"/>
+                <filter name="customer" string="Customer" domain="[('scope', '=', 'customer')]"/>
+                <group name="group_by">
+                    <filter name="grp_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="grp_scope" string="Scope" context="{'group_by': 'scope'}"/>
+                    <filter name="grp_asked_by" string="Asked By"
+                            context="{'group_by': 'asked_by_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_hermes_question_list" model="ir.ui.view">
+        <field name="name">southbrook.hermes.question.list</field>
+        <field name="model">southbrook.hermes.question</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state == 'answered'">
+                <field name="question"/>
+                <field name="scope"/>
+                <field name="partner_id"/>
+                <field name="project_id"/>
+                <field name="asked_by_id" widget="many2one_avatar_user"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'answered'"
+                       decoration-muted="state == 'draft'"/>
+                <field name="recommendation_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hermes_question_form" model="ir.ui.view">
+        <field name="name">southbrook.hermes.question.form</field>
+        <field name="model">southbrook.hermes.question</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_answer" type="object" string="Ask Fabio"
+                            class="btn-primary"/>
+                    <button name="action_create_recommendation" type="object"
+                            string="Create Draft Recommendation"
+                            invisible="not answer or recommendation_id"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,answered"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_hermes_recommendation)d" type="action"
+                                class="oe_stat_button" icon="fa-lightbulb-o"
+                                invisible="not recommendation_id"
+                                context="{'search_default_id': recommendation_id}">
+                            <field name="recommendation_id" widget="statinfo"
+                                   string="Recommendation"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="question"/>
+                        <h1>
+                            <field name="question"
+                                   placeholder="Ask Fabio about production, blockers, customers, approvals, or users."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="scope"/>
+                            <field name="asked_by_id"/>
+                        </group>
+                        <group invisible="scope != 'customer'">
+                            <field name="partner_id"/>
+                            <field name="project_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Answer" name="answer">
+                            <field name="answer" widget="text" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hermes_question" model="ir.actions.act_window">
+        <field name="name">Ask Fabio</field>
+        <field name="res_model">southbrook.hermes.question</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hermes_question_search"/>
+        <field name="context">{'default_scope': 'internal'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Ask Fabio a question</p>
+            <p>
+                Fabio can answer production, blocker, warning, project,
+                approval, and user-role questions from Odoo data.
+            </p>
+        </field>
+    </record>
+
+</odoo>

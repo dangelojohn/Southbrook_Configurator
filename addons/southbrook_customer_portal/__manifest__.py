@@ -41,6 +41,7 @@ Three.js KitchenCanvas (Phase 2):
     "version": "19.0.0.4.0",
     "depends": [
         "portal",
+        "southbrook_hermes",
         "southbrook_kitchen_workspace",
         "southbrook_config_engine",
     ],

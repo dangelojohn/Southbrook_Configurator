@@ -1,2 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_hermes_recommendation_reviewer,southbrook.hermes.recommendation reviewer,model_southbrook_hermes_recommendation,group_hermes_reviewer,1,1,1,0
+access_hermes_question_reviewer,southbrook.hermes.question reviewer,model_southbrook_hermes_question,group_hermes_reviewer,1,1,1,0
