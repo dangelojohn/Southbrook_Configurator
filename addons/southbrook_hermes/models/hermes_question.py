@@ -48,6 +48,26 @@ class SouthbrookHermesQuestion(models.Model):
             question.write({"answer": answer, "state": "answered"})
         return True
 
+    @api.model
+    def log_conversation(self, *, question, answer, partner_id, scope="customer",
+                         project_id=None):
+        """Persist a Q+A turn from the Hermes sidecar.
+
+        Used by POST /api/hermes/conversation/log. The sidecar has already
+        run its grounded answer through the LLM and just needs to drop the
+        result somewhere the Order Builder can show it.
+        """
+        values = {
+            "question": question or "",
+            "answer": answer or "",
+            "state": "answered",
+            "scope": scope,
+            "partner_id": partner_id,
+        }
+        if project_id:
+            values["project_id"] = project_id
+        return self.create(values)
+
     def action_create_recommendation(self):
         for question in self:
             if not question.answer:
