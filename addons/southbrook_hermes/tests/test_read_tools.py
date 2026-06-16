@@ -57,3 +57,33 @@ class TestReadToolsBatch1(TransactionCase):
         with self.assertRaises(Exception):
             self.tools.get_order_line(
                 self.env, order_id=self.order.id, line_id=their_line.id)
+
+
+@tagged("post_install", "-at_install", "southbrook", "hermes")
+class TestReadToolsBatch2(TransactionCase):
+    def setUp(self):
+        super().setUp()
+        from odoo.addons.southbrook_hermes.tools import read_tools  # noqa
+        self.tools = read_tools
+
+    def test_get_os_section_returns_charter(self):
+        result = self.tools.get_os_section(self.env, slug="00_charter")
+        for k in ("slug", "body", "version"):
+            self.assertIn(k, result)
+        self.assertEqual(result["slug"], "00_charter")
+
+    def test_get_os_section_missing(self):
+        with self.assertRaises(Exception):
+            self.tools.get_os_section(self.env, slug="no_such_slug_anywhere")
+
+    def test_list_my_kitchen_projects_returns_list(self):
+        partner = self.env["res.partner"].create({"name": "Empty Partner"})
+        result = self.tools.list_my_kitchen_projects(
+            self.env, partner_id=partner.id)
+        self.assertEqual(result, [])
+
+    def test_list_my_recommendations(self):
+        partner = self.env["res.partner"].create({"name": "Rec Partner"})
+        result = self.tools.list_my_recommendations(
+            self.env, partner_id=partner.id)
+        self.assertIsInstance(result, list)

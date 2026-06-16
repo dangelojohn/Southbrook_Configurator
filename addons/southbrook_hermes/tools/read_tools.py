@@ -91,3 +91,142 @@ def get_order_line(env, order_id: int, line_id: int):
         "channel": line.price_subtotal,
         "flags": [],
     }
+
+
+@hermes_tool(
+    personas=["trade_partner", "sales_rep"],
+    tier="T0", scope="own",
+    description="List kitchen projects visible to this partner.",
+)
+def list_my_kitchen_projects(env, partner_id: int):
+    Project = env["sb.kitchen.project"] if "sb.kitchen.project" in env else None
+    if Project is None:
+        return []
+    projects = Project.sudo().search(
+        [("partner_id", "=", partner_id)], order="create_date desc")
+    return [
+        {
+            "ref": p.name,
+            "stage": getattr(p, "state", None),
+            "option_count": len(p.option_ids) if hasattr(p, "option_ids") else 0,
+            "selected": next(
+                (o.name for o in getattr(p, "option_ids", [])
+                 if getattr(o, "is_selected", False)), None),
+        }
+        for p in projects
+    ]
+
+
+@hermes_tool(
+    personas=["trade_partner", "sales_rep"],
+    tier="T0", scope="own_order",
+    description="Return options + approval status of a kitchen project.",
+)
+def get_kitchen_project(env, project_id: int):
+    Project = env["sb.kitchen.project"] if "sb.kitchen.project" in env else None
+    if Project is None:
+        raise MissingError("Kitchen projects not available on this instance.")
+    project = Project.browse(project_id)
+    try:
+        project.check_access_rights("read")
+        project.check_access_rule("read")
+    except Exception:
+        raise MissingError("Project not visible to this user.")
+    return {
+        "options": [
+            {"name": o.name, "is_selected": getattr(o, "is_selected", False)}
+            for o in getattr(project, "option_ids", [])
+        ],
+        "approval_status": getattr(project, "approval_status", None),
+        "drawings_url": getattr(project, "drawings_url", None),
+    }
+
+
+@hermes_tool(
+    personas=["trade_partner", "sales_rep"],
+    tier="T0", scope="own_order",
+    description="Return install schedule + risk flag for an order.",
+)
+def get_install_schedule(env, order_id: int):
+    order = env["sale.order"].browse(order_id)
+    try:
+        order.check_access_rights("read")
+    except Exception:
+        raise MissingError("Order not visible to this user.")
+    return {
+        "date": (order.commitment_date.isoformat()
+                 if order.commitment_date else None),
+        "dispatch": getattr(order, "delivery_status", None),
+        "risk_flag": "unknown",
+        "risk_reason": None,
+    }
+
+
+@hermes_tool(
+    personas=["trade_partner", "sales_rep"],
+    tier="T0", scope="own_order",
+    description="Return the quote PDF URL + expiry for an order.",
+)
+def get_quote_pdf_url(env, order_id: int):
+    order = env["sale.order"].browse(order_id)
+    try:
+        order.check_access_rights("read")
+    except Exception:
+        raise MissingError("Order not visible to this user.")
+    base_url = env["ir.config_parameter"].sudo().get_param("web.base.url", "")
+    return {
+        "pdf_url": (f"{base_url}/my/orders/{order.id}?report_type=pdf"
+                    if base_url else None),
+        "valid_until": (order.validity_date.isoformat()
+                        if order.validity_date else None),
+    }
+
+
+@hermes_tool(
+    personas=["trade_partner", "sales_rep"],
+    tier="T0", scope="own",
+    description="List Hermes recommendations awaiting this partner's approval.",
+)
+def list_my_recommendations(env, partner_id: int):
+    # Partner attribution on southbrook.hermes.recommendation uses the
+    # generic (source_model, source_res_id) pair — see
+    # addons/southbrook_hermes/models/hermes_recommendation.py:43-44.
+    Rec = env["southbrook.hermes.recommendation"] if (
+        "southbrook.hermes.recommendation" in env) else None
+    if Rec is None:
+        return []
+    recs = Rec.sudo().search([
+        ("source_model", "=", "res.partner"),
+        ("source_res_id", "=", partner_id),
+        ("state", "in", ("draft", "ready")),
+    ], order="create_date desc")
+    return [
+        {
+            "rec_id": r.id,
+            "type": r.recommendation_type,
+            "summary": r.summary or "",
+            "state": r.state,
+        }
+        for r in recs
+    ]
+
+
+@hermes_tool(
+    personas=["trade_partner", "sales_rep", "mfg_manager"],
+    tier="T0", scope="global",
+    description=(
+        "Return the body and current version of a named OS section "
+        "(e.g., '02_catalog', '07_partner_faq')."),
+)
+def get_os_section(env, slug: str):
+    Section = env["southbrook.os.section"].sudo()
+    section = Section.search([("slug", "=", slug)], limit=1)
+    if not section:
+        raise MissingError(f"OS section '{slug}' not found.")
+    return {
+        "slug": section.slug,
+        "name": section.name,
+        "version": section.version,
+        "source": section.source,
+        "body": section.body,
+    }
