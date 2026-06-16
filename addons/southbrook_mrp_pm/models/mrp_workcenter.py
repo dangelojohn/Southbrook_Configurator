@@ -46,6 +46,18 @@ _IN_FLIGHT_WO_STATES = ("pending", "waiting", "ready", "progress")
 class MrpWorkcenter(models.Model):
     _inherit = "mrp.workcenter"
 
+    # Inverse of maintenance.equipment.workcenter_id (added by this
+    # module — see maintenance_equipment.py). Without this O2M, the
+    # _compute_southbrook_can_start_today field in southbrook_project_mrp
+    # cannot resolve its @api.depends('workcenter_id.equipment_ids.…')
+    # chain at registry-build time, and cold install fails with
+    # "Dependency field 'equipment_ids' not found in model mrp.workcenter".
+    equipment_ids = fields.One2many(
+        "maintenance.equipment",
+        "workcenter_id",
+        string="Equipment at this Workcenter",
+    )
+
     southbrook_pm_inflight_count = fields.Integer(
         string="In-Flight WOs",
         compute="_compute_southbrook_pm_kpis",

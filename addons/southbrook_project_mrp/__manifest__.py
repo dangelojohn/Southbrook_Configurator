@@ -32,7 +32,10 @@ rather than duplicating them — material/BoM/cost are pulled FROM the linked MO
     # sale_mrp brings sale<->mrp; southbrook_project brings the task polish we
     # extend. mrp_product_costing is NOT depended on (it lives outside this
     # repo) — its cost fields are read defensively via getattr.
-    "depends": ["southbrook_project", "sale_mrp", "purchase_mrp", "maintenance"],
+    # southbrook_mrp_pm contributes the maintenance.equipment.workcenter_id
+    # M2O the mrp.workorder compute below traverses (equipment_ids inverse).
+    "depends": ["southbrook_project", "sale_mrp", "purchase_mrp",
+                "maintenance", "southbrook_mrp_pm"],
     "data": [
         "security/ir.model.access.csv",
         "data/project_job_templates.xml",
