@@ -11,7 +11,7 @@ AI/tool orchestration can submit draft recommendations through an API key, but
 business changes remain gated by Odoo users who approve, reject, and apply the
 recommendation.
 """,
-    "version": "19.0.2.0.0",
+    "version": "19.0.3.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -37,7 +37,15 @@ recommendation.
         "views/hermes_recommendation_views.xml",
         "views/hermes_question_views.xml",
         "views/hermes_menus.xml",
+        "views/order_builder_chat_inject.xml",
     ],
+    "assets": {
+        "web.assets_frontend": [
+            "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.esm.js",
+            "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.xml",
+            "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.scss",
+        ],
+    },
     "application": True,
     "installable": True,
     "auto_install": False,

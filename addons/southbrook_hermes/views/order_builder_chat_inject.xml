@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Inject the HermesChat mount point into the Order Builder portal
+       page. The mount is auto-discovered by the OWL bundle's
+       autoMount() routine and Hermes appears as a chat panel below the
+       order header card. -->
+  <template id="hermes_chat_inject_order_builder"
+            inherit_id="southbrook_estimating_website.portal_order_builder"
+            name="Hermes Chat — Order Builder mount">
+    <xpath expr="//div[hasclass('o_southbrook_portal_header')]" position="after">
+      <div class="o_hermes_chat_wrap mt-3 mb-3"
+           data-hermes-chat-mount="1"
+           t-att-data-order-id="order_id or ''"/>
+    </xpath>
+  </template>
+</odoo>
