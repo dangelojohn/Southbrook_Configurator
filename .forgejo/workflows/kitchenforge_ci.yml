@@ -272,31 +272,66 @@ jobs:
             exit 1
           fi
 
-      - name: Sync addons via docker cp (no host bind-mount needed)
-        # Skip rsync-to-bind-mount. Just `docker cp` the addon dirs straight
-        # into the southbrook-odoo container's addon path. Avoids any
-        # dependency on the runner's host-FS visibility.
+      - name: Discover the live Odoo addons path
+        # Don't assume /mnt/extra-addons — read the running config. The
+        # southbrook stack may bind-mount at /var/lib/odoo/addons,
+        # /opt/odoo/addons, or somewhere else entirely.
+        id: paths
         run: |
-          set -e
+          set -euo pipefail
+          docker exec southbrook-odoo bash -c '
+            echo "=== running odoo binary path ==="
+            which odoo || true
+            echo "=== addons_path from running odoo.conf ==="
+            cat /etc/odoo/odoo.conf 2>/dev/null | grep -E "^addons_path" || \
+              cat /etc/odoo.conf 2>/dev/null | grep -E "^addons_path" || \
+              echo "(no odoo.conf in standard locations)"
+            echo "=== writable mount points likely to be addon dirs ==="
+            for p in /mnt/extra-addons /opt/odoo/addons /var/lib/odoo/addons /etc/odoo/addons; do
+              if [ -d "$p" ]; then
+                echo "  $p exists ($(ls -1 "$p" | wc -l) items)"
+                ls -1 "$p" | head -5 | sed "s|^|    |"
+              fi
+            done
+            echo "=== docker inspect from inside container is moot; check mounts via /proc ==="
+            grep -E "extra-addons|odoo.*addons" /proc/self/mountinfo 2>/dev/null | head -5 || true
+          '
+          # Capture the addon path for the next step. Default to /mnt/extra-addons.
+          PATH_DETECTED=$(docker exec southbrook-odoo bash -c '
+            for p in /mnt/extra-addons /opt/odoo/addons /var/lib/odoo/addons; do
+              if [ -d "$p" ] && [ -w "$p" ]; then echo "$p"; exit 0; fi
+            done
+            echo /mnt/extra-addons
+          ')
+          echo "addon_path=$PATH_DETECTED" >> "$GITHUB_OUTPUT"
+          echo "Detected addon path: $PATH_DETECTED"
+
+      - name: Sync addons via docker cp into detected path
+        run: |
+          set -euo pipefail
+          TARGET="${{ steps.paths.outputs.addon_path }}"
+          echo "Target addon dir in container: $TARGET"
           for addon in kitchenforge_core kitchenforge_marathon kitchenforge_saas kitchenforge_southbrook_seed; do
             if [ ! -d "addons/$addon" ]; then
-              echo "skipping missing addon: $addon"
+              echo "skipping missing local addon: $addon"
               continue
             fi
-            # Wipe any stale copy first so removed files don't linger.
-            docker exec southbrook-odoo bash -c "rm -rf /mnt/extra-addons/$addon" || true
-            echo "copying addons/$addon -> southbrook-odoo:/mnt/extra-addons/$addon"
-            docker cp "addons/$addon" "southbrook-odoo:/mnt/extra-addons/$addon"
+            docker exec southbrook-odoo bash -c "rm -rf '$TARGET/$addon'" || true
+            echo "docker cp addons/$addon -> southbrook-odoo:$TARGET/$addon"
+            docker cp "addons/$addon" "southbrook-odoo:$TARGET/$addon"
           done
-          echo "--- addons now in container: ---"
-          docker exec southbrook-odoo bash -c "ls /mnt/extra-addons/ | grep -E '^kitchenforge' || echo 'NONE FOUND'"
+          echo "--- addons now in container's $TARGET: ---"
+          docker exec southbrook-odoo bash -c "ls -1 '$TARGET' | grep -E '^kitchenforge' || (echo 'NONE FOUND'; exit 1)"
 
-      - name: Install/upgrade addons in live Odoo (lock-protected)
+      - name: Install/upgrade addons in live Odoo (lock-protected, FAIL-LOUD)
         # flock pattern per memory southbrook_deploy_flock_lock.md.
         # -i AND -u: -i installs missing modules (first deploy), -u upgrades
         # installed ones (subsequent deploys). Idempotent in both directions.
+        # CRITICAL: pipefail so a non-zero odoo exit code fails the step
+        # (previously masked by `| tail`).
         run: |
-          set -e
+          set -euo pipefail
+          LOG=$(mktemp)
           docker exec southbrook-odoo bash -c "
             flock -E 75 -w 600 /tmp/southbrook-odoo-upgrade.lock \
               odoo -d southbrook \
@@ -304,7 +339,19 @@ jobs:
                 -u ${ADDON_LIST} \
                 --stop-after-init --no-http \
                 --workers=0 --max-cron-threads=0
-          " 2>&1 | tail -80
+          " > "$LOG" 2>&1 &
+          ODOO_PID=$!
+          # Stream output as it lands (some Odoo installs take 5+ min)
+          tail -F "$LOG" --pid=$ODOO_PID &
+          TAIL_PID=$!
+          wait $ODOO_PID
+          ODOO_RC=$?
+          kill $TAIL_PID 2>/dev/null || true
+          echo "--- odoo install exit code: $ODOO_RC ---"
+          echo "--- last 80 lines for forensic if failed: ---"
+          tail -80 "$LOG"
+          rm -f "$LOG"
+          exit $ODOO_RC
 
       - name: Restart southbrook-odoo (clear worker ormcache)
         # Per memory qnap_odoo_upgrade_cache_reset.md — registry signal alone
