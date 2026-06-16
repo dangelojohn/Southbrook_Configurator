@@ -1,1 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_os_section_user,os section read all,model_southbrook_os_section,base.group_user,1,0,0,0
+access_os_section_admin,os section admin,model_southbrook_os_section,base.group_system,1,1,1,1
