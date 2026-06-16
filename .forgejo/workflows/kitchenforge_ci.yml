@@ -246,60 +246,55 @@ jobs:
     # we want a manual approval gate later, switch to a `workflow_dispatch`
     # event with `inputs.confirm`.
     #
-    # SSH path retired — runner mounts the QNAP's system-docker socket
-    # (per memory qnap_forgejo_actions.md), so we can docker-exec the
-    # southbrook-odoo container directly. No SSH key, no `secrets.QNAP_SSH_KEY`.
-    container:
-      image: docker:24-cli
-      volumes:
-        - /var/run/system-docker.sock:/var/run/docker.sock
-        - /share/CACHEDEV3_DATA/Container/southbrook/addons:/host/southbrook-addons
+    # SSH path retired — the act_runner is itself a docker container with
+    # the QNAP system-docker.sock mounted in (per qnap_forgejo_actions.md),
+    # so steps can call `docker` directly via the runner's default shell.
+    # NO `container:` block — that would nest a second container layer
+    # where workflow-level `volumes:` aren't honored by the runner config.
     env:
-      DOCKER_HOST: unix:///var/run/docker.sock
       ADDON_LIST: kitchenforge_core,kitchenforge_marathon,kitchenforge_saas,kitchenforge_southbrook_seed
+      ADDON_HOST_DIR: /share/CACHEDEV3_DATA/Container/southbrook/addons
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Verify docker socket reaches QNAP system-docker
+      - name: Verify runner has docker access
         run: |
           set -e
-          docker version --format '{{.Server.Version}}'
+          which docker || { echo "ERROR: docker CLI not in runner image" >&2; exit 1; }
+          docker version --format 'docker {{.Server.Version}}'
           docker ps --filter name=southbrook-odoo --format '{{.Names}} {{.Status}}'
           if ! docker ps --filter name=^southbrook-odoo$ --format '{{.Names}}' | grep -q southbrook-odoo; then
-            echo "ERROR: southbrook-odoo container not running" >&2
+            echo "ERROR: southbrook-odoo container not running on this docker daemon" >&2
+            docker ps | head -20
             exit 1
           fi
 
-      - name: Sync addons to host bind mount
-        # The southbrook-odoo container reads addons from a host bind-mount
-        # at /share/CACHEDEV3_DATA/Container/southbrook/addons (mapped to
-        # /mnt/extra-addons inside the container). The runner mounts the same
-        # host path at /host/southbrook-addons, so we rsync our checkout
-        # in-place. rsync is `apk`-installable in the alpine base.
+      - name: Sync addons via docker cp (no host bind-mount needed)
+        # Skip rsync-to-bind-mount. Just `docker cp` the addon dirs straight
+        # into the southbrook-odoo container's addon path. Avoids any
+        # dependency on the runner's host-FS visibility.
         run: |
           set -e
-          apk add --no-cache rsync >/dev/null 2>&1 || true
           for addon in kitchenforge_core kitchenforge_marathon kitchenforge_saas kitchenforge_southbrook_seed; do
             if [ ! -d "addons/$addon" ]; then
               echo "skipping missing addon: $addon"
               continue
             fi
-            echo "syncing addons/$addon -> /host/southbrook-addons/$addon"
-            rsync -a --delete "addons/$addon/" "/host/southbrook-addons/$addon/"
+            # Wipe any stale copy first so removed files don't linger.
+            docker exec southbrook-odoo bash -c "rm -rf /mnt/extra-addons/$addon" || true
+            echo "copying addons/$addon -> southbrook-odoo:/mnt/extra-addons/$addon"
+            docker cp "addons/$addon" "southbrook-odoo:/mnt/extra-addons/$addon"
           done
-          ls -la /host/southbrook-addons/ | grep kitchenforge
+          echo "--- addons now in container: ---"
+          docker exec southbrook-odoo bash -c "ls /mnt/extra-addons/ | grep -E '^kitchenforge' || echo 'NONE FOUND'"
 
       - name: Install/upgrade addons in live Odoo (lock-protected)
-        # flock pattern per memory southbrook_deploy_flock_lock.md — prevents
-        # concurrent -u races. -E 75 raises a distinct exit code on lock wait
-        # timeout so failures are recognizable.
-        #
-        # Both -i AND -u: -i installs any missing modules (first deploy), -u
-        # upgrades already-installed ones (subsequent deploys). Idempotent
-        # in both directions.
+        # flock pattern per memory southbrook_deploy_flock_lock.md.
+        # -i AND -u: -i installs missing modules (first deploy), -u upgrades
+        # installed ones (subsequent deploys). Idempotent in both directions.
         run: |
           set -e
           docker exec southbrook-odoo bash -c "
@@ -309,7 +304,7 @@ jobs:
                 -u ${ADDON_LIST} \
                 --stop-after-init --no-http \
                 --workers=0 --max-cron-threads=0
-          "
+          " 2>&1 | tail -80
 
       - name: Restart southbrook-odoo (clear worker ormcache)
         # Per memory qnap_odoo_upgrade_cache_reset.md — registry signal alone
