@@ -6,3 +6,4 @@ from . import test_generators
 from . import test_cron
 from . import test_public_endpoint
 from . import test_rag_export
+from . import test_os_coverage
