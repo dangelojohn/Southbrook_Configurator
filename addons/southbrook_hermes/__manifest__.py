@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 {
-    "name": "Southbrook HERMES",
-    "summary": "Human-approved HERMES recommendation queue for Southbrook.",
+    "name": "Southbrook Fabio",
+    "summary": "Human-approved Fabio recommendation queue for Southbrook.",
     "description": """
-Southbrook HERMES
+Southbrook Fabio
 =================
 
-Adds a small Odoo approval boundary for the HERMES sidecar agent. External
+Adds a small Odoo approval boundary for the Fabio sidecar agent. External
 AI/tool orchestration can submit draft recommendations through an API key, but
 business changes remain gated by Odoo users who approve, reject, and apply the
 recommendation.

@@ -80,7 +80,7 @@ class SouthbrookHermesRecommendation(models.Model):
                 "reviewer_id": self.env.user.id,
                 "reviewed_date": now,
             })
-            rec.message_post(body=_("HERMES recommendation approved."))
+            rec.message_post(body=_("Fabio recommendation approved."))
         return True
 
     def action_reject(self):
@@ -93,7 +93,7 @@ class SouthbrookHermesRecommendation(models.Model):
                 "reviewer_id": self.env.user.id,
                 "reviewed_date": now,
             })
-            rec.message_post(body=_("HERMES recommendation rejected."))
+            rec.message_post(body=_("Fabio recommendation rejected."))
         return True
 
     def action_apply(self):
@@ -106,7 +106,7 @@ class SouthbrookHermesRecommendation(models.Model):
                 task = rec._create_project_task()
                 values["created_task_id"] = task.id
             rec.write(values)
-            rec.message_post(body=_("HERMES recommendation applied."))
+            rec.message_post(body=_("Fabio recommendation applied."))
         return True
 
     def _create_project_task(self):
@@ -126,7 +126,7 @@ class SouthbrookHermesRecommendation(models.Model):
             "description": self._task_description(payload),
         })
         task.message_post(
-            body=_("Created from HERMES recommendation %s.") % self.display_name,
+            body=_("Created from Fabio recommendation %s.") % self.display_name,
         )
         return task
 

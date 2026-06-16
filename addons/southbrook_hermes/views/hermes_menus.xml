@@ -2,7 +2,7 @@
 <odoo>
 
     <menuitem id="menu_hermes_root"
-              name="HERMES"
+              name="Fabio"
               sequence="55"
               groups="southbrook_hermes.group_hermes_reviewer"/>
 
