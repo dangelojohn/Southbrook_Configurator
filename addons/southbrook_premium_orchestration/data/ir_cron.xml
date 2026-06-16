@@ -30,8 +30,6 @@
             <field name="code">model._cron_recompute_readiness_all()</field>
             <field name="interval_number">30</field>
             <field name="interval_type">minutes</field>
-            <field name="numbercall">-1</field>
-            <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
             <!-- Stagger first fire +2min from install to avoid co-firing with
@@ -49,13 +47,11 @@
         -->
         <record id="cron_mi_engine_refire_gates" model="ir.cron">
             <field name="name">Southbrook: Refire MI Stage-Gate Checks</field>
-            <field name="model_id" ref="model_southbrook_mi_engine"/>
+            <field name="model_id" ref="model_southbrook_mi_engine_state"/>
             <field name="state">code</field>
             <field name="code">model._cron_refire_gates()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">hours</field>
-            <field name="numbercall">-1</field>
-            <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
             <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=5))"/>
@@ -76,8 +72,6 @@
             <field name="code">model._cron_backfill_unscored()</field>
             <field name="interval_number">6</field>
             <field name="interval_type">hours</field>
-            <field name="numbercall">-1</field>
-            <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
             <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=10))"/>
@@ -103,8 +97,6 @@
             <field name="code">model._cron_baseline()</field>
             <field name="interval_number">7</field>
             <field name="interval_type">days</field>
-            <field name="numbercall">-1</field>
-            <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
             <field name="nextcall" eval="(DateTime.now().replace(hour=2, minute=0, second=0, microsecond=0) + timedelta(days=((6 - DateTime.now().weekday()) % 7) or 7))"/>
@@ -125,8 +117,6 @@
             <field name="code">model._cron_nightly_dry_run()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
-            <field name="numbercall">-1</field>
-            <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="user_id" ref="base.user_root"/>
             <field name="nextcall" eval="((DateTime.now().replace(hour=3, minute=0, second=0, microsecond=0)) + timedelta(days=1 if DateTime.now().hour >= 3 else 0))"/>

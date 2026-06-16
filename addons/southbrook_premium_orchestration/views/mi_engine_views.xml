@@ -3,8 +3,8 @@
     <data>
 
         <record id="view_southbrook_mi_engine_form" model="ir.ui.view">
-            <field name="name">southbrook.mi.engine.form</field>
-            <field name="model">southbrook.mi.engine</field>
+            <field name="name">southbrook.mi.engine.state.form</field>
+            <field name="model">southbrook.mi.engine.state</field>
             <field name="arch" type="xml">
                 <form string="Manufacturing Intelligence Engine">
                     <header>
@@ -53,7 +53,7 @@
 
         <record id="action_mi_engine_status" model="ir.actions.act_window">
             <field name="name">MI Engine Status</field>
-            <field name="res_model">southbrook.mi.engine</field>
+            <field name="res_model">southbrook.mi.engine.state</field>
             <field name="view_mode">form</field>
             <field name="view_id" ref="view_southbrook_mi_engine_form"/>
             <field name="target">current</field>

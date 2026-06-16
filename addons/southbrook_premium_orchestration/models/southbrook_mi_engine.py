@@ -20,9 +20,13 @@ from odoo import api, fields, models
 _logger = logging.getLogger(__name__)
 
 
-class SouthbrookMiEngine(models.Model):
-    _inherit = "southbrook.mi.engine"
-    _description = "Southbrook Manufacturing Intelligence Engine"
+class SouthbrookMiEngineState(models.Model):
+    # The parent `southbrook.mi.engine` model in southbrook_manufacturing_intelligence
+    # is an AbstractModel — Odoo 19 forbids _inherit-ing it as a Model. We use a
+    # separate stored model for the singleton telemetry and call into the
+    # abstract parent via env when we need its helpers.
+    _name = "southbrook.mi.engine.state"
+    _description = "Southbrook MI Engine — Singleton State + Cron Orchestrator"
 
     name = fields.Char(
         default="Southbrook Manufacturing Intelligence",

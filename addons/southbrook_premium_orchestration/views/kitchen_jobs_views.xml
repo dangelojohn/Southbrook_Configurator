@@ -21,10 +21,9 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="x_southbrook_sale_order_id"/>
-                <field name="x_install_due_date"/>
+                <field name="install_due_date"/>
                 <field name="readiness_decision"/>
                 <field name="readiness_score"/>
-                <field name="southbrook_unscheduled_wo_count"/>
                 <field name="southbrook_production_release_state"/>
                 <field name="job_at_risk"/>
                 <progressbar field="readiness_decision"
@@ -49,18 +48,13 @@
                                 <span class="fw-bold">SO: </span>
                                 <field name="x_southbrook_sale_order_id"/>
                             </div>
-                            <div t-if="record.x_install_due_date.raw_value">
+                            <div t-if="record.install_due_date.raw_value">
                                 <span class="fw-bold">Install: </span>
-                                <field name="x_install_due_date"/>
+                                <field name="install_due_date"/>
                             </div>
                             <div>
                                 <span class="fw-bold">Readiness: </span>
                                 <field name="readiness_score"/> / 100
-                            </div>
-                            <div t-if="record.southbrook_unscheduled_wo_count.raw_value">
-                                <span class="badge text-bg-warning">
-                                    <field name="southbrook_unscheduled_wo_count"/> unscheduled WO
-                                </span>
                             </div>
                             <div>
                                 <field name="southbrook_production_release_state"
@@ -89,13 +83,12 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="x_southbrook_sale_order_id"/>
-                <field name="x_install_due_date"/>
+                <field name="install_due_date"/>
                 <field name="readiness_decision" widget="badge"
                        decoration-danger="readiness_decision == 'blocked'"
                        decoration-warning="readiness_decision == 'review'"
                        decoration-success="readiness_decision == 'ready'"/>
                 <field name="readiness_score"/>
-                <field name="southbrook_unscheduled_wo_count"/>
                 <field name="southbrook_production_release_state"/>
                 <field name="job_at_risk" widget="boolean_toggle" readonly="1"/>
             </list>
@@ -131,9 +124,9 @@
                 <filter name="at_risk"
                         string="At Risk"
                         domain="[('job_at_risk','=',True)]"/>
-                <filter name="install_14_days"
-                        string="Install Within 14 Days"
-                        domain="[('x_install_due_date','&lt;=', (context_today() + relativedelta(days=14)).strftime('%Y-%m-%d')), ('x_install_due_date','&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="missing_install_date"
+                        string="Missing Install Date"
+                        domain="[('install_date_missing','=',True)]"/>
                 <group name="group_by_kitchen_jobs">
                     <filter name="group_readiness"
                             string="Readiness"
@@ -144,9 +137,6 @@
                     <filter name="group_partner"
                             string="Customer"
                             context="{'group_by': 'partner_id'}"/>
-                    <filter name="group_install_date"
-                            string="Install Date"
-                            context="{'group_by': 'x_install_due_date'}"/>
                 </group>
             </search>
         </field>

@@ -24,8 +24,7 @@
                        decoration-warning="southbrook_production_release_state == 'review'"
                        decoration-success="southbrook_production_release_state == 'ready'"/>
                 <field name="readiness_score"/>
-                <field name="southbrook_unscheduled_wo_count"/>
-                <field name="x_install_due_date"/>
+                <field name="install_due_date"/>
                 <field name="x_southbrook_sale_order_id"/>
                 <field name="job_at_risk" widget="boolean_toggle" readonly="1" optional="hide"/>
             </list>

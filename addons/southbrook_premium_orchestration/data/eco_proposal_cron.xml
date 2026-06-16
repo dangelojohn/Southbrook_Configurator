@@ -8,8 +8,6 @@
             <field name="code">model._cron_propose_eco_for_high_frequency_overrides()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
-            <field name="numbercall">-1</field>
-            <field name="doall" eval="False"/>
             <field name="active" eval="True"/>
             <field name="nextcall" eval="(DateTime.now().replace(hour=4, minute=0, second=0, microsecond=0) + relativedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
         </record>

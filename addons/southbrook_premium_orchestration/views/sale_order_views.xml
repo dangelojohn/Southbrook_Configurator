@@ -20,7 +20,7 @@
                         type="object"
                         class="oe_stat_button"
                         icon="fa-cubes"
-                        invisible="not x_southbrook_project_task_id">
+                        invisible="not x_premium_orchestration_managed">
                     <div class="o_stat_info">
                         <span class="o_stat_text">Kitchen Job</span>
                     </div>

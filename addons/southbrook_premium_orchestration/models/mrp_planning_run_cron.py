@@ -28,6 +28,7 @@ the cron stays installable whether or not every OpenValue layer is in
 the database.
 """
 import logging
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 
@@ -48,7 +49,7 @@ class MrpPlanningRun(models.Model):
         Defensive: any error during ``action_run`` is logged as a
         warning so the cron stays green and self-heals next interval.
         """
-        cutoff = fields.Datetime.now() - fields.timedelta(hours=24)
+        cutoff = fields.Datetime.now() - timedelta(hours=24)
         recent = self.search(
             [("create_date", ">=", fields.Datetime.to_string(cutoff))],
             limit=1,

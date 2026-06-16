@@ -21,7 +21,7 @@ This module:
      B2 readiness cron can find unscored orders cheaply.
 
 Defensive-by-design: the project.task model carries ~60 custom fields in
-production (x_door_style, x_wood_species, x_finish, x_install_due_date, …)
+production (x_door_style, x_wood_species, x_finish, install_due_date, …)
 that are not declared in any tracked python module — they were added via the
 Odoo UI / ir.model.fields in the live DB. We probe with ``_fields`` containment
 and skip silently when absent, so this module is installable on a fresh CE
@@ -214,7 +214,7 @@ class SaleOrder(models.Model):
             "x_door_style": inferred.get("door_style"),
             "x_wood_species": inferred.get("wood_species"),
             "x_finish": inferred.get("finish"),
-            "x_install_due_date": inferred.get("install_due_date"),
+            "install_due_date": inferred.get("install_due_date"),
         }
         for fname, value in spec_map.items():
             if value and fname in Task._fields:

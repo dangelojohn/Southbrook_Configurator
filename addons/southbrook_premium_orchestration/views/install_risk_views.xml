@@ -18,13 +18,12 @@
                   decoration-warning="readiness_decision == 'review'">
                 <field name="name"/>
                 <field name="partner_id"/>
-                <field name="x_install_due_date"/>
+                <field name="install_due_date"/>
                 <field name="readiness_decision" widget="badge"
                        decoration-danger="readiness_decision == 'blocked'"
                        decoration-warning="readiness_decision == 'review'"
                        decoration-success="readiness_decision == 'ready'"/>
                 <field name="readiness_score"/>
-                <field name="southbrook_unscheduled_wo_count"/>
                 <field name="southbrook_production_release_state"/>
                 <field name="job_at_risk" widget="boolean_toggle" readonly="1"/>
                 <field name="x_southbrook_sale_order_id" optional="show"/>
@@ -42,7 +41,7 @@
                     sample="1">
                 <field name="name"/>
                 <field name="partner_id"/>
-                <field name="x_install_due_date"/>
+                <field name="install_due_date"/>
                 <field name="readiness_decision"/>
                 <field name="readiness_score"/>
                 <field name="job_at_risk"/>
@@ -62,9 +61,9 @@
                                    options="{'classes': {'blocked':'danger','review':'warning','ready':'success'}}"/>
                         </div>
                         <div class="o_kanban_record_body">
-                            <div t-if="record.x_install_due_date.raw_value">
+                            <div t-if="record.install_due_date.raw_value">
                                 <span class="fw-bold">Install: </span>
-                                <field name="x_install_due_date"/>
+                                <field name="install_due_date"/>
                             </div>
                             <div t-if="record.job_at_risk.raw_value">
                                 <span class="badge text-bg-danger">At Risk</span>
@@ -87,19 +86,13 @@
                 <filter name="at_risk"
                         string="Flagged At Risk"
                         domain="[('job_at_risk','=',True)]"/>
-                <filter name="install_7_days"
-                        string="Install Within 7 Days"
-                        domain="[('x_install_due_date','&lt;=', (context_today() + relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
-                <filter name="install_14_days"
-                        string="Install Within 14 Days"
-                        domain="[('x_install_due_date','&lt;=', (context_today() + relativedelta(days=14)).strftime('%Y-%m-%d'))]"/>
+                <filter name="missing_install_date"
+                        string="Missing Install Date"
+                        domain="[('install_date_missing','=',True)]"/>
                 <group name="group_by_install_risk">
                     <filter name="group_readiness"
                             string="Readiness"
                             context="{'group_by': 'readiness_decision'}"/>
-                    <filter name="group_install_date"
-                            string="Install Date"
-                            context="{'group_by': 'x_install_due_date'}"/>
                 </group>
             </search>
         </field>
@@ -109,7 +102,7 @@
         <field name="name">Install Risk</field>
         <field name="res_model">project.task</field>
         <field name="view_mode">kanban,list,form</field>
-        <field name="domain">['|',('job_at_risk','=',True),('x_install_due_date','&lt;=',(context_today() + relativedelta(days=14)).strftime('%Y-%m-%d'))]</field>
+        <field name="domain">['|',('job_at_risk','=',True),('install_date_missing','=',True)]</field>
         <field name="search_view_id" ref="view_install_risk_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
