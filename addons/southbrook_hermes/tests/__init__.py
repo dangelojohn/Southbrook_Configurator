@@ -7,3 +7,4 @@ from . import test_recommendation_workflow
 from . import test_jwt_helper
 from . import test_tool_decorator
 from . import test_read_tools
+from . import test_write_tools
