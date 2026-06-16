@@ -77,6 +77,58 @@ class OsGenerators(models.AbstractModel):
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
+    # Cut Specification
+    # ------------------------------------------------------------------
+    @api.model
+    def generate_cut_spec(self):
+        body = self._render_cut_spec_md()
+        return self._upsert_generated(
+            "06_cut_spec.generated", "Cut Specification (active)", body)
+
+    def _render_cut_spec_md(self):
+        CutSpec = self.env.get("southbrook.cut.spec")
+        if CutSpec is None:
+            # southbrook_plm not installed yet — emit a stub
+            body = (
+                "---\nslug: 06_cut_spec.generated\n"
+                "title: Cut Specification (active)\nsource: generated\n---\n\n"
+                "# Cut Specification (active)\n\n"
+                "*Cut spec source not available on this instance.*\n"
+            )
+            return body
+        spec = CutSpec.search([("active", "=", True)], limit=1, order="id desc")
+        if not spec:
+            body = (
+                "---\nslug: 06_cut_spec.generated\n"
+                "title: Cut Specification (active)\nsource: generated\n---\n\n"
+                "# Cut Specification (active)\n\n"
+                "*No active cut spec defined.*\n"
+            )
+            return body
+        # Render the active spec — field names match southbrook_plm conventions.
+        fields_to_emit = [
+            ("box_thickness_mm", "Box / Carcass Thickness", "mm"),
+            ("back_thickness_mm", "Back-Panel Thickness", "mm"),
+            ("rabbet_depth_mm", "Rabbet Depth", "mm"),
+            ("door_thickness_mm", "Door Thickness", "mm"),
+            ("door_reveal_mm", "Door Reveal", "mm"),
+            ("shelf_tolerance_mm", "Shelf Tolerance", "mm"),
+            ("shelf_vent_gap_mm", "Shelf Ventilation Gap", "mm"),
+            ("toe_kick_height_mm", "Toe-Kick Height", "mm"),
+        ]
+        lines = [
+            "---", "slug: 06_cut_spec.generated",
+            "title: Cut Specification (active)", "source: generated", "---", "",
+            f"# Cut Specification (active) — {spec.display_name}", "",
+            "| Parameter | Value | Unit |", "|---|---|---|",
+        ]
+        for fname, label, unit in fields_to_emit:
+            val = getattr(spec, fname, None)
+            if val is not None:
+                lines.append(f"| {label} | {val} | {unit} |")
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
     # Shared upsert with hash-based no-op detection
     # ------------------------------------------------------------------
     def _upsert_generated(self, slug, name, body):

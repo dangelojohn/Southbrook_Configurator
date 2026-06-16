@@ -37,3 +37,16 @@ class TestAttributeGenerator(TransactionCase):
         self.assertTrue(section)
         self.assertIn("attribute", section.body.lower())
         self.assertEqual(result["status"], "ok")
+
+
+@tagged("post_install", "-at_install", "southbrook", "southbrook_os")
+class TestCutSpecGenerator(TransactionCase):
+    def test_cut_spec_generator_emits_active_values(self):
+        result = self.env["southbrook.os.generators"].generate_cut_spec()
+        section = self.env["southbrook.os.section"].search(
+            [("slug", "=", "06_cut_spec.generated")], limit=1)
+        self.assertTrue(section)
+        # Body should mention thickness or reveal terminology
+        text = section.body.lower()
+        self.assertTrue("thickness" in text or "reveal" in text)
+        self.assertEqual(result["status"], "ok")
