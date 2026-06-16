@@ -12,4 +12,8 @@
         <value eval="{'name': 'Fabio Reviewer', 'comment': 'Review, approve, reject, and apply Fabio recommendations.'}"/>
     </function>
 
+    <record id="base.group_system" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('southbrook_hermes.group_hermes_reviewer'))]"/>
+    </record>
+
 </odoo>
