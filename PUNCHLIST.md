@@ -12,19 +12,24 @@ open items. The 5 high-severity items from code review were closed in this sessi
 `git diff origin/main`); the items below are what we **didn't** fix.
 
 ### Backend test regression — 15 failures in `southbrook_configurator_ux`
-- `addons/southbrook_configurator_ux/tests/test_select_commit.py` — all 15 tests in
-  `TestConfiguratorSelectCommit` fail with `error='incomplete_configuration'`.
-  **Root cause identified 2026-06-15:** the test helper `_complete_pick_set` picks
-  the FIRST value of every multi-value attribute_line on the `base_1dr` template,
-  but `Door Overlay` (and sometimes `Door Style`, `Interior Storage`) get
-  rule-rejected by `update_config` silently — `_complete_via_select` doesn't
-  assert `r["ok"]`, so the session ends up with N-3 picks while the completeness
-  check counts all multi-value attributes. Result: `missing_attributes: [Door Overlay]`
-  (or [Door Style, Door Overlay, Interior Storage] for the explicit-multi-value test).
-  Fix path: rewrite `_complete_pick_set` to iterate through each line's values
-  until `values_available` confirms acceptance, OR seed a hard-coded known-valid
-  combination as a constant in the test. Pre-existing breakage from a
-  base_1dr template expansion, not from this session's fixes.
+- `addons/southbrook_configurator_ux/tests/test_select_commit.py` — root cause
+  was the test helper `_complete_pick_set` picking the FIRST value of every
+  multi-value attribute_line on `base_1dr` without rule awareness; `Door Overlay`
+  (and sometimes `Door Style`, `Interior Storage`) got rule-rejected by
+  `update_config` silently while `_complete_via_select` did not assert `r["ok"]`.
+  **Partial fix landed 2026-06-15:** `_complete_via_select` rewritten to iterate
+  per attribute_line, consult `disabled_value_ids` from each /select response,
+  and pick the first non-disabled value. All 5 direct `_complete_pick_set`
+  call-sites switched to use `_complete_via_select(sess)`. Result: tests that
+  needed any rule-valid combination now pass, but ~15 tests with specific SKU
+  expectations (e.g., `SB-18I-ELE-CHE` for Cherry door) still fail because the
+  greedy iteration picks a different valid value (e.g., Walnut) and the SKU
+  changes accordingly.
+  **Remaining work** to close the last failures: either (a) seed a hard-coded
+  pick set per SKU expectation as a class constant, or (b) add backtracking
+  search to the helper so the SKU expectation can drive the value selection.
+  (a) is faster but couples to template seed data; (b) is more robust but
+  ~50 LoC more. Pre-existing breakage, not introduced by this session.
 
 ### Code-review MED/LOW items — batched cleanup branch
 Deferred deliberately so the high-severity fixes land cleanly. Pick up in a follow-up:

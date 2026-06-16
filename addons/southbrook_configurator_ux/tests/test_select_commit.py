@@ -587,9 +587,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
         sess = self._fresh_session()
         # Run a /select with a complete pick set so create_get_variant
         # passes validation, then commit.
-        with stubbed_request(self.env, user=self.user):
-            self.controller.configurator_select(
-                session_id=sess.id, value_ids=self._complete_pick_set())
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(session_id=sess.id)
         self.assertTrue(r["ok"], f"commit failed: {r}")
@@ -609,9 +607,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
         the draft order for days; the engineering snapshot should be
         frozen from the moment they agreed to the configuration."""
         sess = self._fresh_session()
-        with stubbed_request(self.env, user=self.user):
-            self.controller.configurator_select(
-                session_id=sess.id, value_ids=self._complete_pick_set())
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(session_id=sess.id)
         self.assertTrue(r["ok"])
@@ -633,9 +629,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
         Without this, the eventual product code is empty in the DB
         until someone manually fills it."""
         sess = self._fresh_session()
-        with stubbed_request(self.env, user=self.user):
-            sel = self.controller.configurator_select(
-                session_id=sess.id, value_ids=self._complete_pick_set())
+        sel = self._complete_via_select(sess)
         expected_sku = sel["live_sku"]
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(session_id=sess.id)
@@ -681,9 +675,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
         """P4 preserves session_locked — a second commit on the same
         session must return session_locked, not duplicate the line."""
         sess = self._fresh_session()
-        with stubbed_request(self.env, user=self.user):
-            self.controller.configurator_select(
-                session_id=sess.id, value_ids=self._complete_pick_set())
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             first = self.controller.configurator_commit(session_id=sess.id)
         self.assertTrue(first["ok"])
@@ -697,9 +689,7 @@ class TestConfiguratorSelectCommit(TransactionCase):
         """P4 preserves the Phase-2 cart-target decision: commit
         success returns redirect=/my/southbrook/order-builder/<id>."""
         sess = self._fresh_session()
-        with stubbed_request(self.env, user=self.user):
-            self.controller.configurator_select(
-                session_id=sess.id, value_ids=self._complete_pick_set())
+        self._complete_via_select(sess)
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_commit(session_id=sess.id)
         self.assertTrue(r["ok"])
@@ -807,11 +797,51 @@ class TestConfiguratorSelectCommit(TransactionCase):
         })
 
     def _complete_via_select(self, sess):
-        """Pick a complete value set on the session via /select, so a
+        """Pick a complete, rule-valid value set via /select so that a
         following /commit call passes the P4 completeness backstop.
-        Returns the /select response. Picks the first compatible value
-        of each attribute_line."""
-        value_ids = self._complete_pick_set()
-        with stubbed_request(self.env, user=self.user):
-            return self.controller.configurator_select(
-                session_id=sess.id, value_ids=value_ids)
+
+        Returns the final /select response.
+
+        Strategy: iteratively grow the pick set, one attribute_line at
+        a time, consulting the engine's `disabled_value_ids` response
+        after each pick. The naive "first value of each line" approach
+        breaks when the first value of attribute B is forbidden by the
+        first value of attribute A — the rule engine drops the
+        offending pick silently, and the session ends up incomplete by
+        the time /commit runs.
+
+        Order: process attribute_lines by `sequence` so the seeded
+        ordering is deterministic. For each line, pick the first value
+        that is NOT in the cumulative disabled set.
+        """
+        picks = []
+        disabled = set()
+        ordered_lines = sorted(
+            sess.product_tmpl_id.attribute_line_ids,
+            key=lambda l: (l.sequence, l.id),
+        )
+        last_resp = None
+        for line in ordered_lines:
+            candidate = next(
+                (v.id for v in line.value_ids.sorted("sequence")
+                 if v.id not in disabled),
+                None,
+            )
+            if candidate is None:
+                # No value of this line is acceptable given the
+                # current picks — fall through (the completeness
+                # backstop will catch and surface this).
+                continue
+            picks.append(candidate)
+            with stubbed_request(self.env, user=self.user):
+                last_resp = self.controller.configurator_select(
+                    session_id=sess.id, value_ids=picks)
+            # If the engine refused this round, drop the pick we just
+            # made — its prerequisite combination wasn't acceptable.
+            if not last_resp.get("ok"):
+                picks.pop()
+                continue
+            # Refresh disabled set from the engine's response so the
+            # next line's pick respects every rule we've triggered.
+            disabled = set(last_resp.get("disabled_value_ids") or [])
+        return last_resp
