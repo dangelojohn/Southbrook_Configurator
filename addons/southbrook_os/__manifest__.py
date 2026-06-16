@@ -26,6 +26,7 @@ Consumers: Hermes (RAG grounding), public viewer (v1.1), Overseer (v1.x).
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/ir_sequence.xml",
         "data/os_section_seed.xml",
         "data/ir_cron.xml",
     ],
