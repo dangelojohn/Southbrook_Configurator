@@ -35,6 +35,7 @@
                 <field name="name"/>
                 <field name="recommendation_type"/>
                 <field name="priority"/>
+                <field name="agent_partner_id" widget="many2one_avatar"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'applied'"
                        decoration-warning="state in ('ready', 'approved')"
@@ -92,6 +93,7 @@
                         <group>
                             <field name="recommendation_type"/>
                             <field name="priority"/>
+                            <field name="agent_partner_id" widget="many2one_avatar"/>
                             <field name="source_model"/>
                             <field name="source_res_id"/>
                         </group>

@@ -22,6 +22,7 @@ recommendation.
         "southbrook_api",
     ],
     "data": [
+        "data/fabio_partner.xml",
         "security/hermes_security.xml",
         "security/ir.model.access.csv",
         "views/hermes_recommendation_views.xml",

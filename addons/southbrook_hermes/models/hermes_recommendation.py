@@ -31,6 +31,12 @@ class SouthbrookHermesRecommendation(models.Model):
         ("high", "High"),
         ("blocker", "Blocker"),
     ], default="normal", required=True, tracking=True)
+    agent_partner_id = fields.Many2one(
+        "res.partner",
+        default=lambda self: self._default_agent_partner_id(),
+        readonly=True,
+        copy=False,
+    )
     summary = fields.Text(required=True)
     rationale = fields.Text()
     proposed_action = fields.Text()
@@ -48,6 +54,13 @@ class SouthbrookHermesRecommendation(models.Model):
     created_task_id = fields.Many2one(
         "project.task", readonly=True, copy=False,
     )
+
+    @api.model
+    def _default_agent_partner_id(self):
+        return self.env.ref(
+            "southbrook_hermes.partner_fabio_agent",
+            raise_if_not_found=False,
+        )
 
     @api.constrains("payload_json")
     def _check_payload_json(self):
