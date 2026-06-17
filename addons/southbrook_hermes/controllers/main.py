@@ -65,8 +65,38 @@ class SouthbrookHermesApi(http.Controller):
         except (UserError, ValidationError, ValueError) as exc:
             return _error("validation_error", str(exc), 400)
 
+        # Optional fast-path: when the caller has already gone through human
+        # approval on its own side (e.g. the external Hermes Console UI
+        # approved a prospect_lead via WhatsApp or the web UI) it can pass
+        # ``auto_apply: true`` to skip the redundant in-Odoo approval gate.
+        #
+        # Limited to recommendation_type='prospect' for now — generic tasks
+        # MUST still flow through the human-approval boundary that the
+        # Fabio addon is designed around. Prospects are a self-contained
+        # safe action (creating a crm.lead is reversible and audit-trailed)
+        # so single-stage approval is fine.
+        auto_apply = bool(payload.get("auto_apply"))
+        if auto_apply and rec.recommendation_type == "prospect":
+            try:
+                rec.action_mark_ready()
+                rec.action_approve()
+                rec.action_apply()
+            except (UserError, ValidationError) as exc:
+                # Recommendation was created; the auto-apply failed. Return
+                # the partial success rather than rolling back so the caller
+                # can see the rec in Odoo and apply manually.
+                return _json({
+                    "ok": True,
+                    "recommendation_id": rec.id,
+                    "state": rec.state,
+                    "auto_apply_error": str(exc),
+                })
+
         return _json({
             "ok": True,
             "recommendation_id": rec.id,
             "state": rec.state,
+            "created_crm_lead_id": (
+                rec.created_crm_lead_id.id if rec.created_crm_lead_id else None
+            ),
         })
