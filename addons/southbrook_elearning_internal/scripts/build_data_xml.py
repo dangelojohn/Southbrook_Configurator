@@ -104,6 +104,86 @@ COURSE_META: List[Tuple[int, str, str, str, int]] = [
         "recommendation queue.",
         2,
     ),
+    (
+        8,
+        "course_estimating_deep",
+        "Estimating Deep Dive",
+        "Six deep-dive lessons on the Southbrook Estimating addon — "
+        "architecture, Order Builder walkthrough, zone/channel pricing "
+        "math, quote-to-MO handoff, QWeb reports, and the revision/"
+        "versioning chain. Goes deeper than Course 5.",
+        9,
+    ),
+    (
+        9,
+        "course_productgraph",
+        "ProductGraph PLM",
+        "Six deep-dive lessons on ProductGraph — the OpenBOM-mirror PLM "
+        "platform sitting next to (NOT inside) Southbrook. Property "
+        "templates, vendor stubs, the native BoM editor, the MCP "
+        "sidecar, and the Southbrook bridge.",
+        10,
+    ),
+    (
+        10,
+        "course_configurator_deep",
+        "Configurator Deep Dive",
+        "Seven deep-dive lessons on the 5-addon configurator stack. "
+        "Architecture, new-product setup, session state machine, sale + "
+        "MRP integration, the v2 UX overlay, and the common gotchas "
+        "(exclusion explosions, rule ordering, performance).",
+        11,
+    ),
+    (
+        11,
+        "course_new_product_workflow",
+        "Creating a New Product End-to-End",
+        "Eight cross-system lessons walking a new cabinet from "
+        "conception through ProductGraph entry, cut spec, BoM, "
+        "configurator setup, pricing, first MO, and release. The "
+        "course that ties every module together.",
+        1,
+    ),
+    (
+        12,
+        "course_kitchen_ops_deep",
+        "Kitchen Ops Module",
+        "Seven deep-dive lessons on the Kitchen Ops umbrella menu — "
+        "the parent menu architecture, project lifecycle, jobs board, "
+        "production release queue, floor load dashboards, MI engine "
+        "observability, and the cut/hardware/production package trio.",
+        4,
+    ),
+    (
+        13,
+        "course_fabio_module",
+        "Fabio Module (Hermes)",
+        "Seven deep-dive lessons on the Southbrook Fabio AI assistant "
+        "surface — architecture, the recommendation queue, JWT auth + "
+        "persona resolution, the tool registry, all 13 read+write "
+        "tools, and the OWL chat panel + Vercel sidecar.",
+        5,
+    ),
+    (
+        14,
+        "course_project_module",
+        "Project Module (Customized)",
+        "Seven deep-dive lessons on Southbrook's customizations of "
+        "Odoo's Project module — kitchen vs general projects, the 13-"
+        "gate readiness algorithm, 5 release sign-offs, task→MO "
+        "linkage, custom views, and project-level reporting.",
+        6,
+    ),
+    (
+        15,
+        "course_manufacturing_module",
+        "Manufacturing Module (Customized)",
+        "Seven deep-dive lessons on Southbrook's customizations of "
+        "Odoo's Manufacturing module — architecture, MO + workorder + "
+        "BoM extensions, the workcenter surface, custom Kanbans, and "
+        "the MO↔cut-list↔hardware-package linkage.",
+        7,
+    ),
 ]
 
 
@@ -241,7 +321,19 @@ def build() -> None:
                 f"            <field name=\"description\">{html.escape(desc)}</field>\n"
             )
             f.write("            <field name=\"channel_type\">training</field>\n")
-            f.write("            <field name=\"visibility\">public</field>\n")
+            # visibility=connected — any LOGGED-IN user can see the channel
+            #                       on the catalogue (anonymous visitors
+            #                       are bounced to the login page).
+            # enroll=public        — any logged-in user can self-enroll
+            #                       without admin invite. Together: internal
+            #                       staff sign in to Odoo, see the catalogue,
+            #                       click Join, immediately read lessons.
+            #
+            # The combo `visibility=members + enroll=public` is rejected by
+            # the slide_channel_check_enroll constraint (members-only but
+            # self-enrolling is contradictory). For an admin-gated internal
+            # roll-out, flip enroll to 'invite' AND visibility to 'members'.
+            f.write("            <field name=\"visibility\">connected</field>\n")
             f.write("            <field name=\"enroll\">public</field>\n")
             f.write(f"            <field name=\"sequence\">{course_no * 10}</field>\n")
             f.write(

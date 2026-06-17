@@ -1,0 +1,3035 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_11_conception" model="slide.slide">
+            <field name="name">Conception — Capturing the New Product Idea</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Designer working with a customer requirement or with the showroom team — the person who first hears &quot;we want this thing&quot; and has to decide whether it becomes a one-off or a SKU.</field>
+            <field name="html_content"><![CDATA[<h1 id="conception-capturing-the-new-product-idea">Conception — Capturing the New Product Idea</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the designer (or the sales rep with design instincts) who just
+took a phone call, a showroom walk-in, or a dealer email that starts
+with <em>"do you make a..."</em>. The answer is almost always <em>"we can"</em> —
+but the way you capture that requirement decides whether the rest of
+the chain (PLM, configurator, estimating, the shop floor) ever sees a
+coherent picture. This lesson is the process for turning a verbal
+request into a structured idea the next eight lessons can act on.</p>
+<p>There is no code in this lesson. There is barely any clicking. You
+will write things down, sketch, and answer four questions.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The conception step lives <strong>off-platform on purpose</strong>. We don't
+spawn an Odoo record yet because:</p>
+<ul>
+<li>A premature ProductGraph record locks you into a part-number you may
+  abandon (sequences burn through <code>PG-PRT-NNNN</code>).</li>
+<li>A premature <code>product.template</code> clutters the configurator catalog
+  with half-baked SKUs nobody can quote.</li>
+</ul>
+<p>You'll use:</p>
+<blockquote>
+<p><strong>Google Drive → Southbrook → New-Product Intake</strong></p>
+</blockquote>
+<p>…where every new-product idea gets a folder named
+<code>YYYY-MM-DD_&lt;short_slug&gt;</code> (e.g. <code>2026-06-17_floating_corner_shelf</code>).
+The folder is the conception artifact. When this lesson is done, the
+folder contains four files and the green-light decision in its name.</p>
+<p>If your idea makes it through, lesson 11.2 picks up here and
+<strong>creates the first system record</strong> — the <code>pg.item</code> in ProductGraph.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Your "screen" in this lesson is a folder with four expected files:</p>
+<ul>
+<li><strong><code>intake.md</code></strong> — the customer requirement in their own words,
+  pasted verbatim. Names, dates, the dealer or salesperson who took
+  the call, the deadline if any.</li>
+<li><strong><code>scope.md</code></strong> — your decision: is this a <strong>one-off custom</strong> (a
+  single sale-order line built once, no SKU) or a <strong>new SKU</strong> (worth
+  the engineering investment because it'll sell again)? Three
+  paragraphs maximum. Lesson 11.2 won't fire until this answer is
+  <em>new SKU</em>.</li>
+<li><strong><code>sketch.&lt;ext&gt;</code></strong> — a hand sketch, a Sketchup screenshot, a
+  napkin photo, a Prodboard export — any visual that another human
+  could look at and say <em>"yes, that's the thing."</em> Lesson 11.4 (BoM)
+  consumes this directly; the more honest your sketch, the less
+  rework downstream.</li>
+<li><strong><code>spec_draft.md</code></strong> — the unstructured spec. Width range,
+  height range, depth, materials we'd build it from, door style if
+  applicable, hardware, finish constraints. <em>Bullet points are fine.</em>
+  This becomes the property-template selection in lesson 11.2.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Hear the requirement (5 min):</strong></p>
+<ul>
+<li>Take the call, the email, the walk-in conversation. Write down
+  what they said in <code>intake.md</code> <em>in their own words</em>. Do not
+  translate ("they want a 36-inch base with hidden hinges") — paste
+  the verbatim ("we need cabinets in front of the window that don't
+  block the view"). The verbatim becomes the acceptance test later.</li>
+<li>Note the deadline if any. <em>"For our open-house in three weeks"</em>
+  is the difference between <em>new SKU</em> (no) and <em>one-off</em> (yes).</li>
+</ul>
+<p><strong>2. Scope it (10 min):</strong></p>
+<ul>
+<li>Ask the four questions below and write the answers in <code>scope.md</code>.</li>
+<li><strong>Q1: Have we built this before?</strong> Search the existing catalog
+  (Sales → Configurable Templates) for anything close. If yes, this
+  is probably a <em>configurator delta</em> (add an attribute value), not
+  a new product. Stop the lesson and skip to lesson 5.4
+  (configurator UX) for the right path.</li>
+<li><strong>Q2: Will this customer want it again?</strong> Or another customer?
+  If the honest answer is <em>no, this is a one-off built around one
+  kitchen</em>, it's a one-off. One-offs go through the sale order with
+  a custom line; they don't get a ProductGraph item, a configurator
+  entry, or a BoM template. Stop the lesson; the rest of Course 11
+  doesn't apply.</li>
+<li><strong>Q3: Can our shop floor build it on the existing workcenters?</strong>
+  Look at the existing workcenter codes (<code>SB-EDGE</code>, <code>SB-CNC-BORE</code>,
+  <code>SB-ASSY</code>, <code>SB-DOOR</code>, <code>SAND</code>, <code>PAINT</code>, <code>CURE</code>). If the answer is
+  <em>"we'd need a new machine"</em> or <em>"this is hand-built only"</em>, flag
+  that to the production manager <strong>before</strong> sketching. New products
+  that require new workcenters are a much bigger project — they need
+  capex sign-off before lesson 11.2.</li>
+<li><strong>Q4: Is the math sane?</strong> Will the price likely land within
+  ±30% of an existing comparable SKU? If not, the customer
+  probably wants something we can't profitably build at our
+  margins; have the price conversation first, before the design
+  conversation.</li>
+</ul>
+<p><strong>3. Sketch (5 min):</strong></p>
+<ul>
+<li>Draw it. Photograph the napkin. Drop the file in the folder as
+  <code>sketch.&lt;ext&gt;</code>. <em>Resist the urge to model it in CAD now</em> — that
+  belongs to lesson 11.4 (BoM authoring) once the spec is locked.</li>
+</ul>
+<p><strong>4. Draft the spec (10 min):</strong></p>
+<ul>
+<li>In <code>spec_draft.md</code>, bullet the spec. Don't be precise — be
+  <em>complete</em>. Width range (not a single number), height range,
+  depth, materials, door style, hardware, finish. The PLM engineer
+  in lesson 11.2 needs these to pick a property template; vagueness
+  here costs three days later.</li>
+</ul>
+<p><strong>5. Green-light decision (2 min):</strong></p>
+<ul>
+<li>Rename the folder. If green-lit for SKU, append <code>_GREEN</code>. If
+  decided as one-off, append <code>_ONEOFF</code>. If parked for now, append
+  <code>_PARK</code>.</li>
+<li>Send a one-line Slack message to the production manager and the
+  PLM engineer: <em>"New SKU intake green-lit:
+  <code>2026-06-17_floating_corner_shelf_GREEN</code>. Lesson 11.2 yours."</em></li>
+</ul>
+<p>That's it. You're done. The PLM engineer takes over at lesson 11.2.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I created a <code>pg.item</code> already because I was excited."</strong></p>
+<p>Roll it back. ProductGraph items in <code>concept</code> state can be archived
+(<code>active=False</code>) but the part number is burned — <code>PG-PRT-0042</code> is
+gone. Not a disaster, but a habit to break. The intake folder is
+the right artifact at this stage.</p>
+<p><strong>"The customer wants it in two weeks. We don't have time for the
+conception folder."</strong></p>
+<p>Two weeks is a <strong>one-off</strong>, not a new SKU. Build it through the sale
+order with a custom configured product line and skip Course 11
+entirely. New SKUs need 6–12 weeks of catalog hygiene minimum
+(lessons 11.2 through 11.7) and any compression of that is
+manufacturing debt you'll pay back during the first MO.</p>
+<p><strong>"The sketch is just words. Drawing isn't my thing."</strong></p>
+<p>Words are fine <em>if</em> they're complete. The litmus test:
+hand <code>spec_draft.md</code> to the PLM engineer with no other context. If
+they can describe the cabinet back to you correctly in 60 seconds,
+the spec is enough. If they need to ask three follow-ups, the spec
+needs a sketch.</p>
+<p><strong>"I scoped it as SKU but the production manager says we'd need
+a new workcenter."</strong></p>
+<p>Pull the green-light. Rename the folder <code>_BLOCKED_CAPEX</code>. The
+project is not dead, but lesson 11.2 doesn't fire until the
+production manager has run a capex pass on whatever new equipment
+the SKU implies. New cabinets that need new workcenters are a
+separate conversation with the owner, not a Course 11 conversation.</p>
+<p><strong>"Two designers green-lit overlapping ideas in the same week."</strong></p>
+<p>Lesson 11.2's PLM engineer is the merge point. They open both
+folders, pick the better-scoped one (or invent a third), and tell
+the losing designer to archive their folder
+<code>*_DUPLICATE_OF_&lt;slug&gt;</code>. This is normal — Southbrook ideates faster
+than it can engineer; conception is throwaway-cheap on purpose.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(Almost nothing — that's the point of this lesson.)</p>
+<p>The only "system" at this stage is <strong>the folder name convention</strong> and
+<strong>the one-line Slack notification</strong>. No Odoo records, no
+ProductGraph records, no <code>sale.order</code> lines.</p>
+<p>This is deliberate. Every other lesson in Course 11 writes to
+production data — the conception step is the one place where ideas
+that don't survive contact with reality can die cheaply. The cost of
+a dead intake folder is zero; the cost of a dead <code>pg.item</code> is a
+burned part number, an audit-log row, and explaining the
+abandonment in the next PLM weekly.</p>
+<p>When lesson 11.2 fires, the PLM engineer reads <code>spec_draft.md</code>,
+picks a property template, fills in the values, and <em>that's</em> the
+moment the platform learns about the product. Everything before that
+is human work.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A dealer calls and says <em>"we need a cabinet that fits over a
+gas fireplace flue — narrow, tall, vented at the back."</em> You've never
+built one. Two other dealers have asked about similar fireplaces this
+year. What do you do?</p>
+<blockquote>
+<p>Open the intake folder. Capture the dealer's words verbatim in
+<code>intake.md</code>. In <code>scope.md</code> answer Q2 "yes, three dealers in a year
+implies a SKU." Q3 "buildable on SAW+EDGE+ASSY+QC, vent cut is a
+CNC operation we already do for ovens." Sketch the venting in the
+back. Green-light → <code>_GREEN</code>. Notify the PLM engineer; lesson 11.2
+picks it up.</p>
+</blockquote>
+<p><strong>2.</strong> A customer comes in with a magazine clipping of a Scandinavian
+floating shelf and says <em>"we want six of these in our kitchen."</em> The
+shelf is not in our catalog. What do you do?</p>
+<blockquote>
+<p>One-off. Single kitchen, no second customer in sight, no SKU
+investment justified. Skip Course 11 entirely; build it through the
+sale order as a custom line with a free-text description and a
+custom price. Drop the magazine clipping in the kitchen project
+folder for the PLM engineer to glance at during cut-spec authoring.</p>
+</blockquote>
+<p><strong>3.</strong> You sketched the new SKU but the production manager points out
+that the panel sizes you specified exceed <code>x_sbk_max_panel_length_mm</code>
+on every workcenter we own. What do you do?</p>
+<blockquote>
+<p>Pull the green-light. Two options: (a) revise the spec to panels
+the existing workcenters can handle (probably means two-piece
+construction, joined at install) — go back to step 4 of the daily
+flow; (b) flag for capex review — rename folder
+<code>_BLOCKED_CAPEX</code>. Either way, lesson 11.2 does <strong>not</strong> fire today.</p>
+</blockquote>
+<p><strong>4.</strong> You're three days into a new-SKU intake and realise it's
+fundamentally an existing SKU with a new door style. What do you do?</p>
+<blockquote>
+<p>Rename folder <code>_DUPLICATE_OF_&lt;existing_sku&gt;</code>. The right path is a
+<em>new attribute value</em> on the existing template, not a new SKU.
+Send the spec to the configurator admin (lesson 5.4 + 11.5) instead
+of the PLM engineer. Saves about six weeks of unnecessary
+engineering.</p>
+</blockquote>
+<p><strong>5.</strong> The PLM engineer takes the green-lit folder and says <em>"I can't
+pick a property template from this — it's too vague."</em> What's the
+recovery?</p>
+<blockquote>
+<p>Go back to step 4. The spec wasn't complete. Add the missing fields
+— typical hardware? mounting style? load rating? finish range? — to
+<code>spec_draft.md</code>, then re-notify. This is normal on the first
+intake you author; by your fifth, the spec will be tight on the
+first pass.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Anything Odoo. Conception is off-platform; lesson 11.2 is where
+  the first system record is created.</li>
+<li>How to build a one-off custom line on a sale order — that's
+  lesson 5.2 (estimating a quote) with the <em>Custom Product</em> path.</li>
+<li>Configurator deltas (adding a new attribute value to an existing
+  SKU) — lesson 5.4 (configurator UX tweaks) is the right place.</li>
+<li>Capex requests for new workcenters — out of scope for Course 11
+  entirely; that's a manager-to-owner conversation.</li>
+<li>The next lesson (11.2) where the PLM engineer creates the
+  <code>pg.item</code> record in ProductGraph and the new product becomes real.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_11_productgraph_entry" model="slide.slide">
+            <field name="name">Entering the New Product in ProductGraph</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">PLM engineer creating the first system record for a new SKU green-lit at conception.</field>
+            <field name="html_content"><![CDATA[<h1 id="entering-the-new-product-in-productgraph">Entering the New Product in ProductGraph</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PLM engineer. Yesterday a designer dropped a folder
+<code>2026-06-17_&lt;slug&gt;_GREEN</code> in the New-Product Intake share. Today you
+turn that folder into the first system record — a <code>pg.item</code> in the
+ProductGraph platform. From this moment on, the part has a part
+number, an audit log, and a place on the hub. Everything in lessons
+11.3 through 11.8 hangs off this record.</p>
+<p>This lesson does <em>not</em> cover what ProductGraph is, why it exists, or
+how the property-template system works. That's Course 9. This lesson
+is the <strong>workflow-specific delta</strong>: how you take the conception
+folder and create the corresponding ProductGraph entry, attach the
+right metadata, and walk it through to the <em>engineering</em> state ready
+for cut-spec authoring (lesson 11.3).</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>ProductGraph is the standalone platform — separate database, separate
+URL from the main Southbrook Odoo instance. Sign in at the
+ProductGraph URL with your PLM credentials, then:</p>
+<blockquote>
+<p><strong>ProductGraph → Engineering → Items</strong></p>
+</blockquote>
+<p>Click <em>New</em>. The form is the standard <code>pg.item</code> form documented in
+Course 9 lesson 9.2. You'll also touch:</p>
+<blockquote>
+<p><strong>ProductGraph → Configuration → Property Templates</strong></p>
+</blockquote>
+<p>…to confirm the template you intend to pick exists and has the fields
+your spec needs. And:</p>
+<blockquote>
+<p><strong>ProductGraph → Engineering → Items → \&lt;your new item&gt; → Revisions</strong></p>
+</blockquote>
+<p>…where the first <code>pg.revision</code> (revision A) is auto-created when the
+item is saved.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The <code>pg.item</code> form (<code>/Users/naadmin/product_graph_v19/addons/product_graph_base/models/pg_item.py</code>):</p>
+<ul>
+<li><strong>Part number</strong> (<code>part_number</code> on <code>pg.item</code>) — auto-assigned on
+  save, format <code>PG-&lt;TYPE&gt;-NNNN</code> where <code>&lt;TYPE&gt;</code> is one of <code>ASM</code>,
+  <code>PRT</code>, <code>BUY</code>, <code>DOC</code>, <code>SFT</code>, <code>SVC</code>. For a Southbrook cabinet SKU
+  this is almost always <code>PG-ASM-NNNN</code> (it's an assembly). Do <strong>not</strong>
+  pick the type carelessly — burned sequences are forever.</li>
+<li><strong>Name</strong> (<code>name</code>) — human-readable. Convention: family + size +
+  configurable axis, e.g. <em>Base 1-Door Sink Surround 24-36"</em>.</li>
+<li><strong>Description</strong> (<code>description</code>, Html) — paste the verbatim
+  customer requirement from <code>intake.md</code> of the conception folder.
+  This is the only place in the platform where the customer's words
+  survive end-to-end; future engineers reading this in three years
+  will thank you.</li>
+<li><strong>Item type</strong> (<code>item_type</code>) — <code>assembly</code> for a buildable cabinet.
+  <code>purchased</code> if you're ever wrong and this is actually a
+  buy-to-resell item; for Southbrook SKUs it should never be.</li>
+<li><strong>Category</strong> (<code>category_id</code> → <code>pg.category</code>) — the engineering
+  category. Pick one that already exists; do not create new ones
+  here (that's a Course 9 admin task).</li>
+<li><strong>Tag(s)</strong> (<code>tag_ids</code> → <code>pg.item.tag</code>) — multi-tag. At minimum
+  apply <code>cabinet</code>, plus the family tag (<code>base</code> / <code>wall</code> / <code>tall</code> /
+  <code>accessory</code>), plus any cross-cutting tag the conception folder
+  implies (<code>sink</code>, <code>corner</code>, <code>floating</code>, …).</li>
+<li><strong>State</strong> (<code>state</code>) — starts at <code>concept</code>. You'll move it through
+  <code>prototype</code> → <code>engineering</code> over the course of lesson 11.3 and
+  11.4. The release happens in lesson 11.8.</li>
+<li><strong>Property templates</strong> (<code>property_template_ids</code> → many2many
+  <code>pg.property.template</code>) — pick the template(s) whose fields match
+  the spec from <code>spec_draft.md</code>. For a cabinet, that's almost
+  always <em>Cabinet — Carcass &amp; Door</em> plus <em>Hardware Spec</em>. If a
+  field your spec needs isn't on any existing template, <strong>stop and
+  file a request to extend the template</strong> — do not write the value
+  into <code>internal_notes</code> and hope.</li>
+<li><strong>Responsible</strong> (<code>responsible_id</code> → <code>res.users</code>) — you, today.
+  Hand-off to a manufacturing engineer later via the revision flow.</li>
+<li><strong>Image</strong> (<code>image_1920</code>) — drag the conception sketch in. It's
+  placeholder-grade; lesson 11.4 (BoM) will replace it with the
+  FreeCAD render once the BoM is real.</li>
+</ul>
+<p>Smart buttons across the top: <strong>Revisions</strong> / <strong>EBOMs</strong> / <strong>BOMs</strong> /
+<strong>MOs</strong> / <strong>Assets</strong>. On a fresh item, only <em>Revisions</em> has anything
+(the auto-created revision A in <code>draft</code> state).</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Open the conception folder (2 min):</strong></p>
+<ul>
+<li>Read <code>intake.md</code>, <code>scope.md</code>, <code>spec_draft.md</code>, and <code>sketch.&lt;ext&gt;</code>
+  end-to-end. If the spec is too vague to act on, <strong>do not invent</strong>
+  — send it back to the designer (lesson 11.1 has the
+  "spec too vague" recovery).</li>
+</ul>
+<p><strong>2. Verify a property template fits (5 min):</strong></p>
+<ul>
+<li>Open <strong>ProductGraph → Configuration → Property Templates</strong>. Find
+  the template you think fits — for a cabinet, the standard pair is
+  <em>Cabinet — Carcass &amp; Door</em> and <em>Hardware Spec</em>.</li>
+<li>Open the template and read its <code>field_ids</code> (the
+  <code>pg.property.field</code> rows). Cross-check against
+  <code>spec_draft.md</code>: does every spec bullet have a matching field?</li>
+<li>If yes, proceed. If no, <strong>stop</strong>. File a property-template-extend
+  request to the PLM platform owner (the request flow is in Course
+  9 lesson 9.3). Do not start the item creation if the spec can't
+  land cleanly — <code>internal_notes</code> is not a substitute for a
+  proper field.</li>
+</ul>
+<p><strong>3. Create the <code>pg.item</code> (10 min):</strong></p>
+<ul>
+<li>ProductGraph → Engineering → Items → <em>New</em>.</li>
+<li>Pick <strong>Item type = assembly</strong>. (Pick wrong here and you can't
+  fix it — <code>pg.item.item_type</code> is forbidden to change once
+  released; for Southbrook SKUs it's always <code>assembly</code>.)</li>
+<li>Fill <strong>Name</strong> per convention.</li>
+<li>Paste <strong>Description</strong> verbatim from <code>intake.md</code>.</li>
+<li>Pick <strong>Category</strong> (existing).</li>
+<li>Apply <strong>Tags</strong>: <code>cabinet</code> + family + cross-cutting.</li>
+<li>Add <strong>Property templates</strong> (the pair you verified in step 2).</li>
+<li>Set <strong>Responsible = you</strong>.</li>
+<li>Drag the <strong>sketch</strong> in as <code>image_1920</code>.</li>
+<li><strong>Save.</strong> The part number assigns now (<code>PG-ASM-NNNN</code>); revision A
+  auto-creates in <code>draft</code>.</li>
+</ul>
+<p><strong>4. Fill the first revision's property values (10 min):</strong></p>
+<ul>
+<li>Open the auto-created revision A (smart button → Revisions →
+  click row → form).</li>
+<li>The <code>pg.revision</code> form shows a <em>Properties</em> tab listing every
+  field from every property template you attached, as
+  <code>pg.property.value</code> rows (one per field) ready for you to fill.</li>
+<li>Fill <strong>every</strong> field with the best information you have. For
+  ranges (e.g. width 24-36"), the template's field type tells you
+  whether to enter a range or a single representative value
+  (typically range for cabinet width, single for thickness).</li>
+<li>Fill <strong><code>change_summary</code></strong> on the revision: <em>"Initial concept from
+  intake folder 2026-06-17_<slug>"</em>. This is required to advance
+  the revision state.</li>
+</ul>
+<p><strong>5. Attach the vendor stub if any (3 min — usually skipped):</strong></p>
+<ul>
+<li>If the SKU implies a vendor-supplied component you haven't bought
+  before (rare for cabinets — common for novel hardware), create a
+  <code>pg.vendor</code> stub (<code>/Users/naadmin/product_graph_v19/addons/product_graph_base/models/pg_vendor.py</code>)
+  via <em>Engineering → Vendors</em> (model-only, no menu in Phase 1 — use
+  the developer-tools "Open Model" path if you must; Course 9
+  lesson 9.4 documents the workaround).</li>
+<li>95% of cabinet SKUs skip this step.</li>
+</ul>
+<p><strong>6. Attach the spec sheet (5 min):</strong></p>
+<ul>
+<li>Back on the revision form, <em>Documents</em> tab.</li>
+<li>Add a <code>pg.document</code> (<code>document_type = spec</code>) and upload
+  <code>spec_draft.md</code> from the conception folder. This is the first
+  audit trail of the customer requirement in the system.</li>
+<li>Add another <code>pg.document</code> (<code>document_type = drawing</code>) with the
+  sketch image.</li>
+<li><em>Do not</em> attach the BoM here — that comes later from
+  <code>southbrook_plm</code> via the bridge addon (see the lesson's
+  <em>behind the scenes</em> section).</li>
+</ul>
+<p><strong>7. Move the item state forward (2 min):</strong></p>
+<ul>
+<li>On the <code>pg.item</code> form, click <em>Action → Move to Prototype</em>. The
+  item state goes <code>concept → prototype</code>. The first audit-log row
+  fires. This signals to lesson 11.3 (cut-spec authoring) that the
+  product is real and they can start engineering against it.</li>
+<li>Do <strong>not</strong> move to <em>Engineering</em> yet. That happens at the end of
+  lesson 11.4 (BoM created) — the convention is <code>prototype</code> =
+  "creating engineering artefacts," <code>engineering</code> = "engineering
+  artefacts exist and are coherent."</li>
+</ul>
+<p><strong>8. Send the hand-off (1 min):</strong></p>
+<ul>
+<li>One-line Slack message to the cut-spec author (often you, but
+  often a different PLM engineer with cut-math expertise):
+  <em>"<code>PG-ASM-NNNN</code> in prototype, ready for cut spec auth. Conception
+  folder at <code>&lt;path&gt;</code>."</em></li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I picked the wrong <code>item_type</code> (purchased instead of assembly)."</strong></p>
+<p>You cannot change <code>item_type</code> on a released item, but on a
+<code>concept</code>/<code>prototype</code> item you can — open the form, change the field,
+save. The audit log will record the change. If the part number
+sequence ended up wrong as a result (e.g. you got <code>PG-BUY-NNNN</code>
+when you wanted <code>PG-ASM-NNNN</code>), see the next mistake.</p>
+<p><strong>"My part number prefix is wrong."</strong></p>
+<p>Cannot rewrite <code>part_number</code>. The clean path is: archive this
+record (<code>active=False</code>), create a new one with the right type. The
+old part number is burned but no other damage. <em>Do this before
+moving the item past <code>concept</code> state</em> — once you're in <code>prototype</code>,
+downstream references (the BoM, the configurator) start to land and
+roll-back gets expensive.</p>
+<p><strong>"The property template I need doesn't exist and I can't wait for
+the platform owner to add a field."</strong></p>
+<p>Don't write the missing value into <code>internal_notes</code>. The
+configurator (lesson 11.5) and the BoM (lesson 11.4) read from
+property values; values that live only in <code>internal_notes</code> are
+invisible to every downstream consumer. The right escalation is to
+file the template-extend request as a P1 and use the conception
+folder to capture the missing value in the interim. Cost: half a
+day waiting; benefit: every future SKU using this template gets the
+field for free.</p>
+<p><strong>"I forgot to fill <code>change_summary</code> on revision A and now I can't
+advance the revision."</strong></p>
+<p>Fill it. The constraint
+(<code>/Users/naadmin/product_graph_v19/addons/product_graph_revision/models/pg_revision.py</code>)
+is <code>change_summary</code> required to leave <code>draft</code> — type the value, save,
+then advance.</p>
+<p><strong>"I attached the cut spec PDF as a <code>pg.document</code>."</strong></p>
+<p>Detach it. The cut spec lives in <code>southbrook.cut.spec</code> over in the
+main Southbrook database, not as a static document. Lesson 11.3
+authors it there. The PLM bridge addon
+(<code>southbrook_plm_productgraph</code>) is the link between them — see
+behind-the-scenes.</p>
+<p><strong>"Two PLM engineers created two items for the same conception
+folder."</strong></p>
+<p>Lesson 11.2's first action is <em>check no item already exists for this
+intake</em>. If it slipped through, the convention is: keep the
+lower-numbered part number (it's "wholesale" — first claim wins),
+archive the higher one, post a chatter note on the survivor
+explaining the merge. The conception folder's Slack channel should
+have caught it; tighten that channel's etiquette.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you save the <code>pg.item</code>:</p>
+<ul>
+<li>A row in <code>pg.item</code> is created with <code>state=concept</code>,
+  <code>part_number</code> assigned from the ProductGraph sequence (different
+  sequences per <code>item_type</code>).</li>
+<li>A row in <code>pg.revision</code> (revision A) is auto-created with
+  <code>state=draft</code>, linked back via <code>item_id</code>.</li>
+<li>Each property template's <code>pg.property.field</code> rows generate
+  matching <code>pg.property.value</code> rows on the revision (one per field,
+  initially empty).</li>
+<li>The first audit-log row fires (ProductGraph audits every state
+  transition; see Course 9 lesson 9.5).</li>
+<li>A <code>pg.audit.log</code> row records <em>concept created</em> with your user id,
+  timestamp, and an empty <code>before</code> JSON.</li>
+</ul>
+<p>When you click <em>Move to Prototype</em>:</p>
+<ul>
+<li><code>pg.item.action_to_prototype()</code> runs
+  (<code>/Users/naadmin/product_graph_v19/addons/product_graph_base/models/pg_item.py</code>).</li>
+<li><code>state</code> flips <code>concept → prototype</code>. Another audit-log row fires.</li>
+<li><em>No other downstream system is notified yet.</em> The Southbrook main
+  Odoo database has no knowledge of this item — that wiring happens
+  later, when the cut spec is activated (lesson 11.3) and the BoM
+  is created (lesson 11.4). The bridge addon
+  <code>southbrook_plm_productgraph</code> only fires on <strong>ECO apply</strong>
+  (<code>southbrook.eco.action_apply</code> →
+  <code>southbrook.eco._should_trigger_pg_release</code> → creates a
+  <code>pg.release</code>); creating the <code>pg.item</code> itself is one-way upstream
+  metadata.</li>
+</ul>
+<p>The deliberate design: ProductGraph is the "what" (the part
+identity, the property values, the audit trail); Southbrook PLM is
+the "how" (the cut spec, the BoM, the ECO that ties them
+together). Lesson 11.8 (release + iteration) is where the two
+systems re-sync via a <code>pg.release</code> triggered by the formal release
+ECO.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open the conception folder and find a green-light
+<code>spec_draft.md</code> that says <em>"Width 18-30", height 32-42", melamine
+box, slab door, soft-close hinges, finished both sides"</em>. Which
+property templates do you attach to the <code>pg.item</code>?</p>
+<blockquote>
+<p><em>Cabinet — Carcass &amp; Door</em> (covers width range, height range, box
+material, door style, finished-sides flag) and <em>Hardware Spec</em>
+(covers hinge type, soft-close). If your installation doesn't have
+a <em>Hardware Spec</em> template, hardware values land on the
+<em>Cabinet — Carcass &amp; Door</em> template's hardware fields instead;
+Course 9 lesson 9.2 documents the template inventory.</p>
+</blockquote>
+<p><strong>2.</strong> You picked <strong>item_type = purchased</strong> by mistake. You saved
+the item. The part number came back <code>PG-BUY-0117</code>. You haven't
+moved to prototype yet. What do you do?</p>
+<blockquote>
+<p>Edit the form, change <code>item_type</code> to <code>assembly</code>, save. The audit
+log records the change. The part number stays <code>PG-BUY-0117</code>
+(sequences don't rewrite). If you can't live with the wrong
+prefix, archive this record (<code>active=False</code>) and create a new
+one — clean fix, costs one burned sequence. Do this <strong>before</strong>
+moving to prototype, because once downstream artifacts land
+against <code>PG-BUY-0117</code>, rollback gets messy.</p>
+</blockquote>
+<p><strong>3.</strong> The designer says <em>"don't bother creating the <code>pg.item</code> yet,
+I'm still iterating on the spec."</em> The conception folder is not
+green-lit. What do you do?</p>
+<blockquote>
+<p>Wait. Lesson 11.2 fires only when the conception folder is
+renamed <code>*_GREEN</code> and the Slack hand-off has happened. Creating
+the <code>pg.item</code> early burns part numbers, pollutes the ProductGraph
+hub with concept records that may never reach prototype, and
+bypasses the conception gate that's designed to keep junk out of
+the platform.</p>
+</blockquote>
+<p><strong>4.</strong> Three months from now you discover the description on the
+<code>pg.item</code> doesn't match what the customer originally asked for. The
+SKU is in production. What do you do?</p>
+<blockquote>
+<p>Raise an ECO. ProductGraph items past <code>released</code> are
+revision-immutable; the description on <code>pg.item</code> itself is
+mutable but the change must be audited. Open a
+<code>southbrook.eco</code> (target_kind=<em>document</em>) noting the description
+correction, attach the new wording, advance through the ECO
+stages, and let <code>_apply_document</code> fire. The change appears in
+the audit log of both <code>southbrook.eco</code> and (via the bridge) the
+next <code>pg.release</code>.</p>
+</blockquote>
+<p><strong>5.</strong> You finish the revision A property values, advance to
+prototype, and the cut-spec author (lesson 11.3) says <em>"I don't see
+the item — there's no link from <code>southbrook.cut.spec</code> to the
+<code>pg.item</code>."</em> What's going on, and what do you do?</p>
+<blockquote>
+<p>Nothing's wrong. <code>southbrook.cut.spec</code> has <strong>no per-product link</strong>
+— it's a single global active record covering the 8 NF14
+constants for the whole shop. The cut-spec author doesn't read
+from the <code>pg.item</code>; they read from the conception folder + the
+property values you filled. Lesson 11.3 covers this gotcha
+directly. The product/cut-spec link lives at the ECO level
+(<code>southbrook.eco.cut_spec_id</code>), not the product-template level.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>ProductGraph fundamentals — <code>pg.item</code>, revisions, the property
+  template system, the audit log — that's Course 9 (lessons 9.1
+  through 9.5).</li>
+<li>Cut spec authoring in <code>southbrook.cut.spec</code> — that's lesson 11.3.</li>
+<li>Creating the <code>mrp.bom</code> for the product — that's lesson 11.4.</li>
+<li>The configurator entry — that's lesson 11.5.</li>
+<li>The release gate where <code>pg.item.state</code> flips
+  <code>engineering → released</code> — that's lesson 11.8.</li>
+<li>The <code>southbrook_plm_productgraph</code> bridge details (how the ECO
+  apply triggers a <code>pg.release</code>) — covered in lesson 11.8 and in
+  Course 9 lesson 9.6.</li>
+<li>Vendor stub management beyond the one-line stub creation in
+  step 5 — Course 9 lesson 9.4.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_11_cut_spec_authoring" model="slide.slide">
+            <field name="name">Authoring the Cut Spec for the New Product</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">PLM engineer authoring or revising the geometric constants that drive the new product&#x27;s panel-cut math.</field>
+            <field name="html_content"><![CDATA[<h1 id="authoring-the-cut-spec-for-the-new-product">Authoring the Cut Spec for the New Product</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PLM engineer who owns the geometric constants — the panel
+thickness, the rabbet depth, the door reveal, the toe-kick height —
+that every cabinet template's BoM reads through the
+<code>_get_cut_constants()</code> seam. Yesterday lesson 11.2 created
+<code>PG-ASM-NNNN</code>. Today you decide whether the new product needs a <em>new
+cut spec</em> (almost never — only if the constants genuinely change) or
+whether the existing active cut spec serves (almost always — same
+constants, new BoM expression of them).</p>
+<p>This lesson is <strong>workflow-specific</strong>: it does not re-cover the cut
+spec model in detail (that's lesson 4.2). It covers the <em>decision</em>
+("new spec? same spec?") and the <em>activation path</em> in the context of
+introducing a brand-new product.</p>
+<p>The honest reality: 9 times out of 10, your answer is <em>"same active
+cut spec serves; no new spec needed; proceed to lesson 11.4."</em> This
+lesson teaches you to recognise the 1 in 10 where a new spec <strong>is</strong>
+required, and how to land it without breaking the cabinets already in
+production.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Cut spec lives in the main Southbrook Odoo database (not in
+ProductGraph). Sign in at
+<strong>southbrookcabinetry.space/odoo</strong> with your PLM-Approver account
+(<code>group_southbrook_plm_approver</code>), then:</p>
+<blockquote>
+<p><strong>Southbrook PLM → Cut Specifications</strong></p>
+</blockquote>
+<p>You'll see exactly <strong>one</strong> record marked <strong>Active</strong> (green
+decoration), some number of <strong>Draft</strong> records, and an archive of
+<strong>Superseded</strong> records. The single-active invariant is enforced by
+<code>_check_single_active</code>
+(<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_plm/models/southbrook_cut_spec.py</code>,
+line 124) and is the whole reason this lesson is delicate.</p>
+<p>ECOs that propose or activate cut specs live at:</p>
+<blockquote>
+<p><strong>Southbrook PLM → Change Orders</strong></p>
+</blockquote>
+<p>…filtered by <code>target_kind = cut_spec</code>.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The <code>southbrook.cut.spec</code> form (lesson 4.2 covers every field; this
+section recaps what matters for the new-product workflow):</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — convention: cite the source of these
+  constants. <em>"2026 Workbook Rev B"</em>. <strong>Not</strong> the product name. Cut
+  specs are global, not per-product.</li>
+<li><strong>State</strong> (<code>state</code> — Selection <code>draft</code> / <code>active</code> / <code>superseded</code>)
+  — statusbar widget. <strong>You never write this field directly.</strong> The
+  <code>_check_single_active</code> constraint enforces one active at a time.</li>
+<li><strong>The 8 NF14 constants</strong>, all <code>Float</code>, all millimetres:</li>
+<li><code>box_th</code> — box panel thickness</li>
+<li><code>back_th</code> — back panel thickness</li>
+<li><code>rabbet</code> — rabbet depth at back</li>
+<li><code>door_th</code> — door thickness</li>
+<li><code>door_reveal</code> — gap around door edge</li>
+<li><code>shelf_tol</code> — shelf clearance tolerance</li>
+<li><code>shelf_vent_gap</code> — vent gap at top of shelf</li>
+<li><code>toekick_h</code> — toe-kick height</li>
+<li><strong>ECO smart button</strong> (<code>southbrook_eco_ids</code>, count
+  <code>southbrook_eco_count</code>) — every ECO that has proposed or activated
+  this spec.</li>
+</ul>
+<p>The form also surfaces a button <strong>Activate</strong> (visible only to
+PLM-Approvers, only when state is <code>draft</code>). Clicking it calls
+<code>action_activate()</code> (line 177) which: looks up the current active
+via <code>_get_active()</code>, writes <code>state='superseded'</code> on it, posts
+chatter, then writes <code>state='active'</code> on self. <strong>But you almost
+never click this button directly.</strong> The activation should be the
+side effect of an ECO <code>_apply_cut_spec</code>, not a manual flip. See
+<em>Common mistakes</em> below.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Read the property values from lesson 11.2 (5 min):</strong></p>
+<ul>
+<li>Open <code>PG-ASM-NNNN</code> in ProductGraph. Open revision A. Read every
+  <code>pg.property.value</code>.</li>
+<li>Question: do any of the property values <strong>disagree</strong> with the
+  current active cut spec's 8 NF14 constants? Specifically:</li>
+<li>Box panel thickness — does the new product use a thicker box
+    (e.g. solid-wood vs melamine 18mm)?</li>
+<li>Door thickness — does the new product use a thicker door
+    (e.g. 22mm shaker vs 18mm slab)?</li>
+<li>Door reveal — does the new product have a tighter or looser
+    reveal than the shop standard?</li>
+<li>If every property value is consistent with the current active
+  spec, <strong>stop here and skip to lesson 11.4</strong>. The active spec
+  serves; you don't need to author a new one. <strong>This is the
+  expected outcome.</strong></li>
+</ul>
+<p><strong>2. If a constant genuinely differs, decide the path (10 min):</strong></p>
+<p>There are three real paths and one tempting wrong path:</p>
+<ul>
+<li><strong>(a) Update the global spec.</strong> If the new product's value is the
+  <em>new shop standard</em> (e.g. the shop is switching from 18mm to
+  19mm box stock industry-wide), a new global active spec is
+  correct — every cabinet now uses the new value.</li>
+<li><strong>(b) Per-product override in the BoM.</strong> If the new product is
+  the <strong>only</strong> cabinet using the differing constant (e.g. a
+  one-family thick-door SKU), the right fix is <strong>not</strong> a new cut
+  spec — it's the per-product BoM in lesson 11.4 carrying the
+  override directly on its operation parameters or hardware lines.
+  Cut spec is global; per-product variation lives in the BoM.</li>
+<li><strong>(c) Add a new attribute value.</strong> If the differing constant is
+  really a <em>choice</em> the customer makes (e.g. door thickness
+  selectable), the right fix is a new attribute value in the
+  configurator (lesson 11.5), with the BoM math reading the choice.
+  Not a cut spec change.</li>
+<li><strong>(WRONG path) Author a new cut spec to "cover" this product's
+  case.</strong> Cut specs are <strong>not</strong> scoped — there is only ever one
+  active. Authoring a new spec to handle this product breaks
+  every other cabinet in production because every other cabinet's
+  BoM now reads the new constants too.</li>
+</ul>
+<p>If you've decided on (a) — a new global spec — proceed. Otherwise
+escalate to lesson 11.4 (path b) or lesson 11.5 (path c).</p>
+<p><strong>3. Draft the new cut spec (10 min):</strong></p>
+<ul>
+<li><strong>Southbrook PLM → Cut Specifications → New</strong>.</li>
+<li><strong>Name</strong>: cite the source. <em>"2026 Workbook Rev C — 19mm box
+  stock"</em>.</li>
+<li>Fill <strong>all 8 constants</strong> with the new values. Even constants that
+  didn't change must be present — copying the active spec's other
+  seven and updating only the one that changed is correct (lesson
+  4.2 covers the <em>copy from active</em> gotcha).</li>
+<li><strong>State</strong> stays <code>draft</code>. <strong>Do not</strong> click Activate. We're going
+  to activate it via an ECO, not by hand.</li>
+<li><strong>Save.</strong> The draft is now visible in the list view under
+  <em>Draft</em>.</li>
+</ul>
+<p><strong>4. Raise the ECO (5 min):</strong></p>
+<ul>
+<li><strong>Southbrook PLM → Change Orders → New</strong>.</li>
+<li><strong>eco_type_id</strong> → pick an ECO type with <strong>target_kind = cut_spec</strong>
+  (<code>southbrook.eco.eco_type</code> — typed in <code>southbrook_eco_type.py</code>).</li>
+<li><strong>title</strong>: <em>"Activate cut spec for <code>PG-ASM-NNNN</code> — 19mm box
+  stock"</em>.</li>
+<li><strong>description</strong> (Html): include a short rationale citing the
+  ProductGraph item, the property value that drives the constant
+  change, and the affected cabinets (almost always <em>"all cabinets
+  in production"</em> — cut spec is global, this is the point).</li>
+<li><strong>cut_spec_id</strong> → pick the draft you just authored.</li>
+<li><strong>document_ids</strong> → attach the source workbook revision PDF and
+  the conception folder's <code>spec_draft.md</code>.</li>
+<li><strong>Save.</strong> State is <code>open</code>.</li>
+</ul>
+<p><strong>5. Walk the ECO through approval (varies; minutes to days):</strong></p>
+<ul>
+<li>The ECO follows the configured stage Kanban
+  (<code>southbrook.eco.stage</code>). For cut-spec ECOs the typical flow is:
+  <em>Draft → Review → Approved</em>.</li>
+<li>The Review stage requires an approver outside your team to sign
+  off — cut spec changes affect every cabinet, so a second pair of
+  eyes is non-negotiable.</li>
+<li>When the Approver clicks <em>Apply</em>, <code>action_apply()</code> dispatches to
+  <code>_apply_cut_spec()</code> which calls
+  <code>cut_spec_id.action_activate()</code> — the activation happens <strong>as a
+  side effect of the ECO apply</strong>, not by you clicking the form
+  button. This is why we drafted the spec without activating it.</li>
+</ul>
+<p><strong>6. Verify the activation (2 min):</strong></p>
+<ul>
+<li>Reload <strong>Southbrook PLM → Cut Specifications</strong>. The previous
+  active is now superseded; your draft is now active.</li>
+<li>Open an MO that's mid-flight (any one — pick something benign).
+  The MO's BoM now reads your new constants. <strong>No data migration
+  was needed</strong> because the constants are read at BoM-rollup time,
+  not stored on the BoM.</li>
+</ul>
+<p><strong>7. Hand-off to lesson 11.4 (1 min):</strong></p>
+<ul>
+<li>Slack the BoM author (often the same person but often not):
+  <em>"Cut spec active; ready for BoM authoring on <code>PG-ASM-NNNN</code>."</em></li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I clicked the Activate button on the form directly and it worked.
+Why is that bad?"</strong></p>
+<p>It worked <em>mechanically</em> — <code>action_activate()</code> is callable from the
+form. But you bypassed the audit trail: no <code>southbrook.eco</code> row, no
+ECO history smart button on the new active spec, no approver
+sign-off recorded, no chatter explaining why the constants changed.
+Two months from now when the shop floor's cycle times degrade and
+the production manager asks <em>"what changed?"</em>, the answer
+"someone clicked Activate" is unacceptable. <strong>Recovery</strong>: open the
+new active spec. Raise the ECO retroactively (target_kind=cut_spec,
+cut_spec_id=this active record), describe what should have happened,
+walk it through the stages, and apply it. The activation is a
+no-op (already active) but the audit trail catches up. Then write
+yourself a sticky note.</p>
+<p><strong>"I authored a draft spec with one constant changed, activated it,
+and now every base cabinet's cycle time exploded."</strong></p>
+<p>This is path (a) gone wrong: the constant you changed was
+appropriate for the new product but wrong for every existing
+cabinet. <strong>Recovery</strong>: immediately raise an ECO to re-activate the
+previous (now superseded) spec. The superseded record is still in
+the table; the ECO <code>_apply_cut_spec</code> flow re-activates it cleanly.
+Then go back to step 2 of the daily flow and reconsider whether you
+actually needed path (b) or (c).</p>
+<p><strong>"I want to author a 'product-scoped' cut spec just for the new
+product so I don't affect the others."</strong></p>
+<p>You cannot. The model has no scoping field; the
+<code>_check_single_active</code> constraint is global; the
+<code>_get_cut_constants</code> seam reads <code>_get_active()</code> which returns the
+single active record. If the new product genuinely needs different
+constants, the design path is (b) — per-product override in the BoM
+— or (c) — attribute choice. <em>Filing a ticket</em> to add cut spec
+scoping is fine ("add <code>product_tmpl_id</code> to <code>southbrook.cut.spec</code>
+for per-product variants"), but that's a future feature; today you
+take path (b) or (c).</p>
+<p><strong>"The ECO approval is held up and I need to ship the new product."</strong></p>
+<p>The new product cannot ship until the cut spec it depends on is
+active. If you're blocked on approval, two real options: (1)
+escalate the ECO approval — the approver is the bottleneck, not the
+spec; (2) reconsider whether path (a) was right. Often the
+re-think reveals the constant change wasn't really needed, the
+product can ship on the existing spec, and you cancel the draft.</p>
+<p><strong>"I forgot to attach the workbook PDF as <code>document_ids</code> on the
+ECO."</strong></p>
+<p>Edit the ECO, attach it, save. The ECO carries the audit trail of
+the constants change; without the source workbook attachment,
+six months from now when an auditor asks <em>"where did 19mm come
+from?"</em> the answer is <em>"trust me"</em>. Always attach the source.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you click <strong>Apply</strong> on the ECO:</p>
+<ul>
+<li><code>southbrook.eco.action_apply()</code> runs
+  (<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_plm/models/southbrook_eco.py</code>).</li>
+<li>It dispatches on <code>target_kind</code> — for <code>cut_spec</code> it calls
+  <code>_apply_cut_spec()</code>.</li>
+<li><code>_apply_cut_spec()</code> calls <code>self.cut_spec_id.action_activate()</code>.</li>
+<li><code>action_activate()</code> (in <code>southbrook_cut_spec.py</code> line 177):</li>
+<li>Calls <code>_get_active()</code> to find the current active record.</li>
+<li>Writes <code>state='superseded'</code> on the previous active. Posts a
+    chatter message: <em>"Superseded by ECO <code>&lt;name&gt;</code>"</em>.</li>
+<li>Writes <code>state='active'</code> on <code>self</code>. Posts a chatter message:
+    <em>"Activated by ECO <code>&lt;name&gt;</code>"</em>.</li>
+<li>The <code>_check_single_active</code> constraint runs as part of this write
+  and verifies that, after the write, exactly one record has
+  <code>state='active'</code>. (Two would raise <code>ValidationError</code>; zero is
+  allowed transiently inside the same database transaction.)</li>
+<li>The ECO's own state advances to <code>applied</code>, <code>applied_date</code> set to
+  <code>fields.Datetime.now()</code>, and an audit chatter row is written.</li>
+</ul>
+<p>When any cabinet's MO confirms after this point and the BoM rollup
+runs:</p>
+<ul>
+<li><code>mrp.bom._get_cut_constants()</code> is the seam
+  (<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_estimating/models/mrp_bom.py:73</code>
+  is the base; the PLM override is at
+  <code>/Users/naadmin/southbrook-v19cr/addons/southbrook_plm/models/mrp_bom.py:106</code>).</li>
+<li>The PLM override calls
+  <code>self.env['southbrook.cut.spec'].sudo()._get_active()</code>. <code>sudo()</code>
+  is required so portal users hitting <code>/southbrook/api/order/&lt;id&gt;</code>
+  don't <code>AccessError</code> (cut specs are not portal-accessible).</li>
+<li>If found, returns <code>spec.constants_dict()</code> (the 8 NF14 constants).</li>
+<li>If not found (no active spec — only possible during a brief
+  transition window or in a broken environment), returns
+  <code>super()</code> — the hard-coded estimating defaults.</li>
+</ul>
+<p>The ProductGraph bridge (<code>southbrook_plm_productgraph</code>) does <strong>not
+fire on cut spec activation</strong> in v1 — the bridge fires only when
+ECO <code>target_kind</code> is <code>bom</code> (creates a <code>pg.release</code>). Cut spec
+activation is intentionally not propagated to ProductGraph, because
+cut spec is a shop-floor constant, not a per-part attribute. If
+your new product's cut constants needed to land as ProductGraph
+property values, they did — back in lesson 11.2.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You're authoring a new wall cabinet SKU. The property values
+in revision A say <em>box thickness 18mm, door thickness 18mm, reveal
+3mm</em> — exactly the same as the active cut spec. Do you author a new
+spec?</p>
+<blockquote>
+<p>No. The active spec serves. Skip to lesson 11.4 (BoM creation).
+Authoring a "no-op" cut spec would burn a record, require an ECO,
+and add noise to the supersession chain for no benefit.</p>
+</blockquote>
+<p><strong>2.</strong> The new product is a thick-door luxury SKU with <code>door_th =
+22mm</code> while the active spec is <code>door_th = 18mm</code>. Every other
+cabinet stays at 18mm. Which path do you take?</p>
+<blockquote>
+<p>Path (b) — per-product override in the BoM. The BoM's
+operation parameters or door-cut math carries the 22mm
+dimension directly. Cut spec stays at 18mm because every other
+cabinet still uses 18mm. <strong>Do not</strong> activate a new global
+22mm cut spec — you'd break every other cabinet.</p>
+</blockquote>
+<p><strong>3.</strong> You drafted a new cut spec, raised the ECO, the approver
+clicked Apply, and the spec is now active. You then notice the
+<code>shelf_vent_gap</code> value you entered is wrong (15mm instead of 10mm
+— typo). What do you do?</p>
+<blockquote>
+<p>Two recoveries depending on impact: (a) if no MOs have confirmed
+since the activation, draft a corrected spec, raise a follow-on
+ECO, and apply — the broken spec gets superseded after seconds
+of "production." (b) If MOs have already confirmed and run with
+the wrong vent gap, raise an ECO to re-activate the previous
+spec immediately (stops the bleeding), then raise a follow-on
+with the corrected values. Document both ECOs with chatter
+referencing each other.</p>
+</blockquote>
+<p><strong>4.</strong> A PLM-Approver who isn't on your team clicks Activate
+directly on a draft cut spec without an ECO. You discover it during
+a Monday review. What do you do?</p>
+<blockquote>
+<p>Open the now-active spec. Raise an ECO retroactively
+(target_kind=cut_spec, cut_spec_id=this spec), explain in the
+description what should have happened, walk through the stages
+with the approver explicitly named, and apply. The audit trail
+catches up. Use the incident to retrain the approver — the
+Activate button is a footgun and exists only for emergencies.</p>
+</blockquote>
+<p><strong>5.</strong> You're trying to test the new product end-to-end in a staging
+database. You activate the new cut spec in staging, but production
+is still on the old one. A planner asks <em>"are operators going to see
+the new constants?"</em> What's the answer?</p>
+<blockquote>
+<p>Only in staging. Cut spec is a database-scoped record — staging
+has its own <code>southbrook.cut.spec</code> table. When the ECO is applied
+in production, that database's spec activates and production
+operators see the new constants on the next MO confirm. There is
+no automatic staging-to-production replication; the ECO must be
+applied in each database. The pre-prod test in staging is
+deliberate — it lets you verify constants before they hit the
+shop.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Cut spec model fundamentals — every field, the activation
+  mechanics in detail — lesson 4.2.</li>
+<li>How operators read the cut spec at their stations — lesson 1.7.</li>
+<li>ECO fundamentals (raising, approving, applying) — lesson 4.1.</li>
+<li>The BoM that will read these constants — that's lesson 11.4.</li>
+<li>Per-product BoM overrides — covered in lesson 11.4.</li>
+<li>New attribute values for cut-related customer choices — lesson
+  11.5 and lesson 5.4.</li>
+<li>The ProductGraph release flow (which does <strong>not</strong> fire on cut
+  spec activation) — lesson 11.8.</li>
+<li>Cut spec scoping per product — a product gap; file a ticket if
+  your environment routinely needs per-product cut constants.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_11_bom_creation" model="slide.slide">
+            <field name="name">Creating the BoM for the New Product</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">PLM engineer (with production-planner review) authoring the first `mrp.bom` for a brand-new SKU.</field>
+            <field name="html_content"><![CDATA[<h1 id="creating-the-bom-for-the-new-product">Creating the BoM for the New Product</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PLM engineer authoring the <code>mrp.bom</code> for a brand-new SKU,
+working closely with the production planner who'll review your
+routing choices. The BoM you create today is the bridge between the
+abstract product (the <code>pg.item</code> from lesson 11.2 with its property
+values and the active cut spec from lesson 11.3) and the concrete
+shop floor (the workcenter codes, the operation cycle times, the
+hardware lines).</p>
+<p>A bad BoM is a slow shop. A non-existent BoM is a stuck quote — the
+configurator (lesson 11.5) and the estimator (lesson 11.6) can't
+produce a price without one. This lesson is the practical reality of
+authoring the first BoM and getting it past validation.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Manufacturing → Products → Bills of Materials → New</strong></p>
+</blockquote>
+<p>The BoM model is the standard <code>mrp.bom</code>
+(<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_plm/models/mrp_bom.py</code>
+adds PLM tracking; the bulk of the model is Odoo native). You'll
+also touch:</p>
+<blockquote>
+<p><strong>Sales → Configurable Products → Configurable Templates</strong></p>
+</blockquote>
+<p>…to confirm the <code>product.template</code> you'll attach the BoM to exists.
+For a brand-new SKU it usually doesn't yet — you create it now (the
+configurator setup in lesson 11.5 builds it out further).</p>
+<p>And the routing operations live on the BoM directly via
+<code>operation_ids</code> (standard <code>mrp.routing.workcenter</code>). The Southbrook
+seed example is at
+<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_mrp_pm/data/routing_base_1dr.xml</code>
+— <strong>read this file as a template</strong> before authoring your own.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The <code>mrp.bom</code> form (standard Odoo, with Southbrook extensions
+listed in parentheses):</p>
+<ul>
+<li><strong>Product</strong> (<code>product_tmpl_id</code> → <code>product.template</code>) — the
+  configurable template the BoM produces. For a new SKU you'll
+  create the template first (see daily flow step 2).</li>
+<li><strong>Quantity</strong> (<code>product_qty</code>) — almost always <code>1.0</code> for a
+  cabinet. Cabinets are built one at a time on Southbrook routings.</li>
+<li><strong>Routing operations</strong> (<code>operation_ids</code> → <code>mrp.routing.workcenter</code>)
+  — the ordered list of work operations, each with a
+  <code>workcenter_id</code> and a <code>time_cycle_manual</code> (minutes per piece).
+  This is where most of the lesson's effort goes.</li>
+<li><strong>Components</strong> (<code>bom_line_ids</code> → <code>mrp.bom.line</code>) — the raw and
+  semi-finished inputs (panel substrate, edge tape, door blank,
+  hardware kits). Each line has <code>product_id</code>, <code>product_qty</code>,
+  <code>product_uom_id</code>.</li>
+<li><strong>Southbrook version</strong> (<code>southbrook_version</code> Integer, added by
+  <code>southbrook_plm/models/mrp_bom.py</code>) — bumped by ECO apply
+  (<code>_apply_bom</code>). Starts at 1 for the new BoM. Lesson 11.8 covers
+  the post-release ECO that bumps this when you iterate.</li>
+<li><strong>ECO history</strong> (<code>southbrook_eco_ids</code> / <code>southbrook_eco_count</code>
+  smart button) — empty on first creation; populates when ECOs
+  start modifying this BoM.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Pre-flight checklist (3 min):</strong></p>
+<ul>
+<li>Confirm <code>PG-ASM-NNNN</code> is in <code>prototype</code> state (lesson 11.2).</li>
+<li>Confirm cut spec status from lesson 11.3 (either "active spec
+  serves" or "new active spec applied").</li>
+<li>Have the conception sketch and <code>spec_draft.md</code> open.</li>
+</ul>
+<p><strong>2. Create or confirm the <code>product.template</code> (5 min):</strong></p>
+<ul>
+<li><strong>Sales → Configurable Products → Configurable Templates → New</strong>.</li>
+<li><strong>Name</strong>: matches the <code>pg.item.name</code> from lesson 11.2.</li>
+<li><strong>Type</strong>: <em>Storable Product</em>.</li>
+<li><strong>Can be sold</strong>, <strong>Can be purchased = No</strong>.</li>
+<li><strong>Configurable</strong>: tick this on (<code>config_ok = True</code> on
+  <code>product.template</code> — see <code>product_configurator/models/product.py</code>
+  line 78). Lesson 11.5 fills in the attributes; today you just
+  create the shell so the BoM has something to attach to.</li>
+<li><strong>XML ID</strong>: convention <code>southbrook.&lt;family&gt;_&lt;descriptor&gt;</code> (e.g.
+  <code>southbrook.wall_3dr_corner</code>). This locks the ID per Q8 of the
+  estimating brief.</li>
+<li><strong>Save.</strong> Note the database ID and the XML ID.</li>
+</ul>
+<p><strong>3. Open the routing seed file as a reference (3 min):</strong></p>
+<ul>
+<li>Open
+  <code>/Users/naadmin/southbrook-v19cr/addons/southbrook_mrp_pm/data/routing_base_1dr.xml</code>
+  in a text editor (or via VCS) — <strong>do not edit it</strong>. This is the
+  canonical 8-operation routing for a base 1-door cabinet.</li>
+<li>The seed example shows: <code>SB-SAW</code> cut → <code>SB-EDGE</code> band →
+  <code>SB-CNC-BORE</code> drill → <code>SB-ASSY</code> assemble → <code>SB-DOOR</code> mount →
+  <code>SB-HW</code> hardware install → <code>SB-QC</code> inspect → <code>SB-PACK</code> pack.</li>
+<li>Your new BoM probably follows the same 8-step skeleton with
+  different <code>time_cycle_manual</code> values. Deviations from this
+  skeleton (e.g. an extra finish step at <code>SAND</code>/<code>PAINT</code>/<code>CURE</code>,
+  or a routing that skips <code>SB-DOOR</code> for a doorless cabinet) are
+  where the design decisions live.</li>
+</ul>
+<p><strong>4. Create the BoM record (5 min):</strong></p>
+<ul>
+<li><strong>Manufacturing → Products → Bills of Materials → New</strong>.</li>
+<li><strong>Product</strong>: pick the <code>product.template</code> you just created.</li>
+<li><strong>Quantity</strong>: 1.0.</li>
+<li><strong>BoM Type</strong>: <em>Manufacture this product</em> (the default).</li>
+<li><strong>Save.</strong> <code>southbrook_version</code> is now 1, no ECO history yet.</li>
+</ul>
+<p><strong>5. Add the routing operations (15 min):</strong></p>
+<p>For each operation in your planned routing:</p>
+<ul>
+<li><em>Operations</em> tab → <em>Add a line</em>.</li>
+<li><strong>Operation name</strong>: short, station-anchored. <em>"Saw — panel cut"</em>,
+  <em>"Edge band — front rail"</em>, etc.</li>
+<li><strong>Workcenter</strong> (<code>workcenter_id</code>) — pick the right code:</li>
+<li>Cutting → <code>SB-SAW</code></li>
+<li>Edge banding → <code>SB-EDGE</code></li>
+<li>CNC boring (primary) → <code>SB-CNC-BORE</code></li>
+<li>CNC boring (backup / overflow) → <code>CNC02</code></li>
+<li>Assembly → <code>SB-ASSY</code></li>
+<li>Door mounting → <code>SB-DOOR</code></li>
+<li>Sanding → <code>SAND</code></li>
+<li>Painting → <code>PAINT</code></li>
+<li>Curing → <code>CURE</code></li>
+<li>Hardware install → <code>SB-HW</code></li>
+<li>Quality → <code>SB-QC</code></li>
+<li>Packing → <code>SB-PACK</code></li>
+<li><strong>Cycle time</strong> (<code>time_cycle_manual</code>, minutes per piece) — your
+  best estimate, validated against the conception sketch. Cabinet
+  cycle times typically: SAW 6-12 min, EDGE 8-15 min (bottleneck —
+  see lesson 1.2), CNC-BORE 5-10 min, ASSY 15-30 min, DOOR 5-10 min,
+  HW 5-10 min, QC 3-5 min, PACK 3-5 min. <strong>You'll refine these
+  after the first MO (lesson 11.7); today's numbers are the seed.</strong></li>
+<li><strong>Sequence</strong>: the order operations run. SAW first, PACK last.</li>
+</ul>
+<p><strong>6. Add the components (10 min):</strong></p>
+<p>For each material input:</p>
+<ul>
+<li><em>Components</em> tab → <em>Add a line</em>.</li>
+<li><strong>Product</strong> (<code>product_id</code>) — the input product (panel substrate,
+  edge tape SKU, door blank, hardware kit).</li>
+<li><strong>Quantity</strong> (<code>product_qty</code>) — how many per cabinet. <strong>Do not
+  hardcode panel dimensions here</strong> — panel sizes derive from the
+  active cut spec via <code>_get_cut_constants()</code>; the BoM line is
+  the <em>count</em> of panels and the <em>substrate</em>, not the dimensions.</li>
+<li><strong>UoM</strong> (<code>product_uom_id</code>) — pieces for panels, metres for edge
+  tape, units for hardware.</li>
+</ul>
+<p>For hardware specifically, the <code>southbrook_hardware_catalog</code>
+auto-resolver handles per-door/per-shelf/per-cabinet hardware lines
+at MO confirm time (lesson 5.3). You add only the <strong>bespoke</strong>
+hardware lines that the auto-resolver doesn't cover.</p>
+<p><strong>7. Validate the BoM against the routing seed (3 min):</strong></p>
+<ul>
+<li>Compare operation count, sequence, and cycle-time order-of-
+  magnitude against <code>routing_base_1dr.xml</code>. Outliers (e.g. your
+  cycle time at <code>SB-EDGE</code> is 45 min when the seed says 12) are
+  almost always a measurement error or a misunderstanding of the
+  cabinet — escalate to the production planner.</li>
+</ul>
+<p><strong>8. The <code>_get_cut_constants()</code> seam — what to verify (3 min):</strong></p>
+<ul>
+<li>The BoM does <strong>not</strong> store panel dimensions. At MO rollup time,
+  Odoo calls <code>mrp.bom._get_cut_constants()</code>
+  (<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_plm/models/mrp_bom.py:106</code>)
+  which reads the active <code>southbrook.cut.spec</code>. The 8 NF14
+  constants come back as a dict.</li>
+<li>Confirm: open an MO against your BoM (do not confirm it — keep
+  it in draft). Check the cut list preview. The panel dimensions
+  should be derived from the constants, not hardcoded. If you see
+  hardcoded dimensions, you've mis-authored the BoM — the cabinet
+  isn't reading from the cut spec seam and your changes to the cut
+  spec won't propagate.</li>
+</ul>
+<p><strong>9. Move <code>pg.item</code> state forward (1 min):</strong></p>
+<ul>
+<li>Back in ProductGraph, open <code>PG-ASM-NNNN</code>. <em>Action → Move to
+  Engineering</em> (<code>action_to_engineering</code> on <code>pg.item</code>). State
+  flips <code>prototype → engineering</code>. The audit log fires.</li>
+<li>This signals to lesson 11.5 (configurator setup) that the BoM
+  exists and they can hook the configurator attribute mapping to a
+  real BoM.</li>
+</ul>
+<p><strong>10. Hand-off to lesson 11.5 (1 min):</strong></p>
+<ul>
+<li>Slack the configurator admin:
+  <em>"BoM authored for <code>PG-ASM-NNNN</code> /
+  <code>southbrook.&lt;xml_id&gt;</code>; ready for configurator wiring."</em></li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I hardcoded the panel dimensions in the BoM lines."</strong></p>
+<p>The BoM should carry <em>what</em> (substrate, count) not <em>how big</em> (the
+cut spec carries that). If you hardcoded e.g. <code>Panel 720x580x18mm</code>
+as the product on a BoM line, your cut spec changes will not
+propagate to this cabinet — the cabinet will keep cutting 720x580
+forever regardless of <code>box_th</code> updates. <strong>Recovery</strong>: replace the
+hardcoded-dimension product with the generic-substrate product
+(<em>Panel — White Melamine 18mm Stock</em>), and rely on
+<code>_get_cut_constants()</code> at MO time to size the cut. Confirm by
+opening a fresh MO and checking the cut list reflects the active
+spec.</p>
+<p><strong>"My cycle times on <code>SB-EDGE</code> are higher than the seed example
+suggests. The planner says my schedule's going to be wrong."</strong></p>
+<p>Two real causes: (1) your estimate is genuinely wrong and the new
+cabinet is faster than you think — measure on the first MO (lesson
+11.7), revise via ECO; (2) the new cabinet is genuinely slower (e.g.
+solid-wood edge tape vs melamine, or odd-shaped panels). Talk to the
+planner: a slower-than-seed cycle on the bottleneck workcenter (see
+lesson 1.2) reduces shop throughput and may justify a different
+routing (skip <code>SB-EDGE</code> if the cabinet has no banded edges; offload
+to alternative workcenter via <code>alternative_workcenter_ids</code> —
+documented in lesson 2.3).</p>
+<p><strong>"I assigned an operation to a workcenter that doesn't support the
+panel material."</strong></p>
+<p>The workcenter has <code>x_sbk_supported_material_ids</code>. If you assigned
+e.g. solid-wood panels to <code>SB-EDGE</code> (which is melamine/MDF/
+particleboard only), the MO will block at the operator's station
+(lesson 1.2). <strong>Recovery</strong>: change the workcenter on that operation
+to one that supports the substrate, or split the operation into a
+sub-operation that pre-processes the wood and then bands.</p>
+<p><strong>"I forgot to add the routing operations and saved the BoM as
+component-list-only."</strong></p>
+<p>The BoM is technically valid (component-only BoMs are allowed in
+Odoo) but the MO won't have work orders — the shop floor sees
+nothing to do. <strong>Recovery</strong>: edit the BoM, add the operations,
+save. Existing draft MOs will not pick up the new operations; you'll
+need to cancel and re-create them.</p>
+<p><strong>"The XML ID I chose collides with an existing template."</strong></p>
+<p>You'll get a constraint error on save. Rename and retry. Note that
+the locked XML IDs per Q8 of the estimating brief
+(<code>southbrook.base_1dr</code>, <code>southbrook.wall_2dr</code>, etc.) are <em>reserved</em>
+— do not poach them. New SKUs need new IDs.</p>
+<p><strong>"I added a hardware line that the auto-resolver already covers
+(e.g. soft-close hinges per door)."</strong></p>
+<p>The hardware auto-resolver
+(<code>southbrook.hardware.catalog.resolve(...)</code> — lesson 5.3) is
+idempotent but if you also added the same line manually, the
+estimator's quote double-counts the hardware. <strong>Recovery</strong>: remove
+the manual line; let the auto-resolver handle per-door / per-shelf
+/ per-cabinet hardware. Add only bespoke hardware (one-off vendor
+parts the auto-resolver doesn't know about).</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you save the BoM:</p>
+<ul>
+<li>A row in <code>mrp.bom</code> is created with <code>product_tmpl_id</code>,
+  <code>product_qty</code>, and <code>southbrook_version = 1</code>.</li>
+<li>Rows in <code>mrp.bom.line</code> are created (one per component).</li>
+<li>Rows in <code>mrp.routing.workcenter</code> are created (one per operation)
+  with <code>bom_id</code> back-reference.</li>
+<li>The <code>southbrook_plm</code> extension adds <code>southbrook_eco_ids</code>
+  (<code>One2many</code> inverse <code>bom_id</code> on <code>southbrook.eco</code>) — empty list.</li>
+</ul>
+<p>When an MO confirms against this BoM:</p>
+<ul>
+<li><code>mrp.production._action_confirm()</code> (Odoo native) runs the rollup.</li>
+<li><code>mrp.production</code> creates <code>mrp.workorder</code> rows (one per
+  operation) and <code>stock.move</code> rows (one per component).</li>
+<li>Workcenter capacity is checked against
+  <code>mrp.workcenter.workcenter_load</code>; the bottleneck flag
+  (<code>x_sbk_is_bottleneck</code> on <code>SB-EDGE</code>) is honoured by the planner
+  (lesson 2.3).</li>
+<li>The Southbrook MI engine
+  (<code>southbrook_manufacturing_intelligence</code>) reads the cycle times
+  and produces its first cycle-time-baseline-pending recommendation
+  for this BoM (Course 3 lesson 3.1).</li>
+<li>The PLM override of <code>_get_cut_constants()</code> returns the active
+  cut spec's constants; the FreeCAD bridge (lesson 4.3) renders
+  the cabinet using those constants if <code>freecad_bridge.enabled</code> is
+  true.</li>
+</ul>
+<p>When the first ECO modifies this BoM (lesson 11.8):</p>
+<ul>
+<li><code>southbrook.eco.action_apply()</code> dispatches to <code>_apply_bom()</code>
+  (<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_plm/models/southbrook_eco.py</code>).</li>
+<li><code>_apply_bom</code> copies the BoM with <code>southbrook_version + 1</code>,
+  archives the old one (<code>active=False</code>), writes the new one's id
+  back to <code>southbrook.eco.new_bom_id</code>.</li>
+<li>The bridge addon <code>southbrook_plm_productgraph</code> fires
+  <code>_should_trigger_pg_release()</code>; if true, creates a <code>pg.release</code>
+  on the linked <code>pg.ebom</code> and calls <code>action_execute_release()</code> —
+  ProductGraph learns about the new BoM revision via the release
+  flow (lesson 11.8 walks through this).</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You're authoring the BoM for a new wall cabinet. The cabinet
+has 2 doors. The active cut spec says <code>door_th = 18mm</code>. Do you
+hardcode <code>18mm</code> somewhere in the BoM, and if not, what do you do
+instead?</p>
+<blockquote>
+<p>Do not hardcode <code>18mm</code>. Add a BoM line for the <em>door blank
+substrate</em> product (e.g. <em>MDF Door Blank 18mm Stock</em>). The
+dimensions and door reveals come from
+<code>mrp.bom._get_cut_constants()</code> at MO rollup time. If <code>door_th</code>
+changes in the cut spec, your cabinet automatically uses the new
+thickness on the next MO with no BoM edits.</p>
+</blockquote>
+<p><strong>2.</strong> You authored the routing as 8 operations: SAW → EDGE → BORE →
+ASSY → DOOR → HW → QC → PACK. The cabinet has no door (open
+shelving). What do you do with the DOOR operation?</p>
+<blockquote>
+<p>Remove it. A routing operation that does no work consumes planner
+capacity (the work order shows up at SB-DOOR, the operator
+tries to start it, sees no door to mount, and either skips it
+or wastes 5 minutes confused). Better: shorter routing on the
+BoM. If you want the operation to be conditional ("present only
+when door_count &gt; 0"), file a ticket — Odoo's <code>mrp.bom</code>
+doesn't support conditional operations natively in v19; you'd
+need a Southbrook extension.</p>
+</blockquote>
+<p><strong>3.</strong> Your cycle time on <code>SB-EDGE</code> is 25 min for the new cabinet
+while the seed example for <code>base_1dr</code> is 12 min. The planner is
+concerned. What do you do?</p>
+<blockquote>
+<p>Three options: (a) confirm the estimate by measuring against a
+hand-built prototype if available; (b) split the operation across
+<code>SB-EDGE</code> and <code>SB-DOOR</code> if some of the banding is door-edge
+banding that DOOR can handle; (c) accept the higher cycle time
+and let the planner re-balance the shop using
+<code>alternative_workcenter_ids</code> (lesson 2.3). Do <strong>not</strong> lie about
+the cycle time to look better — the MI engine will detect
+actual &gt;&gt; planned variance after the first MO and flag a
+<code>slow_workorder</code> recommendation, and you'll be debugging the
+wrong thing.</p>
+</blockquote>
+<p><strong>4.</strong> You created the <code>product.template</code> with <code>config_ok = True</code>
+but didn't yet attach any attributes (lesson 11.5 does that). Can
+the BoM be authored without attributes?</p>
+<blockquote>
+<p>Yes. <code>mrp.bom</code> doesn't require attributes — it's anchored on the
+template, not on a configured variant. The BoM you author is the
+<em>base</em> BoM; once the configurator (lesson 11.5) layers attributes
+on, the configurator's <code>product_configurator_mrp</code> integration
+generates variant-specific BoM modifications on the fly. Your job
+today is the substrate-and-routing skeleton.</p>
+</blockquote>
+<p><strong>5.</strong> You finish the BoM. The planner reviews and says the
+operations look fine but you're missing the <code>SAND</code> → <code>PAINT</code> →
+<code>CURE</code> block because the new cabinet is finished, not raw. What do
+you do?</p>
+<blockquote>
+<p>Insert three operations between <code>SB-ASSY</code> and <code>SB-DOOR</code> (because
+finishing happens after assembly but before door mounting):
+<code>SAND</code> (10-15 min), <code>PAINT</code> (15-25 min), <code>CURE</code> (overnight —
+typically modelled as a long cycle time that the planner handles
+with parallel CURE slots, not as a blocking operation). The
+three-station finish flow is documented in lesson 1.5.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Workcenter codes and what each station does — lesson 1.1, plus
+  per-station lessons 1.2 through 1.5.</li>
+<li>The cut spec model and <code>_get_cut_constants</code> seam — lesson 4.2
+  and lesson 11.3.</li>
+<li>Hardware auto-resolution (per-door / per-shelf / per-cabinet) —
+  lesson 5.3.</li>
+<li>Configurator attribute setup on the <code>product.template</code> — lesson
+  11.5.</li>
+<li>Variant-specific BoM modifications via
+  <code>product_configurator_mrp</code> — lesson 5.1.</li>
+<li>The MI cycle-time baseline that fires after the first MO —
+  Course 3.</li>
+<li>ECO-driven BoM revision (post-release) — lesson 11.8 and
+  lesson 4.1.</li>
+<li>FreeCAD render of the new BoM — lesson 4.3.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_11_configurator_setup" model="slide.slide">
+            <field name="name">Setting Up the Configurator Entry for the New Product</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Configurator admin attaching attributes, values, exclusions, and construction rules to a brand-new SKU&#x27;s `product.template`.</field>
+            <field name="html_content"><![CDATA[<h1 id="setting-up-the-configurator-entry-for-the-new-product">Setting Up the Configurator Entry for the New Product</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the configurator admin. Yesterday lesson 11.4 produced an
+<code>mrp.bom</code> attached to a <code>product.template</code> with <code>config_ok = True</code>
+but no attributes. Today you turn that empty shell into a
+configurable product — picking attributes, attaching values,
+authoring exclusions, writing the construction rules — and end with
+a test configuration session that produces a valid SKU.</p>
+<p>This lesson does <strong>not</strong> re-cover what attributes, values,
+attribute_lines, and the OCA configurator model are. That's lesson
+5.1. This lesson is the <strong>new-product-specific workflow</strong>: starting
+from a blank template and ending with a publishable configurable
+SKU, with all the rules and exclusions in place.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Sales → Configurable Products → Configurable Templates</strong></p>
+</blockquote>
+<p>…click your new template (the one the BoM was attached to in
+lesson 11.4). You'll spend the lesson on this form. You'll also
+visit:</p>
+<blockquote>
+<p><strong>Sales → Configuration → Attributes</strong></p>
+</blockquote>
+<p>…to confirm the attributes you need exist (you usually do not
+create new ones at this stage — Southbrook's 11 attributes per Q2
+of the estimating brief are seeded; new attributes are a separate
+governance discussion). And:</p>
+<blockquote>
+<p><strong>Sales → Configuration → Configuration Rules</strong></p>
+</blockquote>
+<p>…where <code>product.config.line</code> rules live (the four declarative
+Southbrook rules from the estimating brief §5, plus any
+new-product-specific exclusions you author here).</p>
+<p>For the test session:</p>
+<blockquote>
+<p><strong>\&lt;your template&gt; → Configure button</strong> (OCA wizard)</p>
+</blockquote>
+<p>…or the customer-facing chip-selector:</p>
+<blockquote>
+<p><strong>southbrookcabinetry.space/shop/\&lt;slug&gt;</strong></p>
+</blockquote>
+<p>(if <code>southbrook_configurator_ux</code> is installed — usually it is).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The <code>product.template</code> form
+(<code>product_configurator/models/product.py:13</code>):</p>
+<ul>
+<li><strong>Configurable</strong> (<code>config_ok</code>) — already <code>True</code> from lesson 11.4.</li>
+<li><strong>Variant Attributes</strong> (<code>attribute_line_ids</code> →
+  <code>product.template.attribute.line</code>) — the attributes the
+  configurator presents to the customer/estimator. Empty on a
+  fresh template.</li>
+<li><strong>Configuration Rules</strong>
+  (<code>config_line_ids</code> → <code>product.config.line</code>) — the per-template
+  rule rows. Each row binds one attribute to a
+  <code>product.config.domain</code> (the exclusion expression). Empty.</li>
+<li><strong>Configuration Steps</strong>
+  (<code>product.config.step</code> / <code>product.config.step.line</code>) — optional
+  wizard step grouping; for chip-selector UX (<code>/shop/&lt;slug&gt;</code>)
+  these are ignored, but the OCA backend wizard uses them.</li>
+<li><strong>Mako template name</strong> (<code>mako_tmpl_name</code>) — the configured
+  variant naming pattern. Convention:
+  <code>[${self.attribute_value_ids.filtered(lambda v: v.attribute_id.code == 'family').name}] ${self.attribute_value_ids...}</code> — copy from a similar existing template.</li>
+</ul>
+<p>The <code>product.attribute</code> form
+(<code>product_configurator/models/product_attribute.py:7</code>):</p>
+<ul>
+<li><strong>Name</strong> + <strong>Code</strong> — the attribute identifier (<code>family</code>,
+  <code>width</code>, <code>series</code>, <code>box_material</code>, <code>door_style</code>, <code>finish</code>,
+  <code>hinge_side</code>, <code>finished_sides</code>, <code>gables</code>, <code>handle</code>,
+  <code>accessories</code> — the canonical 11).</li>
+<li><strong>Values</strong> (<code>product.attribute.value</code>) — every possible value,
+  each with <code>lead_time_extra</code> (days) and <code>value_inches</code> /
+  <code>value_mm</code> for dimensional attributes.</li>
+</ul>
+<p>The <code>product.config.domain</code> form
+(<code>product_configurator/models/product_config.py:15</code>):</p>
+<ul>
+<li><strong>Name</strong> — describe the rule (<em>"Contractor series → slab door
+  only"</em>).</li>
+<li><strong>Lines</strong> (<code>domain_line_ids</code> → <code>product.config.domain.line</code>) —
+  each line: <code>attribute_id</code>, <code>condition</code> (<code>in</code> / <code>not in</code>),
+  <code>value_ids</code>, <code>operator</code> (<code>and</code> / <code>or</code>).</li>
+</ul>
+<p>The <code>product.config.line</code> form
+(<code>product_configurator/models/product_config.py:162</code>):</p>
+<ul>
+<li><strong>Template</strong> (<code>product_tmpl_id</code>) — your new template.</li>
+<li><strong>Attribute line</strong> (<code>attribute_line_id</code>) — which attribute this
+  rule restricts.</li>
+<li><strong>Allowed value(s)</strong> (<code>value_ids</code>) — the values that <em>remain
+  allowed</em> when the rule's domain matches.</li>
+<li><strong>Domain</strong> (<code>domain_id</code>) — the trigger condition (the
+  <code>product.config.domain</code> from above).</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Read the spec one more time (3 min):</strong></p>
+<ul>
+<li>Open <code>spec_draft.md</code> from the conception folder. List every
+  customer-facing choice: width, height, door style, hinge side,
+  finished sides, gables, handle, etc.</li>
+<li>Each choice maps to one Southbrook attribute. <strong>Do not invent
+  new attributes</strong> — the 11 canonical attributes per Q2 of the
+  estimating brief cover virtually all cabinet variation. If
+  your spec genuinely needs a 12th attribute, escalate to the
+  configurator owner first (governance discussion).</li>
+</ul>
+<p><strong>2. Attach the attributes to the template (10 min):</strong></p>
+<ul>
+<li>Open the new <code>product.template</code>. <em>Variant Attributes</em> tab.</li>
+<li>For each attribute the spec requires:</li>
+<li><em>Add a line.</em></li>
+<li><strong>Attribute</strong>: pick from the 11 canonical
+    (<code>product.attribute</code>).</li>
+<li><strong>Values</strong> (<code>value_ids</code> on
+    <code>product.template.attribute.line</code>) — pick the subset of values
+    this product offers. <em>"Width: 18, 21, 24, 27, 30 inches"</em> —
+    not all sizes; only the ones this SKU supports.</li>
+<li><strong>Create Variant</strong>: leave as the default (per the OCA
+    configurator's hybrid policy — dynamic variant on confirm, Q6
+    of the estimating brief).</li>
+<li>Save after each attribute line; the
+  <code>_validate_attribute_lines</code> constraint (<code>product.py:41</code>) fires
+  on save and catches coherence errors.</li>
+</ul>
+<p><strong>3. Author exclusions as <code>product.config.domain</code> records (10 min):</strong></p>
+<p>For each customer-spec rule that's a hard exclusion (i.e. <em>"if
+attribute A is value X, then attribute B cannot be value Y"</em>):</p>
+<ul>
+<li><strong>Sales → Configuration → Configuration Rules → New Domain</strong>.</li>
+<li><strong>Name</strong>: describe the rule in plain English (<em>"9-21" cabinets
+  are 1-door only"</em>).</li>
+<li><strong>Lines</strong> (<code>domain_line_ids</code>) — fill the condition:</li>
+<li><code>attribute_id</code> = width</li>
+<li><code>condition</code> = <code>in</code></li>
+<li><code>value_ids</code> = 18, 21</li>
+<li><code>operator</code> = <code>or</code> (combines with next line if any)</li>
+<li>Save the domain.</li>
+</ul>
+<p>For the Southbrook canonical four rules (already seeded in
+<code>addons/southbrook_estimating/data/config_rules.xml</code>), you do
+<strong>not</strong> re-author — they apply to all templates. New rules you
+author here are <strong>product-specific</strong>.</p>
+<p><strong>4. Bind exclusions to the template (5 min):</strong></p>
+<ul>
+<li>On the template's form: <em>Configuration Rules</em> tab → <em>Add a
+  line</em> (this creates <code>product.config.line</code> records).</li>
+<li><strong>Attribute line</strong>: the attribute the rule restricts (e.g.
+  <em>Door count</em>).</li>
+<li><strong>Allowed value(s)</strong> (<code>value_ids</code>): the values that remain
+  allowed when the domain matches (e.g. <em>1-Door</em>).</li>
+<li><strong>Domain</strong>: the <code>product.config.domain</code> you just created.</li>
+<li>Save.</li>
+</ul>
+<p><strong>5. Wire the construction rules (5 min):</strong></p>
+<p>The four canonical Southbrook construction rules (from the
+estimating brief §5) apply to every cabinet automatically — they
+live in <code>addons/southbrook_estimating/data/config_rules.xml</code>. You
+do <strong>not</strong> re-author them. They are:</p>
+<ul>
+<li><em>Contractor series → slab door only.</em></li>
+<li><em>Maple box → Contemporary or Elegance series only</em> (<code>+10%</code> price,
+  <code>+2 weeks</code> lead time).</li>
+<li><em>9-21" → 1-door; 24-36" → 2-door.</em></li>
+<li><em>Bi-fold corner → no soft-close hinge.</em></li>
+</ul>
+<p>What you <strong>may</strong> author here are <em>product-specific</em> construction
+rules — for example, <em>"the new floating shelf SKU requires gable
+support"</em>. These are additional <code>product.config.line</code> records on
+the new template.</p>
+<p><strong>6. Set the BoM-to-attribute mapping (3 min):</strong></p>
+<p>The <code>product_configurator_mrp</code> module bridges attribute selections
+to BoM modifications at MO confirm time. For most cabinets, the
+mapping is the OCA default — no extra config needed. For cabinets
+where an attribute meaningfully changes the BoM (e.g. <em>Door style:
+slab vs five-piece</em> changes the door blank product), you need to
+add explicit BoM-line attribute-value bindings on the
+<code>mrp.bom.line</code> form (the <em>Apply on Variants</em> field). Lesson 5.1
+covers this in detail.</p>
+<p><strong>7. Configure the Mako template (3 min):</strong></p>
+<p>The <code>mako_tmpl_name</code> on <code>product.template</code> defines how the
+configured variant is named. Copy the pattern from a similar
+existing template (e.g. <code>southbrook.base_1dr</code>). The pattern
+references attribute values; the resulting variant name shows up
+on <code>sale.order.line.product_id.display_name</code>.</p>
+<p><strong>8. Test the configuration (10 min):</strong></p>
+<p>The OCA configurator backend wizard:</p>
+<ul>
+<li>On the template form, click <em>Configure</em> (smart button — OCA
+  default). The wizard opens, presenting attributes in step order.</li>
+<li>Walk through every attribute combination. For each:</li>
+<li>Pick a value.</li>
+<li>Confirm the rule-excluded values are correctly disabled.</li>
+<li>Confirm price updates (the configurator session updates
+    <code>product.config.session</code> price on each selection).</li>
+<li>At the end, click <em>Finish</em>. A new <code>product.product</code> variant is
+  created.</li>
+</ul>
+<p>The Southbrook chip-selector (lesson 5.4):</p>
+<ul>
+<li>Open <code>southbrookcabinetry.space/shop/&lt;slug&gt;</code> in an incognito
+  browser.</li>
+<li>Walk the same path. The chip-selector is the customer-facing UX
+  and uses the same <code>product.config.session</code> records under the
+  hood. The <code>ConfiguratorV2</code> OWL component drives the UI.</li>
+<li>If <code>state.disabledValueIds</code> doesn't grey out the right values,
+  your domain expressions are wrong — go back to step 3.</li>
+</ul>
+<p><strong>9. Publish (2 min):</strong></p>
+<ul>
+<li>On the template form, confirm <strong>Can be Sold</strong> is on.</li>
+<li>For the customer-facing site, <em>Website → Published</em> toggle.</li>
+<li>The template is now selectable in the Order Builder (lesson
+  5.2) and visible on the public site.</li>
+</ul>
+<p><strong>10. Hand-off to lesson 11.6 (1 min):</strong></p>
+<ul>
+<li>Slack the estimator:
+  <em>"Configurator wired for <code>southbrook.&lt;xml_id&gt;</code>; ready for
+  pricing review."</em></li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I created a new attribute because the spec needed something the
+canonical 11 don't cover."</strong></p>
+<p>Roll it back. Creating a 12th attribute fragments the configurator
+data model; every existing report, dashboard, and
+<code>product_configurator_sale</code> integration assumes the canonical 11.
+The real path: (a) the spec value fits an existing attribute under
+a slightly looser interpretation — use the existing attribute; or
+(b) the spec value is truly new — file a 12th-attribute proposal to
+the configurator owner. The estimating brief Q2 is the canonical
+list; deviating without governance is technical debt.</p>
+<p><strong>"My <code>product.config.domain</code> rule disables the value I wanted to
+keep allowed, not the other way around."</strong></p>
+<p>The semantics of <code>product.config.line.value_ids</code> is <em>"these values
+remain allowed when the domain matches"</em>. Common confusion: people
+think it's <em>"these values are excluded"</em>. <strong>Recovery</strong>: invert your
+domain (use <code>not in</code> instead of <code>in</code>, or vice versa), or flip the
+value list. The OCA documentation (lesson 5.1) has the canonical
+explanation.</p>
+<p><strong>"The chip-selector greys out everything after I pick the first
+value."</strong></p>
+<p>Your domain expressions are too restrictive — the combination of
+your new rule and the existing four canonical rules leaves no
+allowed values. <strong>Recovery</strong>: walk through each rule, identify
+which one over-restricts (the chip-selector UI shows the rule
+reason on hover for grey chips), and loosen.</p>
+<p><strong>"I authored a product-specific construction rule that contradicts
+one of the canonical four."</strong></p>
+<p>The configurator does not detect rule contradictions — both rules
+fire, and the result is no allowed values. <strong>Recovery</strong>: identify
+the contradiction. If your product-specific rule is right (the
+canonical rule is wrong for this product), file a configurator-
+owner ticket — overriding the canonical four is a governance
+discussion, not a config tweak. Usually the right resolution is to
+remove your rule and accept the canonical behaviour.</p>
+<p><strong>"The Mako template name produces variant names like <code>[False]
+None None</code>."</strong></p>
+<p>The template references attribute values that don't exist on this
+template, or attribute codes that aren't bound. <strong>Recovery</strong>: copy
+the Mako pattern from a similar existing template (e.g.
+<code>southbrook.base_1dr</code>), substitute the attribute code references
+that match the attributes you've actually attached, and re-test by
+creating a new variant.</p>
+<p><strong>"I configured everything and tested it. A week later the
+estimator says new orders for this SKU are throwing
+<code>validate_configuration() failed</code>."</strong></p>
+<p>Something changed downstream — usually a canonical rule was
+updated and your product-specific rules no longer compose
+cleanly. <strong>Recovery</strong>: re-run a test session in the OCA wizard.
+The wizard reports which rule fired the validation failure. Adjust
+the offending <code>product.config.line</code> (yours, not the canonical
+one), test, save.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you attach an attribute line to the template:</p>
+<ul>
+<li>A row in <code>product.template.attribute.line</code>
+  (<code>product_attribute.py:160</code>) is created with <code>product_tmpl_id</code>,
+  <code>attribute_id</code>, <code>value_ids</code>.</li>
+<li>The <code>_validate_attribute_lines</code> constraint
+  (<code>product.py:41</code>) ensures every value referenced is actually a
+  child of the attribute.</li>
+<li>No variants are created yet — variant creation is deferred to
+  the first <code>product.config.session</code> that confirms (the "dynamic
+  variant" pattern, Q6).</li>
+</ul>
+<p>When you create a <code>product.config.domain</code>:</p>
+<ul>
+<li>A row in <code>product.config.domain</code> is created.</li>
+<li>Each line creates a <code>product.config.domain.line</code> row with
+  <code>attribute_id</code>, <code>condition</code>, <code>value_ids</code>, <code>operator</code>.</li>
+<li>The domain is evaluated at attribute-value-selection time by
+  the OCA configurator engine, building up a Python domain
+  expression on the fly.</li>
+</ul>
+<p>When a configurator session runs:</p>
+<ul>
+<li>A <code>product.config.session</code> row is created
+  (<code>product_config.py:344</code>).</li>
+<li>Each customer selection writes to <code>session.value_ids</code> and
+  triggers re-evaluation of all <code>config_line_ids</code> rules.</li>
+<li>Disallowed values get added to <code>state.disabledValueIds</code> (the OWL
+  <code>ConfiguratorV2</code> state — lesson 5.4).</li>
+<li><code>validate_configuration()</code> runs at <em>Confirm</em>; if any rule fails,
+  it raises and the session won't produce a variant.</li>
+<li>On success, <code>session.create_get_variant()</code> is called — it
+  either returns an existing variant matching the value set or
+  creates a new one (dynamic variant policy).</li>
+</ul>
+<p>When the variant is created and a <code>sale.order</code> confirms with that
+variant on a line:</p>
+<ul>
+<li><code>product_configurator_sale</code> writes
+  <code>sale.order.line.product_config_session_id</code> linking the line to
+  the configuration session — so the estimator can re-open it.</li>
+<li><code>product_configurator_mrp</code> reads the variant's attribute values
+  and modifies the rolled-up <code>mrp.bom</code> accordingly (e.g. swaps the
+  door blank product if the door style changed).</li>
+<li>Lesson 11.6 (estimating + pricing) takes over from here.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> Your new SKU is a floating corner shelf. The spec says
+<em>width 12-24", finish material only, no door, no hardware, gable
+support required</em>. Which attributes do you attach, and which do you
+<strong>skip</strong>?</p>
+<blockquote>
+<p>Attach: <code>family</code> (=accessory), <code>width</code>, <code>finish</code>,
+<code>finished_sides</code>. Skip: <code>door_style</code>, <code>hinge_side</code>, <code>handle</code>,
+<code>series</code>, <code>box_material</code> (the shelf isn't a box-carcass product),
+<code>gables</code>. Add a product-specific construction rule:
+<em>"gable support required when family=accessory and
+sub-family=floating_shelf"</em> — but better yet, encode "gable
+support is built into the BoM" rather than as a customer-facing
+attribute. Customer-facing attributes are choices the customer
+can make; non-choices belong in the BoM.</p>
+</blockquote>
+<p><strong>2.</strong> You attach the <code>width</code> attribute with values 18, 21, 24, 27,
+30. The canonical <em>9-21" → 1-door; 24-36" → 2-door</em> rule applies.
+What happens when a customer picks width=24"?</p>
+<blockquote>
+<p>The canonical rule fires. The <code>door_count</code> attribute's allowed
+values are restricted to 2-Door. The chip-selector greys out
+1-Door. The customer cannot pick 1-Door on a 24" cabinet. You
+didn't author this rule — it's seeded in
+<code>southbrook_estimating/data/config_rules.xml</code> — but it applies to
+every template that includes the <code>width</code> and <code>door_count</code>
+attributes, including yours.</p>
+</blockquote>
+<p><strong>3.</strong> You finish configurator setup and test the OCA wizard. It
+works. The chip-selector at <code>/shop/&lt;slug&gt;</code> shows all chips greyed
+out from the start. What's wrong?</p>
+<blockquote>
+<p>The OWL component (<code>ConfiguratorV2</code>) loads
+<code>state.disabledValueIds</code> from the server. If everything is grey,
+the server thinks every value is disabled — almost always means
+an XML data file failed to load (rules misconfigured, attribute
+not attached). Check the browser console for the OWL state
+object; check the Odoo server log for module load errors.
+Lesson 5.4 has the full recovery flow.</p>
+</blockquote>
+<p><strong>4.</strong> Your new SKU has a <code>door_style</code> attribute with values <em>slab,
+five-piece, glass-front</em>. The cabinet's BoM line for <em>Door blank</em>
+points at a single product (slab MDF). What do you do?</p>
+<blockquote>
+<p>Add three <code>mrp.bom.line</code> rows, one per door-style value, each
+with the correct door blank substrate product and the <em>Apply on
+Variants</em> field set to the matching attribute value.
+<code>product_configurator_mrp</code> reads this at MO rollup and includes
+only the line(s) matching the selected variant. Alternatively,
+if all three door styles use the same blank substrate but differ
+in routing operations, the BoM line stays single and the
+operation changes — depends on how the door is built. Lesson 5.1
+covers the BoM/attribute binding patterns.</p>
+</blockquote>
+<p><strong>5.</strong> A week after publish, the estimator says the new template
+isn't appearing in the Order Builder catalog. What do you check?</p>
+<blockquote>
+<p>Three things: (a) <code>config_ok = True</code> on the template (should be);
+(b) the template is in a category visible to the estimator's user
+group (Order Builder filters); (c) <code>sale_ok = True</code> on
+<code>product.template</code> (the "Can be Sold" flag). If all three are
+right and it's still missing, check whether the product is
+archived — <code>active = False</code> hides it from the catalog even if
+everything else is right.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator fundamentals (attributes, values, attribute_lines,
+  rules) — lesson 5.1.</li>
+<li>Customer-facing chip-selector UX details, OWL component
+  internals, test session wiring — lesson 5.4.</li>
+<li>The four canonical Southbrook construction rules — covered in
+  lesson 5.1 and seeded in <code>southbrook_estimating/data/</code>.</li>
+<li>BoM modifications driven by attribute values — lesson 5.1.</li>
+<li>The <code>validate_configuration()</code> runtime — lesson 5.1.</li>
+<li>Pricing (price extra per attribute value, channel multipliers,
+  pricelists) — lesson 11.6.</li>
+<li>The <code>southbrook_configurator_ux</code> bulk-import wizard — lesson
+  5.4.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_11_estimating_pricing" model="slide.slide">
+            <field name="name">Setting Up Pricing for the New Product</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Estimator + Sales Manager assigning the new SKU&#x27;s base price, zone overrides, channel multipliers, tax mapping, and signing off on the first test quote.</field>
+            <field name="html_content"><![CDATA[<h1 id="setting-up-pricing-for-the-new-product">Setting Up Pricing for the New Product</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator who'll be quoting this SKU starting next week,
+working with the sales manager who has the authority to set the
+base price. The configurator (lesson 11.5) is wired and the BoM
+(lesson 11.4) is complete — both feed pricing, but neither <em>sets</em>
+it. Today you fill in the price master row, decide whether the SKU
+needs zone-specific overrides, confirm the six channel pricelists
+apply correctly, map the right tax, and run a sign-off quote.</p>
+<p>This lesson does <strong>not</strong> re-cover the Order Builder UI, the
+signature spec sheet, the channel resolution mechanics, or the
+dealer 50%-off math. That's lesson 5.2 and Course 8. This lesson is
+the <strong>per-product pricing setup</strong> for a brand-new SKU.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Sales → Configurable Products → Configurable Templates →
+\&lt;your new template&gt;</strong></p>
+</blockquote>
+<p>The base price lives on the template (<code>list_price</code> field on
+<code>product.template</code>). Channel pricing derives from this through the
+six pricelists. Per-attribute-value price extras live on:</p>
+<blockquote>
+<p><strong>Sales → Configuration → Attributes → \&lt;attribute&gt; →
+Values → \&lt;value&gt;</strong></p>
+</blockquote>
+<p>…with the <code>price_extra</code> field on
+<code>product.template.attribute.value</code>. And the pricelist data is at:</p>
+<blockquote>
+<p><strong>Sales → Configuration → Pricelists</strong></p>
+</blockquote>
+<p>The six pricelists are seeded by
+<code>addons/southbrook_estimating/data/pricelists.xml</code> — <em>do not edit
+them per-product</em>. You may add per-product price-item overrides
+within an existing pricelist if the SKU needs it.</p>
+<p>For the test quote:</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder</strong></p>
+</blockquote>
+<p>For the tax mapping (rare per-product change; usually inherited):</p>
+<blockquote>
+<p><strong>Accounting → Configuration → Taxes</strong> (admin) and
+<strong>the template form's</strong> <em>Accounting</em> <strong>tab</strong> for per-product
+assignment.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The <code>product.template</code> form, <em>General Information</em> + <em>Sales</em> tabs:</p>
+<ul>
+<li><strong>Sales Price</strong> (<code>list_price</code>) — the base retail price. This is
+  the <strong>anchor</strong>; every channel pricelist multiplies or
+  fixed-offsets from this. Get this wrong and every quote is
+  wrong.</li>
+<li><strong>Cost</strong> (<code>standard_price</code>) — the rolled-up cost from the BoM
+  components and operation costs. Computed by Odoo from the BoM if
+  cost_method is right; check via <em>Update Cost from BoM</em> if needed.</li>
+<li><strong>Sales</strong> tab → <strong>Customer Taxes</strong> (<code>taxes_id</code>) — the
+  sale-side tax. For Southbrook this is almost always <em>GST 5%</em>
+  (Canadian context); the default fiscal-position handling on
+  <code>res.partner</code> re-maps for tax-exempt or out-of-province
+  customers.</li>
+</ul>
+<p>The <code>product.template.attribute.value</code> join form:</p>
+<ul>
+<li><strong>Attribute</strong> + <strong>Value</strong> — the binding pair.</li>
+<li><strong>Extra Price</strong> (<code>price_extra</code>) — additive to <code>list_price</code> when
+  this value is selected on a configuration session. Examples:
+  <em>Maple box +$45</em>, <em>Soft-close hinge +$8 per door</em>, <em>Glass-front
+  door +$95</em>.</li>
+<li><strong>Lead Time Extra</strong> (<code>lead_time_extra</code> on
+  <code>product.attribute.value</code> itself, not the join) — additive
+  days to the cabinet's <code>mrp</code> lead time. <em>Maple box +14 days</em>.</li>
+</ul>
+<p>The six channel pricelists
+(<code>southbrook_estimating/data/pricelists.xml</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Pricelist</th>
+<th>Mechanic</th>
+<th>Set per-product?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Retail</td>
+<td>base — your <code>list_price</code></td>
+<td>No</td>
+</tr>
+<tr>
+<td>Dealer</td>
+<td><code>list_price * 0.50</code></td>
+<td>No (pure data rule)</td>
+</tr>
+<tr>
+<td>Tradesperson</td>
+<td>Cost × 1.05 → tiered discount 25/30/35%</td>
+<td>No (resolved by <code>tradesperson_tier</code>)</td>
+</tr>
+<tr>
+<td>KD</td>
+<td>~46% of retail</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Big-Box</td>
+<td>fixed $65/$98</td>
+<td>Maybe — per-product fixed overrides allowed</td>
+</tr>
+<tr>
+<td>Refacing</td>
+<td>per-SF, 35% margin target</td>
+<td>Yes — refacing-margin-target rule</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>product.pricelist.item</code> form (only relevant if you need a
+per-product override):</p>
+<ul>
+<li><strong>Applies on</strong>: pick <em>Product</em>; reference your template.</li>
+<li><strong>Computation</strong>: <em>Fixed Price</em> (for big-box overrides) or
+  <em>Formula</em> (for refacing-margin-target).</li>
+<li><strong>Refacing margin target</strong>
+  (<code>is_refacing_margin_target</code> on <code>product.pricelist.item</code>,
+  see <code>southbrook_estimating/models/product_pricelist.py:19</code>) —
+  tick this on for refacing-pricelist items; the
+  <code>_compute_refacing_price()</code> method computes price live to hit
+  the <code>REFACING_TARGET_MARGIN = 0.35</code> constant.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Cost roll-up sanity check (5 min):</strong></p>
+<ul>
+<li>Open the new <code>product.template</code>. Confirm <code>standard_price</code> is
+  populated from the BoM (lesson 11.4 should have left this
+  computed; if it's still 0.00, click <em>Update Cost from BoM</em> — or
+  on the BoM form, <em>Update</em> button).</li>
+<li>If cost looks wildly off, the BoM is wrong or the component
+  costs are stale. Stop here and escalate to the BoM author.</li>
+</ul>
+<p><strong>2. Set <code>list_price</code> with the sales manager (10 min):</strong></p>
+<ul>
+<li>Compute the target retail using the sales manager's standard
+  margin (typically <em>cost × 2.5 to 3.0</em> for cabinets — varies by
+  family). The sales manager owns this number, not you.</li>
+<li>The sales manager and you agree on the <code>list_price</code> together.
+  Write the number in the conception folder's <code>scope.md</code>
+  alongside the cost so future estimators can see the margin
+  intent.</li>
+<li>Set <code>list_price</code> on the template. Save.</li>
+</ul>
+<p><strong>3. Add per-attribute-value price extras (10 min):</strong></p>
+<p>For each attribute value that costs more than the base
+configuration:</p>
+<ul>
+<li><strong>Sales → Configuration → Attributes → \&lt;attribute&gt; →
+  Values → \&lt;value&gt;</strong>.</li>
+<li>Find the join row matching your template (the join is
+  <code>product.template.attribute.value</code>, not the raw
+  <code>product.attribute.value</code>).</li>
+<li>Set <strong>Extra Price</strong> (<code>price_extra</code>). Examples from existing
+  cabinets:</li>
+<li><em>Maple box</em> → <code>+10%</code> of base — codify as percentage in
+    <code>price_extra</code> is <strong>not</strong> native Odoo; what you do is set a
+    flat dollar amount equal to 10% of <code>list_price</code> at the
+    current price. This means re-checking when <code>list_price</code>
+    changes — file a ticket if your environment needs
+    percentage-based extras (not in v1).</li>
+<li><em>Soft-close hinge upgrade</em> → flat dollar per door.</li>
+<li><em>Glass-front door</em> → flat dollar substitution.</li>
+<li>Save each value.</li>
+</ul>
+<p><strong>4. Confirm channel multipliers resolve (5 min):</strong></p>
+<p>The six channel pricelists are data — they apply to every
+template without per-template configuration. Test:</p>
+<ul>
+<li><strong>Southbrook Estimating → Order Builder → New</strong>.</li>
+<li>Set customer = <em>Demo Tradesperson Tier 3</em> (the locked Q7 smoke-
+  test partner — <code>res.partner.channel = tradesperson</code>,
+  <code>tradesperson_tier = 3</code> → −35%).</li>
+<li>Add a line for the new SKU.</li>
+<li>Confirm the line price is <code>list_price * 0.65</code> (retail minus
+  35%). If yes, channel resolution works. If no, the partner is
+  on the wrong channel or the pricelist seed didn't load.</li>
+<li>Swap customer to a <em>Demo Dealer</em> (<code>channel = dealer</code>). Confirm
+  line price is <code>list_price * 0.50</code>.</li>
+<li>Swap customer to a <em>Demo Retail</em> (<code>channel = retail</code>). Confirm
+  line price is <code>list_price</code>.</li>
+</ul>
+<p><strong>5. Zone overrides (3 min — usually skipped):</strong></p>
+<p>The Order Builder supports multi-zone orders
+(<code>sale.order.line.zone</code> field — Q21: <code>base_run / wall / tall /
+island / accessory / other</code>). Zone overrides are <strong>not</strong> common
+for a single SKU — zones are an order-level concept, not a
+product-level one. A new SKU generally enters every zone it can
+naturally fit (a base SKU enters <code>base_run</code> and <code>island</code>, a wall
+SKU enters <code>wall</code>, an accessory enters <code>accessory</code>).</p>
+<p>If your new SKU is genuinely zone-restricted (e.g. <em>island
+peninsula end-cap only fits in <code>island</code></em>), document that in the
+conception folder's <code>scope.md</code> and tell the estimating team
+verbally. There is no enforcement field on the SKU — the estimator
+chooses the zone manually.</p>
+<p><strong>6. Tax mapping (2 min — usually default):</strong></p>
+<ul>
+<li><em>Sales</em> tab → <strong>Customer Taxes</strong>.</li>
+<li>Default is the company default (<em>GST 5%</em> for Southbrook
+  Canada). Almost always correct.</li>
+<li>The fiscal position on <code>res.partner</code> re-maps for tax-exempt
+  (e.g. status-Indian customers) or out-of-province orders.</li>
+<li><strong>You do not need to touch this</strong> unless the SKU has special
+  tax treatment (e.g. tax-exempt parts — extremely rare for
+  cabinetry).</li>
+</ul>
+<p><strong>7. Big-box per-product override (2 min — usually skipped):</strong></p>
+<p>If the new SKU will be sold through the Big-Box channel:</p>
+<ul>
+<li><strong>Sales → Configuration → Pricelists → Big-Box Wholesale</strong>.</li>
+<li><em>Items</em> tab → <em>Add</em>.</li>
+<li><strong>Applies on</strong>: <em>Product</em>; reference your template.</li>
+<li><strong>Computation</strong>: <em>Fixed Price</em>.</li>
+<li><strong>Fixed Price</strong>: $65 cost / $98 retail (per the channel
+  economics).</li>
+</ul>
+<p>Most new SKUs do <strong>not</strong> sell through Big-Box (which carries a
+fixed small catalog). Skip this step unless the conception folder
+explicitly green-lit Big-Box distribution.</p>
+<p><strong>8. Refacing per-product override (2 min — usually skipped):</strong></p>
+<p>If the new SKU will be sold through the Refacing channel:</p>
+<ul>
+<li><strong>Sales → Configuration → Pricelists → Refacing (CTHS)</strong>.</li>
+<li><em>Items</em> tab → <em>Add</em>.</li>
+<li><strong>Applies on</strong>: <em>Product</em>; reference your template.</li>
+<li><strong>Refacing margin target</strong> (<code>is_refacing_margin_target</code>) → On.</li>
+<li>The <code>_compute_refacing_price()</code> method
+  (<code>southbrook_estimating/models/product_pricelist.py:19</code>)
+  computes price live to hit the 35% target margin against
+  current <code>standard_price</code>.</li>
+</ul>
+<p>Refacing is door-and-front-only — a new full-cabinet SKU
+typically does <strong>not</strong> apply to Refacing. Skip unless explicit.</p>
+<p><strong>9. Run the test quote (10 min):</strong></p>
+<ul>
+<li><strong>Southbrook Estimating → Order Builder → New</strong>.</li>
+<li>Customer: <em>Demo Tradesperson Tier 3</em> (canonical smoke-test
+  partner per Q7).</li>
+<li>Add a line; pick your new template; click <em>Configure</em>; pick
+  the most expensive plausible configuration (highest-priced
+  options on every attribute).</li>
+<li>Confirm:</li>
+<li>Line price = base × 0.65 + sum of price_extras × 0.65.</li>
+<li><code>sb_panel_count</code>, <code>sb_door_count</code>, <code>sb_width_mm</code> populate
+    (the Southbrook line metadata fields on <code>sale.order.line</code>
+    from <code>southbrook_estimating/models/sale_order_line.py</code>).</li>
+<li><strong>BoM Preview tab</strong> (well — the <code>kitchen_3d_preview</code>
+    notebook page per the audit finding) shows the rolled-up BoM
+    with the right components and operations.</li>
+<li>Tax line reads the right tax (<em>GST 5%</em> unless overridden).</li>
+<li>Print the <strong>Signature Spec Sheet</strong> (lesson 5.2 covers the PDF
+  flow).</li>
+</ul>
+<p><strong>10. Sales-manager sign-off (3 min):</strong></p>
+<ul>
+<li>Email the signature spec sheet to the sales manager.</li>
+<li>They confirm the margin against cost, the price extras feel
+  right, and the configuration on the test quote isn't
+  pathological.</li>
+<li>Verbal approval is enough; the audit trail is the spec sheet
+  PDF stored in the conception folder.</li>
+</ul>
+<p><strong>11. Hand-off to lesson 11.7 (1 min):</strong></p>
+<ul>
+<li>Mark the template <em>Active for sale</em> (already is, but confirm).</li>
+<li>Slack the production planner:
+  <em>"Pricing signed off on <code>southbrook.&lt;xml_id&gt;</code>; ready for first
+  MO scheduling."</em></li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I set <code>list_price</code> and the estimator's quote came back showing
+the dealer pricelist amount, not retail."</strong></p>
+<p>Channel pricelists override retail when the customer's channel is
+<code>dealer</code>. The Order Builder is <strong>showing</strong> the dealer customer's
+price correctly; you set <code>list_price</code> correctly. <em>Verify</em> by
+switching the customer to a <code>retail</code> channel — the price should
+show the unmultiplied <code>list_price</code>. If even the retail customer's
+quote shows the wrong price, your <code>list_price</code> is wrong; fix it
+on the template.</p>
+<p><strong>"The cost on the template says $0.00."</strong></p>
+<p>The BoM cost roll-up didn't run. On the template, click <em>Update
+Cost from BoM</em> (button in the <em>Sales</em> tab — may be on the BoM
+form depending on Odoo version). If still $0.00, the BoM is
+empty or its components have $0.00 cost. Lesson 11.4 should have
+left this populated; if not, escalate to the BoM author.</p>
+<p><strong>"I set a price_extra of $45 for the <em>Maple box</em> value, but the
+quote is adding $45 to the retail price even when the customer is
+on a dealer pricelist — I expected $22.50."</strong></p>
+<p><code>price_extra</code> on <code>product.template.attribute.value</code> adds to
+<em>pretax retail</em>, then the pricelist multiplier applies. So
+<code>(list_price + price_extra) * 0.50</code> = the dealer price.
+Order-of-operations is right; check the math.</p>
+<p><strong>"The refacing-margin target isn't computing — the price is
+showing as $0.00."</strong></p>
+<p>The <code>is_refacing_margin_target</code> field on the
+<code>product.pricelist.item</code> must be ticked <strong>and</strong> the item must
+apply to your product. Also confirm <code>standard_price</code> is populated
+(if cost is $0, target margin of 35% on $0 is $0). And the
+<code>_compute_refacing_price()</code> method (estimating addon) reads the
+current cost, so a stale cost means a stale price.</p>
+<p><strong>"I set per-attribute-value price extras and they applied to
+<em>every</em> template that uses the attribute, not just mine."</strong></p>
+<p>Then you edited the wrong row. The <code>price_extra</code> field exists on
+<strong>two</strong> different join models in Odoo v19:
+- <code>product.attribute.value.price_extra</code> — affects every template
+  the value appears on.
+- <code>product.template.attribute.value.price_extra</code> — affects
+  <em>this template</em> only.
+You want the second. Find the row via the template form's
+<em>Variant Attributes</em> tab → click into the attribute line → the
+values listed each have an Extra Price column. That's the
+template-scoped one.</p>
+<p><strong>"The test quote works for Tradesperson Tier 3 but the locked Q7
+smoke test calls for switching customer between Tier 3 and retail.
+When I switch, the quote doesn't re-price."</strong></p>
+<p>Check <code>sale.order._onchange_partner_id_southbrook_pricelist</code>
+(<code>southbrook_estimating/models/sale_order.py:117</code>) is firing.
+The Q7 smoke test is the canonical regression — failures here mean
+the channel-resolution onchange isn't wired. Check the developer
+console for errors; the most likely cause is a customisation that
+disabled the onchange.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you set <code>list_price</code> and save:</p>
+<ul>
+<li>A write on <code>product.template.list_price</code> happens.</li>
+<li>No immediate variant updates — variants compute their price on
+  the fly from <code>list_price + sum(price_extras)</code>.</li>
+</ul>
+<p>When a customer is selected on a sale order:</p>
+<ul>
+<li><code>sale.order._onchange_partner_id</code> (Odoo native) fires.</li>
+<li>The Southbrook override
+  <code>_onchange_partner_id_southbrook_pricelist</code>
+  (<code>sale_order.py:117</code>) runs, calling
+  <code>_resolve_channel_pricelist(partner)</code> (line 59).</li>
+<li><code>_resolve_channel_pricelist</code> reads <code>partner.channel</code> (the
+  Southbrook field on <code>res.partner</code> per
+  <code>southbrook_estimating/models/res_partner.py:33</code>) and, if
+  <code>channel == 'tradesperson'</code>, reads <code>tradesperson_tier</code> (line
+  55) to pick from <code>_TRADESPERSON_TIER_PRICELISTS</code> map.</li>
+<li>The resolved pricelist id is written to
+  <code>sale.order.pricelist_id</code>.</li>
+<li>All <code>sale.order.line.price_unit</code> re-computes from the new
+  pricelist's rules against each variant's
+  <code>(list_price + price_extras)</code>.</li>
+</ul>
+<p>When a line's variant has price_extras:</p>
+<ul>
+<li>The variant's
+  <code>product.product.list_price</code> reads
+  <code>template.list_price + sum(price_extra for each
+  template_attribute_value on this variant)</code>.</li>
+<li>The pricelist applies its multiplier to that total.</li>
+</ul>
+<p>When the refacing-margin target item runs:</p>
+<ul>
+<li>The pricelist item's <code>_compute_refacing_price()</code> reads
+  <code>self.product_tmpl_id.standard_price</code> (current rolled-up cost).</li>
+<li>Computes target price as <code>cost / (1 - 0.35)</code> to hit 35% margin.</li>
+<li>Returns this as the line price.</li>
+</ul>
+<p>When the test quote is confirmed (you don't confirm in this
+lesson — the sales manager sign-off is enough), the standard
+<code>sale.order.action_confirm</code> runs; the order transitions through
+the Southbrook stage pipeline
+(<code>production_approval_state</code> on <code>sale.order</code>, added by
+<code>southbrook_mrp_pm/models/sale_order.py:54</code> — separate from
+estimating despite the conceptual proximity).</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You set <code>list_price = $400</code> and the Maple box value
+<code>price_extra = $40</code>. A dealer customer adds the SKU with the
+Maple box option. What does their quote line show?</p>
+<blockquote>
+<p><code>(400 + 40) * 0.50 = $220</code>. The price extra adds to retail
+first, then the dealer multiplier of 0.5 applies. Don't try to
+apply the multiplier to the extra separately — that math gives
+$220 too in this case but it's coincidence; for non-50% channels
+the right order matters (e.g. Tier 3 tradesperson:
+<code>(400 + 40) * 0.65 = $286</code>, not <code>400*0.65 + 40 = $300</code>).</p>
+</blockquote>
+<p><strong>2.</strong> The sales manager wants the new SKU to enter the catalog at
+$520 retail. The cost (from BoM rollup) is $185. What's the gross
+margin?</p>
+<blockquote>
+<p>Gross margin = <code>(520 - 185) / 520 = 64.4%</code>. That's healthy for
+a cabinet — Southbrook's catalog typically targets 60-70% gross
+margin at retail (which becomes 20-40% at dealer after the −50%
+multiplier). If the sales manager wanted a higher list price,
+capture the rationale in <code>scope.md</code>; if they wanted lower, ask
+whether the SKU has a strategic reason to under-price.</p>
+</blockquote>
+<p><strong>3.</strong> You're asked to enable the new SKU on Big-Box. What price
+do you set in the per-product Big-Box override?</p>
+<blockquote>
+<p>Wholesale fixed $65 cost / $98 retail — the Big-Box channel is
+a fixed-price-per-SKU channel, not a multiplier. Add the
+per-product fixed-price item on the Big-Box pricelist. Do not
+add a Big-Box override unless the channel green-lit this SKU —
+Big-Box carries a deliberately small catalog and adding random
+SKUs disrupts the channel relationship.</p>
+</blockquote>
+<p><strong>4.</strong> The test quote shows the right line price but the BoM
+Preview tab is empty. The configurator session ran fine. What's
+wrong?</p>
+<blockquote>
+<p>The BoM exists (lesson 11.4) but the <em>configurator-to-BoM
+bridge</em> (<code>product_configurator_mrp</code>) isn't picking up
+attribute-value-to-BoM-line bindings. Likely cause: the BoM
+lines don't have <em>Apply on Variants</em> configured (lesson 5.1).
+Recovery: open the BoM, set Apply on Variants for each
+attribute-dependent line, save, re-run the test session. The
+BoM Preview should now populate.</p>
+</blockquote>
+<p><strong>5.</strong> The sales manager says <em>"this should match the price of
+<code>southbrook.base_2dr</code> at retail."</em> What do you do?</p>
+<blockquote>
+<p>Open <code>southbrook.base_2dr</code> and copy its <code>list_price</code> to your
+new template. Then walk every common attribute value (any
+attribute both templates share) and confirm the <code>price_extra</code>
+values match. The two SKUs end up priced identically at retail
+and identically through every channel. Document the deliberate
+price-parity in <code>scope.md</code> so future estimators don't drift the
+two prices apart.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Order Builder UI and the daily quoting flow — lesson 5.2.</li>
+<li>Channel pricelist fundamentals (retail, dealer, tradesperson
+  tiers, KD, big-box, refacing) — Course 8 and lesson 5.2.</li>
+<li>The <code>_resolve_channel_pricelist</code> algorithm — lesson 5.2 and
+  <code>southbrook_estimating/models/sale_order.py</code>.</li>
+<li>The Signature Spec Sheet PDF — lesson 5.2.</li>
+<li>Bulk-import of pricing across many SKUs — lesson 5.4
+  configurator UX import wizard.</li>
+<li>The hardware auto-resolver pricing for per-door / per-shelf
+  hardware — lesson 5.3.</li>
+<li>Tax fiscal-position remapping (out-of-province, status-Indian
+  customers) — native Odoo accounting training, not this course.</li>
+<li>The first MO and what happens on the shop floor — that's
+  lesson 11.7.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_11_first_mo" model="slide.slide">
+            <field name="name">First MO — The Test Run on the Shop Floor</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Production planner + production manager + lead operator on the new SKU&#x27;s first manufacturing order; everybody downstream is invited to watch.</field>
+            <field name="html_content"><![CDATA[<h1 id="first-mo-the-test-run-on-the-shop-floor">First MO — The Test Run on the Shop Floor</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the production planner scheduling the new SKU's first MO,
+the production manager supervising the run, and the lead operator
+(usually whichever station has the most expected variance —
+typically <code>SB-EDGE</code> or <code>SB-CNC-BORE</code>) handling the hands-on work.
+This is the first time the platform touches the new product end-
+to-end on real materials. It's also the first time you'll see
+actual cycle times vs the estimates you typed into the BoM in
+lesson 11.4 — and the variance is <em>information</em>, not failure.</p>
+<p>This lesson is the workflow for running that first MO with
+deliberate eyes on the things that go wrong on first runs (cycle
+time variance, scrap, edge-band misses, hardware-resolver
+surprises), and how to turn the data into actionable feedback for
+the post-run debrief that informs lesson 11.8.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Sales → Kitchen Workspace → Projects → New</strong></p>
+</blockquote>
+<p>…to create the kitchen project that wraps the test order. Then:</p>
+<blockquote>
+<p><strong>Sales → Orders → Order Builder</strong></p>
+</blockquote>
+<p>…to create the sale order against an internal customer (a
+sandboxed <code>res.partner</code> named <em>Demo — First MO</em> is the convention).
+Once confirmed:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Production Release Queue</strong></p>
+</blockquote>
+<p>…where the planner + ENG01 engineer walk the release gate (lesson
+2.2).</p>
+<blockquote>
+<p><strong>Manufacturing → Operations → Manufacturing Orders → \&lt;the MO&gt;</strong></p>
+</blockquote>
+<p>…to monitor the MO state through <code>confirmed → in_progress → done</code>.</p>
+<blockquote>
+<p><strong>Kitchen Ops → Shop Floor → \&lt;each workcenter&gt;</strong></p>
+</blockquote>
+<p>…where the operators see their work orders for the run.</p>
+<p>Post-run:</p>
+<blockquote>
+<p><strong>Kitchen Ops → MI Dashboards</strong></p>
+</blockquote>
+<p>…for the cycle-time variance, scrap, and downtime data.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The <code>sb.kitchen.project</code> form
+(<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_kitchen_workspace/models/sb_kitchen_project.py:43</code>):</p>
+<ul>
+<li><strong>Code</strong> (<code>code</code>) — convention for the first MO: <code>&lt;sku_xml_id&gt;-T1</code>
+  (e.g. <code>wall_3dr_corner-T1</code> for the first test). T2/T3 follow if
+  needed.</li>
+<li><strong>State</strong> (<code>state</code>) — <code>draft → designing → awaiting_customer
+  → approved → in_production → done → cancelled</code>. For a test run
+  you skip <code>awaiting_customer</code> (no customer to wait on; the test is
+  internal).</li>
+<li><strong>Partner</strong> (<code>partner_id</code>) — the internal sandbox partner
+  <em>Demo — First MO</em>.</li>
+<li><strong>Salesperson</strong> (<code>salesperson_id</code>) — you.</li>
+<li><strong>Sale order</strong> (<code>sale_order_id</code>) — the linked sale order
+  with the new SKU as a single line.</li>
+</ul>
+<p>The <code>mrp.production</code> form (standard Odoo MO):</p>
+<ul>
+<li><strong>Product</strong> — the configured variant of the new SKU.</li>
+<li><strong>BoM</strong> — the new BoM from lesson 11.4 (version 1).</li>
+<li><strong>Operations</strong> — every routing operation, becomes a
+  <code>mrp.workorder</code> with <code>state pending → progress → done</code>.</li>
+<li><strong>Components</strong> — every BoM line becomes a <code>stock.move</code>.</li>
+</ul>
+<p>The Production Release Queue (lesson 2.2 — <code>project.task</code>):</p>
+<ul>
+<li><strong><code>southbrook_release_cad_approved</code></strong> — boolean.</li>
+<li><strong><code>_cutlist_approved</code></strong> — boolean.</li>
+<li><strong><code>_bom_verified</code></strong> — boolean.</li>
+<li><strong><code>_crew_reserved</code></strong> — boolean.</li>
+<li><strong><code>_equipment_available</code></strong> — boolean.</li>
+<li><strong><code>southbrook_production_release_state</code></strong> — overall computed
+  state (<code>blocked / pending / ready / released</code>).</li>
+</ul>
+<p>The Shop Floor view per workcenter (lesson 1.2 / 1.3 / 1.4 / 1.5):</p>
+<ul>
+<li><strong>Today's queue</strong> — work orders ordered by planner sequence.</li>
+<li><strong>Current operation</strong> — what the operator is on right now.</li>
+<li><strong>Cycle time</strong> — the planned time vs the actual time
+  (<code>mrp.workorder.duration</code> durations).</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Pre-flight (10 min — the night before):</strong></p>
+<ul>
+<li>Confirm the new SKU is <em>active for sale</em>.</li>
+<li>Confirm at least one variant exists (the test session in lesson
+  11.5 left one).</li>
+<li>Confirm <code>standard_price</code> on the template is sane.</li>
+<li>Talk to the production manager: schedule a 1-hour pre-shift
+  walk-through on the morning of the test, with the lead operator
+  attending. The walk-through covers: <em>here's a new SKU, here's
+  what's different about it, here's where I expect variance, here
+  are the things you should write down</em>.</li>
+</ul>
+<p><strong>2. Create the kitchen project (5 min):</strong></p>
+<ul>
+<li><strong>Sales → Kitchen Workspace → Projects → New</strong>.</li>
+<li><strong>Code</strong>: <code>&lt;xml_id&gt;-T1</code>.</li>
+<li><strong>Partner</strong>: <em>Demo — First MO</em>.</li>
+<li><strong>Theme</strong>: free text, e.g. <em>"First MO test — Wall 3-Door
+  Corner"</em>.</li>
+<li><strong>State</strong>: starts <code>draft</code>. Save.</li>
+<li><em>Action → Move to Designing → Approved</em> (you skip
+  <code>awaiting_customer</code> for an internal test). The
+  <code>action_set_state()</code> method
+  (<code>sb_kitchen_project.py:114</code>) enforces the
+  <code>VALID_TRANSITIONS</code> graph (line 28); the <code>draft → designing →
+  approved</code> path is legal.</li>
+</ul>
+<p><strong>3. Create the sale order (10 min):</strong></p>
+<ul>
+<li><strong>Sales → Orders → Order Builder → New</strong>.</li>
+<li><strong>Customer</strong>: <em>Demo — First MO</em> (resolves to whatever channel
+  you've assigned — typically <code>retail</code> for internal tests).</li>
+<li><strong>Kitchen project</strong>: link to the project you just created.</li>
+<li><strong>Add a line</strong>: pick your new template, click <em>Configure</em>, pick
+  the <strong>canonical baseline configuration</strong> (no premium upgrades
+  — the test should run the most representative version of the
+  product, not a corner case).</li>
+<li><em>Save</em>.</li>
+<li><em>Confirm</em> the sale order. State flips <code>draft → sale</code>.</li>
+</ul>
+<p><strong>4. Walk the release gate (15 min):</strong></p>
+<p>The release gate (lesson 2.2) is two-person: the planner verifies
+the data-side flags, then the ENG01 engineer verifies the
+engineering-side flags. The MO <strong>cannot release</strong> until all five
+booleans are <code>True</code>.</p>
+<ul>
+<li><strong>Kitchen Ops → Production Release Queue</strong>. Find the task that
+  spawned from your sale order.</li>
+<li><strong>Planner-side</strong>:</li>
+<li><code>_crew_reserved</code> — confirm operators are available for the
+    expected MO run window. Tick on if so.</li>
+<li><code>_equipment_available</code> — confirm workcenters needed
+    (<code>SB-SAW</code>, <code>SB-EDGE</code>, <code>SB-CNC-BORE</code>, <code>SB-ASSY</code>, <code>SB-DOOR</code>,
+    <code>SAND</code>/<code>PAINT</code>/<code>CURE</code> if finished, <code>SB-HW</code>, <code>SB-QC</code>,
+    <code>SB-PACK</code>) aren't all booked solid. Tick on.</li>
+<li><strong>ENG01-side</strong> (the ENG01 engineer with <code>code=ENG01</code> workcenter
+  membership):</li>
+<li><code>southbrook_release_cad_approved</code> — confirm the FreeCAD
+    render (lesson 4.3) for this product matches expectation, or
+    that the cabinet doesn't need CAD (rare). Tick on.</li>
+<li><code>_cutlist_approved</code> — confirm the cut list preview (lesson
+    11.4 step 8) is sensible. Tick on.</li>
+<li><code>_bom_verified</code> — confirm the BoM components and operations
+    are present and the auto-resolved hardware lines (lesson
+    5.3) look right. Tick on.</li>
+<li>Once all five are on,
+  <code>southbrook_production_release_state</code> computes to <code>released</code>.</li>
+<li>The MO is now eligible for shop-floor scheduling.</li>
+</ul>
+<p><strong>5. Hand-off to the operators (5 min):</strong></p>
+<ul>
+<li>Print or display the <strong>Signature Spec Sheet</strong> (the customer-
+  facing PDF) <strong>and</strong> the <em>Shop Copy</em> + <em>Cut Spec</em> per cabinet.
+  Even though the customer doesn't see the spec sheet for an
+  internal test, the operators benefit from seeing the same view
+  the customer would see.</li>
+<li>Brief the lead operator: <em>"This is the first run of
+  <code>&lt;sku_xml_id&gt;</code>. Cycle times in the BoM are estimates from PLM;
+  measure what actually happens and don't be shy about writing
+  down deviations."</em></li>
+</ul>
+<p><strong>6. Run the MO (varies — typically 2-4 hours for a single
+cabinet):</strong></p>
+<p>The lead operator runs the operations in sequence (or in parallel
+where the routing allows). Per-station behaviour is covered in
+lessons 1.2 through 1.5 — what's specific to a <em>first MO</em> is:</p>
+<ul>
+<li><strong>Watch cycle time variance.</strong> Actual cycle time vs planned
+  (the <code>time_cycle_manual</code> you set in lesson 11.4). The MI engine
+  will flag <code>slow_workorder</code> overnight if actual &gt; planned × 1.2.
+  <em>Don't pre-empt this</em>; let the data land. Variance on a first
+  run is the <strong>point</strong> — you're calibrating estimates.</li>
+<li><strong>Watch scrap.</strong> Edge-band misses, panel chips at the saw,
+  hardware that doesn't fit. Each scrap event is logged via the
+  operator's <em>scrap reason</em> on Done (lesson 1.2). Each scrap
+  event fires a <code>scrap_event</code> recommendation overnight (for the
+  production manager) and a <code>cut_spec_audit</code> recommendation (for
+  the PLM engineer). On a first MO, expect at least one scrap
+  event — and welcome it.</li>
+<li><strong>Watch edge-band misses specifically.</strong> The <code>SB-EDGE</code> station
+  is the most common source of first-MO issues — new SKUs often
+  have edges that need banding in an order the operator wouldn't
+  guess. The operator at <code>SB-EDGE</code> should walk through their
+  decision: <em>"I banded these four edges; is that right?"</em> Sign
+  off before the panel moves downstream.</li>
+<li><strong>Watch the hardware auto-resolver output.</strong> When the MO
+  confirms, <code>southbrook.hardware.catalog.resolve(...)</code> runs
+  (lesson 5.3) and auto-creates hardware lines based on door
+  count, shelf count, etc. <em>Confirm the resolved hardware lines
+  match what the BoM author expected.</em> Misses here mean the BoM
+  was wrong, the hardware-map JSON
+  (<code>southbrook_hardware_catalog/data/hardware_map.json</code>) doesn't
+  know about the new SKU's family, or the auto-resolver's
+  classification logic mismatched.</li>
+</ul>
+<p><strong>7. End-of-run wrap-up (15 min):</strong></p>
+<ul>
+<li>Mark the last <code>mrp.workorder</code> <em>Done</em>. The MO transitions to
+  <code>done</code>. The <code>sale.order</code> line gets the <em>delivered</em> quantity.</li>
+<li>The kitchen project's state can move
+  <code>in_production → done</code> via
+  <code>sb_kitchen_project.action_set_state('done')</code>.</li>
+<li>Walk every operator's <em>Done</em> button entry: any <em>misclick</em>
+  notes? Any <em>scrap reason</em> not captured? Any <em>blocked</em> work
+  orders that need addressing?</li>
+</ul>
+<p><strong>8. Post-run debrief (next morning, 30 min):</strong></p>
+<p>The morning after the MO completes (overnight crons have run, MI
+has computed):</p>
+<ul>
+<li><strong>Kitchen Ops → MI Dashboards</strong> — read the per-station cycle
+  time variance for the new SKU's MO. Outlier stations are your
+  priorities for the lesson 11.8 ECO.</li>
+<li><strong>Hermes Console → Recommendations queue</strong> — read the
+  recommendations the MI engine filed overnight:</li>
+<li><code>slow_workorder</code> — actual cycle time &gt; planned × 1.2.</li>
+<li><code>scrap_event</code> — scrap was logged.</li>
+<li><code>cut_spec_audit</code> — PLM engineer should review (the cut spec
+    constants might not be right for this SKU).</li>
+<li><code>materials_blocked</code> — a work order was blocked.</li>
+<li><strong>Operators' notebooks</strong> — collect the lead operator's notes.
+  Verbal feedback beats system data here.</li>
+<li>Document everything in the conception folder under a new
+  file <code>first_mo_debrief.md</code>. This is the input to lesson 11.8
+  (production release + iteration) — the formal ECO that
+  capitalises the learnings into the BoM and routing.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The MO confirmed but the work orders didn't show up on the
+shop-floor view."</strong></p>
+<p>The release gate (lesson 2.2) wasn't fully closed —
+<code>southbrook_production_release_state</code> is still <code>blocked</code> or
+<code>pending</code>. Operators see no queue until <code>released</code>. <strong>Recovery</strong>:
+re-check all five booleans on the project task; the failing one
+shows in <code>southbrook_production_release_reason</code>.</p>
+<p><strong>"The hardware auto-resolver added zero hardware lines."</strong></p>
+<p>Two likely causes: (a) <code>southbrook.hardware.catalog.resolve(...)</code>
+doesn't know about the new SKU's family — the
+<code>hardware_map.json</code> (<code>data/hardware_map.json</code> in
+<code>southbrook_hardware_catalog</code>) keys off attribute values like
+<code>per_door</code>, <code>per_door_soft_close</code>, <code>per_shelf</code>, <code>per_cabinet</code>,
+<code>per_family</code>. Check the new SKU's family is mapped. (b) The
+resolver's classification of the new variant is wrong — the
+variant doesn't carry a recognisable family attribute. <strong>Recovery
+during the MO</strong>: add hardware lines manually for this MO; <strong>after
+the MO</strong>: file an ECO (lesson 11.8) to update
+<code>hardware_map.json</code> to recognise the new family.</p>
+<p><strong>"The first MO's cycle time at <code>SB-EDGE</code> was 45 minutes; planned
+was 12."</strong></p>
+<p>Three causes to consider: (a) genuine first-run learning curve —
+the operator hadn't seen this SKU before; expect this to drop on
+the second run. Don't act on this. (b) The BoM cycle-time estimate
+was wrong — measure 2-3 more runs before deciding. (c) The cabinet
+genuinely has more banded edges than the BoM accounted for — fix
+in the BoM in lesson 11.8 ECO. <strong>Do not</strong> edit the BoM directly
+during the first run — capture in the debrief and let ECO process
+catch it.</p>
+<p><strong>"The cut list preview at MO confirm time showed panel dimensions
+that don't match the conception sketch."</strong></p>
+<p>The cut spec's NF14 constants may not be right for this SKU
+(lesson 11.3's path-b decision is showing up). <strong>Recovery</strong>: pause
+the MO at the planner level (don't release yet). Re-read lesson
+11.3 — does this product genuinely need per-product BoM overrides
+the BoM author didn't add? Add them via a quick ECO before the MO
+runs. Better to delay a day than cut wrong panels.</p>
+<p><strong>"The MO completed but the kitchen project is stuck in
+<code>in_production</code>."</strong></p>
+<p>The project doesn't auto-transition to <code>done</code> — manual click is
+required via <code>action_set_state('done')</code>. (Lesson 2.1 covers the
+state machine.) <strong>Recovery</strong>: open the kitchen project, click the
+<em>Mark Done</em> button.</p>
+<p><strong>"The MI engine fired a <code>slow_workorder</code> recommendation but the
+cycle was fine — it's reading the changeover time as run time."</strong></p>
+<p>The operator forgot to tap <em>Changeover</em> between work orders at
+<code>SB-EDGE</code> (lesson 1.2). The system attributed the changeover time
+to the next work order's cycle. <strong>Recovery</strong>: the recommendation
+is wrong; mark it <em>invalid reason: unlogged changeover</em> on the
+Hermes Console. Coach the operator to tap <em>Changeover</em> on the
+next run. Not a BoM issue.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When the sale order confirms (<code>action_confirm</code>):</p>
+<ul>
+<li>The standard <code>sale.order.action_confirm</code> runs.</li>
+<li><code>southbrook_kitchen_mrp</code> extensions create the <code>sb.cutlist</code>
+  (<code>sb_cutlist.py:70</code>) linked to the MO via <code>mo_id</code>. State
+  <code>draft</code>.</li>
+<li><code>southbrook.hardware.catalog.resolve(...)</code> runs to add
+  hardware lines to the BoM rollup for this MO (lesson 5.3).</li>
+<li>The <code>sb.production.package</code>
+  (<code>sb_production_package.py:26</code>) bundles <code>mo_id</code>,
+  <code>cutlist_id</code>, <code>hardware_package_id</code> — the holistic "what we're
+  going to build" record.</li>
+<li>The <code>southbrook_freecad_bridge</code> (lesson 4.3) fires
+  <code>_post_cad_render_job</code> if <code>freecad_bridge.enabled</code> system
+  parameter is true.</li>
+</ul>
+<p>When the release gate clears:</p>
+<ul>
+<li><code>southbrook_production_release_state</code> recomputes
+  (<code>southbrook_premium_orchestration/models/project_task.py:134</code>)
+  to <code>released</code>. The <code>action_send_to_production()</code> method
+  (<code>southbrook_mrp_pm/models/sale_order.py:172</code>) is callable.</li>
+<li>The MI engine cron <code>_cron_refire_gates</code> re-evaluates every 15
+  minutes; the planner can also force a re-eval.</li>
+</ul>
+<p>When each work order completes:</p>
+<ul>
+<li><code>mrp.workorder.duration</code> rows accumulate
+  <code>time_start</code>/<code>time_stop</code>/<code>loss_id</code>.</li>
+<li>The MI engine reads these overnight (Course 3) to compute
+  per-station OEE and cycle time variance.</li>
+</ul>
+<p>When the overnight crons run:</p>
+<ul>
+<li>The MI engine's <code>_evaluate_workorder_variance</code> job (or
+  similar) computes
+  <code>actual_cycle / planned_cycle</code> per work order. &gt; 1.2 fires
+  <code>slow_workorder</code>.</li>
+<li>Scrap-logged work orders fire <code>scrap_event</code> for the
+  production manager and <code>cut_spec_audit</code> for the PLM engineer.</li>
+<li>All recommendations land in <code>hermes.recommendation</code> (or the
+  equivalent — Course 3) for the production manager's morning
+  triage.</li>
+</ul>
+<p>The bridge addon <code>southbrook_plm_productgraph</code> does <strong>not</strong> fire
+on the first MO — it only fires on <code>southbrook.eco.action_apply()</code>
+where the ECO targets a BoM (creates a <code>pg.release</code>). The first MO
+produces <em>data</em>, which informs the lesson-11.8 ECO; the ECO
+fires the bridge.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You scheduled the first MO and the release gate has <code>_bom_
+verified = False</code>. The ENG01 engineer says <em>"I haven't reviewed
+the BoM yet — give me an hour."</em> What do you do?</p>
+<blockquote>
+<p>Wait the hour. Do <strong>not</strong> flip the boolean yourself, even though
+you have the technical access. The release gate is a two-
+person handoff specifically to prevent first MOs from running
+against unreviewed BoMs. The cost of waiting one hour is small;
+the cost of running a wrong BoM on real materials is large.</p>
+</blockquote>
+<p><strong>2.</strong> The first MO is mid-run. The operator at <code>SB-EDGE</code> says the
+cycle is taking three times the planned time and asks whether to
+pause. What do you say?</p>
+<blockquote>
+<p>Don't pause. Let the run complete on this cabinet and capture
+the actual cycle time. A first MO is a measurement; mid-run
+changes contaminate the data. Note the operator's observation in
+the debrief notebook ("3x planned cycle, possibly because: ..."),
+finish the run, then decide in lesson 11.8 whether the BoM
+cycle time needs revising or the operator needs more training
+on the new SKU.</p>
+</blockquote>
+<p><strong>3.</strong> The MO completes. The MI dashboard shows the OEE at
+<code>SB-EDGE</code> was 47% during the run — well below the 78% target.
+What do you do?</p>
+<blockquote>
+<p>Two questions: (a) was 47% a one-cabinet artefact (low-volume
+MOs inflate setup-time-as-percentage and depress OEE
+artificially)? Almost certainly yes for a single-cabinet test
+MO. The OEE number is real but not actionable. (b) Did the
+operator log changeovers correctly? Check the work order
+durations for unlogged changeover gaps. If they're there,
+coach. If not, the cycle is what it is and you'll calibrate
+across the next 5-10 MOs.</p>
+</blockquote>
+<p><strong>4.</strong> The hardware auto-resolver added the wrong soft-close
+hinge count — 3 doors got 6 hinges instead of 4. What do you do?</p>
+<blockquote>
+<p>The auto-resolver's <code>per_door</code> or <code>per_door_soft_close</code>
+classification mis-counted doors on this SKU (likely because
+the variant's <code>sb_door_count</code> field on <code>sale.order.line</code>
+(<code>sale_order_line.py:52</code>) wasn't populated correctly by the
+configurator). For this MO, edit the hardware lines manually to
+4 hinges. For lesson 11.8 ECO, file a bug: configurator
+attribute setup (lesson 11.5) needs a fix so <code>sb_door_count</code>
+populates right for this SKU's variants.</p>
+</blockquote>
+<p><strong>5.</strong> The MO is complete and the kitchen project is <code>done</code>. The
+production manager asks <em>"are we ready to release the SKU to
+real customer orders?"</em> What's the right answer?</p>
+<blockquote>
+<p>Not yet — one MO is sample-size-one. The recommended path:
+(a) gather the first-MO debrief (this lesson, step 8); (b)
+raise the lesson-11.8 ECO with the learnings (cycle time
+revisions, scrap-cause fixes, hardware-map updates); (c) apply
+the ECO; (d) run <strong>one more</strong> test MO with the revised BoM. If
+the second test is clean, <em>then</em> release the SKU. Two clean
+tests gives you confidence to charge a customer for it.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Native Odoo MO state machine, work order vocabulary, scrap
+  workflow — Odoo's own MRP training.</li>
+<li>Kitchen project state machine — lesson 2.1.</li>
+<li>The release gate booleans in detail — lesson 2.2.</li>
+<li>Per-station operator workflows — lessons 1.2 through 1.5.</li>
+<li>The hardware auto-resolver internals — lesson 5.3.</li>
+<li>The FreeCAD bridge — lesson 4.3.</li>
+<li>MI dashboards in detail — Course 3.</li>
+<li>Hermes Console recommendation triage — Course 3 lessons 3.2 +
+  3.3 (and the customer-service perspective in lesson 6.3).</li>
+<li>The post-MO ECO that capitalises learnings — lesson 11.8.</li>
+<li>Releasing the SKU formally to customers — lesson 11.8.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_11_release_and_iterate" model="slide.slide">
+            <field name="name">Production Release + Iteration</field>
+            <field name="channel_id" ref="course_new_product_workflow"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">80</field>
+            <field name="description">PLM engineer + Production manager closing out the new-product introduction — taking the first-MO learnings, capitalising them into a formal ECO, walking the SKU through to ProductGraph release, and seeding the iterate-or-retire decision loop.</field>
+            <field name="html_content"><![CDATA[<h1 id="production-release-iteration">Production Release + Iteration</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PLM engineer who started this product back in lesson
+11.2 and the production manager who watched its first MO yesterday.
+The first run produced data — actual cycle times, scrap events,
+unexpected hardware-resolver behaviour, an operator's notebook
+full of <em>"next time we should..."</em>. Today you turn that data into a
+formal ECO, walk it through approval, let the ECO apply propagate
+to ProductGraph via the bridge, and decide: is this SKU ready for
+customer orders?</p>
+<p>This lesson is the <strong>terminal step of new-product introduction</strong>.
+After this lesson, the SKU is either <em>released for customer
+orders</em> (the normal outcome) or <em>parked for a second test MO</em> (a
+common outcome on novel-construction SKUs). It also covers the
+flip-side: when to formally <strong>retire</strong> a product — the inverse of
+this whole course.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Southbrook PLM → Change Orders → New</strong></p>
+</blockquote>
+<p>…for the post-MO ECO. Then:</p>
+<blockquote>
+<p><strong>ProductGraph → Engineering → Items → \&lt;PG-ASM-NNNN&gt;</strong></p>
+</blockquote>
+<p>…to walk the <code>pg.item</code> state from <code>engineering → released</code>.</p>
+<blockquote>
+<p><strong>ProductGraph → Engineering → Releases</strong></p>
+</blockquote>
+<p>…to confirm the <code>pg.release</code> row was created by the bridge addon
+and executed cleanly.</p>
+<blockquote>
+<p><strong>Kitchen Ops → MI Dashboards</strong></p>
+</blockquote>
+<p>…to confirm the new cycle-time baseline lands cleanly after the
+ECO applies.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The <code>southbrook.eco</code> form (lesson 4.1 covers every field; recap
+for the post-MO ECO):</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — sequence-assigned (<code>ECO/2026/NNNN</code>).</li>
+<li><strong>Title</strong> — convention: <em>"Post-MO calibration for
+  <code>PG-ASM-NNNN</code>"</em>.</li>
+<li><strong>eco_type_id</strong> → pick a type with <code>target_kind = bom</code> (the
+  primary change is a BoM revision capturing cycle-time and
+  component fixes).</li>
+<li><strong>bom_id</strong> → the BoM you authored in lesson 11.4 (version 1).
+  This is the <strong>target</strong> BoM the ECO will copy-and-revise.</li>
+<li><strong>new_bom_id</strong> — empty when you raise the ECO; populated when
+  <code>_apply_bom</code> runs.</li>
+<li><strong>document_ids</strong> → attach <code>first_mo_debrief.md</code> from the
+  conception folder plus the MI dashboard screenshot.</li>
+<li><strong>stage_id</strong> → the configurable ECO Kanban stage (<code>open</code> is the
+  starting <code>state</code>; stages typically go <em>Draft → Review →
+  Approved → Applied</em>).</li>
+</ul>
+<p>The bridge-extended fields
+(<code>/Users/naadmin/southbrook-v19cr/addons/southbrook_plm_productgraph/models/southbrook_eco.py</code>):</p>
+<ul>
+<li><strong>pg_ebom_id</strong> — the linked ProductGraph EBOM record. For the
+  first-release ECO, this links to a <code>pg.ebom</code> created by the PLM
+  team in ProductGraph (Course 9 lesson 9.4 covers EBOM authoring).</li>
+<li><strong>pg_release_id</strong> — populated when the bridge creates the
+  release (read-only).</li>
+<li><strong>pg_auto_release</strong> — boolean, default <code>True</code>. Leave on for the
+  release ECO — you want the propagation to fire.</li>
+</ul>
+<p>The <code>pg.release</code> form
+(<code>/Users/naadmin/product_graph_v19/addons/product_graph_release/</code>)
+that the bridge creates:</p>
+<ul>
+<li><strong>ebom_id</strong> — the EBOM being released.</li>
+<li><strong>release_reason</strong> — typically inherited from the ECO's
+  description.</li>
+<li><strong>state</strong> — <code>pending → executing → completed → failed</code>.</li>
+</ul>
+<p>The <code>pg.item</code> form:</p>
+<ul>
+<li><strong>state</strong> — <code>engineering</code> (from lesson 11.4). The
+  <code>action_force_release</code> button (visible to PLM-Approvers) flips
+  it to <code>released</code>. This happens <strong>automatically</strong> when a
+  <code>pg.revision</code> for this item moves to <code>released</code> and triggers
+  <code>_auto_release_from_revision</code> — but on first-release it's
+  cleanest to call the action explicitly.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Gather the debrief inputs (5 min):</strong></p>
+<ul>
+<li>Open <code>first_mo_debrief.md</code> from the conception folder
+  (created end of lesson 11.7).</li>
+<li>Open the MI dashboards from the post-run morning.</li>
+<li>Read the Hermes Console recommendations filed against the test
+  MO: <code>slow_workorder</code>, <code>scrap_event</code>, <code>cut_spec_audit</code>,
+  <code>materials_blocked</code>. Mark each with disposition: <em>act on</em>,
+  <em>ignore (first-run noise)</em>, <em>defer (single sample insufficient)</em>.</li>
+<li>List the changes to make. Typical first-release ECO bundle:</li>
+<li><strong>Cycle-time revision</strong> on 1-3 operations (based on actual vs
+    planned at the operations that showed &gt;20% variance).</li>
+<li><strong>BoM-line correction</strong> for any hardware the auto-resolver got
+    wrong (or the configurator-to-BoM bridge missed).</li>
+<li><strong>Routing tweak</strong> if the operations sequence needs to change
+    (e.g. insert a <code>SAND</code> pass that wasn't on the original BoM).</li>
+<li><strong>Cut spec audit</strong> if scrap or panel issues implied the
+    constants need revisiting (almost always the answer is <em>no, the
+    SKU needs per-product BoM overrides instead</em> — lesson 11.3).</li>
+</ul>
+<p><strong>2. Raise the post-MO ECO (10 min):</strong></p>
+<ul>
+<li><strong>Southbrook PLM → Change Orders → New</strong>.</li>
+<li><strong>Title</strong>: <em>"Post-MO calibration for <code>PG-ASM-NNNN</code>"</em>.</li>
+<li><strong>eco_type_id</strong>: pick a <code>target_kind = bom</code> type.</li>
+<li><strong>bom_id</strong>: the existing BoM (version 1).</li>
+<li><strong>description</strong>: bullet the changes. Cite the specific MI
+  recommendation IDs and the operator's notebook page. Be
+  specific — <em>"<code>SB-EDGE</code> cycle time 12→18 min based on test MO
+  actual of 17.2 min plus 1-min margin"</em> is auditable; <em>"adjust
+  cycle times"</em> is not.</li>
+<li><strong>document_ids</strong>: attach <code>first_mo_debrief.md</code> and the MI
+  screenshot.</li>
+<li><strong>pg_ebom_id</strong>: confirm linked to the right ProductGraph EBOM.</li>
+<li><strong>pg_auto_release</strong>: leave on.</li>
+<li><em>Save</em>. State is <code>open</code>.</li>
+</ul>
+<p><strong>3. Author the revised BoM (varies — 30-60 min):</strong></p>
+<p>The ECO doesn't itself revise the BoM — when <code>_apply_bom</code> runs, it
+<em>copies</em> the source BoM with <code>southbrook_version + 1</code> and archives
+the original. You need to provide the revisions on a <strong>duplicate</strong>
+of the BoM, which becomes the apply target.</p>
+<ul>
+<li>Open the current BoM (version 1). Duplicate it (Odoo native
+  duplicate). The duplicate is <code>southbrook_version</code> 0 initially —
+  the <code>_apply_bom</code> flow bumps it.</li>
+<li>Make the revisions on the duplicate: cycle time updates,
+  component line fixes, routing changes.</li>
+<li>Save.</li>
+<li>Back on the ECO, set <strong>new_bom_id</strong> = your revised duplicate.
+  (Or wait for <code>_apply_bom</code> to do this automatically — depends on
+  the ECO type's setup. Lesson 4.1 covers the variant.)</li>
+</ul>
+<p><strong>4. Walk the ECO through approval (varies — hours to days):</strong></p>
+<p>The ECO stages enforce sign-off. For the post-MO ECO the typical
+flow is:</p>
+<ul>
+<li><em>Draft → Review</em>: the PLM engineer (you) advances after the
+  revised BoM is ready.</li>
+<li><em>Review → Approved</em>: the production manager reviews the
+  revisions, confirms they match the debrief, signs off.</li>
+<li><em>Approved → Applied</em>: the PLM-Approver clicks <em>Apply</em>.
+  <code>action_apply</code> dispatches to <code>_apply_bom</code>, which:</li>
+<li>Copies the revised BoM with <code>southbrook_version + 1</code>.</li>
+<li>Archives the original BoM (<code>active=False</code>).</li>
+<li>Writes the new BoM's id back to <code>southbrook.eco.new_bom_id</code>.</li>
+<li>Posts chatter on both the ECO and the new BoM.</li>
+</ul>
+<p><strong>5. Confirm the ProductGraph bridge fired (5 min):</strong></p>
+<p>After ECO apply, the bridge addon
+(<code>southbrook_plm_productgraph</code>) runs
+<code>_should_trigger_pg_release()</code> and, if true, creates a
+<code>pg.release</code> on the linked <code>pg.ebom</code>:</p>
+<ul>
+<li>Open the ECO. <strong>pg_release_id</strong> should now be populated.</li>
+<li>Click through to the <code>pg.release</code> form. State should be
+  <code>completed</code> (or <code>executing</code> if you're fast).</li>
+<li>If state is <code>failed</code>, the bridge errored — read the chatter on
+  the <code>pg.release</code> record for the cause. Common causes:</li>
+<li>The <code>pg.ebom</code> linked on the ECO isn't <code>released</code> in
+    ProductGraph (it needs to be a real, releasable EBOM, not a
+    draft).</li>
+<li>The ProductGraph database is unreachable (the bridge runs
+    in-process but reads/writes against the standalone
+    ProductGraph schema — check the <code>product_graph_release</code>
+    addon is installed and the system parameters are right).</li>
+<li>Failures <strong>do not roll back the ECO</strong> (per the bridge's
+  defensive contract). Fix the bridge issue and re-create the
+  <code>pg.release</code> manually if needed.</li>
+</ul>
+<p><strong>6. Promote <code>pg.item</code> to <code>released</code> (3 min):</strong></p>
+<p>In ProductGraph:</p>
+<ul>
+<li>Open <code>PG-ASM-NNNN</code>.</li>
+<li>Click <strong>Action → Move to Released</strong> (<code>action_force_release</code> on
+  <code>pg.item</code>).</li>
+<li>State flips <code>engineering → released</code>. Audit-log row fires.</li>
+<li>The <code>pg.item.product_id</code> field is set to the
+  <code>product.product</code> representing the new SKU's
+  <strong>first dynamic variant</strong> (the OCA configurator's variant
+  policy — Q6 of the estimating brief). This is the ProductGraph-
+  to-Southbrook linkage that becomes permanent at release.</li>
+</ul>
+<p><strong>7. Decide: ship to customers, or run a second test MO? (5 min):</strong></p>
+<p>The decision criterion:</p>
+<ul>
+<li>If the first MO's cycle times, scrap, and hardware-resolver
+  behaviour all came out within ±10% of planned <strong>and</strong> the
+  revised BoM should close even that gap → <strong>ship to customers</strong>.</li>
+<li>If any of those came out &gt;20% off plan and the revisions are
+  speculative ("we <em>think</em> this will fix it") → <strong>run a second
+  test MO</strong> before shipping.</li>
+<li>The production manager owns this decision; the PLM engineer
+  advises.</li>
+</ul>
+<p><strong>Shipping to customers:</strong></p>
+<ul>
+<li>Confirm the <code>product.template</code> is <em>active for sale</em> and
+  <em>published</em> on the website (if customer-facing).</li>
+<li>Brief the sales team: <em>"<code>southbrook.&lt;xml_id&gt;</code> is live. Here's
+  the SKU brief: [link to conception folder + signature spec
+  sheet from lesson 11.6]."</em></li>
+<li>The first customer order will follow Course 5 + Course 2
+  flows; no further new-product effort.</li>
+</ul>
+<p><strong>Running a second test MO:</strong></p>
+<ul>
+<li>Loop back to lesson 11.7 step 2. Schedule a second internal
+  MO. The new BoM (version 2) is what the second MO runs against.</li>
+<li>After the second MO, repeat this lesson — but the second post-
+  MO ECO almost always bundles smaller revisions, and the
+  decision usually flips to <em>ship</em>.</li>
+</ul>
+<p><strong>8. The audit trail (2 min):</strong></p>
+<p>Confirm the audit trail is complete. The new SKU should now have:</p>
+<ul>
+<li><strong>ProductGraph audit log</strong> — every state transition on
+  <code>pg.item</code> (<code>concept → prototype → engineering → released</code>)
+  and every release on <code>pg.revision</code>.</li>
+<li><strong>Southbrook ECO history</strong> — every ECO that has modified the
+  BoM or cut spec (<code>southbrook_eco_history_ids</code> smart button on
+  <code>mrp.bom</code>).</li>
+<li><strong>Cut spec supersession chain</strong> — if any cut spec changes
+  fired during the introduction (lesson 11.3).</li>
+<li><strong>MI baseline</strong> — the new SKU's cycle-time baseline rolls into
+  the MI dashboards as a new product line.</li>
+<li><strong>Conception folder</strong> — frozen with all the artifacts. The
+  folder gets one final filename change:
+  <code>2026-06-17_&lt;slug&gt;_GREEN_RELEASED</code>. The folder is now
+  read-only and part of the project archive.</li>
+</ul>
+<p><strong>9. Hand-off to ongoing operations (1 min):</strong></p>
+<ul>
+<li>Slack the sales team + production manager + estimator:
+  <em>"<code>PG-ASM-NNNN</code> / <code>southbrook.&lt;xml_id&gt;</code> released; conception
+  folder archived; happy to take customer orders."</em></li>
+</ul>
+<h2 id="when-to-retire-a-product-the-inverse">When to retire a product (the inverse)</h2>
+<p>The same machinery runs in reverse when a SKU is retiring:</p>
+<ul>
+<li>Raise an ECO with <code>target_kind = document</code> describing the
+  retirement rationale (no longer profitable, vendor stopped
+  supplying a key material, replaced by a successor SKU,
+  customer demand died).</li>
+<li>Sign off through the stages.</li>
+<li>On apply, set <code>product.template.sale_ok = False</code> (no new
+  customer orders).</li>
+<li>Optionally set <code>active = False</code> after the last in-flight order
+  ships (the SKU disappears from search but its history remains).</li>
+<li>In ProductGraph, move the <code>pg.item</code> state via <code>action_to_service</code>
+  → <code>action_to_obsolete</code>. State sequence: <code>released → service →
+  obsolete</code>. The audit log captures the retirement.</li>
+</ul>
+<p>The retirement flow uses the same ECO + ProductGraph machinery as
+release — the difference is the disposition (<code>obsolete</code> vs
+<code>released</code>).</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I applied the ECO and the bridge failed — no <code>pg.release</code> was
+created."</strong></p>
+<p>The ECO is still applied; the BoM is still revised; only the
+ProductGraph propagation didn't fire. <strong>Recovery</strong>: open the
+linked <code>pg.ebom</code> directly in ProductGraph, manually create a
+<code>pg.release</code> (Course 9 lesson 9.4 documents this), and call
+<code>action_execute_release()</code>. The audit gap is small (the manual
+release records the same provenance as the bridge would have).
+File a P2 ticket for the bridge failure so it doesn't repeat.</p>
+<p><strong>"The revised BoM passed approval but the cycle time on <code>SB-EDGE</code>
+still came in at 18 min on the first customer order — same as the
+first test MO."</strong></p>
+<p>Then the cycle time you put in the ECO was right and the first MO
+wasn't an artefact. <strong>Recovery</strong>: nothing to do — the BoM is now
+calibrated. The customer order's cycle is on-plan. The first MO's
+12-min estimate was wrong from PLM; the revised 18-min estimate is
+correct. Good. The variance gap closed.</p>
+<p><strong>"I promoted <code>pg.item</code> to <code>released</code> before the ECO applied, and
+now the post-MO BoM revisions can't propagate because ProductGraph
+treats the item as immutable."</strong></p>
+<p>ProductGraph items in <code>released</code> state are <strong>revision-immutable</strong>
+(meaning <code>pg.revision</code> rows can't be edited), but the bridge
+addon's <code>_should_trigger_pg_release</code> creates a <strong>new</strong> <code>pg.release</code>
+on the <code>pg.ebom</code>, which is a different record than <code>pg.revision</code>.
+Releases <em>can</em> happen on a released item. <strong>Recovery</strong>: nothing —
+the bridge should still fire. If it doesn't, the cause is
+elsewhere (probably the <code>pg.ebom</code> reference is wrong on the ECO).</p>
+<p><strong>"The customer placed an order against the new SKU on day 1 and
+we discovered a small bug — wrong default value on an attribute.
+Do we ECO it, or fix-in-place?"</strong></p>
+<p>ECO it. The new SKU is in production; fix-in-place is a habit
+from pre-release engineering and you've left that phase. The
+attribute default value is a <code>product.template.attribute.value</code>
+record — raise an ECO with <code>target_kind = rule</code> (or <code>document</code> if
+the change is purely informational), walk through approval (fast-
+track for cosmetics), apply. Six months from now an auditor will
+ask <em>"why does this attribute default to X and not Y?"</em> and the
+ECO is your answer.</p>
+<p><strong>"The MI baseline didn't update after the BoM revision."</strong></p>
+<p>The MI engine reads from historical work-order durations. A
+single-MO baseline is high-variance; the MI engine deliberately
+defers committing a baseline until 3-5 MOs have completed. <em>Wait
+for more MOs</em>; the baseline lands automatically. If after 5 MOs the
+baseline still isn't reflecting the revised cycle time, file a
+ticket — usually it's a deeper MI bug, not anything you did.</p>
+<p><strong>"I want to retire the product but it has 12 customer orders
+in-flight."</strong></p>
+<p>Set <code>sale_ok = False</code> (no new orders). Leave <code>active = True</code>.
+The in-flight orders complete normally. When the last order
+ships, set <code>active = False</code>. In ProductGraph, move the <code>pg.item</code>
+to <code>service</code> (not <code>obsolete</code>) — the <em>service</em> state is for
+products no longer sold but still under support. Move to
+<code>obsolete</code> only when the last customer warranty has expired.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When the ECO applies:</p>
+<ul>
+<li><code>southbrook.eco.action_apply()</code>
+  (<code>southbrook_plm/models/southbrook_eco.py</code>) dispatches on
+  <code>target_kind</code>. For <code>bom</code>, calls <code>_apply_bom</code>.</li>
+<li><code>_apply_bom</code> calls <code>self.bom_id.copy({'southbrook_version':
+  self.bom_id.southbrook_version + 1, 'active': True})</code> and
+  archives the original (<code>self.bom_id.active = False</code>).</li>
+<li>The new BoM's id is written to <code>self.new_bom_id</code>.</li>
+<li>Chatter rows on both BoMs and the ECO record the apply event.</li>
+</ul>
+<p>When <code>_should_trigger_pg_release()</code> returns true (the bridge):</p>
+<ul>
+<li><code>southbrook_plm_productgraph/models/southbrook_eco.py</code> extends
+  <code>action_apply</code> to, after the super call, create a <code>pg.release</code>
+  with <code>ebom_id = self.pg_ebom_id</code> and <code>release_reason =
+  self.title</code>.</li>
+<li><code>pg.release.action_execute_release()</code> runs:</li>
+<li>Reads the EBOM's lines.</li>
+<li>Updates the underlying <code>mrp.bom</code> references (for the bridge
+    case where ProductGraph mirrors the BoM).</li>
+<li>State flows <code>pending → executing → completed</code>.</li>
+<li>The ProductGraph audit log fires.</li>
+</ul>
+<p>When <code>pg.item.action_force_release()</code> runs
+(<code>product_graph_base/models/pg_item.py</code>):</p>
+<ul>
+<li><code>state</code> flips <code>engineering → released</code>.</li>
+<li><code>released_date</code> set to <code>fields.Date.today()</code>.</li>
+<li><code>product_id</code> is set to the matching <code>product.product</code> record
+  (the first dynamic variant).</li>
+<li>Audit-log row.</li>
+</ul>
+<p>The ProductGraph release is <strong>one-way</strong> (D1 in the ProductGraph
+decisions). Future Southbrook BoM revisions propagate <strong>up</strong> to
+ProductGraph via the bridge; ProductGraph doesn't push state
+<strong>down</strong> to Southbrook. This is deliberate — Southbrook is the
+operational source of truth, ProductGraph is the engineering
+master.</p>
+<p>When the MI engine processes the second-and-later MOs:</p>
+<ul>
+<li>Per-station cycle times accumulate.</li>
+<li>After 3-5 MOs, a baseline lands in the MI engine and the new
+  SKU shows up on the cycle-time variance dashboards.</li>
+<li>The dashboards now treat the SKU as a known product, not a
+  first-run novelty.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> The first MO completed yesterday. The actual cycle times
+were within 5% of planned. There were no scrap events. Hardware
+auto-resolution worked. The operator notebook is empty. Do you
+need the post-MO ECO?</p>
+<blockquote>
+<p>Yes — a minimal one. Even a "no changes needed" outcome
+deserves an ECO that records the <em>decision</em> to leave the BoM
+as-is, with the first-MO data attached. Future auditors will
+ask <em>"why was version 1 of this BoM also the version that went
+to customers?"</em> The minimal ECO is the answer:
+<em>"Post-MO calibration — first MO clean, no revisions"</em>. Apply
+with <code>pg_auto_release = True</code> so ProductGraph still gets the
+release.</p>
+</blockquote>
+<p><strong>2.</strong> The ECO applied but you notice <code>pg_release_id</code> is empty —
+the bridge didn't fire. The ECO state is <code>applied</code>. What do you
+check first?</p>
+<blockquote>
+<p>Three things in order: (a) <code>pg_ebom_id</code> on the ECO — is it
+populated? If empty, the bridge had nothing to release against.
+(b) <code>pg_auto_release</code> — is it <code>True</code>? If False, the bridge
+deliberately skipped. (c) <code>_should_trigger_pg_release()</code>'s
+internal logic — likely it requires the EBOM to be in a
+<code>released</code> state in ProductGraph; if the EBOM is in
+<code>draft</code>, the bridge no-ops. The fix is on the ProductGraph
+side: release the EBOM, then re-trigger.</p>
+</blockquote>
+<p><strong>3.</strong> The production manager wants to run a second test MO
+before shipping to customers. The post-MO ECO has applied
+(BoM is now version 2). What do you do for the second MO?</p>
+<blockquote>
+<p>Loop back to lesson 11.7 step 2. Schedule a second internal MO
+against the <em>Demo — First MO</em> partner (or a new sandbox
+partner <em>Demo — Second MO</em> for clarity). The MO uses
+BoM version 2 automatically because <code>_apply_bom</code> archived
+version 1. Run it. Repeat the debrief. If clean, the next
+post-MO ECO is trivially small and you ship to customers
+after.</p>
+</blockquote>
+<p><strong>4.</strong> Three months after release, you're retiring the SKU
+because the vendor stopped supplying the door substrate. The
+SKU has 4 in-flight customer orders. What do you do?</p>
+<blockquote>
+<p>(a) Set <code>sale_ok = False</code> on the template — no new orders
+accepted. (b) Leave <code>active = True</code> so the 4 in-flight orders
+complete normally. (c) Raise an ECO with
+<code>target_kind = document</code> describing the retirement (vendor
+reason, customer-comm plan). (d) Move <code>pg.item</code> from
+<code>released → service</code> (not <code>obsolete</code> — there are still
+in-flight orders). (e) After the last order ships,
+<code>active = False</code> and <code>pg.item → obsolete</code>. The MI dashboards
+stop showing the SKU as actively measured; the audit trail
+is complete.</p>
+</blockquote>
+<p><strong>5.</strong> Six months after release, a customer service rep finds a
+small typo in the SKU's customer-facing description on the
+website. What's the right channel to fix it?</p>
+<blockquote>
+<p>An ECO. <code>target_kind = document</code>. Title:
+<em>"Description typo fix for <code>southbrook.&lt;xml_id&gt;</code>"</em>. The actual
+fix (editing <code>product.template.description_sale</code>) takes 10
+seconds; the ECO walking through approval takes a day. The
+ECO is the <em>audit trail</em>, not the <em>work</em>. Yes, this feels like
+overkill for a typo. It is overkill. It is also correct —
+auditors don't distinguish typos from material changes when
+they ask "who changed this and why?". The ECO is the answer
+for both cases.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>ECO fundamentals (raising, walking through stages, applying) —
+  lesson 4.1.</li>
+<li>The first MO mechanics (scheduling, release gate, shop-floor
+  monitoring) — lesson 11.7.</li>
+<li>Cut spec activation via ECO — lesson 11.3 and lesson 4.2.</li>
+<li>ProductGraph release fundamentals — Course 9 lesson 9.4.</li>
+<li>The <code>pg.item</code> state machine in detail — Course 9 lesson 9.2.</li>
+<li>The <code>pg.ebom</code> model and how it relates to <code>mrp.bom</code> — Course
+  9 lesson 9.4.</li>
+<li>MI engine internals — Course 3.</li>
+<li>Customer-side communications about new SKU launches or
+  retirements — Course 6.</li>
+<li>The first customer order flow — Course 5 + Course 2 (the
+  SKU has graduated from new-product introduction).</li>
+<li>Cross-product migration when a new SKU replaces an old one
+  (the <em>successor SKU</em> path) — covered by ECO chaining,
+  documented in the conception folder when relevant.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

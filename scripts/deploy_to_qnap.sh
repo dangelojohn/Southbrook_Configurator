@@ -124,15 +124,68 @@ for mod in "${MODULES[@]}"; do
     "$src/" "$QNAP_HOST:$QNAP_ADDONS_DIR/$mod/"
 done
 
-# ---- run the upgrade (COLD registry load, serialized by flock) --------
-# `-u --stop-after-init` loads the FULL registry in a fresh process. If it
+# ---- decide install vs upgrade per module -----------------------------
+# `odoo -u <mod>` is a no-op if the module has never been registered in
+# the `ir_module_module` table — the deploy then succeeds while the
+# module is still "uninstalled / not in registry" and nothing visible
+# changes. For a fresh addon you need `odoo -i <mod>` (which also
+# performs the equivalent of `--update-list` first to discover it).
+#
+# Classify each requested module by looking it up via psql:
+#   * already in ir_module_module with state='installed' / 'to upgrade'
+#     → keep using -u
+#   * not in ir_module_module OR state='uninstalled'
+#     → switch to -i
+# Mixed batch is OK — we pass two flag groups to odoo on the same
+# command line: `-i to_install -u to_upgrade`. Odoo honours both.
+#
+# Done over psql instead of `odoo shell` because shell takes 30-90s to
+# bootstrap; the classification query takes <100ms.
+log "classifying $MODULES_ARG (install vs upgrade)…"
+PG_PW=$(_ssh "$QNAP_HOST" "$QNAP_DOCKER exec $CONTAINER bash -c 'grep -E \"^db_password\" /etc/odoo/odoo.conf 2>/dev/null | head -1 | cut -d= -f2 | tr -d \" \"'" 2>/dev/null || true)
+# A clean (unquoted) IN-list for the psql query.
+mod_in_list=$(printf "'%s'," "${MODULES[@]}" | sed 's/,$//')
+classify_query="SELECT name || ':' || state FROM ir_module_module WHERE name IN ($mod_in_list);"
+known_states=$(_ssh "$QNAP_HOST" "$QNAP_DOCKER exec -e PGPASSWORD='$PG_PW' $CONTAINER psql -h southbrook-postgres -U odoo -d $DB -At -c \"$classify_query\"" 2>/dev/null || true)
+to_install=()
+to_upgrade=()
+for mod in "${MODULES[@]}"; do
+  state=$(printf '%s\n' "$known_states" | awk -F: -v m="$mod" '$1==m {print $2}')
+  if [[ -z "$state" || "$state" == "uninstalled" ]]; then
+    to_install+=("$mod")
+  else
+    to_upgrade+=("$mod")
+  fi
+done
+INSTALL_ARG=$(IFS=','; echo "${to_install[*]:-}")
+UPGRADE_ARG=$(IFS=','; echo "${to_upgrade[*]:-}")
+if [[ -n "$INSTALL_ARG" ]]; then
+  log "  install: $INSTALL_ARG"
+fi
+if [[ -n "$UPGRADE_ARG" ]]; then
+  log "  upgrade: $UPGRADE_ARG"
+fi
+# Build the odoo command — combine -i and -u when both apply. Two single
+# modules ('foo' to install, 'bar' to upgrade) become:
+#   odoo -i foo -u bar -d southbrook --stop-after-init ...
+ODOO_FLAGS=""
+if [[ -n "$INSTALL_ARG" ]]; then ODOO_FLAGS="-i $INSTALL_ARG"; fi
+if [[ -n "$UPGRADE_ARG" ]]; then
+  if [[ -n "$ODOO_FLAGS" ]]; then ODOO_FLAGS="$ODOO_FLAGS -u $UPGRADE_ARG"; else ODOO_FLAGS="-u $UPGRADE_ARG"; fi
+fi
+if [[ -z "$ODOO_FLAGS" ]]; then
+  fail "no modules to install or upgrade — classification produced empty buckets (bug in this script or in psql probe)"
+fi
+
+# ---- run the install/upgrade (COLD registry load, serialized by flock) -
+# `--stop-after-init` loads the FULL registry in a fresh process. If it
 # fails, a later live restart will ALSO crash-loop — so we FAIL LOUDLY below
 # unless we see a clean 'Modules loaded' with no load errors (this failure was
 # once masked by `| grep ... || true` and a restart took the site down).
-# We also wrap odoo -u in flock INSIDE the container so concurrent upgrade
-# attempts queue instead of racing; `-E 75` makes a lock timeout return exit
+# We also wrap odoo in flock INSIDE the container so concurrent attempts
+# queue instead of racing; `-E 75` makes a lock timeout return exit
 # 75 (surfaced explicitly below) rather than silently "succeeding".
-log "upgrading $MODULES_ARG on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
+log "running $ODOO_FLAGS on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
 # `: > $LOCK_PATH || true` makes sure the lock file exists (flock can't
 # create one against a missing parent dir on first run).
 #
@@ -144,7 +197,7 @@ log "upgrading $MODULES_ARG on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
 # written by THIS script makes the gate deterministic regardless of how
 # Odoo's logger frames the success line.
 SENTINEL="__SBK_COLD_OK__"
-inner_cmd="(: > $LOCK_PATH 2>/dev/null || true) && flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr && echo $SENTINEL"
+inner_cmd="(: > $LOCK_PATH 2>/dev/null || true) && flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo $ODOO_FLAGS -d $DB --stop-after-init --no-http --logfile=/dev/stderr && echo $SENTINEL"
 upgrade_cmd="$QNAP_DOCKER exec $CONTAINER bash -c \"$inner_cmd\""
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"

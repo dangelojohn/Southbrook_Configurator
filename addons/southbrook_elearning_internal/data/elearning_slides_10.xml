@@ -1,0 +1,2883 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_10_configurator_architecture" model="slide.slide">
+            <field name="name">Configurator Architecture — The 5-Addon Stack, Layer by Layer</field>
+            <field name="channel_id" ref="course_configurator_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer extending the configurator + senior admin who owns the catalog. You know what `_inherit` means; you&#x27;ve installed a custom module before.</field>
+            <field name="html_content"><![CDATA[<h1 id="configurator-architecture-the-5-addon-stack-layer-by-layer">Configurator Architecture — The 5-Addon Stack, Layer by Layer</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a developer or senior admin who needs to <strong>change</strong> the
+configurator — add a new attribute, write a new business rule, surface
+a new field to the wizard, debug a session that won't validate. You've
+done the basics in Course 5 (5.1, 5.2, 5.4) and the surface vocabulary
+makes sense. Now you need the map: which addon owns which model, where
+the layering breaks if you cross addons in the wrong order, what gets
+loaded into the registry when you run <code>-u product_configurator</code>. This
+lesson is the architecture pass — you read it once, then you stop
+guessing where to put code.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>You don't navigate to a screen to "see" the architecture — it's the
+shape of the stack. But three reference points anchor everything else:</p>
+<blockquote>
+<p><strong>Sales → Configurable Products → Configurable Templates</strong> — every
+<code>product.template</code> with <code>config_ok = True</code>. The catalog of what the
+configurator can configure.</p>
+<p><strong>Sales → Configuration → Configuration Rules</strong> — every
+<code>product.config.line</code> record. The rule catalog.</p>
+<p><strong>Sales → Configuration → Configuration Sessions</strong> — every
+<code>product.config.session</code> record. Every wizard visit ever, draft +
+done.</p>
+</blockquote>
+<p>The dev shell (<code>odoo-bin shell -d &lt;db&gt;</code>) is where you'll spend more
+time once you actually need to debug a session — see Lesson 10.3.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The 5-addon dependency graph (read top-down):</p>
+<pre><code>                 product_configurator        (OCA base)
+                          │
+            ┌─────────────┼─────────────────┐
+            ▼             ▼                 ▼
+  product_configurator_sale  product_configurator_mrp
+  (sale.order bridge)        (mrp.bom bridge)
+            │
+            ▼
+  website_product_configurator   (auto_install with sale stack)
+            │
+            ▼
+  southbrook_configurator_ux     (Southbrook v2 overlay)
+</code></pre>
+<p>Each box is one addon; each arrow is a <code>depends</code> line in
+<code>__manifest__.py</code>. <strong>Read the arrows as "if you uninstall the
+upstream, the downstream goes too."</strong> Uninstall <code>product_configurator</code>
+and the entire chain unloads.</p>
+<p>What each addon adds — the <strong>delta</strong>:</p>
+<ul>
+<li><strong><code>product_configurator/</code></strong> (OCA base, AGPL-3, v19.0.1.0.0). Defines
+  the entire model layer. Adds <code>config_ok</code>, <code>attribute_line_ids</code> rules,
+  <code>config_line_ids</code>, <code>config_step_line_ids</code>, <code>config_image_ids</code> to
+  <code>product.template</code>; defines <code>product.config.domain</code>,
+  <code>product.config.domain.line</code>, <code>product.config.line</code>,
+  <code>product.config.image</code>, <code>product.config.step</code>,
+  <code>product.config.step.line</code>, <code>product.config.session</code>,
+  <code>product.config.session.custom.value</code> as <strong>new</strong> models. Adds the
+  backend wizard at <code>wizard/product_configurator.py</code> (the <code>product.configurator</code>
+  transient model) and the menu (<code>data/menu_configurable_product.xml</code>).
+  No sale, no MRP, no website knowledge.</li>
+<li><strong><code>product_configurator_sale/</code></strong> (auto_install on <code>sale_management</code>).
+  Inherits <code>sale.order</code> to add <code>action_config_start()</code> (the Configure
+  button on draft orders) and <code>sale.order.line</code> to add <code>config_ok</code>,
+  <code>config_session_id</code>, <code>custom_value_ids</code> (related), plus
+  <code>reconfigure_product()</code> and a price-unit override that reads
+  <code>config_session_id.price</code> instead of the variant list price. Adds the
+  <code>product.configurator.sale</code> transient wizard subclass at
+  <code>wizard/product_configurator.py</code>. <strong>No MRP knowledge</strong> — sale and
+  manufacturing are kept independent.</li>
+<li><strong><code>product_configurator_mrp/</code></strong>. Inherits <code>mrp.production</code>,
+  <code>mrp.bom</code>, <code>mrp.bom.line</code> to add <code>config_ok</code> + <code>config_session_id</code>.
+  Defines two <strong>new</strong> models — <code>mrp.bom.line.configuration.set</code> and
+  <code>mrp.bom.line.configuration</code> — that wire BoM lines to attribute
+  values so a parent BoM can conditionally include / exclude lines per
+  configuration. Inherits <code>product.config.session</code> to add
+  <code>create_get_bom()</code> and override <code>create_get_variant()</code> so every new
+  variant from the configurator also gets a <code>mrp.bom</code> (Lesson 10.5
+  walks the rollup mechanics).</li>
+<li><strong><code>website_product_configurator/</code></strong>. Inherits <code>product.template</code> to
+  add <code>_to_markup_data()</code> (schema.org JSON-LD); inherits <code>sale.order</code>
+  to override <code>_cart_update_order_line</code>, <code>_cart_find_product_line</code>,
+  <code>_prepare_order_line_values</code> so the e-commerce cart respects
+  <code>config_session_id</code>; inherits <code>product.config.session</code> to add
+  <code>remove_inactive_config_sessions()</code> (the second cron — see "Behind
+  the scenes" below); inherits <code>product.config.step.line</code> to add a
+  per-step QWeb template field. Defines the <code>/configurator/...</code> route
+  family in <code>controllers/main.py</code> and the customer portal "My
+  configurations" pages in <code>controllers/portal.py</code>.</li>
+<li><strong><code>southbrook_configurator_ux/</code></strong> (LGPL-3, Southbrook). Inherits the
+  OCA <code>website_product_configurator.product_configurator</code> QWeb template
+  via <code>views/configurator_template.xml</code> (one xpath, position="replace"
+  on <code>//section[@id='unique_product_configurator']</code>). Ships the OWL
+  <code>ConfiguratorV2</code> component + a separate JSON-RPC controller at
+  <code>/southbrook/api/configurator/state|select|commit</code> and an import
+  pipeline at <code>/southbrook/api/import/template|preview|commit</code>. Adds
+  three <strong>data</strong> files: <code>tactical_price_extras.xml</code> (price_extra +
+  weight_extra seed), <code>catalog_expansion.xml</code> (~40 catalog templates),
+  <code>rule_completion.xml</code> (fills OCA <code>product.config.line</code> gaps).</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You won't be installing these every day — but every change you make
+follows the same layering discipline. The five most common operations
+and where they belong:</p>
+<p><strong>1. "I want to add a new attribute (e.g. 'Toe Kick Height')."</strong></p>
+<p>The attribute itself is a <code>product.attribute</code> record. It lives in
+<strong>data</strong>, not Python. Where?</p>
+<ul>
+<li>If the attribute is <strong>Southbrook-specific</strong> (every cabinet uses it,
+  it's part of the brand offering) → it belongs in
+  <code>southbrook_estimating/data/attributes.xml</code>.</li>
+<li>If it's a <strong>generic configurator concept</strong> (display_type extension,
+  uom binding) → upstream <code>product_configurator/data/product_attribute.xml</code>,
+  but you don't touch that. You'd file a PR against OCA.</li>
+</ul>
+<p>You then bind the attribute to one or more templates by creating
+<code>product.template.attribute.line</code> records. Those records also live in
+data — usually <code>southbrook_estimating/data/product_templates.xml</code> or
+the catalog-expansion in <code>southbrook_configurator_ux/data/catalog_expansion.xml</code>.</p>
+<p><strong>2. "I want to add a new business rule."</strong></p>
+<p>Rules are <code>product.config.line</code> records linking a template, an
+attribute_line, blocked value_ids, and a domain trigger
+(<code>product.config.domain</code> + lines). You author them as <strong>XML data</strong>,
+not Python overrides. The four canonical Southbrook rules are in
+<code>southbrook_estimating/data/config_rules.xml</code>; the catalog-expansion
+backfills (e.g. Contemporary + Elegance allowed combinations) are in
+<code>southbrook_configurator_ux/data/rule_completion.xml</code>.</p>
+<p>The acceptance test (CLAUDE.md §9): <code>grep -rn 'if series ==' addons/southbrook_estimating/models/</code>
+returns <strong>zero</strong> hits. Every rule is declarative.</p>
+<p><strong>3. "I want to add a price extra to a value (e.g. brushed nickel pulls +$8)."</strong></p>
+<p>The price extra lives on <code>product.template.attribute.value</code> — the
+OCA model auto-creates one row per (template, value) pair. The value
+itself is <code>product.attribute.value</code>. Set <code>price_extra</code> (and
+<code>weight_extra</code> if the part adds weight). Currently seeded by
+<code>southbrook_configurator_ux/data/tactical_price_extras.xml</code> as a
+demo-grade backfill — this is TBD-move-to-southbrook_estimating per
+the manifest comment.</p>
+<p><strong>4. "I want to expose the wizard a new way (a new surface like 3D)."</strong></p>
+<p>You write a <strong>new</strong> addon depending on <code>product_configurator</code> (for the
+session model) and probably <code>product_configurator_sale</code> (to drop the
+configured line on a sale.order). The OCA wizard form lives at
+<code>wizard/product_configurator.py</code> — that's the backend transient. The
+website v1 form lives in <code>website_product_configurator/views/templates.xml</code>
++ <code>controllers/main.py</code>. The Southbrook v2 chip-UI lives in
+<code>southbrook_configurator_ux/static/src/js/configurator.esm.js</code> +
+its own JSON-RPC controllers. <strong>None of these touch the four upstream
+addons in place</strong> — they all extend via inheritance + a new asset
+bundle. The CLAUDE.md §3 contract.</p>
+<p><strong>5. "I want to debug why a configurator session won't validate."</strong></p>
+<p>Run <code>odoo-bin shell -d &lt;db&gt;</code>, browse the session, call
+<code>session.validate_configuration()</code>. Read the exception. The OCA
+machinery is described step-by-step in Lesson 10.3, but the entry
+point is always the same: a session record + its <code>validate_configuration()</code>
+method (defined at <code>product_configurator/models/product_config.py</code> line
+1482) on top of <code>values_available()</code> (line 1377).</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a model field on <code>product.config.session</code> in
+<code>southbrook_estimating</code> but it's not appearing in the OCA wizard."</strong></p>
+<p>The OCA wizard form is generated <strong>dynamically</strong> by
+<code>wizard/product_configurator.py:_fields_view_get()</code> from the
+template's <code>attribute_line_ids</code> — not from the
+<code>product.config.session</code> model's <code>fields</code>. Adding a field on the
+session doesn't auto-add it to the wizard. If you want it in the
+wizard, you have to (a) inherit the wizard transient model
+(<code>product.configurator</code>) and add the field there, AND (b) inherit the
+wizard view to render it. There is no shortcut.</p>
+<p><strong>"I added a new attribute and the install fails with <code>value_ids</code> empty."</strong></p>
+<p>Every <code>product.template.attribute.line</code> must have at least one
+<code>value_ids</code>. The Odoo 19 <code>_validate_layout</code> raises NF19 ("attribute
+line has no values") at install if any line is empty. Fix: add at
+least one <code>product.attribute.value</code> to the new attribute before
+binding it to a template.</p>
+<p><strong>"I inherited <code>product.config.session</code> in my new module and the
+override isn't firing."</strong></p>
+<p>Check your <code>depends</code> in <code>__manifest__.py</code>. If you forgot to depend on
+<code>product_configurator</code>, Odoo loads your model in alphabetical order
+and your <code>_inherit</code> finds an empty registry entry. Fix the manifest;
+re-run <code>-u &lt;your_addon&gt;</code>.</p>
+<p><strong>"I uninstalled <code>southbrook_configurator_ux</code> and the customer-facing
+page broke, not just the styling."</strong></p>
+<p>The OCA template was reverted — the body of
+<code>website_product_configurator.product_configurator</code> is gone because
+the inheritance was the body markup. The OCA stock layout comes back
+<strong>immediately</strong>. If it didn't, check <code>web.assets_frontend</code> — a stale
+asset bundle may need a <code>--update-assets</code> pass. Reinstall
+<code>southbrook_configurator_ux</code> to recover.</p>
+<p><strong>"I added a rule to <code>rule_completion.xml</code> and customers can still pick
+the forbidden combination."</strong></p>
+<p>The <code>product.config.line</code> record only fires when its <code>domain_id</code>
+trigger evaluates True. Common bug: you wrote the domain with the
+wrong attribute_id reference (you used the value's name string
+instead of the XML id). Symptom: the rule loads, but never fires.
+Fix: re-check the <code>&lt;field name="attribute_id" ref="..."/&gt;</code> in the
+domain.line record matches the attribute you meant.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The five addons compose into one logical machine. The <strong>model layering</strong>
+top-to-bottom (which addon defines what):</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Defined by</th>
+<th>Extended by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product.template</code> (base)</td>
+<td><code>account</code>/<code>stock</code></td>
+<td><code>product_configurator</code> (+config_ok, attribute_line_ids rules), <code>website_product_configurator</code> (+_to_markup_data)</td>
+</tr>
+<tr>
+<td><code>product.template.attribute.line</code> (base)</td>
+<td><code>product</code></td>
+<td><code>product_configurator</code> (+default_val, +rule eval helpers)</td>
+</tr>
+<tr>
+<td><code>product.attribute</code> (base)</td>
+<td><code>product</code></td>
+<td><code>product_configurator</code> (+required, +multi, +sequence, +uom_id, +custom_type, …)</td>
+</tr>
+<tr>
+<td><code>product.attribute.value</code> (base)</td>
+<td><code>product</code></td>
+<td><code>product_configurator</code> (+product_id, +active, +image)</td>
+</tr>
+<tr>
+<td><code>product.config.domain</code></td>
+<td><code>product_configurator</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>product.config.domain.line</code></td>
+<td><code>product_configurator</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>product.config.line</code></td>
+<td><code>product_configurator</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>product.config.image</code></td>
+<td><code>product_configurator</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>product.config.step</code></td>
+<td><code>product_configurator</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>product.config.step.line</code></td>
+<td><code>product_configurator</code></td>
+<td><code>website_product_configurator</code> (+website_tmpl_id, +get_website_template)</td>
+</tr>
+<tr>
+<td><code>product.config.session</code></td>
+<td><code>product_configurator</code></td>
+<td><code>product_configurator_mrp</code> (+sanitized_spec, +create_get_bom, override create_get_variant), <code>website_product_configurator</code> (+remove_inactive_config_sessions, +get_config_form_website_template)</td>
+</tr>
+<tr>
+<td><code>product.config.session.custom.value</code></td>
+<td><code>product_configurator</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>product.product</code></td>
+<td><code>product</code></td>
+<td><code>product_configurator</code> (+config_name, +config_ok, +product_template_attribute_value_ids overrides)</td>
+</tr>
+<tr>
+<td><code>sale.order</code></td>
+<td><code>sale_management</code></td>
+<td><code>product_configurator_sale</code> (+action_config_start), <code>website_product_configurator</code> (+<em>cart</em>* overrides)</td>
+</tr>
+<tr>
+<td><code>sale.order.line</code></td>
+<td><code>sale</code></td>
+<td><code>product_configurator_sale</code> (+config_ok, +config_session_id, +custom_value_ids, +reconfigure_product, +_compute_price_unit)</td>
+</tr>
+<tr>
+<td><code>mrp.production</code></td>
+<td><code>mrp</code></td>
+<td><code>product_configurator_mrp</code> (+config_ok, +config_session_id, +custom_value_ids, +action_config_start, +reconfigure_product)</td>
+</tr>
+<tr>
+<td><code>mrp.bom</code></td>
+<td><code>mrp</code></td>
+<td><code>product_configurator_mrp</code> (+config_ok)</td>
+</tr>
+<tr>
+<td><code>mrp.bom.line</code></td>
+<td><code>mrp</code></td>
+<td><code>product_configurator_mrp</code> (+config_set_id)</td>
+</tr>
+<tr>
+<td><code>mrp.bom.line.configuration.set</code></td>
+<td><code>product_configurator_mrp</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>mrp.bom.line.configuration</code></td>
+<td><code>product_configurator_mrp</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Two GC crons run on <code>product.config.session</code></strong> — one is OCA's
+upstream, one is the Southbrook-website extension:</p>
+<ul>
+<li><code>product_configurator.ir_cron_gc_draft_sessions</code> — daily, calls
+  <code>_gc_draft_sessions()</code>. Deletes draft sessions older than
+  <code>ir.config_parameter product_configurator.session_gc_days</code> (default
+  7 days). Sessions referenced by <code>sale.order.line.config_session_id</code>
+  are protected (TBD: confirm by reading <code>_gc_draft_sessions</code>).</li>
+<li><code>website_product_configurator.cron_delete_sessions_with_no_activity</code> —
+  daily, calls <code>remove_inactive_config_sessions()</code>. Hard-coded 3-day
+  threshold (not configurable), targets draft sessions only. <strong>Notice
+  the two crons disagree on threshold</strong> — a draft session older than
+  3 days gets deleted by the website cron before the OCA 7-day cron
+  sees it. Lesson 10.3 covers the interplay.</li>
+</ul>
+<p><strong>Asset bundle layering</strong> (what JS / SCSS loads when):</p>
+<ul>
+<li><code>web.assets_backend</code> — <code>product_configurator</code>'s form widgets +
+  boolean buttons + kanban widgets + list widgets; <code>product_configurator_mrp</code>'s
+  config-button mixin + list/kanban/form controllers + the
+  mrp_production_views XML overlay. Backend-only.</li>
+<li><code>web.assets_frontend</code> — <code>website_product_configurator</code>'s config_form
+  JS + website_sale JS + config_form SCSS + tooltip SCSS, then
+  <code>southbrook_configurator_ux</code>'s configurator.scss + configurator.esm.js
+  (the OWL component) — in that order, because the SCSS depends on
+  tokens defined upstream.</li>
+<li><code>web.assets_tests</code> — <code>website_product_configurator</code>'s tour test.</li>
+</ul>
+<p>The <strong>registry boot order</strong> at install: Odoo loads modules in
+topological order. <code>product_configurator</code> first → <code>product_configurator_sale</code>
+(auto_install=True so it lands once <code>sale_management</code> is present) +
+<code>product_configurator_mrp</code> → <code>website_product_configurator</code> →
+<code>southbrook_estimating</code> → <code>southbrook_configurator_ux</code>. If you break
+the topology (e.g. circular <code>depends</code>) the registry refuses to load
+and <code>odoo-bin</code> raises <code>KeyError</code>.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You want to add a Southbrook-specific field
+<code>cut_spec_revision</code> to <code>product.config.session</code> so the BoM rollup can
+freeze the spec revision at commit time. Which addon do you put the
+<code>_inherit = 'product.config.session'</code> class in, and why not the OCA
+base?</p>
+<blockquote>
+<p>Put it in <code>southbrook_estimating</code> (or a new Southbrook-side addon if
+the spec is engineering-scoped). NEVER in <code>product_configurator/</code> or
+<code>product_configurator_mrp/</code> — those are the OCA upstream, and the
+CLAUDE.md §3 contract forbids in-place edits because Southbrook must
+stay able to pull OCA updates cleanly. The reason it's not
+<code>southbrook_configurator_ux</code>: that addon is the customer-facing UX
+overlay; engineering state on the session belongs with the
+estimating engine, not the UX skin.</p>
+</blockquote>
+<p><strong>2.</strong> A junior dev adds a new <code>product.config.line</code> rule to
+<code>southbrook_configurator_ux/data/rule_completion.xml</code>. They install,
+test on <code>base_2dr</code>, the rule fires correctly. The next morning they
+add a rule to <code>data/catalog_expansion.xml</code>. It doesn't fire on
+fresh catalog templates. What did they likely get wrong?</p>
+<blockquote>
+<p>Load-order. The manifest's <code>data</code> list loads
+<code>tactical_price_extras.xml</code> → <code>catalog_expansion.xml</code> →
+<code>rule_completion.xml</code>. The new rule in <code>catalog_expansion.xml</code> is
+being processed BEFORE the catalog template records that it
+references — so the <code>product_tmpl_id</code> ref points at a record that
+doesn't yet exist when the rule loads, and the rule silently
+doesn't bind. Fix: move the rule into <code>rule_completion.xml</code> (which
+loads after the catalog), or split it into a 4th file that loads
+last.</p>
+</blockquote>
+<p><strong>3.</strong> A customer reports their cart shows the same configured
+cabinet on two lines instead of incrementing qty. You confirm both
+lines reference the same <code>product.product</code> variant. Which addon's
+override is involved, and what behaviour is intentional vs. a bug?</p>
+<blockquote>
+<p><code>website_product_configurator/models/sale_order.py:_cart_find_product_line</code>.
+This override filters by <code>config_session_id</code> — by design two cart
+adds with <strong>different</strong> sessions land on <strong>different</strong> lines even
+when the variant id matches, because each session can carry
+different <code>custom_value_ids</code> (a free-text engraving, an uploaded
+photo, etc.). That's intentional. The bug is if both lines have
+the SAME <code>config_session_id</code> AND the same variant — that means the
+session is being re-used twice instead of <code>action_confirm</code> locking
+it to <code>state='done'</code>. Open the session, check <code>state</code> — if it's
+still <code>draft</code>, the commit path failed quietly.</p>
+</blockquote>
+<p><strong>4.</strong> You add a new transient model <code>southbrook.configurator.sale.gather</code>
+that orchestrates a multi-cabinet wizard. It depends on
+<code>product_configurator_sale</code>. At install you get
+<code>KeyError: 'product.configurator.sale'</code>. Diagnose.</p>
+<blockquote>
+<p>Your <code>depends</code> is missing <code>product_configurator_sale</code> OR
+<code>product_configurator_sale.auto_install</code> flipped to False on this
+environment so it never installed. The <code>product.configurator.sale</code>
+transient wizard model only exists once <code>product_configurator_sale</code>
+is installed. The auto_install flag depends on <code>sale_management</code>
+being present at install time. Check <code>Apps → Apps</code>, filter
+"configurator", confirm Sale is green.</p>
+</blockquote>
+<p><strong>5.</strong> Why does <code>product_configurator_sale</code> define <code>_compute_price_unit</code>
+to read from <code>config_session_id.price</code> instead of letting Odoo
+compute price from the variant's list price + pricelist?</p>
+<blockquote>
+<p>Because the configurator's price isn't just the variant's
+<code>list_price</code> — it's <code>list_price</code> + sum of all
+<code>product.template.attribute.value.price_extra</code> for the picked
+values + custom-value handling. The session computes that
+aggregate in <code>get_cfg_price()</code> and caches it in <code>session.price</code>.
+If sale.order.line fell back to native Odoo pricing it would lose
+the +10% Maple, +$8 brushed nickel, +$x custom engraving extras.
+The override is what makes the channel pricelist resolve against
+the <strong>configured</strong> price, not the bare list price.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator basics (attributes, values, exclusions) — Course 5,
+  Lesson 5.1.</li>
+<li>Setting up a new configurable product from scratch — Lesson 10.2.</li>
+<li>The session state machine + debugging stuck sessions — Lesson 10.3.</li>
+<li>Sale-flow integration in depth (channel pricing, line snapshots) —
+  Lesson 10.4.</li>
+<li>MRP-flow integration in depth (BoM rollup, configuration sets) —
+  Lesson 10.5.</li>
+<li>The v2 UX OWL component internals — Lesson 10.6.</li>
+<li>Common gotchas + recovery patterns — Lesson 10.7.</li>
+<li>General OCA <code>product_configurator</code> administration — the OCA module's
+  own docs at https://github.com/OCA/product-configurator.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_10_new_configurable_product" model="slide.slide">
+            <field name="name">Setting Up a New Configurable Product — End-to-End</field>
+            <field name="channel_id" ref="course_configurator_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Product admin who owns the cabinet catalog. You add new SKUs every few months as Southbrook adds a series or a vendor changes a door style.</field>
+            <field name="html_content"><![CDATA[<h1 id="setting-up-a-new-configurable-product-end-to-end">Setting Up a New Configurable Product — End-to-End</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the product admin who owns the catalog. Sales has just told
+you Southbrook is launching a new line — say, a 24-in vanity in the
+Elegance series with a fluted door style nobody has seen before. Your
+job is to take that requirement and walk it through the configurator
+stack until an estimator can open the Order Builder, drop a line, hit
+Configure, and price the new product correctly. This lesson is the
+complete checklist. No shortcuts. Six stages, one product to ship.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Three menu paths cover 90% of the work:</p>
+<blockquote>
+<p><strong>Sales → Configurable Products → Configurable Templates</strong> — the
+12 cabinet templates + ~40 expanded catalog templates. Where the new
+SKU's <code>product.template</code> record lives.</p>
+<p><strong>Sales → Configuration → Attributes</strong> — every <code>product.attribute</code>
+and its values. Where new attribute values get added.</p>
+<p><strong>Sales → Configuration → Configuration Rules</strong> — every
+<code>product.config.line</code>. Where you author exclusions + construction
+rules.</p>
+</blockquote>
+<p>A fourth, for proofing:</p>
+<blockquote>
+<p><strong>Sales → Configurable Products → Configuration Sessions</strong> — every
+session ever created. You'll create test sessions here as you
+validate the new product.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The end state — what an estimator sees after you finish:</p>
+<ul>
+<li>A new line in the Order Builder's product picker (filtered by
+  <code>config_ok = True</code>).</li>
+<li>A Configure button on the new line that opens the wizard with the
+  right attribute_lines in the right order.</li>
+<li>Live pricing reflecting the new attribute values' <code>price_extra</code> and
+  any base list_price.</li>
+<li>The 4 Southbrook rules + any new rule you wrote firing as expected.</li>
+<li>The customer-facing <code>/shop/&lt;slug&gt;</code> page rendering the new template
+  in the v2 chip UI (if <code>is_published = True</code>).</li>
+<li>A BoM auto-generated on commit, with the right component lines.</li>
+</ul>
+<p>The work to get there is six staged passes, in order. Skipping any
+one means the next won't work.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>Stage 1 — Gather the spec.</strong></p>
+<p>Before opening Odoo, write down:</p>
+<ul>
+<li><code>default_code</code> — the SKU prefix (e.g. <code>SB-VANITY-24-EL-FLUT</code>). This
+  is your XML id seed too.</li>
+<li><code>name</code> — the display name (e.g. "Vanity 24in Elegance Fluted").</li>
+<li>Which attributes apply (subset of Family, Width, Series, Box
+  Material, Door Style, Finish, Hinge Side, Finished Sides, Gables,
+  Handle, Accessories — plus any derived like Family Subtype, Door
+  Count).</li>
+<li>What <code>value_ids</code> are allowed per attribute (the new fluted door
+  needs a new <code>product.attribute.value</code> if it doesn't exist).</li>
+<li>Base <code>list_price</code> (the retail-channel base — channel pricelists
+  resolve from this).</li>
+<li>Any rules: "Fluted door only on Elegance" → if Elegance is the only
+  series exposed on the template, no rule needed. If multiple series
+  are exposed but Fluted is restricted, that's a <code>product.config.line</code>.</li>
+</ul>
+<p><strong>Stage 2 — Add any new attribute values.</strong></p>
+<p>Navigate to <strong>Sales → Configuration → Attributes</strong>. Open the
+attribute you need to extend (e.g. Door Style). Add a new
+<code>product.attribute.value</code> row:</p>
+<ul>
+<li><code>name</code> — "Fluted Woodgrain".</li>
+<li><code>sequence</code> — drives the order it appears in the wizard pickers; pick
+  a number to slot it between existing values.</li>
+<li><code>value_inches</code> / <code>value_mm</code> if Width-like, <code>lead_time_extra</code> if it
+  bumps lead time (Maple's 14 is the precedent).</li>
+<li><code>html_color</code> if it's a color swatch.</li>
+<li><code>image</code> if it's an image-display attribute.</li>
+</ul>
+<p>Save. The value is now available for any template's attribute_line to
+include. <strong>Adding the value here does NOT make it appear in any
+existing template's wizard</strong> — you have to add it to each
+attribute_line manually.</p>
+<p><strong>Stage 3 — Create the <code>product.template</code>.</strong></p>
+<p>Two paths, pick one:</p>
+<ul>
+<li><strong>Path A — UI.</strong> Navigate to <strong>Sales → Configurable Products →
+  Configurable Templates</strong>. Click "New". Fill:</li>
+<li><code>name</code></li>
+<li><code>default_code</code></li>
+<li><code>type</code> (almost always <code>consu</code> for cabinets — Odoo 19 collapsed
+    <code>product</code> into <code>consu</code> for goods).</li>
+<li><code>categ_id</code> (internal category — <code>All / Saleable / Cabinets</code> or
+    whatever your tree uses).</li>
+<li><code>list_price</code> (the retail base).</li>
+<li><code>config_ok</code> → tick. This is what makes the configurator engine
+    treat it as configurable.</li>
+<li><code>sale_ok</code> → tick. So it appears in the Order Builder product
+    picker.</li>
+<li><code>is_published</code> → tick if customers should see it on <code>/shop</code>.</li>
+<li><code>southbrook_category</code> → Wall / Base / Drawer / Tall / Vanity /
+    Extras.</li>
+<li><code>southbrook_icon_key</code> → matches the JS <code>CABINET_ICONS</code> map keys
+    (wall1, wall2, base1, base2, drawer, sink, pantry, oven, corner,
+    vanity, extra, worktop).</li>
+<li><strong>Path B — XML data.</strong> For permanent additions to the catalog,
+  prefer XML so the record survives DB rebuilds. Add to
+  <code>southbrook_configurator_ux/data/catalog_expansion.xml</code> (or a new
+  data file if you're shipping a separate addon). Use the existing
+  records as patterns. The XML id should match <code>default_code</code>
+  lowercased with underscores. Re-run <code>-u southbrook_configurator_ux</code>
+  to load.</li>
+</ul>
+<p>Either path: confirm <code>config_ok = True</code> after save. Without it the
+configurator refuses to open.</p>
+<p><strong>Stage 4 — Define attribute_lines on the template.</strong></p>
+<p>Open the saved template. Go to the <strong>Attributes</strong> tab. For each
+attribute the product needs, add a <code>product.template.attribute.line</code>:</p>
+<ul>
+<li><code>attribute_id</code> — Width / Series / etc.</li>
+<li><code>value_ids</code> — the allowed <code>product.attribute.value</code> records. For
+  Width on a 24-in fixed-size vanity, set value_ids to just <code>[24 in]</code>.
+  For Door Style on an Elegance-only template, set value_ids to
+  <code>[Five-Piece Woodgrain, Fluted Woodgrain]</code> (your new value).</li>
+<li><code>required</code> — tick if the attribute is a forced choice; leave blank
+  if it's optional. The OCA wizard gates progression on required.</li>
+<li><code>default_val</code> — sets the initial pick. Used at session.create() to
+  seed the wizard.</li>
+</ul>
+<p><strong>Critical: every attribute_line must have at least one value</strong>, or
+v19's <code>_validate_layout</code> raises NF19 at install. If you're authoring
+in XML, double-check <code>&lt;field name="value_ids" eval="[(6, 0, [...])]"/&gt;</code>
+is non-empty.</p>
+<p>The attribute_lines are evaluated by the configurator in
+<code>attribute_id.sequence</code> order. If you need a question to come
+<strong>before</strong> another, edit the attribute's sequence — don't try to
+order the attribute_lines themselves.</p>
+<p><strong>Stage 5 — Author any rules.</strong></p>
+<p>If your new product needs an exclusion or construction rule beyond
+the 4 canonical Southbrook rules, author one or more
+<code>product.config.line</code> records. Each rule needs:</p>
+<ul>
+<li>A <code>product.config.domain</code> — the trigger. e.g. "Series IS Contractor"
+  is <code>domain_series_is_contractor</code> in
+  <code>southbrook_estimating/data/config_rules.xml</code>. Pattern:
+  <code>xml
+  &lt;record id="domain_my_new_trigger" model="product.config.domain"&gt;
+    &lt;field name="name"&gt;My trigger description&lt;/field&gt;
+  &lt;/record&gt;
+  &lt;record id="domain_line_my_new_trigger" model="product.config.domain.line"&gt;
+    &lt;field name="domain_id" ref="domain_my_new_trigger"/&gt;
+    &lt;field name="attribute_id" ref="attr_series"/&gt;
+    &lt;field name="condition"&gt;in&lt;/field&gt;
+    &lt;field name="value_ids" eval="[(6, 0, [ref('value_series_elegance')])]"/&gt;
+  &lt;/record&gt;</code></li>
+<li>A <code>product.config.line</code> per template the rule applies to:
+  <code>xml
+  &lt;record id="rule_my_template_my_constraint" model="product.config.line"&gt;
+    &lt;field name="product_tmpl_id" ref="my_new_vanity_template"/&gt;
+    &lt;field name="attribute_line_id" ref="attr_line_my_template_door_style"/&gt;
+    &lt;field name="value_ids" eval="[(6, 0, [ref('value_door_fluted')])]"/&gt;
+    &lt;field name="domain_id" ref="domain_my_new_trigger"/&gt;
+  &lt;/record&gt;</code></li>
+</ul>
+<p>The <code>value_ids</code> on the <code>product.config.line</code> is <strong>the allowed set when
+the domain fires</strong>, not the blocked set. Picking values outside
+<code>value_ids</code> is what the rule engine forbids.</p>
+<p>Rules are evaluated in <code>sequence</code> order on the config_line — leave
+blank (default 10) unless you need ordering control (Lesson 10.7).</p>
+<p><strong>Stage 6 — Test, publish, and verify the BoM.</strong></p>
+<p>Sub-stage 6a — open the wizard.</p>
+<ul>
+<li>Backend: Sales → Quotations → New, add the new product to a line,
+  hit Configure. Walk through the wizard. Confirm the right attributes
+  appear in the right order, the rules fire as you expect, the price
+  updates after each pick.</li>
+<li>Customer-facing: <code>/shop/&lt;slug-of-your-product&gt;</code> while logged out.
+  Confirm the v2 chip UI renders. Pick through. Confirm Add to Quote
+  routes through the login flow (anonymous → signup).</li>
+</ul>
+<p>Sub-stage 6b — verify the BoM.</p>
+<ul>
+<li>Open <strong>Manufacturing → Bills of Materials</strong>. Filter by your new
+  template. The first wizard commit auto-creates a <code>mrp.bom</code> (via
+  <code>product_configurator_mrp.create_get_bom()</code> — Lesson 10.5). Open
+  it. Confirm the bom_lines reflect your configuration. If there's no
+  BoM, the template doesn't have a parent BoM to inherit lines from —
+  you may need to create one with <code>product_id = False</code> on the
+  template before any variant commit.</li>
+</ul>
+<p>Sub-stage 6c — verify the sale-order pricing.</p>
+<ul>
+<li>Confirm the line's price matches the expected channel-pricelist
+  calculation: base list_price × channel discount + sum of price_extras
+  for picked values. The most common bug is forgetting to set the
+  channel's pricelist on the partner before opening the order.</li>
+</ul>
+<p>Sub-stage 6d — publish + announce.</p>
+<ul>
+<li>Tick <code>is_published = True</code> if you haven't yet.</li>
+<li>Optional: add a <code>product.config.image</code> linking the template to a
+  hero image keyed by a specific <code>value_ids</code> combination (so the
+  preview pane shows different visuals as the customer picks).</li>
+<li>Tell sales the SKU is live.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The wizard opens but the new product isn't in the product picker
+on the Order Builder line."</strong></p>
+<p>Three suspects: (1) <code>config_ok = False</code>, (2) <code>sale_ok = False</code>,
+(3) the template's <code>categ_id</code> excludes it from the picker domain. Open
+the template, fix the missing field. The Order Builder picker reads
+<code>sale_ok = True AND config_ok = True</code> from configurable products.</p>
+<p><strong>"I added the new Fluted door value to the Door Style attribute, but
+the wizard still doesn't show it on the vanity template."</strong></p>
+<p>You added the value at the <strong>attribute</strong> level but didn't add it to
+the <strong>attribute_line</strong> on the specific template. Open the template,
+go to the Attributes tab, edit the Door Style attribute_line, add
+the Fluted value to value_ids. Save.</p>
+<p><strong>"The configurator price doesn't include the +$50 I set on the
+Fluted door style."</strong></p>
+<p>The <code>price_extra</code> lives on <code>product.template.attribute.value</code> (the
+PTAV), NOT on <code>product.attribute.value</code>. When you added the Fluted
+value to the template's Door Style attribute_line, Odoo auto-created
+a PTAV row for (this template, Fluted) with <code>price_extra = 0</code>. You
+have to edit that PTAV to set the price extra. Backend path:
+the attribute_line's <code>product_template_value_ids</code> is where they
+hide. Open them, set <code>price_extra</code>, save.</p>
+<p><strong>"The rule I authored isn't firing — customers can still pick the
+wrong combination."</strong></p>
+<p>Three suspects:
+- The <code>product.config.line.domain_id</code> isn't pointing where you think.
+  Open the rule record, click through to the domain — check the
+  domain's lines reference the right <code>attribute_id</code>.
+- The rule is bound to the wrong <code>attribute_line_id</code>. The rule
+  <code>value_ids</code> are the allowed set for THAT attribute_line. If you
+  bind to "Door Style" but mean "Box Material", the rule fires but
+  on the wrong attribute.
+- The data file load order put the rule before the template — see
+  Lesson 10.1's quiz #2. Move the rule to a file that loads last.</p>
+<p><strong>"The BoM didn't generate after I committed the first configured
+order."</strong></p>
+<p><code>create_get_bom</code> requires either (a) a parent BoM on the template
+with <code>product_id = False</code> whose lines are wired via
+<code>mrp.bom.line.configuration.set</code>, OR (b) attribute values with linked
+<code>product_id</code> records so each picked value contributes a BoM line via
+its option-product. If neither is set up, <code>create_get_bom</code> walks both
+paths and produces an empty BoM (returns False). Fix: create a
+parent BoM with the canonical component list, OR link option-products
+to each attribute_value.</p>
+<p><strong>"I shipped the new template via XML but <code>-u southbrook_configurator_ux</code>
+doesn't update the existing records in the test DB."</strong></p>
+<p>XML data files load with <code>noupdate="1"</code> by default for data records.
+That means re-running <code>-u</code> does NOT overwrite existing rows. To
+force update, either (a) set <code>noupdate="0"</code> on the <code>&lt;odoo&gt;</code> element
+in the data file (already the case for <code>rule_completion.xml</code>), or
+(b) explicitly drop the records via <code>odoo-bin shell</code> before
+re-installing.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you save the new template with <code>config_ok = True</code>, Odoo:</p>
+<ol>
+<li>Writes the <code>product.template</code> row.</li>
+<li>For each attribute_line you add, writes a
+   <code>product.template.attribute.line</code> row AND auto-creates a set of
+   <code>product.template.attribute.value</code> (PTAV) rows — one per
+   (template, value) pair in <code>value_ids</code>. Each PTAV starts with
+   <code>price_extra = 0</code>, <code>weight_extra = 0</code>.</li>
+<li>Because <code>create_variant = 'dynamic'</code> is set on every Southbrook
+   attribute (Q6 decision in CLAUDE.md), Odoo does NOT pre-create
+   variants. Variants are materialised on the first
+   <code>session.create_get_variant()</code> call — that is, when the first
+   customer commits a configuration.</li>
+</ol>
+<p>When an estimator opens the wizard, the OCA backend (defined in
+<code>product_configurator/wizard/product_configurator.py</code>) calls
+<code>_fields_view_get</code> dynamically: it iterates <code>attribute_line_ids</code>
+sorted by <code>attribute_id.sequence</code>, generates a transient field per
+attribute (named <code>__attribute-&lt;id&gt;</code>), and returns a generated form
+view. That's why adding an attribute_line is enough to make the
+wizard ask the question — no view file to edit.</p>
+<p>When the customer hits Add to Quote on the v2 page, the JSON-RPC
+controller at
+<code>southbrook_configurator_ux/controllers/main.py:configurator_commit</code>
+calls <code>session.create_get_variant()</code>. That method (in
+<code>product_configurator/models/product_config.py</code> line 905) calls
+<code>validate_configuration()</code> first (which checks every rule),
+materialises the variant if needed, and — because
+<code>product_configurator_mrp</code> overrides it — also calls
+<code>create_get_bom()</code> to build the matching BoM.</p>
+<p>The price the customer sees is computed by <code>session.get_cfg_price()</code>
+(line 996), which sums <code>product_tmpl.list_price</code> + each picked
+value's <code>price_extra</code> from the PTAV. Channel pricelist resolution
+happens later, at the sale.order.line level via
+<code>product_configurator_sale.sale_order_line._compute_price_unit</code>.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> Sales asks you to add a new 36-in Vanity in the Elegance
+series. Walk through the minimum set of records you create — by
+model name — to make it show up in the Order Builder with the right
+attributes.</p>
+<blockquote>
+<p>One <code>product.template</code> (config_ok=True, sale_ok=True,
+southbrook_category='Vanity'); 5–11 <code>product.template.attribute.line</code>
+records (Width with value <code>36 in</code>, Series with value Elegance,
+Box Material with allowed values, Door Style with allowed values,
+Finish, Hinge Side, Finished Sides, Gables, Handle, Accessories —
+whichever the vanity exposes); Odoo auto-creates the matching
+<code>product.template.attribute.value</code> (PTAV) rows for you. No new
+<code>product.attribute.value</code> records IF you reuse existing values.
+Test session → commit → confirm <code>product.product</code> (variant)
+appears + <code>mrp.bom</code> was generated.</p>
+</blockquote>
+<p><strong>2.</strong> You add a new attribute value "Brushed Brass" to the Handle
+attribute. You set <code>price_extra = 8.0</code> on the value's own record.
+Customers still see the new option but the price doesn't update by
+$8 when they pick it. Why?</p>
+<blockquote>
+<p>The <code>price_extra</code> field on <code>product.attribute.value</code> is <strong>not</strong>
+what the configurator reads. It reads <code>price_extra</code> on
+<code>product.template.attribute.value</code> (PTAV) — the per-template
+price override. When you added Brushed Brass to the Handle
+attribute_line on each template, Odoo auto-created PTAV rows with
+<code>price_extra = 0</code>. You have to open each PTAV (one per template
+the value applies to) and set $8 explicitly. There's no single
+"set price_extra everywhere" UI; you do it once per template, or
+author it in XML.</p>
+</blockquote>
+<p><strong>3.</strong> Your new Fluted door rule fires on the Vanity template but
+not on the Base 2-Door. Both templates expose the Fluted value via
+their Door Style attribute_lines. What's the most likely diagnosis?</p>
+<blockquote>
+<p>The <code>product.config.line</code> you wrote is bound to one specific
+template via <code>product_tmpl_id</code>. Rules are NOT global — they
+apply to one template each. To enforce the rule on Base 2-Door
+as well, write a second <code>product.config.line</code> record with
+<code>product_tmpl_id = base_2dr</code> and the same domain. Pattern: one
+<code>product.config.domain</code> shared across templates + N
+<code>product.config.line</code> records (one per template).</p>
+</blockquote>
+<p><strong>4.</strong> You publish the new product and a customer reports "I picked
+Series=Contractor on this vanity and the wizard let me — but
+Contractor isn't supposed to be available on vanities at all." What
+went wrong at template setup?</p>
+<blockquote>
+<p>You added the Series attribute_line with all 4 series values
+(Contractor, Contemporary, Elegance, Signature) when the vanity
+should expose only Contemporary/Elegance/Signature. Two fixes:
+(a) restrict the attribute_line's <code>value_ids</code> to just the three
+allowed series (clean — the wizard never offers Contractor);
+(b) keep all 4 values exposed but write a <code>product.config.line</code>
+rule that excludes Contractor on the vanity template (uses the
+rule engine, surfaces a "not available" reason in the OCA
+wizard). Option (a) is simpler when the restriction is permanent;
+(b) is better when it might change per channel.</p>
+</blockquote>
+<p><strong>5.</strong> You author the new template entirely in
+<code>southbrook_configurator_ux/data/catalog_expansion.xml</code>. Install
+runs clean. Two weeks later, a junior dev edits the template's
+name in the UI directly. Next deploy, <code>-u</code> runs and the name
+reverts. Diagnose + recover.</p>
+<blockquote>
+<p><code>catalog_expansion.xml</code> ships data records that get loaded with
+the data semantics implied by its <code>&lt;odoo&gt;</code> element. If the file
+opens with <code>&lt;odoo&gt;</code> (default noupdate="0" for some records and
+"1" for others depending on attributes), <code>-u</code> will overwrite
+the UI-edited name with the XML's name on every reinstall.
+Two fixes: (a) update the XML to match the new name (keep
+source-of-truth in version control), or (b) add <code>noupdate="1"</code>
+to the record so <code>-u</code> skips it after first install. Pick (a)
+for sanity — UI edits to data records always drift.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator basics + the 4 Southbrook rules — Course 5, Lesson
+  5.1.</li>
+<li>The 5-addon architecture — Lesson 10.1.</li>
+<li>Session state debugging — Lesson 10.3.</li>
+<li>BoM rollup mechanics + configuration sets — Lesson 10.5.</li>
+<li>The v2 chip UI mounting + JSON-RPC contract — Lesson 10.6.</li>
+<li>Common gotchas under load (rule ordering, exclusion explosion) —
+  Lesson 10.7.</li>
+<li>Native Odoo product administration (categories, tax mapping,
+  multi-company) — Odoo's own native eLearning track.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_10_config_sessions_state" model="slide.slide">
+            <field name="name">Configuration Sessions + the State Machine</field>
+            <field name="channel_id" ref="course_configurator_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Developer or senior admin who has to debug a stuck session, recover a customer&#x27;s lost configuration, or understand why a draft disappeared overnight.</field>
+            <field name="html_content"><![CDATA[<h1 id="configuration-sessions-the-state-machine">Configuration Sessions + the State Machine</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a developer or senior admin and one of three things just
+happened:</p>
+<ul>
+<li>A customer says "my configuration disappeared overnight, I had it
+  set up yesterday."</li>
+<li>An estimator reports "I hit Configure and the wizard opens but
+  picks aren't sticking."</li>
+<li>Your monitoring shows the <code>product_config_session</code> table grew by
+  40k rows in a week and you want to know why.</li>
+</ul>
+<p>All three are session-machine problems. This lesson is the model
+walk-through: what a session is, what states it has, what writes to
+it, what reads it, how it gets garbage-collected, and how to debug
+it from the dev shell. No GUI here — this is shell + log work.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The session catalog UI:</p>
+<blockquote>
+<p><strong>Sales → Configurable Products → Configuration Sessions</strong> — every
+session ever created, draft or done. Filterable by user, template,
+state. Where you go to confirm a customer's session exists before
+diagnosing further.</p>
+</blockquote>
+<p>The cron status:</p>
+<blockquote>
+<p><strong>Settings → Technical → Scheduled Actions</strong> — search "Config" — you
+see two crons:
+- <code>Product Configurator: GC stale draft sessions</code>
+  (<code>ir_cron_gc_draft_sessions</code>, daily)
+- <code>Delete inactive config-sessions</code>
+  (<code>cron_delete_sessions_with_no_activity</code>, daily)</p>
+</blockquote>
+<p>The dev shell (terminal):</p>
+<blockquote>
+<p><code>odoo-bin shell -d &lt;db&gt;</code> — your primary tool for any session-state
+work beyond eyeballing the list.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>A <code>product.config.session</code> record carries:</p>
+<ul>
+<li><strong><code>name</code></strong> — auto-assigned from <code>ir.sequence</code> "product.config.session".
+  Format depends on the sequence config; usually <code>PCS00001</code> upward.</li>
+<li><strong><code>product_tmpl_id</code></strong> — the configurable template (<code>config_ok=True</code>)
+  this session is configuring. Required, M2O.</li>
+<li><strong><code>user_id</code></strong> — the user who started the session. Required. Public
+  visitors get <code>base.public_user</code>; portal customers get their own
+  user; internal estimators get theirs.</li>
+<li><strong><code>value_ids</code></strong> — Many2many to <code>product.attribute.value</code>. The
+  current set of picks. Updated on every wizard step.</li>
+<li><strong><code>custom_value_ids</code></strong> — One2many to
+  <code>product.config.session.custom.value</code>. Free-text picks for
+  attributes flagged <code>custom = True</code> (engraving, dimensions, notes).</li>
+<li><strong><code>product_id</code></strong> — the materialised <code>product.product</code> variant. Null
+  until <code>action_confirm()</code> writes it.</li>
+<li><strong><code>price</code></strong> — computed via <code>_compute_cfg_price()</code> from value picks +
+  PTAV <code>price_extra</code>. Stored.</li>
+<li><strong><code>weight</code></strong> — computed via <code>_compute_cfg_weight()</code> from
+  <code>weight_extra</code>. Not stored.</li>
+<li><strong><code>config_step</code></strong> — Char holding the current step's
+  <code>product.config.step.line.id</code> as a string. The OCA wizard reads
+  this to know which step to render.</li>
+<li><strong><code>config_step_name</code></strong> — computed display name.</li>
+<li><strong><code>bookmark_name</code></strong> + <strong><code>is_saved</code></strong> — the "save configuration"
+  feature; <code>is_saved = True</code> protects the session from the GC cron.</li>
+<li><strong><code>state</code></strong> — the state machine. Selection: <code>draft</code> / <code>done</code>.
+  Required, default <code>draft</code>.</li>
+</ul>
+<p>The state machine is <strong>two states, one transition</strong>:</p>
+<pre><code>       create()                 action_confirm()
+NULL ────────────► draft ────────────────────────► done
+                    │                                 │
+                    │ (write to value_ids)           │ (immutable)
+                    └──── stays draft ───────────────┘
+                    │
+                    │ GC crons
+                    ▼
+                  DELETED
+</code></pre>
+<p>That's it. No <code>cancel</code>, no <code>pending</code>, no <code>error</code>. A session is born
+draft, lives in draft (any number of writes / re-validations), and
+ends one of two ways:</p>
+<ul>
+<li><strong><code>done</code></strong> — <code>action_confirm(product_id)</code> was called. The session
+  is permanently locked. <code>product_id</code> is set. The session is
+  effectively the receipt for that variant.</li>
+<li><strong>DELETED</strong> — a GC cron found it stale and unlinked it.</li>
+</ul>
+<p>A draft session <strong>cannot</strong> be re-opened to <code>draft</code> once <code>done</code>. If a
+customer wants to edit a confirmed configuration, the flow is
+<code>sale.order.line.reconfigure_product()</code> (defined in
+<code>product_configurator_sale/models/sale.py:38</code>) — that creates a
+<strong>new</strong> session, prefilled from the existing variant. The old <code>done</code>
+session is left alone.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You spend most of your "session" time in the dev shell. Three jobs:</p>
+<p><strong>1. "Why won't my session validate?"</strong></p>
+<pre><code class="language-bash">odoo-bin shell -d &lt;db&gt;
+</code></pre>
+<p>Then:</p>
+<pre><code class="language-python">Session = env[&quot;product.config.session&quot;]
+# Find the suspect session
+s = Session.search([
+    (&quot;user_id.login&quot;, &quot;=&quot;, &quot;customer@example.com&quot;),
+    (&quot;state&quot;, &quot;=&quot;, &quot;draft&quot;),
+], limit=1, order=&quot;create_date desc&quot;)
+print(s.read([&quot;name&quot;, &quot;product_tmpl_id&quot;, &quot;value_ids&quot;, &quot;state&quot;]))
+# Try validating
+s.validate_configuration()  # defined at product_config.py:1482
+</code></pre>
+<p>If it raises <code>ValidationError</code>, the exception message tells you
+which rule fired. The common shapes:</p>
+<ul>
+<li><code>"Values must belong to the attribute …"</code> — a value in <code>value_ids</code>
+  isn't allowed on the template's attribute_line. Usually means a
+  rule removed it but the session still has it.</li>
+<li><code>"Required field …"</code> — an attribute_line marked <code>required=True</code>
+  has no value in <code>value_ids</code>.</li>
+<li><code>"Default values provided generate an invalid configuration"</code> —
+  the session's <code>default_val</code> picks (set at create) violate a rule.
+  Means the template was misconfigured at install.</li>
+</ul>
+<p><strong>2. "I have to recover a customer's lost configuration."</strong></p>
+<p>If the session is <code>state='draft'</code> and not yet GC'd:</p>
+<pre><code class="language-python"># By customer email
+s = Session.search([
+    (&quot;user_id.login&quot;, &quot;=&quot;, &quot;customer@example.com&quot;),
+    (&quot;product_tmpl_id.name&quot;, &quot;ilike&quot;, &quot;Vanity 24&quot;),
+], order=&quot;create_date desc&quot;, limit=5)
+# Show what they picked
+for sess in s:
+    print(sess.name, sess.state, sess.write_date,
+          [v.name for v in sess.value_ids])
+</code></pre>
+<p>If <code>state = done</code>, the session is permanent — the customer's
+configuration lives on the variant + the order line referencing
+<code>config_session_id</code>. Open the sale order, find the line, call
+<code>line.reconfigure_product()</code> to spawn a new editable session
+prefilled from the variant.</p>
+<p>If <code>state = draft</code> and the GC cron ran, the row is gone. Lost. The
+only recovery is asking the customer to reconfigure.</p>
+<p><strong>3. "I need to clean up stuck sessions without waiting for the cron."</strong></p>
+<pre><code class="language-python"># Force-run the OCA cron logic
+env[&quot;product.config.session&quot;]._gc_draft_sessions()
+# Or the website cron logic (3-day threshold)
+env[&quot;product.config.session&quot;].remove_inactive_config_sessions()
+env.cr.commit()
+</code></pre>
+<p>Both methods skip done sessions and respect the protection (sessions
+attached to sale.order.lines via <code>config_session_id</code> are not touched
+by either cron in normal operation — but verify by reading the
+method source before running in production).</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"A customer's draft session disappeared overnight even though I'd
+seen it in the catalog yesterday."</strong></p>
+<p>The two crons disagree on threshold. OCA's <code>_gc_draft_sessions</code> uses
+<code>ir.config_parameter product_configurator.session_gc_days</code> (default
+7 days). The website extension's <code>remove_inactive_config_sessions</code>
+uses a <strong>hard-coded 3 days</strong> (see
+<code>website_product_configurator/models/product_config.py:37</code>). The
+website cron runs first chronologically (alphabetical model load
+order); it deletes a 3-to-7-day-old draft before OCA's 7-day cron
+sees it. Workaround: tell customers to use the "Save Configuration"
+button (<code>action_save_config</code>) which sets <code>is_saved=True</code> and (in
+theory) protects against GC. Verify the protection by reading
+<code>_gc_draft_sessions</code>; if the website cron ignores <code>is_saved</code>,
+that's a bug to file.</p>
+<p><strong>"The session is <code>state=draft</code> but write to value_ids raises
+'Invalid Configuration'."</strong></p>
+<p><code>product.config.session.write()</code> calls <code>validate_configuration(final=False)</code>
+on every write. If the new write violates a rule, the entire write
+is rolled back — including writes to unrelated fields. You can't
+just clear <code>value_ids</code> from the UI to recover; the validation runs
+even on <code>[]</code>. Workaround: in the shell, set <code>value_ids = [(5, 0, 0)]</code>
+(the M2M clear) with <code>self.with_context(check_constraints=False)</code> —
+but only if you understand the side effects.</p>
+<p><strong>"I created a session in the shell and the <code>name</code> is <code>New</code> instead
+of <code>PCS00001</code>."</strong></p>
+<p>The <code>name</code> is auto-assigned by <code>ir.sequence.next_by_code('product.config.session')</code>
+in the <code>create()</code> override (line 866). If the sequence is missing
+(e.g. demo DB without <code>product_configurator/data/ir_sequence_data.xml</code>
+loaded), the code falls through to the literal "New" via the
+<code>or self.env._("New")</code> fallback. Diagnose: <code>env["ir.sequence"].search([("code", "=", "product.config.session")])</code>
+— if empty, install/update <code>product_configurator</code> to load the
+sequence.</p>
+<p><strong>"Customer says they hit Save Configuration but coming back the
+next day the configuration is gone."</strong></p>
+<p>Likely the website cron isn't honouring <code>is_saved</code>. Read
+<code>remove_inactive_config_sessions</code> — at the time of writing it
+filters only on <code>state == 'draft'</code> and <code>write_date &lt;</code>, ignoring
+<code>is_saved</code>. <strong>TBD: this is a gap; confirm in the latest code before
+declaring a bug.</strong> Workaround until fixed: add an
+<code>ir.cron</code>-level overlay that explicitly excludes saved sessions, or
+backport <code>is_saved</code> to the GC filter.</p>
+<p><strong>"The same customer has 50 draft sessions for the same template."</strong></p>
+<p>The customer is opening <code>/shop/&lt;slug&gt;</code> repeatedly. Each visit creates
+a fresh session via <code>_get_or_create_session</code> (in
+<code>southbrook_configurator_ux/controllers/main.py:311</code>). The OCA flow
+on the backend tries to reuse but the Southbrook v2 surface always
+creates a fresh draft. Mitigation: the cron clears them in 3 days;
+operationally it's a non-problem unless DB size matters.</p>
+<p><strong>"The session committed but <code>product_id</code> is empty and the line on
+sale.order didn't get its config_session_id."</strong></p>
+<p>Check the order in which the controller fires
+<code>session.action_confirm(product_id=variant)</code> vs creating the line.
+In <code>southbrook_configurator_ux/controllers/main.py:configurator_commit</code>,
+the order is: create variant → write <code>default_code</code> → resolve order
+→ create line → call <code>action_confirm</code>. If <code>action_confirm</code> raises,
+the line is already created but the session stays draft (the
+exception handler logs but doesn't re-raise). This is intentional —
+the customer's order is preserved at the cost of leaving an
+orphan draft. The GC cron will sweep it.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The OCA session's <strong>write</strong> path is the load-bearing piece:</p>
+<pre><code class="language-python">def write(self, vals):
+    res = super().write(vals)
+    if not self.product_tmpl_id:
+        return res
+    value_ids = self.value_ids.ids
+    avail_val_ids = self.values_available(value_ids)
+    if set(value_ids) - set(avail_val_ids):
+        self.value_ids = [(6, 0, avail_val_ids)]  # auto-prune forbidden
+    self.validate_configuration(final=False)
+    return res
+</code></pre>
+<p>Three things to notice:</p>
+<ol>
+<li>The session <strong>auto-prunes</strong> forbidden values. If you write
+   <code>value_ids = [Contractor, Maple]</code> and a rule forbids Maple-on-
+   Contractor, the write call removes Maple silently. The wizard
+   notices because its next render shows Maple unchecked.</li>
+<li><code>validate_configuration(final=False)</code> runs on every write. The
+   <code>final=False</code> mode allows missing required attributes (because
+   you're still mid-wizard). On <code>action_confirm</code>, the variant
+   creation calls <code>validate_configuration()</code> with <code>final=True</code>,
+   which raises if required attributes are missing.</li>
+<li>The validation surface area is <code>values_available()</code> (line 1377)
+   which reads all <code>product.config.line</code> rules for the template and
+   filters their domains against current picks. This is the
+   declarative-rule engine the lessons keep referring to.</li>
+</ol>
+<p>The OCA <code>update_config(attr_val_dict)</code> method (line 754) is the
+canonical setter — it takes <code>{attr_id: value_id}</code> and re-builds
+<code>value_ids</code> by removing old per-attribute picks and adding new
+ones. This is what <code>/select</code> calls in the v2 controller.</p>
+<p><code>action_confirm(product_id=None)</code> (line 649) flips state to <code>done</code>
+and writes <code>product_id</code>. There's no transition out of <code>done</code> — by
+constraint (<code>_check_product_id</code> at line 657), done sessions must
+have <code>product_id</code>, and there's no <code>action_cancel</code> or <code>action_revert</code>.</p>
+<p>The two GC crons (covered in 10.1 too):</p>
+<pre><code class="language-xml">&lt;!-- product_configurator/data/cron.xml --&gt;
+&lt;record id=&quot;ir_cron_gc_draft_sessions&quot; model=&quot;ir.cron&quot;&gt;
+  &lt;field name=&quot;code&quot;&gt;model._gc_draft_sessions()&lt;/field&gt;
+  &lt;field name=&quot;interval_number&quot;&gt;1&lt;/field&gt;
+  &lt;field name=&quot;interval_type&quot;&gt;days&lt;/field&gt;
+&lt;/record&gt;
+
+&lt;!-- website_product_configurator/data/cron.xml --&gt;
+&lt;record id=&quot;cron_delete_sessions_with_no_activity&quot; model=&quot;ir.cron&quot;&gt;
+  &lt;field name=&quot;code&quot;&gt;model.remove_inactive_config_sessions()&lt;/field&gt;
+  &lt;field name=&quot;interval_number&quot;&gt;1&lt;/field&gt;
+  &lt;field name=&quot;interval_type&quot;&gt;days&lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<p><code>_gc_draft_sessions</code> (OCA, the canonical one) — <strong>TBD: read the actual
+implementation to confirm <code>is_saved</code> protection.</strong> The cron comment
+in the XML claims "Sessions referenced by a sale.order.line via
+config_session_id are NEVER collected" — verify in code.</p>
+<p><code>remove_inactive_config_sessions</code> (website) — <strong>3 days hard-coded</strong>,
+draft-only. Does NOT respect <code>is_saved</code>. Bug-or-feature: file a
+ticket if your team relies on Save Configuration.</p>
+<p>The <code>product.config.session.custom.value</code> model (line 1819) is a
+1:1-via-Many2one child carrying free-text custom values. One row per
+custom attribute. Has its own validation (<code>unique_attribute</code>
+constraint at line 1866) so you can't double-write the same attribute.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You browse a session in the shell. <code>state = draft</code>,
+<code>value_ids</code> has 8 values, <code>product_id</code> is False. The customer says
+"I want to confirm this as my variant." Walk through what happens
+when you call <code>s.action_confirm()</code>.</p>
+<blockquote>
+<p><code>action_confirm()</code> calls <code>session.create_get_variant()</code> (because
+<code>product_id</code> is None). <code>create_get_variant</code> calls
+<code>validate_configuration()</code> first (final=True implied — raises
+on missing required or rule-violation), then either fetches the
+existing variant matching the picks or creates a new one. On
+success, it writes <code>state='done'</code> + <code>product_id=variant.id</code>. The
+<code>_check_product_id</code> constraint enforces the link is non-null.
+The session is now permanent.</p>
+</blockquote>
+<p><strong>2.</strong> A customer's draft session shows <code>value_ids = [Contractor,
+Maple]</code> when you browse it in the shell. You know Rule 2 forbids
+Maple-on-Contractor. Why didn't the auto-prune in <code>write()</code> strip
+Maple?</p>
+<blockquote>
+<p>The auto-prune fires inside <code>write()</code> AFTER super().write() —
+which means it depends on <code>values_available()</code> being able to see
+the new picks AND the rule. If the session was created with both
+values in a single <code>create()</code> call (not write), the
+<code>create()</code> override (line 864) runs <code>validate_configuration</code>
+with <code>final=False</code> which allows the combination through if neither
+attribute is the "required" one being missed. Bug-or-feature
+debate. Recovery: in shell call
+<code>s.value_ids = [(6, 0, [Contractor.id])]</code> — write triggers the
+prune correctly when given a single value at a time.</p>
+</blockquote>
+<p><strong>3.</strong> A customer's session is <code>state=draft</code>, write_date is 4 days
+ago. The website GC cron is set to 3-day threshold. The customer
+opened it 4 days ago, paid attention, hit Save Configuration. Next
+morning the session is gone. What happened, and what's the fix?</p>
+<blockquote>
+<p>The website cron <code>remove_inactive_config_sessions</code> doesn't
+currently filter on <code>is_saved</code> — it only checks
+<code>state='draft' AND write_date &lt; now() - 3 days</code>. So the saved
+session gets swept anyway. Two fixes: (a) raise the website cron
+threshold to match OCA's 7-day param, or (b) patch
+<code>remove_inactive_config_sessions</code> to add <code>('is_saved', '=', False)</code>
+to its domain. Patch (b) is correct; (a) only delays.</p>
+</blockquote>
+<p><strong>4.</strong> You want to add a third state to the machine — "approved" —
+between draft and done, gated by a senior estimator. Where do you
+add it and what breaks?</p>
+<blockquote>
+<p>Inherit <code>product.config.session</code> in <code>southbrook_estimating</code>,
+override the <code>state</code> field's selection to add <code>('approved',
+'Approved')</code>. Add an <code>action_approve</code> method to transition
+draft→approved. Override <code>action_confirm</code> to require
+<code>state='approved'</code> instead of <code>state='draft'</code>. What breaks:
+the <code>_check_product_id</code> constraint expects <code>state='done' implies
+product_id is set</code> — your new state needs the same guard. The
+OCA wizard's "Add to Cart" button calls <code>action_confirm</code> directly
+— you'll need a UI override too. And both GC crons treat
+<code>state='draft'</code> as the candidate; an <code>approved</code> session is not
+draft so won't be GC'd, but won't be <code>done</code> either — verify the
+behaviour you want.</p>
+</blockquote>
+<p><strong>5.</strong> Your monitoring shows 250 new sessions per hour created at
+3am. None of your customers configure cabinets at 3am. What's
+happening, and how do you confirm?</p>
+<blockquote>
+<p>A web crawler is hitting <code>/shop/&lt;slug&gt;</code> for configurable
+products. Each hit fires <code>/southbrook/api/configurator/state</code>,
+which calls <code>_get_or_create_session(tmpl)</code> — public visitors
+land on <code>base.public_user</code>, so EVERY anonymous request creates a
+fresh session. Confirm by <code>Session.search([
+("user_id", "=", env.ref("base.public_user").id),
+("create_date", "&gt;=", "&lt;3am window&gt;"),
+])</code> — count should match the alarm. Mitigation: tighten the
+<code>/state</code> route's rate limit at proxy level, OR change
+<code>_get_or_create_session</code> to NOT create-for-public on first hit
+(require an explicit pick action before creating).</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator vocabulary basics — Course 5, Lesson 5.1.</li>
+<li>5-addon dependency graph — Lesson 10.1.</li>
+<li>Setting up a new configurable product — Lesson 10.2.</li>
+<li>Sale-flow integration of session→line — Lesson 10.4.</li>
+<li>MRP-flow integration of session→BoM — Lesson 10.5.</li>
+<li>V2 UX OWL component internals — Lesson 10.6.</li>
+<li>Common rule-authoring gotchas (exclusion explosion, sequencing) —
+  Lesson 10.7.</li>
+<li>Native Odoo cron administration — Odoo's own native eLearning track.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_10_sale_integration" model="slide.slide">
+            <field name="name">Sale Flow Integration — How a Configured Product Lands on a Quote</field>
+            <field name="channel_id" ref="course_configurator_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Estimator who wants to understand pricing + developer who needs to extend the sale.order.line.</field>
+            <field name="html_content"><![CDATA[<h1 id="sale-flow-integration-how-a-configured-product-lands-on-a-quote">Sale Flow Integration — How a Configured Product Lands on a Quote</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're an estimator who's seen the channel-pricelist switcher work
+and wants to know <strong>why</strong> it works — what's happening in the code
+when a Richwood partner becomes a retail walk-in and the price
+changes without re-running the configurator. Or you're a dev who's
+been asked to "make the line carry an extra field so the cut-spec
+gets snapshotted at commit time" and you need to know which method
+to override. Either way, this lesson is the sale-side bridge: from
+the <code>product.config.session</code> that the wizard produces, all the way
+to the <code>sale.order.line</code> the estimator sees on the quote.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The estimator's primary surface:</p>
+<blockquote>
+<p><strong>Sales → Quotations</strong> — every draft order. Each line either is or
+isn't configurable depending on <code>product_id.config_ok</code>.</p>
+</blockquote>
+<p>The configurable trigger is everywhere a configurable product
+appears:</p>
+<blockquote>
+<p>Any <code>sale.order.line</code> whose product is <code>config_ok = True</code> shows a
+<strong>Configure</strong> button and a <strong>Reconfigure</strong> button. Internally these
+map to <code>action_config_start()</code> (on <code>sale.order</code>) and
+<code>reconfigure_product()</code> (on <code>sale.order.line</code>).</p>
+</blockquote>
+<p>The customer-facing portal:</p>
+<blockquote>
+<p><strong><code>/my/southbrook/order-builder/&lt;id&gt;</code></strong> — where the v2 chip UI
+<code>Add to Quote</code> lands after commit. Not the e-commerce
+<code>/shop/cart</code>. The decision was locked in CLAUDE.md Phase 2 (Decision
+A) — configured lines go to the Order Builder, not the website_sale
+cart.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>A <code>sale.order.line</code> for a configured cabinet carries the OCA-extended
+fields:</p>
+<ul>
+<li><strong><code>product_id</code></strong> — the materialised <code>product.product</code> variant
+  (created by <code>session.create_get_variant</code>).</li>
+<li><strong><code>config_ok</code></strong> — related field from <code>product_id.config_ok</code>. Tells
+  the UI to render Configure / Reconfigure buttons.</li>
+<li><strong><code>config_session_id</code></strong> — Many2one to <code>product.config.session</code>.
+  The session that produced this line; one done session per line,
+  reusable for reconfigure-spawned new sessions.</li>
+<li><strong><code>custom_value_ids</code></strong> — related from <code>config_session_id.custom_value_ids</code>.
+  Surfaces free-text custom values (engraving, dimensions) onto
+  the line.</li>
+<li><strong><code>price_unit</code></strong> — <strong>overridden</strong>: reads <code>config_session_id.price</code>
+  (the configurator-resolved price) instead of the native variant
+  list_price. This is the single most load-bearing override in the
+  bridge — it's how Maple's +10% lands on the quote.</li>
+</ul>
+<p>The order header carries the channel resolution:</p>
+<ul>
+<li><strong><code>pricelist_id</code></strong> — set from <code>partner_id.property_product_pricelist</code>,
+  which Southbrook computes from <code>partner.channel</code> (Dealer / Tradesperson
+  / KD / Big-Box / Refacing / Retail per Q1 lock).</li>
+<li>The <code>southbrook_estimating</code> overlay adds zone aggregation and the
+  stage pipeline (Draft → Estimating → Approval → Confirmed → In
+  Production).</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You build quotes; behind every click is one of four bridge code
+paths. Knowing which makes you faster at debugging "the price is
+wrong" or "the line isn't carrying the right session."</p>
+<p><strong>1. Adding a new configured line via the Order Builder.</strong></p>
+<p>You hit <strong>Add Cabinet</strong> on the order. The picker (filtered by
+<code>config_ok=True AND sale_ok=True</code>) shows configurable templates. You
+pick "Vanity 24in Elegance Fluted" (your Lesson 10.2 work). Odoo:</p>
+<ol>
+<li>Inserts a draft <code>sale.order.line</code> with <code>product_id = &lt;template's
+   default variant or False&gt;</code> and <code>product_uom_qty = 1</code>.</li>
+<li>Because <code>config_ok = True</code> on the product, the UI doesn't
+   auto-confirm — instead it surfaces a Configure button.</li>
+<li>You hit Configure. <code>sale.order.line.action_config_start</code> — wait,
+   no: on the line, the action is <code>sale.order.action_config_start</code>,
+   which is the <strong>header-level</strong> entry point. The line-level entry is
+   <code>reconfigure_product</code>. The first-config flow uses
+   <code>product.template.create_config_wizard(model_name='product.configurator.sale', extra_vals={...})</code>
+   under the hood.</li>
+<li>The wizard opens (the OCA backend wizard, generated dynamically
+   from <code>attribute_line_ids</code>). You step through the 11 attributes.</li>
+<li>On Finish, the wizard's transient model writes the
+   <code>product.config.session.value_ids</code>, calls <code>session.action_confirm</code>,
+   which calls <code>session.create_get_variant</code> — variant is materialised
+   if not already existing — and <code>_check_product_id</code> enforces the
+   link.</li>
+<li>The wizard returns; Odoo writes back to the sale.order.line:
+   <code>product_id = variant</code>, <code>config_session_id = session</code>,
+   <code>price_unit</code> recomputes via the override.</li>
+</ol>
+<p><strong>2. Reconfiguring an existing line.</strong></p>
+<p>You realise the customer wanted a different finish. You click
+Reconfigure on the line. <code>sale.order.line.reconfigure_product()</code>
+runs:</p>
+<pre><code class="language-python">extra_vals = {
+    &quot;order_id&quot;: self.order_id.id,
+    &quot;order_line_id&quot;: self.id,
+    &quot;product_id&quot;: self.product_id.id,
+}
+return self.product_id.product_tmpl_id.create_config_wizard(
+    model_name=&quot;product.configurator.sale&quot;,
+    extra_vals=extra_vals,
+)
+</code></pre>
+<p>This spawns a <strong>new</strong> session prefilled from the existing variant.
+The wizard opens with the customer's prior picks. You change Finish,
+hit Finish. The new session reaches <code>state='done'</code>, materialises a
+<strong>different</strong> variant (or finds the existing one if the picks happen
+to match another variant), updates the line's
+<code>product_id</code>, <code>config_session_id</code>, <code>price_unit</code>. The old session
+stays at <code>state='done'</code> — you have a permanent record of the
+pre-change configuration.</p>
+<p><strong>3. Switching the customer (channel resolution).</strong></p>
+<p>You change <code>partner_id</code> on the order header from Richwood (Dealer
+channel, -35% pricelist) to Retail Walk-In. Odoo's
+<code>sale.order.onchange_partner_id</code> swaps the order's <code>pricelist_id</code> to
+the retail base list. Every line's <code>price_unit</code> recomputes — but the
+override reads <code>config_session_id.price</code>, NOT
+<code>product_id.list_price</code>. So what's the rule of thumb?</p>
+<p><code>session.price</code> is <strong>base list_price + sum(picked PTAV price_extras)</strong>
+— it is a pricelist-naive number. The channel pricelist is applied
+on top by Odoo's standard pricelist resolution, taking
+<code>session.price</code> as the input price. <strong>That's the locked smoke test
+in CLAUDE.md §9: switching partner re-prices the line without
+re-running the configurator.</strong> It works because the override fixes
+the base price; the pricelist still operates as native Odoo.</p>
+<p><strong>4. Confirming the order → spawning an MO.</strong></p>
+<p>Standard Odoo confirms the order (state <code>draft → sale</code>). The MO
+spawn from the configurable line uses
+<code>product_configurator_mrp/models/mrp.py:MrpProduction</code> — which
+inherits to add <code>config_ok</code>, <code>config_session_id</code>, and <code>custom_value_ids</code>.
+The MO records the session that produced the variant; Lesson 10.5
+walks the BoM rollup.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I changed the customer and the price didn't update."</strong></p>
+<p>Three suspects:
+- The line was confirmed (<code>sale.order.state = sale</code> or higher). Once
+  confirmed, <code>_compute_price_unit</code> is gated; it doesn't re-fire on
+  partner switch. Recovery: revert to draft (<code>action_draft</code>) or
+  duplicate the order with the new customer.
+- The partner doesn't have <code>property_product_pricelist</code> set. The
+  channel resolution in <code>southbrook_estimating</code> reads
+  <code>partner.channel</code> → resolves to a pricelist; if the partner record
+  is mid-migration and the field is null, no pricelist applies and
+  the line falls back to retail.
+- The line's <code>config_session_id</code> is null (it was added before being
+  configured, or via a non-configurator path). Without the session,
+  the price-unit override no-ops and Odoo's default pricing applies
+  — which may or may not reflect what you expect.</p>
+<p><strong>"Re-configure spawns a new session but the old session's data is
+lost."</strong></p>
+<p>It isn't — the old session is still there, <code>state='done'</code>,
+<code>product_id</code> pointing at the old variant. The line now points at the
+new session + new variant. To audit history, browse all sessions for
+the order: <code>env["product.config.session"].search([("user_id.partner_id",
+"=", order.partner_id.id), ("write_date", "&gt;=", order.create_date)])</code>.</p>
+<p><strong>"A line has price_unit = 0 even though the variant has list_price = 295."</strong></p>
+<p>The <code>_compute_price_unit</code> override (line 62 of
+<code>product_configurator_sale/models/sale.py</code>) returns the
+session's <code>price</code> if <code>config_session_id</code> is set, which can be 0 if
+the session has no values picked yet. Likely the line was added but
+Configure was never finished — <code>config_session_id</code> was set early in
+the flow and never reached <code>state='done'</code>. Recovery: complete the
+configuration via Reconfigure.</p>
+<p><strong>"The 'custom value' the customer typed (their initials) shows on
+the line but not on the printed PDF."</strong></p>
+<p>The PDF template renders from <code>sale.order.line.name</code> or the
+variant's <code>display_name</code>. Custom values are surfaced via
+<code>_get_sale_order_line_multiline_description_variants</code> (line 77 of
+<code>product_configurator_sale/models/sale.py</code>) — which appends them to
+the description. If your PDF QWeb uses <code>line.name</code> only without
+calling that helper, custom values won't print. Fix: edit the QWeb
+to include <code>line._get_sale_order_line_multiline_description_variants()</code>,
+or use <code>line.name</code> which is normally pre-populated with it.</p>
+<p><strong>"Customer hit Add to Quote on <code>/shop/&lt;slug&gt;</code> but their order is
+empty."</strong></p>
+<p>Check <code>southbrook_configurator_ux/controllers/main.py:configurator_commit</code>
+(line 568). The flow is: validate session → create_get_variant →
+resolve or create the user's draft sale.order → create the line.
+The most common failure point: the partner has no draft order AND
+the resolve-or-create fell through to AccessError because the
+partner doesn't have sale ACL on <code>sale.order</code> create. Public
+visitors hit <code>login_required</code> first — but a portal user without
+proper sale ACL gets a different failure. Diagnose by running the
+commit path in the shell with the user as the request user
+(<code>with_user(partner.user_ids[:1])</code>).</p>
+<p><strong>"The line shows the right SKU but my BoM-driven cut list missed
+the Maple price extra."</strong></p>
+<p>The <code>_compute_price_unit</code> override reads
+<code>config_session_id.price</code>, which is correct for the <strong>quote price</strong>.
+But the BoM rollup (via <code>product_configurator_mrp.create_get_bom</code>)
+reads bomline products + their costs. Maple's +10% is a price_extra
+on the PTAV; it doesn't flow into the BoM as a cost line. The
+quote shows +10%, the MO cost report shows the raw component cost.
+<strong>This is intentional separation</strong> but a frequent surprise — Lesson
+10.5 covers it in depth.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The bridge is <strong>3 inheritance hops</strong> plus <strong>1 model addition</strong>.</p>
+<p>The <strong>3 inheritance hops</strong> (all in <code>product_configurator_sale/models/sale.py</code>):</p>
+<pre><code class="language-python">class SaleOrder(models.Model):
+    _inherit = &quot;sale.order&quot;
+
+    def action_config_start(self):
+        &quot;&quot;&quot;Header-level Configure entry — opens the
+        product.configurator.sale wizard with allow_preset_selection=True
+        so the user can pick a preset.&quot;&quot;&quot;
+        configurator_obj = self.env[&quot;product.configurator.sale&quot;]
+        ctx = dict(self.env.context,
+                   default_order_id=self.id,
+                   wizard_model=&quot;product.configurator.sale&quot;,
+                   allow_preset_selection=True)
+        return configurator_obj.with_context(**ctx).get_wizard_action()
+
+
+class SaleOrderLine(models.Model):
+    _inherit = &quot;sale.order.line&quot;
+
+    custom_value_ids = fields.One2many(
+        comodel_name=&quot;product.config.session.custom.value&quot;,
+        inverse_name=&quot;cfg_session_id&quot;,
+        related=&quot;config_session_id.custom_value_ids&quot;,
+    )
+    config_ok = fields.Boolean(
+        related=&quot;product_id.config_ok&quot;, readonly=True)
+    config_session_id = fields.Many2one(
+        comodel_name=&quot;product.config.session&quot;)
+
+    def reconfigure_product(self):
+        wizard_model = &quot;product.configurator.sale&quot;
+        extra_vals = {
+            &quot;order_id&quot;: self.order_id.id,
+            &quot;order_line_id&quot;: self.id,
+            &quot;product_id&quot;: self.product_id.id,
+        }
+        return self.product_id.product_tmpl_id.create_config_wizard(
+            model_name=wizard_model, extra_vals=extra_vals)
+
+    @api.depends(&quot;config_session_id&quot;, &quot;tax_ids&quot;, &quot;company_id&quot;)
+    def _compute_price_unit(self):
+        result = None
+        for line in self:
+            if line.config_session_id:
+                line.price_unit = self.env[&quot;account.tax&quot;]._fix_tax_included_price_company(
+                    line.config_session_id.price,
+                    line.product_id.taxes_id,
+                    line.tax_ids,
+                    line.company_id,
+                )
+            else:
+                result = super()._compute_price_unit()
+        return result
+</code></pre>
+<p>The <strong>model addition</strong> is the transient wizard
+<code>product.configurator.sale</code> (in
+<code>product_configurator_sale/wizard/product_configurator.py</code>) — a
+subclass of the OCA <code>product.configurator</code> transient. Same wizard
+machinery, just typed for sale.</p>
+<p>The <strong>website cart bridge</strong> is in <code>website_product_configurator/models/sale_order.py</code>:
+three overrides — <code>_cart_update_order_line</code>, <code>_cart_find_product_line</code>,
+<code>_prepare_order_line_values</code> — that thread <code>config_session_id</code>
+through the website_sale add-to-cart pathway. This is what makes the
+e-commerce <code>/shop/cart</code> flow work with configurable products. The v2
+Southbrook commit bypasses this entirely by writing directly to
+<code>sale.order.line.create</code> in the controller — the cart bridge is
+unused on the v2 path.</p>
+<p>The <strong>price computation</strong> chain:</p>
+<ol>
+<li>Wizard finish → <code>session.action_confirm</code> → <code>validate_configuration()</code> →
+   <code>create_get_variant()</code>.</li>
+<li><code>create_get_variant</code> writes <code>state='done'</code>, <code>product_id=variant</code>.</li>
+<li>Calling code writes <code>sale.order.line.config_session_id = session</code>.</li>
+<li><code>_compute_price_unit</code> fires (depends on <code>config_session_id</code>),
+   reads <code>session.price</code>.</li>
+<li><code>session.price</code> is the computed field from <code>_compute_cfg_price</code>,
+   which calls <code>get_cfg_price()</code> (line 996), which sums
+   <code>tmpl.list_price</code> + sum of PTAV <code>price_extra</code> for picked values.</li>
+<li><code>_compute_price_unit</code> further wraps with
+   <code>account.tax._fix_tax_included_price_company</code> to normalise
+   tax-included pricing across companies.</li>
+<li>Native Odoo pricelist resolution then maps <code>price_unit</code> against
+   the order's <code>pricelist_id</code> for the customer-displayed price.</li>
+</ol>
+<p>The <strong><code>southbrook_estimating</code> overlay</strong> — the Order Builder — adds
+zone aggregation and the stage pipeline on top of <code>sale.order</code>. It
+does NOT replace the bridge above; it sits next to it. Zone is a
+free-text + selection field on <code>sale.order.line</code> per Q21; the stage
+pipeline is <code>southbrook_submitted_date</code> + a state machine on the
+order header.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> An estimator builds a 12-line quote against Richwood (Dealer
+channel). They click on the partner field, switch to a Retail walk-in.
+The total drops by less than expected — they were anticipating a
+50% jump, got 35%. What's likely happening?</p>
+<blockquote>
+<p>The partner switch is firing <code>_compute_price_unit</code> via the
+<code>config_session_id</code> dependency chain on every line — each line's
+price_unit recomputes from <code>session.price</code>. But the
+session.price is base + PTAV extras, NOT discounted. The
+pricelist applies on top. If the Retail pricelist is in the
+middle of being authored (some items have items rules, some
+don't), only the items with matching <code>product.pricelist.item</code>
+rules get retail pricing; the others fall through to the
+session.price unchanged. Audit the retail pricelist; ensure
+every configurable cabinet template has a coverage rule.</p>
+</blockquote>
+<p><strong>2.</strong> You add a new field <code>cut_spec_version</code> to <code>sale.order.line</code>
+in <code>southbrook_estimating</code>. You want it to be set automatically at
+commit time from the session's variant's spec. Where do you put the
+write?</p>
+<blockquote>
+<p>Override <code>sale.order.line._compute_price_unit</code> (or add a new
+compute on <code>cut_spec_version</code> with <code>@api.depends('config_session_id',
+'config_session_id.product_id')</code>). The
+<code>southbrook_configurator_ux/controllers/main.py:configurator_commit</code>
+path also explicitly calls a hook
+<code>line._capture_southbrook_version_snapshots()</code> if it exists —
+that's the canonical extension point for commit-time snapshots
+(see line 740 in the controller). Implement that method on
+<code>sale.order.line</code> in <code>southbrook_estimating</code>; the controller
+calls it for free, with a non-fatal try/except wrapper.</p>
+</blockquote>
+<p><strong>3.</strong> A configured line on a confirmed order shows
+<code>config_session_id = False</code>. The variant looks right. What
+happened, and is it recoverable?</p>
+<blockquote>
+<p>Likely the order was confirmed via a code path that bypassed
+the wizard — e.g. duplicated from an older order, or imported.
+The variant carries the PTAV values; the session record never
+existed for this line. Recoverable only if you create a new
+session retroactively (browse template, create session, write
+value_ids from the variant's PTAVs, action_confirm with the
+existing variant). Easier: tell the estimator to Reconfigure
+the line, which spawns a fresh session prefilled from the
+variant.</p>
+</blockquote>
+<p><strong>4.</strong> A customer commits a configuration on <code>/shop</code> and the
+controller log shows <code>session.action_confirm failed on session 873</code>.
+The line was created. What's the user-facing impact, and what
+cleanup do you run?</p>
+<blockquote>
+<p>The variant + line exist with correct product_id and price; the
+session stays draft with no product_id. The customer sees their
+quote correctly. Operational impact: the session won't be
+retrievable as a <code>done</code> audit trail; the next GC cron sweeps it
+in 3-7 days. Cleanup: in the shell, find the session
+(<code>Session.search([("user_id", "=", customer_user.id),
+("state", "=", "draft"), ("write_date", "&gt;=", order.create_date)])</code>)
+and either complete it manually (<code>session.action_confirm(product_id=
+line.product_id)</code>) for a clean audit trail, or let GC clean it
+up.</p>
+</blockquote>
+<p><strong>5.</strong> You're asked to make the configurable line carry a
+"DesignedBy" field linking to the designer (a <code>res.users</code>) who
+authored the configuration. The customer's user must be visible
+only at the order level; the designer is who clicked through the
+wizard. Where do you store it?</p>
+<blockquote>
+<p>On <code>sale.order.line</code> directly. Add a <code>designed_by_user_id</code>
+Many2one field on <code>sale.order.line</code> in <code>southbrook_estimating</code>.
+Wire it via the controller's commit path or via the OCA wizard's
+finish step — <code>session.user_id</code> is the designer in your case
+(the user driving the wizard), so on commit you write
+<code>line.designed_by_user_id = session.user_id</code>. Don't store on the
+session — sessions can be re-used across users in some flows
+(reconfigure spawned from a shared variant). Line-level binds
+the attribution to the actual line you're auditing.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator vocabulary basics — Course 5, Lesson 5.1.</li>
+<li>5-addon architecture — Lesson 10.1.</li>
+<li>Setting up a new configurable product — Lesson 10.2.</li>
+<li>Session state machine — Lesson 10.3.</li>
+<li>MRP integration (BoM rollup, MO creation, configuration sets) —
+  Lesson 10.5.</li>
+<li>V2 UX OWL internals (the <code>/state|/select|/commit</code> JSON-RPC
+  contract) — Lesson 10.6.</li>
+<li>Common gotchas (rule ordering, exclusion explosion, performance) —
+  Lesson 10.7.</li>
+<li>Native Odoo sale.order pipeline, pricelists, taxes, multi-company —
+  Odoo's own native eLearning track.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_10_mrp_integration" model="slide.slide">
+            <field name="name">MRP Flow Integration — From Configured Variant to Manufacturing Order</field>
+            <field name="channel_id" ref="course_configurator_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Production planner who watches BoMs land in Manufacturing + developer who needs to extend the BoM rollup.</field>
+            <field name="html_content"><![CDATA[<h1 id="mrp-flow-integration-from-configured-variant-to-manufacturing-order">MRP Flow Integration — From Configured Variant to Manufacturing Order</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a production planner: a confirmed sale.order has just landed
+in your queue and you need to know why one configured cabinet shows
+up with 23 BoM lines and another shows 6 — when nobody changed the
+template. Or you're a developer: the team has asked you to add a
+fifth construction-rule case where a 36-in cabinet gets an extra
+shelf-support cleat in the BoM, and you don't know whether that
+belongs in <code>southbrook_estimating</code> or <code>product_configurator_mrp</code>.
+Either way: this lesson is the MRP-side bridge. From the
+<code>product.config.session</code> to the <code>mrp.bom</code> and finally the
+<code>mrp.production</code> MO.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The MO and BoM list views:</p>
+<blockquote>
+<p><strong>Manufacturing → Operations → Manufacturing Orders</strong> — every MO,
+draft → confirmed → done. Configurable MOs carry a Configure
+button on the line per the <code>product_configurator_mrp</code> overlay.</p>
+<p><strong>Manufacturing → Products → Bills of Materials</strong> — every BoM.
+Configurable templates can have a <strong>parent BoM</strong> (one with
+<code>product_id = False</code>) that acts as the rollup template, plus
+per-variant BoMs created automatically on commit.</p>
+</blockquote>
+<p>The configuration-set catalog (rarely visited but load-bearing):</p>
+<blockquote>
+<p><strong>Manufacturing → Configuration → BoM Line Configuration Sets</strong> —
+<code>mrp.bom.line.configuration.set</code> records. Each is a named group of
+conditional BoM lines keyed by attribute values. This is the magic
+that lets one parent BoM serve many variants.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>A configured variant's BoM has the standard <code>mrp.bom</code> fields plus
+the configurator extensions:</p>
+<ul>
+<li><strong><code>product_tmpl_id</code></strong> — the template (configurable). Required.</li>
+<li><strong><code>product_id</code></strong> — the specific variant. Set on per-variant BoMs
+  (the auto-created ones from <code>create_get_bom</code>). Empty on the
+  template's parent BoM.</li>
+<li><strong><code>bom_line_ids</code></strong> — the components. Each <code>mrp.bom.line</code> can carry
+  a <code>config_set_id</code> linking to a <code>mrp.bom.line.configuration.set</code>
+  for conditional inclusion.</li>
+<li><strong><code>config_ok</code></strong> — related field from <code>product_tmpl_id.config_ok</code>.
+  Stored so MRP queries can filter on it without joining.</li>
+</ul>
+<p>A <code>mrp.bom.line.configuration.set</code> carries:</p>
+<ul>
+<li><strong><code>name</code></strong> — e.g. "Maple-on-Contemporary" — a description.</li>
+<li><strong><code>configuration_ids</code></strong> — One2many to <code>mrp.bom.line.configuration</code>.
+  Each child is a single rule pattern.</li>
+<li><strong><code>bom_line_ids</code></strong> — One2many back: the BoM lines that reference
+  this set.</li>
+</ul>
+<p>A <code>mrp.bom.line.configuration</code> carries:</p>
+<ul>
+<li><strong><code>value_ids</code></strong> — Many2many <code>product.attribute.value</code>. The set of
+  attribute values that must ALL be in the variant's picks for the
+  parent line to apply.</li>
+</ul>
+<p>The MO (<code>mrp.production</code>) overlay adds:</p>
+<ul>
+<li><strong><code>config_ok</code></strong> — stored related from <code>product_id.config_ok</code>.</li>
+<li><strong><code>config_session_id</code></strong> — Many2one to the session that produced
+  this MO's product. Lets you trace back from a shop-floor MO to
+  the original wizard configuration.</li>
+<li><strong><code>custom_value_ids</code></strong> — related One2many surfacing the session's
+  custom values onto the MO.</li>
+</ul>
+<p>The MO also exposes Configure / Reconfigure buttons (model
+methods <code>action_config_start</code> and <code>reconfigure_product</code>) — these
+let a production engineer re-spawn the wizard for a
+configurable product on the production side. Use case:
+"engineering needs to swap the door style on this MO before it
+goes to production" — Reconfigure spawns a new session, commits a
+new variant, updates the MO's product_id.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You don't author BoM logic every day — but when you do, three
+patterns cover most of the work.</p>
+<p><strong>1. Setting up a parent BoM with configuration sets.</strong></p>
+<p>You're adding a new template (Lesson 10.2 work) and you want the
+BoM to be dynamic — e.g. "if Door Style = Five-Piece Woodgrain, add
+2× side stiles; if Slab, skip them."</p>
+<ul>
+<li>Navigate to <strong>Manufacturing → Products → Bills of Materials → New</strong>.</li>
+<li><code>product_tmpl_id</code> = your new template. <code>product_id</code> = <strong>leave
+  empty</strong> — this is the parent BoM.</li>
+<li>Add bom_line_ids for every component the template <strong>can</strong>
+  contribute.</li>
+<li>For lines that are conditional, create a
+  <code>mrp.bom.line.configuration.set</code> first via <strong>Manufacturing →
+  Configuration → BoM Line Configuration Sets → New</strong>:</li>
+<li>Name it descriptively ("Five-Piece door — side stiles").</li>
+<li>Add one or more <code>mrp.bom.line.configuration</code> rows, each with
+    <code>value_ids = [&lt;the attribute values that trigger this case&gt;]</code>.</li>
+<li>On the BoM line, set <code>config_set_id = &lt;your config set&gt;</code>.</li>
+<li>Save.</li>
+</ul>
+<p>Now: when a customer commits a configuration, <code>create_get_bom</code>
+walks the parent BoM line-by-line. For each line with a <code>config_set_id</code>,
+it checks each <code>configuration_ids</code> row — if the variant's picks
+include ALL <code>value_ids</code> in that row, the line is included; otherwise
+skipped.</p>
+<p><strong>2. Forcing a BoM regeneration for a specific variant.</strong></p>
+<p>You change the parent BoM (add a new line). Existing per-variant
+BoMs don't auto-update — <code>create_get_bom</code> only creates a new BoM if
+one doesn't already exist for the (template, variant) pair (the
+<code>existing_bom</code> short-circuit at line 48 of
+<code>product_configurator_mrp/models/product_config.py</code>).</p>
+<p>To force a regen for one variant:</p>
+<pre><code class="language-bash">odoo-bin shell -d &lt;db&gt;
+</code></pre>
+<pre><code class="language-python">Session = env[&quot;product.config.session&quot;]
+s = Session.browse(&lt;session_id&gt;)
+# Delete the existing variant BoM
+old_bom = env[&quot;mrp.bom&quot;].search([
+    (&quot;product_tmpl_id&quot;, &quot;=&quot;, s.product_tmpl_id.id),
+    (&quot;product_id&quot;, &quot;=&quot;, s.product_id.id),
+])
+old_bom.unlink()
+# Re-run BoM creation
+s.create_get_bom(s.product_id)
+env.cr.commit()
+</code></pre>
+<p>Or mass-regen by deleting all variant BoMs for a template:</p>
+<pre><code class="language-python">env[&quot;mrp.bom&quot;].search([
+    (&quot;product_tmpl_id&quot;, &quot;=&quot;, tmpl_id),
+    (&quot;product_id&quot;, &quot;!=&quot;, False),
+]).unlink()
+# Next time create_get_variant runs on any session for this template,
+# a fresh BoM will be built from the parent.
+</code></pre>
+<p><strong>3. Spawning the MO from a confirmed sale.order line.</strong></p>
+<p>You confirm the sale order. Native Odoo's procurement run
+identifies the configurable product as <code>route_id = make_to_order</code>
+or similar and spawns an MO. The MO inherits <code>product_id</code> from the
+sale.order.line; the <code>product_configurator_mrp.mrp.production</code>
+overlay reads <code>config_session_id</code> from the line (via the sale
+overlay's <code>_action_confirm</code> flow) and sets it on the MO.</p>
+<p>The MO's <code>bom_id</code> is resolved from the <code>mrp.bom</code> record matching
+the variant (the per-variant BoM that <code>create_get_bom</code> made). Work
+orders generate from <code>bom_id.operation_ids</code> per native Odoo.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The first customer commit produced no BoM at all."</strong></p>
+<p><code>create_get_bom</code> (line 24 of
+<code>product_configurator_mrp/models/product_config.py</code>) needs <strong>either</strong>
+(a) a parent BoM on the template (with <code>product_id = False</code>) whose
+lines may or may not have config_set_ids, OR (b) attribute values
+with <code>product_id</code> linked (so each picked value contributes a BoM
+line via its option-product). With neither, the function walks both
+branches, finds nothing, and returns False. The variant is created
+but no BoM exists. Fix: create the parent BoM with the canonical
+component list. Then regen per the daily-flow #2.</p>
+<p><strong>"The BoM was created but it's missing the Maple core lines."</strong></p>
+<p>The parent BoM's "Maple core" line has a <code>config_set_id</code> referencing
+a configuration set whose only <code>mrp.bom.line.configuration</code> row is
+<code>value_ids = [Maple]</code>. The variant must have Maple picked AND the
+checker uses <code>set.issubset</code> (line 88 of the same file): the
+configuration's <code>value_ids</code> must be a subset of the variant's
+attribute_values. So if Maple is in <code>value_ids</code> but the
+<code>configuration</code> row also requires <code>Contemporary</code> (e.g. you set
+<code>value_ids = [Maple, Contemporary]</code>), and the variant is Maple +
+Elegance, the subset check fails and the line is skipped.</p>
+<p>Fix: either split the config set (one config per series) or
+loosen the <code>value_ids</code> to just <code>[Maple]</code>.</p>
+<p><strong>"The Reconfigure button on the MO opens the wizard but commits
+don't update the MO's product_id."</strong></p>
+<p>The MO's <code>reconfigure_product</code> (line 38 of <code>product_configurator_mrp/models/mrp.py</code>)
+spawns the wizard with <code>extra_vals = {"order_id": self.id,
+"product_id": self.product_id.id}</code>. The wizard subclass
+<code>product.configurator.mrp</code> handles the write-back to the MO. If
+the MO is in state <code>confirmed</code> or higher, the OCA validation may
+silently fail the variant swap. Recovery: cancel the MO, recreate.</p>
+<p><strong>"The MO has a config_session_id but custom_value_ids shows
+nothing on the shop floor printout."</strong></p>
+<p>The <code>custom_value_ids</code> on the MO is a related field
+(<code>product_configurator_mrp.mrp.production</code> line 19 — defined as
+<code>fields.One2many(related="config_session_id.custom_value_ids")</code>).
+Related O2M fields don't sync into MO-level reports automatically
+because the report's QWeb usually reads <code>mrp.production</code> direct
+fields. Fix the QWeb to call <code>production.custom_value_ids</code> (Odoo
+resolves related O2M for reads transparently).</p>
+<p><strong>"The BoM cost rollup doesn't include the +10% Maple price extra."</strong></p>
+<p>Correct — and intentional. The Maple +10% is on the <strong>sale side</strong>
+(<code>product.template.attribute.value.price_extra</code> flows into
+<code>session.price</code> flows into <code>sale.order.line.price_unit</code>). The MRP
+side's cost is the actual component cost — the Maple <code>product.product</code>
+linked via the attribute value's <code>product_id</code>. If that product has
+<code>standard_price = 60</code> and white melamine has <code>standard_price = 40</code>,
+the BoM's cost reflects $60 not "+10%". The price_extra is for
+<strong>pricing</strong>, not <strong>costing</strong>. They're orthogonal axes; that
+separation is the OCA design intent.</p>
+<p><strong>"Two variants with identical picks have different BoMs."</strong></p>
+<p><code>create_get_bom</code> has an <code>existing_bom</code> short-circuit (line 48): it
+finds and reuses ANY BoM where <code>product_tmpl_id = X AND product_id =
+variant</code>. If two variants share <code>value_ids</code> exactly, they should
+match the same variant_id (configurator's variant-dedup). If they
+don't, you've split the variant catalog — likely from a manual
+variant creation outside the wizard. Audit:
+<code>env["product.product"].search([("product_tmpl_id", "=", tmpl_id)])</code> —
+look for duplicates with same PTAV combinations.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The MRP overlay is <strong>3 inheritance hops</strong> + <strong>3 new models</strong>.</p>
+<p><strong>Inheritance hops</strong> (in <code>product_configurator_mrp/models/mrp.py</code>):</p>
+<ul>
+<li><code>mrp.production</code> gains <code>config_ok</code>, <code>config_session_id</code>,
+  <code>custom_value_ids</code>, plus <code>action_config_start</code> and
+  <code>reconfigure_product</code>. The Configure/Reconfigure buttons on the MO
+  form.</li>
+<li><code>mrp.bom</code> gains <code>config_ok</code> (stored, for filtering).</li>
+<li><code>mrp.bom.line</code> gains <code>config_set_id</code> — the link to the
+  configuration set.</li>
+</ul>
+<p><strong>New models</strong> (also in mrp.py):</p>
+<ul>
+<li><code>mrp.bom.line.configuration.set</code> — a named container.</li>
+<li><code>mrp.bom.line.configuration</code> — one rule pattern per set
+  (<code>value_ids</code> = the trigger combination).</li>
+</ul>
+<p>The <strong>third inheritance hop</strong> is on <code>product.config.session</code> itself
+(<code>product_configurator_mrp/models/product_config.py</code>):</p>
+<pre><code class="language-python">class ProductConfigSession(models.Model):
+    _inherit = &quot;product.config.session&quot;
+
+    def create_get_bom(self, variant, product_tmpl_id=None, values=None):
+        # Short-circuit: if a BoM already exists for (tmpl, variant), return it.
+        existing_bom = self.env[&quot;mrp.bom&quot;].search([
+            (&quot;product_tmpl_id&quot;, &quot;=&quot;, product_tmpl_id.id),
+            (&quot;product_id&quot;, &quot;=&quot;, variant.id),
+        ])
+        if existing_bom:
+            return existing_bom[:1]
+
+        # Look for a parent BoM (product_id = False).
+        parent_bom = self.env[&quot;mrp.bom&quot;].search([
+            (&quot;product_tmpl_id&quot;, &quot;=&quot;, product_tmpl_id.id),
+            (&quot;product_id&quot;, &quot;=&quot;, False),
+        ], order=&quot;sequence asc&quot;, limit=1)
+
+        bom_lines = []
+        if not parent_bom:
+            # No parent — walk attribute values' option-products.
+            for product in attr_products:
+                # Build bom_line vals via onchange, append.
+                ...
+        else:
+            # Walk parent BoM line-by-line.
+            for parent_bom_line in parent_bom.bom_line_ids:
+                if parent_bom_line.config_set_id:
+                    # Conditional line — check each configuration.
+                    for config in parent_bom_line.config_set_id.configuration_ids:
+                        if set(config.value_ids.ids).issubset(set(attr_values.ids)):
+                            # Variant has all the required values — include.
+                            ...
+                else:
+                    # Unconditional line — always include.
+                    ...
+        # Create the BoM.
+        ...
+
+    def create_get_variant(self, value_ids=None, custom_vals=None):
+        variant = super().create_get_variant(value_ids, custom_vals)
+        self.create_get_bom(variant, product_tmpl_id=self.product_tmpl_id)
+        return variant
+</code></pre>
+<p>This is the load-bearing override: it makes BoM generation <strong>automatic</strong>
+on every wizard commit. Without this overlay (i.e. with only
+<code>product_configurator</code> installed), variants are created without
+BoMs, and the production planner has to author them by hand.</p>
+<p>The MO spawn from sale.order doesn't go through this code — it
+uses native Odoo procurement, which looks up the per-variant BoM
+that <code>create_get_bom</code> already wrote. The <code>config_session_id</code> on the
+MO is wired by the sale→MO procurement chain through standard Odoo
+context propagation; the <code>product_configurator_sale</code> overlay sets
+up the line; the MO's overlay reads the line's session and stores
+it on the MO.</p>
+<p>The <strong>work orders</strong> (<code>mrp.workorder</code>) are generated by native Odoo
+from <code>bom_id.operation_ids</code> — the configurator has no overlay
+there. If you need configurable operations (e.g. "if Maple, add a
+sanding step"), you author it as standard <code>mrp.routing.workcenter</code>
+records on the parent BoM and rely on the configuration_ids
+mechanism for line inclusion. Operation-level configurability is
+not natively supported — TBD-feature-gap.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You author a parent BoM with 12 unconditional lines and 4
+conditional lines (each in its own <code>mrp.bom.line.configuration.set</code>
+keyed by a different attribute value). Customer A picks values that
+match 2 of the 4 conditional sets. How many lines does Customer A's
+auto-generated BoM contain, assuming all attribute_values link to
+real option-products?</p>
+<blockquote>
+<p>12 unconditional + 2 conditional = 14 lines. The unconditional
+lines always copy (their parent has no <code>config_set_id</code>); each
+conditional line is included only if at least one of its
+configuration's <code>value_ids</code> is a subset of Customer A's picks.</p>
+</blockquote>
+<p><strong>2.</strong> A configuration set has one configuration row:
+<code>value_ids = [Maple, Contemporary]</code>. A variant has picks
+<code>[Maple, Elegance, Slab Door]</code>. Does the line apply, and why?</p>
+<blockquote>
+<p>No. <code>set.issubset</code> requires ALL <code>value_ids</code> to be in the picks.
+Maple is in the picks but Contemporary is not (Elegance is) — so
+<code>{Maple, Contemporary}.issubset({Maple, Elegance, Slab})</code> is
+False. The line is skipped. If you wanted "Maple AND
+(Contemporary OR Elegance)", you'd need two configuration rows
+in the same set: <code>[Maple, Contemporary]</code> and <code>[Maple, Elegance]</code>
+— each independently checked, line included if EITHER matches.</p>
+</blockquote>
+<p><strong>3.</strong> The team adds a "Toe Kick Trim" component that should land
+in the BoM only for vanity templates with Width &gt;= 24in. Where do
+you author this, and what's the trade-off vs putting the rule on
+the configurator side?</p>
+<blockquote>
+<p>Author it on the MRP side: a <code>mrp.bom.line</code> on the vanity's
+parent BoM with <code>config_set_id</code> linked to a set whose
+configuration is <code>value_ids = [Width 24, Width 27, Width 30,
+Width 33, Width 36]</code>. Trade-off: this is BoM-only — the
+configurator wizard doesn't show the line, the customer doesn't
+see "+toe kick trim" in their price. If the trim adds cost they
+see, you'd ALSO need a PTAV <code>price_extra</code> on the relevant
+attribute_values. Two-axis change for an axis-crossing
+feature is the OCA design tax. Alternative: bind the toe-kick
+trim as an attribute (Toe Kick = Yes/No) with <code>price_extra</code> AND
+a config_set; price + BoM stay in sync.</p>
+</blockquote>
+<p><strong>4.</strong> You change the parent BoM and want every future variant of
+that template to use the new structure — but you also have 14
+existing per-variant BoMs from prior commits. Outline the cleanest
+recovery.</p>
+<blockquote>
+<p>Run in shell:
+<code>env["mrp.bom"].search([("product_tmpl_id", "=", tmpl_id),
+("product_id", "!=", False)]).unlink()</code>. This deletes all
+per-variant BoMs. The next time a session commits or
+<code>create_get_bom</code> is called for an existing variant, a fresh BoM
+is built from the new parent. Caveat: any MO currently in
+<code>draft</code> referencing one of those BoMs has its <code>bom_id</code> blanked
+(cascade) — re-open the MO and select the new BoM. MOs in
+<code>confirmed</code> or later are unaffected (they froze their BoM via
+<code>mrp.production.move_raw_ids</code> at confirm time).</p>
+</blockquote>
+<p><strong>5.</strong> A configured MO is in <code>confirmed</code> state. The customer
+changes their mind on door style. You hit Reconfigure on the MO
+and step through the wizard with the new pick. What happens to the
+old BoM, the new BoM, and the work orders?</p>
+<blockquote>
+<p>The wizard creates a new session, which materialises a new
+variant (or finds an existing one matching the new picks). The
+MO's <code>product_id</code> updates to the new variant. <strong>The old
+per-variant BoM stays in the database</strong> — it's still linked to
+the old variant, which still exists. The new variant either has
+an existing BoM or gets one created by <code>create_get_bom</code>. The MO's
+<code>bom_id</code> typically re-resolves on save to the new variant's BoM.
+<strong>Work orders</strong>: native Odoo's MO state machine is the load-bearing
+piece here — <code>mrp.production</code> may or may not regenerate work orders
+on <code>product_id</code> change depending on state. Test before relying on
+it. If you need this flow routinely, build a wrapper that cancels
+the MO and creates a fresh one rather than mutating an existing
+confirmed MO.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator basics — Course 5, Lesson 5.1.</li>
+<li>5-addon architecture — Lesson 10.1.</li>
+<li>Setting up a new configurable product — Lesson 10.2.</li>
+<li>Session state machine — Lesson 10.3.</li>
+<li>Sale-flow integration (channel pricing, line snapshots) — Lesson
+  10.4.</li>
+<li>V2 UX OWL component + JSON-RPC contract — Lesson 10.6.</li>
+<li>Common gotchas (rule ordering, exclusion explosion, performance) —
+  Lesson 10.7.</li>
+<li>Native Odoo MRP (work centers, routings, procurement rules,
+  scrap, backflush) — Odoo's own native eLearning track, plus
+  Southbrook Course 1 (workcenters) + 2 (production planning).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_10_v2_ux_deep_dive" model="slide.slide">
+            <field name="name">Configurator UX v2 Deep Dive — OWL, JSON-RPC, and the QWeb Inheritance Pattern</field>
+            <field name="channel_id" ref="course_configurator_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Estimator who designs the customer flow + frontend dev who extends the v2 chip UI.</field>
+            <field name="html_content"><![CDATA[<h1 id="configurator-ux-v2-deep-dive-owl-json-rpc-and-the-qweb-inheritance-pattern">Configurator UX v2 Deep Dive — OWL, JSON-RPC, and the QWeb Inheritance Pattern</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator who needs to know "why does the chip turn grey
+after this pick" — and the developer who needs to add a new chip
+group, a new endpoint, or a new keyboard shortcut. Course 5 lesson
+5.4 gave you the UX vocabulary. This lesson is the implementation:
+which file owns which DOM node, where state lives, how the 3
+JSON-RPC endpoints sequence, what happens on every chip click. You
+can repro it from the source after reading this; no surprises.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Two surfaces:</p>
+<blockquote>
+<p><strong><code>/shop/&lt;cabinet-slug&gt;</code></strong> — the customer-facing v2 page on
+southbrookcabinetry.space. Every configurable product renders
+through the inherited template.</p>
+<p><strong><code>/southbrook/api/configurator/{state|select|commit}</code></strong> and
+<strong><code>/southbrook/api/import/{template|preview|commit}</code></strong> — six
+JSON-RPC + HTTP endpoints. All defined in
+<code>addons/southbrook_configurator_ux/controllers/main.py</code>.</p>
+</blockquote>
+<p>Two implementation files:</p>
+<ul>
+<li><code>addons/southbrook_configurator_ux/views/configurator_template.xml</code>
+  — the QWeb body that the OWL component mounts into.</li>
+<li><code>addons/southbrook_configurator_ux/static/src/js/configurator.esm.js</code>
+  — the <code>ConfiguratorV2</code> OWL component (1,307 lines).</li>
+</ul>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The DOM produced by the QWeb shell:</p>
+<pre><code>#sb_cfg_v2_root[data-product-tmpl-id]
+├── .sb_cfg_progwrap (role=&quot;progressbar&quot;)
+│   └── .sb_cfg_progbar
+├── .sb_cfg_crumbs
+└── #sb_cfg_v2_main_mount[data-internal-user=&quot;0|1&quot;]
+    └── (no-JS fallback &quot;Loading…&quot;)
+</code></pre>
+<p><code>ConfiguratorV2</code> mounts into <code>#sb_cfg_v2_main_mount</code>. The static
+fallback content gets replaced. The component's rendered output:</p>
+<pre><code>.sb_cfg_v2_main
+├── .sb_cfg_titlebar (title + tagline + bulk-tools bar*)
+├── .sb_cfg_bulkbar (* internal users only)
+└── .sb_cfg_grid
+    ├── .sb_cfg_panel.sb_cfg_left (sticky)
+    │   ├── .sb_cfg_viewer (CSS-box preview)
+    │   ├── .sb_cfg_summary (Price LIVE + Weight + SKU + spec + ring)
+    │   └── .sb_cfg_actionbar (validation + Add to Quote)
+    └── .sb_cfg_panel.sb_cfg_right (scroll)
+        └── (4 collapsible attribute groups, chip selectors)
+</code></pre>
+<p>Plus two body-level overlays:</p>
+<ul>
+<li><code>#sb_cfg_importOverlay</code> — the bulk-import modal (position:fixed).</li>
+<li>toast container — flash messages.</li>
+</ul>
+<p>These are body-level because they sit OUTSIDE the OWL component
+tree — they're rendered by the static QWeb so they can layer above
+the component without OWL teleport.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You won't touch v2 every day, but if you do, four operations cover
+everything.</p>
+<p><strong>1. Adding a new chip group.</strong></p>
+<p>The 4 groups are defined in
+<code>southbrook_configurator_ux/controllers/main.py:126-131</code> as the
+<code>ATTRIBUTE_GROUPS</code> constant:</p>
+<pre><code class="language-python">ATTRIBUTE_GROUPS = [
+    (&quot;Size &amp; Layout&quot;,         [&quot;Width&quot;, &quot;Door Count&quot;]),
+    (&quot;Series &amp; Materials&quot;,    [&quot;Series&quot;, &quot;Box Material&quot;, &quot;Door Style&quot;]),
+    (&quot;Finish &amp; Construction&quot;, [&quot;Finish&quot;, &quot;Hinge Side&quot;, &quot;Finished Sides&quot;, &quot;Gables&quot;]),
+    (&quot;Hardware &amp; Add-ons&quot;,    [&quot;Handle&quot;, &quot;Accessories&quot;]),
+]
+</code></pre>
+<p>The <code>/state</code> endpoint maps live attribute_lines to these groups by
+attribute name. Attributes on the template that don't match any
+group fall into an "Other" group at the end. To add a 5th group,
+edit the constant. The JS reads the result from
+<code>state.groups</code> — no client-side change needed (the new group will
+render automatically).</p>
+<p>Caveat: the manifest comment notes Phase 3+ moves this to a
+configurable grouping (probably an <code>ir.config_parameter</code> or a new
+field on <code>product.attribute</code>). For now, code edit + redeploy.</p>
+<p><strong>2. Adding a new endpoint.</strong></p>
+<p>The pattern is in <code>main.py:140-205</code> for <code>configurator_state</code>. To add
+a new JSON-RPC route:</p>
+<ul>
+<li>Add an <code>@http.route("/southbrook/api/configurator/&lt;name&gt;",
+  type="json", auth="public", methods=["POST"], website=True)</code>
+  method on <code>SouthbrookConfiguratorAPI</code>.</li>
+<li>For session-touching endpoints, route through
+  <code>_authorize_session(session_id)</code> (line 779) to enforce per-user
+  scoping.</li>
+<li>Return <code>{ok: True, ...}</code> on success or <code>{ok: False, error: "&lt;code&gt;",
+  message: "&lt;text&gt;"}</code> on failure. The OWL component reads <code>.ok</code> to
+  branch.</li>
+<li>The OWL side: in <code>configurator.esm.js</code>, call <code>rpcJsonCall("/southbrook/api/configurator/&lt;name&gt;", { ... })</code>
+  (line 59 — the bundle uses raw fetch because the public <code>/shop</code>
+  page has no Odoo service worker).</li>
+</ul>
+<p><strong>3. Changing the SKU composition.</strong></p>
+<p>The SKU is composed by joining the first 3 alphanumeric characters
+of values from attributes named in <code>SKU_ATTR_NAMES</code>. Both client
+(<code>configurator.esm.js:94</code>) and server (<code>main.py:123</code>) define the
+same constant:</p>
+<pre><code class="language-js">const SKU_ATTR_NAMES = [&quot;Width&quot;, &quot;Series&quot;, &quot;Finish&quot;];
+</code></pre>
+<pre><code class="language-python">_SKU_ATTR_NAMES = (&quot;Width&quot;, &quot;Series&quot;, &quot;Finish&quot;)
+</code></pre>
+<p>These <strong>MUST stay in sync</strong> — otherwise client preview shows one
+SKU and the server writes a different <code>variant.default_code</code> at
+commit time. To extend (e.g. add Door Style):</p>
+<ul>
+<li>Add "Door Style" to both arrays.</li>
+<li>Verify the customer-facing SKU stays readable (3-char abbrs of
+  values).</li>
+</ul>
+<p><code>SPEC_ATTR_NAMES</code> (client only) at line 95 drives the "Your build"
+spec line — these can diverge from SKU; the spec is a human
+summary, not a code.</p>
+<p><strong>4. Adding a new finish color swatch.</strong></p>
+<p>The CSS-box preview uses <code>FINISH_COLORS</code> at line 81:</p>
+<pre><code class="language-js">const FINISH_COLORS = {
+    &quot;White&quot;:          &quot;#f3f0ea&quot;,
+    &quot;Maple Stain&quot;:    &quot;#d9a566&quot;,
+    &quot;Cherry Stain&quot;:   &quot;#8a3b2a&quot;,
+    &quot;Walnut Stain&quot;:   &quot;#5a3b28&quot;,
+    &quot;Custom&quot;:         &quot;#b9a07a&quot;,
+    &quot;Maple&quot;:          &quot;#caa06a&quot;,
+    &quot;White Melamine&quot;: &quot;#eceae4&quot;,
+};
+</code></pre>
+<p>Add the new finish's display name → hex. The manifest comment
+notes Phase 3+ sources these from <code>product.template.attribute.value.html_color</code>
+— so for new finishes, set <code>html_color</code> on the PTAV too. Today the
+JS hardcoded map wins; the <code>/state</code> endpoint surfaces
+<code>val.html_color</code> already but the JS preview ignores it for non-color
+display_type attributes.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a chip group and the new group's attributes are showing
+in 'Other' instead."</strong></p>
+<p>The group title-to-attribute-name match is case-sensitive. If the
+attribute is named "doorstyle" (lowercase) and your group entry is
+"Door Style", they don't match. Fix the constant or rename the
+attribute.</p>
+<p><strong>"I added a new endpoint but the client always gets a 404."</strong></p>
+<p>Most likely the asset bundle is stale and the JS is calling the
+new endpoint URL but the server hasn't been restarted. Or the
+manifest's <code>data</code> list doesn't include the new route's view file —
+routes are Python, so no view file is needed, but if you authored
+in a new module, did you add it to <code>addons_path</code>? Run <code>--update=all
+--dev=all</code> to refresh.</p>
+<p><strong>"The chip selectors render but clicks don't do anything."</strong></p>
+<p>OWL didn't mount. Look at the browser console:
+- <code>Couldn't load this configurator</code> with a server message —
+  <code>/state</code> returned an error. Common: the product isn't
+  <code>config_ok=True</code>.
+- No error but blank static fallback — the bootstrap couldn't find
+  <code>#sb_cfg_v2_root</code>. Either the QWeb inheritance didn't load (try
+  <code>-u southbrook_configurator_ux</code>) or you're on a non-configurable
+  product page.</p>
+<p><strong>"Two Add-to-Quote clicks fire in rapid succession and we get two
+order lines."</strong></p>
+<p>The component sets <code>state.adding = true</code> on click and reads it for
+the button's <code>disabled</code> attribute. Race: if <code>adding</code> is set after
+the second click is already in flight, both POSTs land. Mitigation:
+client-side debounce (already in code), but the server's
+<code>/commit</code> has its own duplicate-guard via <code>session.state</code> —
+double-commit on the same session is blocked because the second
+call hits <code>state.session_locked</code>. The real bug if you see two
+lines: the second click hit a DIFFERENT session. Audit by logging
+session_id at every commit.</p>
+<p><strong>"The bulk-tools bar is visible to a portal user."</strong></p>
+<p>The QWeb shell sets <code>data-internal-user</code> from
+<code>request.env.user.share</code> (False = internal, True = portal). The
+component reads that attribute at mount and gates render. If a
+portal user sees the bar, the attribute is "1" but the component
+mis-reads — check the QWeb expression
+<code>t-att-data-internal-user="'0' if request.env.user.share else '1'"</code>.
+The endpoints themselves have a backend <code>auth='user' + user.share</code>
+check (line 838, line 1000), so they'll 403 even if the UI shows
+the bar — the cosmetic gap is visual only, but file a bug.</p>
+<p><strong>"A chip is greyed but the user clicks anyway and the pick goes
+through."</strong></p>
+<p>The <code>isValueDisabled</code> check (line 503) reads
+<code>state.disabledValueIds</code> from <code>/select</code> response. If the click
+fires BEFORE <code>/select</code> has responded, the optimistic local update
+goes through. Then <code>/select</code> returns with the disabled flag, the
+UI re-renders, the value is now greyed but the pick is set. The
+component's reconcile logic should roll back — verify it. If not,
+the user can force-pick blocked values. Workaround: server-side
+<code>/commit</code> validates again via <code>validate_configuration</code> — so it can
+still reject. But UX-wise this is a bug.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The OWL component is <strong>one class, one state tree</strong>:</p>
+<pre><code class="language-js">class ConfiguratorV2 extends Component {
+  setup() {
+    this.state = useState({
+      loading: true,
+      loadError: null,
+      product: { name: &quot;&quot;, currency: {...} },
+      sessionId: null,
+      basePrice: 0,
+      groups: [],          // from /state
+      attributes: {},      // {&lt;id&gt;: {name, display_type, values: [...]}}
+      picked: {},          // {&lt;attrId&gt;: &lt;valId&gt;}
+      closedGroups: {},    // {&lt;title&gt;: bool}
+      serverPrice: null,
+      serverWeight: null,
+      liveSku: null,
+      disabledValueIds: [],
+      adding: false,
+      previewBadge: &quot;&quot;,
+      // ...
+    });
+    this.viewerRef = useRef(&quot;viewer&quot;);
+    this.imgInputRef = useRef(&quot;imgInput&quot;);
+
+    onWillStart(async () =&gt; {
+      const r = await rpcJsonCall(
+        &quot;/southbrook/api/configurator/state&quot;,
+        { product_tmpl_id: productTmplId },
+      );
+      if (!r || !r.ok) {
+        this.state.loadError = (r &amp;&amp; r.message) || &quot;Could not load.&quot;;
+      } else {
+        this.hydrateState(r);
+      }
+      this.state.loading = false;
+    });
+
+    onMounted(() =&gt; {
+      // Bind keyboard shortcuts, pre-fire one /select to populate disabled set.
+    });
+  }
+  // ... toggleGroup, onChipClick, onSelectChange, onChipKeydown,
+  //     onGroupKeydown, onAddToQuote, isValueDisabled, autoSku,
+  //     priceText, weightText, validationClass, validationText, etc.
+}
+</code></pre>
+<p><strong>Three JSON-RPC endpoints</strong> + <strong>three HTTP endpoints</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Type</th>
+<th>Auth</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/state</code></td>
+<td>json</td>
+<td>public</td>
+<td>Returns product + attributes + groups + session_id</td>
+</tr>
+<tr>
+<td><code>/select</code></td>
+<td>json</td>
+<td>public</td>
+<td>Applies picks, returns price + weight + disabled set + live SKU</td>
+</tr>
+<tr>
+<td><code>/commit</code></td>
+<td>json</td>
+<td>public</td>
+<td>Materialises variant + adds to sale.order + locks session</td>
+</tr>
+<tr>
+<td><code>/import/template</code></td>
+<td>http</td>
+<td>user (internal)</td>
+<td>Downloads xlsx template</td>
+</tr>
+<tr>
+<td><code>/import/preview</code></td>
+<td>http</td>
+<td>user (internal)</td>
+<td>Validates uploaded xlsx, returns per-row report</td>
+</tr>
+<tr>
+<td><code>/import/commit</code></td>
+<td>http</td>
+<td>user (internal)</td>
+<td>Writes valid rows from xlsx (requires <code>confirm=true</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The /select endpoint's most subtle behaviour</strong> — "premature
+disables." OCA's <code>values_available</code> returns the set of values
+whose attributes' rules' domains all match. When picks are empty,
+every value with ANY rule (whose domain depends on Series, etc.)
+gets flagged unavailable — because no Series has been picked yet
+to satisfy the rule's "in [...]" check. The customer would see all
+Box Material chips greyed at page load.</p>
+<p>The controller (lines 446-509) refines this: for each
+"prematurely disabled" value, walk its restricting rules; keep the
+disability only if at least one rule has a trigger attribute the
+user HAS picked AND the user's pick doesn't satisfy the rule's
+allow list. The actual code:</p>
+<pre><code class="language-python">for vid in disabled_ids:
+    rules = tmpl.config_line_ids.filtered(
+        lambda r, _vid=vid: _vid in r.value_ids.ids)
+    for rule in rules:
+        rule_blocks = False
+        for dl in rule.domain_id.domain_line_ids:
+            trigger_attr_id = dl.attribute_id.id
+            if trigger_attr_id not in picked_set_by_attr:
+                continue  # User hasn't picked the trigger yet.
+            user_picks = picked_set_by_attr[trigger_attr_id]
+            allowed = set(dl.value_ids.ids)
+            if dl.condition == &quot;in&quot;:
+                if not (user_picks &amp; allowed):
+                    rule_blocks = True
+                    break
+            else:  # &quot;not in&quot;
+                if user_picks &amp; allowed:
+                    rule_blocks = True
+                    break
+        if rule_blocks:
+            refined_disabled.add(vid)
+            break
+disabled_ids = sorted(refined_disabled)
+</code></pre>
+<p>This is <strong>load-bearing UX logic</strong> — without it the v2 page is
+unusable on page load. The customer's mental model: "I can't pick
+this only if my prior pick makes it impossible." Implemented in
+the controller, not the rule engine.</p>
+<p><strong>The /commit endpoint's completeness backstop</strong> (lines 641-657):
+before calling <code>create_get_variant</code>, walk every
+<code>attribute_line_ids</code> with <code>len(value_ids) &gt; 1</code> and check whether
+the session has a pick for that attribute. Returns
+<code>incomplete_configuration</code> with a <code>missing_attributes</code> list. This
+gives a specific error like "Please choose: Series, Finish" rather
+than OCA's generic ValidationError.</p>
+<p><strong>The OWL component's lifecycle</strong> on a chip click:</p>
+<ol>
+<li>User clicks chip → <code>onChipClick(attrId, val)</code> fires.</li>
+<li>If <code>isValueDisabled(attr, val)</code> returns true, no-op.</li>
+<li>Else <code>state.picked[attrId] = val.id</code> (optimistic).</li>
+<li>Call <code>/select</code> with the full pick set.</li>
+<li>On response, update <code>state.serverPrice</code>, <code>state.serverWeight</code>,
+   <code>state.disabledValueIds</code>, <code>state.liveSku</code>.</li>
+<li>Re-render is automatic (OWL <code>useState</code>).</li>
+</ol>
+<p>The <strong>import overlay</strong> is a separate flow — it lives at
+<code>#sb_cfg_importOverlay</code> (a body-level QWeb fragment) and gets
+toggled by the bulk-tools bar buttons. The xlsx upload goes to
+<code>/import/preview</code> (multipart form, returns a per-row report).
+After review, the customer clicks Commit, which POSTs to
+<code>/import/commit</code> with <code>confirm=true</code> — the explicit human gate
+required by Phase-4 stop-point in the manifest.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A customer reports the v2 page loads, all chips are visible,
+but every chip in the Box Material group is greyed at page load
+before they've picked anything. What's the most likely cause and
+where do you look in the code?</p>
+<blockquote>
+<p>The "premature disables" refiner at
+<code>controllers/main.py:446-509</code> isn't running, or is running but
+is being bypassed. Open the Network tab on the customer's
+repro, look at the <code>/select</code> response — <code>disabled_value_ids</code>
+should be empty when no picks are made (every Box Material
+chip should be enabled at page load). If <code>disabled_value_ids</code>
+is full, the refiner ran but every rule's trigger attribute
+was somehow flagged "picked" — possibly because the session
+already had stale picks from a prior visit. Fix: clear the
+session or wipe its <code>value_ids</code>. If the refiner code is
+outright skipping (e.g. catching an exception silently), the
+fallback in line 444 (<code>available_ids = list(all_val_ids)</code>)
+would actually mean "everything enabled" — so the symptom
+rules out that branch.</p>
+</blockquote>
+<p><strong>2.</strong> You want to add a "Lead Time" badge to the summary card
+showing the configured variant's expected lead time (current +
+any <code>lead_time_extra</code> from picks like Maple). Walk through the
+change set.</p>
+<blockquote>
+<p>Three files. (a) <code>controllers/main.py:configurator_select</code> —
+add <code>lead_time</code> to the response, computed from
+<code>session.product_tmpl_id.lead_time + sum(picked PTAV.lead_time_extra)</code>.
+Reuse <code>picked_set_by_attr</code> already in scope. (b)
+<code>static/src/js/configurator.esm.js</code> — add
+<code>state.serverLeadTime</code> to the <code>useState</code> tree; hydrate from
+the /select response in the reconcile callback; expose a
+<code>leadTimeText</code> getter that formats it ("3 weeks" or "5 weeks
++ 2 weeks for Maple"). (c) Update the summary-card QWeb in
+the template literal to render <code>t-esc="leadTimeText"</code>. SCSS
+tweak optional. Test: pick Maple, verify the badge updates
+live.</p>
+</blockquote>
+<p><strong>3.</strong> A developer adds a new endpoint <code>/southbrook/api/configurator/save_draft</code>
+that lets a customer bookmark a session (mapped to
+<code>session.action_save_config(name)</code>). The customer reports "click
+Save, nothing happens." Diagnose.</p>
+<blockquote>
+<p>Three suspects:
+(a) The endpoint is <code>auth='public'</code> but the customer is anonymous
+and <code>action_save_config</code> requires a real user_id — the public_user
+has no portal context, so the bookmark is technically saved but
+unreachable. Confirm by browsing
+<code>Session.search([("is_saved", "=", True)])</code> — count delta should
+be zero for the anonymous case.
+(b) The endpoint forgot the <code>_authorize_session</code> guard, and a
+mismatched session_id is being passed. Server silently ignores.
+Audit the OWL component's call signature.
+(c) The website GC cron (3-day threshold) doesn't respect
+<code>is_saved</code> and the saved session is gone the next day. (See
+Lesson 10.3 for the cron bug.) Customer's "save" worked but the
+session vanished overnight.</p>
+</blockquote>
+<p><strong>4.</strong> You're asked to add keyboard shortcut <code>Enter</code> to commit-and-
+go directly from the chip grid. Where do you wire it without
+breaking existing chip-keyboard semantics?</p>
+<blockquote>
+<p>Don't reuse <code>onChipKeydown</code> — it already handles Enter/Space to
+select the focused chip. Add a global keydown listener inside
+the component's <code>onMounted</code> hook scoped to the component's root
+element (e.g. <code>useRef("root")</code> and bind
+<code>addEventListener('keydown', ...)</code>). Check
+<code>ev.target.matches('.sb_cfg_actionbar button')</code> AND <code>ev.key ===
+'Enter'</code> — only fire commit when the focus is in the action bar
+already, NOT from a chip. Otherwise users pressing Enter to
+select a chip would commit unintentionally. Add visible focus
+styles and the standard prevent-double-fire <code>state.adding</code> gate.</p>
+</blockquote>
+<p><strong>5.</strong> A customer reports "Add to Quote shows 'Adding…' for 30
+seconds then errors with 'Configuration session belongs to a
+different user.'" What sequence of events causes this?</p>
+<blockquote>
+<p>The session was created under one user (probably during an
+anonymous browse), then the customer signed up / logged in
+mid-session. The session's <code>user_id</code> is still the prior
+(public) user. <code>/commit</code> calls <code>_authorize_session(session_id)</code>
+which checks <code>session.user_id.id == request.env.user.id</code> and
+returns the "forbidden" error dict. The 30-second hang is
+probably the OWL component spinning until the response — the
+server returns fast, the JS just doesn't surface the error
+nicely.</p>
+<p>Recovery for the user: refresh the page — <code>/state</code>
+<code>_get_or_create_session</code> will find no draft session under the
+new user and create a fresh one. They'll lose their picks
+(the old session is orphaned). Long-term fix: on login from
+<code>/shop</code>, re-attach the prior session's <code>user_id</code> to the new
+user before redirecting — currently not implemented.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator vocabulary basics — Course 5, Lesson 5.1.</li>
+<li>5-addon architecture — Lesson 10.1.</li>
+<li>Setting up a new configurable product — Lesson 10.2.</li>
+<li>Session state machine — Lesson 10.3.</li>
+<li>Sale flow integration — Lesson 10.4.</li>
+<li>MRP flow integration — Lesson 10.5.</li>
+<li>Common gotchas (rule ordering, exclusion explosion, performance) —
+  Lesson 10.7.</li>
+<li>The Phase-3 3D parametric carcass layer — separate workstream.</li>
+<li>General OWL framework administration — Odoo's own dev docs.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_10_common_gotchas" model="slide.slide">
+            <field name="name">Common Gotchas — Exclusion Explosion, Rule Ordering, Performance, Recovery</field>
+            <field name="channel_id" ref="course_configurator_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Anyone who extends the configurator after the first 6 lessons. Devs, senior admins, lead estimators.</field>
+            <field name="html_content"><![CDATA[<h1 id="common-gotchas-exclusion-explosion-rule-ordering-performance-recovery">Common Gotchas — Exclusion Explosion, Rule Ordering, Performance, Recovery</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You've made it through the architecture, the new-product flow, the
+session state machine, both integration layers, and the v2 UX deep
+dive. You can read the codebase. But the configurator is a system
+that gets harder to reason about as the catalog grows — 5 attributes
+with 8 values each is fine; 12 attributes with 15 values each is
+where the wheels come off. This lesson is the bestiary of failure
+modes that surface as the system scales, and how to recover from
+each. Read it once before your next non-trivial change.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>You'll be in three places when these gotchas bite:</p>
+<blockquote>
+<p><strong>Sales → Configuration → Configuration Rules</strong> — to spot the
+exclusion-rule sprawl.</p>
+<p><strong>Sales → Configurable Products → Configuration Sessions</strong> —
+filter by state=draft, group by template, to spot stuck or
+abandoned sessions.</p>
+<p>The dev shell (<code>odoo-bin shell -d &lt;db&gt;</code>) — where you'll diagnose
+and recover.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>There's no single screen for "gotchas" — each one shows up
+differently:</p>
+<ul>
+<li><strong>Exclusion explosion</strong> — the Rules list grows from 4 records to
+  40 records to 400 over six months. Every new attribute value
+  needs its own exclusion against the prior ones; the rule catalog
+  becomes unmaintainable.</li>
+<li><strong>Rule ordering bugs</strong> — two rules apply to the same
+  attribute_line; whichever runs second wins. The customer reports
+  "the system let me pick X" when X is supposedly blocked.</li>
+<li><strong>Performance</strong> — the wizard takes 2-4 seconds per pick on
+  templates with 50+ attribute_lines. The OWL component's
+  <code>/select</code> round-trip is the bottleneck.</li>
+<li><strong>"Configuration session not found"</strong> — a customer's URL points
+  at a session that's been GC'd, or never existed.</li>
+<li><strong>Stuck sessions</strong> — <code>state=draft</code>, <code>value_ids</code> is non-trivial,
+  but <code>validate_configuration</code> raises. The user can't progress AND
+  can't reset.</li>
+<li><strong>Phantom variants</strong> — <code>product.product</code> records that look like
+  duplicates but aren't, blowing up the variant catalog.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>The five most common gotchas, each with a recovery path.</p>
+<p><strong>1. Exclusion explosion.</strong></p>
+<p>You add a new Series called "Heritage." Heritage doesn't allow
+Slab doors. You write a rule:</p>
+<pre><code class="language-xml">&lt;record id=&quot;rule_heritage_door_style&quot; model=&quot;product.config.line&quot;&gt;
+  &lt;field name=&quot;product_tmpl_id&quot; ref=&quot;base_2dr&quot;/&gt;
+  &lt;field name=&quot;attribute_line_id&quot; ref=&quot;attr_line_base_2dr_door_style&quot;/&gt;
+  &lt;field name=&quot;value_ids&quot; eval=&quot;[(6, 0, [
+    ref('value_door_five_piece_woodgrain'),
+    ref('value_door_fluted'),
+    ref('value_door_custom')])]&quot;/&gt;
+  &lt;field name=&quot;domain_id&quot; ref=&quot;domain_series_is_heritage&quot;/&gt;
+&lt;/record&gt;
+</code></pre>
+<p>Note the <code>value_ids</code> is the <strong>allowed</strong> set (lesson 10.2). You've
+listed all 3 non-Slab values. Now add a 4th door style: "Beaded."
+You have to update Heritage's rule, AND every other Series rule
+that listed the allowed set. <strong>The rule cost is O(N×M)</strong> —
+N series × M door styles. Six months and 5 new attributes later
+the rule catalog has 200+ records.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li><strong>Use "not in" condition on domain.lines.</strong> Instead of listing
+  the allowed values on the rule, list the BLOCKED trigger values
+  on the domain. The rule's <code>value_ids</code> then lists only the
+  forbidden set — which is usually 1-2 items. Saves the O(N×M)
+  to O(N+M). The OCA model supports it (<code>condition in [in,
+  not in]</code> — see line 95 of <code>product_configurator/models/product_config.py</code>).</li>
+<li><strong>Move from exclusions to attribute_line value_ids.</strong> If a
+  template never offers a value, don't list it on the
+  attribute_line at all. The wizard never offers it; no rule
+  needed. Use rules only for <strong>conditional</strong> restrictions.</li>
+<li><strong>Audit rule cardinality regularly.</strong> Run in shell:
+  <code>python
+  Rule = env["product.config.line"]
+  by_tmpl = {}
+  for r in Rule.search([]):
+      by_tmpl[r.product_tmpl_id.id] = by_tmpl.get(r.product_tmpl_id.id, 0) + 1
+  print(sorted(by_tmpl.items(), key=lambda x: -x[1])[:10])</code>
+  Templates with &gt; 30 rules need a refactor.</li>
+</ul>
+<p><strong>2. Rule ordering bugs.</strong></p>
+<p>Two rules for the same attribute_line on the same template:</p>
+<ul>
+<li>Rule A: <code>domain_series_is_contractor</code> → allow <code>[Thermofoil Slab]</code>.</li>
+<li>Rule B: <code>domain_box_is_maple</code> → allow <code>[Five-Piece, Fluted, Custom]</code>.</li>
+</ul>
+<p>User picks Series=Contractor + Box=Maple. Both rules fire. Which
+wins?</p>
+<p>The OCA engine reads rules in <code>sequence</code> order (line 165:
+<code>_order = "product_tmpl_id, sequence, id"</code>). The LAST rule's
+<code>value_ids</code> is what survives — the earlier rule's allowed set is
+overwritten because each rule rewrites the attribute_line's
+available values, not intersects.</p>
+<p>The right answer: the <strong>intersection</strong> should be the allowed set
+({Thermofoil Slab} ∩ {Five-Piece, Fluted, Custom} = ∅), meaning
+the combination is invalid and the user should see a hard block.
+The OCA engine does NOT intersect. Last-rule-wins.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li><strong>Author rules so they don't overlap on the same attribute_line.</strong>
+  Each (template, attribute_line) should have at most ONE rule's
+  domain match at any time. Use mutually-exclusive domain
+  conditions.</li>
+<li><strong>Set <code>sequence</code> explicitly when ordering matters.</strong> The default
+  is 10; set to 5/15/25 to control eval order. Higher number wins
+  (runs last).</li>
+<li><strong>Combine rules into one with compound domain.</strong> If Series=
+  Contractor AND Box=Maple is the trigger, write ONE rule with a
+  domain that uses <code>domain_line.operator = and</code> to require both.
+  See <code>product.config.domain.line.operator</code> at line 150.</li>
+</ul>
+<p><strong>3. Performance — slow <code>/select</code> round-trips.</strong></p>
+<p>Symptom: customer picks a chip, the LIVE badge shows for 2-3
+seconds before the price updates. On templates with 50+
+attribute_lines.</p>
+<p><code>controllers/main.py:configurator_select</code> calls
+<code>session.values_available(check_val_ids=list(all_val_ids))</code> which
+calls OCA's rule engine for every value. Each rule evaluates its
+domain via <code>compute_domain()</code> (line 34). For a template with
+20 attribute_lines × 10 values × 30 rules, that's potentially
+6,000 domain evals per click.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li><strong>Cache <code>all_val_ids</code> per template per request.</strong> The set
+  doesn't change between picks within a session.</li>
+<li><strong>Reduce rule count via the cardinality audit (gotcha #1).</strong></li>
+<li><strong>Add Postgres indexes</strong>: <code>product_config_line.product_tmpl_id</code>,
+  <code>product_config_line.attribute_line_id</code>,
+  <code>cfg_line_attr_val_id_rel(cfg_line_id)</code>. These are usually
+  created by Odoo but verify under load.</li>
+<li><strong>Move heavy computations off the request path.</strong> If you need
+  derived data per pick (e.g. recommended add-ons), pre-compute
+  at variant creation and read from the variant instead of
+  recomputing in <code>/select</code>.</li>
+<li><strong>Profile with <code>pyinstrument</code></strong>: <code>odoo-bin shell -d &lt;db&gt;
+  --enable=pyinstrument</code> then profile a real <code>/select</code> call to
+  identify the actual hotspot.</li>
+</ul>
+<p><strong>4. "Configuration session not found" — the dreaded error.</strong></p>
+<p>Customer URL: <code>/configurator/&lt;session_id&gt;/...</code>. Server returns
+404 or the v2 page shows <code>loadError = "session belongs to a
+different user"</code>. Three causes:</p>
+<ul>
+<li><strong>Session GC'd.</strong> Customer left it 3+ days, the website GC
+  cron unlinked it. Recovery: customer reconfigures from
+  scratch. No recovery for lost picks unless they hit Save
+  Configuration first (and even then, see Lesson 10.3 gap re:
+  <code>is_saved</code> not protecting against the website cron).</li>
+<li><strong>Session owned by another user.</strong> Customer was anonymous, then
+  logged in. The session's <code>user_id</code> is base.public_user; the
+  authenticated user can't access it. Recovery: have the customer
+  start a fresh session post-login, OR fix the controller to
+  reassign <code>user_id</code> on login (currently not implemented).</li>
+<li><strong>Session never existed (typo / old link).</strong> Customer
+  bookmarked a session URL that got GC'd. Recovery: redirect to
+  the product page so they can start fresh.</li>
+</ul>
+<p>The defensive controller pattern (already in the codebase): every
+endpoint that touches a session calls
+<code>_authorize_session(session_id)</code> and returns an <code>error</code> dict the
+OWL component can render gracefully.</p>
+<p><strong>5. Stuck sessions.</strong></p>
+<p><code>state=draft</code>, <code>value_ids</code> has 8 values, <code>validate_configuration()</code>
+raises. The customer can't proceed. The web UI greys everything out.</p>
+<p>Common causes:</p>
+<ul>
+<li>The customer's prior picks no longer satisfy a rule that was
+  added after the session was created. Rules are stored on the
+  template — if you added a new rule, prior draft sessions
+  immediately become invalid.</li>
+<li>A <code>default_val</code> on an attribute_line was changed; the session's
+  auto-seeded default no longer matches the allowed set.</li>
+<li>An attribute_value was deactivated (<code>active=False</code>) but the
+  session still references it.</li>
+</ul>
+<p><strong>Recovery in the shell:</strong></p>
+<pre><code class="language-python">Session = env[&quot;product.config.session&quot;]
+s = Session.browse(&lt;session_id&gt;)
+# What's currently picked
+print([v.name for v in s.value_ids])
+# Try validating to see the actual error
+try:
+    s.validate_configuration()
+except Exception as e:
+    print(repr(e))
+# Strip the offending value(s)
+s.value_ids = [(3, &lt;bad_value_id&gt;)]  # remove
+# Or clear all picks and start over
+s.value_ids = [(5, 0, 0)]
+# Re-validate
+s.validate_configuration(final=False)
+</code></pre>
+<p>The <code>write()</code> override (line 845) auto-prunes invalid values on
+the way back — but only if you write <code>value_ids</code> directly. If
+you go through <code>update_config(attr_val_dict)</code> (line 754) it
+respects the dict semantics first.</p>
+<p><strong>6. Phantom variants.</strong></p>
+<p>Symptom: a template that should have 4 variants (one per Series)
+has 47 variants in <code>product.product</code>. The catalog explodes.</p>
+<p>Cause: every distinct <code>value_ids</code> combination through the
+configurator can materialise a new variant. With
+<code>create_variant='dynamic'</code>, OCA tries to dedupe — but only on
+<strong>exact</strong> PTAV match. If two sessions pick the same values in
+different orders or with custom values that differ trivially
+(whitespace, case), they may create two variants.</p>
+<p>Custom-value sessions ALWAYS create new variants (custom values
+aren't dedupable). 47 variants on a custom-engraving template
+might be 47 distinct engravings — that's correct.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li><strong>Audit periodically:</strong>
+  <code>python
+  P = env["product.product"]
+  by_tmpl = {}
+  for p in P.search([("config_ok", "=", True)]):
+      by_tmpl[p.product_tmpl_id.id] = by_tmpl.get(p.product_tmpl_id.id, 0) + 1
+  print(sorted(by_tmpl.items(), key=lambda x: -x[1])[:10])</code></li>
+<li><strong>For custom-value-heavy templates, accept the variant count.</strong>
+  It's intentional.</li>
+<li><strong>For non-custom templates with sprawl, dedupe</strong>:
+  <code>python
+  # Find variants with identical PTAV signatures and merge
+  # (manual review — script the candidates, don't auto-delete)</code></li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a new rule and the install errored: 'Values must belong
+to the attribute of the corresponding attribute_line set on the
+configuration line.'"</strong></p>
+<p>The <code>check_value_attributes</code> constraint (line 229 of
+<code>product_configurator/models/product_config.py</code>) verifies that
+every value in <code>value_ids</code> is one of the values on the
+<code>attribute_line_id</code>. You linked the rule to (say) Door Style's
+attribute_line but listed a Series value_id. Fix the value_ids to
+match the attribute_line's allowed set.</p>
+<p><strong>"After I bumped the OCA module to a new version, the
+auto-prune in <code>write()</code> started clearing valid picks."</strong></p>
+<p>OCA may have changed how <code>values_available</code> interacts with
+required attributes. Diff the method in the version upgrade. Common
+case: a method that used to return all attribute_values when no
+constraint applied now returns only matching ones. Fix by reading
+the new contract carefully; don't just disable the override.</p>
+<p><strong>"I uninstalled <code>southbrook_configurator_ux</code> and the rule the
+addon shipped via <code>rule_completion.xml</code> stayed in the DB."</strong></p>
+<p>Records in <code>noupdate="0"</code> files with explicit XML ids are still
+data records — uninstall removes them ONLY if the data record's
+<code>module</code> is the uninstalled module. Confirm:
+<code>env["ir.model.data"].search([("module", "=", "southbrook_configurator_ux"),
+("model", "=", "product.config.line")])</code>. If empty, the data
+records were imported under a different module name (e.g.
+manual XML id without module prefix) and uninstall doesn't sweep
+them. Manually delete the orphaned records.</p>
+<p><strong>"My v2 chip group is showing Other instead of the 4 named
+groups."</strong></p>
+<p>The attribute names on the new template don't match the
+<code>ATTRIBUTE_GROUPS</code> constant (line 126 of
+<code>controllers/main.py</code>). Spelling, case, leading/trailing spaces all
+matter. Either rename the attribute or extend the constant. See
+Lesson 10.6 for the constant.</p>
+<p><strong>"BoM rollup produces empty BoMs for every variant of one
+template."</strong></p>
+<p>The parent BoM has zero unconditional lines AND zero conditional
+lines that ANY variant matches. Check: open the parent BoM —
+<code>bom_line_ids</code> should be non-empty; for any line with a
+<code>config_set_id</code>, its <code>configuration_ids</code> should have at least one
+<code>value_ids</code> set that matches a real variant's picks. Lesson 10.5
+walks the rollup mechanics.</p>
+<p><strong>"Customer reports the v2 page froze mid-configuration."</strong></p>
+<p>Most likely the <code>/select</code> endpoint 500'd and the OWL component is
+spinning waiting for response. Open Network tab → look at
+<code>/southbrook/api/configurator/select</code> — what was the response?
+The controller has a belt-and-braces fallback (line 435-444): if
+<code>values_available</code> raises, it treats all values as enabled. If
+even THAT fails, the response is a Python exception JSON. Add
+the customer's session_id to the log, repro in shell with
+<code>session.values_available(...)</code>, fix the actual error (often a
+malformed rule data record).</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The five gotchas above expose four design choices in the OCA
+codebase that are load-bearing:</p>
+<ol>
+<li><strong>Declarative rule engine.</strong> Rules are data records, not code.
+   This is a strength (auditable, hot-loadable, multi-tenant
+   friendly) and a weakness (exclusion explosion, rule ordering
+   surprises, no compile-time checks). Every gotcha here is an
+   instance of the data-vs-code trade-off.</li>
+<li><strong>Optimistic UI + server reconciliation.</strong> The v2 OWL
+   component updates state on click and reconciles from <code>/select</code>.
+   This makes the UI feel snappy but creates race windows where
+   clicks fire before the previous response. Mitigation:
+   server-side guards (state lock, validation) always run; the UI
+   is decoration, not enforcement.</li>
+<li><strong>Session-as-receipt.</strong> Once <code>state=done</code>, the session is
+   immutable. This makes audit trails clean but means any
+   "I want to edit my done configuration" flow has to spawn a
+   new session via <code>reconfigure_product</code>. The old one stays.
+   Database grows — see GC crons in Lesson 10.3.</li>
+<li><strong>PTAV-level pricing/weighting.</strong> <code>price_extra</code> and
+   <code>weight_extra</code> live on <code>product.template.attribute.value</code>, NOT
+   on the bare <code>product.attribute.value</code>. Every (template, value)
+   gets its own override row, which is correct but means setting
+   a price extra on a value is <strong>per template</strong> work.
+   Centralising "Maple costs $X everywhere" requires either a
+   script or a custom field.</li>
+</ol>
+<p>The exclusion-explosion problem in particular has been raised
+upstream multiple times. The OCA's TODO comment at line 38 of
+<code>product_configurator/models/product_config.py</code>:</p>
+<pre><code class="language-python"># TODO: Enable the usage of OR operators between implied_ids
+# TODO: Add implied_ids sequence field to enforce order of operations
+# TODO: Prevent circular dependencies
+</code></pre>
+<p>These are exactly the cures for exclusion explosion + rule
+ordering. Upstream hasn't shipped them. Southbrook works around
+via discipline (Lesson 10.2's "use attribute_line value_ids, not
+rules, for permanent restrictions").</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> Your team adds 3 new Series this quarter (Heritage, Modern,
+Industrial). Each must restrict door style. After authoring,
+the configurator wizard takes 8 seconds per pick on the affected
+templates. Outline a 3-step diagnosis-to-fix path.</p>
+<blockquote>
+<p>(1) Profile: open the dev shell, time
+<code>session.values_available(check_val_ids=list_of_all_value_ids)</code>
+on one of the slow sessions. If it's &gt; 2s, you've found the
+bottleneck — rule eval count. (2) Count: run the rule cardinality
+audit from gotcha #1. If the affected templates have &gt; 30 rules
+each, you've confirmed exclusion explosion. (3) Refactor: move
+permanent restrictions to <code>attribute_line.value_ids</code> (drop
+Slab from Heritage's door style attribute_line directly, kill
+the rule). Validate by re-timing — should drop to &lt; 500ms per
+pick.</p>
+</blockquote>
+<p><strong>2.</strong> Two rules on the same template restrict the Door Style
+attribute_line. Rule A allows {Slab}; Rule B allows {Slab,
+Five-Piece, Fluted}. A user picks the trigger conditions for
+BOTH rules simultaneously. Which value ends up offered, and how
+do you make the intended behaviour (intersection — only Slab)
+the actual behaviour?</p>
+<blockquote>
+<p>Last-rule-wins by <code>sequence</code> order. If Rule B's sequence &gt; Rule
+A's sequence, the wizard offers {Slab, Five-Piece, Fluted} even
+though Rule A says only Slab. Fix: combine the two rules into
+one with a compound <code>product.config.domain</code> whose
+<code>domain_line_ids</code> require BOTH trigger conditions (use the <code>and</code>
+operator on the domain.line, default). Single rule, single
+allowed set ({Slab}). Cleaner than fighting sequence order.</p>
+</blockquote>
+<p><strong>3.</strong> Your monitoring shows 18,000 <code>product.config.session</code> rows
+in the database. 17,200 are draft, 6 months old. Why didn't the
+GC crons clean them up, and what's the recovery?</p>
+<blockquote>
+<p>Two suspects:
+(a) Crons are disabled. Check <strong>Settings → Technical → Scheduled
+Actions</strong> — both crons <code>active=True</code>? If not, enable.
+(b) Crons are running but the unlink is failing on a constraint
+(e.g. a draft session is referenced by a sale.order.line, but
+the cron tries to delete it anyway and Postgres FK refuses).
+Check the cron's last_call → error_count.</p>
+<p>Recovery: in the shell, run the unlink manually with explicit
+filter and try/except per record so one failure doesn't abort
+the batch:
+<code>python
+from datetime import timedelta
+cutoff = fields.Datetime.now() - timedelta(days=30)
+sessions = env["product.config.session"].search([
+    ("state", "=", "draft"),
+    ("write_date", "&lt;", cutoff),
+])
+for s in sessions:
+    try: s.unlink()
+    except Exception as e: print("skip", s.id, e)
+env.cr.commit()</code></p>
+</blockquote>
+<p><strong>4.</strong> You ship a new attribute and accidentally set
+<code>default_val</code> to a value that violates a rule already in the
+catalog. Install runs clean (the rule fires only when the trigger
+attribute is picked, which the default doesn't satisfy). Three
+months later, customers start hitting "Default values provided
+generate an invalid configuration" on session create. What
+changed?</p>
+<blockquote>
+<p>Someone added the trigger attribute's default_val too. Now
+session creation seeds both attribute defaults simultaneously,
+and the rule's trigger is satisfied at create time —
+<code>validate_configuration(final=False)</code> runs during create
+(line 886) and raises. Fix: change one of the default_vals so
+the combination is valid, OR drop the default_val on the
+attribute that was added later (defaults are optional). Audit
+all attribute_lines' default_val combinations against the rule
+catalog before shipping new defaults.</p>
+</blockquote>
+<p><strong>5.</strong> A senior dev wants to "fix" rule ordering by overriding
+<code>_order</code> on <code>product.config.line</code> to use a custom priority field.
+The change ships. Three weeks later, 4 templates start showing
+wrong allowed values. Diagnose and outline the right fix.</p>
+<blockquote>
+<p>The override changed eval order, which in last-rule-wins
+semantics changes which rule's <code>value_ids</code> survives. Templates
+whose rules were authored expecting the original <code>sequence,
+id</code> order now have a different "last rule" — wrong allowed
+values surface. Two options:
+(a) Revert the override; document the gotcha; insist new rules
+set explicit <code>sequence</code>.
+(b) Implement actual intersection semantics — override
+<code>values_available</code> to compute the intersection of allowed
+value sets from all matching rules, not last-wins. This is the
+right long-term fix and matches the OCA TODO. Risk: behaviour
+change to existing rules — every overlap that worked by
+accident may now break. Test against the full rule catalog
+before shipping.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Configurator vocabulary basics — Course 5, Lesson 5.1.</li>
+<li>5-addon architecture — Lesson 10.1.</li>
+<li>Setting up a new configurable product — Lesson 10.2.</li>
+<li>Session state machine — Lesson 10.3.</li>
+<li>Sale flow integration — Lesson 10.4.</li>
+<li>MRP flow integration — Lesson 10.5.</li>
+<li>V2 UX deep dive — Lesson 10.6.</li>
+<li>The 3D parametric carcass layer (Phase 3) — separate workstream.</li>
+<li>General Odoo administration, performance tuning, database
+  maintenance — Odoo's own native eLearning track + sysadmin
+  Course 7.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

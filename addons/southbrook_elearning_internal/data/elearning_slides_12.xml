@@ -1,0 +1,3212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_12_kitchen_ops_menu_architecture" model="slide.slide">
+            <field name="name">The Kitchen Ops Menu — Architecture, Ownership, Security</field>
+            <field name="channel_id" ref="course_kitchen_ops_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Ops Lead + Developer (the two people who answer &quot;why is this menu here and what owns it?&quot;).</field>
+            <field name="html_content"><![CDATA[<h1 id="the-kitchen-ops-menu-architecture-ownership-security">The Kitchen Ops Menu — Architecture, Ownership, Security</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the ops lead who has to answer "where do I find X?" all day, or
+you're the developer who has to answer "if I rip out
+<code>southbrook_premium_orchestration</code> does Kitchen Ops still work?" Both
+of you need to know that Kitchen Ops is <strong>not one addon's menu</strong> — it's
+a parent menuitem owned by <code>southbrook_premium_orchestration</code> with
+seven submenus, each pointing at an action defined either in the same
+addon or in a sibling. Get the ownership map wrong and you'll spend
+hours hunting a missing menu after a partial install.</p>
+<p>Course 2 lessons gave you the planner's-eye view of the screens
+themselves. This lesson is the architecture map: which submenu lives
+where, what action it triggers, which security group can see it, and
+what happens to the menu when you uninstall an upstream addon.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in as a planner or sysadmin at <strong>southbrookcabinetry.space/odoo</strong>.
+The Kitchen Ops menu lives in the top app bar:</p>
+<blockquote>
+<p><strong>Kitchen Ops</strong></p>
+</blockquote>
+<p>It's the second app entry after Sales (sequence 20 — see "behind the
+scenes"). Click it to expand the eight submenus.</p>
+<p>For the underlying menuitem records:</p>
+<blockquote>
+<p><strong>Settings → Technical → User Interface → Menu Items</strong></p>
+</blockquote>
+<p>Filter by name containing <code>Kitchen Ops</code> to see all nine records (the
+parent + eight children). Each one has an XML id you can use to trace
+the seed file that defined it.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The Kitchen Ops parent menu carries eight children in this order
+(sequence numbers in parens, all seeded in
+<code>southbrook_premium_orchestration/views/menus.xml</code>):</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Seq</th>
+<th>Label</th>
+<th>Action</th>
+<th>Underlying model</th>
+<th>Owning addon</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">10</td>
+<td>Kitchen Jobs</td>
+<td><code>action_kitchen_jobs_board</code></td>
+<td><code>project.task</code> (kanban + list)</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">20</td>
+<td>Production Release Queue</td>
+<td><code>action_production_release_queue</code></td>
+<td><code>project.task</code> (filtered list)</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">30</td>
+<td>Install Risk</td>
+<td><code>action_install_risk_board</code></td>
+<td><code>project.task</code> (risk-filtered)</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td>Workcenter Bottlenecks</td>
+<td><code>action_workcenter_bottleneck_board</code></td>
+<td><code>mrp.workcenter</code> (kanban)</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">50</td>
+<td>MI Engine Status</td>
+<td><code>action_mi_engine_status</code></td>
+<td><code>southbrook.mi.engine.state</code> (singleton form)</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">60</td>
+<td>Tool Lifecycle Board</td>
+<td><code>action_tool_lifecycle_board</code></td>
+<td><code>southbrook.tool.asset</code> (kanban)</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">70</td>
+<td>Cut-Spec Overrides</td>
+<td><code>action_cut_spec_override_list</code></td>
+<td><code>southbrook.cut.spec.override</code> (list)</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">80</td>
+<td>Archive Test Users</td>
+<td><code>action_test_user_archive_wizard</code></td>
+<td>wizard transient</td>
+<td><code>southbrook_premium_orchestration</code></td>
+</tr>
+</tbody>
+</table>
+<p>The parent menu (<code>menu_kitchen_ops_root</code>) has no action of its own —
+clicking the bare "Kitchen Ops" label does nothing useful in Odoo 19;
+you have to click a child.</p>
+<p><strong>Sequence numbers matter.</strong> The 10-20-30 pattern leaves room for
+later addons to insert their own children between existing ones
+without renumbering. If you build a new Kitchen Ops submenu, pick a
+sequence like 35 (between Install Risk and Workcenter Bottlenecks) so
+the visual order matches the daily workflow.</p>
+<h2 id="the-addon-ownership-map">The addon ownership map</h2>
+<p>This is the question that comes up every time someone uninstalls
+something:</p>
+<ul>
+<li><strong><code>southbrook_premium_orchestration</code></strong> owns:</li>
+<li>The parent menu (<code>menu_kitchen_ops_root</code>).</li>
+<li><strong>All eight submenus</strong> (every <code>menuitem</code> is in <code>menus.xml</code>).</li>
+<li>The actions for Kitchen Jobs, Production Release Queue, Install
+    Risk, Workcenter Bottlenecks, MI Engine Status, Tool Lifecycle
+    Board, Cut-Spec Overrides.</li>
+<li>The Archive Test Users wizard.</li>
+<li>
+<p>The <code>southbrook.mi.engine.state</code> singleton model (the State sibling
+    of the abstract parent <code>southbrook.mi.engine</code> — see lesson 12.6 and
+    Course 2 lesson 2.4's "behind the scenes" for the Odoo-19
+    AbstractModel-inherit trap that forced this split).</p>
+</li>
+<li>
+<p><strong><code>southbrook_kitchen_workspace</code></strong> owns:</p>
+</li>
+<li>The <strong>Sales → Kitchen Workspace → Projects</strong> menu (NOT under Kitchen
+    Ops — see "design intent" below).</li>
+<li>The <code>sb.kitchen.project</code> / <code>sb.kitchen.design.option</code> /
+    <code>sb.kitchen.ai.analysis</code> / <code>sb.kitchen.appliance</code> /
+    <code>sb.kitchen.approval</code> models.</li>
+<li>
+<p>The project state machine (<code>VALID_TRANSITIONS</code> in
+    <code>models/sb_kitchen_project.py</code>) covered in lesson 12.2.</p>
+</li>
+<li>
+<p><strong><code>southbrook_kitchen_mrp</code></strong> owns:</p>
+</li>
+<li>The <code>sb.cutlist</code> / <code>sb.hardware.package</code> / <code>sb.production.package</code>
+    models surfaced by Kitchen Ops dashboards.</li>
+<li>The <code>generate_from_mo</code> orchestrator (lesson 12.7).</li>
+<li>
+<p>The <strong>Southbrook Kitchen → Production Packages</strong> menu — NOT under
+    Kitchen Ops.</p>
+</li>
+<li>
+<p><strong><code>southbrook_mrp_pm</code></strong> owns:</p>
+</li>
+<li>The eight base <code>mrp.workcenter</code> records (SB-SAW, SB-EDGE,
+    SB-CNC-BORE, SB-ASSY, SB-DOOR, SB-HW, SB-QC, SB-PACK) plus the
+    extended 10 (CNC, EB, DOOR, SAND, PAINT, CURE, ASM, HW, QC, PACK).</li>
+<li>The four PM KPI computes on <code>mrp.workcenter</code>
+    (<code>southbrook_pm_inflight_count</code>, <code>southbrook_pm_throughput_today</code>,
+    <code>southbrook_pm_late_count</code>, <code>southbrook_pm_equipment_alerts</code>) that
+    the Workcenter Bottlenecks board reads.</li>
+<li>The <code>southbrook_condition</code> enum on <code>maintenance.equipment</code>.</li>
+<li>
+<p>The <strong>Southbrook PM</strong> top-level menu (parallel to Kitchen Ops —
+    different framing of overlapping data).</p>
+</li>
+<li>
+<p><strong><code>southbrook_manufacturing_intelligence</code></strong> owns:</p>
+</li>
+<li>The abstract <code>southbrook.mi.engine</code> parent (the singleton State
+    lives in <code>southbrook_premium_orchestration</code> because of the v19
+    inherit trap).</li>
+<li>The <code>southbrook.mi.check</code> model (<code>is_gate</code>, <code>severity</code>, <code>category</code>,
+    <code>production_id</code>, <code>production_package_id</code>).</li>
+<li>The <code>x_mi_*</code> extension fields on <code>sb.production.package</code> and
+    <code>mrp.production</code> (<code>x_mi_status</code>, <code>x_mi_check_ids</code>,
+    <code>x_mi_blocker_count</code>, <code>x_mi_warning_count</code>, <code>x_mi_next_action</code>,
+    <code>x_mi_yield_pct</code>, <code>x_mi_waste_area_m2</code>, <code>x_mi_edge_band_m</code>).</li>
+</ul>
+<h2 id="design-intent-why-kitchen-ops-vs-sales-vs-southbrook-pm">Design intent — why Kitchen Ops vs Sales vs Southbrook PM</h2>
+<p>There are three top-level menus that all surface kitchen-related data:</p>
+<ol>
+<li><strong>Sales → Kitchen Workspace</strong> — designer / salesperson view. Owns
+   the <strong>pre-sale</strong> records (<code>sb.kitchen.project</code>). Lesson 12.2.</li>
+<li><strong>Kitchen Ops</strong> — planner / project manager view. Owns the
+   <strong>production lifecycle</strong> records (<code>project.task</code> spines,
+   release queue, MI status). Most of this Course 12.</li>
+<li><strong>Southbrook PM</strong> — production manager view. Owns the
+   <strong>operations</strong> records (<code>mrp.workcenter</code> floor load, equipment,
+   capacity planning). Lesson 12.5.</li>
+</ol>
+<p>The same workcenter record (<code>mrp.workcenter</code> for SB-CNC-BORE) is read
+from three menus: Manufacturing → Configuration → Work Centers (Odoo
+native), Southbrook PM → Floor Load, and Kitchen Ops → Workcenter
+Bottlenecks. <strong>Different framing of the same data.</strong> Choose the menu
+that matches your role; don't try to do release-queue work from the
+PM dashboard.</p>
+<h2 id="security-who-can-see-kitchen-ops">Security — who can see Kitchen Ops?</h2>
+<p>The Kitchen Ops parent menu has <strong>no <code>groups</code> attribute</strong>. Anyone with
+the default Odoo user role can see the label in the top bar. The
+gating happens at the action level — each submenu's action carries
+its own model-level ACL.</p>
+<p>Two exceptions live on the parent's children:</p>
+<ul>
+<li><strong>Archive Test Users</strong> (sequence 80) — <code>groups="base.group_system"</code>.
+  Only the System user sees this entry, because it's a destructive
+  wizard.</li>
+<li><strong>Tool Lifecycle Board</strong> and <strong>Cut-Spec Overrides</strong> are visible to
+  everyone but read-locked for non-MRP users via the standard
+  <code>ir.model.access.csv</code> ACLs in
+  <code>southbrook_premium_orchestration/security/</code>.</li>
+</ul>
+<p>For a planner role to use all Kitchen Ops surfaces, they need
+membership in:</p>
+<ul>
+<li><code>mrp.group_mrp_user</code> (read on <code>mrp.production</code>, <code>mrp.workcenter</code>,
+  <code>mrp.workorder</code>).</li>
+<li><code>project.group_project_user</code> (read/write on <code>project.task</code>).</li>
+<li><code>southbrook_mrp_pm.group_floor_manager</code> (floor-portal access — only
+  needed for the portal templates in lesson 12.5).</li>
+</ul>
+<p>Without <code>project.group_project_user</code>, the Kitchen Jobs board renders
+an empty kanban — the action runs, but every record fails the
+record-rule check. This is the most common "menu shows but board is
+empty" failure mode for fresh user accounts.</p>
+<h2 id="what-changes-when-you-uninstall-an-addon">What changes when you uninstall an addon</h2>
+<p>The dependency chain matters when you're debugging a missing menu:</p>
+<ul>
+<li>
+<p><strong>Uninstall <code>southbrook_premium_orchestration</code></strong> — Kitchen Ops menu
+  disappears entirely. Sales → Kitchen Workspace stays. Southbrook PM
+  stays. The MI Engine State singleton record is deleted; readiness
+  flips silently stop happening because the six crons are gone.</p>
+</li>
+<li>
+<p><strong>Uninstall <code>southbrook_manufacturing_intelligence</code></strong> — the parent
+  abstract MI engine model is removed, which breaks
+  <code>southbrook_premium_orchestration</code> (it depends on it). Odoo refuses
+  the uninstall unless you cascade. Kitchen Ops → MI Engine Status
+  starts throwing <code>KeyError: southbrook.mi.check</code> on open.</p>
+</li>
+<li>
+<p><strong>Uninstall <code>southbrook_kitchen_workspace</code></strong> — Sales → Kitchen
+  Workspace disappears. The <code>sb.kitchen.project</code> records are deleted.
+  Kitchen Ops → Kitchen Jobs CONTINUES TO WORK because it reads from
+  <code>project.task</code> (not <code>sb.kitchen.project</code>). But the design-options
+  flow that creates the order in the first place is gone, so you'll
+  stop seeing new spine tasks land on the board.</p>
+</li>
+<li>
+<p><strong>Uninstall <code>southbrook_kitchen_mrp</code></strong> — the cut/hardware/production
+  package models are gone. Kitchen Ops menu still loads, but every
+  <code>x_mi_*</code> field on <code>sb.production.package</code> cascades to <code>False</code> and
+  the MI Production Board (Course 2 lesson 2.5) is empty.</p>
+</li>
+</ul>
+<p>Don't uninstall ad-hoc — these are tight coupling boundaries. The
+ProductGraph-style "you can take a module out" promise does NOT apply
+inside the Kitchen Ops stack.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>The ops lead (start of day, 5 min):</strong></p>
+<ul>
+<li>Open the top bar, click <strong>Kitchen Ops</strong>. All eight children must
+  appear. If one is missing, the action it references couldn't be
+  resolved at install time — check that addon's status under
+  Settings → Apps.</li>
+<li>Click <strong>Kitchen Jobs</strong> first; this is your home screen. Lesson 12.3
+  goes deep.</li>
+<li>The ordering is the workflow: Jobs (look at today) → Release Queue
+  (clear blockers) → Install Risk (deliveries this week) →
+  Workcenter Bottlenecks (mid-day load) → MI Engine Status (is the
+  cron running?) → Tool Lifecycle (rare check) → Cut-Spec Overrides
+  (PLM signals).</li>
+</ul>
+<p><strong>The developer (when a menu is missing):</strong></p>
+<ol>
+<li>Open <strong>Settings → Technical → User Interface → Menu Items</strong>.</li>
+<li>Filter by <code>Kitchen Ops</code>. Confirm all 9 records present.</li>
+<li>For each child, click in. The <strong>Action</strong> field MUST resolve. If
+   it's empty, the action XML id was not seeded — most often because
+   the owning addon was uninstalled or never installed.</li>
+<li>If the action resolves but clicking the menu errors, the model the
+   action references is the problem — check the model exists with
+   <code>env['southbrook.mi.engine.state']</code> in a shell.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a new MRP user and they can see Kitchen Ops but the Jobs
+board is empty."</strong></p>
+<p>Missing <code>project.group_project_user</code>. Add them to the Project / User
+group under Settings → Users → Permissions. The action runs (which is
+why the menu lights up), but the record rule on <code>project.task</code> filters
+every row to zero.</p>
+<p><strong>"After upgrading premium_orchestration, MI Engine Status is gone."</strong></p>
+<p>Two failures look the same. (a) The action record was archived during
+upgrade — check
+<code>env.ref('southbrook_premium_orchestration.action_mi_engine_status')</code>
+in a shell. If it returns nothing, re-run <code>-u
+southbrook_premium_orchestration</code> to re-seed. (b) The singleton model
+<code>southbrook.mi.engine.state</code> failed to register — check the upgrade log
+for <code>Cannot inherit AbstractModel</code>. The fix is the sibling-stored-model
+pattern documented in the cog comments.</p>
+<p><strong>"Archive Test Users is greyed out / hidden for me."</strong></p>
+<p>It's <code>groups="base.group_system"</code> only. Members of Project / Manager
+or MRP / Manager don't see it. Either escalate to a sysadmin or get
+added to the System group temporarily (and remove yourself when done).</p>
+<p><strong>"I uninstalled <code>southbrook_kitchen_workspace</code> and now nothing
+confirms a kitchen project."</strong></p>
+<p>Workspace is the pre-sale layer. Without it, customers/designers
+can't create design options, can't approve, and can't push a
+configurator session into a sale.order. The Kitchen Ops board still
+LOADS but it's read-only and nothing new lands. Reinstall workspace.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The Kitchen Ops parent menu is one <code>ir.ui.menu</code> record:</p>
+<pre><code class="language-xml">&lt;menuitem id=&quot;menu_kitchen_ops_root&quot;
+          name=&quot;Kitchen Ops&quot;
+          sequence=&quot;20&quot;
+          web_icon=&quot;southbrook_premium_orchestration,static/description/icon.png&quot;/&gt;
+</code></pre>
+<p>No <code>action</code>, no <code>parent</code>. The eight children each have
+<code>parent="menu_kitchen_ops_root"</code>, an <code>action=</code> referencing a sibling
+action record, and a <code>sequence</code> controlling order. Odoo's menu loader
+resolves each <code>action=</code> at install time and silently skips the menu
+if the action can't be found (Odoo 19 emits a <code>ParseError</code> to the
+log but the upgrade keeps going). This is why a missing menu is
+almost always a missing action, not a missing menu record.</p>
+<p>The action references are split across six XML files in the same
+addon:</p>
+<ul>
+<li><code>kitchen_jobs_views.xml</code> — <code>action_kitchen_jobs_board</code>.</li>
+<li><code>production_release_views.xml</code> — <code>action_production_release_queue</code>.</li>
+<li><code>install_risk_views.xml</code> — <code>action_install_risk_board</code>.</li>
+<li><code>workcenter_bottleneck_views.xml</code> — <code>action_workcenter_bottleneck_board</code>.</li>
+<li><code>mi_engine_views.xml</code> — <code>action_mi_engine_status</code>.</li>
+<li><code>tool_lifecycle_views.xml</code> — <code>action_tool_lifecycle_board</code>.</li>
+<li><code>cut_spec_override_views.xml</code> — <code>action_cut_spec_override_list</code>.</li>
+<li><code>wizards/test_user_archive_views.xml</code> — <code>action_test_user_archive_wizard</code>.</li>
+</ul>
+<p>The manifest's <code>data:</code> list loads these IN ORDER, with <code>menus.xml</code>
+LAST so all action records exist by the time the menuitems try to
+bind. Reorder the list and the install breaks — keep <code>menus.xml</code> last.</p>
+<p>For multi-addon menus (none of Kitchen Ops's children come from
+sibling addons, but the design pattern allows it), Odoo resolves the
+<code>action=</code> via the global xml-id registry. As long as the foreign addon
+loads BEFORE the menu file that references it, the reference
+resolves. This is enforced via the <code>depends:</code> list in the manifest.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A user reports "I can't see the MI Engine Status item under
+Kitchen Ops." You check their groups and they're in MRP / User. What's
+the most likely cause?</p>
+<blockquote>
+<p>Not a groups issue — MI Engine Status has no group restriction. The
+most likely cause is that the action record
+<code>action_mi_engine_status</code> failed to load (premium_orchestration was
+upgraded with an error, or the addon is partially installed). Check
+<code>env.ref('southbrook_premium_orchestration.action_mi_engine_status')</code>
+in a shell. If it's None, re-run <code>-u
+southbrook_premium_orchestration</code> to re-seed.</p>
+</blockquote>
+<p><strong>2.</strong> You're adding a new submenu "Kitchen Ops → Daily Briefing" that
+shows yesterday's MO summary. What sequence number do you pick, and
+which addon should own it?</p>
+<blockquote>
+<p>Pick something like 5 (above Kitchen Jobs) or 15 (between Jobs and
+Release Queue) so it appears in the visual order matching the
+workflow. Owning addon: add it to
+<code>southbrook_premium_orchestration/views/menus.xml</code> ONLY if the action
++ model also live in that addon. If the briefing model is a new
+standalone addon, the menuitem lives in that new addon, parented to
+<code>southbrook_premium_orchestration.menu_kitchen_ops_root</code> via xml-id
+reference.</p>
+</blockquote>
+<p><strong>3.</strong> A planner asks "why is the Kitchen Workspace under Sales but
+Kitchen Jobs under Kitchen Ops?" Walk through the answer.</p>
+<blockquote>
+<p>Kitchen Workspace owns the pre-sale lifecycle — designers and
+customers work it before money changes hands. It belongs under Sales
+because the salesperson and designer live there. Kitchen Ops owns
+the post-sale production lifecycle — planners and PMs work it after
+confirmation. Different teams, different menus, same underlying
+kitchen. The <code>project.task</code> spine is the bridge — Kitchen Workspace
+creates the customer agreement, Kitchen Ops manages turning it into
+manufactured cabinets.</p>
+</blockquote>
+<p><strong>4.</strong> You uninstall <code>southbrook_kitchen_mrp</code> for a refactor. The
+Kitchen Ops menu still loads but the Workcenter Bottlenecks dashboard
+shows empty tiles. Why?</p>
+<blockquote>
+<p>The Workcenter Bottlenecks board reads from <code>mrp.workcenter</code> and the
+four <code>southbrook_pm_*</code> KPI fields — those live in
+<code>southbrook_mrp_pm</code>, not <code>southbrook_kitchen_mrp</code>. So the workcenter
+records and KPIs survive the uninstall. But the
+<code>x_mi_yield_pct</code> / <code>x_mi_waste_area_m2</code> rollups depend on
+<code>sb.cutlist</code> (which IS in kitchen_mrp) — the MI rollups fall to zero
+because there's no cutlist data to compute against. Tiles render but
+with stale/zero data.</p>
+</blockquote>
+<p><strong>5.</strong> A developer wants to add <code>groups="southbrook_mrp_pm.group_floor_manager"</code>
+to the Workcenter Bottlenecks submenu so only floor managers see it.
+What's the right call?</p>
+<blockquote>
+<p>Don't gate at the menu level for this — it overscopes. The same
+board is useful to the planner (lesson 12.5 audience) who isn't a
+floor manager. Gate at the <strong>record-rule level</strong> instead: floor
+managers see only their assigned stations; planners see all. The
+menu stays visible to everyone, and the data scoping happens at
+the model layer. Menu-level groups are for destructive admin
+actions (e.g. Archive Test Users), not for role-specific views.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The detailed shape of the Kitchen Jobs board itself → lesson 12.3.</li>
+<li>The state machine on <code>sb.kitchen.project</code> and how Workspace records
+  bridge into the Kitchen Ops board → lesson 12.2.</li>
+<li>What the five release booleans mean and how the engineer flips them
+  → lesson 12.4 + Course 2 lesson 2.2.</li>
+<li>The Workcenter Bottleneck dashboard internals → lesson 12.5 +
+  Course 2 lesson 2.3.</li>
+<li>MI Engine Status from the sysadmin's perspective → lesson 12.6 +
+  Course 7 lesson 7.1.</li>
+<li>Cut + hardware + production packages → lesson 12.7.</li>
+<li>Native Odoo <code>ir.ui.menu</code> mechanics, group inheritance, and menu
+  resolution → Odoo's own developer documentation.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_12_kitchen_project_lifecycle" model="slide.slide">
+            <field name="name">Kitchen Project Lifecycle — The Seven-State Machine</field>
+            <field name="channel_id" ref="course_kitchen_ops_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Project Manager + Designer (the two roles that drive a kitchen from draft to done).</field>
+            <field name="html_content"><![CDATA[<h1 id="kitchen-project-lifecycle-the-seven-state-machine">Kitchen Project Lifecycle — The Seven-State Machine</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the project manager or designer who actually drives a kitchen
+through its design conversation, customer approval, and handoff to the
+shop floor. Course 2 lesson 2.1 gave you the planner's view ("these
+three records describe the same kitchen"). This lesson is the inside
+view of one of those records — <code>sb.kitchen.project</code> — and the seven
+states it moves through. You need to know which button to press, in
+what order, when each state requires a specific artifact, and what
+fires downstream when you flip a state.</p>
+<p>Get the state machine wrong and you'll either jam a half-designed
+project into production, or you'll discover at install time that the
+customer never actually approved anything in the system.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the designer:</p>
+<blockquote>
+<p><strong>Sales → Kitchen Workspace → Projects</strong></p>
+</blockquote>
+<p>The list view of <code>sb.kitchen.project</code> records. Filter by your own
+designer user; sort by <code>date_created desc</code>. Click a project to open
+the form.</p>
+<p>For the project manager:</p>
+<blockquote>
+<p><strong>Sales → Kitchen Workspace → Projects → My Active Projects</strong></p>
+</blockquote>
+<p>The same model, filtered to your assigned partners and states
+<code>designing / awaiting_customer / approved</code>. The PM doesn't typically
+work <code>draft</code> or <code>done</code> records — those are designer / archive
+concerns.</p>
+<p>The Kitchen Jobs board (Kitchen Ops → Kitchen Jobs) is the
+<strong>downstream</strong> view — it shows <code>project.task</code> spines, not
+<code>sb.kitchen.project</code> records. The two records bridge at the
+<code>sale_order_id</code> field; the project doesn't appear on Kitchen Jobs
+until its sale order is confirmed (see "what fires downstream" below).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>On the <code>sb.kitchen.project</code> form:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — required, free text. The designer writes
+  something human like "Smith Kitchen — Walnut Shaker".</li>
+<li><strong>Code</strong> (<code>code</code>) — auto-generated by sequence
+  (<code>KP/2026/000123</code>), readonly. This is the stable identifier across
+  the lifecycle.</li>
+<li><strong>State</strong> (<code>state</code>) — the seven-state Selection (<code>draft</code>,
+  <code>designing</code>, <code>awaiting_customer</code>, <code>approved</code>, <code>in_production</code>,
+  <code>done</code>, <code>cancelled</code>). Tracked, so every flip lands on chatter.</li>
+<li><strong>Theme</strong> (<code>theme</code>) — <code>signature</code> / <code>elegance</code> / <code>contemporary</code> /
+  <code>contractor</code>. Aligned to the configurator's series choice. Drives
+  what door styles and finishes the configurator offers downstream.</li>
+<li><strong>Date created</strong> (<code>date_created</code>) — when the designer first hit
+  Create. Readonly.</li>
+<li><strong>Target completion</strong> (<code>date_target</code>) — the designer's internal
+  estimate for when the kitchen ships. Editable.</li>
+<li><strong>Date completed</strong> (<code>date_completed</code>) — written when state moves
+  to <code>done</code>. Readonly.</li>
+<li><strong>Customer</strong> (<code>partner_id</code>) — the <code>res.partner</code> who's paying.
+  Required. Tracked.</li>
+<li><strong>CRM opportunity</strong> (<code>opportunity_id</code>) — link to the <code>crm.lead</code>
+  this project came from. Optional but encouraged for sales-funnel
+  reporting.</li>
+<li><strong>Designer / Salesperson</strong> (<code>salesperson_id</code>) — defaults to the
+  user who created the project.</li>
+<li><strong>Design options</strong> (<code>design_option_ids</code>) — the One2many to
+  <code>sb.kitchen.design.option</code>. The A/B/C alternatives.</li>
+<li><strong>Selected option</strong> (<code>selected_design_option_id</code>) — computed from
+  <code>design_option_ids.is_selected</code>. Exactly one must be True before
+  the customer can approve.</li>
+<li><strong>AI room analysis</strong> (<code>ai_analysis_id</code>) — Many2one to
+  <code>sb.kitchen.ai.analysis</code>. The Gemini analysis output for this
+  room. Critical: its <code>confirmed_by_human</code> flag gates downstream
+  configurator runs (see "behind the scenes").</li>
+<li><strong>Appliances</strong> (<code>appliance_ids</code>) — One2many to <code>sb.kitchen.appliance</code>.
+  Each carries its own <code>confirmed_by_human</code> flag.</li>
+<li><strong>Approvals</strong> (<code>approval_ids</code>) — <code>sb.kitchen.approval</code> records,
+  one per gate (concept / design / engineering / production-release).</li>
+<li><strong>Sale order</strong> (<code>sale_order_id</code>) — written when the configurator
+  generates a quote from this project.</li>
+</ul>
+<h2 id="the-seven-state-machine-what-each-state-means">The seven-state machine — what each state means</h2>
+<p>The states form a directed acyclic graph enforced by
+<code>VALID_TRANSITIONS</code> in
+<code>southbrook_kitchen_workspace/models/sb_kitchen_project.py</code>. Any
+transition off-graph raises <code>UserError</code>.</p>
+<h3 id="state-1-draft">State 1: <code>draft</code></h3>
+<p>The designer created the record. Customer is set; theme is probably
+set; nothing else. No design options yet. Allowed next states:
+<code>designing</code>, <code>cancelled</code>. <strong>Who triggers</strong>: the designer, via
+<strong>Start Designing</strong> button (<code>action_start_designing</code>). <strong>What fires
+downstream</strong>: nothing — no quote, no task, no MO. This is private to
+the designer.</p>
+<h3 id="state-2-designing">State 2: <code>designing</code></h3>
+<p>The designer is iterating with the customer on photos, AI analysis,
+design options. Allowed next states: <code>awaiting_customer</code>, <code>cancelled</code>.
+<strong>Who triggers</strong>: the designer, via <strong>Submit to Customer</strong>
+(<code>action_submit_to_customer</code>). <strong>Required artifact</strong>: at least one
+<code>sb.kitchen.design.option</code> must exist (enforced by
+<code>_require_at_least_one_design_option</code>). <strong>What fires downstream</strong>:
+sends the <code>email_template_concepts_ready</code> mail template (best-effort,
+logged-not-raised on failure). Nothing in production land yet.</p>
+<h3 id="state-3-awaiting_customer">State 3: <code>awaiting_customer</code></h3>
+<p>The customer is reviewing options. The designer is hands-off; the
+record is waiting on a customer email or call. Allowed next states:
+<code>approved</code> (yes), <code>designing</code> (back to drawing board), <code>cancelled</code>.
+<strong>Who triggers</strong>: the designer, via <strong>Customer Approves</strong>
+(<code>action_customer_approves</code>) when the customer says yes, or <strong>Back
+to Designing</strong> when the customer wants changes. <strong>Required artifact</strong>:
+exactly one <code>design_option_ids.is_selected = True</code> (enforced by
+<code>_require_selected_design_option</code>). <strong>What fires downstream</strong>: sends
+<code>email_template_design_approved</code>. Customer-facing — they get the
+"thanks, your design is approved, here comes a quote" email.</p>
+<h3 id="state-4-approved">State 4: <code>approved</code></h3>
+<p>Design is locked. The configurator now uses
+<code>selected_design_option_id</code> as the canonical input. A quote /
+<code>sale.order</code> is typically generated at this point and linked via
+<code>sale_order_id</code>. Allowed next states: <code>in_production</code>, <code>cancelled</code>.
+<strong>Who triggers</strong>: typically the PM (not the designer), via <strong>Release
+to Production</strong> (<code>action_release_to_production</code>) AFTER the customer
+confirms the sale.order (pays the deposit, signs the contract).
+<strong>What fires downstream</strong>: sends <code>email_template_released_to_production</code>.
+THIS IS THE BRIDGE INTO KITCHEN OPS — the sale order's
+<code>action_confirm</code> override (in <code>southbrook_premium_orchestration</code>)
+creates the <code>project.task</code> spine, which lands on the Kitchen Jobs
+board.</p>
+<h3 id="state-5-in_production">State 5: <code>in_production</code></h3>
+<p>The shop floor is working on the cabinets. The
+<code>project.task</code> spine is being driven through readiness, release, and
+scheduling lessons (12.3, 12.4, 12.5). Allowed next states: <code>done</code>,
+<code>cancelled</code>. <strong>Who triggers</strong>: the PM, via <strong>Mark Done</strong>
+(<code>action_done</code>) once the cabinets ship and install completes.
+<strong>What fires downstream</strong>: sends <code>email_template_project_done</code>,
+sets <code>date_completed = today</code>.</p>
+<h3 id="state-6-done">State 6: <code>done</code></h3>
+<p>The project is closed. The cabinets are installed; the customer is
+(hopefully) happy. No further state transitions allowed except
+manual archival outside the state machine. <strong>Who triggers</strong>: terminal
+state, nobody triggers a move out of it.</p>
+<h3 id="state-7-cancelled">State 7: <code>cancelled</code></h3>
+<p>Anything from <code>draft</code> through <code>in_production</code> can land here.
+<strong>Intentional gap</strong>: there's no automated email on cancellation —
+that conversation should be a phone call, not a templated message.
+<strong>Who triggers</strong>: any role, via <strong>Cancel</strong> (<code>action_cancel</code>). Terminal.</p>
+<h2 id="the-valid_transitions-map">The VALID_TRANSITIONS map</h2>
+<p>For reference (from <code>models/sb_kitchen_project.py</code>):</p>
+<pre><code class="language-python">VALID_TRANSITIONS = {
+    (&quot;draft&quot;, &quot;designing&quot;),
+    (&quot;draft&quot;, &quot;cancelled&quot;),
+    (&quot;designing&quot;, &quot;awaiting_customer&quot;),
+    (&quot;designing&quot;, &quot;cancelled&quot;),
+    (&quot;awaiting_customer&quot;, &quot;approved&quot;),
+    (&quot;awaiting_customer&quot;, &quot;designing&quot;),  # back to drawing board
+    (&quot;awaiting_customer&quot;, &quot;cancelled&quot;),
+    (&quot;approved&quot;, &quot;in_production&quot;),
+    (&quot;approved&quot;, &quot;cancelled&quot;),
+    (&quot;in_production&quot;, &quot;done&quot;),
+    (&quot;in_production&quot;, &quot;cancelled&quot;),
+}
+</code></pre>
+<p>Attempting any transition not in this set raises <code>UserError</code> with the
+list of valid next states. The state can't be force-set even from
+the API; <code>action_set_state</code> is the only entry point and it validates.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<h3 id="the-designer-per-project">The designer (per project)</h3>
+<ol>
+<li><strong>Create</strong> the project under Sales → Kitchen Workspace → Projects.
+   Set customer + theme. State = <code>draft</code>.</li>
+<li>Take photos of the customer's room, attach them via chatter. Run
+   AI room analysis (Gemini-backed) — that creates an
+   <code>sb.kitchen.ai.analysis</code> record. Open it, validate the
+   detected dimensions, <strong>set <code>confirmed_by_human = True</code></strong> — this is
+   GAP-02 / Module 6, the configurator REFUSES to run otherwise.</li>
+<li>List the appliances the customer has (stove, fridge, sink). For
+   each, set <code>confirmed_by_human = True</code> after confirming with the
+   customer.</li>
+<li>Click <strong>Start Designing</strong> → state moves to <code>designing</code>.</li>
+<li>Author 1-3 <code>sb.kitchen.design.option</code> records (A/B/C). Each one
+   can have its own placement_data, sketches, notes.</li>
+<li>Click <strong>Submit to Customer</strong> → state moves to <code>awaiting_customer</code>.
+   The customer gets the "concepts ready" email.</li>
+<li>The customer comes back: either picks one option (sets
+   <code>is_selected = True</code> on it) and you click <strong>Customer Approves</strong>,
+   or asks for changes and you click <strong>Back to Designing</strong>.</li>
+<li>Once <strong>Customer Approves</strong> fires, state = <code>approved</code>. The
+   configurator now reads the selected option as the canonical
+   design input. Quote generation begins.</li>
+</ol>
+<h3 id="the-pm-per-project">The PM (per project)</h3>
+<ol>
+<li>The designer hands off in state <code>approved</code> with a linked
+   <code>sale.order</code> in <code>draft</code> or <code>sent</code> state.</li>
+<li>Confirm the sale order (separate Odoo Sales action — this triggers
+   the <code>action_confirm</code> override that creates the <code>project.task</code>
+   spine).</li>
+<li>Click <strong>Release to Production</strong> on the kitchen project → state
+   moves to <code>in_production</code>. This is a SALES-side bookkeeping flag;
+   the actual shop floor release happens through the engineering
+   gate covered in lesson 12.4.</li>
+<li>Monitor the Kitchen Jobs board (which now shows the
+   <code>project.task</code> spine) until the cabinets ship and install. Once
+   verified, click <strong>Mark Done</strong> → state = <code>done</code>.</li>
+</ol>
+<h2 id="what-fires-downstream-at-each-state-change">What fires downstream at each state change</h2>
+<p>This is the "if I click this, what happens elsewhere?" map every PM
+needs:</p>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>Source state</th>
+<th>Target state</th>
+<th>Downstream effects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>action_start_designing</code></td>
+<td>draft</td>
+<td>designing</td>
+<td>None (private to designer)</td>
+</tr>
+<tr>
+<td><code>action_submit_to_customer</code></td>
+<td>designing</td>
+<td>awaiting_customer</td>
+<td><code>email_template_concepts_ready</code> sent to customer</td>
+</tr>
+<tr>
+<td><code>action_customer_approves</code></td>
+<td>awaiting_customer</td>
+<td>approved</td>
+<td><code>email_template_design_approved</code> sent. Quote can now be generated via configurator.</td>
+</tr>
+<tr>
+<td><code>action_release_to_production</code></td>
+<td>approved</td>
+<td>in_production</td>
+<td><code>email_template_released_to_production</code> sent. <strong>Sales-side flag only</strong> — the actual production release happens via the engineering gate (lesson 12.4). The <code>project.task</code> spine that drives Kitchen Ops was created by <code>sale.order.action_confirm</code> separately.</td>
+</tr>
+<tr>
+<td><code>action_done</code></td>
+<td>in_production</td>
+<td>done</td>
+<td><code>email_template_project_done</code> sent. <code>date_completed</code> set. Project goes off the active list.</td>
+</tr>
+<tr>
+<td><code>action_cancel</code></td>
+<td>any (per transitions)</td>
+<td>cancelled</td>
+<td><strong>No email</strong> — intentional.</td>
+</tr>
+</tbody>
+</table>
+<p>The most-missed nuance: clicking <code>action_release_to_production</code> on
+the <code>sb.kitchen.project</code> does <strong>not</strong> flip the <code>project.task</code>'s
+release state. They're independent. See Course 2 lesson 2.1 quiz
+question 4 — they typically agree but can disagree when the engineer
+hasn't yet approved a specific MO.</p>
+<h2 id="what-the-ai-confirmation-gate-enforces">What the AI confirmation gate enforces</h2>
+<p>The <code>is_ready_for_config_engine()</code> method on <code>sb.kitchen.project</code> is
+called BEFORE the configurator runs. It returns <code>True</code> only when:</p>
+<ol>
+<li><code>ai_analysis_id</code> is set, AND</li>
+<li><code>ai_analysis_id.confirmed_by_human = True</code>, AND</li>
+<li>EVERY <code>appliance_ids.confirmed_by_human = True</code>.</li>
+</ol>
+<p>If any of the three fails, the configurator refuses to generate a
+quote and the designer sees an error popup. This is the
+human-in-the-loop guarantee: the AI's measurements never reach
+production without a designer eyeballing them. It's GAP-02 from the
+init doc and one of the few hard refuse-to-proceed gates in the
+whole platform.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I tried to click Customer Approves but got 'no design option is
+selected'."</strong></p>
+<p>The customer told you they like Option B, but nobody flipped
+<code>is_selected = True</code> on it. Open the design options tab on the
+project, edit Option B, tick the box, save. The compute on
+<code>selected_design_option_id</code> updates immediately; click Customer
+Approves again.</p>
+<p><strong>"The configurator refused to generate a quote with 'project not
+ready for config engine'."</strong></p>
+<p>You skipped the AI / appliance confirmation. Open <code>ai_analysis_id</code>,
+verify dimensions, set <code>confirmed_by_human = True</code>. Then walk every
+appliance and confirm each. The gate clears the moment all three
+conditions are met; no further action needed.</p>
+<p><strong>"I tried to push state from <code>designing</code> directly to <code>approved</code> via
+the dev shell and got UserError."</strong></p>
+<p>That's the state machine enforcing <code>VALID_TRANSITIONS</code>. You CAN'T
+skip <code>awaiting_customer</code> — it's there to capture the actual customer
+yes/no moment. The right path is <code>designing → awaiting_customer →
+approved</code>. If you're testing, set <code>is_selected = True</code> on a design
+option, then call <code>action_submit_to_customer</code>, then
+<code>action_customer_approves</code>.</p>
+<p><strong>"I clicked Release to Production on the project but the
+project.task on Kitchen Jobs didn't move to release=ready."</strong></p>
+<p>These are independent. <code>sb.kitchen.project.state = in_production</code> is
+the SALES-side flag — "this kitchen is past the design conversation
+and into production accounting." The task's release state is
+controlled by the ENG01 engineer flipping the five booleans (lesson
+12.4). They CAN agree but they don't have to.</p>
+<p><strong>"The customer wants to come back to designing after I clicked
+Approved."</strong></p>
+<p>You can't transition <code>approved → designing</code> (it's not in
+<code>VALID_TRANSITIONS</code>). The choices are: (a) move to <code>cancelled</code> and
+start a fresh project (preserves the audit trail but feels
+heavy-handed); (b) keep state at <code>approved</code> and treat the changes as
+post-approval design tweaks (typical for minor changes — door style
+swap, accessory adds). For major redesigns, option (a) is the right
+call; the new project can reference the old via chatter for context.</p>
+<p><strong>"I clicked Mark Done but the cabinets haven't actually shipped
+yet."</strong></p>
+<p>You can't undo to <code>in_production</code> (no transition). Recovery options
+are limited: either accept the early flip and rely on chatter for
+the truth, or use the API to write <code>state = in_production</code> and
+clear <code>date_completed</code> (requires admin access — <code>action_set_state</code>
+won't let you). Better: don't click Mark Done until installation is
+verified.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p><code>sb.kitchen.project</code> is defined in
+<code>southbrook_kitchen_workspace/models/sb_kitchen_project.py</code>. It
+inherits <code>mail.thread</code> + <code>mail.activity.mixin</code> so every state flip
+lands on chatter with the user who triggered it. The state field has
+<code>tracking=True</code> so the chatter shows the from/to transitions; this
+is your audit trail.</p>
+<p><code>action_set_state(new_state)</code> is the single entry point. Every
+convenience button (<code>action_start_designing</code>,
+<code>action_submit_to_customer</code>, etc.) ultimately calls it. The method
+walks <code>self</code>, checks <code>(current, new_state) in VALID_TRANSITIONS</code>,
+raises <code>UserError</code> with the list of valid next states if not, then
+writes the new state plus side-effect fields (<code>date_completed</code> on
+<code>done</code>).</p>
+<p>The lifecycle email helper <code>_send_lifecycle_email</code> is <strong>best-effort,
+logged-not-raised</strong>: if the mail template doesn't exist or the send
+fails, the state transition still completes. The chain is
+deliberate — the state machine is the truth, email is a side-effect
+that can be re-sent manually if it fails. Templates live in
+<code>data/mail_templates.xml</code>.</p>
+<p>The <code>is_ready_for_config_engine()</code> gate is the only place in this
+addon where downstream code is blocked. The configurator
+(<code>product.config.session</code>) calls it before generating a
+<code>product.config.session</code> line and refuses if False. No other code
+path checks it — if you bypass the configurator's check, the gate
+doesn't fire.</p>
+<p>The bridge to <code>project.task</code> is NOT in this model — it's in
+<code>southbrook_premium_orchestration/models/sale_order.py</code>. When the
+sale.order is confirmed, the <code>action_confirm</code> override creates a
+<code>project.task</code> spine. The <code>sb.kitchen.project</code> is the <strong>input</strong> to
+that flow, not the producer. This is why moving <code>sb.kitchen.project</code>
+to <code>in_production</code> doesn't create a task — the sale order's
+confirmation does.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A designer is iterating with a customer who keeps changing
+their mind. The project is in <code>awaiting_customer</code>. Customer asks for
+a fourth option. The designer wants to add a new
+<code>sb.kitchen.design.option</code> without going through the state machine.
+Is that OK?</p>
+<blockquote>
+<p>Yes — adding a design option doesn't require a state flip. Open
+the design options tab, hit Create, fill in option D. The
+<code>selected_design_option_id</code> recompute fires on save. If the new
+option is the one the customer chooses, mark it
+<code>is_selected = True</code> (which auto-clears the others via the
+compute), then click Customer Approves. The state machine only
+guards the seven states, not the underlying data.</p>
+</blockquote>
+<p><strong>2.</strong> A PM tries to release a kitchen project to production but the
+underlying sale.order is still in <code>draft</code> state. What happens?</p>
+<blockquote>
+<p>Two things are independent. <code>action_release_to_production</code> on the
+kitchen project will run successfully — it only checks the
+kitchen project's state machine, not the sale order's state.
+State moves to <code>in_production</code>. BUT the Kitchen Jobs board won't
+show a <code>project.task</code> until the sale order is confirmed, because
+the spine creator runs in <code>sale.order.action_confirm</code>. Recovery:
+confirm the sale order in Sales → Quotations. The
+<code>project.task</code> lands; the kitchen project is already where you
+want it.</p>
+</blockquote>
+<p><strong>3.</strong> A customer cancels mid-production. The kitchen project is
+<code>in_production</code>, the cabinets are half-made, the sale order is
+<code>sale</code>. What's the right sequence?</p>
+<blockquote>
+<p>(1) Click Cancel on the kitchen project. State moves to
+<code>cancelled</code>. No automated email — pick up the phone. (2) Open the
+sale order. Mark it as Cancelled (Odoo Sales action). The
+in-flight MOs need separate cancellation in Manufacturing — go
+through each linked <code>mrp.production</code> and click Cancel. (3) Open
+the linked <code>project.task</code> (find it via the chatter on the sale
+order or via <code>x_southbrook_project_task_id</code>). The cron will
+recompute its readiness as blocked overnight, or you can manually
+archive it. (4) Inform the floor — they may already have material
+on the cut line that needs to be scrapped or rerouted.</p>
+</blockquote>
+<p><strong>4.</strong> The AI room analysis on a project shows the kitchen's width
+as 4.2m but the designer measured 4.0m on site. What does the
+designer do?</p>
+<blockquote>
+<p>Open the <code>sb.kitchen.ai.analysis</code> record. Edit the dimension
+fields to the designer's measurements (4.0m). THEN flip
+<code>confirmed_by_human = True</code>. The flag means "I, a human, validated
+these numbers" — flipping it without correcting first is the
+failure mode the gate exists to prevent. The configurator then
+uses the corrected 4.0m for cabinet sizing.</p>
+</blockquote>
+<p><strong>5.</strong> A designer asks "can I just delete a project in <code>draft</code> state
+to clean up tests?"</p>
+<blockquote>
+<p>Yes — <code>draft</code> projects haven't fired any downstream signals (no
+emails, no quotes, no tasks), so deleting them is clean. Odoo
+standard <code>unlink</code> works. The chatter and any attached photos are
+deleted too. For <code>cancelled</code> projects with downstream artifacts
+(sale orders, tasks), archival is safer than deletion — use the
+archive action on the form, which sets <code>active = False</code> without
+losing the audit trail.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The downstream <code>project.task</code> spine and how readiness flows on
+  Kitchen Jobs → lesson 12.3.</li>
+<li>The five release booleans the engineer flips and the production
+  release queue → lesson 12.4.</li>
+<li>How a confirmed sale order creates the <code>project.task</code> spine
+  (the <code>action_confirm</code> override mechanics) → Course 2 lesson 2.1</li>
+<li>lesson 12.3 "behind the scenes".</li>
+<li>Design option authoring details, AI analysis sub-fields, appliance
+  models → Course 4 (PLM + Design).</li>
+<li>Quote generation from a kitchen project (the configurator path) →
+  Course 5 (Estimating + Configurator).</li>
+<li>Native Odoo state-machine patterns and <code>_inherit</code> mechanics →
+  Odoo's own developer documentation.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_12_kitchen_jobs_taskboard" model="slide.slide">
+            <field name="name">Kitchen Jobs / Task Board — The Readiness Engine</field>
+            <field name="channel_id" ref="course_kitchen_ops_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Project Manager + Production Planner (the two who live on this board).</field>
+            <field name="html_content"><![CDATA[<h1 id="kitchen-jobs-task-board-the-readiness-engine">Kitchen Jobs / Task Board — The Readiness Engine</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PM or planner who lives on the Kitchen Jobs board all day.
+Course 2 lesson 2.1 introduced the three-record (project / order /
+task) model. This lesson goes inside the <strong>task</strong> — what makes a task
+"ready", how the readiness score is computed, what the swimlanes
+mean, what the filters do, and how the cron stitches it together.</p>
+<p>If you've ever stared at a card showing <code>readiness=review</code> and
+wondered "what specifically is the cron checking?" — this is the
+lesson.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Kitchen Ops → Kitchen Jobs</strong></p>
+</blockquote>
+<p>This is the default landing for PMs. The board defaults to the
+<strong>Open</strong> filter (excludes <code>done</code> / <code>cancelled</code> stages) and groups
+cards by <code>readiness_decision</code>.</p>
+<blockquote>
+<p><strong>Kitchen Ops → Kitchen Jobs → List</strong></p>
+</blockquote>
+<p>Same data, list view — useful when you want to bulk-sort by
+<code>install_due_date</code> or export to CSV.</p>
+<blockquote>
+<p><strong>Kitchen Ops → Kitchen Jobs → \&lt;click a card&gt;</strong></p>
+</blockquote>
+<p>The per-task form view. This is where every field on the card has a
+deeper story.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Each card on the Kitchen Jobs kanban is one <code>project.task</code> record.
+The fields surfaced on the card (defined in
+<code>southbrook_premium_orchestration/views/kitchen_jobs_views.xml</code>):</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code> on <code>project.task</code>) — composed by the orchestration
+  layer as <code>Kitchen Cabinet Set - &lt;style&gt; (&lt;species&gt;) [&lt;order ref&gt;]</code>
+  from the order line names at sale.order confirmation time.</li>
+<li><strong>Customer</strong> (<code>partner_id</code>) — same partner as on the sale order.</li>
+<li><strong>Linked SO</strong> (<code>x_southbrook_sale_order_id</code>) — the reverse-side
+  many2one from task to sale.order. <strong>This is the bidirectional link
+  that works on every database, fresh or live.</strong> The forward link
+  <code>sale.order.x_southbrook_project_task_id</code> exists only on
+  UI-extended live DBs.</li>
+<li><strong>Install due date</strong> (<code>install_due_date</code>) — computed from the
+  underlying MOs' <code>x_sbk_install_due_date</code>, falling back to
+  <code>sale.order.commitment_date</code> at confirmation time. Editable on the
+  task once written.</li>
+<li><strong>Readiness decision</strong> (<code>readiness_decision</code>) — Selection
+  (<code>ready</code> / <code>review</code> / <code>blocked</code> / <code>info</code>). Computed by
+  <code>_compute_phase1_operational_context</code>. Drives the kanban grouping.</li>
+<li><strong>Readiness score</strong> (<code>readiness_score</code>) — Integer 0-100. Computed
+  from sub-signals. Useful for sorting "most ready first" within a
+  swimlane.</li>
+<li><strong>Production release state</strong> (<code>southbrook_production_release_state</code>)
+  — Selection (<code>ready</code> / <code>review</code> / <code>blocked</code> / <code>info</code>). Distinct
+  from readiness; controlled by the five engineer booleans + readiness
+  (see lesson 12.4).</li>
+<li><strong>At risk</strong> (<code>job_at_risk</code>) — boolean badge, red. Set by
+  <code>_compute_mrp_status</code> when the job is behind or blocked relative to
+  its deadline.</li>
+</ul>
+<p>The kanban has a <strong>progress bar header</strong> for each readiness column
+that colour-codes <code>ready=success</code> / <code>review=warning</code> /
+<code>blocked=danger</code>. Clicking the band filters the column.</p>
+<h2 id="the-readiness-sub-signals">The readiness sub-signals</h2>
+<p>A task's <code>readiness_decision</code> is computed from
+<code>action_recompute_readiness_lines</code> in <code>southbrook_project_mrp</code>. The
+method walks the linked MOs (<code>production_ids</code> on the task) and
+produces <code>southbrook.project.readiness.line</code> records — one per check
+type. The standard sub-signals (from
+<code>southbrook_project_mrp/models/project_readiness_line.py</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Sub-signal</th>
+<th>What it checks</th>
+<th>Owning model field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cad</code></td>
+<td>At least one MO has a populated CAD link or <code>x_cad_status = done</code></td>
+<td><code>mrp.production.x_cad_status</code></td>
+</tr>
+<tr>
+<td><code>cutlist</code></td>
+<td>The production package has a non-empty <code>sb.cutlist</code> with substrate set</td>
+<td><code>sb.cutlist.line_ids</code> count + substrate</td>
+</tr>
+<tr>
+<td><code>bom</code></td>
+<td>Every MO has a populated <code>bom_id</code> and the BoM has at least one component</td>
+<td><code>mrp.production.bom_id</code></td>
+</tr>
+<tr>
+<td><code>crew</code></td>
+<td>The task has a <code>user_ids</code> assignee whose <code>hr.employee</code> has the required skills</td>
+<td><code>project.task.user_ids</code> + <code>x_sbk_required_skill_ids</code></td>
+</tr>
+<tr>
+<td><code>equipment</code></td>
+<td>All routing workcenters have <code>southbrook_pm_equipment_alerts = 0</code></td>
+<td><code>mrp.workcenter.southbrook_pm_equipment_alerts</code></td>
+</tr>
+<tr>
+<td><code>install_date</code></td>
+<td><code>install_due_date</code> is set and in the future</td>
+<td><code>project.task.install_due_date</code></td>
+</tr>
+<tr>
+<td><code>cabinet_specs</code></td>
+<td>The task has <code>x_door_style</code> + <code>x_wood_species</code> + <code>x_finish</code> populated (Phase-1 heuristics inferred at confirmation)</td>
+<td><code>southbrook_specs_complete</code> computed</td>
+</tr>
+</tbody>
+</table>
+<p>Each sub-signal returns a score 0-100. The <code>readiness_decision</code>
+banding:</p>
+<ul>
+<li><code>ready</code> — score ≥ 80 AND no blocker-severity sub-signals.</li>
+<li><code>review</code> — score 60-79 OR at least one warning-severity sub-signal.</li>
+<li><code>blocked</code> — score &lt; 60 OR at least one blocker-severity sub-signal.</li>
+<li><code>info</code> — no MOs linked yet (the task exists but the spine isn't
+  fully wired).</li>
+</ul>
+<h2 id="the-cabinet-spec-heuristic-fields">The cabinet-spec heuristic fields</h2>
+<p>When the sale.order's <code>action_confirm</code> override creates the spine,
+it tries to infer cabinet specs from the order line names. The
+heuristics are scoped Phase-1 — they're not authoritative, just a
+starting guess for the planner to confirm or correct:</p>
+<ul>
+<li><strong>Door style</strong> (<code>southbrook_door_style</code>) — guessed from the line
+  product name's <code>slab</code> / <code>shaker</code> / <code>flat panel</code> / <code>five-piece</code>
+  tokens. Used by the configurator at re-pricing time.</li>
+<li><strong>Wood species</strong> (<code>x_southbrook_material_species</code>) — guessed from
+  <code>oak</code> / <code>maple</code> / <code>walnut</code> / <code>cherry</code> tokens.</li>
+<li><strong>Finish</strong> (<code>southbrook_finish</code>) — guessed from <code>natural</code> /
+  <code>painted</code> / <code>stain</code> tokens.</li>
+<li><strong>Hardware specs</strong> (<code>x_southbrook_hardware_specs</code>) — left blank;
+  filled by the designer or PM during planning.</li>
+</ul>
+<p>The DQ cron (Course 2 lesson 2.4 cron 5) reads these — a low
+<code>cabinet_specs</code> score is what flips a card from green to amber
+overnight when a designer forgets to fill them in.</p>
+<h2 id="the-board-filters">The board filters</h2>
+<p>The default search view (<code>view_kitchen_jobs_search</code> in
+<code>kitchen_jobs_views.xml</code>) carries these named filters:</p>
+<ul>
+<li><strong>Open</strong> — <code>[('stage_id.fold','=',False)]</code>. Default on. Hides
+  done / cancelled stages.</li>
+<li><strong>My Jobs</strong> — <code>[('user_ids','in',uid)]</code>. Cards where YOU are an
+  assignee.</li>
+<li><strong>Blocked</strong> — <code>[('readiness_decision','=','blocked')]</code>. Anything
+  the cron decided was missing data.</li>
+<li><strong>Needs Review</strong> — <code>[('readiness_decision','=','review')]</code>.</li>
+<li><strong>Ready</strong> — <code>[('readiness_decision','=','ready')]</code>. Your planning
+  pool.</li>
+<li><strong>At Risk</strong> — <code>[('job_at_risk','=',True)]</code>. The PM's escalation
+  queue.</li>
+<li><strong>Missing Install Date</strong> — <code>[('install_date_missing','=',True)]</code>.
+  Data-quality filter — these are the cards where the spine landed
+  but the install date is missing.</li>
+</ul>
+<p>Group-by options: readiness, release state, customer.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<h3 id="the-pm-planner-start-of-day-15-min">The PM / planner (start of day, 15 min)</h3>
+<ol>
+<li>Open <strong>Kitchen Ops → Kitchen Jobs</strong>. Default filter Open + group
+   by Readiness.</li>
+<li><strong>Scan the Blocked column first.</strong> Sort within it by
+   <code>install_due_date</code> ascending. Open each card whose install is
+   within 14 days — the cron flipped these overnight, and the
+   chatter has the readiness-line breakdown. Read it; identify the
+   failing sub-signal.</li>
+<li><strong>For each Blocked card</strong>: chase the artifact owner.
+   - Sub-signal <code>cad</code> failing → designer / PLM engineer.
+   - Sub-signal <code>cutlist</code> failing → planner runs <code>generate_from_mo</code>
+     on the production package (lesson 12.7).
+   - Sub-signal <code>bom</code> failing → BoM author (typically engineering).
+   - Sub-signal <code>crew</code> failing → HR / scheduler.
+   - Sub-signal <code>equipment</code> failing → maintenance.
+   - Sub-signal <code>cabinet_specs</code> failing → designer.</li>
+<li><strong>Move to the Review column.</strong> These are amber. Sort by
+   <code>readiness_score desc</code> (most-ready first). For each, check the
+   sub-signals to see what's keeping it under 80.</li>
+<li><strong>Ready column</strong> is your planning pool. Cards here can be
+   released to production (if the engineer has signed off the gate —
+   lesson 12.4).</li>
+</ol>
+<h3 id="mid-day-check-3-min">Mid-day check (3 min)</h3>
+<p>The readiness cron fires every 30 minutes. Refresh the board around
+11:00, 14:00, 16:00 — cards may have flipped Ready→Review if an
+upstream artifact was invalidated (BoM updated, ECO raised). Cards
+RARELY flip Review→Ready mid-day unless someone fixed the artifact
+manually.</p>
+<h3 id="end-of-day-5-min">End of day (5 min)</h3>
+<ul>
+<li>Filter <strong>My Jobs + At Risk</strong>. Add a chatter note on each
+  explaining what's blocking and your action plan for tomorrow.</li>
+<li>Confirm <strong>MI Engine Status</strong> shows <code>last_run_at</code> within the last
+  hour — if the MI refire cron stalled, the gate-state flips you're
+  seeing on this board are stale.</li>
+</ul>
+<h2 id="when-the-readiness-cron-flips-a-card-overnight">When the readiness cron flips a card overnight</h2>
+<p>The chatter line you see in the morning reads something like:</p>
+<blockquote>
+<p>Decision: ready -&gt; blocked, Release state: ready -&gt; blocked.</p>
+</blockquote>
+<p>This is the readiness cron (cron 1 in lesson 2.4,
+<code>_cron_recompute_readiness_all</code>) detecting that ONE of the
+sub-signals changed since the last tick. The cron:</p>
+<ol>
+<li>Snapshot pre-state: <code>(readiness_decision, southbrook_production_release_state)</code>.</li>
+<li>Calls <code>action_recompute_readiness_lines</code>.</li>
+<li>Stamps <code>readiness_last_recomputed_at = now()</code>.</li>
+<li>Compares post-state to pre-state.</li>
+<li>If either field changed, posts the chatter note showing both
+   transitions.</li>
+</ol>
+<p>It doesn't tell you which sub-signal changed. To find that out, open
+the task and look at the readiness-lines breakdown
+(<code>readiness_line_ids</code>) — the line whose <code>value</code> is False where it
+was True yesterday is the cause.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"A card shows readiness=blocked but the score is 95."</strong></p>
+<p>That's a sub-signal carrying blocker severity that doesn't
+contribute much to the score. Most common: the <code>cad</code> sub-signal is
+blocker-severity (no CAD = can't go to production), but on a 7-MO
+spine where 6 are CAD-done, the score is high. The decision honours
+the blocker regardless. Open the readiness lines; the False blocker
+is your target.</p>
+<p><strong>"The card name says 'Kitchen Cabinet Set - White Slab (Maple)
+[SO-12455]' but the customer ordered walnut."</strong></p>
+<p>The name was inferred at confirmation time from the FIRST sale
+order line. If the order has multiple lines and the first one is
+the dummy "setup fee" or "delivery", the inference goes wrong.
+Recovery: edit <code>name</code> directly on the task; it's free text. Don't
+worry about resyncing with the sale order — the field drifts by
+design.</p>
+<p><strong>"My MOs are linked to the task via production_ids but the readiness
+sub-signal for <code>bom</code> is still failing."</strong></p>
+<p>The sub-signal checks <code>mrp.production.bom_id IS NOT NULL</code> AND the
+BoM has components. If the MO was created via Send-to-Production
+with a phantom BoM template, the <code>bom_id</code> is set but the
+<code>bom_line_ids</code> is empty. Open the BoM, add components, save. The
+sub-signal flips on the next cron tick (30 min) or you can trigger
+a manual recompute via the task's action button.</p>
+<p><strong>"I see <code>install_due_date</code> is blank on a card but the sale order
+has commitment_date set."</strong></p>
+<p>The copy happens at <code>action_confirm</code> time. If the spine task
+already existed (from a prior partial run) and confirmation didn't
+re-overwrite it, the field stays blank. Recovery: open the order,
+run <strong>Backfill Kitchen Task</strong> server action — the idempotent
+backfill re-reads the commitment_date.</p>
+<p><strong>"A card is <code>info</code> decision with score 0 and no chatter notes."</strong></p>
+<p><code>info</code> is the "no MOs linked yet" state — the spine task exists
+but the orchestration hasn't (or can't) link any MOs. Either the
+sale order has only non-manufactured lines (services, delivery
+fees) or the MO creation step failed silently. Open the order's
+chatter for any "failed to create MO" warnings; check the
+products are manufactured-type.</p>
+<p><strong>"The board is empty even though I know there are 20 active
+projects."</strong></p>
+<p>The action's domain is <code>[('x_southbrook_sale_order_id','!=',False)]</code>
+— so the board hides tasks without a sale-order link. If your
+projects are still in design (<code>sb.kitchen.project.state =
+designing</code>), no sale order exists yet and no task is on the board.
+Look at Sales → Kitchen Workspace → Projects instead for the
+design pipeline.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The <code>project.task</code> model is extended in
+<code>southbrook_project_mrp/models/project_task.py</code>. The Phase-1
+computes (<code>_compute_phase1_job_context</code>,
+<code>_compute_phase1_operational_context</code>) live there. They walk the
+task's <code>production_ids</code> (the One2many to <code>mrp.production</code> added by
+the same addon) and roll up readiness, risk, top blocker, and
+manufacturing-reality summary.</p>
+<p>The readiness recompute (<code>action_recompute_readiness_lines</code>) is also
+in <code>southbrook_project_mrp</code>. It uses the
+<code>southbrook.project.readiness.line</code> model to record per-sub-signal
+state. Each line carries <code>(task_id, signal_key, value, severity,
+score, reason)</code> — the line records ARE the audit trail.</p>
+<p>The compute on the task is <strong>non-stored</strong> but <code>@api.depends_context("uid")</code> —
+which means it re-evaluates on every page-load for the requesting
+user. This makes the kanban responsive without polluting the DB with
+denormalised state. The downside: the cron's job is to write the
+<code>readiness_last_recomputed_at</code> field SO the chatter flip detection
+works. Without the cron, you'd never see the chatter "decision
+changed" line, even though the live view would show the new state.</p>
+<p>The cron's chatter post code (in
+<code>southbrook_premium_orchestration/models/project_task.py</code>):</p>
+<pre><code class="language-python">if pre_decision != task.readiness_decision \
+   or pre_release != task.southbrook_production_release_state:
+    task.message_post(body=f&quot;Decision: {pre_decision} -&gt; &quot;
+                           f&quot;{task.readiness_decision}, &quot;
+                           f&quot;Release state: {pre_release} -&gt; &quot;
+                           f&quot;{task.southbrook_production_release_state}.&quot;)
+</code></pre>
+<p>This is the line you see on chatter every morning. It's the only
+audit trail of the overnight flip; the per-sub-signal change has to
+be inferred by re-reading the readiness lines.</p>
+<p>The <code>job_at_risk</code> compute is conservative: it fires when components
+are waiting on a started MO, OR an MO is past its deadline, OR the
+install date is within 7 days and readiness is still review/blocked.
+The search method (<code>_search_job_at_risk</code>) lets the kanban filter
+use it efficiently without storing.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open a card on Kitchen Jobs and see <code>readiness_decision =
+blocked, readiness_score = 92</code>. The chatter says "Decision: ready -&gt;
+blocked." Walk through the diagnosis.</p>
+<blockquote>
+<p>A blocker-severity sub-signal flipped to False since the last
+cron run. The score is high because most sub-signals are still
+True; the blocker one is dragging the decision regardless. Open
+the readiness lines on the task (<code>readiness_line_ids</code>). Find the
+line where <code>value = False</code> AND <code>severity = 'blocker'</code>. That's
+your cause. Common: <code>cad</code> failing because an ECO was opened
+overnight that invalidates the CAD package.</p>
+</blockquote>
+<p><strong>2.</strong> A PM asks "why does this card say install_due_date = Jan 15
+but the sale order's commitment_date is Jan 22?" Walk through the
+answer.</p>
+<blockquote>
+<p>The install_due_date on the task is editable after confirmation,
+and the planner intentionally drifts it from the order's
+commitment_date to build internal slack. The order's date is the
+CUSTOMER-FACING contract date; the task's date is the SHOP-FACING
+internal deadline. Lesson 2.1 covers this. If you want them
+resynced, open the task and re-set the date to match the order's
+commitment_date manually — there's no auto-sync.</p>
+</blockquote>
+<p><strong>3.</strong> You're looking at a card with <code>readiness_decision = info,
+production_ids = []</code>. The customer paid 3 days ago. What happened?</p>
+<blockquote>
+<p>The spine task was created at confirmation time but no MOs were
+created. Most likely the order lines are all non-manufactured
+(delivery, services) OR the MO creation step in
+<code>_create_kitchen_project_task</code> errored and was silently logged.
+Open the order's chatter; look for "failed to create MO" or
+"no manufactured products". Recovery: confirm the order lines
+have manufactured products with BoMs, then re-run <strong>Backfill
+Kitchen Task</strong> to retry the MO creation.</p>
+</blockquote>
+<p><strong>4.</strong> A planner says "the cron should have fired at 03:30 but the
+readiness_last_recomputed_at on my tasks is still 22:00 yesterday."
+Where do you look first?</p>
+<blockquote>
+<p>The cron worker is the suspect, not the cron record. Open
+Settings → Technical → Scheduled Actions → Southbrook: Recompute
+Project Readiness. Check <code>nextcall</code> — if it's in the past, the
+previous tick crashed. Check <code>active = True</code>. Click <strong>Run
+Manually</strong> to fire it synchronously; if it works, the cron is
+probably stuck behind a queue. Restart the Odoo container as a
+last resort — <code>nextcall</code> is preserved so the cron picks up after
+restart.</p>
+</blockquote>
+<p><strong>5.</strong> A new planner asks "I see Cabinet Specs Complete on the form
+but it's read-only. How do I edit it?"</p>
+<blockquote>
+<p>You don't — it's a computed field
+(<code>southbrook_specs_complete</code>) reading <code>southbrook_door_style</code>,
+<code>x_southbrook_material_species</code>, <code>southbrook_finish</code>, and
+<code>x_southbrook_hardware_specs</code>. Set those four to non-empty values
+and the computed bool flips True automatically. The compute lives
+on the task form's Spec tab. If you've set all four and the bool
+is still False, one of them has whitespace-only content (which
+the compute treats as empty); strip whitespace and re-save.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The pre-sale <code>sb.kitchen.project</code> and its state machine →
+  lesson 12.2.</li>
+<li>The five engineer release booleans and the Production Release
+  Queue → lesson 12.4.</li>
+<li>The workcenter side of equipment and bottleneck data →
+  lesson 12.5.</li>
+<li>MI Engine Status from the planner / sysadmin lens →
+  lesson 12.6.</li>
+<li>The cron mechanics (schedule, model, method, last-run reading)
+  → Course 2 lesson 2.4.</li>
+<li>The orchestration's <code>action_confirm</code> override that creates the
+  spine → Course 2 lesson 2.1 "behind the scenes".</li>
+<li>Native Odoo <code>project.task</code> mechanics, stages, kanban customisation
+  → Odoo's own training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_12_production_release_queue" model="slide.slide">
+            <field name="name">Production Release Queue — The Five Booleans and the Bypass</field>
+            <field name="channel_id" ref="course_kitchen_ops_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Planner + ENG01 Production Engineer (the two-person handoff).</field>
+            <field name="html_content"><![CDATA[<h1 id="production-release-queue-the-five-booleans-and-the-bypass">Production Release Queue — The Five Booleans and the Bypass</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner or ENG01 engineer who runs the daily release
+gate. Course 2 lesson 2.2 introduced the gate at a working level —
+what the booleans mean, who flips each, the per-flow steps. This
+lesson goes a layer deeper: the <strong>detailed flip mechanics</strong>
+(tracking, search, ACL), the <strong>emergency bypass workflow with the
+audit trail</strong>, the <strong>rollback path</strong> when a release goes bad after
+the cabinets are already cut, and the <strong>interaction between the
+five booleans and the readiness compute</strong> that makes a "valid" flip
+sometimes a no-op.</p>
+<p>If you've ever flipped all five booleans and watched the state stay
+<code>blocked</code>, this lesson tells you why.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the planner:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Production Release Queue</strong></p>
+</blockquote>
+<p>The list view of <code>project.task</code> records, default-filtered to
+<code>southbrook_production_release_state in ('review', 'blocked')</code> AND
+<code>x_southbrook_sale_order_id != False</code>. The action is
+<code>action_production_release_queue</code> in
+<code>southbrook_premium_orchestration/views/production_release_views.xml</code>.</p>
+<p>For the engineer:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Kitchen Jobs → \&lt;open a card&gt;</strong></p>
+</blockquote>
+<p>The Production Release tab on the task form. That's where the five
+booleans live. Same model (<code>project.task</code>), same fields, different
+framing.</p>
+<p>For the ENG01 workcenter (where the engineer "lives"):</p>
+<blockquote>
+<p><strong>Manufacturing → Configuration → Work Centers → Design Review /
+Production Engineering (ENG01)</strong></p>
+</blockquote>
+<p>Code <code>ENG01</code>, <code>x_sbk_station_type = engineering</code>,
+<code>x_sbk_is_bottleneck = False</code>, <code>x_sbk_allows_parallel_jobs = True</code>.
+Seeded by
+<code>southbrook_mrp_kitchen_workcenters/data/mrp_workcenter_seed.xml</code>.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>On the Production Release Queue list:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code> on <code>project.task</code>).</li>
+<li><strong>Customer</strong> (<code>partner_id</code>).</li>
+<li><strong>Release state</strong> (<code>southbrook_production_release_state</code>) —
+  rendered as a colour-coded badge (red for blocked, amber for
+  review, green for ready; though green is filtered out by the
+  action domain).</li>
+<li><strong>Readiness score</strong> (<code>readiness_score</code>).</li>
+<li><strong>Install due date</strong> (<code>install_due_date</code>).</li>
+<li><strong>Linked SO</strong> (<code>x_southbrook_sale_order_id</code>).</li>
+<li><strong>At risk</strong> (<code>job_at_risk</code>) — optional column, hidden by default.</li>
+</ul>
+<p>On the per-task <strong>Production Release</strong> tab, the five booleans plus
+the computed state + reason:</p>
+<ul>
+<li><strong>CAD Approved</strong> (<code>southbrook_release_cad_approved</code>) — Boolean,
+  <code>tracking=True</code>.</li>
+<li><strong>Cutlist Approved</strong> (<code>southbrook_release_cutlist_approved</code>) —
+  Boolean, <code>tracking=True</code>.</li>
+<li><strong>BoM Verified</strong> (<code>southbrook_release_bom_verified</code>) — Boolean,
+  <code>tracking=True</code>.</li>
+<li><strong>Crew Assigned / Reserved</strong> (<code>southbrook_release_crew_reserved</code>) —
+  Boolean, <code>tracking=True</code>.</li>
+<li><strong>Critical Equipment Available</strong>
+  (<code>southbrook_release_equipment_available</code>) — Boolean,
+  <code>tracking=True</code>.</li>
+<li><strong>Production Release</strong> (<code>southbrook_production_release_state</code>) —
+  computed, readonly. Selection: <code>ready</code> / <code>review</code> / <code>blocked</code> /
+  <code>info</code>.</li>
+<li><strong>Production Release Reason</strong>
+  (<code>southbrook_production_release_reason</code>) — computed, readonly.
+  Free text explaining the failing item (e.g. "Missing CAD approved,
+  Cutlist approved.").</li>
+</ul>
+<h2 id="the-full-compute-what-makes-the-state-ready">The full compute — what makes the state <code>ready</code></h2>
+<p>This is where Course 2 lesson 2.2's simplification matters. The
+compute in
+<code>southbrook_project_mrp/models/project_task.py:_compute_southbrook_production_release</code>
+walks <code>_southbrook_missing_production_release_items()</code> which checks:</p>
+<ol>
+<li><code>southbrook_site_measurement_status</code> ∈ <code>('received', 'waived')</code>.</li>
+<li><code>southbrook_release_cad_approved</code> OR <code>job_cad_status</code> contains
+   "done".</li>
+<li><code>southbrook_release_cutlist_approved</code>.</li>
+<li><code>southbrook_specs_complete</code> (computed from door style + species +
+   finish + hardware specs being non-empty).</li>
+<li><code>southbrook_release_bom_verified</code>.</li>
+<li><code>production_count &gt; 0</code> (Linked MOs).</li>
+<li><code>components_available == "ready"</code> (every linked MO fully reserved).</li>
+<li><code>workorder_count &gt; 0</code> AND <code>unscheduled_workorder_count == 0</code>.</li>
+<li><code>crew_gap = False</code> OR <code>southbrook_release_crew_reserved = True</code>.</li>
+<li><code>equipment_blocked = False</code> AND
+    <code>southbrook_release_equipment_available = True</code>.</li>
+<li><code>job_install_due</code> is set.</li>
+</ol>
+<p>If ALL eleven pass, state = <code>ready</code>. Any missing item → state =
+<code>blocked</code> with reason = "Missing X, Y, Z."</p>
+<p>This is broader than just five booleans — there are six DATA
+prerequisites (site measurement, specs, MOs, components, WOs,
+install date) that the engineer can't override by flipping a
+boolean. The five booleans gate the engineer's SUBJECTIVE sign-offs
+(CAD looks right, cutlist looks right, BoM looks right, crew is
+there, equipment works). The other six gate the OBJECTIVE data
+state — the booleans don't replace them.</p>
+<h2 id="who-flips-each-boolean-the-responsibility-map">Who flips each boolean — the responsibility map</h2>
+<table>
+<thead>
+<tr>
+<th>Boolean</th>
+<th>Who flips</th>
+<th>Underlying artifact they verified</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_release_cad_approved</code></td>
+<td>ENG01 engineer (preferred) OR designer / PLM engineer (with engineer's verbal ack)</td>
+<td>FreeCAD render exists OR <code>job_cad_status</code> contains "done"; matches <code>selected_design_option_id</code>.</td>
+</tr>
+<tr>
+<td><code>southbrook_release_cutlist_approved</code></td>
+<td>ENG01 engineer</td>
+<td><code>sb.cutlist</code> exists, lines &gt; 0, substrate set; MI engine's per-MO <code>x_mi_blocker_count = 0</code>.</td>
+</tr>
+<tr>
+<td><code>southbrook_release_bom_verified</code></td>
+<td>ENG01 engineer</td>
+<td>Every linked MO has <code>bom_id</code>; hardware package in <code>picked</code> or <code>delivered</code> state; <code>has_pricing_pending = False</code>.</td>
+</tr>
+<tr>
+<td><code>southbrook_release_crew_reserved</code></td>
+<td>Planner</td>
+<td>Skills match (<code>x_sbk_required_skill_ids</code> on workcenter ↔ <code>hr.skill</code> on assignees); body at every bottleneck station for the planned day.</td>
+</tr>
+<tr>
+<td><code>southbrook_release_equipment_available</code></td>
+<td>ENG01 engineer + maintenance lead</td>
+<td>Every routing workcenter has <code>southbrook_pm_equipment_alerts = 0</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>The fields don't have ACL restrictions — anyone with write access
+to <code>project.task</code> can flip any boolean. The tracking is the audit
+trail: every flip lands on chatter with the user who wrote.</p>
+<h2 id="the-emergency-bypass-workflow">The emergency bypass workflow</h2>
+<p>Once per quarter or so, a customer install is tomorrow and the
+ENG01 engineer is unreachable. The system has NO "force release"
+button — flipping the booleans IS the bypass. Course 2 lesson 2.2
+covered the basic steps; here's the full audit-tracked version:</p>
+<h3 id="when-bypass-is-appropriate">When bypass is appropriate</h3>
+<ul>
+<li>Install date &lt; 48 hours away AND</li>
+<li>All five engineer artifacts are actually OK (you've physically
+  looked) AND</li>
+<li>The engineer is unreachable for verbal sign-off AND</li>
+<li>The PM has authorised the bypass in writing (chatter note OR
+  email).</li>
+</ul>
+<h3 id="when-bypass-is-not-appropriate">When bypass is NOT appropriate</h3>
+<ul>
+<li>The cutlist has an MI engine blocker check (<code>Oversized panel</code>,
+  <code>Missing cutlist</code>) — that's a real data problem, not a sign-off
+  delay.</li>
+<li>An equipment alert is <code>critical</code> or <code>offline</code> — bypassing this
+  ships defective product.</li>
+<li>The customer hasn't actually approved the latest design — bypassing
+  this ships the wrong cabinets.</li>
+</ul>
+<h3 id="the-bypass-procedure">The bypass procedure</h3>
+<ol>
+<li><strong>Open the task</strong>, Production Release tab.</li>
+<li><strong>Verify each artifact</strong>. Open the CAD render, look at it. Open
+   the cutlist, scan lines. Open the BoM, check components. Walk the
+   floor and check the equipment. <strong>Don't lie</strong> — if you haven't
+   actually verified, you're shipping a release without the gate.</li>
+<li><strong>Flip the booleans you actually verified.</strong> Each flip lands on
+   chatter with your user.</li>
+<li><strong>Post a chatter note</strong> ON THE TASK explaining: bypass reason,
+   who authorised (PM name + phone-call timestamp), what artifacts
+   you personally verified, when the engineer is expected back, and
+   any open risk.</li>
+<li><strong>Update <code>x_sbk_planning_notes</code></strong> on the ENG01 workcenter with
+   a one-liner pointing to the bypassed task: "BYPASSED: task
+   <name>, Customer <partner>, ratify Monday." The engineer sees
+   this when they next open the workcenter form.</li>
+<li><strong>Send an email to the PM</strong> (out-of-band) summarising what you
+   did. The chatter is the system audit trail; the email is the
+   business audit trail.</li>
+</ol>
+<h3 id="what-happens-after-bypass">What happens after bypass</h3>
+<p>The MI gate refire cron (Course 2 lesson 2.4 cron 2,
+<code>_cron_refire_gates</code>) runs every hour. It re-evaluates every active
+gate check against every in-flight MO. If a gate check fires a
+blocker for the bypassed task (e.g. the cutlist actually had a
+blocker you missed), the gate check writes a check row and the
+recommendation engine catches it. The release state may flip back
+to <code>blocked</code> overnight — that's the system catching the bypass.</p>
+<p>The engineer, returning to work, opens the task and sees:
+- Five booleans flipped by you.
+- Chatter showing your bypass note + each boolean flip.
+- Possibly a refire-cron-induced flip back to blocked.</p>
+<p>They either ratify (everything was fine, leave booleans True) or
+back out (flip the failing one back to False and address the actual
+issue). That's their judgement, not yours.</p>
+<h2 id="the-rollback-when-a-release-goes-bad-after-the-floor-starts">The rollback when a release goes bad after the floor starts</h2>
+<p>This is the situation Course 2 didn't cover: the gate passed, the
+floor started, and the cabinets are partially cut when something
+discovers a problem (wrong species, wrong dimensions, BoM error).</p>
+<h3 id="step-1-stop-the-floor">Step 1 — Stop the floor</h3>
+<ol>
+<li>Open every linked MO from the task (<code>production_ids</code>).</li>
+<li>For each, click <strong>Mark as Done → Cancel</strong> OR put the work orders
+   into <code>paused</code> state. Don't unlink — you'll lose the audit trail.</li>
+<li>Post a chatter note explaining the rollback reason.</li>
+</ol>
+<h3 id="step-2-reset-the-release-state">Step 2 — Reset the release state</h3>
+<p>The release state is <strong>computed</strong>, not stored, so you can't "set it
+back to review" directly. Flip the relevant booleans BACK to False:</p>
+<ul>
+<li>If the BoM was wrong: <code>southbrook_release_bom_verified = False</code>.</li>
+<li>If the cutlist was wrong: <code>southbrook_release_cutlist_approved =
+  False</code>.</li>
+<li>If the CAD didn't match: <code>southbrook_release_cad_approved = False</code>.</li>
+</ul>
+<p>The compute re-runs immediately on save; state flips back to
+<code>blocked</code> and the task lands on the Production Release Queue again.</p>
+<h3 id="step-3-quantify-the-damage">Step 3 — Quantify the damage</h3>
+<p>How many panels were cut? How many already banded? How many
+assembled? Open the MOs' work order durations to see. Anything that
+was started counts as scrap unless it can be reused (different
+cabinet, similar dimensions).</p>
+<h3 id="step-4-fix-the-upstream-artifact">Step 4 — Fix the upstream artifact</h3>
+<p>The whole point of rollback is that the upstream artifact (BoM /
+cutlist / CAD) was wrong. Open it, fix it, re-verify. The fix
+typically requires:</p>
+<ul>
+<li>An ECO (<code>southbrook.eco</code>) raised against the BoM to track the
+  change.</li>
+<li>A new cutlist via <code>generate_from_mo</code> on the production package.</li>
+<li>A new CAD render via the FreeCAD bridge.</li>
+</ul>
+<h3 id="step-5-re-release">Step 5 — Re-release</h3>
+<p>After the upstream is fixed and re-verified, re-flip the booleans.
+The compute re-fires; state goes back to <code>ready</code>. Re-confirm the
+MOs (Manufacturing → MO → Reset to Draft → Confirm). The floor
+picks up from where they stopped (or from scratch if the scrap was
+heavy).</p>
+<p>The whole chain MUST land on chatter. Without the trail, the next
+audit can't reconstruct what happened.</p>
+<h2 id="the-interaction-with-the-readiness-compute">The interaction with the readiness compute</h2>
+<p>A common confusion: <strong>flipping all five booleans is necessary but
+not sufficient for <code>ready</code>.</strong> The compute also reads the SIX data
+prerequisites (site measurement, specs, MOs, components, WOs,
+install date). The readiness sub-signals contribute to many of
+those:</p>
+<ul>
+<li><code>readiness_decision</code> doesn't directly appear in the release
+  compute, but the data sub-signals it reads (BoM, CAD, cutlist)
+  also feed the release compute via <code>job_cad_status</code>,
+  <code>southbrook_specs_complete</code>, <code>production_count</code>, etc.</li>
+</ul>
+<p>So when the engineer says "I flipped all five booleans, why is it
+still blocked?":</p>
+<ol>
+<li>Re-read the <code>southbrook_production_release_reason</code> — it names
+   the specific missing item.</li>
+<li>If it says "Missing components available", the issue is
+   <code>components_available != 'ready'</code> — go to the MOs and reserve
+   components.</li>
+<li>If it says "Missing Schedule work orders", the issue is
+   <code>unscheduled_workorder_count &gt; 0</code> — schedule the WOs.</li>
+<li>If it says "Missing Crew assigned/reserved", the issue is the
+   <code>crew_gap</code> compute returning True AND
+   <code>southbrook_release_crew_reserved = False</code> — assign a user OR
+   flip the boolean.</li>
+</ol>
+<p>The reason field is the truth. Read it before chasing artifacts.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>This is the same as Course 2 lesson 2.2 — read that first for the
+basic flow. The additions here:</p>
+<p><strong>Per release decision (engineer):</strong></p>
+<ul>
+<li>After flipping the five booleans, <strong>REFRESH the task form</strong> before
+  declaring the gate clear. The compute fires on save; if you don't
+  refresh, you're looking at stale fields.</li>
+<li>If the state stays <code>blocked</code> after refresh, read the <strong>reason</strong>.
+  The fields you skipped are listed.</li>
+</ul>
+<p><strong>Per bypass (planner):</strong></p>
+<ul>
+<li>Always post a chatter note BEFORE flipping the bypassed boolean.
+  If you forget, the chatter shows "field flipped" without context;
+  the audit reconstruction is painful.</li>
+</ul>
+<p><strong>Per rollback (joint):</strong></p>
+<ul>
+<li>The engineer flips the bad boolean back. The planner cancels the
+  MOs. They MUST coordinate; one without the other leaves an
+  inconsistent state (booleans say "approved" but MOs are cancelled,
+  or MOs running while booleans say "blocked").</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p>(Course 2 lesson 2.2 covers the basic ones. The new ones here:)</p>
+<p><strong>"I flipped CAD Approved and Cutlist Approved, the reason says
+'Missing BoM verified.' I flipped that boolean too but the reason
+still says it."</strong></p>
+<p>The compute didn't re-fire. Save the form (the floppy disk icon)
+explicitly — the boolean flip is a UI write, but the page-level
+save fires the compute. If saving doesn't help, the
+<code>@api.depends</code> may not include the field you just flipped (unlikely
+but possible after a code change); force-recompute via the
+task action menu.</p>
+<p><strong>"I bypassed the release Friday night, the engineer ratified
+Monday, but Wednesday it flipped back to blocked overnight."</strong></p>
+<p>The MI gate refire cron caught an actual issue that wasn't apparent
+Friday or Monday. Check the most recent chatter note from the MI
+engine — it names which check fired. Likely candidates: an ECO was
+raised against the BoM, an equipment record condition flipped, a
+crew assignment was archived. Address the underlying issue; don't
+re-flip the boolean to silence the cron.</p>
+<p><strong>"I want to release a job but the reason says 'Missing Linked
+MOs.'"</strong></p>
+<p>The spine task exists but no MOs are linked. Open the sale order,
+look at the order lines — if they're all services / non-manufactured
+products, there's nothing to manufacture and the spine shouldn't be
+on the release queue (it shouldn't be in the queue domain either,
+but Phase 1 doesn't filter on this). Likely the planner needs to
+manually create MOs from the order lines OR the order has the
+wrong product type and needs correction. Don't bypass this — it's
+data-state, not sign-off.</p>
+<p><strong>"The release state went from <code>ready</code> to <code>info</code> overnight."</strong></p>
+<p><code>info</code> is the catch-all for "not enough data to decide." Something
+on the task was archived or unlinked. Open the task, look at
+<code>production_ids</code> (any MOs left?), <code>production_count</code>, then check
+the chatter for what was unlinked. If an MO was deleted (rare but
+possible from sysadmin actions), recover by re-running <strong>Backfill
+Kitchen Task</strong> on the sale order.</p>
+<p><strong>"I rolled back a bad release, fixed the BoM, re-flipped the
+booleans, but the MOs are still cancelled."</strong></p>
+<p>Cancelling an MO is a separate action from flipping the gate
+booleans. The booleans control the GATE; the MOs are downstream
+artifacts. Re-open each MO and click <strong>Reset to Draft → Confirm</strong>
+to put them back to confirmed state. The work orders re-generate
+from the routing.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The five booleans live on <code>project.task</code> (added by
+<code>southbrook_project_mrp</code>). They have <code>tracking=True</code> so every flip
+appears in chatter with the user identity. They have no <code>groups</code>
+restriction — anyone with write access on <code>project.task</code> can flip.</p>
+<p>The compute <code>_compute_southbrook_production_release</code> runs on every
+save of any of the dependent fields (the eleven items above). Its
+<code>@api.depends</code> includes all five booleans plus the data prerequisites.
+It calls <code>_southbrook_missing_production_release_items</code> to build
+the list, then sets state + reason accordingly.</p>
+<p>The search method <code>_search_southbrook_production_release_state</code>
+exists because the compute is non-stored — without it, the Production
+Release Queue's domain (<code>southbrook_production_release_state in
+('review', 'blocked')</code>) wouldn't work. The search builds a domain
+on the underlying fields to deliver tasks whose computed state
+matches the requested value.</p>
+<p>The reason text is recomputed alongside the state. Reading
+<code>southbrook_production_release_reason</code> is the fastest way to know
+"what's missing" without opening the form.</p>
+<p>The MI gate refire cron (<code>_cron_refire_gates</code> in
+<code>southbrook.mi.engine.state</code>) re-evaluates every active gate check
+hourly. A gate check that fires writes a <code>southbrook.mi.check</code> row,
+which can flip <code>x_mi_status</code> on the production package, which can
+flip <code>southbrook_release_bom_verified</code> if the BoM check is on
+the gate set. This is the chain by which an Monday-ratified
+bypass can revert by Wednesday — the gate check is doing its job.</p>
+<p>The audit trail is split:
+- <strong>Chatter on the task</strong> — every boolean flip, the user, the
+  timestamp.
+- <strong>Chatter on the workcenter</strong> (<code>x_sbk_planning_notes</code> updates) —
+  bypass narrative.
+- <strong><code>ir.logging</code></strong> — cron output, including which check fired and
+  why.</p>
+<p>A complete audit reconstruction reads all three.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You flip all five booleans on a task with <code>install_due_date =
+tomorrow</code>, state stays <code>blocked</code>, reason says "Missing Schedule work
+orders." What does this mean and how do you fix?</p>
+<blockquote>
+<p>The compute reads <code>unscheduled_workorder_count</code> — if any linked
+WO has no <code>date_planned_start</code>, the gate stays blocked even though
+the engineer signed off. Open <strong>Manufacturing → Work Orders</strong>,
+filter by the task's MOs, schedule the unscheduled WOs against
+their workcenters. The compute re-fires on save; state flips to
+<code>ready</code> once every WO has a planned start. The booleans alone
+don't cover scheduling — that's the planner's job.</p>
+</blockquote>
+<p><strong>2.</strong> The engineer is sick on a Tuesday with an install tomorrow.
+The PM tells you to bypass. Walk through the bypass procedure
+end-to-end.</p>
+<blockquote>
+<p>(1) Verify each artifact yourself: open the CAD render, scan the
+cutlist, walk the BoM, confirm crew on the calendar, check the
+equipment list. (2) If everything is actually OK, flip the five
+booleans on the task. (3) Post a chatter note on the task
+explaining the bypass: PM authorised by phone at <time>, you
+verified each artifact at <time>, engineer expected back <day>.
+(4) Open the ENG01 workcenter (Manufacturing → Workcenters → ENG01),
+add a line in <code>x_sbk_planning_notes</code>: "BYPASSED: task <name>,
+ratify <day>." (5) Email the PM a summary so the business has its
+own audit trail. The chatter alone is fine for the system audit
+but the email is the business contract.</p>
+</blockquote>
+<p><strong>3.</strong> A release was approved Monday, the floor cut 40 panels
+Tuesday, then Wednesday the planner discovers the BoM had the wrong
+hinge type. Walk through the rollback.</p>
+<blockquote>
+<p>(1) Stop the floor: cancel or pause the linked MOs.
+(2) Flip <code>southbrook_release_bom_verified = False</code> on the task.
+Compute fires, state goes back to <code>blocked</code> with reason
+"Missing BoM verified." Task lands on Production Release Queue.
+(3) Quantify damage: 40 panels cut, count how many are reusable
+(different cabinet, same dimensions). Scrap the rest via
+<code>stock.scrap</code>. (4) Raise a <code>southbrook.eco</code> against the BoM with
+the hinge correction; PLM engineer reviews + approves. (5) Once
+the BoM is fixed, re-flip <code>southbrook_release_bom_verified = True</code>.
+Compute fires, state goes back to <code>ready</code>. (6) Reset MOs to draft,
+confirm, re-start the floor. Every step lands on chatter; this is
+the audit reconstruction the next quality review will read.</p>
+</blockquote>
+<p><strong>4.</strong> A planner asks "if the engineer's booleans are necessary but
+not sufficient, what's actually sufficient for a <code>ready</code> state?"</p>
+<blockquote>
+<p>The compute checks ELEVEN items: 5 engineer booleans + 6 data
+prerequisites (site measurement, cabinet specs, linked MOs,
+components ready, WOs generated + scheduled, crew + equipment +
+install date). The five booleans gate engineer judgement; the six
+data items gate objective data state. ALL eleven must pass. The
+reason field always names the failing one. Read the reason; don't
+just count booleans.</p>
+</blockquote>
+<p><strong>5.</strong> The release state flipped from <code>ready</code> back to <code>info</code>
+overnight. The chatter shows no MI engine note. What's the
+diagnosis?</p>
+<blockquote>
+<p><code>info</code> means "not enough data to decide" — typically the linked
+MOs got unlinked (deleted, archived, or the spine lost its
+<code>production_ids</code>). Open the task; if <code>production_count = 0</code>, the
+spine is empty. Check the sale order's chatter for any
+auto-action that may have cancelled MOs. Recovery: run
+<strong>Backfill Kitchen Task</strong> on the sale order to re-create the
+spine and re-link MOs. The compute re-fires on save; state
+returns to either <code>blocked</code> (more data missing) or <code>review</code> /
+<code>ready</code> if the boolean booleans were preserved.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The basic gate-flow each role does day-to-day → Course 2 lesson 2.2.</li>
+<li>The Kitchen Jobs board and how readiness flows in →
+  lesson 12.3 + Course 2 lesson 2.1.</li>
+<li>Bottleneck-aware scheduling once a job is released →
+  Course 2 lesson 2.3 + lesson 12.5.</li>
+<li>The MI gate refire cron mechanics — schedule, last-run, failure
+  modes → Course 2 lesson 2.4 cron 2.</li>
+<li>The MI Engine Status board → lesson 12.6.</li>
+<li>ECO authoring details → Course 4 lesson 4.1.</li>
+<li>Native Odoo work-order scheduling and resource calendar mechanics
+  → Odoo's own training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_12_floor_load_dashboards" model="slide.slide">
+            <field name="name">Floor Load + Workcenter Bottlenecks — The Read-Side Analytics</field>
+            <field name="channel_id" ref="course_kitchen_ops_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Production Planner + Production Manager (the two who walk the floor with this board).</field>
+            <field name="html_content"><![CDATA[<h1 id="floor-load-workcenter-bottlenecks-the-read-side-analytics">Floor Load + Workcenter Bottlenecks — The Read-Side Analytics</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner or production manager walking the floor with the
+Workcenter Bottlenecks board open on your tablet. Course 2 lesson
+2.3 gave you the operational flow (read the board, schedule MOs,
+reroute on breakdowns). This lesson goes inside the data: how each
+KPI is COMPUTED, why the bottleneck KPI you see may already be
+stale, how the <code>alternative_workcenter_ids</code> relationship feeds
+re-routing, and how the structural vs live bottleneck flags
+disagree.</p>
+<p>Get the compute timing wrong and you'll make scheduling decisions
+based on yesterday's load numbers — that's the most common rookie
+mistake.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the planner:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenter Bottlenecks</strong></p>
+</blockquote>
+<p>Default kanban view on <code>mrp.workcenter</code>. Action is
+<code>action_workcenter_bottleneck_board</code> in
+<code>southbrook_premium_orchestration/views/workcenter_bottleneck_views.xml</code>.
+Domain filter: <code>active = True</code>.</p>
+<p>For the production manager's walk-around:</p>
+<blockquote>
+<p><strong>Southbrook PM → Floor Load</strong></p>
+</blockquote>
+<p>Same underlying data, different framing. Owned by
+<code>southbrook_mrp_pm/views/pm_menus.xml</code>. The PM uses this on a tablet
+while walking the floor; the planner uses Kitchen Ops →
+Bottlenecks from a desk.</p>
+<p>For the per-workcenter detail:</p>
+<blockquote>
+<p><strong>Manufacturing → Configuration → Work Centers → \&lt;click one&gt;</strong></p>
+</blockquote>
+<p>The OOTB Odoo workcenter form, extended with the Southbrook fields.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Each tile on the Workcenter Bottlenecks kanban (using Odoo's stock
+mrp.workcenter kanban — see the "behind the scenes" for why
+Southbrook doesn't ship a custom one):</p>
+<ul>
+<li><strong>Workcenter name + code</strong> (<code>name</code>, <code>code</code> on <code>mrp.workcenter</code>).
+  E.g. "Panel Saw / CNC Nesting (SB-SAW)".</li>
+<li><strong>In-Flight WOs</strong> (<code>southbrook_pm_inflight_count</code>) — count of
+  work orders at this station in <code>pending</code> / <code>waiting</code> / <code>ready</code> /
+  <code>progress</code>. Live, no cache.</li>
+<li><strong>Done Today</strong> (<code>southbrook_pm_throughput_today</code>) — count finished
+  here since midnight (<code>state = done</code> AND <code>date_finished &gt;=
+  today 00:00</code>).</li>
+<li><strong>Late MOs</strong> (<code>southbrook_pm_late_count</code>) — count of MOs with at
+  least one WO at this station whose <code>date_deadline</code> has passed
+  and which aren't done.</li>
+<li><strong>Equipment Alerts</strong> (<code>southbrook_pm_equipment_alerts</code>) — count
+  of <code>maintenance.equipment</code> records at this station whose
+  <code>southbrook_condition</code> is anything other than <code>good</code> (i.e.
+  <code>fair</code> / <code>watch</code> / <code>critical</code> / <code>offline</code>).</li>
+</ul>
+<p>On the per-workcenter form, the Southbrook tab shows the planner /
+configuration fields:</p>
+<ul>
+<li><strong>Station type</strong> (<code>x_sbk_station_type</code>) — Selection: <code>cutting</code>,
+  <code>cnc</code>, <code>edge_banding</code>, <code>assembly</code>, <code>finishing</code>, <code>engineering</code>,
+  <code>quality</code>, <code>subcontract</code>, etc.</li>
+<li><strong>Bottleneck flag</strong> (<code>x_sbk_is_bottleneck</code>) — Boolean,
+  <strong>configuration</strong>, NOT live state.</li>
+<li><strong>Allows parallel jobs</strong> (<code>x_sbk_allows_parallel_jobs</code>) — True
+  for stations that can run multiple WOs concurrently.</li>
+<li><strong>Max panel size</strong> (<code>x_sbk_max_panel_length_mm</code>,
+  <code>x_sbk_max_panel_width_mm</code>) — operations whose cutlist line
+  exceeds this can't route here.</li>
+<li><strong>Supported materials</strong> (<code>x_sbk_supported_material_ids</code>).</li>
+<li><strong>Required skills</strong> (<code>x_sbk_required_skill_ids</code>).</li>
+<li><strong>Default setup time</strong> (<code>x_sbk_default_setup_time_min</code>).</li>
+<li><strong>Changeover time</strong> (<code>x_sbk_changeover_time_min</code>).</li>
+<li><strong>OEE target</strong> (<code>x_sbk_oee_target</code>).</li>
+<li><strong>Planning notes</strong> (<code>x_sbk_planning_notes</code>) — Text.</li>
+<li><strong>Alternative workcenters</strong> (<code>alternative_workcenter_ids</code>) —
+  Many2many to self. The reroutable backups.</li>
+</ul>
+<h2 id="the-four-kpi-computes-how-each-is-calculated">The four KPI computes — how each is calculated</h2>
+<p>Defined in <code>southbrook_mrp_pm/models/mrp_workcenter.py</code>. All four
+are NOT stored — each page load re-runs the search:</p>
+<h3 id="southbrook_pm_inflight_count"><code>southbrook_pm_inflight_count</code></h3>
+<pre><code class="language-python">Wo.search_count([
+    (&quot;workcenter_id&quot;, &quot;=&quot;, wc.id),
+    (&quot;state&quot;, &quot;in&quot;, [&quot;pending&quot;, &quot;waiting&quot;, &quot;ready&quot;, &quot;progress&quot;]),
+])
+</code></pre>
+<p><strong>The "how busy is this station now?" metric.</strong> Counts WOs that are
+queued, waiting on prerequisites, ready to start, or running. The
+metric grows as the planner schedules more MOs and shrinks as WOs
+move to <code>done</code> or <code>cancel</code>.</p>
+<p>Important: <code>waiting</code> state means the WO has unfinished predecessor
+WOs (cutting must finish before edge banding can start). So a
+high inflight count includes WOs that aren't physically at the
+station yet — they're queued because the upstream isn't done.
+Sub-filter to <code>state = ready</code> to see what's actually claimable.</p>
+<h3 id="southbrook_pm_throughput_today"><code>southbrook_pm_throughput_today</code></h3>
+<pre><code class="language-python">Wo.search_count([
+    (&quot;workcenter_id&quot;, &quot;=&quot;, wc.id),
+    (&quot;state&quot;, &quot;=&quot;, &quot;done&quot;),
+    (&quot;date_finished&quot;, &quot;&gt;=&quot;, today_start),
+])
+</code></pre>
+<p><strong>The coarse-grain throughput.</strong> Counts WOs finished since midnight.
+Resets daily. The fine-grain OEE compute (Course 3 lesson 3.3) is
+the proper performance metric; this one is the "are we shipping?"
+gut check.</p>
+<h3 id="southbrook_pm_late_count"><code>southbrook_pm_late_count</code></h3>
+<pre><code class="language-python">Mo.search_count([
+    (&quot;state&quot;, &quot;not in&quot;, [&quot;done&quot;, &quot;cancel&quot;]),
+    (&quot;date_deadline&quot;, &quot;&lt;&quot;, now),
+    (&quot;workorder_ids.workcenter_id&quot;, &quot;=&quot;, wc.id),
+])
+</code></pre>
+<p><strong>The alarm bell.</strong> Counts MOs (not WOs) whose deadline has passed
+and which aren't done. The <code>workorder_ids.workcenter_id</code> join means
+"this MO touches this station." A late count at SB-SAW cascades to
+SB-EDGE three hours later because nothing has tape to band — the
+cascade is the planner's job to predict.</p>
+<h3 id="southbrook_pm_equipment_alerts"><code>southbrook_pm_equipment_alerts</code></h3>
+<pre><code class="language-python">Eq.search_count([
+    (&quot;workcenter_id&quot;, &quot;=&quot;, wc.id),
+    (&quot;southbrook_condition&quot;, &quot;in&quot;,
+     [&quot;fair&quot;, &quot;watch&quot;, &quot;critical&quot;, &quot;offline&quot;]),
+])
+</code></pre>
+<p><strong>The maintenance signal.</strong> <code>southbrook_condition</code> is a custom
+Selection added by <code>southbrook_mrp_pm</code> to <code>maintenance.equipment</code>:
+<code>good</code> / <code>fair</code> / <code>watch</code> / <code>critical</code> / <code>offline</code>. A <code>critical</code>
+or <code>offline</code> machine at a workcenter means the station can run on
+reduced capacity OR can't run at all — both surface as <code>&gt; 0</code>
+alerts.</p>
+<h3 id="when-are-these-computed">When are these computed?</h3>
+<p>All four have <code>@api.depends_context("uid")</code> — they re-evaluate on
+EVERY page load for the requesting user. There's no cron pushing
+updates; the data is read live from the underlying tables. The
+upside: zero staleness, no cache invalidation. The downside: on
+boards with many workcenters, each workcenter triggers four
+search_counts on the database. The cost is manageable for the 18
+Southbrook workcenters but would be painful at 200+.</p>
+<h2 id="the-amber-red-banding-what-drives-it">The amber / red banding — what drives it</h2>
+<p>The Workcenter Bottlenecks board uses Odoo's <strong>stock</strong> kanban view
+on <code>mrp.workcenter</code> (see "behind the scenes" — Southbrook
+deliberately didn't ship a custom kanban). The banding signals you
+see come from the OOTB load vs capacity column:</p>
+<ul>
+<li><strong>Green</strong> — load &lt; 80% of capacity for the day.</li>
+<li><strong>Amber</strong> — load 80-100% of capacity.</li>
+<li><strong>Red</strong> — load &gt; 100%.</li>
+</ul>
+<p><code>workcenter.load</code> is OOTB Odoo (sum of planned hours for in-flight
+WOs at this station for today). <code>workcenter.capacity</code> is also OOTB
+(hours per day from the resource calendar × time efficiency).</p>
+<p>The Southbrook fields (<code>southbrook_pm_*</code>) are surfaced AS COLUMNS
+on the kanban, but they don't drive the colour. If you want
+colour-coded Southbrook KPIs, write a custom kanban that decorates
+on the Southbrook fields directly. This is a documented gap that
+the team hasn't prioritised.</p>
+<h2 id="the-bottleneck-flag-what-it-means-and-what-it-doesnt">The bottleneck flag — what it means and what it doesn't</h2>
+<p>Two fields carry the word "bottleneck":</p>
+<ul>
+<li><strong><code>x_sbk_is_bottleneck</code></strong> on <code>mrp.workcenter</code> — CONFIGURATION
+  flag set at install time in
+  <code>southbrook_mrp_kitchen_workcenters/data/mrp_workcenter_seed.xml</code>.
+  It tells the planner "this is a structural constraint; never
+  overload it." Doesn't change as work runs.</li>
+<li><strong><code>x_mi_bottleneck_workcenter_id</code></strong> on <code>mrp.production</code> — LIVE
+  field set by the MI engine. For a specific in-flight MO,
+  identifies which workcenter is the constraint TODAY. Changes as
+  conditions change.</li>
+</ul>
+<p>The structural flag values (from the seed file):</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Name</th>
+<th style="text-align: right;">Bottleneck?</th>
+<th>Alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SB-SAW</td>
+<td>Panel Saw / CNC Nesting</td>
+<td style="text-align: right;">True</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SB-EDGE</td>
+<td>Edge Bander</td>
+<td style="text-align: right;">True</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SB-CNC-BORE</td>
+<td>CNC Boring</td>
+<td style="text-align: right;">True</td>
+<td>CNC02</td>
+</tr>
+<tr>
+<td>SB-ASSY</td>
+<td>Carcass Assembly</td>
+<td style="text-align: right;">True</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SB-DOOR</td>
+<td>Door Hanging</td>
+<td style="text-align: right;">False</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SB-HW</td>
+<td>Hardware Fitting</td>
+<td style="text-align: right;">False</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SB-QC</td>
+<td>Quality Control</td>
+<td style="text-align: right;">True</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SB-PACK</td>
+<td>Pack &amp; Label</td>
+<td style="text-align: right;">False</td>
+<td>—</td>
+</tr>
+<tr>
+<td>ENG01</td>
+<td>Design Review / Production Eng</td>
+<td style="text-align: right;">False</td>
+<td>—</td>
+</tr>
+<tr>
+<td>CNC02</td>
+<td>CNC Router 02 (Backup)</td>
+<td style="text-align: right;">False</td>
+<td>SB-CNC-BORE</td>
+</tr>
+<tr>
+<td>(extended: PAINT)</td>
+<td>Paint Booth</td>
+<td style="text-align: right;">True (in extended seed)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Bottleneck stations get planning attention: the bottleneck board
+sorts them to the top, the MI engine watches their idle minutes
+more aggressively, and the planner shouldn't overload them.</p>
+<h2 id="the-alternative_workcenter_ids-relationship">The <code>alternative_workcenter_ids</code> relationship</h2>
+<p>This is native Odoo <code>mrp.workcenter</code> field (many2many to self).
+Southbrook adds the <strong>reciprocity</strong> convention via seed file:
+SB-CNC-BORE → CNC02 AND CNC02 → SB-CNC-BORE. The reciprocity is
+tested by <code>southbrook_mrp_kitchen_workcenters/tests/test_m1_workcenter_fields.py</code>.</p>
+<p>The operation template
+(<code>southbrook.kitchen.operation.template</code> — owned by
+<code>southbrook_mrp_kitchen_workcenters</code>) reads BOTH <code>workcenter_id</code>
+AND <code>alternative_workcenter_ids</code> when deciding which station can
+run an operation step. This is the code path that lets you
+re-route without re-writing the routing definition.</p>
+<p><strong>Practical consequence</strong>: when SB-CNC-BORE breaks down mid-day, the
+planner opens the workcenter, sees CNC02 listed as the alternative,
+and moves the unstarted WOs to CNC02. The operation template
+accepts CNC02 because it was the listed alternative. No routing
+edit needed.</p>
+<p>The flip side: <strong>SB-SAW, SB-EDGE, SB-ASSY, SB-QC, PAINT have NO
+alternative.</strong> They're irreplaceable in the current shop layout.
+When one breaks, the only recovery options are:</p>
+<ol>
+<li>Push the install date (PM + customer call).</li>
+<li>Subcontract (if a <code>x_sbk_station_type = subcontract</code> routing is
+   approved).</li>
+<li>Triage which MOs survive (tightest deadline first).</li>
+</ol>
+<p>Course 2 lesson 2.3 covers these recovery flows.</p>
+<h2 id="when-the-bottleneck-kpi-lies">When the bottleneck KPI lies</h2>
+<p>The KPIs are computed live but they read from the database state.
+If the database is half-updated, the KPIs reflect the half-update.
+The most common "the KPI lies" cases:</p>
+<ul>
+<li><strong>WO not closed at end-of-shift</strong>: the operator forgot to tap
+  Done. The WO stays in <code>progress</code>, so <code>southbrook_pm_inflight_count</code>
+  is one too high for the next day's planning. Fix: educate
+  operators on closing WOs; review the <code>progress</code>-state WO list
+  daily.</li>
+<li><strong>WO assigned to wrong workcenter</strong>: the planner moved an MO from
+  SB-CNC-BORE to CNC02 but the WO's <code>workcenter_id</code> is still
+  SB-CNC-BORE. Fix: re-confirm the MO so the WO regenerates from
+  the updated routing.</li>
+<li><strong><code>date_deadline</code> field auto-shifted by <code>_compute</code></strong>: native MRP
+  recomputes deadlines when an MO is re-confirmed. If your late
+  count flips from 4 to 0 overnight without anything finishing,
+  the deadlines moved. Open the MOs and check <code>date_deadline</code> —
+  it should match the install date.</li>
+<li><strong>Equipment condition stale</strong>: someone flipped a machine to
+  <code>good</code> after maintenance but forgot to mark another that just
+  broke. The alert count stays the same; reality has moved.
+  Cross-check with the actual floor.</li>
+</ul>
+<p>The KPI is a SIGNAL, not the truth. Walk the floor; the floor is
+the truth.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>(Course 2 lesson 2.3 covers the basic flow. The detail additions
+here:)</p>
+<p><strong>Start of day (10 min):</strong></p>
+<ul>
+<li>Open Kitchen Ops → Workcenter Bottlenecks. <strong>Sort the kanban by
+  bottleneck flag</strong> (configurable in the search bar — group by
+  <code>x_sbk_is_bottleneck</code> and the True column floats to the top).</li>
+<li>For each bottleneck station:</li>
+<li>Note <code>southbrook_pm_inflight_count</code>. Compare to yesterday's
+    end-of-day note in <code>x_sbk_planning_notes</code>. If today's number is
+    higher, the overnight queue grew (waiting WOs from upstream
+    finishing).</li>
+<li>Note <code>southbrook_pm_late_count</code>. Anything &gt; 0 needs immediate
+    triage.</li>
+<li>Click into the workcenter, look at <code>alternative_workcenter_ids</code>.
+    If there's a backup, you have a reroute option; if not, you
+    don't.</li>
+</ul>
+<p><strong>Mid-day check (5 min, around 11:00 and 14:00):</strong></p>
+<ul>
+<li>Refresh. The inflight counts may have shifted as morning WOs
+  finished. The throughput-today count should be tracking to half
+  of the day's plan by lunch.</li>
+<li>If a bottleneck's <code>southbrook_pm_equipment_alerts</code> increased
+  since morning, a machine broke — drop everything and check.</li>
+</ul>
+<p><strong>End of day (5 min):</strong></p>
+<ul>
+<li>Update each bottleneck's <code>x_sbk_planning_notes</code> with the
+  end-of-day count for tomorrow's reference: "EOD: 12 inflight, 8
+  done today, 0 late, 0 equipment alerts."</li>
+<li>Cross-check the late count is consistent with the at-risk badges
+  on the Kitchen Jobs board.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"My inflight count says 8 but I can see 12 work orders queued at
+the station."</strong></p>
+<p>The 4 missing are in <code>cancel</code> or <code>done</code> state (closed) and aren't
+counted, OR they're attached to MOs that were cancelled (the WO
+state is <code>cancel</code> too). Open the workcenter's WO list, look at the
+state column. The count is <code>pending / waiting / ready / progress</code>
+only.</p>
+<p><strong>"Done Today shows 0 at SB-CNC-BORE but the operator finished 5
+WOs this morning."</strong></p>
+<p>Either (a) the WOs weren't actually moved to <code>done</code> state — the
+operator hit some other button (clock out, pause), or (b) the
+<code>date_finished</code> wasn't written. Both happen when the floor portal
+disconnects mid-action. Recovery: open Manufacturing → Work Orders,
+filter by SB-CNC-BORE + today's date, check the state column. Any
+in <code>progress</code> or with <code>date_finished</code> blank: edit manually and
+mark Done with the actual finish time.</p>
+<p><strong>"The late count went from 0 to 7 overnight at SB-ASSY but nothing
+ran overnight."</strong></p>
+<p>The compute uses <code>date_deadline</code> on the MO, not on the WO. When
+midnight rolled over, 7 MOs whose deadline was "today" became
+"yesterday" and tripped the late filter. The cabinets aren't
+physically late yet; the planning baseline is. This is the
+signal to escalate to PM, not panic — the deadline was already
+known, you just hadn't acted on it.</p>
+<p><strong>"I rerouted from SB-CNC-BORE to CNC02 but the workcenter's
+inflight count on SB-CNC-BORE didn't drop."</strong></p>
+<p>The route change updates the OPERATION TEMPLATE's allowed
+workcenters, not the existing WOs' <code>workcenter_id</code>. To actually
+move the WOs, open them and change <code>workcenter_id</code> on each. Or
+cancel the WOs and let confirmation regenerate them against the
+new routing.</p>
+<p><strong>"Equipment alert count is 1 but I can't find the bad machine."</strong></p>
+<p>The compute counts equipment records at this workcenter with
+condition <code>fair</code>/<code>watch</code>/<code>critical</code>/<code>offline</code>. Open the
+workcenter's linked <code>maintenance.equipment</code> list (under the
+workcenter form, look for the equipment tab or filter on
+<code>workcenter_id</code>). Find the one whose condition isn't <code>good</code>. If
+the count is 1 but no equipment shows up there, the
+<code>workcenter_id</code> on the equipment record might be wrong — check
+the field and fix.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The Workcenter Bottlenecks board action
+(<code>action_workcenter_bottleneck_board</code>) <strong>deliberately doesn't
+specify a custom view_id</strong>. Odoo falls back to the stock kanban +
+list + form views for <code>mrp.workcenter</code>. The comment in
+<code>workcenter_bottleneck_views.xml</code> explains why: in Odoo 19,
+<code>mrp.workcenter</code> has load-order quirks around capacity / load
+fields that fail view validation during <code>-u</code> even when the
+fields exist in <code>fields_get</code>. Falling back to stock views is
+safer.</p>
+<p>The four Southbrook KPI fields ARE visible on the stock kanban
+because they exist on the model, but the OOTB kanban template
+doesn't include them by default — the planner sees them on the
+form view, not the kanban tile. This is a UI gap; surfacing them
+on the kanban requires a view inheritance the team hasn't shipped.</p>
+<p>The <code>x_sbk_is_bottleneck</code> flag is configuration, set in
+<code>mrp_workcenter_seed.xml</code>. The seed runs at install time and on
+<code>-u southbrook_mrp_kitchen_workcenters</code>. Flipping it via the UI
+is allowed but discouraged — the seed re-runs on update will NOT
+re-overwrite (the seed uses <code>noupdate=0</code> for the new records but
+<code>noupdate=1</code> for existing field updates, intentionally).</p>
+<p>The <code>alternative_workcenter_ids</code> field is native Odoo m2m to
+self. The Southbrook seed sets the reciprocity (A→B AND B→A).
+The reciprocity test catches future regressions.</p>
+<p>The MI engine's <code>x_mi_bottleneck_workcenter_id</code> on
+<code>mrp.production</code> is the LIVE bottleneck for that MO at the time
+of the last MI recompute. The recompute fires on MO save and on
+the hourly MI gate refire cron. So <code>x_mi_bottleneck_workcenter_id</code>
+can change between morning and afternoon as conditions shift
+(equipment goes down, alternative workcenter comes online).</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open the Workcenter Bottlenecks board at 08:00. SB-SAW
+shows <code>inflight=22, late=2, equipment_alerts=0</code>. CNC02 shows
+<code>inflight=3</code>. The cron just ran at 07:30. What's the right
+sequence of actions?</p>
+<blockquote>
+<p>SB-SAW is dangerously overloaded (22 inflight, typical 6-10).
+The 2 late MOs are already off-plan. (1) Open SB-SAW's WO list,
+sort by <code>date_planned_start</code>. Identify the 8-12 WOs that can
+roll to tomorrow — defer them. (2) Check
+<code>alternative_workcenter_ids</code> on SB-SAW — it's empty, no reroute.
+(3) The cascade hits SB-EDGE in 3 hours; pre-warn the edge bander
+operator about reduced volume. (4) Tell the PM the 2 late MOs
+need install-date conversation TODAY. CNC02's low inflight is
+unrelated (different routing path); don't move SB-SAW work to
+CNC02 — different operations.</p>
+</blockquote>
+<p><strong>2.</strong> A planner notices <code>southbrook_pm_throughput_today</code> at 0 on
+SB-CNC-BORE at 14:00 but knows the operator ran 4 WOs since
+morning. What are the two most likely causes?</p>
+<blockquote>
+<p>(1) The WOs are in <code>progress</code> state, not <code>done</code>. The operator
+hit Start but didn't tap Done — they're still "in flight" in the
+system. Recovery: educate the operator, walk them through closing
+WOs. (2) The WOs ARE done but <code>date_finished</code> is blank (floor
+portal disconnect mid-tap). Recovery: open each WO, set
+<code>date_finished</code> to the actual finish time. The count flips on
+the next page refresh.</p>
+</blockquote>
+<p><strong>3.</strong> SB-EDGE's <code>southbrook_pm_late_count</code> is 4 at 09:00 with
+zero new MOs running. What happened between yesterday's close and
+this morning?</p>
+<blockquote>
+<p>Midnight rolled over and 4 MOs whose <code>date_deadline</code> was
+yesterday became late. These were already known-late at end of
+shift but the alarm was suppressed until the date crossed. The
+action: escalate to PM for install-date negotiation, identify
+what tomorrow's plan deprioritises to drain the backlog.</p>
+</blockquote>
+<p><strong>4.</strong> A planner moves an unstarted WO from SB-CNC-BORE to CNC02
+by editing the WO's <code>workcenter_id</code> field directly. The next cron
+tick, the WO's workcenter_id is back to SB-CNC-BORE. What's the
+cause?</p>
+<blockquote>
+<p>Some downstream automation re-derived <code>workcenter_id</code> from the
+routing. Native Odoo's MO recompute can do this on certain
+state transitions. The right way to reroute is via the operation
+template's <code>alternative_workcenter_ids</code> (which is already set
+for the SB-CNC-BORE ↔ CNC02 pair) so the routing allows both;
+then the WO assignment should persist. If it's still reverting,
+open the MO and look at the routing — the operation step might
+have <code>workcenter_id</code> hard-coded to SB-CNC-BORE without the
+alternative listed.</p>
+</blockquote>
+<p><strong>5.</strong> A PM asks "why doesn't the kanban tile colour reflect the
+Southbrook KPIs? SB-EDGE shows 26 inflight but the tile is green."</p>
+<blockquote>
+<p>The action falls back to Odoo's stock kanban view because Odoo
+19's <code>mrp.workcenter</code> has view-validation quirks that broke a
+custom kanban we tried earlier. The stock kanban colour comes
+from native <code>load</code> vs <code>capacity</code> columns (today's scheduled
+hours vs the resource calendar's hours). The Southbrook KPIs
+are columns on the form, not the kanban. This is a known UI
+gap; the workaround is to use the list view (sortable by
+Southbrook columns) for triage instead of relying on tile
+colour.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The basic scheduling flow and rerouting playbook → Course 2
+  lesson 2.3.</li>
+<li>The MI engine's per-MO live bottleneck
+  (<code>x_mi_bottleneck_workcenter_id</code>) and how it differs from the
+  structural one → Course 2 lesson 2.3 + 2.5.</li>
+<li>OEE (the proper performance metric beyond throughput_today) →
+  Course 3 lesson 3.3.</li>
+<li>Native Odoo <code>mrp.workcenter</code> resource calendar, capacity, load
+  computes → Odoo's own training.</li>
+<li>Per-operator daily flow at each station → Course 1 lessons
+  1.2-1.5.</li>
+<li>Authoring routings + operation templates → developer-side, out
+  of e-learning scope.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_12_mi_engine_observability" model="slide.slide">
+            <field name="name">MI Engine Status — The Planner&#x27;s Observability Lens</field>
+            <field name="channel_id" ref="course_kitchen_ops_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Production Planner + IT Admin (the two who read the singleton telemetry).</field>
+            <field name="html_content"><![CDATA[<h1 id="mi-engine-status-the-planners-observability-lens">MI Engine Status — The Planner's Observability Lens</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner who walks in at 7am and wants a 30-second answer
+to "is the MI engine running cleanly?" OR you're the IT admin who
+got paged at 03:14 because something flipped overnight and you need
+to confirm the cron's not the culprit. Course 2 lesson 2.4 covered
+the cron mechanics from the sysadmin's perspective; lesson 2.5
+covered the per-MO MI checks the planner acts on. THIS lesson is
+the <strong>singleton state record</strong> that sits between them — the engine's
+self-reported last-run telemetry.</p>
+<p>The MI Engine Status board is a one-screen health dashboard. Get
+comfortable with it and you'll stop chasing ghosts when the readiness
+crons go quiet.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the planner:</p>
+<blockquote>
+<p><strong>Kitchen Ops → MI Engine Status</strong></p>
+</blockquote>
+<p>The singleton form on <code>southbrook.mi.engine.state</code>. Action
+<code>action_mi_engine_status</code> in
+<code>southbrook_premium_orchestration/views/mi_engine_views.xml</code>.</p>
+<p>For the IT admin (cron-level diagnosis):</p>
+<blockquote>
+<p><strong>Settings → Technical → Scheduled Actions → "Southbrook: Refire MI
+Stage-Gate Checks"</strong></p>
+</blockquote>
+<p>The cron record itself. From here you can see <code>nextcall</code>, <code>lastcall</code>
+(approximate), <code>active</code>, and click <strong>Run Manually</strong> to fire
+synchronously.</p>
+<p>For the live MI checks the singleton's telemetry counted:</p>
+<blockquote>
+<p><strong>Settings → Technical → Models → southbrook.mi.check</strong></p>
+</blockquote>
+<p>The flat record list. Filter by <code>is_gate = True</code> to see the rules
+the cron evaluates against in-flight MOs.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The MI Engine Status form (only one record exists — singleton) has
+two columns and a notice banner:</p>
+<h3 id="left-column-last-run">Left column: Last Run</h3>
+<ul>
+<li><strong>Last Run At</strong> (<code>last_run_at</code>) — Datetime, readonly. Timestamp
+  of the most recent <code>_cron_refire_gates</code> execution.</li>
+<li><strong>Last Run Duration (ms)</strong> (<code>last_run_duration_ms</code>) — Integer,
+  readonly. How long the last sweep took. Typical: 100-2000 ms for
+  the Southbrook load.</li>
+<li><strong>Last Run Evaluations</strong> (<code>last_run_check_count</code>) — Integer,
+  readonly. The number of (MO × check) evaluations attempted.
+  Equals <code>mo_in_flight_count × rule_count</code> if all combinations
+  fired.</li>
+<li><strong>Last Run Blockers</strong> (<code>last_run_blockers</code>) — Integer, readonly.
+  How many evaluations returned <code>severity = blocker</code>.</li>
+<li><strong>Last Run Warnings</strong> (<code>last_run_warnings</code>) — Integer, readonly.
+  How many returned <code>severity = warning</code>.</li>
+</ul>
+<h3 id="right-column-current-state">Right column: Current State</h3>
+<ul>
+<li><strong>MOs In Flight</strong> (<code>mo_in_flight_count</code>) — Integer, computed live.
+  <code>mrp.production</code> count where <code>state in ('confirmed', 'progress')</code>.</li>
+<li><strong>Active Gate Rules</strong> (<code>rule_count</code>) — Integer, computed live.
+  <code>southbrook.mi.check</code> count where <code>is_gate = True</code> (or all rows
+  if <code>is_gate</code> field doesn't exist).</li>
+</ul>
+<h3 id="header">Header</h3>
+<ul>
+<li><strong>Run Engine Now</strong> button (<code>action_run_now</code>) — fires
+  <code>_cron_refire_gates</code> synchronously and pops a notification with
+  the result (or warning if any blockers).</li>
+</ul>
+<h3 id="notice-banner">Notice banner</h3>
+<p>A blue info panel explaining that the MI engine refires every
+active gate check against every in-flight MO on an hourly schedule,
+and recommends Run Engine Now for immediate refire after rule
+edits or new MO releases.</p>
+<h2 id="how-the-planner-reads-this-board-30-seconds">How the planner reads this board (30 seconds)</h2>
+<p>The morning check:</p>
+<ol>
+<li>
+<p><strong>Is <code>Last Run At</code> within the last hour?</strong>
+   - Yes → cron is healthy. Move to step 2.
+   - No → cron stalled. Page the IT admin (or follow the
+     diagnosis path below if you're it).</p>
+</li>
+<li>
+<p><strong>Is <code>Last Run Duration (ms)</code> typical for your load?</strong>
+   - &lt;2000 ms → normal.
+   - 2000-10000 ms → slow but functional; investigate at end of day.
+   - &gt;10000 ms → cron is grinding; almost certainly a regression in
+     a check evaluator. Page the dev team.</p>
+</li>
+<li>
+<p><strong>Is <code>Last Run Blockers</code> zero?</strong>
+   - Yes → no MO is currently failing a gate. Floor releases are
+     clean.
+   - No → at least one MO failed a gate check. Cross-reference with
+     the Kitchen Jobs board (any cards in <code>release=blocked</code>?) and
+     the per-MO MI Production Board (lesson 2.5).</p>
+</li>
+<li>
+<p><strong>Does <code>Last Run Evaluations</code> ≈ <code>MOs In Flight × Active Gate
+   Rules</code>?</strong>
+   - Yes (close to product) → every MO was evaluated against every
+     rule. Healthy sweep.
+   - Way less → some MOs or rules were skipped (likely error
+     branches in the evaluator). Check <code>ir.logging</code> for warnings.
+   - Way more → the evaluator is double-firing somehow. Unusual; dev
+     investigation needed.</p>
+</li>
+</ol>
+<h2 id="how-the-it-admin-reads-this-board-incident-triage">How the IT admin reads this board (incident triage)</h2>
+<p>When something flipped overnight that shouldn't have:</p>
+<ol>
+<li><strong>Confirm the cron ran.</strong> <code>Last Run At</code> should be ≤1 hour ago.</li>
+<li><strong>Confirm it counted things.</strong> <code>Last Run Evaluations</code> &gt; 0. If
+   zero, either no MOs are in flight (check
+   <code>mo_in_flight_count</code>) or no gate rules exist (check <code>rule_count</code>).</li>
+<li><strong>Inspect the gate output.</strong> If <code>Last Run Blockers &gt; 0</code>, open
+   the Kitchen Jobs board and find the affected MOs / tasks via the
+   release queue (lesson 12.4). The chatter on each task will
+   show "release state ready → blocked" with the timestamp.</li>
+<li><strong>Compare to the prior tick.</strong> The singleton stores only the
+   LATEST run. To see the prior run's telemetry, check
+   <code>ir.logging</code> (filter by model <code>southbrook.mi.engine.state</code> or
+   keyword <code>MI engine refire</code>). The cron emits one INFO line per
+   tick with the same summary numbers.</li>
+</ol>
+<h2 id="the-relationship-to-the-six-orchestration-crons">The relationship to the six orchestration crons</h2>
+<p>Course 2 lesson 2.4 has the full cron schedule. The MI Engine
+Status board surfaces ONE of the six crons specifically:</p>
+<p><strong>Cron 2 — Southbrook: Refire MI Stage-Gate Checks</strong> — every hour,
+calls <code>southbrook.mi.engine.state._cron_refire_gates()</code>. This is
+the cron whose telemetry the singleton stores.</p>
+<p>The other five crons are NOT surfaced on this board:</p>
+<ul>
+<li>Cron 1 (Recompute Project Readiness) — telemetry is the
+  <code>readiness_last_recomputed_at</code> stamp on each <code>project.task</code>.</li>
+<li>Cron 3 (Backfill Order Analytics) — telemetry is in
+  <code>ir.logging</code>.</li>
+<li>Cron 4 (Weekly Planning Baseline) — telemetry is the new
+  <code>mrp.planning.run</code> record's <code>create_date</code> + state.</li>
+<li>Cron 5 (Quality Dry-Run Nightly) — telemetry is one
+  <code>southbrook.project.data.quality.report</code> per project per night.</li>
+<li>Cron 6 (Propose ECOs for High-Frequency Cut-Spec Overrides) —
+  telemetry is the newly-created <code>southbrook.eco</code> records.</li>
+</ul>
+<p>So the MI Engine Status board is NOT a one-stop overall health
+panel — it's specifically the MI gate refire cron's panel. Other
+crons need other observability paths.</p>
+<h2 id="how-to-spot-a-stuck-cron">How to spot a stuck cron</h2>
+<p>The pattern:</p>
+<ul>
+<li><code>Last Run At</code> is hours old.</li>
+<li><code>MOs In Flight</code> is healthy (&gt; 0).</li>
+<li><code>Active Gate Rules</code> is healthy (&gt; 0).</li>
+<li>The Kitchen Jobs board shows stale readiness decisions (cards
+  still showing yesterday's state).</li>
+</ul>
+<p>This means the cron isn't firing. Diagnosis:</p>
+<ol>
+<li>Open <strong>Settings → Technical → Scheduled Actions → Southbrook:
+   Refire MI Stage-Gate Checks</strong>.</li>
+<li>Check <code>Active</code> is True. If False, someone disabled it — flip
+   back on.</li>
+<li>Check <code>Next Execution Date</code>. If it's in the past, the previous
+   tick crashed and the cron is stuck waiting. Read the Odoo log
+   for <code>cron</code> warnings around that timestamp.</li>
+<li>Click <strong>Run Manually</strong>. If it fires cleanly, the cron is fine
+   now and the previous failure was transient; the next scheduled
+   tick will pick up.</li>
+<li>If it errors immediately, the cron body has a regression. Read
+   the popup exception text. Most common: a new MI check rule
+   has a syntax error in its evaluator method. Find via
+   <code>southbrook.mi.check</code> records modified recently; fix; re-run.</li>
+</ol>
+<h2 id="how-to-manually-re-fire-the-mi-engine">How to manually re-fire the MI engine</h2>
+<p>From the MI Engine Status form:</p>
+<ol>
+<li>Click the green <strong>Run Engine Now</strong> button in the header.</li>
+<li>The form's <code>action_run_now</code> method calls <code>_cron_refire_gates()</code>
+   synchronously and shows a notification: "Refired N evaluations
+   in M ms (X blockers, Y warnings)." The notification is <code>success</code>
+   if blockers == 0, otherwise <code>warning</code>.</li>
+<li>The singleton fields update on save. Refresh the form to see
+   the new <code>last_run_at</code> etc.</li>
+</ol>
+<p>When to use Run Now:</p>
+<ul>
+<li>After editing or creating a gate rule (<code>southbrook.mi.check</code> with
+  <code>is_gate = True</code>).</li>
+<li>After releasing a new MO to production (to confirm it passes the
+  gate immediately rather than waiting for the next hourly tick).</li>
+<li>During incident response, to confirm a fix worked without
+  waiting 60 minutes.</li>
+</ul>
+<p>When NOT to use Run Now:</p>
+<ul>
+<li>On a slow shop (Run Now blocks the UI for the duration of the
+  sweep). Use the scheduled cron and refresh the board after.</li>
+<li>Repeatedly to test a check (use a unit test against the
+  evaluator directly instead).</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>Planner (start of day, 1 min):</strong></p>
+<ol>
+<li>Open Kitchen Ops → MI Engine Status.</li>
+<li>Confirm Last Run At ≤ 1 hour ago.</li>
+<li>Confirm Last Run Blockers == 0 (or note the count for triage).</li>
+<li>Close the tab.</li>
+</ol>
+<p>Done. This is a 60-second check. Everything else from MI lives on
+the per-MO MI Production Board (Course 2 lesson 2.5).</p>
+<p><strong>IT admin (weekly review):</strong></p>
+<ol>
+<li>Open the board. Spot-check Last Run At is recent.</li>
+<li>Open Settings → Technical → Scheduled Actions → filter
+   "Southbrook:". All 6 cron rows should be green.</li>
+<li>Open <code>ir.logging</code>, filter <code>model = southbrook.mi.engine.state</code>,
+   last 7 days. Scan for WARNING lines. Each WARNING names a
+   specific check that errored — over time these accumulate and
+   indicate a check that needs maintenance.</li>
+</ol>
+<p><strong>During an incident (planner OR admin):</strong></p>
+<ol>
+<li>Open the board. Read all 7 fields.</li>
+<li>If Run Engine Now is appropriate, click it and watch the
+   notification.</li>
+<li>Compare the post-run state to the pre-run state — did blockers
+   drop? If yes, the issue is resolved. If no, the underlying
+   data hasn't changed and the recommendation is to fix the
+   upstream artifact (BoM, cutlist, etc).</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"<code>Last Run At</code> is current but blockers is 47 and we have only 8
+MOs in flight."</strong></p>
+<p>The blocker count is <code>(MO × check)</code> evaluations that returned
+blocker, not unique MOs. If you have 8 MOs and 6 gate rules and
+all 8 MOs fail the same rule, blockers = 8. If they fail different
+rules with overlap, it can climb. The number is signal strength,
+not unique-MO count. To find unique MOs, open the MI Production
+Board (lesson 2.5) filtered by <code>x_mi_status = blocked</code>.</p>
+<p><strong>"The form shows <code>MOs In Flight = 0</code> but I just confirmed 5 MOs
+ten minutes ago."</strong></p>
+<p>The two right-column counts are LIVE computes (page-load time).
+Refresh the form. If still 0, the MOs aren't in <code>confirmed</code> or
+<code>progress</code> state — they're probably in <code>draft</code> or some other state
+the cron doesn't count. Open the MOs and check the state.</p>
+<p><strong>"<code>Active Gate Rules = 0</code> but the team configured rules last
+week."</strong></p>
+<p>Two causes. (a) The rules were created with <code>is_gate = False</code> (the
+default). Open <code>southbrook.mi.check</code> records and flip <code>is_gate =
+True</code> on the ones meant to gate. (b) The <code>is_gate</code> field doesn't
+exist on the model (older version of MI). Verify by
+<code>'is_gate' in env['southbrook.mi.check']._fields</code> in a shell. If
+False, the cron falls back to counting all rules — but the count
+would then be non-zero. If True and the count is zero, the rules
+just aren't gates.</p>
+<p><strong>"I clicked Run Engine Now and the page hangs."</strong></p>
+<p>The synchronous run is taking too long. Either the sweep is
+genuinely huge (hundreds of MOs × dozens of checks) or one check
+evaluator is in an infinite loop. Wait 30 seconds; if still
+hanging, kill the browser tab. The cron will recover; the next
+scheduled tick fires normally. Page the dev team if it hangs every
+time.</p>
+<p><strong>"The notification says 'Refired 0 evaluations.' I have MOs in
+flight."</strong></p>
+<p>The MOs are in flight but the gate-rule query returned zero rules
+(check <code>rule_count</code> on the form). With no rules to evaluate, the
+sweep does nothing. Configure at least one rule with <code>is_gate =
+True</code> to activate the cron's purpose.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The MI engine has TWO models, by design, because of a v19
+constraint:</p>
+<ol>
+<li><strong><code>southbrook.mi.engine</code></strong> — AbstractModel defined in
+   <code>southbrook_manufacturing_intelligence/models/mi_engine.py</code>.
+   Holds the helper methods (cut summary, severity normalisation,
+   per-package and per-MO recompute logic) used by other agents.</li>
+<li><strong><code>southbrook.mi.engine.state</code></strong> — concrete stored Model
+   defined in
+   <code>southbrook_premium_orchestration/models/southbrook_mi_engine.py</code>.
+   Holds the singleton telemetry record and the
+   <code>_cron_refire_gates</code> cron entry point.</li>
+</ol>
+<p>Why two? Odoo 19 forbids <code>_inherit</code>-ing an AbstractModel as a
+Model (the <code>AbstractModel inherit trap</code> documented in the QNAP
+memory notes). The original design was to extend the abstract
+parent to add <code>last_run_at</code> etc., but that raised <code>TypeError</code> at
+registry load. The Phase 1 fix: keep the parent abstract for its
+helpers, add a sibling stored model for the telemetry.</p>
+<p>The cron config (<code>data/ir_cron.xml</code>):</p>
+<pre><code class="language-xml">&lt;record id=&quot;cron_mi_engine_refire_gates&quot; model=&quot;ir.cron&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Southbrook: Refire MI Stage-Gate Checks&lt;/field&gt;
+    &lt;field name=&quot;model_id&quot; ref=&quot;model_southbrook_mi_engine_state&quot;/&gt;
+    &lt;field name=&quot;state&quot;&gt;code&lt;/field&gt;
+    &lt;field name=&quot;code&quot;&gt;model._cron_refire_gates()&lt;/field&gt;
+    &lt;field name=&quot;interval_number&quot;&gt;1&lt;/field&gt;
+    &lt;field name=&quot;interval_type&quot;&gt;hours&lt;/field&gt;
+    &lt;field name=&quot;user_id&quot; ref=&quot;base.user_root&quot;/&gt;
+&lt;/record&gt;
+</code></pre>
+<p><code>model._cron_refire_gates()</code> is the entry point. The implementation:</p>
+<ol>
+<li>Time the start (millisecond precision).</li>
+<li>Get / create the singleton via <code>_get_singleton</code>.</li>
+<li>Search all MOs in <code>confirmed</code> / <code>progress</code>.</li>
+<li>Search all gate checks (<code>is_gate = True</code>, with fallback to all
+   if the field doesn't exist).</li>
+<li>For each (MO × check) pair, call
+   <code>_evaluate_check_against_mo</code>, which dispatches to whatever
+   evaluator the check exposes (<code>_evaluate_against</code>,
+   <code>_evaluate_for_mo</code>, or <code>evaluate</code>).</li>
+<li>Normalise the return value to <code>blocker</code> / <code>warning</code> / other
+   via <code>_severity_of</code>.</li>
+<li>Count blockers and warnings.</li>
+<li><strong>Wrap every evaluator call in try/except.</strong> A single
+   misbehaving check can't stall the sweep — it's logged WARNING
+   with the check id, MO id, and exception text, and counted as
+   a no-op.</li>
+<li>Write the singleton with last_run_at, count, blockers, warnings,
+   duration.</li>
+<li>Log INFO with the summary.</li>
+<li>Return the summary dict (for <code>action_run_now</code>'s notification).</li>
+</ol>
+<p>The Run Engine Now button (<code>action_run_now</code>):</p>
+<ol>
+<li>Ensure singleton.</li>
+<li>Call <code>_cron_refire_gates()</code>.</li>
+<li>Build a notification dict with the summary.</li>
+<li>Return — Odoo displays the notification.</li>
+</ol>
+<p>The notification severity is <code>success</code> if blockers == 0 else
+<code>warning</code>. This is your visual feedback in the UI for "did Run
+Now solve the problem?"</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open MI Engine Status and see <code>Last Run At</code> is 4 hours
+old, <code>MOs In Flight = 12</code>, <code>Active Gate Rules = 7</code>. What's the
+diagnosis and recovery?</p>
+<blockquote>
+<p>The cron is stuck. Open Settings → Technical → Scheduled Actions
+→ "Southbrook: Refire MI Stage-Gate Checks". Check Active is
+True. Check Next Execution Date — if it's in the past, the
+previous tick crashed. Click Run Manually to fire synchronously
+and watch for errors. If it succeeds, the cron resumes its
+normal hourly cadence. If it errors immediately, the popup
+shows the exception; check <code>ir.logging</code> for the matching
+WARNING line and fix the underlying cause.</p>
+</blockquote>
+<p><strong>2.</strong> A planner asks "the MI Engine Status shows zero blockers
+but the Kitchen Jobs board has a card in <code>release=blocked</code>. Why?"</p>
+<blockquote>
+<p>The MI engine's blocker count is from <code>is_gate = True</code> checks
+against in-flight MOs (state <code>confirmed</code> / <code>progress</code>). The
+release state on the task is computed from FIVE different
+booleans + six data prerequisites (lesson 12.4). They're
+different gates. A task can be release=blocked because the
+install date is missing (no MI involvement) or because the
+engineer hasn't flipped CAD Approved. The MI engine isn't the
+only gate; it's one of several.</p>
+</blockquote>
+<p><strong>3.</strong> You click Run Engine Now and the notification says "Refired
+14 evaluations in 230 ms (0 blockers, 2 warnings)." Walk through
+what this tells you.</p>
+<blockquote>
+<p>14 evaluations means 14 (MO × check) pairs were attempted.
+230 ms is healthy. 0 blockers means no MO failed a hard gate.
+2 warnings means 2 evaluations returned severity=warning —
+non-blocking concerns. To find them, open the MI Production
+Board (lesson 2.5), filter by <code>x_mi_warning_count &gt; 0</code>. The 2
+warnings are surfaced there as <code>southbrook.mi.check</code> rows with
+severity=warning.</p>
+</blockquote>
+<p><strong>4.</strong> An admin notices the singleton form's <code>Last Run
+Evaluations</code> keeps growing each tick (1000, 2000, 4000, 8000) but
+<code>MOs In Flight</code> is constant at 50 and <code>Active Gate Rules</code> is
+constant at 8. What's the diagnosis?</p>
+<blockquote>
+<p>50 × 8 = 400 evaluations per tick is normal. Seeing 1000+ means
+the sweep is double-firing. Most likely cause: an evaluator
+method is recursing into the cron (calling
+<code>_cron_refire_gates</code> from inside itself, perhaps through a
+trigger). This is a code regression. Page the dev team; in the
+meantime disable the cron and Run Now manually for spot
+evaluations until fixed.</p>
+</blockquote>
+<p><strong>5.</strong> A planner asks "if I want to know how long the cron has
+been broken, where do I look?"</p>
+<blockquote>
+<p>Two places. (1) <code>Last Run At</code> on the singleton shows the
+timestamp of the most recent successful tick — so the broken
+window started after that time. (2) <code>ir.logging</code> filtered by
+<code>model = southbrook.mi.engine.state</code> shows every tick's INFO
+line, including the broken ones (failures are WARNINGs).
+Combined, you can reconstruct the failure window: last
+successful INFO line, then a series of WARNINGs, then now. The
+singleton itself only stores the most recent SUCCESSFUL run.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The cron mechanics for all six orchestration crons (schedule,
+  model, method, recovery) → Course 2 lesson 2.4 + Course 7
+  lesson 7.1.</li>
+<li>The per-MO MI checks the planner triages (severity, category,
+  recommendation) → Course 2 lesson 2.5.</li>
+<li>The Production Release Queue and the five engineer booleans →
+  lesson 12.4 + Course 2 lesson 2.2.</li>
+<li>How an MI check fires a Hermes recommendation → Course 3 lesson
+  3.2.</li>
+<li>Authoring new MI checks → developer-side, out of e-learning
+  scope; refer to the MI engine source in
+  <code>southbrook_manufacturing_intelligence/models/mi_engine.py</code>.</li>
+<li>Native Odoo <code>ir.cron</code> mechanics → Odoo's own documentation.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_12_cut_and_hardware_packages" model="slide.slide">
+            <field name="name">Cut Lists, Hardware Packages, Production Packages — The Shop-Floor Trio</field>
+            <field name="channel_id" ref="course_kitchen_ops_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Project Manager + Production Planner (the two who own these records day-to-day).</field>
+            <field name="html_content"><![CDATA[<h1 id="cut-lists-hardware-packages-production-packages-the-shop-floor-trio">Cut Lists, Hardware Packages, Production Packages — The Shop-Floor Trio</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PM or planner who has to answer "what does the floor
+actually get when we release this MO?" The answer is <strong>three linked
+records</strong>, each owned by <code>southbrook_kitchen_mrp</code>, plus a fourth
+read-side projection from <code>southbrook_manufacturing_intelligence</code>
+that decorates them with MI checks. This lesson is the inside view
+of that record trio — what each contains, when each is created in
+the project lifecycle, how the MI engine reads them, and how the
+dealer portal exports them.</p>
+<p>Get the trio wrong and the floor cuts wrong panels, picks wrong
+hardware, and the customer's cabinets are scrap.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the planner:</p>
+<blockquote>
+<p><strong>Southbrook Kitchen → Production Packages</strong></p>
+</blockquote>
+<p>The list view of <code>sb.production.package</code> records. One per MO. The
+menu is in
+<code>southbrook_kitchen_mrp/views/southbrook_kitchen_mrp_menus.xml</code>.</p>
+<blockquote>
+<p><strong>Southbrook Kitchen → Cut Lists</strong></p>
+</blockquote>
+<p>The list view of <code>sb.cutlist</code> records. One per MO (typically),
+created by the production package's <code>generate_from_mo</code>.</p>
+<blockquote>
+<p><strong>Southbrook Kitchen → Hardware Packages</strong></p>
+</blockquote>
+<p>The list view of <code>sb.hardware.package</code> records. One per MO,
+created alongside the cutlist.</p>
+<p>For the MI-decorated planner view:</p>
+<blockquote>
+<p><strong>Southbrook PM → MI Production Board</strong></p>
+</blockquote>
+<p>A list of <code>sb.production.package</code> records decorated with the
+<code>x_mi_status</code> / <code>x_mi_blocker_count</code> / <code>x_mi_warning_count</code> /
+<code>x_mi_next_action</code> fields. Same model, MI-extended view.</p>
+<p>From inside an MO:</p>
+<blockquote>
+<p><strong>Manufacturing → Manufacturing Orders → \&lt;open one&gt;</strong></p>
+</blockquote>
+<p>The <code>mrp.production</code> form. Links to the production package via the
+package's <code>mo_id</code> field; reverse navigation via smart buttons (when
+present).</p>
+<p>For the dealer (export endpoint):</p>
+<blockquote>
+<p><code>https://southbrookcabinetry.space/my/dealer/production-package/&lt;pkg_id&gt;/kd</code>
+<code>https://southbrookcabinetry.space/my/dealer/production-package/&lt;pkg_id&gt;/installation-pdf</code></p>
+</blockquote>
+<p>Routes defined in
+<code>southbrook_dealer_portal/controllers/main.py</code>. Dealer-channel
+partners only.</p>
+<h2 id="the-model-trio-what-each-holds">The model trio — what each holds</h2>
+<h3 id="sbproductionpackage-the-orchestrator"><code>sb.production.package</code> (the orchestrator)</h3>
+<p>Defined in
+<code>southbrook_kitchen_mrp/models/sb_production_package.py</code>. The
+<strong>bundle</strong> record that links a cutlist + a hardware package to a
+single MO and carries the shop-floor state machine.</p>
+<p>Fields:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — auto-sequence (<code>sb.production.package</code>).</li>
+<li><strong>Manufacturing Order</strong> (<code>mo_id</code>) — Many2one to <code>mrp.production</code>,
+  required, <code>ondelete=cascade</code>.</li>
+<li><strong>State</strong> (<code>state</code>) — Selection:</li>
+<li><code>draft</code> — initial</li>
+<li><code>ready</code> — written by <code>generate_from_mo</code> once cutlist + hardware
+    package created</li>
+<li><code>released</code> — operator-facing state (the floor is working it)</li>
+<li><code>done</code> — closed</li>
+<li><strong>Cut List</strong> (<code>cutlist_id</code>) — Many2one to <code>sb.cutlist</code>,
+  <code>ondelete=restrict</code>.</li>
+<li><strong>Hardware Package</strong> (<code>hardware_package_id</code>) — Many2one to
+  <code>sb.hardware.package</code>, <code>ondelete=restrict</code>.</li>
+<li><strong>Has Pricing Pending</strong> (<code>has_pricing_pending</code>) — related from
+  hardware_package_id.</li>
+</ul>
+<p>Plus MI-extended fields (added by
+<code>southbrook_manufacturing_intelligence/models/sb_production_package.py</code>):</p>
+<ul>
+<li><strong>MI Status</strong> (<code>x_mi_status</code>) — Selection: <code>ok</code> / <code>review</code> /
+  <code>blocked</code>. Computed from the severities of linked
+  <code>southbrook.mi.check</code> rows.</li>
+<li><strong>MI Checks</strong> (<code>x_mi_check_ids</code>) — One2many to
+  <code>southbrook.mi.check</code> filtered by <code>production_package_id = self</code>.</li>
+<li><strong>MI Blockers</strong> (<code>x_mi_blocker_count</code>) — Integer.</li>
+<li><strong>MI Warnings</strong> (<code>x_mi_warning_count</code>) — Integer.</li>
+<li><strong>MI Install Warnings</strong> (<code>x_mi_install_warning_count</code>) — Integer,
+  the count of <code>category = install</code> warnings (filler / scribe /
+  tall cabinet review).</li>
+<li><strong>MI Next Action</strong> (<code>x_mi_next_action</code>) — Text. The top
+  recommendation, or "Manufacturing intelligence checks are clear."</li>
+<li><strong>MI Yield %</strong> (<code>x_mi_yield_pct</code>) — Float. Sheet yield from cut
+  summary.</li>
+<li><strong>MI Waste Area m²</strong> (<code>x_mi_waste_area_m2</code>) — Float.</li>
+<li><strong>MI Edge Band (m)</strong> (<code>x_mi_edge_band_m</code>) — Float.</li>
+</ul>
+<p>Constraints:</p>
+<ul>
+<li><code>@api.constrains("mo_id"): _check_unique_mo</code> — only one
+  production package per MO (enforced at Python level because
+  Odoo 19 deprecated <code>_sql_constraints</code>).</li>
+</ul>
+<h3 id="sbcutlist-sbcutlistline-the-panels"><code>sb.cutlist</code> + <code>sb.cutlist.line</code> (the panels)</h3>
+<p>Defined in <code>southbrook_kitchen_mrp/models/sb_cutlist.py</code>. The
+panel cut list for one MO.</p>
+<p><code>sb.cutlist</code>:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — auto-sequence.</li>
+<li><strong>MO</strong> (<code>mo_id</code>) — Many2one to <code>mrp.production</code>,
+  <code>ondelete=cascade</code>.</li>
+<li><strong>State</strong> (<code>state</code>) — Selection: <code>draft</code> / <code>exported</code> /
+  <code>nested</code> / <code>done</code>. Tracked.</li>
+<li><strong>Lines</strong> (<code>line_ids</code>) — One2many to <code>sb.cutlist.line</code>.</li>
+<li><strong>Line Count</strong> (<code>line_count</code>) — computed.</li>
+<li><strong>Nesting Result JSON</strong> (<code>nesting_result_json</code>) — Text. Round-trip
+  stash from the nesting tool.</li>
+</ul>
+<p><code>sb.cutlist.line</code>:</p>
+<ul>
+<li><strong>Panel Name</strong> (<code>panel_name</code>) — Selection (7 fixed values:
+  <code>side_L</code>, <code>side_R</code>, <code>top</code>, <code>bottom</code>, <code>back</code>, <code>adjustable_shelf</code>,
+  <code>door</code>).</li>
+<li><strong>Sequence</strong> (<code>sequence</code>) — Integer, default 10.</li>
+<li><strong>Qty</strong> (<code>qty</code>) — Integer, default 1.</li>
+<li><strong>Length / Width / Thickness (mm)</strong> (<code>length_mm</code>, <code>width_mm</code>,
+  <code>thickness_mm</code>) — Floats.</li>
+<li><strong>Substrate</strong> (<code>substrate</code>) — Selection: <code>melamine_white_5_8</code> /
+  <code>melamine_oak_5_8</code> / <code>mdf_5_8</code> / <code>hardboard_1_4</code> / <code>ply_3_4</code>.</li>
+<li><strong>Grain Direction</strong> (<code>grain_dir</code>) — Selection: <code>with_grain</code> /
+  <code>cross_grain</code> / <code>no_grain</code>.</li>
+<li><strong>Edge Banding Config</strong> (<code>edge_banding_config</code>) — Text (JSON).</li>
+</ul>
+<p><strong>The toe-kick contract.</strong> The panel formula
+(<code>shared.southbrook_dims.panel_cut_list</code>) returns a panel dict that
+INCLUDES a <code>toe_kick</code> key as a METADATA descriptor (dict). The
+cutlist generation INTENTIONALLY skips it because toe-kick is
+integrated into the side panels and emitting it as a cutlist line
+would create a phantom panel. The contract is enforced by tests
+and the generation code asserts the iteration explicitly. This is
+the only place in the platform where "missing record" is the
+correct outcome — never look for a toe-kick cutlist line.</p>
+<h3 id="sbhardwarepackage-sbhardwarepackageline-the-hardware"><code>sb.hardware.package</code> + <code>sb.hardware.package.line</code> (the hardware)</h3>
+<p>Defined in
+<code>southbrook_kitchen_mrp/models/sb_hardware_package.py</code>. The
+resolved hardware pick list for one MO. Generated by calling
+<code>env['southbrook.hardware.catalog'].resolve(...)</code> (owned by
+<code>southbrook_hardware_catalog</code>), which aggregates per_door +
+per_drawer + per_shelf + per_cabinet + per_family rules into one
+line per SKU.</p>
+<p><code>sb.hardware.package</code>:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — auto-sequence.</li>
+<li><strong>MO</strong> (<code>mo_id</code>) — Many2one to <code>mrp.production</code>,
+  <code>ondelete=cascade</code>.</li>
+<li><strong>State</strong> (<code>state</code>) — Selection: <code>draft</code> / <code>picked</code> /
+  <code>delivered</code>. Tracked.</li>
+<li><strong>Lines</strong> (<code>line_ids</code>) — One2many to
+  <code>sb.hardware.package.line</code>.</li>
+<li><strong>Line Count</strong> (<code>line_count</code>) — computed.</li>
+<li><strong>Has Pricing Pending</strong> (<code>has_pricing_pending</code>) — computed from
+  any line whose product has <code>x_pricing_pending = True</code>.</li>
+</ul>
+<p><code>sb.hardware.package.line</code>:</p>
+<ul>
+<li><strong>Package</strong> (<code>package_id</code>) — Many2one, <code>ondelete=cascade</code>.</li>
+<li><strong>Product</strong> (<code>product_id</code>) — Many2one to <code>product.product</code>,
+  filtered to hardware SKUs
+  (<code>[('x_hardware_category', '!=', False)]</code>).</li>
+<li><strong>Qty</strong> (<code>qty</code>) — Integer.</li>
+<li><strong>Pricing Pending</strong> (<code>pricing_pending</code>) — related from
+  <code>product_id.x_pricing_pending</code>.</li>
+<li><strong>Hardware Category</strong> (<code>hardware_category</code>) — related from
+  <code>product_id.x_hardware_category</code> (<code>hinge</code> / <code>pull</code> / <code>slide</code> /
+  <code>mounting</code>).</li>
+<li><strong>Brand</strong> (<code>brand_id</code>) — related from
+  <code>product_id.x_hardware_brand_id</code>.</li>
+</ul>
+<h2 id="when-each-record-gets-created">When each record gets created</h2>
+<p>The lifecycle of the trio:</p>
+<h3 id="1-at-saleorder-confirmation">1. At sale.order confirmation</h3>
+<p>The <code>action_confirm</code> override on <code>sale.order</code> (in
+<code>southbrook_premium_orchestration</code>) creates the project.task spine
+and any new <code>mrp.production</code> records from order lines. <strong>No
+production package, cutlist, or hardware package is created yet.</strong>
+The MO has a routing and a BoM but no Southbrook trio.</p>
+<h3 id="2-at-gate-review-planner-engineer-action">2. At gate review (planner / engineer action)</h3>
+<p>When the engineer is about to flip Cutlist Approved on the release
+gate (lesson 12.4), they need a cutlist to look at. They (or the
+planner) open the MO and click the <strong>Generate Production Package</strong>
+action button OR run
+<code>env['sb.production.package'].generate_from_mo(mo, width, height,
+depth, family, door_count, drawer_count, soft_close)</code> from a shell.</p>
+<p><code>generate_from_mo</code> is the ONE orchestration method that creates the
+trio. It:</p>
+<ol>
+<li><strong>Deletes any existing package</strong> for the MO (idempotency — calling
+   twice rebuilds rather than duplicating). Deletion order matters
+   because of <code>ondelete='restrict'</code> on the m2o references: the
+   package is deleted FIRST, then the cutlist + lines, then the
+   hardware package + lines.</li>
+<li><strong>Calls <code>shared.southbrook_dims.panel_cut_list</code></strong> to get the
+   geometry dict. Same module the FreeCAD bridge renders from, so
+   cutlist geometry is guaranteed identical to rendered geometry.</li>
+<li><strong>Creates the <code>sb.cutlist</code></strong> for the MO, generates lines via
+   <code>generate_lines_from_panel_dict</code> (skipping toe_kick).</li>
+<li><strong>Calls <code>env['southbrook.hardware.catalog'].resolve</code></strong> with the
+   cabinet family, door count, drawer count, shelf count, soft_close
+   flag. Returns a list of (product, qty) tuples.</li>
+<li><strong>Creates the <code>sb.hardware.package</code></strong> and generates lines via
+   <code>generate_lines_from_resolution</code>.</li>
+<li><strong>Creates the <code>sb.production.package</code></strong> linking both, sets
+   <code>state = 'ready'</code>.</li>
+</ol>
+<p>After this runs, the MI engine has data to score:
+<code>action_recompute_manufacturing_intelligence</code> on the package
+walks the cutlist + hardware package + install context and writes
+<code>southbrook.mi.check</code> rows + the per-package
+<code>x_mi_status</code> / <code>x_mi_blocker_count</code> / etc.</p>
+<h3 id="3-at-dealer-nesting-export">3. At dealer / nesting export</h3>
+<p>When the cutlist is sent to the cutting / nesting division:</p>
+<ul>
+<li>The planner calls <code>cutlist.to_nesting_envelope()</code> → returns a
+  deterministic JSON dict with <code>schema: "southbrook.nesting.v1"</code>,
+  cutlist_id, mo_id, and the panel list.</li>
+<li>The nesting division processes the envelope, returns a payload
+  with sheets_used / yield_pct / waste_pct.</li>
+<li>The planner calls <code>cutlist.from_nesting_result(payload)</code> →
+  validates <code>schema == southbrook.nesting.v1</code>, stores the
+  <code>nesting_result_json</code>, sets <code>state = 'nested'</code>.</li>
+</ul>
+<p>For KD-channel (knockdown) dealers:</p>
+<ul>
+<li>The dealer logs in to the portal, lands at
+  <code>/my/dealer/orders</code>.</li>
+<li>Selects a production package.</li>
+<li>Hits <code>/my/dealer/production-package/&lt;pkg_id&gt;/kd</code> →
+  <code>kd_export()</code> controller method calls
+  <code>package.export_kd_envelope()</code> (Phase-1 method on
+  <code>sb.production.package</code>, <strong>not yet documented in lesson scope —
+  see TBD below</strong>) and returns a JSON download.</li>
+<li>Or hits
+  <code>/my/dealer/production-package/&lt;pkg_id&gt;/installation-pdf</code> →
+  <code>installation_pdf()</code> calls <code>package.export_installation_pdf()</code>,
+  returns a PDF download.</li>
+</ul>
+<p>The <code>_require_dealer</code> guard in the controller ensures only
+<code>channel = 'dealer'</code> partners get through. Tradesperson partners
+are blocked (Phase-1 limitation; see audit finding 4 in
+<code>docs/elearning/README.md</code>).</p>
+<h3 id="4-at-end-of-mo">4. At end of MO</h3>
+<p>When the MO is done (<code>state = 'done'</code>), the production package's
+state moves to <code>done</code> via a manual or operator action. The cutlist
+and hardware package states should also be <code>done</code>.</p>
+<h2 id="the-relationship-to-mrpproduction">The relationship to <code>mrp.production</code></h2>
+<p>Each record in the trio has a Many2one <code>mo_id</code> to
+<code>mrp.production</code>. There's no direct link from <code>mrp.production</code>
+back to the trio — you find the package via search:</p>
+<pre><code class="language-python">package = env['sb.production.package'].search(
+    [('mo_id', '=', mo.id)], limit=1
+)
+</code></pre>
+<p>The MO carries the:
+- <strong>Quantity</strong> (<code>product_qty</code>) — how many cabinets.
+- <strong>Routing</strong> (<code>routing_id</code>) — workcenter sequence (cutting →
+  edge banding → CNC boring → assembly → ...).
+- <strong>BoM</strong> (<code>bom_id</code>) — bill of materials (panels + hardware as
+  components).</p>
+<p>The trio carries the:
+- <strong>Cutlist</strong> — the panel-level CUT spec (lengths, substrates,
+  grain).
+- <strong>Hardware package</strong> — the resolved hardware PICK list (which
+  hinges, which pulls, qty).
+- <strong>Production package</strong> — the BUNDLED state for the shop floor.</p>
+<p>The BoM is the BUSINESS contract ("this MO uses these
+components"). The trio is the SHOP-FLOOR detail ("here's how to
+cut and pick those components"). Both must agree; the MI engine's
+<strong>BoM Verified</strong> sub-signal checks them.</p>
+<h2 id="the-per-package-mi-fields-what-each-tells-you">The per-package MI fields — what each tells you</h2>
+<p>These live on <code>sb.production.package</code> via
+<code>southbrook_manufacturing_intelligence</code>:</p>
+<ul>
+<li><strong><code>x_mi_status</code></strong> (<code>ok</code> / <code>review</code> / <code>blocked</code>) — banded status.
+  Any blocker → <code>blocked</code>. Any warning (no blocker) → <code>review</code>.
+  Otherwise <code>ok</code>.</li>
+<li><strong><code>x_mi_blocker_count</code></strong> — count of blocker-severity checks on
+  this package. Zero is green.</li>
+<li><strong><code>x_mi_warning_count</code></strong> — count of warning-severity checks.</li>
+<li><strong><code>x_mi_install_warning_count</code></strong> — count of install-category
+  warnings specifically (lift, scribe, filler).</li>
+<li><strong><code>x_mi_next_action</code></strong> — Text. The TOP blocker's recommendation
+  (or top warning if no blocker, or "Manufacturing intelligence
+  checks are clear").</li>
+<li><strong><code>x_mi_yield_pct</code></strong> — from cut summary (panel_area /
+  gross_sheet_area × 100). Below 45% triggers a "Low sheet yield"
+  warning.</li>
+<li><strong><code>x_mi_waste_area_m2</code></strong> — leftover sheet area. Above 0.09 m²
+  triggers a "Reusable offcut" info check.</li>
+<li><strong><code>x_mi_edge_band_m</code></strong> — total edge banding length the cutlist
+  requires. Helps the edge bander operator pre-stage tape.</li>
+</ul>
+<p>The action button <strong>Recompute Manufacturing Intelligence</strong>
+(<code>action_recompute_manufacturing_intelligence</code>) on the package
+form fires <code>env['southbrook.mi.engine']._recompute_package(package)</code>
+synchronously. Use it after editing cutlist lines manually or
+after a hardware SKU pricing update.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<h3 id="the-planner-per-release">The planner (per release)</h3>
+<ol>
+<li>Open the MO from Kitchen Jobs (lesson 12.3) or from
+   Manufacturing → MOs.</li>
+<li>Check whether a production package exists. If not, click
+   <strong>Generate Production Package</strong> OR run <code>generate_from_mo</code> from
+   shell.</li>
+<li>Open the package. Verify:
+   - Cutlist line count &gt; 0 and substrate is set on every line.
+   - Hardware package line count &gt; 0 and <code>has_pricing_pending =
+     False</code>.
+   - <code>x_mi_status = ok</code> (or <code>review</code> for non-blocking).</li>
+<li>If <code>x_mi_blocker_count &gt; 0</code>, open <code>x_mi_check_ids</code> tab, read
+   each blocker. Resolve before the gate review (lesson 12.4).</li>
+<li>Hand off to the engineer for gate review.</li>
+</ol>
+<h3 id="the-pm-weekly">The PM (weekly)</h3>
+<ul>
+<li>Filter MI Production Board by <code>has_pricing_pending = True</code>. These
+  packages have hardware lines whose product has
+  <code>x_pricing_pending = True</code> — the customer price is locked but
+  internal COGS is wrong. Send to finance for pricing reconciliation.</li>
+<li>Filter by <code>x_mi_install_warning_count &gt; 0</code>. These need install
+  team coordination (tall cabinet, long shelf, filler/scribe).</li>
+</ul>
+<h3 id="the-dealer-per-order">The dealer (per order)</h3>
+<ol>
+<li>Log in to <code>/my/dealer/orders</code>. See the list of own orders.</li>
+<li>For each, navigate to the production package (the route via
+   <code>/my/dealer/production-package/&lt;pkg_id&gt;/...</code>).</li>
+<li>For KD orders: hit the <code>/kd</code> route → download the JSON envelope.
+   Forward to the cutting partner.</li>
+<li>For all orders: hit the <code>/installation-pdf</code> route → download the
+   installation drawings. Pack with the cabinets for the install
+   team.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I ran generate_from_mo twice and now I have duplicate cutlists
+in the DB."</strong></p>
+<p>You shouldn't — the method's first step is to delete the prior
+package for the MO. If you have duplicates, either (a) the deletion
+failed silently (DB integrity error on <code>ondelete='restrict'</code>), or
+(b) you ran generate_from_mo as a different user with different
+ACLs. Inspect the duplicates' MO links; the older one is the stale
+copy. Delete it by hand: package first, then cutlist + lines, then
+hardware package + lines (mind the <code>ondelete='restrict'</code>).</p>
+<p><strong>"The cutlist line for the back panel shows substrate = false."</strong></p>
+<p>The line's substrate wasn't set on creation. Default is
+<code>hardboard_1_4</code> (from <code>DEFAULT_SUBSTRATE_BY_PANEL</code> in
+<code>models/sb_cutlist.py</code>). If it's blank, the dict iteration found
+the back key but the default lookup failed (extremely unlikely).
+Recovery: edit the line, set substrate manually. Re-run
+<code>action_recompute_manufacturing_intelligence</code> so the MI engine
+re-evaluates.</p>
+<p><strong>"The hardware package has zero lines but the cabinet definitely
+needs hinges."</strong></p>
+<p>The <code>southbrook.hardware.catalog.resolve</code> call returned an empty
+list. Causes: (a) the cabinet family isn't in the catalog rules,
+(b) door_count + drawer_count both passed as 0, (c) the catalog
+records were unseeded. Open the catalog
+(<code>Southbrook Configuration → Hardware Catalog</code>), check rule
+records exist for the family. Re-run <code>generate_from_mo</code> after
+fixing.</p>
+<p><strong>"The MI Status shows <code>ok</code> but the cutlist has a 2900mm panel that
+shouldn't fit any sheet."</strong></p>
+<p>The MI cut check uses
+<code>ir.config_parameter.southbrook_mi.sheet_width_mm</code> (default 2440)
+and <code>southbrook_mi.sheet_height_mm</code> (default 1220). If those
+parameters were edited to larger values, the 2900mm panel doesn't
+trip "Oversized panel" anymore. Cross-check the parameter values.
+Lesson 2.5 has the full check catalog.</p>
+<p><strong>"The dealer can't download the KD envelope — the page errors."</strong></p>
+<p>Three likely causes. (a) Their partner record doesn't have
+<code>channel = 'dealer'</code> — <code>_require_dealer</code> throws AccessError.
+Fix: set channel on the partner. (b) The production package ID in
+the URL is wrong (typo or stale). The controller raises
+MissingError. Fix: navigate from the orders list. (c) The package
+exists but <code>export_kd_envelope()</code> raises an error (e.g. cutlist not
+in <code>nested</code> state). Check the package state and the cutlist state.</p>
+<p><strong>"Installation PDF download returns garbage / empty bytes."</strong></p>
+<p>The QWeb report wasn't generated. Open the package form, look for
+the <strong>Print → Installation PDF</strong> action; run it directly. If it
+errors, the PDF template has a regression. Page the dev team —
+the route's <code>export_installation_pdf()</code> is delegating to the same
+report.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The trio is owned by <strong><code>southbrook_kitchen_mrp</code></strong>. The MI extension
+is owned by <strong><code>southbrook_manufacturing_intelligence</code></strong>. The dealer
+portal routes are owned by <strong><code>southbrook_dealer_portal</code></strong>.</p>
+<p><code>generate_from_mo</code> is the only sanctioned way to create the trio.
+Bypassing it (creating cutlist/hardware/package records by hand)
+will:
+- Skip the idempotent delete-and-recreate guard.
+- Skip the <code>shared.southbrook_dims.panel_cut_list</code> formula (your
+  geometry won't match the FreeCAD bridge's rendering).
+- Skip the hardware catalog resolve (your hardware list won't
+  match the configured rules).</p>
+<p>Always go through <code>generate_from_mo</code> or its UI action wrapper.</p>
+<p>The <code>_check_unique_mo</code> constraint on <code>sb.production.package</code> is
+Python-side because Odoo 19 deprecated <code>_sql_constraints</code> (which
+the old codebase used). The <code>ValidationError</code> message tells you to
+use <code>generate_from_mo</code> to replace rather than duplicate.</p>
+<p>The nesting envelope's <code>schema: "southbrook.nesting.v1"</code> is the
+contract version. Future nesting tools may produce
+<code>southbrook.nesting.v2</code> (different fields); the
+<code>from_nesting_result</code> method validates the schema string before
+accepting, so a v2 payload fails cleanly until the platform is
+upgraded.</p>
+<p>The MI checks (<code>southbrook.mi.check</code>) are written by
+<code>southbrook.mi.engine._recompute_package(package)</code>. Each check
+carries:
+- <code>severity</code> — <code>blocker</code> / <code>warning</code> / <code>info</code>.
+- <code>category</code> — <code>cut</code> / <code>production</code> / <code>assembly</code> / <code>install</code> /
+  <code>cad</code> / <code>hardware</code>.
+- <code>production_package_id</code> — back-link to the package.
+- <code>production_id</code> — back-link to the MO (when the check is
+  MO-scoped rather than package-scoped).
+- <code>message</code> — specific finding text.
+- <code>recommendation</code> — engine's suggested action.</p>
+<p>The MI engine's <code>_recompute_package</code> deletes the prior checks for
+this package first, then walks the cut summary + hardware summary
++ install context and writes new ones. This is why "edit a cutlist
+line, refresh, MI checks change immediately" works — they're
+recomputed from scratch on each invocation.</p>
+<h2 id="tbd-the-dealer-export-methods">TBD — the dealer export methods</h2>
+<p>The dealer portal controllers call
+<code>package.export_kd_envelope()</code> and
+<code>package.export_installation_pdf()</code>. These methods live on
+<code>sb.production.package</code> but the <strong>exact implementation isn't in
+the addon code I traced for this lesson</strong> — they're called from
+the controller but the method bodies are either in a Phase-2
+extension or a dynamically-installed module on the live DB. The
+test file
+<code>southbrook_dealer_portal/tests/test_kd_export.py</code> confirms the
+methods exist and return the expected envelope schema, but the
+trainer should TBD-flag this for the dealer-portal trainer until
+the method source is traced.</p>
+<p>What we know works (from tests):</p>
+<ul>
+<li><code>export_kd_envelope()</code> returns a dict matching the nesting
+  envelope schema PLUS pre-drilled hole data on sides + tops PLUS
+  the hardware list. JSON-serialisable.</li>
+<li><code>export_installation_pdf()</code> returns PDF bytes (≥1KB in test
+  fixtures, asserted by <code>test_installation_pdf_emits_bytes</code>).</li>
+<li>Both methods reject if <code>state</code> is <code>draft</code> (cutlist must be at
+  least in <code>exported</code> or <code>nested</code>).</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A planner opens an MO, sees no production package, and runs
+<code>generate_from_mo(mo, 600, 900, 600, "base", door_count=1)</code>. The
+call succeeds. They run it again with the same arguments. What
+happens, and what's the rationale?</p>
+<blockquote>
+<p>The second call deletes the prior package + its cutlist +
+hardware package, then recreates everything. Idempotency: calling
+twice doesn't duplicate. Rationale: <code>generate_from_mo</code> is the
+intended entry point AND debug tool; the planner can regenerate
+after edits to the cabinet dimensions or catalog without
+manually cleaning up old records. The deletion order
+(package → cutlist → hardware) respects the <code>ondelete='restrict'</code>
+constraints; reverse order would error.</p>
+</blockquote>
+<p><strong>2.</strong> The MI Production Board shows a package with
+<code>x_mi_blocker_count = 2, x_mi_status = blocked, x_mi_next_action =
+"Split the part, select a larger sheet, or confirm a special-order
+blank before cutting."</code> What do you do first?</p>
+<blockquote>
+<p>Open the package, click into <code>x_mi_check_ids</code>. The "next action"
+text comes from the top blocker's recommendation; there are 2
+blockers, so there's at least one more. Read both. Most common
+combo: an <code>Oversized panel</code> blocker + a <code>Missing cutlist</code> (the
+second often appears when the first prevents a fresh
+generate_from_mo). Resolve the panel size first (split design,
+source larger sheet, or push back to the designer), then re-run
+<code>generate_from_mo</code> to rebuild the cutlist clean.</p>
+</blockquote>
+<p><strong>3.</strong> A dealer says "I can see the order list but the KD download
+link errors with 'access denied.'" Walk through diagnosis.</p>
+<blockquote>
+<p>The <code>_require_dealer</code> guard in <code>southbrook_dealer_portal/
+controllers/main.py</code> checks <code>partner.channel == 'dealer'</code>. Open
+the dealer's res.partner, look at the channel field. If it's
+<code>tradesperson</code>, <code>kd</code>, <code>bigbox</code>, or <code>retail</code>, the guard rejects
+with the 'dealer-only' error. (This is Phase-1 audit finding 4
+— tradesperson channel was rejected even when business logic
+says they should access; ticket to be filed.) Fix for this
+dealer: set channel to <code>dealer</code> on the partner; refresh the
+page; the guard passes.</p>
+</blockquote>
+<p><strong>4.</strong> A PM asks "why does the cutlist have 7 panels for a base
+cabinet but no toe-kick line?" What's your answer?</p>
+<blockquote>
+<p>By design. The panel formula
+(<code>shared.southbrook_dims.panel_cut_list</code>) returns a <code>toe_kick</code>
+key as a METADATA descriptor (dict), not a panel tuple. The
+cutlist generation INTENTIONALLY skips it because toe-kick is
+integrated into the side panels — emitting it as a cutlist line
+would create a phantom panel that the floor would try to cut.
+The contract is enforced by tests; never look for a toe-kick
+line. The 7 panels are side_L, side_R, top, bottom, back,
+adjustable_shelf, door — that's the full cabinet's cut spec.</p>
+</blockquote>
+<p><strong>5.</strong> A planner sends a cutlist to the nesting tool, gets back a
+payload with <code>{"schema": "southbrook.nesting.v2", ...}</code> and calls
+<code>from_nesting_result</code>. The method raises UserError. Why, and what
+should they do?</p>
+<blockquote>
+<p>The method validates <code>schema == "southbrook.nesting.v1"</code> and
+raises UserError on mismatch. The v2 schema is a future contract
+the platform doesn't accept yet. Two paths: (a) wait for the
+platform upgrade that adds v2 support; (b) downgrade the nesting
+tool to emit v1 envelopes. Don't manually stuff the v2 payload
+into v1 — schema versioning exists precisely to prevent silent
+field-name mismatches that would scramble yield + waste
+reporting.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The Kitchen Jobs board and how the production package's MI
+  status surfaces back onto release readiness → lesson 12.3 +
+  Course 2 lesson 2.1.</li>
+<li>The MI check catalog (cut / assembly / hardware / install
+  checks, what each says, severity bands) → Course 2 lesson 2.5.</li>
+<li>The MI Engine Status singleton and the gate refire cron →
+  lesson 12.6 + Course 2 lesson 2.4 cron 2.</li>
+<li>The release gate engineer's flow (the five booleans, how the
+  cutlist gets approved) → lesson 12.4 + Course 2 lesson 2.2.</li>
+<li>The hardware catalog rules — per_door / per_drawer / per_shelf
+  / per_cabinet / per_family — and how <code>resolve()</code> aggregates them
+  → Course 5 lesson 5.3.</li>
+<li>The dealer portal's other surfaces (customer-facing dealer
+  views, order portal) → Course 6 lesson 6.2.</li>
+<li>Native Odoo <code>mrp.production</code> mechanics, BoM authoring, routing
+  definitions → Odoo's own training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

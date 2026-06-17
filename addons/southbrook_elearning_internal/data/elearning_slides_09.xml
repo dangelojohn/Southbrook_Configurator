@@ -1,0 +1,2248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_09_productgraph_overview" model="slide.slide">
+            <field name="name">ProductGraph — What It Is, Where It Lives, Why It&#x27;s Next To Odoo</field>
+            <field name="channel_id" ref="course_productgraph"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Anyone who&#x27;ll touch ProductGraph — PLM engineer, estimator, dev, IT admin.</field>
+            <field name="html_content"><![CDATA[<h1 id="productgraph-what-it-is-where-it-lives-why-its-next-to-odoo">ProductGraph — What It Is, Where It Lives, Why It's Next To Odoo</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You will hear "ProductGraph" mentioned in three kinds of conversations and
+it means slightly different things in each. If you're an engineer about to
+author a property template, an estimator wondering why the price catalog
+won't show a part, or an IT admin staring at a <code>product-graph-mcp</code>
+container in the QNAP stack, this is the lesson that gives you the map.
+After this you'll know which side of the platform owns what, and which
+URL to point at when you need to look something up.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>ProductGraph is <strong>two codebases sitting next to each other</strong>, not one
+addon. That's the most important thing to internalise:</p>
+<table>
+<thead>
+<tr>
+<th>Side</th>
+<th>Where it runs</th>
+<th>What it is</th>
+<th>Repo on disk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standalone platform</td>
+<td>Same Odoo container as Southbrook (currently)</td>
+<td>5 Odoo addons + a Python sidecar — generic, publishable, LGPL-3</td>
+<td><code>~/product_graph_v19/</code></td>
+</tr>
+<tr>
+<td>Southbrook bridge</td>
+<td>The Southbrook Odoo container</td>
+<td>One addon — proprietary, glues Southbrook ECOs to ProductGraph releases</td>
+<td><code>~/southbrook-v19cr/addons/southbrook_plm_productgraph/</code></td>
+</tr>
+<tr>
+<td>Closure helper</td>
+<td>The Southbrook Odoo container</td>
+<td>Materialised graph closure for relationship lookups</td>
+<td><code>~/southbrook-v19cr/addons/product_graph_relationship/</code></td>
+</tr>
+</tbody>
+</table>
+<p>In the Odoo backend you'll see ProductGraph menus mixed in with native
+Odoo menus:</p>
+<blockquote>
+<p><strong>Manufacturing → ProductGraph → Items</strong>
+<strong>Manufacturing → ProductGraph → EBOMs</strong>
+<strong>Manufacturing → ProductGraph → Releases</strong>
+<strong>Manufacturing → ProductGraph → Property Templates</strong></p>
+</blockquote>
+<p>The MCP sidecar runs in its own container (<code>product-graph-mcp</code>) and is
+not part of any Odoo menu — that's an HTTP/SSE endpoint Claude and other
+LLM agents talk to.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>When you open <strong>Manufacturing → ProductGraph → Items</strong> (the generic
+platform side, served by <code>product_graph_base</code>):</p>
+<ul>
+<li><strong>Part number</strong> (<code>part_number</code> on <code>pg.item</code>) — system-assigned. Prefix
+  depends on item type: <code>PG-ASM-NNNN</code> for assemblies, <code>PG-PRT-NNNN</code> for
+  manufactured parts, <code>PG-BUY-NNNN</code> for purchased, <code>PG-DOC-NNNN</code> for
+  documents, <code>PG-SFT-NNNN</code> for software, <code>PG-SVC-NNNN</code> for service. The
+  prefix is set by per-type sequences (<code>_ITEM_TYPE_SEQUENCE</code> map in
+  <code>pg_item.py</code>).</li>
+<li><strong>Item type</strong> (<code>item_type</code>) — drives the prefix above AND which
+  property templates the item can attach.</li>
+<li><strong>Status</strong> (<code>state</code> on <code>pg.item</code>) — the 6-state lifecycle:
+  <code>concept → prototype → engineering → released → service → obsolete</code>.
+  Once an item reaches <code>released</code>, it is <strong>immutable at the ORM level</strong>
+  — only chatter, tags and a handful of admin fields can change.</li>
+<li><strong>Property Templates</strong> (<code>property_template_ids</code>, many2many to
+  <code>pg.property.template</code>) — zero or more templates attached to this
+  item. See lesson 9.2.</li>
+<li><strong>Revisions</strong> (smart button) — opens <code>pg.revision</code> records for this
+  item. Revisions carry the property <em>values</em>; items carry the
+  <em>templates</em>.</li>
+<li><strong>EBOMs</strong> (smart button) — engineering BOMs rooted at this item.</li>
+<li><strong>MRP BOMs</strong> (smart button) — <code>mrp.bom</code> records that came out of a
+  <code>pg.release</code> for this item. <strong>The only path</strong> to those is through a
+  release; nothing else writes <code>mrp.bom</code> from ProductGraph.</li>
+</ul>
+<p>Compare against native Odoo PLM (<code>mrp_plm</code>) and <code>southbrook_plm</code>: those
+two store <strong>ECOs and cut specs</strong> (the manufacturing decisions);
+ProductGraph stores <strong>the engineering catalog</strong> (the design intent that
+those decisions are made about).</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Decide which side you're on.</strong></p>
+<p>If the question is <em>"what's the canonical engineering structure of this
+cabinet assembly"</em> — that's ProductGraph. Open the <code>pg.item</code>, read its
+released revision, look at the EBOM lines, check the property values.</p>
+<p>If the question is <em>"who's approving the ECO that swaps this hinge"</em> —
+that's <code>southbrook_plm</code>. The ECO record (<code>southbrook.eco</code>) lives there.
+The bridge addon adds a <em>pointer</em> from the ECO to a ProductGraph EBOM,
+but the ECO itself stays in <code>southbrook_plm</code>.</p>
+<p>If the question is <em>"can an AI agent fetch this BoM and propose a
+property change"</em> — that's the MCP sidecar (lesson 9.5).</p>
+<p><strong>2. Read before you write.</strong></p>
+<p>The 5 generic addons enforce hard rules (<code>R1</code> through <code>R9</code> in
+<code>~/product_graph_v19/CLAUDE.md</code>). Two of them you'll bump into often:</p>
+<ul>
+<li><strong>R1 — Release boundary is sacred.</strong> <code>mrp.bom</code> is written ONLY by
+  <code>pg.release.action_execute_release</code>. If you have code that wants to
+  touch <code>mrp.bom</code>, it's wrong; route it through a release.</li>
+<li><strong>R3 — No hard deletes on released or historically significant
+  records.</strong> <code>unlink()</code> overrides on <code>pg.item</code>/<code>pg.revision</code>/<code>pg.ebom</code>/
+  <code>pg.release</code> reject deletion outside <code>(draft, obsolete)</code>. Don't fight
+  this; obsolete instead.</li>
+</ul>
+<p><strong>3. Use the bridge addon when you mean to release.</strong></p>
+<p>The Southbrook flow is: author the change in <code>southbrook.eco</code>, set the
+ECO's <code>pg_ebom_id</code> to the released <code>pg.ebom</code> you want to push to
+manufacturing, leave <code>pg_auto_release</code> on, and apply the ECO. The
+bridge runs <code>pg.release.action_execute_release</code> for you and links the
+resulting <code>pg.release</code> back onto the ECO. See lesson 9.6.</p>
+<p><strong>4. Check the audit log when something looks wrong.</strong></p>
+<p><code>pg.audit.log</code> (in <code>product_graph_base</code>) is append-only, write-blocked,
+unlink-blocked. Every state transition, every blocked write, every
+release writes a row. <strong>Manufacturing → ProductGraph → Audit Log</strong> is
+the first place to look when you can't explain why an item is in the
+state it's in.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I want to add a <code>southbrook_dealer_id</code> field to <code>pg.item</code> because
+the dealer determines pricing."</strong></p>
+<p>Don't. The bridge spec (<code>bridge_spec/SPEC.md</code> in
+<code>~/product_graph_v19/</code>) explicitly forbids Southbrook-specific fields
+on <code>pg.*</code> models — that's how the generic LGPL-3 codebase stays
+publishable. Put the field on a new <code>southbrook.*</code> model that references
+the <code>pg.item</code> by m2o instead.</p>
+<p><strong>"I edited a released item's name and got a <code>UserError: Item X is
+Released and immutable</code>."</strong></p>
+<p>Working as designed. Released items are immutable by ORM override.
+Create a new revision and propose the change there. See lesson 9.2 for
+the workflow; see lesson 4.1 (ECOs) for who has to approve it.</p>
+<p><strong>"The ProductGraph release ran but no <code>mrp.bom</code> appeared. Did it
+silently fail?"</strong></p>
+<p>Check <code>pg.release.state</code>. If it's <code>failed</code>, the release rolled itself
+back inside a savepoint (Manufacturing Governance MG-8). Read
+<code>failure_reason</code> on the release record. Common causes: a child item
+isn't <code>released</code> (cross-model gate, EBOM Bible §10), or the linked
+revision has <code>incompatible_with_previous=True</code> and a warehouse
+notification is pending acknowledgement (MG-3).</p>
+<p><strong>"My MCP-bot service account's API key expired."</strong></p>
+<p>Odoo 19's default <code>api_key_duration</code> for <code>base.group_user</code> is 90 days.
+The bridge addon's install data raises this to 1825 days (5 years) via
+<code>data/api_key_policy.xml</code> — but that's the <em>cap</em>; the key itself still
+has the expiration the operator set when minting it. Re-mint via the
+MCP-bot user's My Profile → Account Security, then update the
+<code>PRODUCTGRAPH_API_KEY</code> env var on the sidecar container.</p>
+<p><strong>"I see <code>product_graph_relationship</code> in the Southbrook addons but
+nowhere in <code>~/product_graph_v19/</code>. Which one is real?"</strong></p>
+<p>Both. <code>product_graph_relationship</code> (Phase 2) lives in BOTH repos —
+the generic one defines the closure model, the Southbrook copy is
+running on the deployed stack. The closure is materialised per
+relationship kind (<code>substitutes</code>, <code>alternates</code>, <code>supersedes</code>,
+<code>references</code>, <code>related</code>) — see lesson 4.x and the
+<code>pg.relationship.closure</code> model. The Southbrook codebase needs only the
+closure model because that's what the deployed instance queries.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>ProductGraph is the <strong>OpenBOM mirror</strong> — same data model, same
+governance discipline, but living inside Odoo rather than as a separate
+SaaS. Three things make it different from Odoo's native PLM:</p>
+<p><strong>1. Property templates (<code>pg.property.template</code> →
+<code>pg.property.field</code> → <code>pg.property.value</code>).</strong> Native Odoo product
+attributes are flat selections. Property templates are
+schema-defined typed fields (char/integer/float/boolean/date/selection)
+grouped by item type. A template for "Cabinet Mechanical" defines
+<code>width_mm</code>, <code>height_mm</code>, <code>depth_mm</code>, <code>material</code>. Every cabinet
+revision binds to that template and records its specific values.
+Lesson 9.2 is the full tour.</p>
+<p><strong>2. Vendor stubs (<code>pg.vendor</code>, <code>pg.vendor.part</code>).</strong> In
+<code>product_graph_base</code> these are model-only stubs (Decision D3) —
+reserves the schema path without UI. The Phase 2 <code>product_graph_vendor</code>
+addon turns them into a full Approved Vendor List with a 5-state
+qualification lifecycle (<code>unqualified → probationary → qualified →
+suspended → disqualified</code>). Lesson 9.3.</p>
+<p><strong>3. Deep graph relationships (<code>pg.relationship</code>,
+<code>pg.relationship.closure</code>).</strong> Substitute, alternate, supersession,
+references, and related — five kinds of edges across the catalog.
+The closure is materialised so multi-hop queries are O(rows-returned)
+instead of O(graph-walk). This is what powers "find all the parts
+that could replace this if the vendor goes EOL."</p>
+<p><strong>Five addons, plus the sidecar and the bridge:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Addon</th>
+<th>What it owns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product_graph_base</code></td>
+<td><code>pg.item</code>, <code>pg.category</code>, <code>pg.property.*</code>, <code>pg.audit.log</code>, vendor stubs, 6 security groups, per-type sequences</td>
+</tr>
+<tr>
+<td><code>product_graph_revision</code></td>
+<td><code>pg.revision</code>, <code>pg.document</code> (versioned attachments), <code>pg.property.value</code></td>
+</tr>
+<tr>
+<td><code>product_graph_ebom</code></td>
+<td><code>pg.ebom</code>, <code>pg.ebom.line</code>, <code>pg.ebom.closure</code> (materialised where-used)</td>
+</tr>
+<tr>
+<td><code>product_graph_release</code></td>
+<td><code>pg.release</code>, the only writer of <code>mrp.bom</code>; MO-freeze logic; QWeb release reports</td>
+</tr>
+<tr>
+<td><code>product_graph_api</code></td>
+<td>REST <code>/api/v1/productgraph/*</code> for headless integration</td>
+</tr>
+<tr>
+<td><code>mcp/</code> sidecar</td>
+<td>Python container, MCP protocol over stdio or SSE, ~30 tools</td>
+</tr>
+<tr>
+<td><code>southbrook_plm_productgraph</code></td>
+<td>Bridge — wraps <code>southbrook.eco.action_apply</code> to fire <code>pg.release</code></td>
+</tr>
+</tbody>
+</table>
+<p>The 6 security groups (Bible R7) are layered:
+<code>group_pg_viewer &lt; group_pg_user &lt; group_pg_engineer &lt; group_pg_approver
+&lt; group_pg_mfg &lt; group_pg_admin</code>. Approver is required to release an
+EBOM; Engineer is required to call mutating MCP tools (re-checked at
+the tool boundary per Decision D6).</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A designer wants to know "what's the canonical width of the
+36-inch base cabinet, and where does that get changed?" Where do you
+look?</p>
+<blockquote>
+<p>ProductGraph side. Open the <code>pg.item</code> for the 36-inch base cabinet,
+click its released <code>pg.revision</code>, look at the <code>pg.property.value</code>
+rows for the "Cabinet Mechanical" template. The width is stored as
+<code>value_integer</code> on the row where <code>field_id.key = 'width_mm'</code>. To
+change it, you'd create a new revision (not edit the released one —
+it's immutable) and release that through the EBOM flow.</p>
+</blockquote>
+<p><strong>2.</strong> You write an Odoo migration script that does
+<code>self.env['mrp.bom'].create({...})</code> to add a BoM line for a new
+cabinet. It works. Should it?</p>
+<blockquote>
+<p>No. Bible Rule R1: <code>mrp.bom</code> and <code>mrp.bom.line</code> are written <strong>only</strong>
+inside <code>pg.release.action_execute_release</code>. Every other path is
+forbidden. The fact that the ORM doesn't physically stop you doesn't
+make it allowed — your script is a Bible violation that will break
+reconciliation with the ProductGraph audit trail. Refactor to create
+a <code>pg.release</code> against a released <code>pg.ebom</code> and let the release flow
+mint the BOM.</p>
+</blockquote>
+<p><strong>3.</strong> A PLM engineer asks "can I install ProductGraph without
+installing the Southbrook bridge?" What's the answer and why?</p>
+<blockquote>
+<p>Yes — the 5 generic addons (<code>product_graph_base/revision/ebom/
+release/api</code>) plus the MCP sidecar are deliberately publishable
+LGPL-3 with <strong>no</strong> reference to <code>southbrook_plm</code>. The bridge
+(<code>southbrook_plm_productgraph</code>) is a one-way glue that imports
+<code>pg.release</code> but <code>pg.release</code> does not know it exists. If you
+install ProductGraph on a non-Southbrook Odoo instance, you skip the
+bridge entirely.</p>
+</blockquote>
+<p><strong>4.</strong> The MCP sidecar's container has been failing to start for two
+days. The Slack alert says "authentication failed". You re-mint a
+fresh API key for <code>mcp-bot@...</code> and update the env var, but it still
+fails. What else do you check?</p>
+<blockquote>
+<p>Two things. (a) Is <code>mcp-bot</code>'s <code>api_key_duration</code> cap actually 1825
+days? If <code>data/api_key_policy.xml</code> from the bridge install didn't
+run (or someone reverted it), the cap might be back to 90 days and
+your fresh key may have a shorter-than-intended expiration. Settings
+→ General → API Keys shows the cap. (b) Does <code>mcp-bot</code> actually have
+<code>group_pg_engineer</code>? Without it, list-tools works but every mutating
+tool errors <code>permission_denied</code>. Check the user's groups via Settings
+→ Users.</p>
+</blockquote>
+<p><strong>5.</strong> The Production Manager says "I want to delete this obsolete
+prototype item — it's cluttering the search." Can you?</p>
+<blockquote>
+<p>Probably not without losing history. <code>pg.item.unlink()</code> rejects
+deletion outside <code>state in ('concept',)</code> (Bible R3 — no hard deletes
+on historically significant records). If the item is <code>prototype</code>,
+<code>engineering</code>, <code>released</code>, <code>service</code> or <code>obsolete</code>, it stays. The
+right move is to <em>obsolete it</em> (<code>state='obsolete'</code>), then set
+<code>active=False</code> so it falls out of default search views. The audit
+trail is preserved.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The detail of property templates / fields / values — lesson 9.2.</li>
+<li>Vendor stubs and the AVL workflow — lesson 9.3.</li>
+<li>Authoring an EBOM in the native editor — lesson 9.4.</li>
+<li>The MCP sidecar tooling and auth model — lesson 9.5.</li>
+<li>How the Southbrook bridge wires ECOs to releases — lesson 9.6.</li>
+<li>ECO lifecycle inside <code>southbrook_plm</code> — lesson 4.1.</li>
+<li>Cut spec authoring against released items — lesson 4.2.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_09_property_templates" model="slide.slide">
+            <field name="name">Property Templates — Authoring Engineering Specs</field>
+            <field name="channel_id" ref="course_productgraph"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">PLM engineer authoring product specs (cabinet mechanical, vendor components, drawings).</field>
+            <field name="html_content"><![CDATA[<h1 id="property-templates-authoring-engineering-specs">Property Templates — Authoring Engineering Specs</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You are the PLM engineer who defines <em>what gets measured</em> on every item
+in the catalog. The 36" base cabinet has a width, height, depth, box
+material — but those aren't free-form text on the cabinet record. They're
+typed fields on a <strong>property template</strong> that lots of cabinets share.
+When the sourcing team adds a new vendor component, it goes on a
+different template — one for <code>mpn</code>, <code>datasheet_url</code>, <code>lead_time_days</code>.
+This lesson is the practical reality of authoring templates, attaching
+them to items, and entering the values that downstream tools (BoM
+generator, MCP sidecar, REST API) consume.</p>
+<p>This lesson is entirely on the <strong>standalone ProductGraph platform</strong>
+side. Templates live in <code>product_graph_base</code>; values live in
+<code>product_graph_revision</code>. The Southbrook bridge addon does not touch
+templates at all — it just reads finished items.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> as an Engineer or
+Approver, then:</p>
+<blockquote>
+<p><strong>Manufacturing → ProductGraph → Property Templates</strong></p>
+</blockquote>
+<p>You'll see a list of every <code>pg.property.template</code> in the system, grouped
+by <code>item_type</code>. To enter a value for an item:</p>
+<blockquote>
+<p><strong>Manufacturing → ProductGraph → Items → [pick item] → Revisions →
+[pick draft revision] → Properties tab</strong></p>
+</blockquote>
+<p>The split is deliberate: <strong>templates</strong> are catalog-level definitions
+(rarely changed, often shared); <strong>values</strong> are revision-scoped (often
+changed, immutable once the revision releases).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Open a property template (e.g. "Cabinet Mechanical"). The form shows:</p>
+<ul>
+<li><strong>Template Name</strong> (<code>name</code> on <code>pg.property.template</code>) — human label.</li>
+<li><strong>Code</strong> (<code>code</code>) — short stable identifier; <code>_code_unique</code> constraint.</li>
+<li><strong>Sequence</strong> (<code>sequence</code>, default 10) — list ordering.</li>
+<li><strong>Applies To Item Type</strong> (<code>item_type</code>) — one of the 6 item types:
+  <code>assembly / part / purchased / document / software / service</code>. Mirrors
+  the <code>item_type</code> selection on <code>pg.item</code>. A template can only be
+  attached to items whose <code>item_type</code> matches.</li>
+<li><strong>Description</strong> (<code>description</code>) — free text. Show your work — future
+  engineers will need to know why this template exists.</li>
+<li><strong>Fields</strong> (<code>field_ids</code>, one2many to <code>pg.property.field</code>) — the typed
+  fields. Each row shows:</li>
+<li><strong>Key</strong> (<code>key</code>) — machine-readable, snake_case. The API and the
+    MCP sidecar use this. Examples: <code>width_mm</code>, <code>mpn</code>, <code>lead_time_days</code>.
+    <code>(template_id, key)</code> is unique. Validation rejects digits-at-start
+    and non-alphanumeric (excepting underscore).</li>
+<li><strong>Label</strong> (<code>label</code>) — human-readable, shown in forms and reports.
+    Translatable.</li>
+<li><strong>Type</strong> (<code>field_type</code>) — one of <code>char / integer / float / boolean
+    / date / selection</code>. To add a new type, you'd have to extend BOTH
+    this selection AND <code>pg.property.value</code>'s typed columns — that's a
+    Phase 2 expansion, locked in Phase 1.</li>
+<li><strong>Required</strong> (<code>is_required</code>) — whether the value must be set on a
+    revision before the revision can move out of <code>draft</code>. Phase 1 does
+    not enforce this at the ORM level; soft hint only.</li>
+<li><strong>Help</strong> (<code>help_text</code>) — tooltip, translatable.</li>
+<li><strong>Default Value</strong> (<code>default_value</code>) — pre-fills new
+    <code>pg.property.value</code> rows.</li>
+<li><strong>Selection Options</strong> (<code>selection_options</code>) — comma-separated, only
+    meaningful when <code>field_type='selection'</code>. A constraint enforces
+    this is populated when the type is selection. Example: <code>"S,M,L,XL"</code>.</li>
+<li><strong>Unit of Measure</strong> (<code>uom_id</code>) — display-only in Phase 1. Useful
+    hint for numeric fields.</li>
+</ul>
+<p>Open a draft revision and switch to the <strong>Properties tab</strong>. Each row
+is a <code>pg.property.value</code> and shows:</p>
+<ul>
+<li><strong>Field Label</strong> (related to <code>field_id.label</code>)</li>
+<li><strong>Field Key</strong> (related to <code>field_id.key</code>)</li>
+<li><strong>Field Type</strong> (related; drives which input control appears)</li>
+<li><strong>Value</strong> — actually stored in one of <code>value_char</code> / <code>value_integer</code>
+  / <code>value_float</code> / <code>value_boolean</code> / <code>value_date</code> / <code>value_selection</code>
+  depending on the field type. The <code>display_value</code> compute reads back
+  from the right slot.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Define the template (once).</strong></p>
+<p>You're standing up a new cabinet line and need a "Cabinet Mechanical"
+template that didn't exist before:</p>
+<ul>
+<li><strong>Manufacturing → ProductGraph → Property Templates → Create.</strong></li>
+<li>Set <code>name = "Cabinet Mechanical"</code>, <code>code = "CAB_MECH"</code>,
+  <code>item_type = "Manufactured Part"</code>, sequence = 10.</li>
+<li>In <strong>Fields</strong>, add lines:</li>
+<li><code>width_mm</code> / Integer / required / uom = mm</li>
+<li><code>height_mm</code> / Integer / required / uom = mm</li>
+<li><code>depth_mm</code> / Integer / required / uom = mm</li>
+<li><code>material</code> / Selection / required / options = <code>"melamine,MDF,particleboard,plywood"</code></li>
+<li><code>door_count</code> / Integer / not required / default = <code>"1"</code></li>
+<li>Save. The template is now available to attach.</li>
+</ul>
+<p><strong>2. Attach to an item (once per item).</strong></p>
+<ul>
+<li>Open the <code>pg.item</code> for the cabinet.</li>
+<li><strong>Property Templates</strong> field is a many2many to <code>pg.property.template</code>
+  with <code>domain="[('item_type','=',item_type),('active','=',True)]"</code> —
+  only matching-type templates appear in the dropdown.</li>
+<li>Add "Cabinet Mechanical." Save.</li>
+</ul>
+<p><strong>3. Enter values (once per revision).</strong></p>
+<ul>
+<li>Open the item's draft revision.</li>
+<li>Switch to the <strong>Properties tab</strong>.</li>
+<li>One row per <code>pg.property.field</code> of every attached template will be
+  there (the defaults from <code>default_value</code> pre-fill).</li>
+<li>Fill in the values: width = 914, height = 762, depth = 610, material
+  = melamine, door_count = 2.</li>
+<li>Save. The cross-model constraint
+  (<code>_check_template_belongs_to_item</code>) verifies the field's template is
+  actually attached to the parent item before accepting the value.</li>
+</ul>
+<p><strong>4. Submit, review, release.</strong></p>
+<ul>
+<li>Submit the revision for review → release. Once released, the
+  <code>pg.property.value</code> rows become immutable (write/unlink blocked by
+  <code>_check_revision_writable</code> unless the <code>_pg_release_bypass</code> context
+  flag is set, which only <code>pg.release.action_execute_release</code> uses).</li>
+<li>This is when downstream consumers — the REST API, the MCP sidecar,
+  the bridge's release — start trusting the values.</li>
+</ul>
+<p><strong>5. Override on the next revision.</strong></p>
+<p>If a vendor change means the depth is now 600mm (not 610):</p>
+<ul>
+<li>Create a new draft revision against the item.</li>
+<li>The Properties tab pre-fills from the template defaults, NOT from the
+  previous released revision's values. <strong>In Phase 1 you re-enter what
+  changed.</strong></li>
+<li>Fill <code>depth_mm = 600</code>, leave everything else as it was.</li>
+<li>Submit, release. The old revision is auto-superseded; both revisions
+  retain their own <code>pg.property.value</code> rows for historical record.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I tried to attach a <code>Document</code> template to an Assembly item and it
+won't show in the dropdown."</strong></p>
+<p>Working as designed. The <code>property_template_ids</code> field on <code>pg.item</code> is
+domained:
+<code>[('item_type','=',item_type),('active','=',True)]</code>. Templates whose
+<code>item_type</code> doesn't match the item's <code>item_type</code> are filtered out. If
+you really need this, you've found a modelling problem — file a ticket.</p>
+<p><strong>"I added a field to a template after several items already had
+values for the other fields. Nothing populated."</strong></p>
+<p>Adding a field to a template does NOT retroactively create
+<code>pg.property.value</code> rows on existing revisions. The new field will
+appear empty on draft revisions; users have to enter the value. For
+already-released revisions, the field will appear absent — released
+revisions are immutable.</p>
+<p><strong>"I tried to delete a field from a template and got a foreign key
+error."</strong></p>
+<p><code>pg.property.field</code> has <code>ondelete='cascade'</code> from template, but
+<code>pg.property.value</code> references the field with <code>ondelete='restrict'</code>.
+The DB blocks deletion if any value row references it. Either obsolete
+the field (set <code>active=False</code>) or delete the dependent values from
+draft revisions first.</p>
+<p><strong>"I changed the <code>key</code> of a field after some revisions had values for
+it. Did anything break?"</strong></p>
+<p>Quietly, yes. The MCP sidecar's <code>propose_revision</code> tool and the REST
+API both reference fields by <code>key</code>, not by id. Any client code that
+referenced the old key now silently misses the field. The system does
+not warn about this — keys are stable identifiers by convention, not by
+constraint. Don't rename keys after release.</p>
+<p><strong>"My values aren't saving. I get <code>Property template X is not attached
+to item Y</code>."</strong></p>
+<p>Constraint <code>_check_template_belongs_to_item</code> fires when the revision's
+parent item doesn't have the field's template in its
+<code>property_template_ids</code>. Two fixes: either attach the template to the
+item, or move the value to a revision of a different item that does
+have the template. Likely you set the wrong <code>revision_id</code>.</p>
+<p><strong>"The release ran but the resulting <code>mrp.bom</code> doesn't have the
+property values."</strong></p>
+<p>Property values live on <code>pg.property.value</code> (on the revision), not on
+<code>mrp.bom</code>. The release stamps the <code>pg.release.line</code> rows with the
+revision they came from; if you need a property at the BoM level (e.g.
+to drive a cut spec) you read it through
+<code>release.line_ids.revision_id.property_value_ids</code> or through the
+<code>pg.item.product_id</code> link. There is <strong>no</strong> direct field-to-field push
+into <code>mrp.bom</code>.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Three models, three jobs:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Module</th>
+<th>Job</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pg.property.template</code></td>
+<td><code>product_graph_base</code></td>
+<td>Defines a named, item-type-scoped collection of fields. Catalog-level.</td>
+</tr>
+<tr>
+<td><code>pg.property.field</code></td>
+<td><code>product_graph_base</code></td>
+<td>One typed field within a template. <code>(template_id, key)</code> unique.</td>
+</tr>
+<tr>
+<td><code>pg.property.value</code></td>
+<td><code>product_graph_revision</code></td>
+<td>One typed value bound to one revision + one field. <code>(revision_id, field_id)</code> unique.</td>
+</tr>
+</tbody>
+</table>
+<p>The typed-slot pattern on <code>pg.property.value</code> keeps storage normalised.
+Instead of one polymorphic <code>value</code> column that's always a string and
+gets cast at read time, each row has six columns — <code>value_char</code>,
+<code>value_integer</code>, <code>value_float</code>, <code>value_boolean</code>, <code>value_date</code>,
+<code>value_selection</code> — and the <code>_compute_display_value</code> method reads from
+the slot that matches the field's <code>field_type</code>. Queries like "all
+items with <code>width_mm &gt; 800</code>" are real integer comparisons against
+<code>value_integer</code>, not string-coerced.</p>
+<p>The selection constraint
+(<code>_check_selection_in_options</code>) re-parses
+<code>field_id.selection_options</code> at write time to ensure the value is in
+the allowed set. The class method <code>get_selection_choices</code> on
+<code>pg.property.field</code> returns <code>[(value, label), ...]</code> for that parse so
+both the constraint and the form view stay in sync.</p>
+<p>The immutability is enforced in <code>pg.property.value</code>'s <code>write</code> and
+<code>unlink</code> overrides:</p>
+<pre><code class="language-python">def _check_revision_writable(self):
+    for rec in self:
+        if rec.revision_id.state in ('released', 'superseded', 'obsolete') \
+                and not self.env.context.get('_pg_release_bypass'):
+            raise UserError(_(&quot;Cannot edit property values on revision …&quot;))
+</code></pre>
+<p>The <code>_pg_release_bypass</code> context flag is the same one used across all
+of <code>pg.*</code> — it's set only inside <code>pg.release.action_execute_release</code>.
+This is the rule called "context-flag bypass instead of raw SQL"
+(Decision D7, ProductGraph CLAUDE.md): no <code>env.cr.execute("UPDATE
+pg_property_value SET ...")</code> is ever required to release. The Bible
+treats raw SQL on <code>pg.*</code> tables as a violation.</p>
+<p>Phase 1 deliberately stops here. The OpenBOM-mirror spec calls for
+formula evaluation, cross-item rollup ("if any child width &gt; 800, mark
+parent as oversize"), and conditional visibility — these are Phase 2.
+Decision D2 locks "schema + UI for definition and value entry only" as
+the Phase 1 cap.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You're authoring a property template for purchased components.
+You add a <code>selection</code> field called <code>package_type</code> and save. The save
+errors with <code>Selection field 'Package Type' requires
+selection_options</code>. What did you miss?</p>
+<blockquote>
+<p>The <code>_check_selection_has_options</code> constraint fires when
+<code>field_type='selection'</code> and <code>selection_options</code> is blank. Add the
+comma-separated allowed values (e.g. <code>"SOIC,TSSOP,QFN,BGA"</code>) before
+saving. Selection fields without options would be unusable
+downstream anyway — the MCP sidecar's <code>propose_revision</code> and the
+form view both call <code>get_selection_choices()</code> which returns empty
+for an unconfigured field.</p>
+</blockquote>
+<p><strong>2.</strong> A designer asks "I changed the depth on the 36" base cabinet
+revision from 610 to 600 last week but the manufacturing BOM still
+shows 610. Why?"</p>
+<blockquote>
+<p>Two likely causes. (a) The revision is still in <code>draft</code> — the
+release flow hasn't run yet, so no <code>mrp.bom</code> exists tied to the new
+values. Check <code>pg.revision.state</code>. (b) The revision released but
+downstream code is reading the value off the <em>previous</em> released
+revision (the now-superseded one). Property values are
+revision-scoped, so a stale revision reference returns stale
+values. Find the consumer and have it read off the item's current
+released revision.</p>
+</blockquote>
+<p><strong>3.</strong> Your template has 12 fields. An engineer attaches it to an item
+and creates a draft revision. On the Properties tab they see 0 rows,
+not 12. What happened?</p>
+<blockquote>
+<p>Phase 1 does NOT auto-create <code>pg.property.value</code> rows when a
+template is attached. The tab shows whatever values exist; if none
+have been entered, it's empty. The engineer needs to add the rows
+manually (one per field they want to set a value for). Defaults
+from <code>default_value</code> only apply when a row is being created. If you
+want auto-population, that's a Phase 2 ergonomics improvement; file
+a ticket.</p>
+</blockquote>
+<p><strong>4.</strong> The MCP sidecar's <code>propose_revision</code> tool is being asked to
+set <code>lead_time_days = "fourteen"</code> on a purchased item. What happens?</p>
+<blockquote>
+<p>The Odoo write hits <code>pg.property.value.write</code> with
+<code>value_integer = "fourteen"</code>. ORM type coercion will fail with a
+<code>ValueError</code> (cannot cast "fourteen" to integer). The MCP server's
+top-level handler catches <code>Exception</code> and returns a JSON error
+blob with <code>error: "tool_error"</code> and the exception message. The
+revision is not modified; no audit log row written. The agent
+should re-call with <code>lead_time_days = 14</code> (numeric).</p>
+</blockquote>
+<p><strong>5.</strong> A regulatory audit asks "what was the width of the 36" base
+cabinet on 2026-03-15?" You're standing in front of the item. Where do
+you look?</p>
+<blockquote>
+<p>Find the <code>pg.revision</code> that was the released revision for that
+item on that date — check <code>release_timestamp</code> and <code>effective_date</code>
+on each revision; the one that bracketed 2026-03-15 is the answer.
+Open its <code>pg.property.value</code> rows, find the row where
+<code>field_id.key='width_mm'</code>, read <code>value_integer</code>. The audit trail
+(<code>pg.audit.log</code>) confirms when that revision was released and by
+whom — that's the regulatory artifact.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The 5 item-state machine (<code>concept → … → obsolete</code>) — lesson 9.1.</li>
+<li>Authoring an EBOM that consumes these property values — lesson 9.4.</li>
+<li>How the MCP sidecar's <code>get_item</code> returns the values to an LLM agent
+  — lesson 9.5.</li>
+<li>ECO workflow that approves a value change — lesson 4.1.</li>
+<li>Cut spec authoring that reads <code>width_mm</code> etc — lesson 4.2 / 1.7.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_09_vendor_stubs" model="slide.slide">
+            <field name="name">Vendor Stubs &amp; Approved Vendor List</field>
+            <field name="channel_id" ref="course_productgraph"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Purchasing team + PLM engineer.</field>
+            <field name="html_content"><![CDATA[<h1 id="vendor-stubs-approved-vendor-list">Vendor Stubs &amp; Approved Vendor List</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're either (a) a purchasing buyer who needs to know which vendors
+the engineering team has <em>qualified</em> for a part before raising a PO,
+or (b) a PLM engineer who's about to disqualify a vendor that's gone
+EOL and needs to understand the workflow downstream of that decision.</p>
+<p>There are two flavours of "vendor" in ProductGraph and the distinction
+matters a lot:</p>
+<ul>
+<li><strong>Vendor stubs</strong> — model-only records in <code>product_graph_base</code>. No UI,
+  no menus, no procurement hooks. They reserve the schema path and are
+  what the MCP sidecar's read tools query. (Decision D3, Phase 1.)</li>
+<li><strong>Vendor governance / AVL</strong> — full lifecycle in
+  <code>product_graph_vendor</code>. Adds qualification state machine, decision
+  audit log, AVL display on every item, UI menus. (Phase 2.)</li>
+</ul>
+<p>Both live in the <strong>standalone ProductGraph platform</strong>. The Southbrook
+bridge addon does not extend them at all — Southbrook reads but does
+not author vendor data.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>If <code>product_graph_vendor</code> is installed (the AVL feature):</p>
+<blockquote>
+<p><strong>Manufacturing → ProductGraph → Vendors</strong>
+<strong>Manufacturing → ProductGraph → Vendor Parts</strong>
+<strong>Manufacturing → ProductGraph → Vendors → [pick vendor] →
+Qualification Log tab</strong></p>
+</blockquote>
+<p>On any item, vendor data appears as:</p>
+<blockquote>
+<p><strong>Manufacturing → ProductGraph → Items → [pick item] → Approved
+Sources tab</strong></p>
+</blockquote>
+<p>If only <code>product_graph_base</code> is installed, the models exist but no
+menus do. You can still query them via the REST API and the MCP
+sidecar's <code>list_vendors</code> / <code>vendor_for_item</code> tools (see
+<code>mcp/src/product_graph_mcp/tools/vendor.py</code>).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p><strong>On the vendor form (<code>pg.vendor</code>):</strong></p>
+<ul>
+<li><strong>Vendor Name</strong> (<code>name</code>) — required.</li>
+<li><strong>Vendor Code</strong> (<code>code</code>) — <code>_code_unique</code> constraint. Stable
+  short identifier.</li>
+<li><strong>Linked Partner</strong> (<code>partner_id</code>) — many2one to <code>res.partner</code>,
+  <code>ondelete='restrict'</code>. Optional in Phase 1, populated in Phase 2.</li>
+<li><strong>Qualification State</strong> (<code>state</code>) — 5-state lifecycle:
+  <code>unqualified → probationary → qualified → suspended → disqualified</code>.
+  Tracking enabled. The valid forward transitions are locked in
+  <code>VENDOR_TRANSITIONS</code> (see <code>pg_vendor.py</code> in
+  <code>product_graph_vendor/models/</code>):
+  <code>unqualified  → probationary, disqualified
+  probationary → qualified, suspended, disqualified
+  qualified    → suspended, disqualified
+  suspended    → qualified, disqualified
+  disqualified → (terminal)</code></li>
+<li><strong>Qualified On</strong> (<code>qualified_on</code>) — auto-stamped first time the
+  vendor reaches <code>qualified</code>.</li>
+<li><strong>Qualified By</strong> (<code>qualified_by_id</code>) — user who pulled the trigger.</li>
+<li><strong>Re-qualify By</strong> (<code>qualification_expires_on</code>) — re-qualification
+  cadence target. <strong>Not enforced</strong> in Phase 1 — flagged on the form
+  only.</li>
+<li><strong>Approved</strong> (<code>is_approved</code>) — denormalised convenience flag, kept in
+  sync with <code>state == 'qualified'</code> via compute.</li>
+<li><strong>Qualification Log</strong> (<code>qualification_ids</code>, one2many to
+  <code>pg.vendor.qualification</code>) — append-only audit row per transition.
+  Cannot be edited or deleted (write/unlink overrides raise UserError).</li>
+<li><strong>Cross-References</strong> (<code>vendor_part_ids</code>, one2many to
+  <code>pg.vendor.part</code>) — every item this vendor is approved to supply.</li>
+</ul>
+<p><strong>On the vendor part form (<code>pg.vendor.part</code>):</strong></p>
+<ul>
+<li><strong>Engineering Item</strong> (<code>item_id</code>) — many2one to <code>pg.item</code>,
+  <code>ondelete='cascade'</code>.</li>
+<li><strong>Vendor</strong> (<code>vendor_id</code>) — many2one to <code>pg.vendor</code>,
+  <code>ondelete='restrict'</code>.</li>
+<li><strong>Vendor Part Number</strong> (<code>vendor_part_number</code>) — what the vendor calls
+  this part.</li>
+<li><strong>Preferred Source</strong> (<code>is_preferred</code>) — boolean, at most one per item
+  (enforced by <code>_check_one_preferred_per_item</code> constraint in
+  <code>product_graph_vendor</code>).</li>
+<li><strong>Source Rank</strong> (<code>rank</code>, default 10) — lower = preferred. Tie-breaker
+  when no <code>is_preferred</code> is set.</li>
+<li><strong>Vendor Qualified</strong> (<code>is_qualified</code>) — related, <code>store=True</code>.
+  Tracks the parent vendor's approval status.</li>
+<li><strong>Minimum Order Quantity</strong> (<code>moq</code>, default 1.0)</li>
+<li><strong>Unit Price Hint</strong> (<code>unit_price_hint</code>)</li>
+<li><strong>Lead Time (days)</strong> (<code>lead_time_days</code>)</li>
+<li><strong>Currency</strong> (<code>currency_id</code>)</li>
+<li><strong>Notes</strong> (<code>notes</code>) — free text</li>
+<li><strong>Unique</strong> — <code>(item_id, vendor_id, vendor_part_number)</code> is unique.</li>
+</ul>
+<p><strong>On any item (<code>pg.item</code>) with <code>product_graph_vendor</code> installed:</strong></p>
+<ul>
+<li><strong>Approved Sources</strong> (<code>vendor_part_ids</code>) — one2many to vendor parts.</li>
+<li><strong>Primary Source</strong> (<code>primary_vendor_part_id</code>) — computed: the
+  preferred-flagged source, falling back to the lowest-rank qualified
+  vendor-part.</li>
+<li><strong>Primary Vendor</strong> (<code>primary_vendor_id</code>) — related, store=True.</li>
+<li>Smart button <strong>Approved Sources</strong> opens the list filtered to this
+  item.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Onboarding a new vendor (purchasing + engineering, joint).</strong></p>
+<ul>
+<li><strong>Manufacturing → ProductGraph → Vendors → Create.</strong></li>
+<li>Fill <code>name</code>, <code>code</code> (stable handle, e.g. <code>BLUM_AT</code>).</li>
+<li>Link <code>partner_id</code> to the matching <code>res.partner</code> so the accounting
+  side stays connected.</li>
+<li>New vendor lands in <code>state='unqualified'</code>.</li>
+<li>Approver clicks <strong>Move to Probationary</strong> (<code>action_to_probationary</code>)
+  once paperwork is in order. Engineer can now create vendor-parts.</li>
+<li>Approver clicks <strong>Qualify</strong> (<code>action_qualify</code>) once the parts pass
+  PPAP / qualification testing. <code>qualified_on</code> and <code>qualified_by_id</code>
+  are stamped automatically. A row appears in the Qualification Log.
+  The <code>is_approved</code> compute flips to True.</li>
+</ul>
+<p><strong>2. Adding an approved source on a part (engineer).</strong></p>
+<ul>
+<li>Open the <code>pg.item</code> for the part (e.g. a 110° hinge).</li>
+<li>Switch to <strong>Approved Sources tab</strong>.</li>
+<li>Click <em>Create</em>:</li>
+<li>Pick the qualified <code>pg.vendor</code>.</li>
+<li>Enter their <code>vendor_part_number</code> (e.g. <code>BLUM-71B3550</code>).</li>
+<li>Set <code>moq</code>, <code>unit_price_hint</code>, <code>lead_time_days</code>.</li>
+<li>Mark <code>is_preferred = True</code> if this is the go-to source.</li>
+<li>Save. The <code>(item, vendor, vendor_part_number)</code> triple must be unique.</li>
+<li>The item's <code>primary_vendor_part_id</code> recomputes immediately.</li>
+</ul>
+<p><strong>3. EOL response (engineer + purchasing).</strong></p>
+<p>When a vendor announces a part is end-of-life:</p>
+<ul>
+<li>Open the affected <code>pg.vendor.part</code>.</li>
+<li>DON'T delete it — that erases history. Set <code>active = False</code> instead.</li>
+<li>The item's <code>primary_vendor_part_id</code> recomputes; if there's another
+  qualified-and-active source, it takes over. If not, the item now has
+  no primary source — downstream consumers (PO suggestions, MRP
+  re-orders) lose their default.</li>
+<li>If you want a hard signal that the <em>vendor itself</em> is gone:</li>
+<li>Open the <code>pg.vendor</code>.</li>
+<li>Click <strong>Suspend</strong> (<code>action_suspend</code>) for a recoverable issue, or
+    <strong>Disqualify</strong> (<code>action_disqualify</code>) for permanent removal. Both
+    require a comment (passed via context
+    <code>default_qualification_comment</code>). The comment lands on the
+    Qualification Log row.</li>
+<li>Every related <code>pg.vendor.part</code> loses <code>is_qualified</code> (it's
+    related-stored to <code>vendor_id.state</code> qualified).</li>
+</ul>
+<p><strong>4. Audit query — "what items use Vendor X?"</strong></p>
+<p>Open the vendor record. The <strong>Cross-References</strong> tab lists every
+<code>pg.vendor.part</code> where <code>vendor_id = X</code>. Each row's <code>item_id</code> is the
+engineering item. Two computed counts on the vendor make this fast:</p>
+<ul>
+<li><code>vendor_part_count</code> — number of <code>pg.vendor.part</code> rows.</li>
+<li><code>item_count</code> — DISTINCT <code>pg.items</code> (one part can have many
+  vendor-parts, but item_count is the distinct count).</li>
+</ul>
+<p>Or via the MCP sidecar: <code>vendor_for_item(part_number)</code> returns the
+approved-sources list for one item; <code>list_vendors(state='qualified')</code>
+returns the qualified list.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I tried to disqualify a vendor without a comment and got a
+ValidationError."</strong></p>
+<p>Working as designed. <code>action_suspend</code> and <code>action_disqualify</code> both
+require a comment (passed via context
+<code>default_qualification_comment</code>). The reason is audit integrity — a
+"why" must be recorded on the <code>pg.vendor.qualification</code> log row.
+Suspension/disqualification without a justification is the single most
+common audit finding.</p>
+<p><strong>"I want to bring a vendor back from disqualified."</strong></p>
+<p>You can't. <code>disqualified</code> is terminal in <code>VENDOR_TRANSITIONS</code>. The
+intent is "this vendor is permanently removed from the AVL." If you
+need them back, create a NEW <code>pg.vendor</code> record (different code, e.g.
+<code>BLUM_AT_V2</code>) and qualify it from scratch. The historical disqualified
+record stays for the audit trail.</p>
+<p><strong>"I marked a vendor-part as preferred, but it's still not showing as
+the item's primary."</strong></p>
+<p>Two possibilities. (a) The vendor isn't <code>qualified</code> —
+<code>primary_vendor_part_id</code> falls through <code>preferred</code> to
+<code>qualified.sorted('rank')</code>; a non-qualified preferred candidate is
+skipped. Check <code>vendor_id.state</code>. (b) Another vendor-part on the same
+item is also <code>is_preferred=True</code>. The constraint
+<code>_check_one_preferred_per_item</code> should reject the second one at write
+time, but if you're seeing two it's a sign someone bypassed the
+constraint with raw SQL — file a ticket.</p>
+<p><strong>"I deleted a vendor record and now I have orphan vendor-parts."</strong></p>
+<p><code>pg.vendor.part.vendor_id</code> has <code>ondelete='restrict'</code>, so the delete
+should have been rejected with a foreign key error. If it succeeded,
+someone removed the constraint manually. The orphans will show as
+<code>vendor_id = NULL</code> and will need cleanup. Don't replicate the trick.</p>
+<p><strong>"I changed a vendor-part's <code>vendor_part_number</code> and the audit log
+doesn't have a row."</strong></p>
+<p>Correct — <code>pg.vendor.part</code> is NOT a <code>pg.audit.log</code>-tracked model.
+Audit log rows fire only on <code>pg.item</code>, <code>pg.revision</code>, <code>pg.ebom</code>,
+<code>pg.release</code>, and <code>pg.vendor</code> state changes. Mid-stream vendor-part
+edits are tracked on the model's own <code>mail.thread</code> (chatter) but not in
+the formal pg.audit.log. If this matters for your audit, file a ticket.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p><strong>Phase 1 is a deliberate stub.</strong> Decision D3 in
+<code>~/product_graph_v19/CLAUDE.md</code> reads:</p>
+<blockquote>
+<p>Model-only stubs in base: <code>pg.vendor</code> and <code>pg.vendor.part</code>. No UI, no
+procurement hooks, no menus. Reserves the schema path the same way
+<code>pg.asset</code> reserves the Digital Twin path.</p>
+</blockquote>
+<p>This means: if you install only <code>product_graph_base</code>, the tables exist
+and the REST API works, but you won't see vendors anywhere in the
+Odoo UI. That's intentional — it lets the OpenBOM-mirror REST contract
+ship Day 1 without dragging in the AVL workflow.</p>
+<p><strong><code>product_graph_vendor</code> (Phase 2) is what flips the switch.</strong> It
+inherits both <code>pg.vendor</code> and <code>pg.vendor.part</code> and adds:</p>
+<ul>
+<li><code>mail.thread</code> and <code>mail.activity.mixin</code> on <code>pg.vendor</code> (so chatter
+  works).</li>
+<li>The 5-state qualification machine + <code>VENDOR_TRANSITIONS</code> map.</li>
+<li>The <code>pg.vendor.qualification</code> append-only audit model.</li>
+<li>The smart-button menus, vendor-list views, vendor-form, AVL
+  inherit views on <code>pg.item</code>.</li>
+<li>The <code>primary_vendor_part_id</code> compute on <code>pg.item</code>.</li>
+</ul>
+<p>State transitions go through one helper, <code>_transition(to_state,
+comment)</code>, which checks:</p>
+<ol>
+<li>The acting user is in <code>group_pg_approver</code> (raises UserError otherwise).</li>
+<li>The target state is in <code>VENDOR_TRANSITIONS[current_state]</code>.</li>
+<li>Stamps <code>qualified_on</code> / <code>qualified_by_id</code> on first qualify.</li>
+<li>Creates a <code>pg.vendor.qualification</code> row.</li>
+<li>Writes a <code>pg.audit.log</code> row via <code>env['pg.audit.log'].sudo()._log(...)</code>
+   with <code>action='state_change'</code>, from/to, notes (Bible R4 — all
+   transitions emit audit + chatter).</li>
+<li>Posts a chatter message on the vendor.</li>
+</ol>
+<p>The append-only <code>pg.vendor.qualification</code> model is enforced at the ORM
+level:</p>
+<pre><code class="language-python">def write(self, vals):
+    raise UserError(_(&quot;Vendor qualification records are append-only and
+                      cannot be edited.&quot;))
+def unlink(self):
+    raise UserError(_(&quot;Vendor qualification records are append-only and
+                      cannot be deleted.&quot;))
+</code></pre>
+<p>What's <strong>NOT here</strong>:
+- No <code>purchase.order</code> integration. The <code>primary_vendor_part_id</code> is
+  computed and exposed, but no PO is auto-created from it. That's the
+  planned <code>product_graph_procurement</code> companion's job (in-progress,
+  see addons list).
+- No RFQ workflow — that's <code>product_graph_rfq</code>.
+- No re-qualification cadence enforcement — <code>qualification_expires_on</code>
+  is a flag on the form, not a cron action.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> Purchasing tells you the 110° concealed hinge from Blum has been
+discontinued and Blum's replacement (<code>71B3650</code>) costs 12% more. What's
+the workflow?</p>
+<blockquote>
+<p>Don't delete the old <code>pg.vendor.part</code> — that erases history. Set the
+existing row's <code>active=False</code> (records why: "EOL per Blum notice
+2026-06"). Create a NEW <code>pg.vendor.part</code> for the same item with
+<code>vendor_part_number='71B3650'</code>, the new <code>unit_price_hint</code>, and mark
+<code>is_preferred=True</code> if it's now the go-to. The item's
+<code>primary_vendor_part_id</code> recomputes to the new row. The
+<code>vendor_id.state</code> is still <code>qualified</code> — Blum as a vendor is fine;
+only one of their parts went EOL.</p>
+</blockquote>
+<p><strong>2.</strong> An approver tries to disqualify a vendor by going to the form
+and changing the <code>state</code> selection directly to <code>disqualified</code> instead
+of clicking the action button. Does it work?</p>
+<blockquote>
+<p>No — and that's by design. The state field is tracked but the
+<code>_transition</code> helper is where the guards live (approver-group check,
+transition validity, audit log write, chatter). Writing directly to
+<code>state</code> will fail the audit/chatter expectation and likely the
+<code>tracking=True</code> write itself will go through but produce a broken
+record (qualification log missing, audit log missing). Always use
+the action buttons (<code>action_suspend</code>, <code>action_disqualify</code>, etc.).</p>
+</blockquote>
+<p><strong>3.</strong> The MCP sidecar's <code>vendor_for_item</code> tool is called with
+<code>part_number = 'PG-PRT-0042'</code>. The item has 3 vendor-parts: one
+preferred and qualified (rank 10), one not-preferred but qualified
+(rank 20), one not-preferred and unqualified (rank 5). Which one is
+the "primary"?</p>
+<blockquote>
+<p>The preferred-and-qualified rank-10 one. The compute checks
+<code>preferred</code> first (and finds it), so it returns that row regardless
+of rank. The unqualified rank-5 row is filtered out
+(<code>primary_vendor_part_id</code> only considers <code>vendor_part_ids.filtered('active')</code>
+and preferred-or-qualified). The qualified rank-20 row would have
+won only if there were no preferred candidate.</p>
+</blockquote>
+<p><strong>4.</strong> You're standing up a new dev DB and install only
+<code>product_graph_base</code>. A REST API consumer reports
+<code>vendor_part_count</code> is always 0. Why?</p>
+<blockquote>
+<p>The base module ships <code>pg.vendor.part</code> as a stub but does NOT add the
+<code>vendor_part_ids</code> o2m relationship to <code>pg.item</code> — that's added by the
+<code>product_graph_vendor</code> Phase 2 inherit (<code>pg_item.py</code> in the vendor
+module). Without that addon, items have no inverse relation to
+their vendor-parts; the field literally doesn't exist on the model.
+Install <code>product_graph_vendor</code> to get the AVL view on items.</p>
+</blockquote>
+<p><strong>5.</strong> A regulator asks for the full qualification history of vendor
+"Blum Austria GmbH." Where do you point them?</p>
+<blockquote>
+<p>Open the <code>pg.vendor</code> record. The <strong>Qualification Log</strong> tab
+(<code>qualification_ids</code>, one2many to <code>pg.vendor.qualification</code>) is the
+append-only audit trail: every transition with <code>(decision,
+decided_by_id, decided_on, comment)</code>. Plus the
+<code>pg.audit.log</code> rows filtered to <code>res_model='pg.vendor'</code> and
+<code>res_id=&lt;this vendor's id&gt;</code> for the same events as seen by the
+broader ProductGraph audit. Both are write-blocked and
+unlink-blocked at the ORM level, so the regulator's tamper concern is
+answered by design.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Property templates (engineering specs) — lesson 9.2.</li>
+<li>Authoring an EBOM that uses the primary vendor for cost rollup —
+  lesson 9.4.</li>
+<li>The Procurement and RFQ companion addons (<code>product_graph_procurement</code>,
+  <code>product_graph_rfq</code>) — Phase 2, out of scope here.</li>
+<li>ECO workflow that swaps vendors as a side effect — lesson 4.1.</li>
+<li>Native Odoo <code>product.supplierinfo</code> — different table, different
+  authority. ProductGraph's AVL is the engineering authority; the
+  Odoo <code>product.supplierinfo</code> is the purchasing-pricelist authority.
+  They are NOT auto-synced in Phase 1.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_09_native_bom_editor" model="slide.slide">
+            <field name="name">The Native EBOM Editor — Authoring + Releasing to MRP</field>
+            <field name="channel_id" ref="course_productgraph"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">PLM engineer authoring engineering BOMs.</field>
+            <field name="html_content"><![CDATA[<h1 id="the-native-ebom-editor-authoring-releasing-to-mrp">The Native EBOM Editor — Authoring + Releasing to MRP</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PLM engineer who authors the engineering BOM for a cabinet
+assembly: the list of carcass panels, hinges, drawer slides, fasteners
+that go into it. You will NOT use Odoo's <code>mrp.bom</code> editor for this —
+ProductGraph has its own EBOM model (<code>pg.ebom</code>) one level upstream
+from <code>mrp.bom</code>. This lesson is the practical reality of using
+ProductGraph's editor, the differences from Odoo's <code>mrp.bom</code> editor,
+and how a successful release turns your <code>pg.ebom</code> into a working
+<code>mrp.bom</code> that production can use.</p>
+<p>This lesson is entirely on the <strong>standalone ProductGraph platform</strong>
+side. The Southbrook bridge addon does not touch EBOMs — it only
+<em>triggers</em> the release that converts them to <code>mrp.bom</code>.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Manufacturing → ProductGraph → EBOMs</strong></p>
+</blockquote>
+<p>For a specific item's EBOM:</p>
+<blockquote>
+<p><strong>Manufacturing → ProductGraph → Items → [pick item] → Smart button:
+EBOMs → [pick draft EBOM]</strong></p>
+</blockquote>
+<p>The Odoo-native MRP BOM editor still exists at:</p>
+<blockquote>
+<p><strong>Manufacturing → Products → Bills of Materials</strong></p>
+</blockquote>
+<p>You will see <code>mrp.bom</code> records there AFTER a <code>pg.release</code> runs. <strong>Do
+not edit them directly.</strong> Bible Rule R1 forbids any code path from
+writing <code>mrp.bom</code> outside <code>pg.release.action_execute_release</code>. The
+<code>mrp.bom</code> you see is a <em>projection</em> of the released <code>pg.ebom</code>;
+hand-editing it diverges your engineering source of truth from your
+manufacturing source of truth.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>A <code>pg.ebom</code> form has three identity fields and one big list:</p>
+<ul>
+<li><strong>EBOM Reference</strong> (<code>name</code>) — auto-assigned from the <code>pg.ebom</code>
+  sequence. Default <code>New</code> until create.</li>
+<li><strong>Root Assembly</strong> (<code>root_item_id</code>) — many2one to <code>pg.item</code>,
+  <code>ondelete='restrict'</code>. Domain restricts to
+  <code>item_type in ('assembly','part')</code> — purchased components can't be
+  roots.</li>
+<li><strong>Item Revision</strong> (<code>revision_id</code>) — many2one to <code>pg.revision</code>,
+  <code>ondelete='restrict'</code>. Domain restricts to revisions of the chosen
+  root item. The (root_item, revision) tuple is unique
+  (<code>_root_revision_unique</code> constraint) — only one EBOM per (root,
+  revision) is allowed.</li>
+<li><strong>Status</strong> (<code>state</code>) — the 4-state lifecycle:
+  <code>draft → review → released → superseded</code>. Tracking enabled.</li>
+<li><strong>EBOM Type</strong> (<code>ebom_type</code>) — <code>production</code> or <code>prototype</code>. Production
+  is the default and is what gets fed to MRP.</li>
+<li><strong>Components</strong> (<code>ebom_line_ids</code>, one2many to <code>pg.ebom.line</code>) — the
+  list of child items. Each line shows:</li>
+<li><strong>Sequence</strong> (<code>sequence</code>, default 10) — drives line ordering.</li>
+<li><strong>Component</strong> (<code>pg_item_id</code>) — the child engineering item.
+    Required, <code>ondelete='restrict'</code>.</li>
+<li><strong>Specific Revision</strong> (<code>pg_revision_id</code>) — optional, pins to a
+    specific released revision. Leave blank to use whatever the child
+    item's current released revision is at release time.</li>
+<li><strong>Part Number</strong> (<code>part_number</code>) — related from
+    <code>pg_item_id.part_number</code>, stored for grouping/search.</li>
+<li><strong>Item State</strong> (<code>item_state</code>) — related from <code>pg_item_id.state</code>,
+    read-only. Useful to spot draft children before submitting for
+    review.</li>
+<li><strong>Quantity</strong> (<code>product_qty</code>) — float, default 1.0.</li>
+<li><strong>UoM</strong> (<code>uom_id</code>) — defaults from the child item's <code>uom_id</code> via
+    <code>_onchange_pg_item_id</code>.</li>
+<li><strong>Designator</strong> (<code>reference</code>) — free text. Examples: "R1", "C12",
+    "Top Hinge", "Left Gable".</li>
+<li><strong>Notes</strong> (<code>notes</code>) — free text.</li>
+<li><strong>Type</strong> (<code>bom_line_type</code>) — <code>normal / phantom / optional</code>.
+    Phantoms are sub-assemblies that explode through; optional lines
+    are engineering-deferred decisions for manufacturing.</li>
+<li><strong>Alternate Group</strong> (<code>alternate_group</code>) — free-form tag identifying
+    a set of interchangeable parts (e.g. "HINGE_GROUP").</li>
+<li><strong>Primary in Alternate Group</strong> (<code>is_primary</code>) — within an alternate
+    group, exactly one line should be marked primary. The validate
+    step warns (not blocks) on groups with !=1 primary.</li>
+</ul>
+<p>After release, four extra fields are stamped:</p>
+<ul>
+<li><strong>Effective Date</strong> (<code>effective_date</code>)</li>
+<li><strong>Released By</strong> (<code>released_by_id</code>)</li>
+<li><strong>Released At</strong> (<code>release_timestamp</code>)</li>
+<li><strong>Superseded By</strong> (<code>successor_ebom_id</code>) — back-pointer set on the
+  previous EBOM when a new one is released for the same root item.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Create the EBOM (draft).</strong></p>
+<ul>
+<li>Open the item you're authoring for — say, the 36" base cabinet
+  assembly.</li>
+<li>Smart button → <strong>EBOMs → New EBOM</strong>.</li>
+<li>The form auto-fills <code>root_item_id</code>. Pick the <code>revision_id</code> — must be
+  a draft or review revision of the same item, on the first author.</li>
+<li>Save. <code>state = 'draft'</code>, name auto-assigned via <code>pg.ebom</code> sequence.</li>
+</ul>
+<p><strong>2. Add lines.</strong></p>
+<p>The editor uses Odoo's native x2many editable list (Decision D4 —
+"native Odoo x2many editable list + CSV import/export + keyboard-
+friendly inline reference &amp; qty edit. NO custom OWL widget in Phase
+1"). You're not getting a spreadsheet experience; you're getting Odoo
+list inline editing.</p>
+<ul>
+<li>Click <em>Add a line</em>.</li>
+<li>Pick the child <code>pg_item_id</code> (autocomplete on part_number or name).</li>
+<li>Quantity, UoM (pre-filled), designator, notes.</li>
+<li>Press <em>Tab</em> or arrow keys to move between fields without your hand
+  leaving the keyboard.</li>
+<li>Save.</li>
+</ul>
+<p>For larger BOMs (50+ lines, e.g. a full cabinet with hardware):</p>
+<ul>
+<li>Click the <strong>Import Lines</strong> button (if the import wizard is enabled
+  in your install) — accepts a CSV with columns <code>part_number, qty,
+  uom, designator, notes, alternate_group, is_primary</code>.</li>
+<li>The importer matches <code>part_number</code> to <code>pg.item</code> and rejects unknown
+  parts.</li>
+</ul>
+<p><strong>3. Submit for review.</strong></p>
+<ul>
+<li>Click <strong>Submit for Review</strong> (<code>action_submit_for_review</code>).</li>
+<li>Authority gate: requires <code>group_pg_engineer</code>. Approvers also have
+  this group transitively.</li>
+<li>Pre-check: EBOM must have at least one line, else UserError("EBOM X
+  has no lines.").</li>
+<li>State flips <code>draft → review</code>. Audit log row written with
+  <code>action='state_change'</code>. Chatter message posted.</li>
+</ul>
+<p><strong>4. Validate (optional but recommended).</strong></p>
+<ul>
+<li>Click <strong>Validate</strong> (<code>action_validate</code>). This runs the same checks
+  the release will run, WITHOUT changing state. Returns a dict
+  <code>{ok, errors, warnings}</code>. Use it as a pre-flight.</li>
+<li>Validation checks:</li>
+<li><strong>All child items must be released.</strong> Non-released children are
+    listed as errors (this is the cross-model gate, EBOM Bible §10).</li>
+<li><strong>Recursion.</strong> A root item appearing in its own descendants is an
+    error — that's a circular BOM. Phase 1's check is shallow
+    (top-level duplicate of the root); deeper cycles are caught by the
+    closure rebuild.</li>
+<li><strong>Alternate group integrity.</strong> Groups with !=1 primary line are
+    warnings (release proceeds; planner picks at MO time).</li>
+</ul>
+<p><strong>5. Release.</strong></p>
+<ul>
+<li>Click <strong>Release</strong> (<code>action_release</code>).</li>
+<li>Authority gate: requires <code>group_pg_approver</code>. Engineers can't
+  self-release.</li>
+<li>Runs the validation; releases only if <code>validation['ok']</code> is True.</li>
+<li>Finds the previous active released EBOM for the same root_item and
+  marks it <code>superseded</code> + sets <code>successor_ebom_id</code>. Clears its
+  closure rows.</li>
+<li>Stamps <code>effective_date = today</code>, <code>released_by_id</code>, <code>release_timestamp</code>.</li>
+<li>Writes a <code>pg.audit.log</code> row with <code>action='state_change'</code>,
+  <code>from_state='review'</code>, <code>to_state='released'</code>.</li>
+<li><strong>Rebuilds the closure</strong> via
+  <code>self.env['pg.ebom.closure']._build_for_ebom(rec)</code> — every
+  (ancestor, descendant, depth) row for the BOM tree, the same pattern
+  as <code>pg.relationship.closure</code>. This is what makes
+  <code>where_used</code> / <code>bom_explode</code> queries fast at MCP/REST time.</li>
+</ul>
+<p>The EBOM is now <code>released</code> and IMMUTABLE — the <code>write</code> override
+blocks all field changes except the small <code>_MUTABLE_ON_LOCKED</code> set
+(<code>state</code>, <code>active</code>, chatter fields).</p>
+<p><strong>6. Release to MRP (separate step).</strong></p>
+<p>Releasing the EBOM does NOT create a <code>mrp.bom</code>. That's a separate
+<code>pg.release</code> flow:</p>
+<ul>
+<li>From the released EBOM, click <strong>Release to MRP</strong> (opens the
+  <code>pg.release</code> wizard) — or create a <code>pg.release</code> programmatically
+  with <code>ebom_id = your_ebom.id, release_reason = "Reason text"</code> and
+  call <code>release.action_execute_release()</code>.</li>
+<li>The release flow is the only writer of <code>mrp.bom</code> (Bible R1). See
+  lesson 9.6 for the Southbrook bridge that runs this for you on ECO
+  apply.</li>
+</ul>
+<h2 id="differences-from-odoos-mrpbom-editor">Differences from Odoo's <code>mrp.bom</code> editor</h2>
+<p>The native MRP BOM editor has:</p>
+<ul>
+<li>Variants (<code>bom_id.product_id</code> vs <code>product_tmpl_id</code>)</li>
+<li>Routings (<code>operation_ids</code>)</li>
+<li>Byproducts (<code>byproduct_ids</code>)</li>
+<li>Product type filtering</li>
+</ul>
+<p>ProductGraph's EBOM is <strong>upstream</strong> of all that:</p>
+<table>
+<thead>
+<tr>
+<th>ProductGraph EBOM</th>
+<th>Odoo <code>mrp.bom</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>root_item_id</code> — the engineering item</td>
+<td><code>product_tmpl_id</code> — the product template</td>
+</tr>
+<tr>
+<td><code>revision_id</code> — explicit engineering revision</td>
+<td>(no concept of revision)</td>
+</tr>
+<tr>
+<td>4-state lifecycle with approver gate</td>
+<td>No state</td>
+</tr>
+<tr>
+<td>Closure-materialised where-used</td>
+<td>Live recursive query</td>
+</tr>
+<tr>
+<td>Property-driven lines (read property values off child revisions)</td>
+<td>Variant-driven lines (read attribute values off variants)</td>
+</tr>
+<tr>
+<td>Immutable after release</td>
+<td>Editable anytime</td>
+</tr>
+<tr>
+<td>Audit-logged transitions</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>alternate_group</code> for substitute parts</td>
+<td><code>byproduct_ids</code> and operation alternatives</td>
+</tr>
+</tbody>
+</table>
+<p>The two are connected via the release: <code>pg.release.mrp_bom_id</code> is the
+<code>mrp.bom</code> that was minted from this EBOM. The closure is what powers
+multi-hop "what cabinets use this hinge" without walking the tree at
+read time.</p>
+<h2 id="how-the-ebom-syncs-to-mrpbom-via-the-bridge">How the EBOM syncs to <code>mrp.bom</code> via the bridge</h2>
+<p>The Southbrook bridge addon (<code>southbrook_plm_productgraph</code>) is the
+mechanism by which an ECO closure triggers an EBOM release:</p>
+<ol>
+<li>Engineer raises an ECO in <code>southbrook_plm</code>.</li>
+<li>ECO has <code>pg_ebom_id = your_released_ebom.id</code> set and
+   <code>pg_auto_release = True</code>.</li>
+<li>ECO state moves through draft → approved → applied.</li>
+<li><code>action_apply</code> runs. <strong>After</strong> the PLM side does its job (state
+   change, kind dispatch, <code>applied_date</code> stamp), the bridge runs:
+   <code>python
+   release = self.env["pg.release"].create({
+       "ebom_id": self.pg_ebom_id.id,
+       "release_reason": f"Southbrook ECO {self.name}: {self.title}",
+   })
+   release.action_execute_release()</code></li>
+<li>The release runs the full mint-mrp.bom flow (validate, ensure
+   product, freeze open MOs on previous BOM, create new mrp.bom,
+   archive previous, write release outcome, audit, notify).</li>
+<li><code>eco.pg_release_id</code> is set to the new <code>pg.release.id</code>; chatter
+   message posted on the ECO.</li>
+</ol>
+<p>If the release fails, the ECO <strong>stays applied</strong> (Manufacturing
+Governance §8). The bridge does NOT roll back the ECO — that would
+corrupt the PLM audit trail. A chatter note flags the failure and the
+Approver retries from the EBOM form.</p>
+<h2 id="conflict-resolution-if-both-sides-edit">Conflict resolution if both sides edit</h2>
+<p>Phase 1's conflict story is <strong>simple by design</strong>:</p>
+<ul>
+<li>The released <code>pg.ebom</code> is immutable. You cannot edit it.</li>
+<li>The <code>mrp.bom</code> is editable in the Odoo UI, but Bible R1 forbids it.</li>
+<li>If someone edits the <code>mrp.bom</code> manually:</li>
+<li>The <code>pg.release</code> record's <code>mrp_bom_id</code> still points at the now-
+    drifted BOM. There is no automatic re-sync.</li>
+<li>Next release for the same product will archive the drifted BOM
+    (via <code>archive_previous_bom=True</code> on the next release) and mint a
+    fresh one from the new EBOM, so the drift is auto-corrected on
+    the NEXT release.</li>
+<li>In between, the manufacturing team is following a BOM that
+    diverges from engineering intent.</li>
+<li>The right workflow when you find drift: open a new draft revision
+  on the root item, copy the changes from the modified <code>mrp.bom</code> into
+  a new <code>pg.ebom</code>, release it. The next <code>pg.release</code> will replace the
+  drifted <code>mrp.bom</code> cleanly.</li>
+</ul>
+<p>Phase 2 plans a re-sync gate, but it's out of scope here.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a line for a child item but <code>action_release</code> fails saying
+'Non-released child items: …'."</strong></p>
+<p>The cross-model gate (EBOM Bible §10). All children must be in
+<code>released</code> state before the parent EBOM can release. Two paths:
+release each child first (boring but correct), or remove the child
+from the EBOM if it's not actually a real component yet.</p>
+<p><strong>"I tried to add a child item that's the same as the root. The
+validation flagged it."</strong></p>
+<p>Working as designed — <code>action_validate</code> flags top-level recursion. A
+root item appearing as its own immediate child is a circular BOM. The
+deeper case (root appears as a grandchild via a phantom) is caught by
+the closure rebuild on release.</p>
+<p><strong>"I released an EBOM with an alternate group that has two primaries.
+Why didn't the release fail?"</strong></p>
+<p>Alternate-group primary integrity is a <strong>warning</strong>, not an error.
+<code>action_validate</code> returns it as a warning string but doesn't add it to
+<code>errors</code>. Release proceeds; the planner picks which alternate to use at
+MO time (Phase 1 has no auto-substitution per Mfg Governance §6 Rule
+4.1). If you want this to block release, file a ticket.</p>
+<p><strong>"I tried to edit a line on a released EBOM and got a
+UserError about immutability."</strong></p>
+<p>Working as designed. <code>pg.ebom.line._check_ebom_writable</code> blocks all
+writes/unlinks when the parent EBOM is <code>released</code> or <code>superseded</code>. To
+change the BOM, create a new revision of the root item, create a new
+<code>pg.ebom</code> against that revision, modify lines there, release it. The
+old EBOM auto-supersedes.</p>
+<p><strong>"I released an EBOM and the <code>mrp.bom</code> didn't appear."</strong></p>
+<p>EBOM release does NOT create <code>mrp.bom</code>. It transitions the EBOM state
+and rebuilds the closure. To create the <code>mrp.bom</code> you need a separate
+<code>pg.release</code> against the released EBOM. The bridge addon does this
+automatically on ECO apply; manual is a wizard click or programmatic
+<code>pg.release.create() → action_execute_release()</code>.</p>
+<p><strong>"My EBOM is in <code>review</code> state and I want to add a line. The form
+seems editable but my save did nothing."</strong></p>
+<p>Lines can be edited in <code>draft</code> and <code>review</code> states. If your save
+appeared to do nothing, check whether (a) you have
+<code>group_pg_engineer</code>, (b) the line's child <code>pg_item_id</code> is actually
+released — if not, the inline error might be silenced. Click
+<strong>Validate</strong> to see the full diagnostic.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The release flow (<code>action_execute_release</code> on <code>pg.release</code>) is the
+9-step process the EBOM hands off to:</p>
+<ol>
+<li><strong>Validate</strong> — every child line item is in <code>released</code> state and
+   has a linked <code>product.product</code> (or <code>create_product_if_missing</code> is
+   on so we mint one).</li>
+<li><strong>Ensure product</strong> — if the root item doesn't have a
+   <code>product.product</code>, create one with <code>default_code = part_number</code>.</li>
+<li><strong>Collect previous BOM</strong> — search active <code>mrp.bom</code> for the same
+   product template.</li>
+<li><strong>Freeze open MOs</strong> on the previous BOM — Manufacturing Governance
+   §1 (MG-1). They go into <code>frozen_mo_ids</code> and <code>frozen_mo_count</code>.</li>
+<li><strong>Create new <code>mrp.bom</code></strong> — THE ONLY PLACE in the codebase this
+   happens (Bible R1). One <code>mrp.bom</code> header + N <code>mrp.bom.line</code> rows
+   from the EBOM's <code>ebom_line_ids</code>.</li>
+<li><strong>Archive previous</strong> — set old <code>mrp.bom.active = False</code>
+   (MG-5).</li>
+<li><strong>Write release outcome</strong> — <code>state='completed'</code>, <code>mrp_bom_id</code>,
+   <code>product_id</code>, <code>release_timestamp</code>, <code>released_by_id</code>. This write
+   uses <code>_pg_release_bypass=True</code> context to bypass the immutability
+   guard on completed releases.</li>
+<li><strong>Audit</strong> — <code>pg.audit.log</code> row with <code>action='release'</code>,
+   from/to/notes/payload (payload includes ebom_id, revision_id,
+   mrp_bom_id, product_id, frozen_mo_count,
+   incompatible_with_previous).</li>
+<li><strong>Notify</strong> — chatter post + subscribe the manufacturing group.</li>
+</ol>
+<p>The entire run is inside <code>with self.env.cr.savepoint():</code>. Any
+exception triggers a rollback inside the savepoint, the catch block
+writes <code>state='failed'</code> and <code>failure_reason</code>, writes an audit row,
+and re-raises. This is MG-8 — atomic savepoint ensures failure leaves
+no partial <code>mrp.bom</code>.</p>
+<p>The closure (<code>pg.ebom.closure</code>) is rebuilt per EBOM by
+<code>_build_for_ebom</code>. Closure rows are <code>(ebom_id, ancestor_id,
+descendant_id, depth)</code> tuples; queries like "find all assemblies that
+use part X" become a one-domain search instead of a recursive walk.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You author a <code>pg.ebom</code> for the 36" base cabinet, add 14
+lines (panels, hinges, slides, fasteners). Two of the panel items are
+still in <code>engineering</code> state. You click <strong>Submit for Review</strong>. What
+happens?</p>
+<blockquote>
+<p>Submit succeeds — the engineer-state check is only "EBOM has at
+least one line." The non-released children fail at the
+next step: <strong>Release</strong> runs <code>action_validate</code> and fails with
+"Non-released child items: …". You have two options: release each
+non-released panel item (and its revision) first, or roll back the
+EBOM to <code>draft</code> (<code>action_reject_to_draft</code>, approver only) and remove
+those lines.</p>
+</blockquote>
+<p><strong>2.</strong> An engineer asks "I edited a <code>mrp.bom</code> line directly in
+Manufacturing because the cabinet was missing a fastener. Did I just
+break something?"</p>
+<blockquote>
+<p>Bible Rule R1 yes — <code>mrp.bom</code> is supposed to be written only by
+<code>pg.release.action_execute_release</code>. Your edit is now drift. Next
+<code>pg.release</code> for the same product will archive your drifted BOM and
+mint a fresh one from the released EBOM, silently overwriting your
+change. Right fix: create a new revision of the cabinet item, new
+draft <code>pg.ebom</code>, add the fastener line, submit, release, then
+release-to-MRP. The next manufacturing order picks up the corrected
+EBOM AND your change is preserved engineering-side.</p>
+</blockquote>
+<p><strong>3.</strong> Two engineers race: both create a draft <code>pg.ebom</code> for the same
+(root_item, revision). What stops the duplicate?</p>
+<blockquote>
+<p>The <code>_root_revision_unique</code> constraint —
+<code>UNIQUE(root_item_id, revision_id)</code> — at the DB level. The second
+create raises an IntegrityError surfaced as a UserError. There's no
+Phase 1 collaborative-editing protection beyond that; whoever lost
+the race needs to either edit the existing draft or wait for the
+next revision.</p>
+</blockquote>
+<p><strong>4.</strong> A released EBOM has 6 lines, one with <code>alternate_group =
+'HINGE_GROUP'</code> containing 3 alternates, one primary. A production
+order based on the mrp.bom is in progress. The PLM engineer creates a
+new revision, swaps the primary alternate to a different vendor's
+hinge, and releases a new EBOM. What happens to the in-progress MO?</p>
+<blockquote>
+<p>The new <code>pg.release</code> finds the active <code>mrp.bom</code> for the product,
+calls <code>_freeze_open_mos(old_bom)</code>, the in-progress MO goes into the
+release's <code>frozen_mo_ids</code> (MG-1). The MO is NOT modified — it
+finishes against the old BOM/old hinge. The new <code>mrp.bom</code> becomes
+the active one for the next MO. The release record's
+<code>frozen_mo_count</code> shows the count; the audit log payload records
+which MOs were frozen.</p>
+</blockquote>
+<p><strong>5.</strong> You released an EBOM and the closure rebuild took 8 seconds
+(usually sub-second). What might be going on?</p>
+<blockquote>
+<p>Either (a) very deep BOM tree (&gt;5 levels of nesting) — closure
+rebuild is O(active edges) which compounds with depth, or (b) the
+rebuild ran inside a slow transaction with lots of contended locks.
+Check <code>_logger</code> output from <code>pg.ebom.closure._build_for_ebom</code>. If
+it's a one-time thing, ignore. If it's persistent, consider whether
+the EBOM should be split — a flatter tree is faster to maintain and
+easier to reason about for the manufacturing team. Bible R6 doesn't
+limit depth, but engineering convention is "no more than 4 levels
+below the top assembly."</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The <code>pg.release</code> flow internals — covered in this lesson but the
+  failure-mode detail is part of Bible §3 and Manufacturing
+  Governance §8.</li>
+<li>The MCP <code>validate_ebom</code> / <code>simulate_release</code> / <code>bom_explode</code> tools
+  — lesson 9.5.</li>
+<li>The Southbrook bridge wrapper around <code>action_apply</code> — lesson 9.6.</li>
+<li>ECO state machine that drives <code>apply</code> — lesson 4.1.</li>
+<li>Cut spec authoring against released BOMs — lesson 4.2.</li>
+<li>Native Odoo MRP BOM editor — covered by Odoo's own training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_09_mcp_sidecar" model="slide.slide">
+            <field name="name">The MCP Sidecar — LLM Access to ProductGraph</field>
+            <field name="channel_id" ref="course_productgraph"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer building agents against the catalog + IT admin running the sidecar container.</field>
+            <field name="html_content"><![CDATA[<h1 id="the-mcp-sidecar-llm-access-to-productgraph">The MCP Sidecar — LLM Access to ProductGraph</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You are either (a) a developer wiring Claude (or another MCP-compatible
+agent) to query and mutate the engineering catalog, or (b) an IT admin
+keeping the <code>product-graph-mcp</code> container alive on the QNAP stack.
+Either way, this lesson is about a service that runs <strong>next to Odoo,
+not inside it</strong> — talks Model Context Protocol (Anthropic's tool-calling
+standard) on one end, talks XML-RPC to Odoo on the other, enforces
+authentication and authorisation in two layers.</p>
+<p>This lesson is entirely on the <strong>standalone ProductGraph platform</strong>
+side. The sidecar lives at <code>~/product_graph_v19/mcp/</code>. The Southbrook
+bridge addon is unaware of the sidecar's existence; the sidecar talks
+to Odoo via XML-RPC like any other API client.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The sidecar is <strong>not</strong> an Odoo menu. It's a container.</p>
+<ul>
+<li><strong>Code</strong>: <code>~/product_graph_v19/mcp/src/product_graph_mcp/</code></li>
+<li><strong>Container on the QNAP</strong>: <code>product-graph-mcp</code>, joined to the
+  <code>alfacore-caddy</code> Docker network alongside <code>southbrook-odoo</code> and
+  <code>alfacore-caddy</code>.</li>
+<li><strong>Endpoint</strong>: SSE (Server-Sent Events) on internal port <code>9234</code>,
+  fronted by Cloudflared with Zero-Trust on the public hostname.</li>
+<li><strong>For local development (Claude Desktop)</strong>: stdio transport — the
+  agent spawns the sidecar as a subprocess.</li>
+</ul>
+<p>What Claude/your agent sees: a list of tools (around 30 across 12
+categories) exposed via the MCP <code>list_tools</code> RPC and called via
+<code>call_tool</code>.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>There are no screens. There are three readable artefacts:</p>
+<p><strong>1. The tool registry (<code>server.py</code>).</strong></p>
+<pre><code class="language-python">TOOL_REGISTRY = [
+    *catalog.TOOLS,
+    *bom.TOOLS,
+    *revision_tools.TOOLS,
+    *document.TOOLS,
+    *release.TOOLS,
+    *vendor.TOOLS,
+    *eco.TOOLS,
+    *rfq.TOOLS,
+    *relationship.TOOLS,
+    *cad.TOOLS,
+    *procurement.TOOLS,
+]
+</code></pre>
+<p>Twelve modules under <code>mcp/src/product_graph_mcp/tools/</code>, each exposes
+a <code>TOOLS = [...]</code> list of dicts shaped:</p>
+<pre><code class="language-python">{
+    &quot;name&quot;: &quot;list_items&quot;,
+    &quot;description&quot;: &quot;List engineering items …&quot;,
+    &quot;input_schema&quot;: {...},   # JSON Schema
+    &quot;handler&quot;: callable,
+    &quot;mutating&quot;: bool,        # default False
+}
+</code></pre>
+<p>A sample of what's there (see <code>mcp/README.md</code> for the full list):</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Mutating</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>list_items</code></td>
+<td>no</td>
+<td>List <code>pg.item</code> records by state/type/category</td>
+</tr>
+<tr>
+<td><code>get_item</code></td>
+<td>no</td>
+<td>One item by part_number, with revision list</td>
+</tr>
+<tr>
+<td><code>search_catalog</code></td>
+<td>no</td>
+<td>Free-text over <code>part_number</code> and <code>name</code></td>
+</tr>
+<tr>
+<td><code>where_used</code></td>
+<td>no</td>
+<td>Parent EBOMs of an item from the materialised closure</td>
+</tr>
+<tr>
+<td><code>bom_explode</code></td>
+<td>no</td>
+<td>Multi-level flat explosion of an EBOM</td>
+</tr>
+<tr>
+<td><code>validate_ebom</code></td>
+<td>no</td>
+<td>Pre-release validation report</td>
+</tr>
+<tr>
+<td><code>simulate_release</code></td>
+<td>no</td>
+<td>Dry-run of a release — errors/warnings, no side effects</td>
+</tr>
+<tr>
+<td><code>get_release</code></td>
+<td>no</td>
+<td>Inspect a <code>pg.release</code> record</td>
+</tr>
+<tr>
+<td><code>propose_revision</code></td>
+<td><strong>yes</strong></td>
+<td>Create new draft revision against an item</td>
+</tr>
+<tr>
+<td><code>comment_on_revision</code></td>
+<td><strong>yes</strong></td>
+<td>Chatter note on a revision</td>
+</tr>
+<tr>
+<td><code>attach_document</code></td>
+<td><strong>yes</strong></td>
+<td>Upload binary to a revision</td>
+</tr>
+<tr>
+<td><code>vendor_for_item</code></td>
+<td>no</td>
+<td>AVL — approved sources for a part</td>
+</tr>
+</tbody>
+</table>
+<p><strong>2. The config (<code>config.py</code>).</strong></p>
+<p>A frozen dataclass loaded from environment variables — single source
+of truth, no other module reads <code>os.environ</code>:</p>
+<pre><code class="language-env">PRODUCTGRAPH_ODOO_URL=https://southbrookcabinetry.space
+PRODUCTGRAPH_DB=southbrook
+PRODUCTGRAPH_ODOO_USER=mcp-bot@southbrookcabinetry.local
+PRODUCTGRAPH_API_KEY=&lt;personal API key&gt;
+PRODUCTGRAPH_MCP_TRANSPORT=sse        # or 'stdio' for desktop
+PRODUCTGRAPH_MCP_HOST=0.0.0.0
+PRODUCTGRAPH_MCP_PORT=9234
+PRODUCTGRAPH_DEFAULT_LIMIT=50
+PRODUCTGRAPH_MAX_LIMIT=500
+PRODUCTGRAPH_LOG_LEVEL=INFO
+</code></pre>
+<p>If any required var is missing the process exits with <code>SystemExit</code>
+rather than running with bad config.</p>
+<p><strong>3. The XML-RPC client (<code>odoo_client.py</code>).</strong></p>
+<p>A thread-local connection-per-thread wrapper around
+<code>xmlrpc.client.ServerProxy</code>. Authenticates once via <code>common.authenticate</code>
+with <code>(db, user, api_key)</code>, caches the resulting <code>uid</code>, executes every
+subsequent call via <code>object.execute_kw</code> with the same <code>(db, uid,
+api_key)</code> tuple.</p>
+<p>Two public methods that the per-tool group check goes through:</p>
+<ul>
+<li><code>has_group(xml_id)</code> — returns whether <code>mcp-bot</code> is in the named group.</li>
+<li><code>require_group(xml_id)</code> — raises <code>PermissionError</code> if not. Called by
+  the dispatcher (see below) for every <code>mutating=True</code> tool.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Add a new tool (developer).</strong></p>
+<ul>
+<li>Open <code>mcp/src/product_graph_mcp/tools/&lt;category&gt;.py</code>.</li>
+<li>Write a handler function: <code>def my_tool(odoo: OdooClient, config:
+  Config, args: dict) -&gt; dict</code>. Use <code>odoo.search_read</code>,
+  <code>odoo.call_method</code> etc. Never call <code>os.environ</code> or import outside
+  the module.</li>
+<li>Append a dict to that file's <code>TOOLS = [...]</code> list with
+  <code>name / description / input_schema / handler / mutating</code>.</li>
+<li>If mutating, also re-check the group inside the handler (defense in
+  depth — <code>odoo.require_group("product_graph_base.group_pg_engineer")</code>).</li>
+<li>Restart the container. Claude (or whoever) will see the new tool on
+  the next <code>list_tools</code> call.</li>
+</ul>
+<p><strong>2. Run locally for development.</strong></p>
+<pre><code class="language-bash">cd ~/product_graph_v19/mcp/
+pip install -e .
+PRODUCTGRAPH_MCP_TRANSPORT=stdio product-graph-mcp
+</code></pre>
+<p>For Claude Desktop, wire it into
+<code>~/Library/Application Support/Claude/claude_desktop_config.json</code>:</p>
+<pre><code class="language-json">{
+  &quot;mcpServers&quot;: {
+    &quot;product-graph&quot;: {
+      &quot;command&quot;: &quot;product-graph-mcp&quot;,
+      &quot;env&quot;: {
+        &quot;PRODUCTGRAPH_ODOO_URL&quot;: &quot;https://southbrookcabinetry.space&quot;,
+        &quot;PRODUCTGRAPH_DB&quot;: &quot;southbrook&quot;,
+        &quot;PRODUCTGRAPH_ODOO_USER&quot;: &quot;mcp-bot@southbrookcabinetry.local&quot;,
+        &quot;PRODUCTGRAPH_API_KEY&quot;: &quot;...&quot;
+      }
+    }
+  }
+}
+</code></pre>
+<p><strong>3. Deploy to the QNAP (admin).</strong></p>
+<pre><code class="language-bash">cd ~/product_graph_v19/mcp/
+docker build -t product-graph-mcp:0.1.0 .
+docker compose up -d
+</code></pre>
+<p>The container joins <code>alfacore-caddy</code> external network. SSE listens on
+9234, exposed internally only. Public ingress is via cloudflared with
+Zero-Trust on a hostname like
+<code>mcp.productgraph.southbrook.example.com</code>.</p>
+<p><strong>4. Rotate the API key (admin, every ~5 years).</strong></p>
+<ul>
+<li>Log into Odoo as the <code>mcp-bot</code> service user.</li>
+<li><strong>My Profile → Account Security → New API Key.</strong> Set the
+  duration close to 5 years (1825 days) — that's the cap raised by the
+  bridge's install data (<code>southbrook_plm_productgraph/data/api_key_policy.xml</code>).</li>
+<li>Copy the key, put it into the container's <code>.env</code>, restart the
+  container: <code>docker compose restart product-graph-mcp</code>.</li>
+<li>The cached <code>uid</code> re-authenticates on the next call.</li>
+</ul>
+<h2 id="the-auth-model-decision-d6">The auth model (Decision D6)</h2>
+<p>Three layers, defense in depth:</p>
+<p><strong>Layer 1 — Cloudflared Zero-Trust on the public route.</strong> Before the
+request even reaches the container, Cloudflared enforces the Zero-Trust
+policy you defined (typically: Google Workspace identity, restricted to
+<code>@southbrookcabinetry.com</code> domain). OAuth2 device flow is explicitly
+out of scope for Phase 1; Zero-Trust is the gate.</p>
+<p><strong>Layer 2 — Odoo personal API key.</strong> The XML-RPC client authenticates
+with <code>(db, mcp-bot user, api_key)</code>. The key is a personal API key on
+the <code>mcp-bot@southbrookcabinetry.local</code> user. The user has the
+<code>group_pg_engineer</code> membership at minimum.</p>
+<p><strong>Layer 3 — Per-tool group check at the call site.</strong> Every tool with
+<code>mutating=True</code> triggers <code>odoo.require_group(
+"product_graph_base.group_pg_engineer")</code> before the handler runs:</p>
+<pre><code class="language-python">if spec.get(&quot;mutating&quot;):
+    odoo.require_group(&quot;product_graph_base.group_pg_engineer&quot;)
+result = spec[&quot;handler&quot;](odoo, config, arguments)
+</code></pre>
+<p>This is the boundary check, called at the dispatcher level. If the
+operating user's groups change (e.g. demotion) the change takes effect
+on the very next call without restarting the sidecar — because
+<code>has_group</code> is a fresh XML-RPC call to <code>res.users.has_group</code> each time.</p>
+<p>Why three layers? Because layer 1 protects the route, layer 2 protects
+the database, and layer 3 protects the <em>intent</em>: a misconfigured user
+who somehow has API access but no engineer role still can't mutate
+records through the sidecar. The boundary is at the tool, not at the
+network.</p>
+<h2 id="rate-limiting">Rate limiting</h2>
+<p>Phase 1 does <strong>not</strong> include a per-user rate limiter inside the
+sidecar. The pacing constraints come from three places:</p>
+<ul>
+<li><strong>Cloudflared.</strong> You can set Zero-Trust rate limits at the route
+  level. Recommended: 60 req/min for an interactive agent, 600 req/min
+  for a batch agent — tune per use case.</li>
+<li><strong>Odoo's own session.</strong> Odoo throttles at the worker level. A flood
+  from one agent will manifest as <code>502</code> / <code>504</code> from Odoo before it
+  saturates the sidecar.</li>
+<li><strong>MCP tool limits.</strong> Read tools accept <code>limit</code> and <code>offset</code>
+  parameters; <code>limit</code> is clamped against <code>PRODUCTGRAPH_MAX_LIMIT</code>
+  (default 500). An agent asking for <code>limit=99999</code> gets 500.</li>
+</ul>
+<p>If you need true sidecar-level rate limiting, that's a Phase 2 ask.
+File a ticket with the expected per-token-per-minute envelope.</p>
+<h2 id="audit-logging">Audit logging</h2>
+<p>There are three audit trails relevant to the sidecar:</p>
+<p><strong>1. Sidecar stdout/stderr (the container log).</strong> Every tool call logs
+<code>Tool &lt;name&gt; failed</code> on exception with full traceback. Routine success
+calls don't log unless <code>PRODUCTGRAPH_LOG_LEVEL=DEBUG</code>.</p>
+<p><strong>2. Odoo <code>pg.audit.log</code>.</strong> Every mutation that lands as a state
+transition on <code>pg.item</code>/<code>pg.revision</code>/<code>pg.ebom</code>/<code>pg.release</code>/<code>pg.vendor</code>
+writes a row, with <code>user_id = mcp-bot</code>. This is the same audit table
+human users write to — there is no special "MCP" tag. If you want to
+trace what an agent did vs what John did, filter on
+<code>user_id = mcp-bot.id</code>.</p>
+<p><strong>3. Cloudflared logs.</strong> Per-request, per-identity. Connects the
+<code>pg.audit.log</code> row (<code>mcp-bot</code> did it) to the upstream identity (who
+was driving the agent at the time).</p>
+<p>The triangle: Cloudflared knows the human, Odoo knows the service
+account, sidecar logs connect the tool call to the response. There is
+no single dashboard combining the three in Phase 1 — that's another
+Phase 2 ask.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The container won't start — <code>Required environment variable
+PRODUCTGRAPH_API_KEY is missing</code>."</strong></p>
+<p><code>Config.from_env</code> exits if any of <code>ODOO_URL</code>, <code>DB</code>, <code>ODOO_USER</code>,
+<code>API_KEY</code> are missing. Check <code>.env</code> is loaded by docker-compose
+(<code>env_file: ./.env</code> in <code>docker-compose.yml</code>).</p>
+<p><strong>"All my mutating tools return <code>{error: 'permission_denied',
+message: 'User mcp-bot lacks required group …'}</code>."</strong></p>
+<p>The <code>mcp-bot</code> user is not in <code>product_graph_base.group_pg_engineer</code>.
+Add them via Settings → Users → mcp-bot → Groups → tick "ProductGraph
+/ Engineer". Or grant the engineer-or-above bundle via the access
+groups XML.</p>
+<p><strong>"My <code>propose_revision</code> call returns <code>{error: 'change_summary
+required (min 10 chars)'}</code> but I passed 9 chars."</strong></p>
+<p>The validation is sidecar-side, in the handler. 10-char minimum is
+the contract — pad your change summary or expand it.</p>
+<p><strong>"The list-tools response is empty after I added a new tool."</strong></p>
+<p>You restarted the container, right? <code>TOOL_REGISTRY</code> is built at module
+load. A live process won't pick up changes to <code>TOOLS = [...]</code> without
+reload.</p>
+<p><strong>"An MCP call hangs for 30 seconds then times out."</strong></p>
+<p>The sidecar's XML-RPC call is synchronous; if Odoo is slow (worker
+saturation, slow query, contended row lock) the sidecar blocks. Check
+the Odoo worker logs first. The sidecar itself has no SLA budget;
+Phase 1 trusts Odoo's own response time.</p>
+<p><strong>"I rotated the API key but <code>docker compose restart</code> left the old key
+cached somewhere."</strong></p>
+<p>The cached <code>uid</code> is in-process — restart clears it. But check whether
+the OLD key is still valid in Odoo (it might be — Odoo doesn't
+auto-revoke keys, you have to delete the row from My Profile → Account
+Security explicitly). If both old and new are valid, the sidecar will
+keep using the env-var key (the new one); the old one is dead weight,
+delete it from Odoo.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The dispatcher (<code>_call_tool</code> in <code>server.py</code>) is the single chokepoint
+for every MCP call:</p>
+<pre><code class="language-python">@server.call_tool()
+async def _call_tool(name: str, arguments: dict | None) -&gt; list[TextContent]:
+    arguments = arguments or {}
+    spec = next((t for t in TOOL_REGISTRY if t[&quot;name&quot;] == name), None)
+    if spec is None:
+        return [TextContent(type=&quot;text&quot;, text=json.dumps({
+            &quot;error&quot;: f&quot;Unknown tool: {name}&quot;,
+        }))]
+    try:
+        if spec.get(&quot;mutating&quot;):
+            odoo.require_group(&quot;product_graph_base.group_pg_engineer&quot;)
+        result = spec[&quot;handler&quot;](odoo, config, arguments)
+        payload = json.dumps(result, default=str, indent=2)
+        return [TextContent(type=&quot;text&quot;, text=payload)]
+    except PermissionError as e:
+        return [TextContent(type=&quot;text&quot;, text=json.dumps({
+            &quot;error&quot;: &quot;permission_denied&quot;,
+            &quot;message&quot;: str(e),
+        }))]
+    except Exception as e:
+        log.exception(&quot;Tool %s failed&quot;, name)
+        return [TextContent(type=&quot;text&quot;, text=json.dumps({
+            &quot;error&quot;: &quot;tool_error&quot;,
+            &quot;tool&quot;: name,
+            &quot;message&quot;: str(e),
+        }))]
+</code></pre>
+<p>Three error shapes, exactly:</p>
+<ul>
+<li>Unknown tool → <code>{error: "Unknown tool: …"}</code>.</li>
+<li>Permission denied (group missing) → <code>{error: "permission_denied",
+  message: …}</code>.</li>
+<li>Any other exception → <code>{error: "tool_error", tool: …, message: …}</code>.</li>
+</ul>
+<p>Tool handlers return plain Python dicts; the dispatcher JSON-encodes
+them with <code>default=str</code> (so dates and IDs serialise). The agent
+receives one <code>TextContent</code> block per tool call.</p>
+<p><strong>Why XML-RPC and not REST?</strong> Decision: the sidecar can talk to an
+Odoo deployment that has only <code>base/revision/ebom/release</code> installed,
+WITHOUT <code>product_graph_api</code> (the REST module). This keeps the REST
+addon an <em>optional</em> extra.</p>
+<p><strong>Why stdio and SSE both?</strong> stdio is for Claude Desktop and other
+local agents (the client spawns the sidecar as a subprocess). SSE is
+for remote agents going through Cloudflared. Same <code>TOOL_REGISTRY</code>, same
+handlers — <code>Config.transport</code> switches the binding.</p>
+<p><strong>Why <code>mutating=True</code> is a contract, not just a flag.</strong> A tool marked
+mutating tells the dispatcher to do the group check AND tells the agent
+(via the JSON Schema descriptions) that this is a write operation —
+LLM safety policies typically require user confirmation before
+invoking write tools. If your tool changes state, mark it mutating.
+Forgetting to mark mutates as mutating is a bug; the test suite
+(<code>tests/test_tool_metadata.py</code> in the sidecar) flags it.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> An agent calls <code>propose_revision</code> with
+<code>{item_id: 42, change_summary: "fix"}</code>. What's the response?</p>
+<blockquote>
+<p><code>{error: "change_summary required (min 10 chars)"}</code>. The handler
+validates length before any XML-RPC call. No revision is created; no
+audit row written. The agent should retry with a longer summary
+(≥10 chars), e.g. "Fix the hinge spec — minor rework."</p>
+</blockquote>
+<p><strong>2.</strong> You rotate the API key but forget to restart the container.
+Subsequent calls fail. Why might calls still succeed for the first
+30 seconds?</p>
+<blockquote>
+<p>The cached <code>uid</code> from the previous authentication is still in
+memory. Odoo's <code>object.execute_kw</code> accepts <code>(db, uid, api_key)</code> —
+as long as the <strong>api_key</strong> is valid, the call succeeds. If you
+deleted the old key from Odoo's My Profile → Account Security, the
+very next call fails. If you only minted a new one and didn't
+delete the old, calls keep succeeding with the old key until you
+restart the container and the new env-var key takes effect.</p>
+</blockquote>
+<p><strong>3.</strong> The sidecar returns
+<code>{error: "permission_denied", message: "User mcp-bot lacks required
+group product_graph_base.group_pg_engineer."}</code>. The IT admin checks
+the user record and sees they ARE in the engineer group. What changed?</p>
+<blockquote>
+<p>Two possibilities. (a) The XML-RPC user is not actually <code>mcp-bot</code> —
+the env var <code>PRODUCTGRAPH_ODOO_USER</code> might point at a different
+login (e.g. an old <code>mcp-service@…</code> account that was demoted). Check
+the running container's env. (b) The <code>has_group</code> call hits a
+permissions-cache invalidation issue — restart the Odoo worker
+serving the request, or wait for the cache to age out. The sidecar
+itself caches nothing per-call; the answer comes fresh from Odoo.</p>
+</blockquote>
+<p><strong>4.</strong> You want to add a <code>bulk_propose_revisions</code> tool that takes a
+list of <code>{item_id, change_summary}</code> and creates revisions for all of
+them. What two design rules apply?</p>
+<blockquote>
+<p>(a) Mark it <code>mutating=True</code> so the dispatcher enforces
+<code>group_pg_engineer</code>. (b) Decide on per-item atomicity — either each
+revision is its own XML-RPC call (some succeed, some fail), or you
+batch them server-side via a custom Odoo method that runs in one
+transaction. Phase 1 sidecar tools are individual XML-RPC calls; if
+you need true atomicity, write the server method first in
+<code>product_graph_revision</code> and call it from the tool.</p>
+</blockquote>
+<p><strong>5.</strong> A junior dev adds a new tool <code>delete_item</code> that calls
+<code>pg.item.unlink()</code>. Tests pass locally. What's wrong?</p>
+<blockquote>
+<p>Two things. (a) <code>pg.item.unlink</code> rejects deletion outside <code>concept</code>
+state (Bible R3 — no hard deletes on historically significant
+records). The tool will work on concept items only; everything else
+will error. (b) Even on concept items, deleting an engineering item
+via an LLM tool is dangerous — the audit trail is lost. The right
+design is <code>obsolete_item</code> (a tool that transitions to <code>obsolete</code>),
+NOT <code>delete_item</code>. Mark mutating; the dispatcher does the rest.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The detail of the REST API (<code>product_graph_api</code>) — different surface,
+  similar auth model, separately addressed.</li>
+<li>The internals of MCP protocol itself — see the Anthropic spec.</li>
+<li>Cloudflared Zero-Trust policy configuration — IT admin domain;
+  separate runbook on the QNAP.</li>
+<li>Per-tool implementation of <code>where_used</code> / <code>bom_explode</code> closure
+  queries — covered in lesson 9.4.</li>
+<li>How the agent decides to call which tool — that's prompt
+  engineering, not platform work.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_09_southbrook_bridge" model="slide.slide">
+            <field name="name">The Southbrook Bridge — ECO Closure Triggers a Release</field>
+            <field name="channel_id" ref="course_productgraph"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">PLM engineer + estimator + dev (anyone whose ECO produces a release).</field>
+            <field name="html_content"><![CDATA[<h1 id="the-southbrook-bridge-eco-closure-triggers-a-release">The Southbrook Bridge — ECO Closure Triggers a Release</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're an engineer who's about to apply an ECO that should also push a
+new BoM into MRP. Or you're a developer debugging why a <code>pg.release</code>
+fired (or didn't) when an ECO closed. Or you're the IT admin verifying
+the bridge is wired correctly after a deploy. The Southbrook bridge is
+a single tiny addon — one Python file, two field additions, one
+override of <code>action_apply</code>. But it's the <strong>only</strong> documented path by
+which a Southbrook ECO triggers writes into <code>mrp.bom</code> via ProductGraph.</p>
+<p>This lesson is uniquely about the <strong>glue</strong>: the
+<code>southbrook_plm_productgraph</code> addon that wraps <code>southbrook.eco.action_apply</code>
+and fires <code>pg.release.action_execute_release()</code> after the PLM side
+finishes. The Southbrook ECO model lives in <code>southbrook_plm</code> (lesson
+4.1). The release flow lives in <code>product_graph_release</code> (lesson 9.4).
+The bridge is the single file that knows about both.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The bridge surfaces on the <strong>southbrook.eco form</strong> under
+<code>southbrook_plm</code>'s usual menu:</p>
+<blockquote>
+<p><strong>Manufacturing → PLM → Engineering Change Orders → [pick ECO] →
+ProductGraph Linkage group</strong></p>
+</blockquote>
+<p>You will see three new fields and one new smart button:</p>
+<ul>
+<li>Field <strong>ProductGraph EBOM</strong> (<code>pg_ebom_id</code> on <code>southbrook.eco</code>)</li>
+<li>Field <strong>Auto-trigger ProductGraph Release on Apply</strong>
+  (<code>pg_auto_release</code>)</li>
+<li>Field <strong>Triggered ProductGraph Release</strong> (<code>pg_release_id</code>) — read-only,
+  appears only after a successful bridge fire</li>
+<li>Smart button <strong>PG Release</strong> — appears only when <code>pg_release_id</code> is set;
+  opens the resulting <code>pg.release</code> form</li>
+</ul>
+<p>The button group is injected via the inheriting view
+<code>view_southbrook_eco_form_inherit_pg</code> in
+<code>southbrook_plm_productgraph/views/southbrook_eco_views.xml</code>, xpath
+<code>//sheet position="inside"</code> so it lands below the existing target /
+approval / document blocks.</p>
+<p>On disk:</p>
+<ul>
+<li>Code: <code>~/southbrook-v19cr/addons/southbrook_plm_productgraph/</code></li>
+<li>Deployed: <code>/share/CACHEDEV3_DATA/Container/southbrook/addons/southbrook_plm_productgraph/</code></li>
+<li>README: <code>southbrook_plm_productgraph/README.md</code></li>
+<li>Spec: <code>~/product_graph_v19/bridge_spec/SPEC.md</code> (the published contract)</li>
+</ul>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>When you open an ECO that's not yet applied:</p>
+<ul>
+<li><strong>ProductGraph EBOM</strong> (<code>pg_ebom_id</code>) — many2one to <code>pg.ebom</code>. Domain
+  restricted to <code>[('state','=','released')]</code> — draft/review EBOMs
+  don't appear in the dropdown. Optional. <code>copy=False</code>. Read-only once
+  <code>state == 'applied'</code>.</li>
+<li><strong>Auto-trigger ProductGraph Release on Apply</strong> (<code>pg_auto_release</code>)
+  — boolean, default <code>True</code>. Read-only once <code>state == 'applied'</code>. Lets
+  an engineer suppress the release for an ECO that should apply
+  PLM-side but NOT touch MRP.</li>
+<li><strong>Triggered ProductGraph Release</strong> (<code>pg_release_id</code>) — many2one to
+  <code>pg.release</code>, readonly. Hidden via <code>invisible="not pg_release_id"</code>
+  until a successful fire stamps it.</li>
+</ul>
+<p>Once the ECO transitions to applied (<code>state = 'applied'</code>) and the
+bridge fired:</p>
+<ul>
+<li>The smart button <strong>PG Release</strong> appears (also gated on
+  <code>pg_release_id</code>). Clicking it calls <code>action_view_pg_release</code> which
+  opens the <code>pg.release</code> form for the resulting record.</li>
+<li>A chatter post on the ECO records:
+  <code>"ProductGraph release REL-NNNN executed — mrp.bom Cabinet-36
+   created. Frozen open MOs: N."</code> (the line count comes from
+  <code>release.frozen_mo_count</code>).</li>
+<li>If the bridge FAILED (release error, not PLM-side error), a chatter
+  post records:
+  <code>"ProductGraph release FAILED: &lt;exc&gt;. The ECO remains in</code>applied<code>state. Retry the release manually from EBOM &lt;name&gt; → Release to
+   MRP …"</code></li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Author the change (engineering side).</strong></p>
+<ul>
+<li>Open the <code>pg.ebom</code> to be released (lesson 9.4) — author it, submit,
+  approve, release. Now it's in <code>state='released'</code> and visible to the
+  ECO's domain filter.</li>
+</ul>
+<p><strong>2. Author the ECO (<code>southbrook_plm</code> side).</strong></p>
+<ul>
+<li><strong>Manufacturing → PLM → Engineering Change Orders → Create.</strong></li>
+<li>Fill the usual ECO fields — title, <code>eco_type_id</code> (drives
+  <code>target_kind</code> — bom, cut_spec, rule, document), targets, attachments.</li>
+<li>In the <strong>ProductGraph Linkage</strong> group, set <code>pg_ebom_id</code> to the
+  released EBOM you want to push to MRP. Leave <code>pg_auto_release</code>
+  checked.</li>
+<li>Save. The ECO is in <code>state='open'</code>.</li>
+</ul>
+<p><strong>3. Submit + approve.</strong></p>
+<ul>
+<li>Move the ECO through its stages (lesson 4.1). The Southbrook ECO
+  Kanban stage workflow is <strong>stage-driven</strong> — when a stage with
+  <code>is_applied_stage = True</code> is reached AND the ECO has been approved
+  via <code>action_approve</code>, you're cleared to call <code>action_apply</code>.</li>
+</ul>
+<p><strong>4. Apply.</strong></p>
+<ul>
+<li>Click <strong>Apply</strong>. This calls <code>southbrook.eco.action_apply</code>. What
+  happens, in order:</li>
+<li><code>super().action_apply()</code> runs first. The PLM side does its full
+    job: state machine transition, kind-specific dispatch
+    (<code>_apply_bom</code> / <code>_apply_cut_spec</code> / <code>_apply_rule</code> /
+    <code>_apply_document</code>), stamps <code>applied_date</code>, posts chatter.</li>
+<li>Then the bridge's loop runs. For each ECO record:
+    <code>_should_trigger_pg_release()</code> returns True iff:<ul>
+<li><code>pg_auto_release</code> is True, AND</li>
+<li><code>pg_ebom_id</code> is set, AND</li>
+<li><code>pg_release_id</code> is NOT already set (idempotency — already fired
+  once), AND</li>
+<li><code>pg_ebom_id.state == 'released'</code> (otherwise a chatter note flags
+  the skip).</li>
+</ul>
+</li>
+<li>When True, <code>_trigger_pg_release()</code> creates a <code>pg.release</code>:
+    <code>python
+    release = self.env["pg.release"].create({
+        "ebom_id": self.pg_ebom_id.id,
+        "release_reason": (
+            f"Southbrook ECO {self.name}: "
+            f"{(self.title or 'untitled').strip()[:200]}"
+        ),
+    })
+    release.action_execute_release()</code></li>
+<li>The <code>pg.release</code> runs its 9-step flow (see lesson 9.4: validate,
+    ensure product, freeze open MOs, create mrp.bom, archive previous,
+    write outcome, audit log, notify).</li>
+<li>On success: <code>self.pg_release_id = release.id</code>; chatter post on
+    the ECO with the release name + new mrp.bom display name + frozen
+    MO count.</li>
+<li>On exception: chatter post flags the failure; ECO STAYS APPLIED.
+    The bridge does NOT roll back the ECO.</li>
+</ul>
+<p><strong>5. Verify.</strong></p>
+<ul>
+<li>The ECO smart button <strong>PG Release</strong> is now present. Click it.</li>
+<li>Confirm <code>pg.release.state == 'completed'</code>,
+  <code>pg.release.mrp_bom_id</code> is set.</li>
+<li>Open <strong>Manufacturing → Products → Bills of Materials</strong> — the new
+  <code>mrp.bom</code> is the active one for that product; the previous one is
+  archived (<code>active=False</code>).</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I applied the ECO and the release didn't fire. The smart button
+isn't there."</strong></p>
+<p>Walk through <code>_should_trigger_pg_release</code> mentally. Most common cases:</p>
+<ul>
+<li><code>pg_ebom_id</code> is blank — the engineer forgot to set it before apply.
+  Once the ECO is applied (<code>state='applied'</code>), <code>pg_ebom_id</code> is
+  read-only — you can't add it after the fact. <strong>Fix</strong>: from the
+  intended <code>pg.ebom</code>, run <strong>Release to MRP</strong> manually (wizard).</li>
+<li><code>pg_auto_release</code> was unchecked. Same fix as above.</li>
+<li>The EBOM you pointed at isn't <code>released</code> state. Chatter on the ECO
+  will have a note: <code>"ProductGraph release skipped: EBOM X is in
+  state &lt;state&gt; (must be released)"</code>. Release the EBOM, then
+  re-trigger the release manually from the EBOM form.</li>
+</ul>
+<p><strong>"The bridge fired but the chatter says 'ProductGraph release FAILED:
+…'."</strong></p>
+<p>The <code>pg.release.action_execute_release</code> raised. Common causes:</p>
+<ul>
+<li>A child item on the EBOM is not in <code>released</code> state (cross-model gate,
+  EBOM Bible §10). Fix: release the child item; re-trigger the release
+  via the EBOM's Release to MRP button.</li>
+<li>The user doing the apply isn't in <code>group_pg_approver</code>
+  (<code>action_execute_release</code> checks this). The bridge runs as the user
+  applying the ECO, so the apply-user must also be a PG approver.</li>
+<li>A row lock conflict (rare). The savepoint context manager rolled
+  back the <code>mrp.bom</code> creation; <code>pg.release.state</code> is now <code>failed</code>.
+  Reset to pending (<code>action_reset_to_pending</code>, approver only) and
+  re-execute.</li>
+</ul>
+<p><strong>The ECO stays in <code>applied</code> regardless</strong>, by design (Manufacturing
+Governance §8). The bridge spec is explicit: "if the pg.release fails
+for any reason, the ECO STAYS APPLIED. We do NOT roll back the ECO —
+the PLM side already completed, possibly with its own <code>mrp.bom</code> copy
+or <code>cut_spec</code> version. Reverting that here would corrupt the PLM
+audit trail."</p>
+<p><strong>"I want to fire the release a second time on the same ECO."</strong></p>
+<p>The idempotency check (<code>if self.pg_release_id: return False</code>) blocks
+this. The bridge fires at most once per ECO. If you need to re-release
+the EBOM after the first fire (e.g. the first release failed and you
+fixed the upstream issue), use the EBOM's <strong>Release to MRP</strong> button
+directly — it creates a fresh <code>pg.release</code> independent of the ECO.</p>
+<p><strong>"I unchecked <code>pg_auto_release</code> AFTER approval to test something,
+then re-checked it. Apply didn't fire the release."</strong></p>
+<p>Check the moment-of-truth: <code>pg_auto_release</code> is read at
+<code>_should_trigger_pg_release</code> time, which is during <code>action_apply</code>. If
+the field value at that exact moment was False, the bridge skipped. If
+you flipped it back True after <code>action_apply</code> already returned, too
+late — the bridge already decided. Run the manual EBOM → Release to MRP
+flow as the recovery.</p>
+<p><strong>"I tried to install the bridge addon on a non-Southbrook Odoo instance
+and it errored."</strong></p>
+<p>Working as designed. The bridge's <code>depends = ["southbrook_plm",
+"product_graph_release"]</code> — without <code>southbrook_plm</code> present, the
+inherit on <code>southbrook.eco</code> fails. The bridge is intentionally
+Southbrook-specific. The generic ProductGraph addons (the 5
+<code>product_graph_*</code> modules + the MCP sidecar) have NO reference to
+<code>southbrook_plm</code> and can be installed standalone — that's Decision D1.</p>
+<p><strong>"The bridge install also raised the <code>base.group_user</code>
+<code>api_key_duration</code> cap to 1825 days. Was that supposed to happen?"</strong></p>
+<p>Yes. <code>data/api_key_policy.xml</code> (the bridge's install data) raises the
+cap so the MCP sidecar's service account can mint a long-lived API key
+without group elevation. Side-effect: every internal user in this DB
+can now mint keys up to 5 years. <code>noupdate="1"</code> so an admin can lower
+the cap back via Settings → General Settings → API Keys without
+revert on next module upgrade.</p>
+<h2 id="the-sync-cadence">The sync cadence</h2>
+<p><strong>The bridge is event-driven, not cron-driven.</strong> There is no scheduled
+task. The release fires exactly when <code>southbrook.eco.action_apply</code> is
+called. That action is itself triggered by:</p>
+<ul>
+<li>An engineer clicking the <strong>Apply</strong> button on the ECO form.</li>
+<li>A programmatic call from another module (rare).</li>
+<li>The Hermes (Fabio) recommendation auto-apply flow when configured for
+  ECO automation (see lesson 3.2; ECO automation is opt-in).</li>
+</ul>
+<p>There is <strong>no batch mode</strong>, no "apply all approved ECOs at midnight"
+cron. Each apply is a synchronous Odoo call; the bridge runs inside
+the same transaction as the PLM-side apply (until the PLM side
+commits, then the release runs in its own savepoint).</p>
+<h2 id="how-to-debug-a-sync-mismatch">How to debug a sync mismatch</h2>
+<p>You expected a <code>mrp.bom</code> to land but didn't see it. Walk this list:</p>
+<p><strong>1. Find the ECO.</strong> Open the southbrook.eco that was supposed to fire
+the bridge. Check <code>state</code>. If not <code>applied</code>, the bridge never had a
+chance — fix the ECO workflow first (lesson 4.1).</p>
+<p><strong>2. Check <code>pg_ebom_id</code>.</strong> Blank? The engineer didn't link the ECO
+to an EBOM. The bridge correctly skipped.</p>
+<p><strong>3. Check <code>pg_auto_release</code>.</strong> False? The engineer suppressed the
+auto-release. Intentional, presumably.</p>
+<p><strong>4. Check <code>pg_release_id</code>.</strong> If set, the bridge fired. Open the
+release. If <code>state == 'completed'</code>, the <code>mrp_bom_id</code> is the new
+<code>mrp.bom</code>. If <code>state == 'failed'</code>, read <code>failure_reason</code>.</p>
+<p><strong>5. Check the ECO chatter.</strong> The bridge posts a message on every
+fire — success or failure. Search the thread for "ProductGraph release".</p>
+<p><strong>6. Check <code>pg.audit.log</code>.</strong> Filter <code>res_model='pg.release'</code> and
+sort by <code>create_date desc</code>. The most recent row for the release in
+question shows <code>action='release'</code>, <code>from_state</code>, <code>to_state</code>,
+payload (incl. ebom_id, revision_id, mrp_bom_id, product_id,
+frozen_mo_count).</p>
+<p><strong>7. Check the worker logs.</strong> If the bridge raised an exception that
+didn't go to chatter (e.g. the ECO's <code>action_apply</code> itself failed
+before the bridge even ran), Odoo logs the traceback to stdout.</p>
+<h2 id="the-bridge-security-model">The bridge security model</h2>
+<p><strong>The bridge runs as the ECO-applying user.</strong> No <code>sudo()</code>. The user
+calling <code>action_apply</code> must have:</p>
+<ul>
+<li>Whatever permission <code>southbrook_plm</code> requires to apply the ECO
+  (typically <code>group_southbrook_plm_approver</code> or similar).</li>
+<li><code>group_pg_approver</code> on the ProductGraph side
+  (<code>action_execute_release</code> checks this). Without it, the release
+  raises UserError and the bridge logs the failure.</li>
+</ul>
+<p>This is intentional — <strong>the apply-user IS the release-authoriser</strong>.
+The bridge does not laundered authority through sudo. If you want to
+allow a junior engineer to apply ECOs but not release to MRP, the
+release will fail and the ECO will be flagged "Release manual" — the
+Approver retries later.</p>
+<p>The bridge does NOT have its own ACL CSV — there are no records to
+secure beyond what's already secured on <code>southbrook.eco</code> and
+<code>pg.release</code>. The added fields inherit the ACLs of the parent model.</p>
+<p>The MCP API-key duration policy
+(<code>base.group_user.api_key_duration = 1825</code>) is unrelated to the bridge's
+runtime authority; it's about the sidecar's service-account key
+lifetime. See lesson 9.5.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The bridge is <strong>one Python file, ~150 lines</strong> (<code>models/southbrook_eco.py</code>):</p>
+<pre><code class="language-python">class SouthbrookEco(models.Model):
+    _inherit = &quot;southbrook.eco&quot;
+
+    pg_ebom_id = fields.Many2one(&quot;pg.ebom&quot;, ...)
+    pg_release_id = fields.Many2one(&quot;pg.release&quot;, readonly=True, ...)
+    pg_auto_release = fields.Boolean(default=True, ...)
+
+    def action_apply(self):
+        # 1. Let the PLM side do its whole job first.
+        result = super().action_apply()
+        # 2. Optionally fire a ProductGraph release per ECO.
+        for eco in self:
+            if not eco._should_trigger_pg_release():
+                continue
+            eco._trigger_pg_release()
+        return result
+</code></pre>
+<p>Three helpers, separated for testability:</p>
+<ul>
+<li><code>_should_trigger_pg_release()</code> — pure-decision predicate, returns
+  bool. Encodes the four conditions above. Posts a chatter note if
+  the EBOM isn't released.</li>
+<li><code>_trigger_pg_release()</code> — performs the create + execute. The
+  try/except catches all exceptions, logs via <code>_logger.exception</code>,
+  posts a chatter message, and returns (does NOT raise). This is the
+  failure-doesn't-cascade contract.</li>
+<li><code>action_view_pg_release()</code> — smart-button handler returning an
+  <code>ir.actions.act_window</code> dict.</li>
+</ul>
+<p>The test suite (<code>tests/test_bridge.py</code>) covers four cases (these are
+the actual test names you can grep for):</p>
+<ul>
+<li><code>test_bridge_fires_release</code> — ECO with <code>pg_ebom_id</code> → <code>pg.release.state
+  == "completed"</code> + <code>mrp.bom</code> created.</li>
+<li><code>test_bridge_skips_without_ebom</code> — no <code>pg_ebom_id</code> → no release fired.</li>
+<li><code>test_bridge_skips_when_auto_release_off</code> — toggle off → no release
+  fired.</li>
+<li><code>test_bridge_idempotent</code> — already-released ECO would not re-fire.</li>
+</ul>
+<p>The directional rule (Decision D1) is the <em>whole point</em>:</p>
+<pre><code>  southbrook_plm.eco       (Southbrook private — cabinet ECO authority)
+        │
+        │   on apply →
+        ▼
+  pg.release.action_execute_release   (generic ProductGraph LGPL)
+        │
+        ▼
+  mrp.bom + mrp.bom.line               (Odoo core)
+</code></pre>
+<p>ProductGraph code NEVER imports anything from <code>southbrook_plm</code>.
+That's what keeps the 5 generic ProductGraph addons publishable as
+LGPL-3, while letting Southbrook drive releases from their existing
+ECO workflow without forking the generic codebase.</p>
+<p>The bridge spec at <code>~/product_graph_v19/bridge_spec/SPEC.md</code> documents
+this contract for any future re-implementer. <strong>The bridge MAY</strong> add
+fields to <code>southbrook.eco</code>, override <code>action_apply</code>, add smart buttons,
+add demo data. <strong>The bridge MUST NOT</strong> modify any <code>pg.*</code> model
+definitions, add Southbrook-specific fields to <code>pg.item</code> /
+<code>pg.revision</code> / <code>pg.ebom</code> / <code>pg.release</code>, or override
+<code>pg.release.action_execute_release</code> (the keystone method — the bridge
+calls it, never replaces it).</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> An engineer applies an ECO with a released <code>pg_ebom_id</code> and
+<code>pg_auto_release = True</code>. The ECO state goes to <code>applied</code>. The bridge
+chatter post says <code>"ProductGraph release skipped: EBOM Cabinet-36 is
+in state superseded (must be released)"</code>. What happened?</p>
+<blockquote>
+<p>Between the time the engineer set <code>pg_ebom_id</code> and the time they
+clicked Apply, someone released a newer EBOM for the same root item.
+The new EBOM auto-superseded the one the ECO was pointing at. The
+bridge's <code>_should_trigger_pg_release</code> correctly detects the state
+mismatch and skips. <strong>Recovery</strong>: open the newer released EBOM and
+click <strong>Release to MRP</strong> there. The ECO stays applied — the PLM
+side did its job — but the release is fired against the right EBOM.</p>
+</blockquote>
+<p><strong>2.</strong> A junior engineer (no <code>group_pg_approver</code>) applies an ECO with
+a linked EBOM and <code>pg_auto_release</code> on. What happens?</p>
+<blockquote>
+<p><code>super().action_apply()</code> runs — the PLM side does its job. Then the
+bridge enters <code>_trigger_pg_release</code>, creates the <code>pg.release</code>,
+calls <code>action_execute_release</code>. The release raises UserError
+("Only Approvers may execute releases"). The bridge's try/except
+catches it, posts a chatter "ProductGraph release FAILED: …", and
+returns. The ECO stays <code>applied</code>. An Approver can retry from the
+EBOM's <strong>Release to MRP</strong> button later.</p>
+</blockquote>
+<p><strong>3.</strong> The IT admin deploys the bridge to a fresh Odoo container that
+already has <code>product_graph_release</code> installed but NOT <code>southbrook_plm</code>.
+What happens?</p>
+<blockquote>
+<p>The install fails immediately at the manifest dependency check —
+<code>depends = ["southbrook_plm", "product_graph_release"]</code> requires
+<code>southbrook_plm</code> to be installable first. Without it, the bridge is
+not installable. This is by design: the bridge is Southbrook-private
+and meaningless without the Southbrook ECO model.</p>
+</blockquote>
+<p><strong>4.</strong> A regulator asks "show me the full audit trail of the BoM
+change that resulted from ECO ECO-2026-0042." Where do you look?</p>
+<blockquote>
+<p>Three places, joined by IDs. (a) The southbrook.eco record with
+<code>name = "ECO-2026-0042"</code> — its chatter has the "ProductGraph release
+X executed" post; its <code>pg_release_id</code> field links to the release.
+(b) The <code>pg.release</code> record's chatter and <code>pg.audit.log</code> row with
+<code>action='release'</code>, payload containing ebom_id, revision_id,
+mrp_bom_id, product_id, frozen_mo_count, incompatible_with_previous.
+(c) The previous <code>mrp.bom</code> (now <code>active=False</code>) for the same
+product, archived by the release flow — confirms the
+manufacturing-side state at the time of change.</p>
+</blockquote>
+<p><strong>5.</strong> An estimator says "I changed an <code>mrp.bom</code> line by hand to add a
+fastener because the ECO didn't include it. Did the bridge undo my
+edit on the next ECO apply?"</p>
+<blockquote>
+<p>Sort of, yes. The bridge fires <code>pg.release.action_execute_release</code>
+which finds the active <code>mrp.bom</code>, archives it (<code>active=False</code>,
+assuming <code>archive_previous_bom=True</code> on the release — default), and
+mints a fresh BOM from the EBOM. The estimator's hand-edit lives in
+the now-archived BOM and is no longer the active one. <strong>Recovery
+path</strong>: the estimator's edit should have been a new ECO that added
+the fastener line in the next EBOM revision. Bible R1 forbids
+direct <code>mrp.bom</code> writes precisely because of this loss-of-truth
+scenario; lesson 9.4 is the long form.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The Southbrook ECO state machine and stage workflow — lesson 4.1.</li>
+<li>The detail of the <code>pg.release</code> 9-step flow — lesson 9.4.</li>
+<li>Cut spec activation triggered by an ECO with <code>target_kind='cut_spec'</code>
+  — that's a separate <code>_apply_cut_spec</code> path inside <code>southbrook_plm</code>,
+  unrelated to the bridge.</li>
+<li>Hermes/Fabio recommendations that auto-apply ECOs — lesson 3.2.</li>
+<li>The MCP sidecar's <code>propose_revision</code> flow (the agent path to author
+  an EBOM) — lesson 9.5.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>
