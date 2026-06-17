@@ -135,7 +135,16 @@ done
 log "upgrading $MODULES_ARG on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
 # `: > $LOCK_PATH || true` makes sure the lock file exists (flock can't
 # create one against a missing parent dir on first run).
-inner_cmd="(: > $LOCK_PATH 2>/dev/null || true) && flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
+#
+# The sentinel `__SBK_COLD_OK__` is echoed AFTER odoo exits 0. Earlier we
+# grep'd for the literal "Modules loaded" Odoo log line, but on very long
+# deploys (the multi-GB OCA registry load) the grep against the captured
+# $upgrade_log occasionally returned false-negative even when the log
+# unambiguously contained the string. A short, unambiguous sentinel
+# written by THIS script makes the gate deterministic regardless of how
+# Odoo's logger frames the success line.
+SENTINEL="__SBK_COLD_OK__"
+inner_cmd="(: > $LOCK_PATH 2>/dev/null || true) && flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr && echo $SENTINEL"
 upgrade_cmd="$QNAP_DOCKER exec $CONTAINER bash -c \"$inner_cmd\""
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"
@@ -174,9 +183,18 @@ exec $CONTAINER ps -ef | grep \"odoo.*-u\"'"
   if printf '%s\n' "$upgrade_log" | grep -qE 'Failed to load registry|CRITICAL|AssertionError'; then
     fail "cold upgrade hit a registry/load error (see [odoo] lines above). NOT trusting this deploy — a live restart would crash. Investigate before restarting $CONTAINER."
   fi
-  if ! printf '%s\n' "$upgrade_log" | grep -q 'Modules loaded'; then
+  # Success gate: the sentinel is echoed by `inner_cmd` after odoo exits 0.
+  # If we see it, the upgrade ran to completion. Fall back to the literal
+  # 'Modules loaded' line if the sentinel is missing — that handles the
+  # case where ssh dropped between odoo finishing and our echo running
+  # (rare but possible over a high-latency tunnel).
+  if printf '%s\n' "$upgrade_log" | grep -q "$SENTINEL"; then
+    :  # sentinel present → unambiguous success
+  elif printf '%s\n' "$upgrade_log" | grep -q 'Modules loaded'; then
+    log "sentinel missing but 'Modules loaded' line present — trusting the log."
+  else
     log "tail of upgrade log:"; printf '%s\n' "$upgrade_log" | tail -20 >&2
-    fail "cold upgrade did not reach 'Modules loaded' — treat as FAILED."
+    fail "cold upgrade did not reach success (no sentinel, no 'Modules loaded' line) — treat as FAILED. ssh rc was $rc."
   fi
   log "cold upgrade OK — registry loads cleanly (no lock contention)."
 fi
