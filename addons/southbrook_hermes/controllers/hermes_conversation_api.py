@@ -38,6 +38,7 @@ class HermesConversationApiController(http.Controller):
             partner_id=claims["partner_id"],
             scope=body.get("scope", "customer"),
             project_id=body.get("project_id"),
+            order_id=body.get("order_id"),
         )
         return self._json({"ok": True, "question_id": rec.id})
 

@@ -37,6 +37,12 @@ _STREAM_CHUNK = 4096
 # Match Vercel's max function duration for /api/hermes/ask (60s).
 _SIDECAR_TIMEOUT = 65
 
+# Mint JWTs with enough lifetime to cover the sidecar's whole agent loop
+# plus tool roundtrips. A 60s token expired mid-loop on a multi-step
+# question, returned 401 to a tool call, and the model surfaced a confusing
+# error to the user. 120s gives the streamText stopWhen budget headroom.
+_JWT_TTL_FOR_ASK = 120
+
 
 def _is_truthy(val):
     return (val or "").strip().lower() in ("1", "true", "yes", "on")
@@ -68,6 +74,7 @@ class HermesProxyController(http.Controller):
             token = jwt_helper.mint_jwt(
                 request.env, tenant="southbrook", persona=persona,
                 partner_id=partner_id, tier=tier,
+                ttl_seconds=_JWT_TTL_FOR_ASK,
                 extra={"order_id": body.get("order_id")})
         except RuntimeError as e:
             return self._json(
@@ -118,7 +125,10 @@ class HermesProxyController(http.Controller):
 
         if not upstream.ok:
             # Pass the error through. Try to preserve the upstream's JSON
-            # error envelope; fall back to a synthesized one.
+            # error envelope; fall back to a synthesized one. Close the
+            # streamed Response explicitly — otherwise the socket leaks
+            # for the lifetime of the worker (generate() never runs on
+            # this path, so its finally:close() never fires).
             try:
                 payload = upstream.json()
             except ValueError:
@@ -127,6 +137,7 @@ class HermesProxyController(http.Controller):
                     "status": upstream.status_code,
                     "detail": upstream.text[:512],
                 }
+            upstream.close()
             return self._json(payload, status=upstream.status_code)
 
         # Stream the body straight to the browser. The OWL component reads

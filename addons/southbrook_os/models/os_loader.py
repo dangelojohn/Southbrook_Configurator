@@ -35,7 +35,16 @@ class OsLoader(models.AbstractModel):
             }
             existing = Section.search([("slug", "=", slug)], limit=1)
             if existing:
-                existing.write({"body": body, "name": vals["name"]})
+                # Write the full vals dict so a frontmatter change to
+                # audience or source isn't silently discarded. Skip slug
+                # (already matched) and let the section's own version field
+                # stay owned by OSROs / generators.
+                existing.write({
+                    "name": vals["name"],
+                    "source": vals["source"],
+                    "body": body,
+                    "audience_tags": vals["audience_tags"],
+                })
                 loaded.append(existing)
             else:
                 loaded.append(Section.create(vals))

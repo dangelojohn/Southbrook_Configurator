@@ -16,8 +16,14 @@ function getSecret(): Uint8Array {
 }
 
 export async function verifyJwt(token: string): Promise<Claims | null> {
+  // Pull the secret OUTSIDE the try so a missing/misconfigured env var
+  // surfaces as a thrown Error to the caller (→ 503 hermes_not_configured),
+  // not as a silent null (→ 401 invalid_token). Otherwise a mis-rotated
+  // secret looks indistinguishable from "attacker sent garbage" — bad for
+  // ops debugging.
+  const secret = getSecret();
   try {
-    const { payload } = await jwtVerify(token, getSecret(), {
+    const { payload } = await jwtVerify(token, secret, {
       algorithms: ["HS256"],
       clockTolerance: 5, // seconds — Odoo's clock may drift slightly.
     });

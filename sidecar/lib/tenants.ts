@@ -13,16 +13,28 @@ function loadRegistry(): TenantRegistry {
         '{"southbrook":"https://southbrookcabinetry.space"}.',
     );
   }
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) {
-      throw new Error("TENANT_REGISTRY must be a JSON object.");
-    }
-    cached = parsed as TenantRegistry;
-    return cached;
+    parsed = JSON.parse(raw);
   } catch (e) {
     throw new Error(`TENANT_REGISTRY is not valid JSON: ${(e as Error).message}`);
   }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("TENANT_REGISTRY must be a non-null JSON object.");
+  }
+  // Validate every value is a non-empty string. A malformed-but-parseable
+  // entry like {"southbrook": null} would otherwise poison the module
+  // cache and crash getOdooUrl with a confusing TypeError on every
+  // subsequent request.
+  for (const [k, v] of Object.entries(parsed)) {
+    if (typeof v !== "string" || !v) {
+      throw new Error(
+        `TENANT_REGISTRY entry '${k}' must be a non-empty string URL, got ${typeof v}.`,
+      );
+    }
+  }
+  cached = parsed as TenantRegistry;
+  return cached;
 }
 
 export function getOdooUrl(tenant: string): string {

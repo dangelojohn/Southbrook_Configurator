@@ -94,6 +94,11 @@ export class HermesChat extends Component {
                 assistant.content += decoder.decode(value, { stream: true });
                 this._scrollToBottom();
             }
+            // Flush any UTF-8 bytes still buffered in the decoder (split
+            // multi-byte sequences in the final chunk would otherwise be
+            // silently dropped — affects accented characters, em-dashes,
+            // currency symbols).
+            assistant.content += decoder.decode();
             assistant.streaming = false;
         } catch (e) {
             assistant.content = `(Hermes request failed: ${e.message})`;

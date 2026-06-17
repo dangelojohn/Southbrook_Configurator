@@ -20,8 +20,12 @@ const registryCache = new Map<string, RegistryResponse>();
 export async function fetchToolRegistry(
   tenant: string,
   jwt: string,
+  claims: { persona: string; tier: string },
 ): Promise<RegistryResponse> {
-  const key = `${tenant}::${jwt.slice(-12)}`;
+  // Cache by what actually affects the response shape: tenant + persona +
+  // tier mask. NOT the JWT suffix — that changes per request (so cache
+  // never warmed) AND could collide between users whose token tails match.
+  const key = `${tenant}::${claims.persona}::${claims.tier}`;
   const cached = registryCache.get(key);
   if (cached) return cached;
   const resp = await fetch(`${getOdooUrl(tenant)}/api/hermes/tools`, {

@@ -33,6 +33,12 @@ class SouthbrookHermesQuestion(models.Model):
         help="Customer scope is limited to this partner's kitchen projects.",
     )
     project_id = fields.Many2one("sb.kitchen.project", string="Kitchen Project")
+    sale_order_id = fields.Many2one(
+        "sale.order",
+        string="Order",
+        help="When the question was asked from an Order Builder context, "
+             "the order it was about.",
+    )
     recommendation_id = fields.Many2one(
         "southbrook.hermes.recommendation",
         readonly=True,
@@ -50,7 +56,7 @@ class SouthbrookHermesQuestion(models.Model):
 
     @api.model
     def log_conversation(self, *, question, answer, partner_id, scope="customer",
-                         project_id=None):
+                         project_id=None, order_id=None):
         """Persist a Q+A turn from the Hermes sidecar.
 
         Used by POST /api/hermes/conversation/log. The sidecar has already
@@ -66,6 +72,8 @@ class SouthbrookHermesQuestion(models.Model):
         }
         if project_id:
             values["project_id"] = project_id
+        if order_id:
+            values["sale_order_id"] = order_id
         return self.create(values)
 
     def action_create_recommendation(self):

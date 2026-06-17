@@ -39,7 +39,11 @@ def get_order_status(env, order_id: int):
         order.check_access_rule("read")
     except Exception:
         raise MissingError("Order not visible to this user.")
-    kj = env["project.task"].sudo().search(
+    # Both project.task and mrp.production are read WITHOUT sudo so portal
+    # record rules apply. If a record rule hides them (e.g., MOs are
+    # internal-only), the calls degrade to empty results and the return
+    # dict surfaces None — exactly what the spec § 4.4 ACL rule wants.
+    kj = env["project.task"].search(
         [("sale_order_id", "=", order.id)], limit=1)
     return {
         "stage": order.state,
@@ -58,7 +62,7 @@ def get_order_status(env, order_id: int):
 
 def _count_mos_for_order(env, order):
     line_ids = order.order_line.ids
-    return env["mrp.production"].sudo().search_count(
+    return env["mrp.production"].search_count(
         [("sale_order_line_id", "in", line_ids)])
 
 
@@ -98,12 +102,15 @@ def get_order_line(env, order_id: int, line_id: int):
     tier="T0", scope="own",
     description="List kitchen projects visible to this partner.",
 )
-def list_my_kitchen_projects(env, partner_id: int):
+def list_my_kitchen_projects(env, partner_id: int = None):
+    # partner_id is informational only — the authoritative scope comes from
+    # the caller's env.user (set by the dispatch controller from JWT claims),
+    # so an LLM arg can NOT widen the result set to another partner.
     Project = env["sb.kitchen.project"] if "sb.kitchen.project" in env else None
     if Project is None:
         return []
-    projects = Project.sudo().search(
-        [("partner_id", "=", partner_id)], order="create_date desc")
+    projects = Project.search(
+        [("partner_id", "=", env.user.partner_id.id)], order="create_date desc")
     return [
         {
             "ref": p.name,
@@ -151,6 +158,7 @@ def get_install_schedule(env, order_id: int):
     order = env["sale.order"].browse(order_id)
     try:
         order.check_access_rights("read")
+        order.check_access_rule("read")
     except Exception:
         raise MissingError("Order not visible to this user.")
     return {
@@ -171,6 +179,7 @@ def get_quote_pdf_url(env, order_id: int):
     order = env["sale.order"].browse(order_id)
     try:
         order.check_access_rights("read")
+        order.check_access_rule("read")
     except Exception:
         raise MissingError("Order not visible to this user.")
     base_url = env["ir.config_parameter"].sudo().get_param("web.base.url", "")
@@ -187,17 +196,17 @@ def get_quote_pdf_url(env, order_id: int):
     tier="T0", scope="own",
     description="List Hermes recommendations awaiting this partner's approval.",
 )
-def list_my_recommendations(env, partner_id: int):
-    # Partner attribution on southbrook.hermes.recommendation uses the
-    # generic (source_model, source_res_id) pair — see
-    # addons/southbrook_hermes/models/hermes_recommendation.py:43-44.
+def list_my_recommendations(env, partner_id: int = None):
+    # partner_id is informational only — the authoritative scope comes from
+    # env.user.partner_id (controller-bound from JWT claims). Caller arg
+    # can NOT widen the result to another partner.
     Rec = env["southbrook.hermes.recommendation"] if (
         "southbrook.hermes.recommendation" in env) else None
     if Rec is None:
         return []
-    recs = Rec.sudo().search([
+    recs = Rec.search([
         ("source_model", "=", "res.partner"),
-        ("source_res_id", "=", partner_id),
+        ("source_res_id", "=", env.user.partner_id.id),
         ("state", "in", ("draft", "ready")),
     ], order="create_date desc")
     return [

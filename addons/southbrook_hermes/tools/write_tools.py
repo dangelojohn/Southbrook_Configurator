@@ -64,6 +64,7 @@ def schedule_followup_activity(env, order_id: int, summary: str, due_date: str):
         raise UserError("Activity due_date must be today or in the future.")
     order = env["sale.order"].browse(order_id)
     order.check_access_rights("read")
+    order.check_access_rule("read")  # record-rule scope per spec § 4.4
     activity_type = env.ref("mail.mail_activity_data_todo")
     activity = env["mail.activity"].create({
         "res_id": order.id,
@@ -98,18 +99,30 @@ _TRADE_PARTNER_INTENTS = (
         "request_install_reschedule, and request_clarification intents "
         "are allowed."),
 )
-def propose_recommendation(env, partner_id: int, intent: str, payload: dict,
-                            summary: str, persona: str = "trade_partner",
+def propose_recommendation(env, intent: str, payload: dict, summary: str,
+                            partner_id: int = None, persona: str = None,
                             name: str = None):
+    # persona + partner_id are AUTHORITATIVELY set by the dispatch controller
+    # from verified JWT claims (see hermes_tools_api.py). Any caller-supplied
+    # values for these args are overridden by the controller before this fn
+    # runs, so the LLM cannot lift its own intent-guard or attribute the
+    # recommendation to another partner.
     import json
     if persona == "trade_partner" and intent not in _TRADE_PARTNER_INTENTS:
         raise UserError(
             f"Trade partners cannot propose '{intent}' recommendations. "
             f"Allowed intents: {', '.join(_TRADE_PARTNER_INTENTS)}.")
+    if not partner_id:
+        # Fall back to env.user.partner_id when the dispatch controller didn't
+        # inject — happens only in direct in-process tests that bypass dispatch.
+        partner_id = env.user.partner_id.id
     Rec = env["southbrook.hermes.recommendation"]
-    # Encode the intent + caller payload in payload_json so the approve→
-    # apply pipeline preserves what the partner asked for.
     full_payload = {"intent": intent, "data": payload or {}}
+    # sudo() is the spec § 4.4 "explicitly tier-gated T2 tools with a
+    # documented reason" carve-out: a draft recommendation is owned by
+    # the Fabio agent partner, not by the requesting partner, and must
+    # be visible to Southbrook reviewers via record rules that don't
+    # match the requesting portal user.
     rec = Rec.sudo().create({
         "name": name or f"Hermes/{intent}/{summary[:48]}",
         "summary": summary,

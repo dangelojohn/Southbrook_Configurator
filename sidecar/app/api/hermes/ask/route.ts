@@ -8,7 +8,7 @@
 //   5. streamText with tools — the AI SDK handles tool roundtrips for us.
 //   6. After stream completes, fire-and-forget the conversation log to
 //      Odoo so the Q+A persists alongside Fabio v0 records.
-import { streamText, convertToModelMessages } from "ai";
+import { streamText } from "ai";
 import type { CoreMessage } from "ai";
 
 import { getModel } from "@/lib/ai";
@@ -55,8 +55,11 @@ export async function POST(req: Request): Promise<Response> {
   const q = (body.q || "").trim();
   if (!q) return jsonResp({ error: "empty_question" }, 400);
 
-  // (2) Tool registry — cached per cold start.
-  const registry = await fetchToolRegistry(claims.tenant, token);
+  // (2) Tool registry — cached per (tenant, persona, tier).
+  const registry = await fetchToolRegistry(claims.tenant, token, {
+    persona: claims.persona,
+    tier: claims.tier,
+  });
   const tools = toAiSdkTools(registry.tools, claims.tenant, token);
 
   // (3) RAG retrieval.
@@ -76,10 +79,14 @@ export async function POST(req: Request): Promise<Response> {
   }
   messages.push({ role: "user", content: q });
 
-  // (5) Stream the answer + handle tool roundtrips.
+  // (5) Stream the answer + handle tool roundtrips. streamText accepts
+  // CoreMessage[] directly; convertToModelMessages is for the UI-message
+  // layer (id/parts/createdAt) → CoreMessage, NOT for already-typed
+  // CoreMessage[]. Passing through it can silently drop our system
+  // messages (RAG injection, persona voice).
   const result = streamText({
     model: getModel("default"),
-    messages: convertToModelMessages(messages),
+    messages,
     tools,
     // Cap tool use so a runaway loop is bounded. 5 covers the worst-case
     // realistic chain (list_my_orders → get_order_status → get_order_line
@@ -120,7 +127,11 @@ async function logConversation(
       question: body.question,
       answer: body.answer,
       scope: "customer",
-      project_id: null,
+      // Pass order_id through so the persisted question record stays
+      // linked to whichever order the chat was about. Odoo's
+      // log_conversation method ignores unknown kwargs, so this stays
+      // forward-compatible if the Odoo side adds the column later.
+      order_id: body.order_id ?? null,
     }),
   });
 }

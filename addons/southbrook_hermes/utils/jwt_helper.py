@@ -72,9 +72,16 @@ def resolve_persona(user):
 
 
 def tier_for_persona(persona):
-    """Default tier mask per persona. Trade partners get T0+T1 — T2 routes to recommendations."""
+    """Default tier mask per persona.
+
+    Trade partners get T0+T1+T2 because propose_recommendation is the spec
+    § 6 "T2 universal escape hatch" — a T2 tool with an intent-allow-list
+    that the function itself enforces (see write_tools.py:_TRADE_PARTNER_INTENTS).
+    The T2 mask is "can call tools tier-labelled T2 whose internal guards
+    allow this persona," not "write business state directly."
+    """
     return {
-        "trade_partner": "T0+T1",
+        "trade_partner": "T0+T1+T2",
         "sales_rep": "T0+T1+T2",
         "mfg_manager": "T0+T1+T2",
     }.get(persona, "T0")
