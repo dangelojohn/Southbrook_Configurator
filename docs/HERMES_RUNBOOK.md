@@ -14,7 +14,7 @@ Day-to-day operations for the Hermes trade-partner platform shipped
 | Layer | Version | Health check |
 |---|---|---|
 | `southbrook_os` (Odoo addon) | `19.0.1.0.0` | `curl https://southbrookcabinetry.space/southbrook/os.json` → 200, 14 sections |
-| `southbrook_hermes` (Odoo addon) | `19.0.3.2.0` | `./scripts/smoke_hermes.sh` → all PASS |
+| `southbrook_hermes` (Odoo addon) | `19.0.4.0.0` | `./scripts/smoke_hermes.sh` → all PASS |
 | Hermes sidecar (Vercel) | NOT YET DEPLOYED | Will be `vercel inspect` once stood up |
 | OWL chat panel | embedded in Order Builder | Visible to authenticated trade partners under the order header card |
 
@@ -215,6 +215,40 @@ The mirror MUST happen before/during the Odoo restart; otherwise minted
 JWTs won't verify on the sidecar side until the values match.
 
 ---
+
+## 7a. Recommendation types
+
+The Fabio approval queue (`southbrook.hermes.recommendation`) supports
+five `recommendation_type` values, each with a distinct apply behavior:
+
+| Type | What apply creates | Source |
+|---|---|---|
+| `task` | `project.task` | Default; partner-requested intents from Hermes Chat |
+| `risk` | (chatter post only) | Operational alerts |
+| `note` | (chatter post only) | Free-form annotations |
+| `followup` | (chatter post only) | "Remember to do X later" |
+| `prospect` | `crm.lead` with mapped priority + tag + filtered website | Hermes Console `lead_prospector` agent loop (Gemini-grounded search) |
+
+### Prospect apply behavior
+
+When `recommendation_type='prospect'` is approved + applied, the
+`_create_crm_lead` method maps the payload like so:
+
+| Payload key | Lead field | Notes |
+|---|---|---|
+| `company` | `partner_name` | falls back to "Unknown company" |
+| `city` | `city` | "Toronto, ON" → "Toronto" (province stripped) |
+| `why_fit` | description (head) | 1-2 sentence rationale |
+| `proposed_action` (rec) | description | "Proposed next step:" prefix |
+| `source_url` | `website` AND description | ONLY set on `website` if not a `vertexaisearch.cloud.google.com` redirector |
+| `contact_hint` | description | email/phone/form URL |
+| `lead_type` | description + `tag_ids` | auto-creates `crm.tag` "Hermes: <lead_type>" if absent |
+| priority (rec) | `priority` | low/normal/high/blocker → 0/1/2/3 |
+
+The created `crm.lead` is linked back via the recommendation's
+`created_crm_lead_id` field; the lead's chatter records the Hermes
+provenance. Test coverage: `tests/test_prospect_recommendation.py`
+(11 unit tests, tag `prospect`).
 
 ## 8. Adding a new tool
 
