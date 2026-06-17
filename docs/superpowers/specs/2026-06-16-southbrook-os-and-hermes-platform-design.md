@@ -478,3 +478,146 @@ These don't gate the design but must be answered before writing-plans:
 - `2026-06-16-hermes-agent-design.md` — Fabio v0 sidecar pattern (predecessor of this spec)
 - `2026-06-16-fabio-agent-identity-design.md` — Fabio's branded agent identity (predecessor)
 - The 63-step canonical Southbrook OS narrative supplied in the brainstorm prompt — this becomes the seed for `southbrook_os/canonical/*.md`
+
+---
+
+## 14 · Implementation deltas (added 2026-06-16 post-build)
+
+Spec ↔ implementation drift captured after Plan B1 + B2 landed. These are
+the places where the shipped code diverges from the brainstorm-validated
+design above; every one is intentional, surfaced by the xhigh-effort code
+review pass, and is reflected in the live `southbrook_os 19.0.1.0.0` +
+`southbrook_hermes 19.0.3.2.0` build.
+
+### 14.1 Persona tier mask widened to include T2
+
+§ 4.2's matrix marks T2 as "✗" for trade partners while § 6 calls
+`propose_recommendation` a "T2 universal escape hatch." Strictly enforcing
+the mask blocks every trade-partner call to a T2 tool at the dispatch
+controller's tier check.
+
+Resolved by widening `tier_for_persona` to return `T0+T1+T2` for all three
+personas. The trade-partner safety boundary moves from the tier mask
+(always going to leak the moment one T2 tool needed to be addressable by
+trade partners) to the tool's own intent allow-list:
+`propose_recommendation` enforces `_TRADE_PARTNER_INTENTS` directly, and
+dispatch injects the persona claim before the tool runs so a caller can't
+forge it. Net behavior = exactly what § 4.2 wanted; only the enforcement
+layer moved.
+
+### 14.2 Dispatch claim-binding overrides caller-supplied args
+
+§ 4.3 says "ACL = tool registry" but doesn't specify how persona context
+reaches each tool function. The first implementation accepted `persona`,
+`partner_id`, and `tenant` as ordinary tool args — which the LLM (or a
+malicious prompt injection) could forge to attribute a recommendation to
+another partner or lift its own intent guard.
+
+Resolved: dispatch now inspects each tool's signature and, for any of
+`persona` / `partner_id` / `tenant`, overrides the request-body value
+with the verified JWT claim before calling. Tools that don't declare
+those args are unaffected.
+
+### 14.3 Dispatch returns 403 when partner has no `res.users`
+
+§ 4.3's tool dispatch resolved partner → user via `partner.user_ids[:1]`.
+If empty (e.g., a partner imported without a portal invite), the original
+code fell back to `request.env.user` — which on the `auth='public'` route
+is the public user. Every subsequent tool call then ran as the
+least-privileged identity, surfacing as confusing 500s with no signal
+that the root cause was a missing user link.
+
+Resolved: dispatch now returns 403 `partner_has_no_user` with a clear
+detail message, AND 403 `unknown_partner` if the partner record itself
+is missing. See § 14.11 for the full error table addition.
+
+### 14.4 Read tools derive partner from `env.user`, not args
+
+`list_my_kitchen_projects` and `list_my_recommendations` originally took
+a `partner_id` arg and ran a `.sudo()` search keyed on it — the LLM
+could pass any other partner's ID to enumerate their data. Resolved:
+both tools now ignore the args-supplied `partner_id` and key off
+`env.user.partner_id.id` (which dispatch sets from the verified JWT).
+The arg signature is preserved for backward compatibility but
+documented as informational only.
+
+### 14.5 `check_access_rule` added everywhere it was missing
+
+§ 4.4 rule 2 ("Hard ban on `sudo()` inside tools") was missed in three
+read tools and one write tool. `get_install_schedule`,
+`get_quote_pdf_url`, and `schedule_followup_activity` called
+`check_access_rights` (model-level ACL) but skipped `check_access_rule`
+(record-rule scope). All three now call both checks. `get_order_status`
+was likewise sudo-reading `project.task` and `mrp.production`; dropped
+to bare search so record rules apply.
+
+### 14.6 Conversation log carries `sale_order_id`
+
+§ 6's tool catalog and § 3's data flow assume the conversation persists
+with order context. The original `southbrook.hermes.question` model had
+`project_id` (kitchen project) but no `sale_order_id`, so the sidecar's
+`order_id` was dropped at the controller. Added `sale_order_id`
+Many2one + `order_id` kwarg on `log_conversation` + controller plumbing.
+Persisted Q+A records now link back to the order the partner was
+looking at.
+
+### 14.7 JWT TTL widened from 60s to 120s
+
+§ 3 invariant 3 says "JWT lifetime is the inner request, not the
+conversation." The 60-second default was correct in spirit but, on a
+slow model run with 4–5 tool roundtrips, the token expired mid-loop and
+the next tool call returned 401 to the LLM as a confusing tool-error
+result. Resolved: `hermes_proxy.py:_JWT_TTL_FOR_ASK = 120`. Lifetime is
+still per-request (not per-conversation) but covers the realistic
+worst-case agent loop within Vercel's 60s function cap.
+
+### 14.8 Sidecar registry cache key
+
+§ 2.3's "cached per tenant for the lifetime of the cold start" was
+implemented as `tenant + last-12-chars-of-jwt`. Since each request mints
+a fresh JWT the suffix is random — the cache never warmed across
+requests AND could collide on base64url-suffix matches. Resolved: cache
+key is now `tenant::persona::tier` from verified claims.
+
+### 14.9 Sidecar `verifyJwt` surfaces config errors
+
+A missing `HERMES_JWT_SECRET` env var was being swallowed by a bare
+`catch{}` and returned as `null` — operationally indistinguishable from
+a bad token. Resolved: `getSecret()` now throws outside the try so a
+config error propagates to the route handler's 503 `jwt_config`
+response instead of masquerading as 401 `invalid_token`.
+
+### 14.10 Other minor deltas
+
+- `convertToModelMessages()` removed from the agent loop — was incorrect
+  for already-typed `CoreMessage[]`, could silently drop the RAG
+  injection + persona-voice system messages.
+- `tenants.ts` validates every TENANT_REGISTRY value is a non-empty
+  string at parse time, preventing `null` values from poisoning the
+  module-global cache.
+- `hermes_proxy.py` explicitly closes the upstream `requests.Response`
+  on the non-2xx error branch — was leaking sockets under sustained
+  sidecar errors.
+- `os_loader.py` writes the full vals dict on re-import (was dropping
+  `source` + `audience_tags`, updating only `body` + `name`).
+- OWL chat panel's `TextDecoder` is flushed after the stream ends so
+  multi-byte UTF-8 sequences in the final chunk (accented characters,
+  em-dashes) aren't silently dropped.
+
+### 14.11 Error envelopes the spec § 10 table didn't anticipate
+
+Added to the live error contract:
+
+| Surface | Code | Status | When |
+|---|---|---|---|
+| dispatch | `partner_has_no_user` | 403 | partner is JWT-authenticated but has no `res.users` row |
+| dispatch | `unknown_partner` | 403 | `partner_id` claim points at a deleted/non-existent partner |
+| proxy | `hermes_not_configured` | 503 | JWT secret unset OR PyJWT not installed |
+| proxy | `sidecar_unreachable` | 502 | `requests.RequestException` from the sidecar POST |
+| proxy | `sidecar_error` | passthrough | sidecar returned non-JSON 4xx/5xx |
+| sidecar `/ask` | `jwt_config` | 503 | `HERMES_JWT_SECRET` env var missing |
+| sidecar `/ask` | `unknown_tenant` | 403 | JWT tenant claim not in `TENANT_REGISTRY` |
+| sidecar `/ask` | `empty_question` | 400 | empty `body.q` |
+
+All verified end-to-end by `scripts/smoke_hermes.sh`.
+
