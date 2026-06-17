@@ -135,7 +135,50 @@ print("    question_id:", d["question_id"])
 ' || fail "conversation/log response shape mismatch"
 pass "conversation log accepted, persisted with id"
 
-# ---- 4. Regression — public surfaces unchanged ----------------------------
+# ---- 4. OWL chat-panel asset deployment ------------------------------------
+info "OWL chat panel — assets, bundle, view inheritance"
+
+# 4a. Raw static assets must be reachable
+for path in \
+  /southbrook_hermes/static/src/components/hermes_chat/hermes_chat.esm.js \
+  /southbrook_hermes/static/src/components/hermes_chat/hermes_chat.xml \
+  /southbrook_hermes/static/src/components/hermes_chat/hermes_chat.scss; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_BASE$path")
+  if [[ "$code" != "200" ]]; then
+    fail "$path returned $code (expected 200; manifest assets entry may be wrong)"
+  fi
+done
+pass "all 3 chat-panel static assets reachable"
+
+# 4b. The lazy frontend bundle should contain the OWL component markers
+LOGIN_HTML=$(curl -s "$PUBLIC_BASE/web/login")
+LAZY_JS=$(printf '%s' "$LOGIN_HTML" | grep -oE '/web/assets/[^"]+web\.assets_frontend_lazy[^"]*\.min\.js' | head -1)
+FRONTEND_CSS=$(printf '%s' "$LOGIN_HTML" | grep -oE '/web/assets/[^"]+web\.assets_frontend[^"]*\.min\.css' | head -1)
+
+if [[ -z "$LAZY_JS" ]] || [[ -z "$FRONTEND_CSS" ]]; then
+  fail "could not locate frontend bundle URLs in /web/login response"
+fi
+
+JS_MARKERS=$(curl -s "$PUBLIC_BASE$LAZY_JS" | grep -oE 'HermesChat|hermes-chat-mount|o_hermes_chat' | sort -u | wc -l | tr -d ' ')
+if [[ "$JS_MARKERS" -lt 3 ]]; then
+  fail "lazy bundle missing OWL chat markers (found $JS_MARKERS/3+; expected HermesChat, hermes-chat-mount, o_hermes_chat)"
+fi
+pass "lazy bundle contains $JS_MARKERS+ OWL chat markers"
+
+CSS_MARKERS=$(curl -s "$PUBLIC_BASE$FRONTEND_CSS" | grep -oE 'o_hermes_chat[a-z_-]*' | sort -u | wc -l | tr -d ' ')
+if [[ "$CSS_MARKERS" -lt 1 ]]; then
+  fail "frontend CSS bundle missing o_hermes_chat styles"
+fi
+pass "frontend CSS contains $CSS_MARKERS o_hermes_chat style classes"
+
+# 4c. ir.ui.view record for the xpath inheritance must exist
+INHERIT_COUNT=$(ssh "$QNAP_HOST" "$QNAP_DOCKER exec southbrook-postgres psql -U odoo -d $DB -At -c \"SELECT COUNT(*) FROM ir_ui_view WHERE key = 'southbrook_hermes.hermes_chat_inject_order_builder';\"" 2>&1 | tr -d ' \r')
+if [[ "$INHERIT_COUNT" != "1" ]]; then
+  fail "ir.ui.view 'southbrook_hermes.hermes_chat_inject_order_builder' missing or duplicated (count: $INHERIT_COUNT)"
+fi
+pass "ir.ui.view inheritance record present (1 row)"
+
+# ---- 5. Regression — public surfaces unchanged ----------------------------
 info "regression check"
 
 for path in /southbrook/os.json /commercial; do
@@ -146,7 +189,7 @@ for path in /southbrook/os.json /commercial; do
   pass "$path → 200"
 done
 
-# ---- 5. Toggle state report -----------------------------------------------
+# ---- 6. Toggle state report -----------------------------------------------
 info "sidecar config state"
 
 # shellcheck disable=SC2087
