@@ -1,0 +1,2041 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_02_kitchen_projects" model="slide.slide">
+            <field name="name">Kitchen Projects vs Sale Orders — Why We Have a Project Layer</field>
+            <field name="channel_id" ref="course_production_planning"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Production Planner (the person who decides what runs when on the shop floor).</field>
+            <field name="html_content"><![CDATA[<h1 id="kitchen-projects-vs-sale-orders-why-we-have-a-project-layer">Kitchen Projects vs Sale Orders — Why We Have a Project Layer</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner who looks at the queue every morning and decides what
+goes to cutting today. Before you can do that you need to know which
+records are real customer commitments, which are still being designed,
+and which got confirmed at the till but aren't actually ready for the
+shop floor. This lesson is about the three records — <code>sb.kitchen.project</code>,
+<code>sale.order</code>, <code>project.task</code> — that all describe "the same kitchen" but
+at different points in its life. You need to know which one to look at
+for which question.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your planner account.
+Three menus give you three different views of the same kitchen:</p>
+<blockquote>
+<p><strong>Sales -&gt; Kitchen Workspace -&gt; Projects</strong> — the design-stage record
+(<code>sb.kitchen.project</code>) the salesperson opens before a quote exists.</p>
+<p><strong>Sales -&gt; Quotations / Orders</strong> — the standard Odoo sale.order list,
+filterable by stage. Confirmed orders are the ones you care about.</p>
+<p><strong>Kitchen Ops -&gt; Kitchen Jobs</strong> — the planner-facing kanban of every
+confirmed order's downstream <code>project.task</code> spine, grouped by
+readiness decision. <strong>This is your home screen.</strong></p>
+</blockquote>
+<p>Don't try to plan from the Sales list. The Sales list shows revenue
+state, not shop state — an order can be <code>sale</code> (confirmed) and still
+have zero MOs because the engineering gate hasn't released it. The
+Kitchen Jobs board shows shop state and is the only screen that tells
+you the truth.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>On <strong>Kitchen Ops -&gt; Kitchen Jobs</strong> (the kanban) each card represents
+one customer kitchen and shows:</p>
+<ul>
+<li><strong>Job name</strong> (<code>name</code> on <code>project.task</code>) — composed by the orchestration
+  layer as <code>Kitchen Cabinet Set - &lt;style&gt; (&lt;species&gt;) [&lt;order ref&gt;]</code>.
+  Pulled live from the order's line names at confirmation time.</li>
+<li><strong>Customer</strong> (<code>partner_id</code>) — the same partner as on the sale order.</li>
+<li><strong>Linked SO</strong> (<code>x_southbrook_sale_order_id</code> on <code>project.task</code>) — click
+  this to jump back to the sale.order. <strong>This is the only reliable
+  bidirectional link between an order and its kitchen job.</strong></li>
+<li><strong>Install due date</strong> (<code>install_due_date</code>) — read from
+  <code>sale.order.commitment_date</code> at confirmation time, then editable on the
+  task. If a customer pushes their install date, change it HERE, not on
+  the sale order.</li>
+<li><strong>Readiness decision</strong> (<code>readiness_decision</code>) — <code>ready</code> / <code>review</code> /
+  <code>blocked</code>. Computed nightly by the readiness cron from upstream signals
+  (BoM exists, drawings exist, tooling reserved, crew assigned). The
+  kanban groups cards by this so you see your blocked queue at a glance.</li>
+<li><strong>Readiness score</strong> (<code>readiness_score</code>) — 0-100. Useful for sorting
+  "most-ready first" inside a column.</li>
+<li><strong>Production release state</strong> (<code>southbrook_production_release_state</code>) —
+  separate from readiness. <code>ready</code> means the ENG01 engineer has signed
+  off the gate (covered in lesson 2.2). A job can be <code>readiness=ready</code>
+  and <code>release=blocked</code> if the engineer hasn't approved yet.</li>
+<li><strong>At-risk badge</strong> (<code>job_at_risk</code>) — red badge when the readiness score
+  and install date together suggest the job won't make its deadline.
+  Surfaced by the orchestration's risk compute.</li>
+</ul>
+<p>The <code>sb.kitchen.project</code> record (the <strong>Sales -&gt; Kitchen Workspace -&gt;
+Projects</strong> view) is a different shape. It shows:</p>
+<ul>
+<li><strong>Project state</strong> (<code>state</code> on <code>sb.kitchen.project</code>) — <code>draft</code> -&gt;
+  <code>designing</code> -&gt; <code>awaiting_customer</code> -&gt; <code>approved</code> -&gt; <code>in_production</code>
+  -&gt; <code>done</code>. Transitions are enforced by <code>VALID_TRANSITIONS</code> in the
+  model, so you can't yank a project straight from <code>designing</code> to
+  <code>in_production</code> even from the API.</li>
+<li><strong>Theme</strong> (<code>theme</code>) — <code>signature</code> / <code>elegance</code> / <code>contemporary</code> /
+  <code>contractor</code>, matching the configurator series.</li>
+<li><strong>Design options</strong> (<code>design_option_ids</code>) — the alternatives the
+  customer is choosing between; exactly one becomes
+  <code>selected_design_option_id</code>.</li>
+<li><strong>AI room analysis confirmation</strong> (<code>ai_analysis_id.confirmed_by_human</code>)
+  — gate that the configurator refuses to run against unless True.</li>
+<li><strong>Linked sale order</strong> (<code>sale_order_id</code>) — populated once the customer
+  approves and a quote/order is generated.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>This is a <strong>start-of-day</strong> lesson — your loop here is "wake up, figure
+out what's planning-ready, plan it." Per-job decisions live in the
+later lessons.</p>
+<p><strong>1. Start of day (10 min): triage the Kitchen Jobs board.</strong></p>
+<ul>
+<li>Open <strong>Kitchen Ops -&gt; Kitchen Jobs</strong>.</li>
+<li>Default filter is <strong>Open</strong> (excludes done / cancelled). Leave it on.</li>
+<li>Sort within each readiness column by <code>install_due_date</code> ascending
+  (tightest deadline first). The kanban remembers your sort.</li>
+<li>Scan the <strong>Blocked</strong> column first — these jobs need something the
+  readiness cron decided is missing. Click each card; the chatter shows
+  the most recent readiness flip note posted by the
+  <code>_cron_recompute_readiness_all</code> cron, e.g.
+  "Decision: ready -&gt; blocked, Release state: ready -&gt; blocked." That
+  tells you what tripped overnight.</li>
+<li>Move to the <strong>Review</strong> column. These need a human decision — usually
+  a missing cabinet spec field (door style, wood species, finish) the
+  designer hasn't filled in yet. Click the card, look at the
+  <code>x_door_style</code> / <code>x_wood_species</code> / <code>x_finish</code> fields. If any are
+  blank, ping the designer; don't try to fill them in yourself.</li>
+<li>The <strong>Ready</strong> column is your planning pool. These are the kitchens
+  you can release today.</li>
+</ul>
+<p><strong>2. When a designer creates a new project (per-design loop):</strong></p>
+<p>The designer (not you) opens <strong>Sales -&gt; Kitchen Workspace -&gt; Projects</strong>,
+hits <strong>Create</strong>, fills in customer + theme, and clicks <strong>Start Designing</strong>.
+The project moves <code>draft -&gt; designing</code>. You don't see this work; it
+hasn't reached your queue yet.</p>
+<p>When the customer approves the design, the designer clicks <strong>Customer
+Approves</strong>. The project moves <code>awaiting_customer -&gt; approved</code> and a
+quote is generated. When the customer confirms the quote, <strong>two things
+happen in the same transaction</strong>:</p>
+<ul>
+<li>The <code>sale.order</code> moves to <code>sale</code> (confirmed) state.</li>
+<li>The orchestration layer's <code>action_confirm</code> override creates a
+  <code>project.task</code> spine for this order (job name, install due date,
+  partner, customer specs inferred from line names) and stamps
+  <code>x_premium_orchestration_managed = True</code> on the order.</li>
+</ul>
+<p>The new task appears on your Kitchen Jobs board, almost always in the
+<strong>Blocked</strong> column at first — because nothing downstream (BoM, drawings,
+tooling) is wired yet. It moves to <strong>Review</strong> then <strong>Ready</strong> as the
+readiness cron flips it overnight.</p>
+<p><strong>3. End of day (5 min): handoff.</strong></p>
+<ul>
+<li>Note any <code>Blocked</code> cards whose blocker you can't unblock yourself
+  (e.g. waiting on the designer, waiting on the customer). Drop a
+  chatter note on the task so the next shift sees the context.</li>
+<li>Check the <strong>At Risk</strong> filter — any job whose install date is tight
+  and whose readiness is still review/blocked. Escalate to the PM
+  before you leave.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I confirmed the sale order in Odoo Sales but no card appeared on
+Kitchen Jobs."</strong></p>
+<p>The <code>action_confirm</code> override caught an exception during spine creation
+and silently logged it — see the order's chatter for a "failed to create
+kitchen project.task spine" note. Recovery: open the sale order and run
+the <strong>Backfill Kitchen Task</strong> server action (it calls
+<code>action_backfill_kitchen_task</code> on the order, which is idempotent and
+safe to re-run). The card appears the moment the task lands.</p>
+<p><strong>"I edited install_due_date on the sale order and the Kitchen Jobs
+card still shows the old date."</strong></p>
+<p>The install date is copied <strong>at confirmation time</strong> from
+<code>sale.order.commitment_date</code> onto <code>project.task.install_due_date</code>, then
+the two drift apart. The task is the truth for the shop; the order is
+the truth for the customer. Edit the task date if the floor needs to
+know, then update the order's commitment date separately so the
+customer-facing artifacts (invoice, install confirmation email) stay
+honest. This is by design — the planner often needs to negotiate an
+internal install date that's distinct from the contract date.</p>
+<p><strong>"A card shows up under a customer whose project isn't even out of
+designing yet."</strong></p>
+<p>You're looking at the <code>Kitchen Jobs</code> board, which is wired to
+<code>project.task</code> records, not to <code>sb.kitchen.project</code> records. A
+<code>sb.kitchen.project</code> in <code>designing</code> state has no sale order and no
+task, so it can't be the cause. What probably happened: the same
+customer has TWO kitchens going — the design project (in designing)
+and an older one that was already confirmed. Cross-check the SO link
+on the card. If it points to an order that ALREADY shipped, the task
+should have been archived; use the <strong>Archive Test Users</strong> wizard
+admin path (or ask a sysadmin) to clean up.</p>
+<p><strong>"The card is <code>readiness=ready</code> and <code>release=blocked</code> — what do I
+do?"</strong></p>
+<p>Readiness and release are separate gates. Readiness is the cron's view
+of "do the upstream artifacts exist?" Release is the ENG01 engineer's
+view of "is this safe to send to the floor?" A <code>ready+blocked</code> card
+means the data is complete but the engineer hasn't approved. That's
+lesson 2.2; for now, leave it alone — it's not your decision.</p>
+<p><strong>"I deleted a task by accident and now the order has no spine."</strong></p>
+<p>Don't recreate the task by hand. Open the sale order, run <strong>Backfill
+Kitchen Task</strong> from the server action menu. The orchestration code
+will re-resolve the project, recreate the task, and re-backlink any
+MOs that became orphans when you deleted (the <code>_backlink_orphan_mos</code>
+helper covers both <code>sale_line_id.order_id</code> and bare <code>origin</code>
+references).</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>You're looking at three records that describe the same kitchen at
+three different points in its life:</p>
+<ul>
+<li>
+<p><strong><code>sb.kitchen.project</code></strong> (defined in <code>southbrook_kitchen_workspace</code>)
+  is the <strong>pre-sale</strong> record. It's where the salesperson and the
+  customer work out the design before money changes hands. Its state
+  machine is the only one of the three with hard-enforced transitions
+  (<code>VALID_TRANSITIONS</code> set) — you can't skip a step. Required AI-room
+  analysis confirmation gate (<code>is_ready_for_config_engine</code>) lives here.</p>
+</li>
+<li>
+<p><strong><code>sale.order</code></strong> is the <strong>commercial</strong> record. It owns the price, the
+  channel pricelist, the customer, and the install due date as a
+  contractual commitment. The configurator writes its line items.
+  Confirming it triggers <code>action_confirm</code>, which fires the override in
+  <code>southbrook_premium_orchestration.sale_order._create_kitchen_project_task</code>.</p>
+</li>
+<li>
+<p><strong><code>project.task</code></strong> is the <strong>shop floor</strong> record. It carries readiness
+  state, release state, install date, MO backlinks (<code>production_ids</code>),
+  and the cabinet spec heuristics (<code>x_door_style</code>, <code>x_wood_species</code>,
+  <code>x_finish</code>) inferred from the order's product names at confirmation
+  time. The orchestration layer also stores <code>readiness_last_recomputed_at</code>
+  on this record so the cron can sort "stalest first."</p>
+</li>
+</ul>
+<p>The bridge between them: <code>sale.order.x_southbrook_project_task_id</code>
+(direct, on the live DB only) and
+<code>project.task.x_southbrook_sale_order_id</code> (the reverse-side link that
+exists on every DB, fresh or live). The orchestration's
+<code>_find_existing_kitchen_task</code> probes both so it works in either DB
+shape.</p>
+<p>When the readiness cron fires, it walks open kitchen tasks
+(<code>x_southbrook_sale_order_id IS NOT NULL</code>, state not in done/cancelled),
+calls the readiness recompute (<code>action_recompute_readiness_lines</code> from
+<code>southbrook_project_mrp</code>), stamps <code>readiness_last_recomputed_at</code>, and
+if <code>readiness_decision</code> flipped between runs, posts a chatter note on
+the task so YOU see the transition tomorrow morning.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A designer tells you "I just sent quote SO-12455 to the
+customer, why isn't it on Kitchen Jobs?" What do you check first?</p>
+<blockquote>
+<p>The order's state. The Kitchen Jobs board is wired to project.tasks
+created at sale.order.action_confirm — a quote (<code>sale.order</code> in
+<code>draft</code> / <code>sent</code> state) never triggers it. Once the customer
+confirms, the task appears. If they confirmed but no task exists,
+open the order, look at the chatter for a "failed to create kitchen
+project.task spine" note, and run the <strong>Backfill Kitchen Task</strong>
+server action.</p>
+</blockquote>
+<p><strong>2.</strong> You see a Kitchen Jobs card whose readiness score is 90 (well
+into the Ready band) but whose <code>southbrook_production_release_state</code>
+is <code>blocked</code>. The customer is angry because their install date is
+next week. Can you release it yourself?</p>
+<blockquote>
+<p>No. Readiness and release are separate. Release is the ENG01
+engineer's gate (lesson 2.2). What you CAN do: open the task, look
+at the release-gate checklist booleans
+(<code>southbrook_release_cad_approved</code>, <code>_cutlist_approved</code>,
+<code>_bom_verified</code>, <code>_crew_reserved</code>, <code>_equipment_available</code>) and see
+which one is unchecked — then chase the right person to fix it.
+Don't try to flip the booleans yourself.</p>
+</blockquote>
+<p><strong>3.</strong> A customer phones in and asks to push their install date from
+the 22nd to the 29th. Where do you record the change?</p>
+<blockquote>
+<p>Update <code>install_due_date</code> on the <code>project.task</code> (Kitchen Jobs card
+-&gt; open -&gt; change the date). Then ALSO update <code>commitment_date</code> on
+the <code>sale.order</code> so the contract record stays honest. The two
+fields don't auto-sync after confirmation by design — the planner
+often wants the shop-floor date to differ from the customer
+contract date to build slack.</p>
+</blockquote>
+<p><strong>4.</strong> A designer asks "what's the difference between the sb.kitchen.project
+'in_production' state and the project.task being released to production?"</p>
+<blockquote>
+<p>The <code>sb.kitchen.project.state = in_production</code> is the SALES-side
+record that the kitchen has crossed from quoted/approved into
+manufacturing — it's set by the <strong>action_release_to_production</strong>
+button after the customer commits. The project.task release state
+is the SHOP-side gate (ENG01 engineering approval). They typically
+agree but are independent on purpose, because you can have a
+project in production for accounting while the engineer hasn't yet
+approved a specific MO in the spine.</p>
+</blockquote>
+<p><strong>5.</strong> You open a task and see the chatter line "Decision: review -&gt;
+blocked, Release state: ready -&gt; blocked." What just happened, and
+what do you do?</p>
+<blockquote>
+<p>Last night the readiness cron re-ran and an upstream artifact went
+missing (a BoM was deleted, an MO was cancelled, a tooling
+reservation expired). The release state ALSO flipped to blocked,
+which means the engineer's previous approval no longer applies.
+Open the task, look at the readiness-line breakdown (cad / cutlist
+/ bom / crew / equipment), identify which one tripped, and chase
+the owner of that artifact. Once it's restored, the next cron tick
+(within 30 minutes) will recompute and flip the card back if it's
+truly resolved.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The ENG01 release gate (what the engineer actually checks and how
+  the planner releases through them) -&gt; lesson 2.2.</li>
+<li>Bottleneck-aware scheduling once a job is released -&gt; lesson 2.3.</li>
+<li>The 6 nightly crons that drive readiness, MI re-fire, and analytics
+  -&gt; lesson 2.4.</li>
+<li>How the MI engine produces the recommendations the production
+  manager acts on -&gt; lesson 2.5.</li>
+<li>Native Odoo sale.order lifecycle, partner setup, and pricelist
+  resolution -&gt; Odoo's own training.</li>
+<li>Designer-side workflows (creating design options, recording
+  customer approvals, AI room analysis) -&gt; lesson 4.4 / Course 4.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_02_release_gate" model="slide.slide">
+            <field name="name">The Approved -&gt; In Production Release Gate (ENG01)</field>
+            <field name="channel_id" ref="course_production_planning"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Production Planner + ENG01 Production Engineer (the two-person handoff).</field>
+            <field name="html_content"><![CDATA[<h1 id="the-approved-in-production-release-gate-eng01">The Approved -&gt; In Production Release Gate (ENG01)</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner staring at a Kitchen Jobs card that's <code>readiness=ready</code>
+but <code>release=blocked</code>, and you need to get it through the gate. OR you're
+the ENG01 production engineer who runs that gate — the human at the
+Design Review / Production Engineering workcenter (<code>code = ENG01</code>) who
+signs off CAD, BoM, cut list, and production notes before a job leaves
+your bay. Both of you need to read this. The gate has two sides.</p>
+<p>The ENG01 workcenter exists for exactly this purpose; it carries
+<code>x_sbk_station_type = engineering</code> and a planning-notes string that
+reads "Owns the gate between sb.kitchen.project state 'approved' and
+'in_production'" — that's not aspirational, that's the contract.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the <strong>planner</strong>:</p>
+<blockquote>
+<p><strong>Kitchen Ops -&gt; Production Release Queue</strong></p>
+</blockquote>
+<p>Default-filtered to <code>review + blocked</code> release states with at least one
+linked sale.order. The queue is whatever isn't <code>ready</code> — every card
+here is a job waiting on the gate.</p>
+<p>For the <strong>engineer</strong>:</p>
+<blockquote>
+<p><strong>Kitchen Ops -&gt; Kitchen Jobs</strong>, then click into one card</p>
+</blockquote>
+<p>Or from the per-task form, the <strong>Production Release</strong> tab. That's where
+the five gate booleans live and where you tick them off.</p>
+<p>The underlying workcenter:</p>
+<blockquote>
+<p><strong>Manufacturing -&gt; Configuration -&gt; Work Centers -&gt; Design Review /
+Production Engineering (ENG01)</strong></p>
+</blockquote>
+<p>Engineers don't usually open this directly, but the planner does when
+the engineer is out and the planning notes need a temporary override.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>On the <strong>Production Release Queue</strong> list:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code> on <code>project.task</code>) — the kitchen job name.</li>
+<li><strong>Customer</strong> (<code>partner_id</code>).</li>
+<li><strong>Release state</strong> (<code>southbrook_production_release_state</code>) — <code>ready</code>,
+  <code>review</code>, <code>blocked</code>, or <code>info</code>. Rendered as a coloured badge: red
+  for blocked, amber for review, green for ready. The queue is
+  domain-filtered to <code>review + blocked</code> so green never appears here.</li>
+<li><strong>Readiness score</strong> (<code>readiness_score</code>) — 0-100 from the readiness
+  cron. Useful for spotting jobs that have great data but a missing
+  signature vs jobs that are blocked because the data is incomplete.</li>
+<li><strong>Install due date</strong> (<code>install_due_date</code>) — sort ascending, work
+  the tightest deadlines first.</li>
+<li><strong>Linked SO</strong> (<code>x_southbrook_sale_order_id</code>) — click through to the
+  order.</li>
+<li><strong>At risk</strong> (<code>job_at_risk</code>) — boolean toggle, surfaces jobs that
+  the risk-compute decided won't make their date.</li>
+</ul>
+<p>Open one card. The <strong>Production Release</strong> tab on the task form shows
+the five sign-off booleans the engineer (or, in their absence, the
+planner with a documented note) flips:</p>
+<ul>
+<li><strong>CAD Approved</strong> (<code>southbrook_release_cad_approved</code>) — the CAD model
+  exists in <code>southbrook_freecad_bridge</code>, has been rendered, and the
+  rendering matches what the customer agreed to. Tracking on, chatter
+  records who flipped it.</li>
+<li><strong>Cutlist Approved</strong> (<code>southbrook_release_cutlist_approved</code>) — the
+  <code>sb.cutlist</code> has been generated for every MO in the spine, the panel
+  counts and dimensions sanity-check, and the substrate column is set
+  (no <code>false</code> rows). The MI engine's per-MO cut summary should show a
+  yield_pct above 45% and zero <code>oversized panel</code> blocker checks.</li>
+<li><strong>BoM Verified</strong> (<code>southbrook_release_bom_verified</code>) — every linked
+  <code>mrp.production</code> has a populated BoM, hardware lines roll up cleanly
+  into <code>sb.hardware.package</code>, no <code>has_pricing_pending</code> flags are set.</li>
+<li><strong>Crew Assigned / Reserved</strong> (<code>southbrook_release_crew_reserved</code>) —
+  the workcenter assignments respect operator skills
+  (<code>hr.skill</code> matched via <code>x_sbk_required_skill_ids</code> on the
+  workcenter) and there's a body at every required station for the
+  scheduled day.</li>
+<li><strong>Critical Equipment Available</strong> (<code>southbrook_release_equipment_available</code>)
+  — the maintenance.equipment records at the routing's workcenters
+  are not in <code>southbrook_condition</code> <code>critical</code> or <code>offline</code>. The
+  workcenter's <code>southbrook_pm_equipment_alerts</code> count tells you the
+  number of yellow/red machines at each station.</li>
+</ul>
+<p>Below the booleans, two read-only fields:</p>
+<ul>
+<li><strong>Production Release</strong> (<code>southbrook_production_release_state</code>) —
+  computed from the five booleans + upstream readiness signals. ALL
+  five booleans must be True AND readiness must be <code>ready</code> for this
+  to compute to <code>ready</code>. Anything else is <code>review</code> or <code>blocked</code>.</li>
+<li><strong>Production Release Reason</strong> (<code>southbrook_production_release_reason</code>)
+  — short text explaining which gate failed (e.g. "Cutlist not
+  approved" or "Critical equipment offline at CNC01").</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>This lesson splits into two flows — one for the engineer, one for the
+planner. They meet in the middle on each release decision.</p>
+<h3 id="the-engineers-flow-eng01">The engineer's flow (ENG01)</h3>
+<p><strong>Per release decision (typically 6-12 per day).</strong></p>
+<p>A card lands in your queue at <code>release=review</code> — the upstream
+artifacts exist but no one's signed off yet.</p>
+<ol>
+<li>Click into the task. Look at the <strong>Production Release</strong> tab.</li>
+<li><strong>CAD check.</strong> Open the linked freecad render (if the bridge is
+   active) or the configurator's spec sheet PDF. Compare to the design
+   the customer approved on <code>sb.kitchen.project.selected_design_option_id</code>.
+   If it matches, flip <strong>CAD Approved</strong>.</li>
+<li><strong>Cutlist check.</strong> Open the <strong>Manufacturing -&gt; Manufacturing Orders</strong>
+   linked from the task. For each MO, look at its production package
+   (<code>sb.production.package</code>), open the cutlist, scan the line count and
+   the substrate column. Also check the MI engine's per-MO blockers
+   (<code>x_mi_blocker_count</code>) — anything &gt; 0 means stop and read the
+   <code>x_mi_check_ids</code> list. Common blockers: <code>Oversized panel</code> (panel
+   exceeds the workcenter's <code>x_sbk_max_panel_length_mm</code>), <code>Missing
+   cutlist</code>. If clear, flip <strong>Cutlist Approved</strong>.</li>
+<li><strong>BoM check.</strong> On the same MO form, the BoM tab. Confirm hardware
+   rolls up (the <code>sb.hardware.package</code> should be in <code>picked</code> or
+   <code>delivered</code> state, not <code>draft</code>). Look at <code>has_pricing_pending</code> on
+   the package — if True, the MI engine has already filed a
+   <code>Hardware pricing pending</code> warning; investigate before flipping
+   BoM Verified.</li>
+<li><strong>Crew check.</strong> Open the Manufacturing schedule for the planned
+   release day. Confirm an operator is on the calendar for each
+   bottleneck workcenter (<code>x_sbk_is_bottleneck = True</code>) the MO
+   touches. Flip <strong>Crew Assigned</strong>.</li>
+<li><strong>Equipment check.</strong> On each routing workcenter, look at
+   <code>southbrook_pm_equipment_alerts</code>. Zero is green-light. If any
+   machine at a workcenter is in <code>critical</code> or <code>offline</code>, escalate
+   to maintenance BEFORE flipping the boolean — flipping it green
+   when a key machine is down is the most common source of
+   bad-release incidents.</li>
+<li>With all five booleans True, the computed
+   <code>southbrook_production_release_state</code> flips to <code>ready</code>. The card
+   disappears from the Production Release Queue and lights up green
+   on the planner's Kitchen Jobs board. <strong>Your sign-off is now
+   on chatter</strong> — anyone investigating later can see which engineer
+   approved and when.</li>
+</ol>
+<h3 id="the-planners-flow">The planner's flow</h3>
+<p><strong>Per release decision (parallel to the engineer's flow).</strong></p>
+<ol>
+<li>Open <strong>Kitchen Ops -&gt; Production Release Queue</strong> at start of
+   day. Sort by <code>install_due_date</code> ascending.</li>
+<li>For each card, eyeball <code>readiness_score</code> and the
+   <code>southbrook_production_release_reason</code> text. The reason names the
+   specific failed gate.</li>
+<li><strong>If readiness &lt; 60 and the reason is data-completeness:</strong> don't
+   bother the engineer. The card isn't ready for the gate yet; fix
+   the upstream data first (chase the designer for <code>x_door_style</code> /
+   <code>x_wood_species</code> / <code>x_finish</code>, ask the BoM owner to populate, etc).</li>
+<li><strong>If readiness &gt;= 70 and the gate is <code>review</code>:</strong> ping the engineer
+   to actually look at it. Add a chatter note with the install date
+   so they can prioritise.</li>
+<li><strong>If readiness &gt;= 70 and the gate is <code>blocked</code> because of a
+   <code>southbrook_release_equipment_available = False</code>:</strong> open the
+   workcenter (<code>mrp.workcenter</code>) at the failing station, look at the
+   maintenance.equipment list, and see if the planner can route the
+   work to an alternative (<code>alternative_workcenter_ids</code>). If yes,
+   the engineer just flips the equipment boolean after re-routing.
+   If no — escalate to maintenance.</li>
+<li>When the engineer signs off, the card moves to <code>release=ready</code>
+   and disappears from this queue. Now it goes into your normal
+   schedule (lesson 2.3).</li>
+</ol>
+<h2 id="emergency-bypass-planner-side-only-audit-tracked">Emergency bypass (planner-side only, audit-tracked)</h2>
+<p>Once per quarter or so something genuinely cannot wait. The customer's
+contractor is on site, the cabinets need to ship tomorrow, and ENG01
+is at lunch. The system does not have a "force release" button —
+flipping the boolean fields is the bypass. <strong>What you do:</strong></p>
+<ol>
+<li>Open the task, <strong>Production Release</strong> tab.</li>
+<li>Flip the booleans that are actually approved (don't lie — flip
+   only the ones whose underlying artifact really is OK).</li>
+<li>For the one you're bypassing, flip it True ANYWAY but post a
+   chatter note on the task explaining what's being bypassed, the
+   business reason, and who approved (PM name + verbal phone
+   acknowledgement).</li>
+<li>Open the workcenter (<code>mrp.workcenter</code> ENG01) and add a note in
+   <code>x_sbk_planning_notes</code> so the engineer sees the bypass on Monday
+   morning. They will either ratify it or back it out — that's their
+   call, not yours.</li>
+<li>The chatter note is the audit trail. Without it, the MI engine's
+   <code>_cron_refire_gates</code> will re-evaluate the gate overnight and may
+   flip the state back to <code>blocked</code>, which surfaces the bypass to
+   the production manager via the MI Engine Status board.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I ticked CAD Approved and the release state stayed at <code>blocked</code>."</strong></p>
+<p>The release state is a compute, not a write. All five booleans must
+be True AND the upstream <code>readiness_decision</code> must be <code>ready</code>. If
+readiness is still <code>blocked</code>, your engineer-side boolean doesn't
+move the state. Check the readiness score and reason; that's where
+the actual block lives.</p>
+<p><strong>"The engineer ticked all five booleans but the card is still in
+the queue."</strong></p>
+<p>The queue is domain-filtered to <code>release_state in ('review',
+'blocked')</code>. After the booleans are all True, the compute runs on
+the next save (or on the next readiness cron tick, every 30 min).
+Refresh the queue. If it's still there after 30 minutes, the
+readiness compute is the holdup — open the card, look at the
+readiness lines breakdown.</p>
+<p><strong>"I flipped Cutlist Approved but the cutlist itself shows zero
+lines."</strong></p>
+<p>You approved an empty cutlist. The system doesn't prevent this — the
+boolean is your judgement, not a generated guarantee. Recovery:
+flip it back to False, open the production package, run
+<code>generate_from_mo()</code> (the action button on the package form), and
+re-evaluate.</p>
+<p><strong>"Crew check passed but on the day of release nobody showed up at
+SB-CNC-BORE because the assigned operator called in sick."</strong></p>
+<p>That's a real-world failure, not a system failure. Recovery path:
+the workcenter has <code>alternative_workcenter_ids</code> (CNC02 is the
+configured backup for CNC-BORE). The planner re-routes the day's
+MOs to CNC02 — see lesson 2.3 for the bottleneck-rerouting flow.
+The release stays valid; only the schedule needs to change.</p>
+<p><strong>"The release state flipped from <code>ready</code> back to <code>blocked</code>
+overnight."</strong></p>
+<p>The MI engine's <code>_cron_refire_gates</code> ran (hourly cron — see lesson
+2.4) and re-evaluated the gate. Something downstream changed: an
+ECO was raised against the BoM, a piece of equipment went into
+critical condition, a crew assignment was archived. Open the task,
+look at the most recent chatter note from the MI engine, follow
+the breadcrumb. <strong>Do not just flip the boolean back.</strong> Figure out
+what changed and either fix it or re-approve with the new
+information.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The five sign-off booleans live on <code>project.task</code> (added by
+<code>southbrook_project_mrp</code>). The computed
+<code>southbrook_production_release_state</code> reads them PLUS the upstream
+<code>readiness_decision</code> and emits one of <code>ready</code> / <code>review</code> / <code>blocked</code>
+/ <code>info</code>. The compute is registered on the task and runs on every
+save of the relevant booleans, and on every readiness cron tick.</p>
+<p>The Production Release Queue (<code>action_production_release_queue</code> in
+<code>southbrook_premium_orchestration/views/production_release_views.xml</code>)
+is just a list view on <code>project.task</code> with the domain
+<code>[('southbrook_production_release_state','in',('review','blocked')),
+('x_southbrook_sale_order_id','!=',False)]</code>. That domain is why a job
+without a sale-order link never shows up here — internal admin tasks
+don't count.</p>
+<p>Every flip you make on the booleans is tracked on chatter (the fields
+carry <code>tracking=True</code>). The MI engine's hourly <code>_cron_refire_gates</code>
+re-evaluates every active gate check (<code>southbrook.mi.check</code> records
+with <code>is_gate=True</code>) against every in-flight MO. That cron is the
+reason a release can revert overnight — it catches data changes that
+invalidate a prior approval. The cron's last run details show up on
+<strong>Kitchen Ops -&gt; MI Engine Status</strong> so you can confirm it ran clean.</p>
+<p>The ENG01 workcenter itself (<code>code = ENG01</code>,
+<code>x_sbk_station_type = engineering</code>, <code>x_sbk_is_bottleneck = False</code>,
+<code>x_sbk_allows_parallel_jobs = True</code>) is seeded by
+<code>southbrook_mrp_kitchen_workcenters/data/mrp_workcenter_seed.xml</code>. It
+exists in the workcenter list so the routing for the engineering
+operation step can point at it; the engineer-as-a-workcenter framing
+also lets the planning baseline cron see "engineering capacity" the
+same way it sees CNC capacity.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> The engineer says "I just flipped all five booleans on the
+12455 task but it's still showing <code>blocked</code> on your queue." What's
+the most likely cause and how do you check?</p>
+<blockquote>
+<p>The upstream <code>readiness_decision</code> is still <code>blocked</code>. The release
+state is the AND of all five engineer booleans AND the readiness
+decision being <code>ready</code>. Open the task, look at <code>readiness_score</code>
+and the readiness lines breakdown. If a BoM line is missing or
+drawings are missing, that's the actual block; the five booleans
+are necessary but not sufficient.</p>
+</blockquote>
+<p><strong>2.</strong> A customer is screaming at the PM because their install is
+tomorrow and the job is <code>release=blocked</code>. The block is on
+<code>southbrook_release_equipment_available = False</code> because the HOMAG
+edge bander (SB-EDGE) is in <code>critical</code> condition. You can't fix
+the machine in time. What's the realistic recovery?</p>
+<blockquote>
+<p>Reroute the MO around SB-EDGE for tonight's run. SB-EDGE doesn't
+have a configured alternative in the seed data (it's marked as a
+bottleneck precisely because it's irreplaceable), so this means
+shipping unbanded panels and committing to band them on-site
+with a portable bander, OR pushing the customer's install by 24
+hours. Both decisions are above your pay grade — escalate to the
+PM. If they decide ship-unbanded, <strong>document the bypass</strong> in
+chatter on the task AND on the workcenter's
+<code>x_sbk_planning_notes</code>.</p>
+</blockquote>
+<p><strong>3.</strong> You're the engineer at ENG01 and you're looking at a cutlist
+with 47 lines, one of which is a <code>Side L</code> panel that's 2900mm long.
+The MI check tab shows a blocker: "Oversized panel: Side L is 2900
+x 600 mm and does not fit a 2440 x 1220 mm sheet." Do you flip
+Cutlist Approved?</p>
+<blockquote>
+<p>No. The blocker is real — the sheet stock physically can't carry
+a 2900mm panel. Recovery: push back to the designer to split the
+panel (two pieces with a centre joint) or to source a non-standard
+3050x1220 sheet. Don't flip the boolean to silence the warning;
+the floor will discover it at SB-SAW and the rework cost is much
+higher than a 10-minute design conversation now.</p>
+</blockquote>
+<p><strong>4.</strong> A planner asks "can I flip the engineer's booleans for them
+if they're sick?" What's the right answer?</p>
+<blockquote>
+<p>Technically yes (the fields aren't ACL-locked to the engineer).
+But you OWN the decision once you flip it. The system tracks
+which user wrote the boolean, so the audit trail will show you
+as the approver. Only do it if you'd genuinely sign your name to
+the artifact (e.g. you actually opened the CAD render and
+compared to the customer design). Most planners don't have the
+CAD skills for this; better to escalate to a backup engineer or
+push the release decision to tomorrow.</p>
+</blockquote>
+<p><strong>5.</strong> The MI engine <code>_cron_refire_gates</code> cron is configured to run
+every hour. A release was approved at 09:00 and re-evaluated to
+<code>blocked</code> at 10:00. The task's chatter shows the MI engine flipped
+it because <code>is_gate</code> checks fired a new blocker. Which check most
+likely fired between 09:00 and 10:00?</p>
+<blockquote>
+<p>An ECO was raised against the BoM or the cutlist between 9 and
+10. ECOs in <code>state = open</code> are the most common cause of a
+mid-day release-state revert because they invalidate the BoM
+Verified boolean's underlying artifact. Check
+<code>southbrook.eco</code> records linked to the affected MO; if one is
+open, the engineer needs to either approve the ECO and
+re-verify the BoM or close the ECO if it was raised in error.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The shape of the Kitchen Jobs board and the difference between
+  readiness and release states -&gt; lesson 2.1.</li>
+<li>How to schedule a released job against bottleneck workcenters
+  -&gt; lesson 2.3.</li>
+<li>What the 6 nightly crons (readiness, MI refire, analytics
+  backfill, planning baseline, DQ, ECO proposal) do -&gt; lesson 2.4.</li>
+<li>How the MI engine's per-MO checks are generated and read -&gt; lesson
+  2.5.</li>
+<li>Engineering Change Orders (ECOs) — when to raise one, how state
+  transitions work -&gt; Course 4, lesson 4.1.</li>
+<li>Native Odoo MRP workcenter setup, routing definitions, and BoM
+  authoring -&gt; Odoo's own training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_02_bottleneck_scheduling" model="slide.slide">
+            <field name="name">Bottleneck-Aware Scheduling — Cutting, Edge Banding, CNC</field>
+            <field name="channel_id" ref="course_production_planning"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Production Planner (the person who sequences MOs against workcenters).</field>
+            <field name="html_content"><![CDATA[<h1 id="bottleneck-aware-scheduling-cutting-edge-banding-cnc">Bottleneck-Aware Scheduling — Cutting, Edge Banding, CNC</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner who's just had a job land in your "Ready" column on
+Kitchen Jobs (lesson 2.1), the ENG01 engineer signed off the gate
+(lesson 2.2), and now you have to decide which workcenters this MO
+runs through, on which day, in which sequence. Southbrook has eight
+bottleneck stations and three of them — Panel Saw, Edge Bander, CNC
+Boring — eat your day if you over-schedule them. This is the lesson
+where you learn to read the bottleneck flag, route around breakdowns,
+and not let a single broken machine cascade into a week of late
+installs.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Kitchen Ops -&gt; Workcenter Bottlenecks</strong></p>
+</blockquote>
+<p>The bottleneck board — all active <code>mrp.workcenter</code> records, default
+kanban view. Each tile shows load vs capacity; bottleneck-flagged
+stations sort to the top.</p>
+<blockquote>
+<p><strong>Southbrook PM -&gt; Floor Load</strong></p>
+</blockquote>
+<p>Same workcenter list, different framing — what the PM uses on their
+walk-around. Identical underlying data.</p>
+<blockquote>
+<p><strong>Manufacturing -&gt; Configuration -&gt; Work Centers -&gt; <station></strong></p>
+</blockquote>
+<p>The per-workcenter form where you edit <code>alternative_workcenter_ids</code>,
+<code>x_sbk_is_bottleneck</code>, and the cycle-time fields.</p>
+<blockquote>
+<p><strong>Southbrook PM -&gt; Ready Queue</strong></p>
+</blockquote>
+<p>The list of confirmed MOs waiting to be scheduled. This is where you
+pick from when you sit down to sequence the next 24 hours.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>On <strong>Workcenter Bottlenecks</strong> (the kanban), each tile shows:</p>
+<ul>
+<li><strong>Workcenter name + code</strong> (<code>name</code>, <code>code</code> on <code>mrp.workcenter</code>) —
+  e.g. "Panel Saw / CNC Nesting (SB-SAW)".</li>
+<li><strong>In-flight WOs</strong> (<code>southbrook_pm_inflight_count</code>) — work orders in
+  <code>pending</code> / <code>waiting</code> / <code>ready</code> / <code>progress</code>. <strong>The busy-now metric.</strong>
+  Live compute, no cron.</li>
+<li><strong>Done today</strong> (<code>southbrook_pm_throughput_today</code>) — work orders that
+  finished here since midnight. Coarse throughput.</li>
+<li><strong>Late MOs</strong> (<code>southbrook_pm_late_count</code>) — MOs with a work order at
+  this station whose <code>date_deadline</code> has passed and which aren't done
+  yet. <strong>This is your alarm bell.</strong></li>
+<li><strong>Equipment alerts</strong> (<code>southbrook_pm_equipment_alerts</code>) — count of
+  maintenance.equipment records here whose <code>southbrook_condition</code> is
+  <code>fair</code> / <code>watch</code> / <code>critical</code> / <code>offline</code>. Tap to see which
+  machines.</li>
+<li><strong>Bottleneck badge</strong> — visible when <code>x_sbk_is_bottleneck = True</code>.
+  These stations are the ones you can't overload without consequence.</li>
+<li><strong>Station type</strong> (<code>x_sbk_station_type</code>) — <code>cutting</code>, <code>cnc</code>,
+  <code>edge_banding</code>, <code>assembly</code>, <code>finishing</code>, etc.</li>
+<li><strong>Allows parallel jobs</strong> (<code>x_sbk_allows_parallel_jobs</code>) — True for
+  stations that can run multiple WOs concurrently (Cure Room, Door
+  Hanging, Assembly), False for one-at-a-time stations (Panel Saw,
+  Edge Bander, CNC Boring, Paint Booth).</li>
+<li><strong>Alternative workcenters</strong> (<code>alternative_workcenter_ids</code>) — the
+  m2m to backup stations. <strong>This is what gives you a rerouting option
+  when the primary goes down.</strong></li>
+</ul>
+<p>Open one tile. The per-workcenter form shows the planning-relevant
+fields:</p>
+<ul>
+<li><strong>Costs/hour</strong> (<code>costs_hour</code>) — for scheduling, only useful when
+  comparing alternatives. SB-SAW is $85/h, SB-EDGE is $65/h, etc.</li>
+<li><strong>Max panel size</strong> (<code>x_sbk_max_panel_length_mm</code>,
+  <code>x_sbk_max_panel_width_mm</code>) — operations whose cutlist line exceeds
+  these can't run here; the MI engine will flag them before they
+  reach the floor.</li>
+<li><strong>Supported materials</strong> (<code>x_sbk_supported_material_ids</code>) — the
+  scheduler honours this. Don't route melamine panels to a saw set
+  up for solid wood.</li>
+<li><strong>Default setup time</strong> (<code>x_sbk_default_setup_time_min</code>) — minutes
+  added when a job lands here cold. Operation templates override per
+  product family.</li>
+<li><strong>Changeover time</strong> (<code>x_sbk_changeover_time_min</code>) — minutes when
+  the next WO requires a different material/finish/tool. At PAINT
+  Booth this is the colour-change cost; at SB-EDGE it's the tape
+  colour swap.</li>
+<li><strong>OEE target</strong> (<code>x_sbk_oee_target</code>) — default 0.85. Compared against
+  actual OEE on the MI dashboard (lesson 3.3).</li>
+<li><strong>Planning notes</strong> (<code>x_sbk_planning_notes</code>) — your scratch space.
+  Use it.</li>
+</ul>
+<h2 id="the-bottleneck-map">The bottleneck map</h2>
+<p>Southbrook seeds 8 + 2 workcenters via the seed file. As of today's
+config, the bottleneck-flagged stations (<code>x_sbk_is_bottleneck = True</code>)
+are:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Name</th>
+<th>Station type</th>
+<th>Alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SB-SAW</code></td>
+<td>Panel Saw / CNC Nesting</td>
+<td>cutting</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>SB-EDGE</code></td>
+<td>Edge Bander</td>
+<td>edge_banding</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>SB-CNC-BORE</code></td>
+<td>CNC Boring</td>
+<td>cnc</td>
+<td><code>CNC02</code></td>
+</tr>
+<tr>
+<td><code>SB-ASSY</code></td>
+<td>Carcass Assembly</td>
+<td>assembly</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>SB-QC</code></td>
+<td>Quality Control</td>
+<td>quality</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>PAINT</code></td>
+<td>Paint Booth</td>
+<td>finishing</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>CNC02</code></td>
+<td>CNC Router 02 (Backup)</td>
+<td>cnc</td>
+<td><code>SB-CNC-BORE</code></td>
+</tr>
+</tbody>
+</table>
+<p>The CNC pair (<code>SB-CNC-BORE</code> &lt;-&gt; <code>CNC02</code>) is the only configured
+swap. The other bottlenecks have no alternative — they're irreplaceable
+in the current shop layout. The ENG01 workcenter is NOT a bottleneck
+(<code>x_sbk_is_bottleneck = False</code>); it's parallel-friendly because the
+engineer can run multiple gate reviews concurrently.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (15 min): read the bottleneck board.</strong></p>
+<ul>
+<li>Open <strong>Kitchen Ops -&gt; Workcenter Bottlenecks</strong>.</li>
+<li>Look at each bottleneck-flagged station's <code>southbrook_pm_inflight_count</code>.
+  A typical "healthy" day: SB-SAW ~6-10, SB-EDGE ~8-14, SB-CNC-BORE
+  ~4-8, SB-ASSY ~10-20, PAINT ~3-6, SB-QC ~10-15. <strong>If any single
+  bottleneck is above 30, you've over-scheduled it and the cascade is
+  already starting.</strong></li>
+<li>Look at <code>southbrook_pm_late_count</code>. Any number &gt; 0 here means the
+  station is already behind its deadline. A late count at SB-SAW
+  cascades to SB-EDGE three hours later because nothing has tape to
+  band. Don't add today's work at a station that's already late
+  until you've drained it.</li>
+<li>Look at <code>southbrook_pm_equipment_alerts</code>. A <code>critical</code> or <code>offline</code>
+  machine at a bottleneck means you're running with reduced capacity
+  even if the workcenter still shows green. Cross-check the
+  per-equipment view (under the workcenter, the linked
+  <code>maintenance.equipment</code> records).</li>
+</ul>
+<p><strong>2. Per release decision (the loop, ~20 per day):</strong></p>
+<p>For each MO in the <strong>Southbrook PM -&gt; Ready Queue</strong> list:</p>
+<ul>
+<li>Open the MO. Look at its routing — which workcenters it touches and
+  in what order. The routing is defined by the operation template
+  (<code>southbrook_mrp_kitchen_workcenters</code>), so it picks the right
+  station type automatically. Your job is sequencing, not routing
+  selection — the routing already decided.</li>
+<li>Pick the day to release. Use the bottleneck board: if SB-SAW has
+  capacity room today but SB-EDGE is full, schedule the saw work for
+  today and let the edge banding fall to tomorrow. The system <strong>will
+  not refuse</strong> to take the work even when over-loaded; the cascade
+  cost is on you to predict.</li>
+<li>Confirm the MO with <strong>Mark as Done -&gt; Confirm</strong>. The MOs land in
+  <code>mrp.workorder</code> records with their planned start/end times.</li>
+</ul>
+<p><strong>3. Mid-day check (5 min): catch a slipping bottleneck.</strong></p>
+<ul>
+<li>Refresh <strong>Kitchen Ops -&gt; Workcenter Bottlenecks</strong> around 11:00 and
+  14:00.</li>
+<li>A bottleneck's <code>done_today</code> count should be tracking to about half
+  of its expected daily throughput by noon. If SB-EDGE only finished
+  2 work orders by lunch when the day's plan was 12, something is
+  wrong — usually setup time, usually a tape colour change you
+  didn't see coming.</li>
+<li>Open the in-flight list (click into the workcenter). Sort by
+  <code>date_planned_start</code>. The work order at the top is what's actually
+  running. If it's been running for 3x its planned duration, the
+  operator is in trouble — go check on the floor.</li>
+</ul>
+<p><strong>4. End of shift (5 min):</strong></p>
+<ul>
+<li>Look at <code>southbrook_pm_late_count</code> on every bottleneck. The number
+  for tomorrow morning will be whatever's left now, plus whatever
+  rolls over from today. Plan tomorrow knowing the carryover.</li>
+<li>Open the workcenter's <code>x_sbk_planning_notes</code> and add a one-liner
+  for the next shift: "SB-CNC-BORE down at 15:30, rerouted next two
+  WOs to CNC02 — re-evaluate when machinist returns Monday."</li>
+</ul>
+<h2 id="when-a-bottleneck-breaks-down-mid-day">When a bottleneck breaks down mid-day</h2>
+<p>This is the hardest situation and the one this lesson exists for.
+Walk through it:</p>
+<ol>
+<li>The operator at SB-CNC-BORE pages: "spindle bearing seized, I'm
+   down for the rest of the day." They log downtime on the work
+   order (lesson 1.6) and the equipment record's
+   <code>southbrook_condition</code> flips to <code>critical</code>. The
+   <code>southbrook_pm_equipment_alerts</code> count on SB-CNC-BORE goes from
+   0 to 1.</li>
+<li>Open the workcenter. Read <code>alternative_workcenter_ids</code> — SB-CNC-BORE
+   lists <code>CNC02</code> as a backup (the reciprocal m2m is also set on
+   CNC02). The capability tags are compatible because both are
+   <code>x_sbk_station_type = cnc</code> and the operation template was
+   authored to support both.</li>
+<li>Find every work order at SB-CNC-BORE that hasn't started yet
+   today. From the workcenter's in-flight list, select them, <strong>Action
+   -&gt; Re-plan</strong> (or move them to CNC02's queue manually — the
+   operation template's <code>alternative_workcenter_ids</code> makes this
+   legal). The work orders move to CNC02's queue, the <code>workcenter_id</code>
+   updates, and the schedule reflects the new station.</li>
+<li>CNC02 is the BACKUP — it's slower (likely older), so plan setup
+   time generously. Update <code>x_sbk_planning_notes</code> on both stations
+   so the next shift knows why work is at CNC02 instead of
+   SB-CNC-BORE.</li>
+<li><strong>Do not flip <code>x_sbk_is_bottleneck = True</code> on CNC02.</strong> That's a
+   structural decision (which station do we never overload at
+   planning time?), not a live-state signal. The MI engine's
+   <code>x_mi_bottleneck_workcenter_id</code> on <code>mrp.production</code> is what
+   reflects today's live bottleneck. Those two fields are
+   intentionally separate — see "behind the scenes" below.</li>
+<li>When SB-CNC-BORE comes back up, check the load on CNC02 vs
+   SB-CNC-BORE; reroute fresh WOs back to the primary so the backup
+   isn't left running at 90% utilisation.</li>
+</ol>
+<p>For the bottlenecks WITHOUT a configured alternative (SB-SAW,
+SB-EDGE, SB-ASSY, PAINT, SB-QC), the rerouting option doesn't exist.
+The realistic actions are:</p>
+<ul>
+<li><strong>Push the install date.</strong> Talk to the PM, talk to the customer.
+  Cabinets late by a day are recoverable; cabinets shipped wrong
+  aren't.</li>
+<li><strong>Subcontract.</strong> Some operations can leave the shop (door
+  finishing at a paint partner). The <code>x_sbk_station_type =
+  subcontract</code> selection exists for this; if you have a subcontract
+  routing approved, point the affected MOs at it.</li>
+<li><strong>Triage which MOs survive.</strong> Tightest-deadline first. The other
+  jobs wait. The PM owns this call; you provide the data.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I scheduled 25 MOs through SB-EDGE today and the operator is
+showing 14 in their queue. Why are 11 missing?"</strong></p>
+<p>The system applies the <code>x_sbk_max_panel_length_mm</code> filter at
+operation-template routing time. If 11 of your MOs had a panel
+exceeding 2500mm, the routing silently picked a different station
+(or failed to route, depending on the template). Open the missing
+MOs, look at the routing — they're probably stuck in an unrouted
+state. The MI engine should have flagged this with <code>Oversized
+panel</code> blockers at the gate (lesson 2.2). If they got through the
+gate without one, the panel size data is missing or wrong.</p>
+<p><strong>"I rerouted from SB-CNC-BORE to CNC02 but the work order still
+shows SB-CNC-BORE on the floor traveler."</strong></p>
+<p>The traveler is generated at MO confirmation, not on every reroute.
+Re-print the traveler after rerouting — the new <code>workcenter_id</code> is
+written to <code>mrp.workorder</code> immediately but the PDF artifact is
+stale until regenerated.</p>
+<p><strong>"I set <code>x_sbk_is_bottleneck = False</code> on SB-EDGE because we got
+a second bander, and now the scheduler is overloading both."</strong></p>
+<p>The flag is a TheoryofConstraints structural decision — it says
+"never schedule more than this station can deliver." Flipping it
+False removes the safety rail; the planner becomes the only thing
+preventing overload. Recovery: flip it back to True. Both banders
+share the SB-EDGE workcenter record; the right model is one
+workcenter with <code>x_sbk_allows_parallel_jobs = True</code>, not two
+records with the bottleneck flag off.</p>
+<p><strong>"The <code>southbrook_pm_inflight_count</code> shows 12 but I count 8 on
+the floor."</strong></p>
+<p>The compute counts WOs in <code>pending</code> / <code>waiting</code> / <code>ready</code> /
+<code>progress</code>. Some of those are sitting in <code>waiting</code> because they
+have unfinished predecessors; they're not at the station yet.
+Filter the workcenter's in-flight list by <code>state = ready</code> to see
+what's actually claimable now.</p>
+<p><strong>"Late count went from 0 to 4 overnight on SB-ASSY but nothing
+was running overnight."</strong></p>
+<p>The compute uses <code>date_deadline</code> on the MO, not on the work order.
+If the MO's deadline is today and the WO at assembly is the last
+remaining step, the count flips at midnight. Recovery: schedule
+the assembly work for first thing today, and double-check the MO
+deadlines weren't auto-shifted by a confirmation re-run.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Two flags carry the word "bottleneck" and they answer different
+questions. Get this straight:</p>
+<ul>
+<li><code>x_sbk_is_bottleneck</code> on <code>mrp.workcenter</code> is a <strong>configuration</strong>
+  flag set at install time in <code>mrp_workcenter_seed.xml</code>. It tells
+  the planner (you) and the scheduler "this is a structural
+  constraint; never overload it." It doesn't change as work runs.</li>
+<li><code>x_mi_bottleneck_workcenter_id</code> on <code>mrp.production</code> is a <strong>live</strong>
+  field set by the MI engine. For a specific in-flight MO, it
+  identifies which workcenter is the constraint today. It changes
+  as conditions change.</li>
+</ul>
+<p>The four KPI computes on <code>mrp.workcenter</code> (<code>southbrook_pm_inflight_count</code>,
+<code>southbrook_pm_throughput_today</code>, <code>southbrook_pm_late_count</code>,
+<code>southbrook_pm_equipment_alerts</code>) live in <code>southbrook_mrp_pm/
+models/mrp_workcenter.py</code>. They depend on <code>uid</code> (so they refresh
+when you reload the page) and are not stored — every page-load
+re-counts, which is fine because the underlying searches are cheap.</p>
+<p>The <code>alternative_workcenter_ids</code> field is a native Odoo <code>mrp.workcenter</code>
+many2many to itself. Southbrook adds the <strong>reciprocity</strong> convention
+in the seed file: if A lists B, B lists A. The test
+<code>test_m1_workcenter_fields.py</code> asserts the round-trip. The operation
+template (<code>southbrook.kitchen.operation.template</code>) reads BOTH the
+primary <code>workcenter_id</code> and <code>alternative_workcenter_ids</code> when deciding
+which station can run an operation step — that's the code path that
+lets you re-route without re-writing the routing.</p>
+<p>The seven nightly + hourly + 30-min crons (lesson 2.4 covers all six
+plus the ECO-proposal cron) are what keep the bottleneck board honest
+overnight. In particular, the <strong>MI gate refire</strong> cron re-evaluates
+gate checks every hour against in-flight MOs, so an equipment
+condition flip at 14:00 surfaces on YOUR queue by 15:00 at the
+latest — you don't have to refresh anything.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open the bottleneck board at 8:00 AM. SB-SAW shows 22
+in-flight, SB-EDGE shows 18 in-flight, SB-CNC-BORE shows 4
+in-flight. Which station do you panic about first?</p>
+<blockquote>
+<p>SB-SAW at 22 in-flight is well above the typical 6-10 range —
+you've over-scheduled cutting, and the cascade hits edge banding
+in three hours. Even though SB-EDGE shows 18 (which is also
+high), SB-SAW is the upstream constraint; if you don't drain it,
+the SB-EDGE number will grow throughout the day as panels
+accumulate. Open SB-SAW's in-flight list, sort by deadline, and
+see if any can roll to tomorrow.</p>
+</blockquote>
+<p><strong>2.</strong> Mid-day, the operator at SB-CNC-BORE pages that the spindle
+seized. CNC02 is configured as an alternative. What's the right
+sequence of actions?</p>
+<blockquote>
+<p>(1) Flip the equipment record's <code>southbrook_condition</code> to
+<code>critical</code> so the alerts surface. (2) Open the workcenter,
+select the unstarted work orders, reroute them to CNC02
+(the m2m <code>alternative_workcenter_ids</code> makes this a legal
+reassignment). (3) Update <code>x_sbk_planning_notes</code> on both
+stations explaining the swap. (4) Do NOT flip
+<code>x_sbk_is_bottleneck</code> on CNC02 — that's a structural flag.
+(5) When SB-CNC-BORE returns, reroute new WOs back to the
+primary so the backup doesn't get stuck at 90% util.</p>
+</blockquote>
+<p><strong>3.</strong> A panel listed at 2800mm doesn't appear on SB-EDGE's queue
+even though the routing should put it there. Why, and what do you
+check?</p>
+<blockquote>
+<p>SB-EDGE's <code>x_sbk_max_panel_length_mm</code> is the gate. If the panel
+exceeds that, the routing doesn't pick SB-EDGE and the operation
+either failed to route or routed to a station with a larger
+capacity envelope. Open the cutlist line, look at the length, and
+compare to the workcenter capacity. The MI engine should have
+raised an <code>Oversized panel</code> blocker at the release gate — if it
+didn't, the panel-size data on the cutlist is bogus.</p>
+</blockquote>
+<p><strong>4.</strong> Mid-day SB-EDGE's <code>southbrook_pm_inflight_count</code> is 26 and
+<code>southbrook_pm_late_count</code> is 5. The PM asks "what's our recovery
+plan?" Walk through the conversation.</p>
+<blockquote>
+<p>First, the bottleneck has no configured alternative — no
+rerouting is available. The recovery options are (a) push install
+dates on the lowest-priority MOs (PM decision, customer call),
+(b) subcontract banding to a partner shop if one is approved
+(<code>x_sbk_station_type = subcontract</code> routing), or (c) work the
+overflow as overtime tonight if the operator agrees. Quantify
+each: the 5 late MOs are tomorrow's late count if untouched;
+the 21 not-late but in-flight WOs are the question of whether
+we can drain the queue by end of shift. Give the PM the numbers,
+let them call.</p>
+</blockquote>
+<p><strong>5.</strong> You see <code>x_mi_bottleneck_workcenter_id</code> on a specific MO is
+SB-ASSY, but the workcenter's <code>x_sbk_is_bottleneck</code> flag on SB-ASSY
+is True. Aren't these the same thing?</p>
+<blockquote>
+<p>No, and it matters. <code>x_sbk_is_bottleneck = True</code> is configuration:
+"Southbrook decided at install time that SB-ASSY is structurally
+a bottleneck workcenter." <code>x_mi_bottleneck_workcenter_id = SB-ASSY</code>
+for one MO is the live measurement: "for THIS specific MO,
+right now, SB-ASSY is the constraint." They can disagree — an
+MO whose finishing schedule is tight might have its
+live bottleneck at PAINT even though the configured bottleneck
+set includes SB-ASSY. Don't confuse the two.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The release gate at ENG01 (what gets a job to your queue in the
+  first place) -&gt; lesson 2.2.</li>
+<li>The Kitchen Jobs board and project.task readiness states -&gt;
+  lesson 2.1.</li>
+<li>The 6 nightly crons that drive readiness, MI refire, analytics,
+  planning, DQ, and ECO proposals -&gt; lesson 2.4.</li>
+<li>Reading the MI report once an MO is mid-flight -&gt; lesson 2.5.</li>
+<li>Per-station operator daily flow (the operator's side of the same
+  numbers) -&gt; Course 1 lessons 1.2-1.5.</li>
+<li>Native Odoo routing definitions, work order state machine, and
+  Manufacturing module setup -&gt; Odoo's own training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_02_premium_orchestration_crons" model="slide.slide">
+            <field name="name">Premium Orchestration — The Six Nightly Crons</field>
+            <field name="channel_id" ref="course_production_planning"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Production Planner + Sysadmin (the two people who read cron output).</field>
+            <field name="html_content"><![CDATA[<h1 id="premium-orchestration-the-six-nightly-crons">Premium Orchestration — The Six Nightly Crons</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner who walks in at 7am and sees a Kitchen Jobs card
+flipped from green to red overnight — that was a cron. OR you're the
+sysadmin who got paged at 03:14 because the data-quality dry-run
+raised a warning in the logs — that was a cron too. Six scheduled
+actions run automatically; you both need to know what each one does,
+when it fires, what state it reads, what it writes, and what to do
+when it fails. Without this lesson the platform feels like magic.
+With it, you can answer "why is this card blocked?" in 30 seconds.</p>
+<p>This is a longer lesson than the others because each cron is its own
+sub-section. Skim the schedule table, then read the section for any
+cron whose output landed in your queue.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the planner (read-only effects):</p>
+<blockquote>
+<p><strong>Kitchen Ops -&gt; Kitchen Jobs</strong> — readiness flips by the readiness cron
+<strong>Kitchen Ops -&gt; MI Engine Status</strong> — last-run telemetry from the MI refire cron
+<strong>Kitchen Ops -&gt; Production Release Queue</strong> — release-state flips from the MI gate refire</p>
+</blockquote>
+<p>For the sysadmin (the actual cron records):</p>
+<blockquote>
+<p><strong>Settings -&gt; Technical -&gt; Automation -&gt; Scheduled Actions</strong></p>
+</blockquote>
+<p>Filter by name containing <code>Southbrook:</code> to see all six. Each record
+shows next fire time, last fire time, status, and the model + method
+it calls. From there you can run <strong>Run Manually</strong> to fire a cron
+out-of-cycle for debugging.</p>
+<p>For each cron's last-run log:</p>
+<blockquote>
+<p><strong>Settings -&gt; Technical -&gt; Logging</strong></p>
+</blockquote>
+<p>Filter by name containing the cron's model name (e.g.
+<code>southbrook.mi.engine.state</code>, <code>southbrook.order.analytics</code>). Cron
+runs emit one INFO line on a successful tick and one WARNING line per
+in-tick exception that was caught.</p>
+<h2 id="the-schedule-at-a-glance">The schedule at a glance</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Name</th>
+<th>Fires</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Southbrook: Recompute Project Readiness</td>
+<td>every 30 min</td>
+<td>B1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Southbrook: Refire MI Stage-Gate Checks</td>
+<td>every hour</td>
+<td>B3</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Southbrook: Backfill Order Analytics</td>
+<td>every 6 hours</td>
+<td>B2</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Southbrook: Weekly Planning Baseline</td>
+<td>Sundays ~02:00</td>
+<td>B2</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Southbrook: Quality Dry-Run Nightly</td>
+<td>nightly ~03:00</td>
+<td>B10</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Southbrook: Propose ECOs for High-Frequency Cut-Spec Overrides</td>
+<td>nightly ~04:00</td>
+<td>B8</td>
+</tr>
+</tbody>
+</table>
+<p>The first five are seeded in <code>data/ir_cron.xml</code>. The sixth is in
+<code>data/eco_proposal_cron.xml</code>. All six are owned by <code>base.user_root</code>
+(the system user) and stamped <code>noupdate="0"</code> so a <code>-u
+southbrook_premium_orchestration</code> re-seeds anything an admin
+accidentally archived.</p>
+<p>Stagger note: the install code on each cron offsets <code>nextcall</code> by
++2/+5/+10/+0 minutes so the first run after install doesn't pile up
+in the same minute. After that, each runs on its own cadence.</p>
+<hr>
+<h2 id="cron-1-cron_recompute_readiness_all">Cron 1 — <code>cron_recompute_readiness_all</code></h2>
+<p><strong>Name in UI:</strong> Southbrook: Recompute Project Readiness
+<strong>Fires:</strong> every 30 minutes (interval_number=30, interval_type=minutes)
+<strong>Model:</strong> <code>project.task</code>
+<strong>Method:</strong> <code>model._cron_recompute_readiness_all()</code>
+<strong>xml_id:</strong> <code>southbrook_premium_orchestration.cron_recompute_readiness_all</code></p>
+<p><strong>What it does.</strong> Sweeps every <code>project.task</code> that's linked to a
+<code>sale.order</code> (via <code>x_southbrook_sale_order_id</code>) and is not in a closed
+state. For each task, snapshots the current <code>readiness_decision</code> and
+<code>southbrook_production_release_state</code>, calls the readiness recompute
+method (<code>action_recompute_readiness_lines</code> from
+<code>southbrook_project_mrp</code>), stamps <code>readiness_last_recomputed_at</code>, and
+if the decision flipped between runs, posts a chatter note on the
+task — that's the "Decision: ready -&gt; blocked" line you see on the
+chatter the next morning.</p>
+<p><strong>What it reads.</strong> All five readiness sub-signals (CAD, cutlist, BoM,
+crew, equipment) plus the upstream artefacts each one is computed
+from. Anything that contributes to the readiness lines.</p>
+<p><strong>What it writes.</strong> <code>readiness_decision</code>, <code>readiness_score</code>,
+<code>readiness_last_recomputed_at</code> on the task. A chatter note when the
+decision flips. Nothing else.</p>
+<p><strong>Who cares.</strong> The planner — every card on Kitchen Jobs is grouped by
+<code>readiness_decision</code>, so this cron is what reshuffles your kanban
+columns. Also the MI gate refire cron downstream, which uses the
+readiness decision as one of its inputs.</p>
+<p><strong>Reading its last run.</strong> Open <strong>Settings -&gt; Technical -&gt; Scheduled
+Actions</strong> -&gt; find this record. The <code>Next Execution Date</code> field tells
+you when it last fired (next call - 30 min). For per-task detail, open
+a specific task and look at <code>readiness_last_recomputed_at</code> — that's
+the exact timestamp.</p>
+<p><strong>What to do if it errored.</strong> The cron is per-task error-isolated — a
+single failing task doesn't poison the whole sweep. If you suspect it
+hung, check the cron's <code>nextcall</code> date — if it's stuck on a past time,
+the previous tick never finished. Run it manually from Scheduled
+Actions to test; if it errors immediately, the log will name the
+failing task. Most common failure: the readiness recompute method
+isn't on the task because <code>southbrook_project_mrp</code> was uninstalled or
+its model name changed. The cron probes three method-name candidates
+(<code>action_recompute_readiness_lines</code>, <code>action_recompute_readiness</code>,
+<code>_recompute_readiness</code>) for migration tolerance, so a clean rename is
+caught automatically.</p>
+<hr>
+<h2 id="cron-2-cron_mi_engine_refire_gates">Cron 2 — <code>cron_mi_engine_refire_gates</code></h2>
+<p><strong>Name in UI:</strong> Southbrook: Refire MI Stage-Gate Checks
+<strong>Fires:</strong> every 1 hour (interval_number=1, interval_type=hours)
+<strong>Model:</strong> <code>southbrook.mi.engine.state</code>
+<strong>Method:</strong> <code>model._cron_refire_gates()</code>
+<strong>xml_id:</strong> <code>southbrook_premium_orchestration.cron_mi_engine_refire_gates</code></p>
+<p><strong>What it does.</strong> Walks every in-flight <code>mrp.production</code> (state in
+<code>confirmed</code> or <code>progress</code>) cross every active gate check
+(<code>southbrook.mi.check</code> where <code>is_gate = True</code>), evaluates each check
+against each MO, and counts the blockers/warnings. Writes a singleton
+<code>southbrook.mi.engine.state</code> record with last_run telemetry: when it
+ran, how many evaluations, how many blockers, how many warnings, how
+many milliseconds it took.</p>
+<p><strong>What it reads.</strong> Every <code>southbrook.mi.check</code> with <code>is_gate=True</code>,
+and the MO state, BoM, cutlist, hardware package state, and any
+custom fields the check's evaluator method examines.</p>
+<p><strong>What it writes.</strong> The singleton state record's <code>last_run_at</code>,
+<code>last_run_check_count</code>, <code>last_run_blockers</code>, <code>last_run_warnings</code>,
+<code>last_run_duration_ms</code>. Indirectly, the per-MO gate flips that get
+written by the check's own evaluator when it fires — these can flip
+the release state from <code>ready</code> back to <code>blocked</code> and that surfaces
+on the Production Release Queue.</p>
+<p><strong>Who cares.</strong> The planner — a release that was green at 09:00 can
+be <code>blocked</code> again by 10:00 because of this cron. Also the production
+manager (Course 3 audience), because gate flips are the recommendation
+engine's main signal.</p>
+<p><strong>Reading its last run.</strong> Open <strong>Kitchen Ops -&gt; MI Engine Status</strong>.
+The form view shows the singleton record's last-run fields directly.
+A green status banner with <code>last_run_blockers = 0</code> means clean.
+There's also a manual <strong>Run Now</strong> button on the form (<code>action_run_now</code>)
+that fires the cron synchronously and returns a popup notification.</p>
+<p><strong>What to do if it errored.</strong> The cron has per-check try/except around
+each evaluator — one misbehaving check can't stall the whole run. The
+WARNING log line names the failing check id + MO id; look up the
+check, fix it, run the cron manually. If the cron is silently doing
+nothing (e.g. <code>last_run_check_count = 0</code>), the most likely cause is
+that no <code>southbrook.mi.check</code> records have <code>is_gate = True</code>. Probe
+with <code>env['southbrook.mi.check'].search_count([('is_gate', '=', True)])</code>
+in a shell.</p>
+<hr>
+<h2 id="cron-3-cron_backfill_order_analytics">Cron 3 — <code>cron_backfill_order_analytics</code></h2>
+<p><strong>Name in UI:</strong> Southbrook: Backfill Order Analytics
+<strong>Fires:</strong> every 6 hours (interval_number=6, interval_type=hours)
+<strong>Model:</strong> <code>southbrook.order.analytics</code>
+<strong>Method:</strong> <code>model._cron_backfill_unscored()</code>
+<strong>xml_id:</strong> <code>southbrook_premium_orchestration.cron_backfill_order_analytics</code></p>
+<p><strong>What it does.</strong> Finds confirmed sale.orders (<code>state = sale</code>) that
+don't yet have a <code>southbrook.order.analytics</code> row, and calls the
+analytics model's <code>capture()</code> method on each one. Idempotent —
+re-running doesn't duplicate. Closes the historical-coverage gap that
+existed before this cron (9 analytics rows on 92 confirmed orders).</p>
+<p><strong>What it reads.</strong> <code>sale.order</code> records via a raw <code>LEFT JOIN ... WHERE
+soa.id IS NULL</code> SQL probe, then loads each missing one into the
+analytics capture method which reads channel pricelist, line totals,
+configurator session, customer specs.</p>
+<p><strong>What it writes.</strong> One <code>southbrook.order.analytics</code> row per
+previously-uncaptured order, with the rollup fields the analytics
+model defines (price, channel, line counts, etc).</p>
+<p><strong>Who cares.</strong> Sales-side analytics dashboards (Course 5 / 6
+material). For the planner, only indirectly — accurate analytics
+rows underpin the customer-specific lead-time estimates the
+configurator quotes. Sysadmin cares because the cron is the safety
+net for any order that was confirmed before the always-on
+<code>action_confirm</code> override hook landed.</p>
+<p><strong>Reading its last run.</strong> Most direct: search the log filter by
+"southbrook.order.analytics". The INFO line reads either
+"no unscored orders, all confirmed orders already captured" (good)
+or "%d unscored confirmed orders found, capturing..." followed by
+"captured X / Y" (also good — that's normal backfill activity after
+a bulk order import).</p>
+<p><strong>What to do if it errored.</strong> Per-order try/except — a single bad
+order is logged as WARNING and the sweep continues. If the cron is
+producing many WARNINGs, open one of the named order IDs and check
+the analytics capture method directly (<code>env['southbrook.order.analytics'].
+capture(order)</code> in a shell) to see the exception. Often the cause is
+a non-kitchen order in <code>state = sale</code> that the capture method wasn't
+written for — a domain narrowing on <code>order_line.product_id.categ_id</code>
+is the right fix.</p>
+<hr>
+<h2 id="cron-4-cron_weekly_planning_baseline">Cron 4 — <code>cron_weekly_planning_baseline</code></h2>
+<p><strong>Name in UI:</strong> Southbrook: Weekly Planning Baseline
+<strong>Fires:</strong> every 7 days, staggered to Sunday at ~02:00 local time
+<strong>Model:</strong> <code>mrp.planning.run</code>
+<strong>Method:</strong> <code>model._cron_baseline()</code>
+<strong>xml_id:</strong> <code>southbrook_premium_orchestration.cron_weekly_planning_baseline</code></p>
+<p><strong>What it does.</strong> Creates and runs a fresh <code>mrp.planning.run</code> record
+as the weekly baseline. Idempotent within a 24h window — if a planning
+run was created in the last day (by this cron or by a human), skips
+and logs. After creating the record, calls <code>action_run()</code> on it if
+the method exists; otherwise leaves it in draft for manual
+inspection.</p>
+<p><strong>What it reads.</strong> Current open sale.orders, current MO backlog,
+workcenter capacity, install due dates. The underlying OpenValue
+planning engine does the heavy lifting; this cron is a thin
+"schedule a baseline weekly" wrapper.</p>
+<p><strong>What it writes.</strong> One new <code>mrp.planning.run</code> record per week.
+Downstream, <code>mrp.planning.run.line_ids</code> carry per-MO scheduling
+decisions.</p>
+<p><strong>Who cares.</strong> The planner — Monday morning, you open the latest
+planning run and use it as the starting point for the week. Without
+this cron the only baseline is the last one a human created; over
+time that drifts.</p>
+<p><strong>Reading its last run.</strong> Open <strong>Manufacturing -&gt; Planning -&gt; Planning
+Runs</strong> (path provided by the OpenValue addon). The most recent record
+is what this cron created. The run record carries <code>state</code> (draft /
+done / error) and a chatter showing whether <code>action_run</code> succeeded.</p>
+<p><strong>What to do if it errored.</strong> Two failure modes: (a) the <code>create()</code>
+failed — logged as WARNING, the cron exits and retries next week;
+(b) the <code>action_run</code> failed — the planning run record exists in
+<code>draft</code> state with no lines. You can open it and run <code>action_run</code>
+manually to debug. Common cause of action_run failure: a workcenter
+without a calendar (<code>mrp.workcenter.resource_calendar_id</code> is False).
+The cron's optional defaults (capacity_horizon_days=14,
+include_sales_demand=True, multilevel=False) are probed via
+<code>hasattr</code> so the cron stays installable even if the OpenValue addon
+ships a minimal field set.</p>
+<hr>
+<h2 id="cron-5-cron_dq_nightly_dry_run">Cron 5 — <code>cron_dq_nightly_dry_run</code></h2>
+<p><strong>Name in UI:</strong> Southbrook: Quality Dry-Run Nightly
+<strong>Fires:</strong> every 1 day, staggered to ~03:00 local time
+<strong>Model:</strong> <code>southbrook.project.data.quality.report</code>
+<strong>Method:</strong> <code>model._cron_nightly_dry_run()</code>
+<strong>xml_id:</strong> <code>southbrook_premium_orchestration.cron_dq_nightly_dry_run</code></p>
+<p><strong>What it does.</strong> Walks every active <code>project.project</code> record, scores
+it against six data-quality dimensions, and writes one report with
+finding lines per project. The six dimensions:</p>
+<ul>
+<li><code>data_completeness</code> — % of confirmed SOs whose project.task link is populated</li>
+<li><code>cabinet_specs</code> — % of project tasks with door_style + wood_species + finish set</li>
+<li><code>mrp_link</code> — % of project tasks that have at least one linked MO</li>
+<li><code>production_release</code> — % of tasks whose release state is not <code>blocked</code></li>
+<li><code>tool_lifecycle</code> — % of in-service tool assets with adequate remaining life</li>
+<li><code>eco_freshness</code> — penalised by count of open ECOs &gt; 30 days old</li>
+</ul>
+<p>Each dimension produces a 0-100 score banded as <code>info</code> (&gt;=90),
+<code>warning</code> (&gt;=70), <code>blocker</code> (&lt;70).</p>
+<p><strong>What it reads.</strong> Sale orders, project tasks, MOs, tool assets,
+ECOs — pretty much everything. Cheapest cron of the six is this is
+NOT (it's the most data-touch-heavy), which is why it's pinned to
+03:00 after the nightly logrotate window completes at 03:30.</p>
+<p><strong>What it writes.</strong> One <code>southbrook.project.data.quality.report</code>
+record per active project per night, with one
+<code>southbrook.project.data.quality.line</code> per dimension. (TransientModel
+means these auto-vacuum after Odoo's default retention, so this isn't
+a database bloat concern.)</p>
+<p><strong>Who cares.</strong> The PM / sysadmin (Course 7). Planner cares only
+because a low DQ score on a project the planner owns means the
+planner has been letting upstream data slide. If <code>cabinet_specs</code> is
+the failing dimension on three of your jobs, you've been releasing
+without door style on file — that becomes a wrong-finish problem at
+the booth two weeks later.</p>
+<p><strong>Reading its last run.</strong> Open the model directly:
+<strong>Settings -&gt; Technical -&gt; Models -&gt; southbrook.project.data.quality.report</strong>
+-&gt; view records. Filter by <code>create_date &gt;= today</code>. The summary field
+shows the per-dimension scores in plaintext; the line_ids show the
+findings. As a TransientModel these don't appear in the main menu —
+they're meant to be read programmatically or surfaced by a wizard.</p>
+<p><strong>What to do if it errored.</strong> Per-project error isolation — one
+project's failure is logged to <code>ir.logging</code> with <code>level=WARNING</code> and
+the cron continues. The most common failure is a project with a
+custom field expected by one of the scorers being absent
+(<code>_score_dimension_*</code> methods all probe <code>_fields</code> and skip cleanly
+when a column is missing). If the cron is producing many WARNINGs,
+check <code>ir.logging</code> filtered by <code>path = ...data_quality_report</code> for
+the actual exception text.</p>
+<hr>
+<h2 id="cron-6-cron_propose_eco_for_high_freq_overrides">Cron 6 — <code>cron_propose_eco_for_high_freq_overrides</code></h2>
+<p><strong>Name in UI:</strong> Southbrook: Propose ECOs for High-Frequency Cut-Spec Overrides
+<strong>Fires:</strong> every 1 day, staggered to ~04:00 local time
+<strong>Model:</strong> <code>southbrook.cut.spec.override</code>
+<strong>Method:</strong> <code>model._cron_propose_eco_for_high_frequency_overrides()</code>
+<strong>xml_id:</strong> <code>southbrook_premium_orchestration.cron_propose_eco_for_high_freq_overrides</code></p>
+<p><strong>What it does.</strong> Aggregates <code>southbrook.cut.spec.override</code> records
+over the last 90 days by <code>rule_key</code>. For any rule that was overridden
+in 10+ work orders with no open ECO already referencing it, drafts
+a new ECO (type "Construction-Rule Change") with the override count
+and 5 sample overrides as evidence. Backlinks the sample overrides
+to the new ECO via <code>eco_proposed_id</code>.</p>
+<p><strong>What it reads.</strong> <code>southbrook.cut.spec.override</code> records (the
+operator-recorded deviations from default cut specs), the
+<code>southbrook.eco</code> and <code>southbrook.eco.type</code> models.</p>
+<p><strong>What it writes.</strong> Zero, one, or more <code>southbrook.eco</code> records in
+<code>state = open</code>. Updates <code>eco_proposed_id</code> on the sample overrides
+that contributed evidence.</p>
+<p><strong>Who cares.</strong> The PLM engineer (Course 4) — they wake up to a queue
+of auto-proposed ECOs every morning, each one saying "the shop floor
+overrode this rule N times last quarter; should the default change?"
+For the planner, only indirectly — an accepted ECO changes the
+default cut spec, which changes how every subsequent MO routes.</p>
+<p><strong>Reading its last run.</strong> Open <strong>PLM -&gt; Engineering Change Orders</strong>.
+Filter by <code>state = open</code> and sort by <code>create_date desc</code>. ECOs whose
+description starts with the cron's signature
+(<code>&lt;p&gt;Rule &lt;code&gt;...&lt;/code&gt; was overridden in &lt;strong&gt;N&lt;/strong&gt;
+work orders...</code>) and ends with <code>&lt;em&gt;Auto-proposed by
+southbrook_premium_orchestration.&lt;/em&gt;</code> are this cron's output.</p>
+<p><strong>What to do if it errored.</strong> Most common: no ECO type matching
+"Construction-Rule Change" exists in the database. The cron logs a
+WARNING and exits clean — no ECOs proposed. Recovery: open
+<strong>PLM -&gt; Configuration -&gt; ECO Types</strong>, create a type named exactly
+"Construction-Rule Change", and the next run picks it up. The
+second-most-common failure is the override threshold being too
+high — if your shop is small, 10 overrides per quarter for a single
+rule is too high; consider tuning <code>threshold_pct</code> and the
+minimum-count constant by calling the method manually with a
+lower threshold to test.</p>
+<hr>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>For the planner — start of day (5 min):</strong></p>
+<ul>
+<li>Open <strong>Kitchen Ops -&gt; MI Engine Status</strong>. Check <code>last_run_at</code> is
+  within the last hour. If it's older, the MI refire cron stalled —
+  flag the sysadmin.</li>
+<li>Open <strong>Kitchen Ops -&gt; Kitchen Jobs</strong>. Scan for chatter flips from
+  the readiness cron overnight (<code>Decision: ready -&gt; blocked</code>). For
+  each, click in and read the chatter to see what tripped.</li>
+<li>Open <strong>Kitchen Ops -&gt; Production Release Queue</strong>. Anything new
+  here vs yesterday came from the MI gate refire — a previously
+  green release that flipped.</li>
+</ul>
+<p><strong>For the sysadmin — weekly (Monday 09:00):</strong></p>
+<ul>
+<li>Open <strong>Settings -&gt; Technical -&gt; Scheduled Actions</strong>, filter
+  <code>Southbrook:</code>. Read the <code>Last Run</code> column. Six rows, all green,
+  none stuck.</li>
+<li>Spot-check the cron 5 (Quality Dry-Run) output — open one report
+  from over the weekend, look at the summary, ensure scores are
+  trending up not down.</li>
+<li>Spot-check cron 6 (ECO Proposals) — open PLM, count open ECOs
+  with the auto-proposed signature. If the count is growing
+  unbounded, the PLM engineer isn't triaging; nudge them.</li>
+</ul>
+<p><strong>On a failed cron (either role):</strong></p>
+<ol>
+<li>Open Scheduled Actions, find the failing one. Read the <code>nextcall</code>
+   date — if it's in the past, the previous tick crashed.</li>
+<li>Click <strong>Run Manually</strong>. Watch the spinner. If it fails immediately,
+   the popup shows the exception.</li>
+<li>Open <strong>Settings -&gt; Technical -&gt; Logging</strong>, filter by the model name
+   from the cron's code. The most recent WARNING line has the
+   specific failure.</li>
+<li>Fix the underlying issue. Run manually again to confirm green. The
+   cron resumes its normal cadence on the next tick.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The MI engine <code>last_run_at</code> shows 14 hours ago — did the cron
+stop?"</strong></p>
+<p>Open the cron record (Scheduled Actions). If <code>nextcall</code> is in the
+future and <code>active = True</code> but the last run was 14 hours ago, the
+worker that should run it is the cron worker, not a web worker.
+On QNAP containers, the cron worker can hang on a long-running
+psql query — check the Odoo container log for <code>cron</code> warnings.
+Restart the container as a last resort; the cron's <code>nextcall</code> is
+preserved so it picks up where it left off.</p>
+<p><strong>"I see a chatter note saying readiness went from ready -&gt; blocked
+but I can't tell what changed."</strong></p>
+<p>The readiness cron only logs the decision flip, not the underlying
+sub-signal that caused it. Open the task, scroll down to the
+readiness-lines breakdown. The sub-signal whose value flipped to
+False between yesterday and today is the cause. Most common: the
+nightly cron 5 (DQ) flagged a missing spec field which downstream
+invalidates BoM Verified.</p>
+<p><strong>"Cron 6 hasn't proposed an ECO in three weeks but I know the shop
+is overriding the depth-to-drawer-count rule constantly."</strong></p>
+<p>Two likely causes. (a) The override count is below the 10-per-90-day
+floor — small shop, infrequent rule. (b) An open ECO already
+references that rule_key — the cron skips a rule that already has
+one open. Open ECOs filtered by description containing
+<code>depth_to_drawer_count</code>. If one exists, close it (accept or reject)
+to unblock future proposals.</p>
+<p><strong>"The DQ dry-run is creating massive reports — disk space concern?"</strong></p>
+<p>It shouldn't. The DQ report is a <code>TransientModel</code> — Odoo auto-vacuum
+prunes it on the standard retention schedule. If it's growing
+unbounded, check <code>ir.config_parameter</code> for
+<code>base.partner_autocomplete_insufficient_credit</code> or similar (legacy
+setting that can disable transient cleanup). The real fix is to
+ensure the transient.autovacuum cron is enabled in the upstream
+mail/base modules.</p>
+<p><strong>"The weekly planning baseline cron created a run but <code>action_run</code>
+errored. The run sits in draft."</strong></p>
+<p>Open the run record. The chatter has the exception. Most common
+cause is a workcenter without a resource calendar
+(<code>mrp.workcenter.resource_calendar_id = False</code>). Fix the workcenter
+(set the calendar to the company's default working hours), then
+open the run and click <strong>Run</strong> manually. The cron's only job is
+to create + kick off the run; once the run exists, the human can
+drive it to completion.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>All six crons live in <code>southbrook_premium_orchestration</code> and are
+seeded by data XML files (<code>data/ir_cron.xml</code> + <code>data/eco_proposal_cron.xml</code>).
+The seed files use <code>noupdate="0"</code> so a <code>-u
+southbrook_premium_orchestration</code> re-creates anything an admin
+archived — they're the authoritative source. The crons reference
+their target model by <code>model_id</code> (via <code>ref="model_..."</code>), which is
+why the model must exist at install time.</p>
+<p>Each cron is owned by <code>base.user_root</code> and runs with full
+system privileges. The <code>state = code</code> field means the cron's body is
+inline Python (<code>model._cron_name()</code>) — not a server action with a
+chain. This is intentional: makes the call stack trivially debuggable
+(the method is in a tracked Python file).</p>
+<p>The crons stagger their first run after install using the <code>nextcall</code>
+field with <code>eval</code> expressions that add 2-10 minutes from
+<code>DateTime.now()</code>. This avoids a thundering-herd on a 2G Odoo
+container. After the first run, each cron's <code>nextcall</code> is driven
+by <code>interval_number</code> + <code>interval_type</code>.</p>
+<p>The MI engine state singleton (cron 2's record) is a stored model
+in this addon (<code>southbrook_premium_orchestration/models/
+southbrook_mi_engine.py</code>) that exists specifically because Odoo 19
+forbids inheriting an <code>AbstractModel</code> as a <code>Model</code> — the parent
+<code>southbrook.mi.engine</code> AbstractModel from the manufacturing
+intelligence addon stays abstract, and we add a sibling stored
+<code>southbrook.mi.engine.state</code> for the telemetry. The cron calls the
+abstract parent's <code>_cron_refire_gates</code> via env.</p>
+<p>Defensive coding throughout: every cron probes <code>_fields</code> containment
+before referencing custom fields (because the live database has UI-
+declared fields that fresh CE databases don't), tries multiple
+method-name variants for migration tolerance, and per-record
+try/except around side-effecting calls so a single bad row doesn't
+stall the sweep. The result is that every cron stays green even on
+half-migrated environments.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open Kitchen Jobs at 08:00 and see five jobs that were
+green at 17:00 yesterday now showing <code>readiness = blocked</code>. The
+chatter on each says the same: "Decision: ready -&gt; blocked." Which
+cron caused this, and what's the most likely upstream cause?</p>
+<blockquote>
+<p>Cron 1 (Recompute Project Readiness, every 30 minutes) ran
+overnight and flipped the decision based on a re-evaluated
+sub-signal. Five jobs flipping simultaneously suggests a shared
+upstream — most likely cron 5 (Quality Dry-Run, nightly ~03:00)
+raised a DQ finding that downstream invalidated one of the
+readiness sub-signals (BoM Verified or Crew Reserved). Open one
+of the tasks, look at the readiness lines breakdown, find the
+False sub-signal — that's the actual cause.</p>
+</blockquote>
+<p><strong>2.</strong> The sysadmin asks why the order analytics backfill cron
+(cron 3) is doing nothing — <code>last_run</code> is recent but no INFO lines
+in the log. What's the explanation?</p>
+<blockquote>
+<p>The cron's INFO line on a clean run reads "no unscored orders,
+all confirmed orders already captured" — meaning every confirmed
+SO already has its analytics row. That's the steady state: this
+cron is a SAFETY NET for orders that bypassed the always-on
+<code>action_confirm</code> capture (the bypass mode is rare). If no orders
+are escaping the realtime capture, the cron's job is to confirm
+"nothing to do" and exit. That's healthy, not broken.</p>
+</blockquote>
+<p><strong>3.</strong> A planner asks "why does the MI Engine Status board show
+last_run_check_count = 0?" What does this mean, and how do you
+diagnose?</p>
+<blockquote>
+<p>The cron 2 fired but found zero gate checks. Either (a) no
+<code>southbrook.mi.check</code> records have <code>is_gate = True</code>, or (b) no
+MOs are in <code>confirmed</code> / <code>progress</code> state. Probe both: in a
+shell, <code>env['southbrook.mi.check'].search_count([('is_gate','=',True)])</code>
+and <code>env['mrp.production'].search_count([('state','in',('confirmed',
+'progress'))])</code>. If the first is zero, gate checks haven't been
+seeded; that's a configuration gap, not a cron failure.</p>
+</blockquote>
+<p><strong>4.</strong> The PLM engineer says "I've gotten three auto-proposed ECOs
+this month for the <code>width_to_door_count</code> rule. They're all redundant —
+can I tune the cron to be less aggressive?"</p>
+<blockquote>
+<p>Yes — the cron threshold is in
+<code>_cron_propose_eco_for_high_frequency_overrides(window_days=90,
+threshold_pct=50.0)</code> and the minimum-count floor is 10 inside the
+method. The aggressive symptom is that the engineer closed the
+previous ECO (which would have suppressed re-proposal — the cron
+filters out rules with an open ECO) before fixing the underlying
+rule. Either keep the previous ECO open until the rule changes,
+or have the engineer set its state to "accepted-but-deferred" so
+the cron's <code>domain = [('state','=','open')]</code> skips it.</p>
+</blockquote>
+<p><strong>5.</strong> The weekly planning baseline cron (cron 4) created a run
+last Sunday but it's stuck in <code>draft</code>. The chatter says
+<code>action_run</code> raised "Workcenter ENG01 has no resource_calendar_id."
+What do you fix, and why is the cron's design resilient to this?</p>
+<blockquote>
+<p>Open the ENG01 workcenter, set <code>resource_calendar_id</code> to the
+company's default working schedule. The cron's design is
+resilient because (a) <code>create()</code> succeeded — the planning run
+record exists for a human to inspect, (b) <code>action_run</code> failed
+inside a try/except so the cron didn't crash and the next week's
+tick will try again, and (c) the cron's INFO log says the run is
+in draft for manual inspection. Once you fix ENG01's calendar
+and click <strong>Run</strong> on the existing run record, the planning
+completes. The cron has done its job — the human takes over for
+the recovery.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The shape of the Kitchen Jobs board and what readiness/release
+  states mean -&gt; lesson 2.1.</li>
+<li>The ENG01 release gate that the MI refire cron's gate checks
+  feed into -&gt; lesson 2.2.</li>
+<li>Bottleneck-aware scheduling against the workcenters whose loads
+  the planning baseline cron computes -&gt; lesson 2.3.</li>
+<li>Reading the MI report — the user-facing surface that this
+  lesson's cron 2 populates -&gt; lesson 2.5.</li>
+<li>Course 4 — how ECOs (raised by cron 6) get triaged, approved,
+  and propagated into cut specs.</li>
+<li>Course 7 — sysadmin's deeper dive into cron 5 (DQ) and cron 4
+  (planning baseline), including how to wire alerts when a cron
+  goes red.</li>
+<li>Native Odoo <code>ir.cron</code> mechanics, the cron worker process, and
+  scheduling internals -&gt; Odoo's own training + the
+  <code>transient.autovacuum</code> reference.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_02_reading_mi_reports" model="slide.slide">
+            <field name="name">Reading the MI Report — What Counts as a Problem</field>
+            <field name="channel_id" ref="course_production_planning"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Production Planner (the person who acts on Manufacturing Intelligence findings before the floor does).</field>
+            <field name="html_content"><![CDATA[<h1 id="reading-the-mi-report-what-counts-as-a-problem">Reading the MI Report — What Counts as a Problem</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner who's seen the MI Status badge on an MO turn red
+and wants to know whether to escalate, reroute, or ignore. The MI
+engine surfaces checks at three severities (blocker / warning / info)
+across six categories (cut / production / assembly / install / cad /
+hardware). Not all of them are emergencies; some are deliberately
+chatty. This lesson teaches you to triage MI output in the time you
+have before you have to make a decision.</p>
+<p>There's no "P0 / P1 / P2" priority field in the underlying schema —
+the MI engine uses <code>severity</code> (blocker / warning / info) and the
+planner's mental model maps that onto P0/P1/P2 the same way: blockers
+hold up the floor (P0), warnings need a planner decision before
+release (P1), info goes on chatter for the audit trail (P2). When
+this lesson uses P0/P1/P2 it's the user-side label; when it cites a
+field it uses the actual <code>severity</code> value.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the planner — two surfaces:</p>
+<blockquote>
+<p><strong>Southbrook PM -&gt; MI Checks</strong></p>
+</blockquote>
+<p>The flat list of every <code>southbrook.mi.check</code> record. Default filter
+is <strong>Blockers</strong>, grouped by <strong>Category</strong>. This is where you start
+when something turned red on the Kitchen Jobs board and you want to
+see the underlying reasons.</p>
+<blockquote>
+<p><strong>Southbrook PM -&gt; MI Production Board</strong></p>
+</blockquote>
+<p>A list of <code>sb.production.package</code> records (one per MO) showing
+per-package <code>x_mi_status</code> (ok / review / blocked), blocker count,
+warning count, and the auto-generated <code>x_mi_next_action</code> string —
+which is the human-readable "do this first" recommendation.</p>
+<p>From inside an MO:</p>
+<blockquote>
+<p><strong>Manufacturing -&gt; Manufacturing Orders -&gt; <open one></strong></p>
+</blockquote>
+<p>The MO form view has an <code>x_mi_check_ids</code> field surfaced in a tab.
+That's the per-MO subset of the MI Checks list, scoped to this one
+manufacturing order.</p>
+<p>For the MI engine's last-run health:</p>
+<blockquote>
+<p><strong>Kitchen Ops -&gt; MI Engine Status</strong></p>
+</blockquote>
+<p>Singleton telemetry — when the refire cron last ran, how many checks
+fired, how many milliseconds. Lesson 2.4 covers this in depth.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Each row on <strong>MI Checks</strong> carries:</p>
+<ul>
+<li><strong>Severity</strong> (<code>severity</code> on <code>southbrook.mi.check</code>) — <code>blocker</code> /
+  <code>warning</code> / <code>info</code>. Rendered as a red / amber / blue row decoration.
+  Sorts via the computed <code>severity_rank</code> field (0/1/2) so the most
+  urgent are always first.</li>
+<li><strong>Category</strong> (<code>category</code>) — <code>cut</code> / <code>production</code> / <code>assembly</code> /
+  <code>install</code> / <code>cad</code> / <code>hardware</code>. Search defaults group by this so
+  similar problems cluster.</li>
+<li><strong>Name</strong> (<code>name</code>) — the check's title, e.g. "Oversized panel",
+  "Hardware pricing pending", "Low sheet yield".</li>
+<li><strong>Production Package</strong> (<code>production_package_id</code>) — the
+  <code>sb.production.package</code> the check is scoped to, when the check
+  was raised at package level.</li>
+<li><strong>Manufacturing Order</strong> (<code>production_id</code>) — the <code>mrp.production</code>
+  when raised at MO level. A check has one or the other, not both.</li>
+<li><strong>Message</strong> (<code>message</code>) — the specific finding text, with numbers
+  filled in. E.g. "Side L is 2900 x 600 mm and does not fit a 2440
+  x 1220 mm sheet."</li>
+<li><strong>Recommendation</strong> (<code>recommendation</code>) — the engine's suggested
+  action, e.g. "Split the part, select a larger sheet, or confirm
+  a special-order blank before cutting."</li>
+</ul>
+<p>The MI Production Board adds the per-package rollup:</p>
+<ul>
+<li><strong>MI Status</strong> (<code>x_mi_status</code> on <code>sb.production.package</code>) — <code>ok</code> /
+  <code>review</code> / <code>blocked</code>. Computed from the severities of the linked
+  checks: any blocker -&gt; blocked, any warning (no blocker) -&gt; review,
+  otherwise ok.</li>
+<li><strong>MI Blockers</strong> (<code>x_mi_blocker_count</code>) — count of blocker-severity
+  checks on this package. Zero is green.</li>
+<li><strong>MI Warnings</strong> (<code>x_mi_warning_count</code>) — count of warning-severity
+  checks. The planner's "stuff I should look at" pool.</li>
+<li><strong>MI Next Action</strong> (<code>x_mi_next_action</code>) — the recommendation text
+  from the most-urgent blocker (or warning if no blocker), or
+  "Manufacturing intelligence checks are clear" when there's
+  nothing pending.</li>
+</ul>
+<p>Per-MO mirror fields on <code>mrp.production</code>:</p>
+<ul>
+<li><code>x_mi_yield_pct</code> — sheet yield % from the cut summary
+  (<code>panel_area / gross_sheet_area * 100</code>). Below 45% triggers a
+  "Low sheet yield" warning.</li>
+<li><code>x_mi_waste_area_m2</code> — leftover sheet area. Above 0.09 m2 triggers
+  a "Reusable offcut" info check (so the floor labels and stores
+  the offcut).</li>
+<li><code>x_mi_bottleneck_workcenter_id</code> — the LIVE bottleneck for this
+  MO at the moment of the last MI recompute. Different from
+  <code>x_sbk_is_bottleneck</code> on the workcenter (which is structural —
+  see lesson 2.3).</li>
+</ul>
+<h2 id="the-check-catalog">The check catalog</h2>
+<p>The MI engine in <code>southbrook_manufacturing_intelligence/models/
+mi_engine.py</code> generates these checks; they're the entire vocabulary
+the planner needs to recognise. Memorise the blockers; warnings and
+info are situational.</p>
+<p><strong><code>cut</code> category:</strong></p>
+<ul>
+<li><strong>Oversized panel</strong> (blocker) — a cutlist line exceeds the sheet
+  envelope (configured via <code>southbrook_mi.sheet_width_mm</code> /
+  <code>sheet_height_mm</code> parameters, default 2440 x 1220 mm). The MO
+  cannot proceed until the panel is split, a larger sheet sourced,
+  or the cabinet redesigned. <strong>P0.</strong></li>
+<li><strong>Grain direction rotation review</strong> (warning) — panel fits the
+  sheet only when rotated, and grain direction is something other
+  than "no_grain". The floor needs a human-visible grain decision
+  before nesting. <strong>P1.</strong></li>
+<li><strong>Low sheet yield</strong> (warning) — yield is below 45%. The nesting
+  is suboptimal; review duplicate panels and sheet selection.
+  Not a release blocker, but worth tightening on. <strong>P1.</strong></li>
+<li><strong>Reusable offcut</strong> (info) — projected waste is &gt;= 0.09 m2,
+  which is a stockable offcut. Label it (material / thickness /
+  grain / usable dimensions) before moving the sheet. <strong>P2.</strong></li>
+<li><strong>Missing cutlist</strong> (blocker) — the package has no
+  <code>sb.cutlist</code>. Generate one via <code>generate_from_mo()</code>. <strong>P0.</strong></li>
+</ul>
+<p><strong><code>production</code> category:</strong></p>
+<ul>
+<li>Reserved for general production-state notes raised by other
+  agents (default category). Few baseline checks in the engine; the
+  category exists so the gate-refire cron can attach
+  recommendations here without polluting the category-specific
+  buckets.</li>
+</ul>
+<p><strong><code>assembly</code> category:</strong></p>
+<ul>
+<li><strong>Long shelf requires assembly review</strong> (warning) — a panel with
+  "shelf" in its name longer than 900mm. The floor needs to confirm
+  support pin spacing, handling, and pin material before release.
+  <strong>P1.</strong></li>
+</ul>
+<p><strong><code>install</code> category:</strong></p>
+<ul>
+<li><strong>Tall cabinet install review</strong> (warning) — cabinet height &gt;=
+  2400mm. The on-site lift path and ceiling clearance need to be
+  confirmed against the install drawings. <strong>P1.</strong></li>
+<li><strong>Filler and scribe confirmation</strong> (info) — always raised. The
+  floor needs to read the install drawings for filler, scribe,
+  and site tolerance — this check exists to force the read. <strong>P2.</strong></li>
+</ul>
+<p><strong><code>cad</code> category:</strong></p>
+<ul>
+<li><strong>CAD not complete</strong> (warning) — <code>x_cad_status</code> on the MO is
+  anything other than <code>done</code>. The MO can proceed if the planner
+  accepts the risk, but the FreeCAD render hasn't validated the
+  geometry. <strong>P1.</strong></li>
+</ul>
+<p><strong><code>hardware</code> category:</strong></p>
+<ul>
+<li><strong>Missing hardware package</strong> (blocker) — production package has
+  no linked <code>sb.hardware.package</code>. Generate or link before release.
+  <strong>P0.</strong></li>
+<li><strong>Empty hardware pick list</strong> (blocker) — the package exists but
+  has zero <code>sb.hardware.package.line</code> records. <strong>P0.</strong></li>
+<li><strong>Hardware pricing pending</strong> (warning) — at least one hardware
+  SKU has <code>x_pricing_pending = True</code>. The cost rollup is wrong
+  until pricing lands; don't lock the customer-facing price.
+  <strong>P1.</strong></li>
+<li><strong>Hardware not picked</strong> (warning) — the hardware package is
+  still in <code>draft</code> state instead of <code>picked</code>. Move to <code>picked</code>
+  before sending to assembly. <strong>P1.</strong></li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of day (10 min): triage MI status across packages.</strong></p>
+<ul>
+<li>Open <strong>Southbrook PM -&gt; MI Production Board</strong>. The default sort
+  puts <code>blocked</code> packages at the top (via <code>x_mi_status</code> decoration).</li>
+<li>Click into each <code>blocked</code> package. The <code>x_mi_next_action</code> field
+  tells you the most-urgent recommendation. Read it; decide whether
+  it's a planner action or a chase-someone-else action.</li>
+<li>For each blocked package, open the underlying MO and look at the
+  <code>x_mi_check_ids</code> tab. Read the actual check messages — the
+  next-action text only carries the top finding; there may be five
+  more behind it.</li>
+<li>Anything in <code>review</code> (any warnings, no blockers) is your "things
+  to think about before the day starts" pile. Walk through them;
+  they're rarely emergencies but they accumulate if ignored.</li>
+</ul>
+<p><strong>2. Per release decision (the loop):</strong></p>
+<p>When you're about to release an MO to production (lesson 2.2), the
+ENG01 engineer ALREADY checked the MI tab during their gate review.
+But check it again from your seat:</p>
+<ul>
+<li>Open the MO. Look at <code>x_mi_status</code>. If it's <code>blocked</code>, do NOT
+  release even if the engineer signed off (they might have missed
+  a check that fired after their sign-off — the MI cron re-fires
+  hourly, see lesson 2.4).</li>
+<li>If <code>review</code>, look at the warnings list. For each warning, decide:</li>
+<li><strong><code>Hardware pricing pending</code></strong> — release anyway but lock the
+    customer price as "estimate"; flag finance to update the
+    invoice when pricing lands.</li>
+<li><strong><code>Low sheet yield</code></strong> — release; the cost is internal, not
+    customer-facing. Note for the production manager's weekly
+    review.</li>
+<li><strong><code>Tall cabinet install review</code></strong> / <strong><code>Long shelf</code></strong> — open
+    the chatter and confirm the install team has been told.
+    Don't release if they haven't.</li>
+<li><strong><code>CAD not complete</code></strong> — usually a hold. Release only with
+    the PLM engineer's verbal sign-off on chatter.</li>
+</ul>
+<p><strong>3. End of day (5 min):</strong></p>
+<ul>
+<li>Open MI Production Board, filter <code>x_mi_warning_count &gt; 0</code>. Anything
+  that's accumulated more than 3 warnings is technically OK to ship
+  but the rework risk is growing. Add a chatter note for the
+  morning planner to recheck.</li>
+<li>Open MI Engine Status. Confirm <code>last_run_at</code> is within the last
+  hour. If the refire cron has stalled, the warnings you're seeing
+  may be stale — and the checks you AREN'T seeing may have fired
+  since the last run.</li>
+</ul>
+<h2 id="when-mi-output-drives-tomorrows-schedule">When MI output drives tomorrow's schedule</h2>
+<p>This is the part that distinguishes a trained planner from someone
+ticking off Odoo screens.</p>
+<p>When the MI engine raises a per-MO check that's recoverable but
+costly (e.g. <code>Low sheet yield</code> warning at 38%), the right move is
+<strong>not</strong> to immediately re-cut. The right move is to:</p>
+<ol>
+<li>Note the MO in <code>x_sbk_planning_notes</code> on the affected workcenter.</li>
+<li>Tomorrow morning, when sequencing the day, batch similar-sized
+   cabinets together for that workcenter. Edge banding colour and
+   panel substrate are the two batchable dimensions; the operation
+   template doesn't auto-batch, but you can.</li>
+<li>Re-fire the MI engine manually via <strong>Kitchen Ops -&gt; MI Engine
+   Status -&gt; Run Now</strong> (<code>action_run_now</code>) and watch the warning
+   count drop on the freshly-batched MOs.</li>
+</ol>
+<p>For <code>Tall cabinet install review</code> warnings: aggregate them weekly
+into a single install-team briefing. The check fires once per MO and
+once per day on the refire; the install team doesn't need 14
+duplicate warnings, they need a Monday morning summary of "5 tall
+cabinets going out this week, here's the lift list."</p>
+<p>For the auto-generated recommendation file: when an MI check fires
+and the engine writes a recommendation (the <code>recommendation</code> field
+on <code>southbrook.mi.check</code>), that recommendation is the seed for the
+production manager's Hermes / Fabio approval queue (Course 3,
+lesson 3.2). The planner doesn't approve recommendations — the PM
+does — but the planner SEES them on the MI Checks list and decides
+whether to act before the PM gets to the queue. That's the planner's
+edge: anticipating what the PM will approve and pre-acting on it.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The MO shows <code>x_mi_status = ok</code> but I can see a hardware pricing
+pending issue on the package."</strong></p>
+<p>The MO-level status and the package-level status are different fields.
+<code>mrp.production.x_mi_status</code> is computed from MO-level checks (CAD,
+production-category items). <code>sb.production.package.x_mi_status</code> is
+computed from the cut + assembly + hardware + install checks. They
+can disagree when the issue lives at the package layer (hardware
+typically does). Check the package status, not just the MO status.</p>
+<p><strong>"I opened the MI Checks list and there are 47 rows. Most look
+identical."</strong></p>
+<p>The refire cron creates new check rows on each tick; the previous
+rows are deleted by <code>_unlink_existing_checks</code> before the new ones
+are written, BUT only for the scope being refired (per-MO or
+per-package). If you're seeing 47 rows, either (a) you're looking
+at 47 different MOs each with a couple checks, or (b) a partial
+recompute left stale rows. The list view's grouping by category +
+package_id collapses duplicates visually; try the group view.</p>
+<p><strong>"<code>x_mi_yield_pct</code> shows 0.0 on an MO but the cutlist looks fine."</strong></p>
+<p>The yield compute only writes on a successful cut summary. If the
+cutlist was deleted and a fresh recompute fired, the engine writes
+0.0 + 0.0 to the MO's yield/waste fields explicitly (per the
+"zero-write on missing cutlist" branch in <code>_recompute_production</code>).
+Recovery: generate a fresh cutlist via the production package's
+<code>generate_from_mo</code>, then trigger
+<code>action_recompute_manufacturing_intelligence</code> on the MO. The yield
+should populate on the next save.</p>
+<p><strong>"A <code>Low sheet yield</code> warning has been on the same MO for three
+days but the cut is already done."</strong></p>
+<p>The refire cron re-evaluates on the current cutlist + current state.
+Once the cut is done, the warning shouldn't keep firing IF the
+cutlist's <code>state</code> advanced to <code>done</code>. If the cutlist is still in
+<code>draft</code> state on a finished MO, the cutlist wasn't progressed —
+the planner or the operator should have moved it. Open the cutlist,
+set state to <code>done</code>, the warning clears on the next refire.</p>
+<p><strong>"The MI Next Action text is generic — 'Manufacturing intelligence
+checks are clear' — even though I'm staring at a blocker."</strong></p>
+<p>The <code>x_mi_next_action</code> field is computed by <code>_next_action_from_checks</code>
+which takes the first blocker's recommendation, or the first
+warning's recommendation, or the "clear" string. If you're seeing
+"clear" alongside a visible blocker, the check rows were written
+in a different transaction than the next-action field — refresh
+the page or trigger a recompute. If it persists, the blocker
+might be on the package and the MO field is computed from MO-only
+checks (or vice versa).</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The MI engine is a stateless calculator. Every recompute call
+(<code>_recompute_production(mo)</code> or <code>_recompute_package(package)</code>):</p>
+<ol>
+<li>Deletes the existing checks scoped to the MO or package via
+   <code>_unlink_existing_checks</code>.</li>
+<li>Walks the cutlist (<code>sb.cutlist.line_ids</code>) and computes a cut
+   summary: panel area, sheet count, yield %, waste, edge band
+   length, duplicate groups.</li>
+<li>Runs the cut checks (oversized / grain / yield / offcut),
+   assembly checks (long shelf), hardware checks (missing pkg /
+   empty list / pricing / not-picked), install checks (tall
+   cabinet / filler).</li>
+<li>Writes the new checks via <code>_create_check</code>.</li>
+<li>Computes the rollup status (<code>_status_from_severities</code>) and
+   writes it to the MO or package along with blocker/warning
+   counts and the <code>x_mi_next_action</code> recommendation text.</li>
+</ol>
+<p>Three caches matter:</p>
+<ul>
+<li><strong>Sheet dimensions</strong> are config-param-driven
+  (<code>ir.config_parameter.southbrook_mi.sheet_width_mm</code> /
+  <code>sheet_height_mm</code>, defaults 2440 / 1220). Changing these
+  invalidates every oversized-panel and yield check; trigger a
+  full re-recompute after a change.</li>
+<li><strong>Cutlist substrate / grain dir</strong> on each line drive the
+  edge-band length math and the duplicate-group bucketing. A wrong
+  substrate value on one panel can move yield by 5%.</li>
+<li><strong>Hardware package state</strong> (<code>draft</code> / <code>picked</code> / <code>delivered</code>)
+  is read into the <code>hardware_summary</code> dict that drives the
+  hardware checks. If a hardware package state is stale, the
+  warning persists.</li>
+</ul>
+<p>The MI gate refire cron (lesson 2.4 cron 2) is what re-fires gate
+checks (<code>southbrook.mi.check</code> with <code>is_gate = True</code>) against every
+in-flight MO every hour. The MI engine state singleton record
+records the last run's telemetry; lesson 2.4 walks you through
+reading that.</p>
+<p>The chain from a fired check to an action: the engine writes a
+<code>southbrook.mi.check</code> row -&gt; the package or MO's <code>x_mi_status</code> is
+recomputed -&gt; a Hermes recommendation can be auto-generated from
+the check's recommendation text (this wiring is in
+<code>southbrook_hermes</code>, Course 3 / Course 6). The recommendation is
+what the production manager approves; once approved, it can become
+a scheduler instruction (re-route, batch differently) or an ECO
+draft (Course 4).</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> An MO shows <code>x_mi_status = blocked</code> with two blocker checks:
+"Oversized panel" and "Missing hardware package". The customer's
+install is in 4 days. Which do you address first?</p>
+<blockquote>
+<p>The hardware package, because it's recoverable today — call
+<code>generate_from_mo()</code> on the production package and the hardware
+resolves from the catalog in seconds. The oversized panel needs
+either a design change (split the panel) or a sheet-stock change
+(source non-standard 3050x1220); both are multi-day. Solve the
+easy blocker first so you can isolate whether the install date
+is still achievable on just the panel issue.</p>
+</blockquote>
+<p><strong>2.</strong> You see a warning "Hardware pricing pending" on a package
+about to release. The customer has already paid. What's the right
+action?</p>
+<blockquote>
+<p>Release the MO — the warning is a planner-facing concern, not a
+floor blocker. The customer price is already locked. The
+internal cost rollup is incomplete, so the finance team's COGS
+for this MO will be wrong until pricing lands. Drop a note in
+the MO chatter for finance ("hardware price pending at release —
+reconcile when SKU pricing updates") and let the floor proceed.</p>
+</blockquote>
+<p><strong>3.</strong> Your MI Production Board shows 8 packages in <code>review</code> state,
+all with the single warning "Tall cabinet install review." The
+install team is doing a delivery this Thursday. What's the most
+efficient action?</p>
+<blockquote>
+<p>Don't action each MI check individually. Aggregate: open the 8
+packages, list the install dates, and confirm 4 of them are
+for this Thursday's delivery. Compose ONE briefing for the
+install team — lift list, ceiling clearance constraints per
+address. After the team confirms, post on each MO's chatter
+"install team briefed for tall cabinets on YYYY-MM-DD." The
+warning will keep firing on each refire (it's threshold-based,
+not state-based), but the chatter note is the audit trail
+that says "yes, we handled this."</p>
+</blockquote>
+<p><strong>4.</strong> The MI Engine Status board shows <code>last_run_at</code> was 38
+minutes ago, but a blocker on one of your MOs has been there
+since yesterday. Why isn't the refire cron clearing it?</p>
+<blockquote>
+<p>Because the underlying issue hasn't been fixed. The refire cron
+re-evaluates checks against current state — it doesn't dismiss
+old findings. If the cutlist still has an oversized panel, the
+"Oversized panel" check fires anew on each tick. The way to
+clear the blocker is to fix the upstream artifact (cutlist line
+width), then either wait for the next refire or click <strong>Run
+Now</strong> on the MI Engine Status form to re-fire synchronously.</p>
+</blockquote>
+<p><strong>5.</strong> A planner asks "is there a P0/P1/P2 priority on each check?"
+What's your answer?</p>
+<blockquote>
+<p>Not as a stored field — there's <code>severity</code> (<code>blocker</code> /
+<code>warning</code> / <code>info</code>) which the user-side reads as P0/P1/P2 by
+convention. Blockers stop release (P0), warnings need a planner
+decision before release (P1), info goes on the audit trail
+(P2). The <code>severity_rank</code> field on <code>southbrook.mi.check</code> is the
+numeric sort key (0/1/2) but it's not surfaced in the UI. If
+you need to filter by "show me everything P0", filter by
+<code>severity = blocker</code> in the search bar.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The shape of the Kitchen Jobs board where MI status surfaces
+  back onto your home screen -&gt; lesson 2.1.</li>
+<li>The ENG01 release gate where the engineer also reads the MI
+  checks before signing off -&gt; lesson 2.2.</li>
+<li>Bottleneck scheduling, including how the LIVE bottleneck
+  (<code>x_mi_bottleneck_workcenter_id</code>) differs from the structural
+  one (<code>x_sbk_is_bottleneck</code>) -&gt; lesson 2.3.</li>
+<li>The MI refire cron in detail — schedule, last-run reading,
+  failure modes -&gt; lesson 2.4, cron 2.</li>
+<li>Course 3 — what the production manager does with the MI
+  recommendations once they reach the Hermes / Fabio approval
+  queue.</li>
+<li>How MI checks become Hermes recommendations and how those flow
+  through the Console -&gt; Course 3, lesson 3.2.</li>
+<li>Authoring new MI checks (the developer-side work) — out of
+  scope for any course; refer to the MI engine source under
+  <code>southbrook_manufacturing_intelligence/models/</code>.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

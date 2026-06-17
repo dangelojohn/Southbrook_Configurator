@@ -1,0 +1,1038 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_03_mi_dashboards" model="slide.slide">
+            <field name="name">Manufacturing Intelligence Dashboards — At-a-Glance Shop Floor Health</field>
+            <field name="channel_id" ref="course_floor_management"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Production Manager (runs the floor, owns shop-wide throughput and on-time delivery).</field>
+            <field name="html_content"><![CDATA[<h1 id="manufacturing-intelligence-dashboards-at-a-glance-shop-floor-health">Manufacturing Intelligence Dashboards — At-a-Glance Shop Floor Health</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the <strong>Production Manager</strong>. Your job is to look at the floor once an
+hour, see what's actually going wrong, and put the right operator or planner
+on the right problem. This lesson covers the four Southbrook-specific dashboards
+that surface that information — what each one measures, where the numbers come
+from, and what to do when one of them crosses a line.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Everything in this lesson lives under the <strong>Southbrook PM</strong> top-level menu. Sign
+in at <strong>southbrookcabinetry.space/odoo</strong> as a user in the <em>Southbrook PM</em> group,
+then:</p>
+<blockquote>
+<p><strong>Southbrook PM → Dashboard</strong> — the workcenter KPI kanban (the home screen)
+<strong>Southbrook PM → Ready Queue</strong> — confirmed MOs waiting to release
+<strong>Southbrook PM → In Production</strong> — MOs currently running
+<strong>Southbrook PM → Late Orders</strong> — past deadline, not done, not cancelled
+<strong>Southbrook PM → Floor Load</strong> — every workcenter, grouped by active
+<strong>Southbrook PM → Family Throughput</strong> — cabinet-family level KPI
+<strong>Southbrook PM → MI Checks</strong> — every active check across the shop
+<strong>Southbrook PM → MI Production Board</strong> — production packages with MI status</p>
+</blockquote>
+<p>The first one — <strong>Dashboard</strong> — is what you open at 7:00am. The rest are drill-down
+targets when something on the Dashboard turns amber or red.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="southbrook-pm-dashboard-the-workcenter-kpi-kanban">Southbrook PM → Dashboard (the workcenter KPI kanban)</h3>
+<p>One kanban card per active workcenter, defined by
+<code>southbrook_mrp_pm.view_southbrook_pm_kanban</code> on <code>mrp.workcenter</code>. Each card
+shows four numbers and the OEE target:</p>
+<ul>
+<li><strong>In Queue</strong> (<code>southbrook_pm_inflight_count</code> on <code>mrp.workcenter</code>) — open work
+  orders pinned to this station right now.</li>
+<li><strong>Done Today</strong> (<code>southbrook_pm_throughput_today</code>) — work orders this station
+  finished since midnight.</li>
+<li><strong>Late</strong> (<code>southbrook_pm_late_count</code>) — work orders touching this station
+  whose MO <code>date_deadline</code> is past and state is not <code>done</code>/<code>cancel</code>.</li>
+<li><strong>Equipment</strong> (<code>southbrook_pm_equipment_alerts</code>) — count of
+  <code>maintenance.equipment</code> records attached to this workcenter with a non-good
+  <code>southbrook_condition</code> pill.</li>
+<li><strong>OEE Target</strong> (<code>oee_target</code> on <code>mrp.workcenter</code>, seeded at <strong>85.0%</strong>) — the
+  native Odoo field, set during install by
+  <code>southbrook_mrp_pm/data/workcenters.xml</code> for the 8 SB stations
+  (SB-SAW, SB-EDGE, SB-CNC-BORE, SB-ASSY, SB-DOOR, SB-HW, SB-QC, SB-PACK). The
+  Southbrook-custom field <code>x_sbk_oee_target</code> on the same model (default 0.85)
+  is a parallel target consumed by the kitchen-workcenter views; both exist.</li>
+</ul>
+<h3 id="southbrook-pm-mi-production-board">Southbrook PM → MI Production Board</h3>
+<p>A list of <code>sb.production.package</code> records decorated by <strong>MI status</strong>
+(<code>x_mi_status</code> on <code>sb.production.package</code>, values <code>ok</code> / <code>review</code> / <code>blocked</code>).
+Columns:</p>
+<ul>
+<li><strong>Name</strong> — the package code.</li>
+<li><strong>MO</strong> (<code>mo_id</code>) — the linked manufacturing order.</li>
+<li><strong>State</strong> — the MO state.</li>
+<li><strong>MI Status</strong> — colour-coded: red <code>blocked</code>, amber <code>review</code>, green <code>ok</code>.</li>
+<li><strong>MI Blockers</strong> (<code>x_mi_blocker_count</code>) and <strong>MI Warnings</strong>
+  (<code>x_mi_warning_count</code>) — totals per package.</li>
+<li><strong>MI Next Action</strong> (<code>x_mi_next_action</code>) — the engine's one-line recommendation
+  derived from the highest-severity check.</li>
+</ul>
+<h3 id="southbrook-pm-mi-checks">Southbrook PM → MI Checks</h3>
+<p>The raw check list — every row is a <code>southbrook.mi.check</code> record, decorated by
+severity (<code>blocker</code> / <code>warning</code> / <code>info</code>) and grouped by category
+(<code>cut</code> / <code>production</code> / <code>assembly</code> / <code>install</code> / <code>cad</code> / <code>hardware</code>). Default
+search filters drop you into <code>Blockers</code> grouped by <code>Category</code> so you see the
+worst problems first.</p>
+<h3 id="per-mo-intelligence-tab">Per-MO Intelligence tab</h3>
+<p>On any manufacturing order form, the <strong>Intelligence</strong> notebook page
+(<code>view_mrp_production_form_mi</code> inheriting <code>mrp.mrp_production_form_view</code>) shows
+the same six fields scoped to that MO:</p>
+<ul>
+<li><strong>MI Status</strong> (<code>x_mi_status</code> on <code>mrp.production</code>, widget=badge)</li>
+<li><strong>MI Next Action</strong> (<code>x_mi_next_action</code>)</li>
+<li><strong>MI Blockers</strong> / <strong>MI Warnings</strong> (<code>x_mi_blocker_count</code>, <code>x_mi_warning_count</code>)</li>
+<li><strong>Sheet Yield %</strong> (<code>x_mi_yield_pct</code>) and <strong>Waste Area m²</strong> (<code>x_mi_waste_area_m2</code>)</li>
+<li>The full <code>x_mi_check_ids</code> list — every check linked to this MO, with severity,
+  category, message, and recommendation.</li>
+</ul>
+<p>A <strong>Recompute Intelligence</strong> button at the top of the tab calls
+<code>action_recompute_manufacturing_intelligence</code> on <code>mrp.production</code>, which
+re-runs the engine for just this MO. Use it when you've just fixed an upstream
+issue and want the dashboard to catch up immediately.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>Start of day (7:00am, 10 min):</strong></p>
+<ol>
+<li>Open <strong>Southbrook PM → Dashboard</strong>. Scan the eight workcenter cards.
+   - All four metrics green or zero → no action.
+   - <strong>Late &gt; 0</strong> on any card → that station has past-deadline work touching it
+     today; jump to <strong>Late Orders</strong> to see which MOs.
+   - <strong>Equipment &gt; 0</strong> → at least one piece of equipment at that station is
+     flagged. Click the card, scroll to equipment list, check the condition
+     pill — <code>red</code> is a breakdown, <code>amber</code> is a watch item.</li>
+<li>Open <strong>Southbrook PM → MI Production Board</strong>. Sort by <em>MI Status</em> descending
+   so <code>blocked</code> rows surface at the top.
+   - Each <code>blocked</code> row will have an <em>MI Next Action</em> line; that's your first
+     job. Click into the package → <strong>Intelligence</strong> tab → read the full check
+     list to see what the engine actually found.</li>
+<li>Open <strong>Southbrook PM → Late Orders</strong>. Anything that wasn't on yesterday's
+   late list is a new escalation; pair it with a planner.</li>
+</ol>
+<p><strong>Mid-day (every 2 hours, 5 min):</strong></p>
+<ul>
+<li>Refresh the <strong>Dashboard</strong>. The kanban fields are computed
+  <em>at view-render time</em> — there is no <code>store=True</code> on
+  <code>x_mi_workcenter_blocker_count</code> / <code>x_mi_workcenter_warning_count</code>, so the
+  counts re-aggregate every time you reload the view.</li>
+<li>If a station's <strong>In Queue</strong> climbs without <strong>Done Today</strong> climbing, the
+  station has stalled — go look.</li>
+<li>New blockers on the <strong>MI Production Board</strong> since morning → follow the <em>Next
+  Action</em> line, then re-run <strong>Recompute Intelligence</strong> on the package once you
+  believe it's fixed.</li>
+</ul>
+<p><strong>End of day (4:30pm, 10 min):</strong></p>
+<ul>
+<li>Open <strong>Southbrook PM → Family Throughput</strong>. Compare <code>throughput_today</code> per
+  family against the planner's plan for the day. A big gap on one family is
+  tomorrow's planner conversation.</li>
+<li>Check that yesterday's <code>blocked</code> packages are now <code>ok</code> or <code>review</code>. Anything
+  still <code>blocked</code> at end of day rolls into tomorrow's stand-up.</li>
+</ul>
+<p><strong>Per investigation (drill-down from a red card):</strong></p>
+<ol>
+<li>Click the workcenter card on the <strong>Dashboard</strong>. The form opens with the PM
+   kanban inherit (<code>view_southbrook_pm_kanban_mi</code>) showing MI chips: <code>MI Blocked</code>,
+   <code>MI Warnings</code>, or <code>MI Clear</code>.</li>
+<li>Open the work orders list on the form — find the WO with the blocker.</li>
+<li>From the WO, click through to its parent MO → <strong>Intelligence</strong> tab → check
+   list.</li>
+<li>The check <code>recommendation</code> field tells you the specific corrective action
+   (e.g. "Split the part, select a larger sheet, or confirm a special-order
+   blank before cutting"). That's what to ask the operator or planner.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The Dashboard says SB-EDGE has 3 blockers but I'm standing in front of the
+station and everything looks fine."</strong></p>
+<p>The kanban fields are not stored — they're a snapshot computed when the view
+renders. If you opened the Dashboard 90 minutes ago and an operator has since
+cleared the upstream issues, the chips lag the truth. <strong>Reload the view</strong> (F5
+or click the menu again) to force a recompute. There's a deliberate design
+note in <code>mrp_workcenter.py</code>: <code>@api.depends_context("uid")</code> means each user's
+view aggregates fresh, but only on render.</p>
+<p><strong>"A check says 'Missing cutlist' on an MO that clearly has one."</strong></p>
+<p>The engine writes checks only when something is recomputed. If you re-linked a
+cutlist after the last engine run, the old check is stale. Click <strong>Recompute
+Intelligence</strong> on the MO's <strong>Intelligence</strong> tab — <code>_recompute_production</code> will
+delete every existing check for that MO (via
+<code>_unlink_existing_checks(production=production)</code>) and rewrite the current
+state from scratch.</p>
+<p><strong>"I approved a package this morning but it's still showing as <code>review</code> on
+the MI Production Board."</strong></p>
+<p>The package-level MI status is recomputed by <code>_recompute_package</code>, not by
+your approval. The hourly <strong>MI Stage-Gate Refire</strong> cron sweeps open MI gates,
+but it only re-fires stage gates — it won't recompute a package whose
+underlying check list hasn't changed. Open the package and click <strong>Recompute
+Intelligence</strong> to force the rewrite.</p>
+<p><strong>"Late Orders shows an MO whose deadline I just extended."</strong></p>
+<p>The Late Orders action uses a domain with <code>time.strftime</code> evaluated at query
+time, so it'll pick up the new deadline on the next reload — but only after
+the MO write has committed. Reload after you save.</p>
+<p><strong>"Sheet yield is showing 0% on a package with a perfectly normal cutlist."</strong></p>
+<p><code>x_mi_yield_pct</code> is reset to 0.0 explicitly when the engine can't find a
+cutlist (the <code>else</code> branch of <code>_recompute_production</code>). If the cutlist exists
+but you still see 0%, the cutlist has no <code>line_ids</code>, or every line has
+zero <code>length_mm</code>/<code>width_mm</code>/<code>qty</code>. Fix the cutlist, then recompute.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(For the curious manager and the supervisor on call when an incident comes in.)</p>
+<p>The dashboards read from three places:</p>
+<ol>
+<li>
+<p><strong><code>southbrook.mi.check</code></strong> — the per-event check rows, written by the
+   engine on the abstract model <code>southbrook.mi.engine</code>. Each row carries
+   <code>severity</code> (<code>blocker</code>/<code>warning</code>/<code>info</code>), <code>category</code> (<code>cut</code>/<code>production</code>/
+   <code>assembly</code>/<code>install</code>/<code>cad</code>/<code>hardware</code>), <code>message</code>, <code>recommendation</code>, and
+   either <code>production_id</code> or <code>production_package_id</code>. The list is sorted by
+   <code>severity_rank</code> (0=blocker, 1=warning, 2=info) so the most urgent rows
+   render first.</p>
+</li>
+<li>
+<p><strong>Computed counters on <code>mrp.production</code> and <code>sb.production.package</code></strong> —
+   <code>x_mi_status</code>, <code>x_mi_blocker_count</code>, <code>x_mi_warning_count</code>,
+   <code>x_mi_next_action</code>, <code>x_mi_yield_pct</code>, <code>x_mi_waste_area_m2</code>,
+   <code>x_mi_edge_band_m</code>. These are written by <code>_recompute_production</code> and
+   <code>_recompute_package</code>, which read the checks the engine just generated and
+   roll them into single fields the views can index.</p>
+</li>
+<li>
+<p><strong>Non-stored aggregates on <code>mrp.workcenter</code></strong> —
+   <code>x_mi_workcenter_blocker_count</code> and <code>x_mi_workcenter_warning_count</code>,
+   computed on view render with <code>@api.depends_context("uid")</code>. The trade-off
+   is documented in <code>mrp_workcenter.py</code>: storing them would require depending
+   on every MI/MO state transition, which deadlocks the save path during high
+   shift volume. So the counters are re-aggregated each time the kanban opens.</p>
+</li>
+</ol>
+<p><strong>Refresh cadence — the orchestration crons.</strong> The five
+<em>Southbrook Premium Orchestration</em> crons (defined in
+<code>southbrook_premium_orchestration/data/ir_cron.xml</code>) are what keep dashboards
+honest without anyone clicking anything:</p>
+<table>
+<thead>
+<tr>
+<th>Cron name</th>
+<th>Interval</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Southbrook: Recompute Project Readiness</td>
+<td>every 30 min</td>
+<td>Recomputes readiness mask (BOM/drawings/tooling/labour) on project tasks.</td>
+</tr>
+<tr>
+<td>Southbrook: Refire MI Stage-Gate Checks</td>
+<td>every 1 hour</td>
+<td>Re-evaluates open MI stage gates so a gate clears the moment its upstream condition flips.</td>
+</tr>
+<tr>
+<td>Southbrook: Backfill Order Analytics</td>
+<td>every 6 hours</td>
+<td>Captures analytics rows for confirmed SOs that don't have one yet.</td>
+</tr>
+<tr>
+<td>Southbrook: Weekly Planning Baseline</td>
+<td>every 7 days (Sun 02:00)</td>
+<td>Creates and runs the fresh weekly <code>mrp.planning.run</code> baseline.</td>
+</tr>
+<tr>
+<td>Southbrook: Quality Dry-Run Nightly</td>
+<td>daily (~03:00)</td>
+<td>Walks the project tree, scores against DQ ruleset, writes a dry-run report.</td>
+</tr>
+</tbody>
+</table>
+<p>The 1-hour <strong>MI Stage-Gate Refire</strong> is the one most relevant to your daily
+flow — it's why a check that was blocking yesterday afternoon can be green by
+the time you come in. If you need a faster pass, click <strong>Recompute
+Intelligence</strong> on the individual MO or package.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> It's 9:30am. The Dashboard shows SB-CNC-BORE with <code>In Queue: 12,
+Done Today: 0, Late: 3, Equipment: 1</code>. What's the first thing you check?</p>
+<blockquote>
+<p><strong>Equipment: 1</strong> — a non-good condition pill on a piece of equipment at the
+CNC. If a machine is down, <em>Done Today: 0</em> is explained. Click into SB-CNC-BORE
+on the dashboard, scroll to the equipment list, see which equipment is in
+<code>red</code> or <code>amber</code> condition. That's the root cause; the late count and the
+queue depth are both downstream of it.</p>
+</blockquote>
+<p><strong>2.</strong> A package shows MI Status <code>blocked</code> with one check: <em>"Production
+package has no cutlist"</em>. You know the cutlist was attached an hour ago.
+What do you do?</p>
+<blockquote>
+<p>Open the package, go to the <strong>Intelligence</strong> tab, click <strong>Recompute
+Intelligence</strong>. The engine's <code>_recompute_package</code> deletes all existing
+checks for the package and rewrites them from scratch — the stale
+<em>"Missing cutlist"</em> row will be gone if the cutlist is now linked.</p>
+</blockquote>
+<p><strong>3.</strong> Your morning Dashboard shows SB-EDGE with 0 blockers and 4 warnings.
+By 11am the chip still says <code>4 MI Warnings</code>, but you know the planner cleared
+two checks. What's going on?</p>
+<blockquote>
+<p>The kanban metrics are not stored — they're computed when you open the
+view. The chip you see is from the morning's render. Reload the view; the
+<code>_compute_southbrook_mi_kpis</code> re-aggregates and the chip drops to 2.</p>
+</blockquote>
+<p><strong>4.</strong> Throughput on the cabinet family <code>SB-BASE</code> was 18 today, plan was
+24. Where do you go next?</p>
+<blockquote>
+<p><strong>Family Throughput</strong> shows you the gap. To find the cause: drill into the
+<code>SB-BASE</code> family card → list of MOs in flight → look at MOs with a non-<code>ok</code>
+MI status. If MI is clean across the board, the gap is a planning issue,
+not an intelligence issue — bring it to the planner with the actual
+numbers, not just the gap.</p>
+</blockquote>
+<p><strong>5.</strong> A check has severity <code>warning</code>, category <code>cut</code>, message
+<em>"Sheet yield is 39.2%"</em>. Should you stop the cut?</p>
+<blockquote>
+<p>No — <code>warning</code> doesn't block; only <code>blocker</code> does (look for red
+decoration on the MI Production Board). The recommendation reads
+<em>"Review nesting, duplicate panels, and sheet selection"</em>. Pass it to the
+planner or PLM engineer to review <em>before</em> the next cut; the current cut
+can proceed. Below 45% yield is the engine's warning threshold (in
+<code>_recompute_package</code>).</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The recommendation queue you approve from Fabio — that's lesson 3.2
+  (<code>03_hermes_fabio_approval.md</code>).</li>
+<li>The per-workcenter OEE drill-down — that's lesson 3.3 (<code>03_oee.md</code>).</li>
+<li>Reading an individual MI report row in full detail — covered in lesson 2.5.</li>
+<li>Native Odoo MRP work-order and MO lifecycle — Odoo's own eLearning track.</li>
+<li>The Hermes Console at hermes.odooiq.com (sysadmin recommendations queue) —
+  Course 7 lesson <code>07_hermes_sysadmin.md</code>.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_03_hermes_fabio_approval" model="slide.slide">
+            <field name="name">Approving Fabio Recommendations from the Queue</field>
+            <field name="channel_id" ref="course_floor_management"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Production Manager (reviews and approves manufacturing recommendations submitted by the Fabio sidecar agent).</field>
+            <field name="html_content"><![CDATA[<h1 id="approving-fabio-recommendations-from-the-queue">Approving Fabio Recommendations from the Queue</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the <strong>Production Manager</strong>. The Fabio sidecar agent (an external AI/tool
+orchestrator) drafts recommendations against the Southbrook database — things
+like "reschedule MO-1042 because the planner overloaded SB-EDGE" or "create a
+rework task for cabinet kit 248-A". The agent <strong>cannot</strong> make business changes
+on its own. Every recommendation lands in your queue first; you read it,
+decide, and either approve, reject, or apply it.</p>
+<p>This lesson is about that in-Odoo queue — the human approval boundary that
+sits between the agent and the database.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with an account in the
+<em>Hermes Reviewer</em> group (<code>southbrook_hermes.group_hermes_reviewer</code>), then:</p>
+<blockquote>
+<p><strong>Fabio → Recommendations</strong></p>
+</blockquote>
+<p>The top-level menu is <strong>Fabio</strong> (sequence 55, between Project and Settings).
+It has two children: <em>Ask</em> (the conversational interface) and <em>Recommendations</em>
+(the queue you work in). The recommendation list opens with the default search
+filter <code>Open</code> applied — that's <code>state in ('draft', 'ready', 'approved')</code>, i.e.
+everything that still needs a human action.</p>
+<p>The internal addon code-name is <code>southbrook_hermes</code>. The user-facing label
+everywhere — menus, partner record, ribbon — is <strong>Fabio</strong>.</p>
+<blockquote>
+<p><strong>Aside — not in scope here.</strong> There is a separate operator-side surface at
+<strong>hermes.odooiq.com</strong> (the Hermes Console) where sysadmin-targeted
+recommendations live. That's Course 7 territory and is run by IT. This
+lesson is only about the in-Odoo manufacturing-recommendation queue. The
+two queues do <em>not</em> share records.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="the-recommendation-list-fabio-recommendations">The recommendation list (Fabio → Recommendations)</h3>
+<p>One row per <code>southbrook.hermes.recommendation</code>. Columns:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — the recommendation title.</li>
+<li><strong>Type</strong> (<code>recommendation_type</code>) — one of <code>task</code> / <code>risk</code> / <code>note</code> /
+  <code>followup</code>. The <code>task</code> type, when applied, creates a <code>project.task</code> record;
+  the others don't.</li>
+<li><strong>Priority</strong> (<code>priority</code>) — <code>low</code> / <code>normal</code> / <code>high</code> / <code>blocker</code>. Rows with
+  <code>priority='blocker'</code> decorate red.</li>
+<li><strong>Agent</strong> (<code>agent_partner_id</code>) — usually the Fabio partner (the partner XML id
+  is <code>southbrook_hermes.partner_fabio_agent</code>, seeded by
+  <code>data/fabio_partner.xml</code>).</li>
+<li><strong>State</strong> (<code>state</code>) — the workflow state, rendered as a coloured badge. See
+  the state machine below.</li>
+<li><strong>Agent Run ID</strong> (<code>agent_run_id</code>) — the sidecar's trace id for the
+  conversation that produced this recommendation. Use it when something
+  doesn't make sense and you need to trace back to what the agent saw.</li>
+<li><strong>Provider / Model</strong> (<code>model_provider</code>, <code>model_name</code>) — which LLM produced
+  the recommendation (e.g. <code>anthropic</code> / <code>claude-opus-4-7</code>).</li>
+<li><strong>Reviewer</strong> / <strong>Reviewed</strong> / <strong>Applied</strong> — your user, the timestamp you
+  approved or rejected, and the timestamp it was applied.</li>
+</ul>
+<h3 id="the-state-machine-verbatim-values">The state machine — verbatim values</h3>
+<p>There are <strong>five</strong> states defined on <code>southbrook.hermes.recommendation.state</code>:</p>
+<ol>
+<li><strong><code>draft</code></strong> — Fabio has just posted it via API. Not yet ready for review.</li>
+<li><strong><code>ready</code></strong> — Marked ready for human review (either by Fabio or by you
+   clicking <strong>Mark Ready</strong> on a draft).</li>
+<li><strong><code>approved</code></strong> — You read it, you agreed. Not yet applied; the database
+   has not changed.</li>
+<li><strong><code>rejected</code></strong> — You read it, you disagreed. Closed; will not be applied.</li>
+<li><strong><code>applied</code></strong> — Approval has been carried out. For <code>task</code> recommendations,
+   the linked <code>project.task</code> (<code>created_task_id</code>) now exists.</li>
+</ol>
+<p>The status bar at the top of the form shows the visible flow as
+<strong>draft → ready → approved → applied</strong> (rejected is a sideways exit and is
+indicated by a red ribbon, not a bar position). There is <strong>no</strong> <code>pending</code>
+state and <strong>no</strong> <code>failed</code> state — if <code>action_apply</code> raises (e.g. because a
+task recommendation is missing <code>payload.project_id</code>), the record stays in
+<code>approved</code> and the error surfaces as a <code>UserError</code>. Re-attempt after fixing
+the payload.</p>
+<h3 id="the-form-view">The form view</h3>
+<p>When you open a recommendation:</p>
+<ul>
+<li><strong>Header</strong> — the action buttons surface conditionally based on state:</li>
+<li><strong>Mark Ready</strong> appears when <code>state == 'draft'</code>.</li>
+<li><strong>Approve</strong> appears when <code>state in ('draft', 'ready')</code>.</li>
+<li><strong>Reject</strong> appears when <code>state != 'applied'</code>.</li>
+<li><strong>Apply</strong> appears when <code>state == 'approved'</code> (with a confirmation
+    dialog: <em>"Apply this Fabio recommendation? This creates only the approved
+    v1 target record."</em>).</li>
+<li><strong>Title</strong> (<code>name</code>) — the recommendation summary line.</li>
+<li><strong>Left group</strong>: type, priority, agent partner, <code>source_model</code>, <code>source_res_id</code>
+  — the model and record id the recommendation refers to.</li>
+<li><strong>Right group</strong>: agent run id, provider, model name, reviewer fields.</li>
+<li><strong>Recommendation tab</strong>: <code>summary</code>, <code>proposed_action</code>, <code>rationale</code> — these
+  are what Fabio wrote.</li>
+<li><strong>Payload tab</strong>: <code>payload_json</code> — the structured payload Fabio sent. For
+  <code>task</code> recommendations, this must contain <code>project_id</code> and may contain
+  <code>task_name</code> and <code>description</code>. The form validates <code>payload_json</code> is a JSON
+  object on every save (<code>_check_payload_json</code>).</li>
+<li><strong>Chatter</strong> — every state transition posts a message
+  ("Fabio recommendation approved.", "Fabio recommendation rejected.",
+  "Fabio recommendation applied."), so the audit trail is on the record
+  itself. Approval/rejection also writes <code>reviewer_id</code> and <code>reviewed_date</code>;
+  apply writes <code>applied_date</code>.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>Per investigation (the loop you run every time a Fabio recommendation
+needs review):</strong></p>
+<ol>
+<li>Open <strong>Fabio → Recommendations</strong>. The default <code>Open</code> filter shows you
+   <code>draft</code>, <code>ready</code>, and <code>approved</code> rows. Group by <em>State</em> (it's the
+   default sort decoration order).</li>
+<li>Pick the top <code>ready</code> row. (<code>draft</code> rows are usually still in transit
+   from the agent; you can mark a stuck <code>draft</code> ready yourself, but be
+   suspicious — it usually means the sidecar errored mid-write.)</li>
+<li>Read in this order:
+   - <strong>Summary</strong> — what does Fabio think should happen?
+   - <strong>Proposed Action</strong> — what specifically?
+   - <strong>Rationale</strong> — why? This is the most important field; if the
+     rationale doesn't actually support the action, <strong>reject</strong> with a note
+     and stop reading.
+   - <strong>Source record</strong> (<code>source_model</code> + <code>source_res_id</code>) — open the
+     referenced record in a new tab. Look at the live data the
+     recommendation is based on. If the data has moved on since Fabio
+     wrote the recommendation, <strong>reject</strong> with a one-line note in the
+     chatter explaining "stale — original condition no longer holds."
+   - <strong>Payload tab</strong> — for <code>task</code> recommendations, verify <code>project_id</code>
+     resolves to a real project and <code>task_name</code> (if present) is sensible.</li>
+<li>Decide:
+   - <strong>Approve</strong> — you agree with both action and rationale.
+   - <strong>Reject</strong> — you disagree, or the underlying data has changed.
+   - <strong>Apply</strong> — once approved, click <strong>Apply</strong> to make the change. For
+     <code>task</code> recommendations this calls <code>_create_project_task</code> which creates
+     a <code>project.task</code> on the payload's <code>project_id</code> and posts a message on
+     it linking back to the recommendation.</li>
+<li>Add a chatter note explaining your reasoning if the decision wasn't
+   obvious. The chatter is the audit trail that survives the recommendation;
+   future-you (and any auditor) needs it to be able to reconstruct <em>why</em>.</li>
+</ol>
+<p><strong>Per shift (5 min at start, 5 min at end):</strong></p>
+<ul>
+<li>Start of shift: scan for any <code>priority='blocker'</code> recommendations
+  (red-decorated rows). These jump the queue.</li>
+<li>End of shift: clear out <code>approved</code> recommendations that have been sitting
+  approved-but-not-applied — that's the manager's backlog, not the agent's.
+  Either apply them or reject them.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I approved it, then realised I shouldn't have. Can I reject it now?"</strong></p>
+<p>Yes — <code>action_reject</code> is allowed from any state <em>except</em> <code>applied</code>. The
+<strong>Reject</strong> button stays visible on the form until the recommendation has
+actually been applied. Click it, add a chatter note explaining the
+reversal, and the state flips to <code>rejected</code>. The reviewer fields update to
+your user and the time.</p>
+<p><strong>"I clicked Apply and got a <code>UserError</code> saying 'Task recommendations
+require payload.project_id'."</strong></p>
+<p>The payload is malformed. The recommendation stays in <code>approved</code> state — it
+did not move to <code>applied</code>. Open the <strong>Payload</strong> tab, add a valid <code>project_id</code>
+key (an integer matching a real <code>project.project.id</code>), save, then click
+Apply again. If the payload was wrong because Fabio mis-extracted the
+project, that's the kind of thing to mention in the chatter — it's
+diagnostic feedback for whoever tunes the sidecar.</p>
+<p><strong>"A recommendation has been sitting in <code>draft</code> for an hour and Fabio isn't
+marking it ready."</strong></p>
+<p>The agent posted it but didn't complete the <code>action_mark_ready</code> transition.
+You can mark it ready yourself (the <strong>Mark Ready</strong> button is visible on
+drafts to reviewers), but check the <em>Agent Run ID</em> first — paste it into
+your IT contact's chat and ask whether the sidecar errored. A flood of
+stuck drafts is usually a sidecar incident, not a per-recommendation issue.</p>
+<p><strong>"I approved a <code>task</code> recommendation but the project task doesn't exist."</strong></p>
+<p>Approval (<code>action_approve</code>) does <strong>not</strong> create the task. Only
+<code>action_apply</code> creates it. Confirm the state on the recommendation: if it
+shows <code>approved</code> (not <code>applied</code>), the task hasn't been created yet. Click
+<strong>Apply</strong>.</p>
+<p><strong>"How do I know who approved last quarter's recommendations?"</strong></p>
+<p>The list view's <strong>Reviewer</strong> and <strong>Reviewed</strong> columns. They're populated on
+the <code>action_approve</code> and <code>action_reject</code> paths only. For application audit,
+sort by <strong>Applied</strong> descending. For a full timeline including any
+intermediate comments, open the record and read the chatter — every state
+transition is logged there as well.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The recommendation queue is a thin Odoo model with a state machine,
+designed as a human approval boundary for the external Fabio sidecar.</p>
+<p>The model <code>southbrook.hermes.recommendation</code> inherits <code>mail.thread</code> and
+<code>mail.activity.mixin</code>, which is why you get chatter + activity for free.
+Five state values are declared on the <code>state</code> selection field:
+<code>draft / ready / approved / rejected / applied</code>. Each transition is a
+separate Python method:</p>
+<ul>
+<li><code>action_mark_ready</code> — <code>draft → ready</code>. Raises <code>UserError</code> if state isn't
+  <code>draft</code>.</li>
+<li><code>action_approve</code> — <code>(draft|ready) → approved</code>. Writes <code>reviewer_id</code> and
+  <code>reviewed_date</code>. Raises if state isn't draft or ready.</li>
+<li><code>action_reject</code> — <code>(any except applied) → rejected</code>. Same reviewer/date
+  fields. Raises if state is <code>applied</code>.</li>
+<li><code>action_apply</code> — <code>approved → applied</code>. Writes <code>applied_date</code>. For
+  <code>recommendation_type == 'task'</code>, calls <code>_create_project_task</code>, which
+  creates a <code>project.task</code> on <code>payload['project_id']</code> and stores the new
+  task id in <code>created_task_id</code>. Raises <code>UserError</code> if state isn't <code>approved</code>.</li>
+</ul>
+<p>The payload is stored as a JSON string in <code>payload_json</code> (default <code>"{}"</code>)
+and validated as a JSON object on every save. The <code>_payload()</code> helper
+decodes it; <code>_check_payload_json</code> is the <code>@api.constrains</code> hook that runs
+on write.</p>
+<p><strong>Outbound bridge — where Fabio actually talks to Odoo.</strong> The
+<code>/hermes/v1/ask</code> controller in <code>controllers/hermes_proxy.py</code> is the
+browser entry point; the controller mints a JWT (using the helper in
+<code>utils/jwt_helper.py</code>, requires <code>PyJWT</code> at runtime) and POSTs to a
+configured sidecar URL. The sidecar URL and enable flag are read from
+<code>ir.config_parameter</code> keys <code>southbrook_hermes.sidecar_url</code> and
+<code>southbrook_hermes.sidecar_enabled</code>; when the flag is off, the controller
+returns a stub answer so the OWL chat panel still works end-to-end. The
+sidecar then writes draft recommendations back through the inbound API
+(controllers in <code>hermes_conversation_api.py</code> and <code>hermes_tools_api.py</code>).
+You don't need to touch any of this for normal review work — it's listed
+here only so you know the loop is real and that the sidecar's writes are
+authenticated, not freeform.</p>
+<p>Access control: the <code>group_hermes_reviewer</code> group gates the entire Fabio
+menu tree and is the only group with read/write/create on the
+recommendation and question models. Production managers should be in this
+group; operators should not.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A <code>ready</code> recommendation says "Reschedule MO-1042 from SB-EDGE
+Monday morning to Tuesday afternoon because SB-EDGE has 14 hours of work
+queued for Monday." You open the source record (MO-1042) and see the
+planner already moved it to Wednesday this morning. What do you do?</p>
+<blockquote>
+<p><strong>Reject</strong> with a chatter note like "Stale — planner has already moved
+MO-1042 to Wednesday." The recommendation's rationale is no longer
+true. The reject writes your user and timestamp into <code>reviewer_id</code> /
+<code>reviewed_date</code> so the audit trail captures who closed it.</p>
+</blockquote>
+<p><strong>2.</strong> You click <strong>Approve</strong> on a <code>task</code>-type recommendation, then realise
+the payload's <code>project_id</code> doesn't exist. What state is the record in,
+and what's the right next move?</p>
+<blockquote>
+<p>The record is <code>approved</code>. <strong>Apply</strong> has not been clicked yet, so no task
+was created. Fix the payload (edit <code>payload_json</code> to point at the right
+project), then click <strong>Apply</strong>. If you decide it shouldn't be applied at
+all, click <strong>Reject</strong> instead — that's still allowed because the state
+isn't <code>applied</code>.</p>
+</blockquote>
+<p><strong>3.</strong> Three weeks after applying a recommendation, an auditor asks who
+approved it. Where do you find that?</p>
+<blockquote>
+<p>The <strong>Reviewer</strong> field (<code>reviewer_id</code>) and <strong>Reviewed</strong> field
+(<code>reviewed_date</code>) on the record. The chatter also has the
+"Fabio recommendation approved." message timestamped with the same data.
+For full context, the same form shows <code>applied_date</code> and (if it was a
+task) <code>created_task_id</code> so you can jump to the resulting task.</p>
+</blockquote>
+<p><strong>4.</strong> A <code>draft</code> recommendation has been sitting for 6 hours and Fabio
+isn't picking it up. The agent run id is filled in. What's most likely
+wrong, and what do you do?</p>
+<blockquote>
+<p>The sidecar most likely errored after posting the draft but before
+marking it ready. Flag it to IT with the <code>agent_run_id</code> so they can
+trace the sidecar log. If the content looks reasonable and is still
+relevant, you can click <strong>Mark Ready</strong> yourself and proceed with normal
+review — but log the manual transition in the chatter so it's clear the
+agent didn't complete the handoff.</p>
+</blockquote>
+<p><strong>5.</strong> A recommendation has <code>state='applied'</code> and <code>created_task_id</code> set.
+Can you reject it?</p>
+<blockquote>
+<p>No. <code>action_reject</code> raises <code>UserError</code> when the state is <code>applied</code>
+("Applied recommendations cannot be rejected."). The change has already
+hit the database. If the task was created in error, close or delete the
+resulting <code>project.task</code> directly, and post a note in the recommendation
+chatter explaining the cleanup.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The Hermes Console at hermes.odooiq.com — separate operator surface for
+  sysadmin recommendations. Covered in lesson 7.3
+  (<code>07_hermes_sysadmin.md</code>).</li>
+<li>Customer-service view of the recommendation queue (different filters,
+  different priorities) — lesson 6.3 (<code>06_hermes_cs_view.md</code>).</li>
+<li>How to author and deploy the Fabio sidecar itself — that's an IT topic
+  outside the trainee track.</li>
+<li>The OWL chat panel ("Ask Fabio") behaviour — covered in <code>06_hermes_cs_view.md</code>.</li>
+<li>Approving non-Fabio recommendations from the MI engine — those are
+  <em>checks</em>, not recommendations, and live in <strong>Southbrook PM → MI Checks</strong>
+  (lesson 3.1).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_03_oee" model="slide.slide">
+            <field name="name">OEE per Workcenter — What `oee_target` Means and When to Investigate</field>
+            <field name="channel_id" ref="course_floor_management"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Production Manager (interprets per-workcenter OEE and decides what corrective action to send to which operator).</field>
+            <field name="html_content"><![CDATA[<h1 id="oee-per-workcenter-what-oee_target-means-and-when-to-investigate">OEE per Workcenter — What <code>oee_target</code> Means and When to Investigate</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the <strong>Production Manager</strong>. OEE is the single number you'll get asked
+about most — by the planner ("is SB-EDGE really the bottleneck?"), by the
+SAMI investment committee ("are we hitting world-class?"), and by yourself
+when a station feels slow but the queue depth doesn't show it. This lesson
+covers what OEE means in Southbrook's specific implementation: which fields
+feed it, which dashboard tile shows it, what <code>oee_target</code> is actually
+benchmarking against, and which operator conversation to have when each
+factor sags.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Southbrook PM → Dashboard</strong> — the kanban shows the OEE target per
+workcenter at the bottom of each card.
+<strong>Manufacturing → Configuration → Work Centers</strong> (or <strong>Southbrook PM →
+Floor Load</strong>) — the workcenter form, where the OEE target lives and
+where the downtime breakdown can be drilled into.</p>
+</blockquote>
+<p>There is no standalone "OEE report" page in v1 — OEE shortfall analysis is
+done by inspecting downtime, cycle-time variance, and rework metrics on the
+work-order list under each workcenter.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="the-dashboard-card-per-workcenter">The Dashboard card (per workcenter)</h3>
+<p>Each kanban card on <strong>Southbrook PM → Dashboard</strong> shows four live metrics
+(<em>In Queue</em>, <em>Done Today</em>, <em>Late</em>, <em>Equipment</em> — see lesson 3.1) and the
+<strong>OEE Target</strong> in the card footer. The target rendered is the native Odoo
+<code>oee_target</code> field on <code>mrp.workcenter</code>, seeded at <strong>85.0%</strong> by
+<code>southbrook_mrp_pm/data/workcenters.xml</code> for all eight Southbrook stations:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Name</th>
+<th><code>oee_target</code></th>
+<th><code>costs_hour</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SB-SAW</code></td>
+<td>Panel Saw / CNC Nesting</td>
+<td>85.0</td>
+<td>$85/hr</td>
+</tr>
+<tr>
+<td><code>SB-EDGE</code></td>
+<td>Edge Bander</td>
+<td>85.0</td>
+<td>$65/hr</td>
+</tr>
+<tr>
+<td><code>SB-CNC-BORE</code></td>
+<td>CNC Boring</td>
+<td>85.0</td>
+<td>$80/hr</td>
+</tr>
+<tr>
+<td><code>SB-ASSY</code></td>
+<td>Carcass Assembly</td>
+<td>85.0</td>
+<td>$60/hr</td>
+</tr>
+<tr>
+<td><code>SB-DOOR</code></td>
+<td>Door Hanging</td>
+<td>85.0</td>
+<td>$55/hr</td>
+</tr>
+<tr>
+<td><code>SB-HW</code></td>
+<td>Hardware Fitting</td>
+<td>85.0</td>
+<td>$50/hr</td>
+</tr>
+<tr>
+<td><code>SB-QC</code></td>
+<td>Quality Control</td>
+<td>85.0</td>
+<td>$40/hr</td>
+</tr>
+<tr>
+<td><code>SB-PACK</code></td>
+<td>Pack &amp; Label</td>
+<td>85.0</td>
+<td>$35/hr</td>
+</tr>
+</tbody>
+</table>
+<p>There is a <strong>second</strong> OEE target field on the same model:
+<strong><code>x_sbk_oee_target</code></strong> (<code>mrp.workcenter</code>, defined in
+<code>southbrook_mrp_kitchen_workcenters/models/mrp_workcenter.py</code>, default
+<strong>0.85</strong> as a 0..1 ratio, widget <code>percentage</code>). It serves the
+kitchen-workcenter views that read 0..1, while the native <code>oee_target</code>
+serves the PM dashboard that reads percent. Both should agree (0.85 ↔ 85.0%).
+The <code>x_sbk_oee_target</code> field is set per workcenter on the form view
+(<code>southbrook_mrp_kitchen_workcenters/views/mrp_workcenter_views.xml</code>); the
+native <code>oee_target</code> is seeded by the PM data file mentioned above.</p>
+<h3 id="the-workcenter-form-the-fields-that-feed-oee">The workcenter form — the fields that feed OEE</h3>
+<p>When you open a workcenter (e.g. <strong>SB-EDGE</strong>), the form shows the kitchen
+extension fields used to compute the three OEE factors:</p>
+<ul>
+<li><strong><code>oee_target</code></strong> (native, percent) — the benchmark the dashboard compares
+  against. 85.0% is the industry-standard "world-class" threshold and what
+  Southbrook adopted at install per the JTBD recommendation in
+  <code>southbrook_mrp_pm/data/workcenters.xml</code>.</li>
+<li><strong><code>x_sbk_oee_target</code></strong> (0..1) — Southbrook-custom mirror, default 0.85,
+  for the kitchen views.</li>
+<li><strong><code>x_sbk_default_setup_time_min</code></strong> — minutes added per WO for setup.</li>
+<li><strong><code>x_sbk_changeover_time_min</code></strong> — minutes when an operation changes
+  material/finish/tool.</li>
+<li><strong><code>x_sbk_is_bottleneck</code></strong> — Theory-of-Constraints configuration flag.
+  Bottleneck stations have stricter scrutiny on availability shortfalls.</li>
+<li><strong><code>costs_hour</code></strong> (native) — used by the downtime cost rollup.</li>
+<li><strong><code>x_sbk_allows_parallel_jobs</code></strong> — whether the station can run multiple
+  WOs in flight at once.</li>
+</ul>
+<h3 id="the-work-order-list-per-workcenter">The work-order list per workcenter</h3>
+<p>The work-order list under any workcenter is the actual data source for OEE
+calculation. Relevant <code>mrp.workorder</code> fields:</p>
+<ul>
+<li><strong><code>duration</code></strong> (native) — actual minutes worked. The denominator for
+  Performance.</li>
+<li><strong><code>duration_expected</code></strong> (native) — Odoo's expected duration.</li>
+<li><strong><code>x_sbk_kitchen_expected_min</code></strong> — parallel expected duration computed
+  from Southbrook's operation-template formula (not Odoo's compute). The
+  planner audits which engine produced which estimate.</li>
+<li><strong><code>x_sbk_variance_min</code></strong> — <code>duration − x_sbk_kitchen_expected_min</code>.
+  Positive = over budget.</li>
+<li><strong><code>x_sbk_downtime_min</code></strong> — sum of attached downtime durations on this
+  WO. The denominator for Availability calculation.</li>
+<li><strong><code>x_sbk_downtime_cost</code></strong> — sum at workcenter's <code>costs_hour</code>.</li>
+<li><strong><code>x_sbk_rework_count</code></strong> — number of rework checks pointing at this WO
+  via <code>x_sbk_rework_workorder_id</code> on <code>southbrook.mi.check</code>. The Quality
+  signal.</li>
+<li><strong><code>x_sbk_rework_cost</code></strong> — rework duration cost attributed back to this
+  WO.</li>
+</ul>
+<h3 id="the-downtime-list">The downtime list</h3>
+<p><code>southbrook.kitchen.workcenter.downtime</code> is the table that feeds the
+Availability factor. Every row carries:</p>
+<ul>
+<li><strong><code>workcenter_id</code></strong> — which station.</li>
+<li><strong><code>workorder_id</code></strong> — optionally, the specific WO that was running.</li>
+<li><strong><code>date_start</code></strong> / <strong><code>date_end</code></strong> / <strong><code>duration_min</code></strong> — the window.</li>
+<li><strong><code>reason</code></strong> — one of 13 reasons (verbatim from the model):</li>
+<li><code>material_not_available</code> — Material Not Available</li>
+<li><code>drawing_issue</code> — Drawing / Spec Issue</li>
+<li><code>machine_breakdown</code> — Machine Breakdown</li>
+<li><code>tool_change</code> — Tool Change</li>
+<li><code>setup_time</code> — Setup Time</li>
+<li><code>color_finish_changeover</code> — Color / Finish Changeover</li>
+<li><code>waiting_previous_operation</code> — Waiting on Previous Operation</li>
+<li><code>waiting_quality_approval</code> — Waiting on Quality Approval</li>
+<li><code>rework</code> — Rework</li>
+<li><code>operator_unavailable</code> — Operator Unavailable</li>
+<li><code>subcontract_delay</code> — Subcontract Delay</li>
+<li><code>maintenance</code> — Planned Maintenance</li>
+<li><code>other</code> — Other</li>
+<li><strong><code>state</code></strong> — <code>draft</code> / <code>active</code> / <code>closed</code> / <code>cancelled</code>.
+  Cancelled rows are excluded from rollup; active and closed both count.</li>
+<li><strong><code>downtime_cost</code></strong> — <code>(duration_min / 60) × costs_hour</code>.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<h3 id="the-oee-formula-how-southbrook-computes-it">The OEE formula (how Southbrook computes it)</h3>
+<p><strong>OEE = Availability × Performance × Quality.</strong> Each factor is a 0..1 ratio
+that is computed per workcenter from the work-order and downtime tables.</p>
+<ul>
+<li><strong>Availability</strong> = <code>productive_time / scheduled_time</code></li>
+<li><code>scheduled_time</code> = sum of <code>duration_expected</code> (or <code>x_sbk_kitchen_expected_min</code>)
+    on all WOs scheduled to the station today.</li>
+<li><code>productive_time</code> = <code>scheduled_time − sum(x_sbk_downtime_min)</code> for the
+    same set of WOs. Any downtime row in state <code>active</code> or <code>closed</code>
+    counts; <code>cancelled</code> does not.</li>
+<li>
+<p>A station with 8 hours of scheduled work and 47 minutes of logged
+    downtime has Availability = (480 − 47) / 480 = 0.902.</p>
+</li>
+<li>
+<p><strong>Performance</strong> = <code>expected_duration / actual_duration</code></p>
+</li>
+<li>For each completed WO: <code>x_sbk_kitchen_expected_min / duration</code>.</li>
+<li>Aggregated per workcenter as the WO-weighted average.</li>
+<li>
+<p>A WO that took 30 minutes but was expected to take 22 has Performance
+    = 22/30 = 0.733. Cycle-time variance directly degrades this.</p>
+</li>
+<li>
+<p><strong>Quality</strong> = <code>good_parts / total_parts</code></p>
+</li>
+<li>For Southbrook this is computed by looking at MI checks of severity
+    <code>blocker</code> or <code>warning</code> in category <code>assembly</code>/<code>hardware</code>/<code>install</code> that
+    point back at WOs on this workcenter via
+    <code>x_sbk_rework_workorder_id</code> — i.e. the WO that produced a defect
+    bad enough to need rework.</li>
+<li>Quality = 1 − (rework_count / total_workorders) for the period.</li>
+</ul>
+<p>OEE = the three numbers multiplied. A station at 0.90 × 0.85 × 0.95 = 0.726,
+which is below the 0.85 target — investigation needed.</p>
+<h3 id="start-of-day-10-min">Start of day (10 min)</h3>
+<ol>
+<li>Open the <strong>Dashboard</strong>. Note the OEE target on each card (85.0% across
+   the board, by seed).</li>
+<li>For each station, look at the Done Today vs In Queue ratio mentally — a
+   station that didn't move much yesterday will have OEE problems showing
+   up in your weekly review.</li>
+<li>Open <strong>Manufacturing → Reporting → Work Orders Performance</strong> (Odoo
+   native) or any pivot view grouped by workcenter for the day prior to
+   see actual yesterday-vs-expected duration ratios.</li>
+</ol>
+<h3 id="per-investigation-when-oee-on-a-station-crosses-the-target">Per investigation (when OEE on a station crosses the target)</h3>
+<p>A station's calculated OEE has dropped below its target. <strong>Decompose into
+the three factors first</strong> — never attack OEE as a single number, because
+the corrective action depends entirely on which factor sagged.</p>
+<p><strong>1. Low Availability</strong> (the station was idle when it shouldn't have been)
+- Open the downtime list filtered to that workcenter for the period:
+  <em>Southbrook PM → (workcenter)</em> → downtime tab.
+- Group by <code>reason</code>. The top reason category is your Pareto winner.
+- Match reason to corrective action:
+  - <code>machine_breakdown</code> → equipment maintenance log; coordinate with
+    Equipment Owner.
+  - <code>material_not_available</code> → planner conversation — material readiness
+    check before MO release (lesson 2.2).
+  - <code>waiting_previous_operation</code> → upstream bottleneck; check the prior
+    station in the routing.
+  - <code>setup_time</code> / <code>tool_change</code> → planner can sequence WOs to share setup;
+    operator can pre-stage tools.
+  - <code>color_finish_changeover</code> → planner sequence again (cluster same-colour
+    WOs); applies hardest at SB-EDGE and finishing stations.
+  - <code>operator_unavailable</code> → HR / shift coverage.
+  - <code>waiting_quality_approval</code> → QC throughput; talk to QC lead.</p>
+<p><strong>2. Low Performance</strong> (the station was running but slower than expected)
+- Open the WO list for the period, filtered to the workcenter.
+- Sort by <code>x_sbk_variance_min</code> descending. The top rows are the WOs that
+  bled time.
+- For each, compare <code>duration</code> to <code>x_sbk_kitchen_expected_min</code>. Common
+  causes:
+  - Operator just learned the operation — variance high on first few WOs,
+    recovers. Coach, don't escalate.
+  - Operation template estimate is wrong — <code>x_sbk_kitchen_expected_min</code>
+    consistently low across many operators on the same op. Talk to the
+    planner about recalibrating the template (via
+    <code>action_sbk_recalc_kitchen_duration</code> on the WO).
+  - Material is harder than expected — check whether <code>x_sbk_complexity_factor</code>
+    on the parent MO is set correctly.</p>
+<p><strong>3. Low Quality</strong> (the station produced rework)
+- Open <strong>Southbrook PM → MI Checks</strong>, filter category to <code>assembly</code> /
+  <code>hardware</code> (or <code>install</code> if you're managing finishing stations),
+  group by <code>production_id</code> to see which MOs the rework is concentrated on.
+- For each affected MO, check the WO that produced the defect — via the
+  <code>x_sbk_rework_workorder_id</code> link on the check.
+- Match to corrective action:
+  - Same operator across multiple rework events → coaching conversation.
+  - Same operation across operators → spec issue; talk to PLM about the
+    cut spec or the routing.
+  - Same upstream component → root cause is at the prior station; rework
+    here is symptomatic.</p>
+<h3 id="per-investigation-the-oee-shortfall-decision-tree">Per investigation (the OEE-shortfall decision tree)</h3>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Most likely factor</th>
+<th>First check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Station went idle for blocks of time</td>
+<td>Availability</td>
+<td>Downtime list, group by <code>reason</code></td>
+</tr>
+<tr>
+<td>Station ran but every WO was over plan</td>
+<td>Performance</td>
+<td>WO list, sort by <code>x_sbk_variance_min</code> desc</td>
+</tr>
+<tr>
+<td>Station ran on time but produced defects</td>
+<td>Quality</td>
+<td>MI Checks, category <code>assembly</code>/<code>hardware</code>, group by <code>production_id</code></td>
+</tr>
+<tr>
+<td>All three sag together</td>
+<td>Upstream</td>
+<td>Check the prior station in the routing — root cause is rarely here</td>
+</tr>
+</tbody>
+</table>
+<h3 id="end-of-day-5-min">End of day (5 min)</h3>
+<ul>
+<li>Note any station where today's OEE was meaningfully under target. A
+  one-day blip is noise; a three-day pattern is a campaign.</li>
+<li>For the bottleneck stations (<code>x_sbk_is_bottleneck = True</code>), shortfall is
+  P0 — capture the cause in the next planning meeting.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The kanban shows <code>OEE Target 85.0%</code> — where do I see actual OEE?"</strong></p>
+<p>The dashboard card shows the <strong>target</strong>, not the live actual. There is no
+single computed OEE field on the workcenter in v1 — actual OEE is computed
+on demand by looking at the three factor sources (workorders, downtime,
+rework checks) for a chosen period. Open the work-order list and the
+downtime list filtered to the workcenter and compute the three factors. A
+future MI engine extension will write a stored actual; until then, the
+dashboard target is the benchmark, not the readout.</p>
+<p><strong>"OEE on SB-EDGE looks bad but every downtime row is <code>cancelled</code>."</strong></p>
+<p><code>cancelled</code> rows are deliberately excluded — that's the inspector's
+"this wasn't really downtime" override (see the model docstring). If you
+think a row was incorrectly cancelled, find it, open it, and reopen via
+the <code>action_start</code> button (which transitions back to <code>active</code>).</p>
+<p><strong>"My calculated Performance is over 1.0 — that's not possible."</strong></p>
+<p>It is, when actual was faster than expected. Performance &gt; 1 means the
+operator beat the operation-template estimate. Two possibilities: the WO
+genuinely went well (no action), or the template estimate is too generous
+(talk to the planner; recalibrate via
+<code>action_sbk_recalc_kitchen_duration</code>).</p>
+<p><strong>"A downtime row I just closed shows <code>duration_min = 0</code>."</strong></p>
+<p>The <code>_compute_duration</code> compute fires on <code>date_start</code> + <code>date_end</code>. If
+you closed it via <strong>Close</strong> (which calls <code>action_close</code>) the <code>date_end</code>
+is now; if the time difference rounds to under 1 minute, you'll see 0.
+The field is writable — backfill an estimate manually. The model docstring
+flags this case ("an operator who forgot to start the timer can backfill
+an estimate").</p>
+<p><strong>"The <code>oee_target</code> and <code>x_sbk_oee_target</code> on a workcenter disagree."</strong></p>
+<p>They should always agree (0.85 ↔ 85.0%). If they don't, someone has
+edited one without the other. The native <code>oee_target</code> is what the PM
+dashboard renders; the <code>x_sbk_oee_target</code> is what the kitchen view shows.
+Update both to keep the displayed target consistent across screens.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>OEE isn't a single Python field — it's a <em>derived metric</em> aggregated from
+three input tables when you look at it. The fields above are what's
+<strong>actually stored</strong>:</p>
+<ul>
+<li><code>mrp.workcenter.oee_target</code> — the percent target seeded by
+  <code>southbrook_mrp_pm/data/workcenters.xml</code> at install.</li>
+<li><code>mrp.workcenter.x_sbk_oee_target</code> — the 0..1 mirror, default 0.85,
+  declared in <code>southbrook_mrp_kitchen_workcenters/models/mrp_workcenter.py</code>.</li>
+<li><code>mrp.workorder.duration</code> and <code>mrp.workorder.x_sbk_kitchen_expected_min</code>
+  — actual and expected minutes per WO. The latter is recomputed by
+  <code>action_sbk_recalc_kitchen_duration</code> from the operation-template formula
+  (driver value × complexity factor).</li>
+<li><code>mrp.workorder.x_sbk_variance_min</code> — stored, computed by
+  <code>_compute_x_sbk_variance</code> as <code>duration − x_sbk_kitchen_expected_min</code>.</li>
+<li><code>mrp.workorder.x_sbk_downtime_min</code> — <em>not</em> stored (<code>store=False</code>),
+  recomputed on view render by aggregating
+  <code>southbrook.kitchen.workcenter.downtime</code> rows where
+  <code>workorder_id == self.id</code> and <code>state in ('active', 'closed')</code>.</li>
+<li><code>mrp.workorder.x_sbk_rework_count</code> and <code>x_sbk_rework_cost</code> — also not
+  stored; counted from <code>southbrook.mi.check</code> records pointing at the WO
+  via <code>x_sbk_rework_workorder_id</code>.</li>
+</ul>
+<p>The <code>southbrook.kitchen.workcenter.downtime</code> model is CE-safe (no
+dependency on Enterprise maintenance/quality) and is the canonical
+source for Availability. The 13 <code>DOWNTIME_REASONS</code> enumerated in the
+model are what populate the Pareto chart you build when Availability is
+the suspect factor.</p>
+<p><strong>Bottleneck handling.</strong> The <code>x_sbk_is_bottleneck = True</code> configuration
+flag on the workcenter tells two systems to treat the station with
+elevated scrutiny: (a) the planner avoids parallel routes through it;
+(b) the MI engine marks extended idle time on it as P0. The flag is
+<em>configuration</em> — set in the workcenter seed XML, not edited on the fly.
+A bottleneck station whose OEE drops below target is an immediate
+investigation; a non-bottleneck station whose OEE drops is a watch item.</p>
+<p><strong>Refresh cadence.</strong> None of the OEE source fields are recomputed by a
+scheduled cron — every read is on demand. The five <strong>Southbrook
+Orchestration</strong> crons (lesson 3.1) drive readiness and MI stage gates,
+not OEE. If you need the variance and downtime aggregates to reflect a
+just-closed downtime row, save the row and reload the WO list; the
+non-stored computes fire on render.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> SB-EDGE's calculated OEE for the week is 0.71 (target 0.85).
+Availability is 0.83, Performance is 0.96, Quality is 0.89. Which
+factor do you investigate first, and where do you look?</p>
+<blockquote>
+<p><strong>Availability</strong>. 0.83 is the lowest of the three and the furthest
+below benchmark (~0.95). Open the downtime list filtered to SB-EDGE
+for the week, group by <code>reason</code>. The top reason category is your
+root cause to attack first.</p>
+</blockquote>
+<p><strong>2.</strong> A downtime row says <code>reason = color_finish_changeover</code> and lasted
+35 minutes. Is that downtime "real" for OEE purposes, or is it normal
+operating time?</p>
+<blockquote>
+<p>Real for Availability — the row is in state <code>closed</code> (active and
+closed both count). But the corrective action is to <strong>sequence WOs by
+colour</strong>, not to fix the machine. Same-colour WOs back-to-back reduce
+the changeover count. Bring it to the planner with the downtime
+Pareto.</p>
+</blockquote>
+<p><strong>3.</strong> SB-CNC-BORE's Performance is 0.62 — everything is running 30-40%
+over expected. The same operator has worked the station all week.
+What's most likely, and what action do you take?</p>
+<blockquote>
+<p>Either the operation-template estimate is too tight (most likely after
+several rounds of consistently-over WOs across operators), or one
+specific operation has a wrong template. Sort the WO list by
+<code>x_sbk_variance_min</code> desc, open the worst row, compare <code>duration</code> to
+<code>x_sbk_kitchen_expected_min</code>. If the same operation surfaces
+repeatedly, talk to the planner about recalibrating the template via
+<code>action_sbk_recalc_kitchen_duration</code>.</p>
+</blockquote>
+<p><strong>4.</strong> A workcenter's calculated Quality is 0.78. You open
+<strong>Southbrook PM → MI Checks</strong> filtered to the workcenter; almost every
+rework check points at the same operator. What conversation do you
+have, and with whom?</p>
+<blockquote>
+<p>Coaching conversation with the operator. The pattern is
+operator-specific, not operation-specific. Pull the specific MI
+checks (their <code>message</code> and <code>recommendation</code> fields tell you exactly
+what went wrong) and walk through them with the operator. If the
+pattern crossed multiple operators, the conversation shifts to PLM
+(cut-spec) instead.</p>
+</blockquote>
+<p><strong>5.</strong> The dashboard card for SB-ASSY shows OEE Target 85.0%, but
+the form view for SB-ASSY shows <code>x_sbk_oee_target = 0.50</code>. Which is
+right, and what do you do?</p>
+<blockquote>
+<p>They are out of sync — someone edited the kitchen field without
+updating the native field (or vice versa). The dashboard card reads
+native <code>oee_target</code> (85.0%) and the kitchen views read
+<code>x_sbk_oee_target</code> (0.50). Decide which is correct for the station's
+realistic target, then update <em>both</em> so every screen shows the same
+benchmark. Default for a healthy station is 0.85 / 85.0%.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Logging downtime as an operator — that's lesson 1.6
+  (<code>01_logging_downtime.md</code>).</li>
+<li>The MI engine's per-package check rollup — lesson 3.1
+  (<code>03_mi_dashboards.md</code>).</li>
+<li>Native Odoo OEE reporting at the Manufacturing → Reporting level — Odoo's
+  own eLearning track covers the OOTB pivots and graphs.</li>
+<li>Recalibrating an operation template — covered in lesson 2.3
+  (<code>02_bottleneck_scheduling.md</code>) and 4.2 (<code>04_cut_specs.md</code>).</li>
+<li>Equipment maintenance cycles — covered in Course 7 (sysadmin).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

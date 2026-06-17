@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="tag_group_internal" model="slide.channel.tag.group">
+            <field name="name">Southbrook Internal</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="tag_internal" model="slide.channel.tag">
+            <field name="name">Internal Custom Modules</field>
+            <field name="group_id" ref="tag_group_internal"/>
+            <field name="color">3</field>
+        </record>
+        <record id="course_workcenter_operators" model="slide.channel">
+            <field name="name">Course 1 — Workcenter Operators</field>
+            <field name="description">Daily flow for the people who run the shop — edge banding, CNC, assembly, sanding, finishing. Anchored on real workcenters: SB-EDGE, SB-CNC-BORE, SB-ASSY, SAND, PAINT, CURE.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">public</field>
+            <field name="enroll">public</field>
+            <field name="sequence">10</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">3</field>
+        </record>
+        <record id="course_production_planning" model="slide.channel">
+            <field name="name">Course 2 — Production Planning</field>
+            <field name="description">For the human sequencing the day&#x27;s work against workcenters, running the release gate, and reading the MI report. Native MRP is assumed knowledge; these lessons cover the Southbrook deltas.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">public</field>
+            <field name="enroll">public</field>
+            <field name="sequence">20</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">4</field>
+        </record>
+        <record id="course_floor_management" model="slide.channel">
+            <field name="name">Course 3 — Floor Management</field>
+            <field name="description">Manufacturing Intelligence dashboards, Fabio recommendation queue, and OEE per workcenter — what a production manager watches and approves.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">public</field>
+            <field name="enroll">public</field>
+            <field name="sequence">30</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">5</field>
+        </record>
+        <record id="course_plm_design" model="slide.channel">
+            <field name="name">Course 4 — PLM + Design</field>
+            <field name="description">Engineering Change Orders, cut spec authoring, FreeCAD render pipeline, and Gemini-backed AI design assist. For designers and ECO engineers.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">public</field>
+            <field name="enroll">public</field>
+            <field name="sequence">40</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">6</field>
+        </record>
+        <record id="course_estimating_configurator" model="slide.channel">
+            <field name="name">Course 5 — Estimating + Configurator</field>
+            <field name="description">Turning a customer&#x27;s kitchen design into a configured quote — OCA configurator vocabulary, the Southbrook Order Builder, the Marathon hardware catalog, and the v2 UX deltas.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">public</field>
+            <field name="enroll">public</field>
+            <field name="sequence">50</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">7</field>
+        </record>
+        <record id="course_customer_touchpoints" model="slide.channel">
+            <field name="name">Course 6 — Customer Touchpoints</field>
+            <field name="description">Customer portal (/my/kitchen-projects), dealer portal with scoped pricing visibility, and the Fabio queue from the CS perspective.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">public</field>
+            <field name="enroll">public</field>
+            <field name="sequence">60</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">8</field>
+        </record>
+        <record id="course_sysadmin" model="slide.channel">
+            <field name="name">Course 7 — Sysadmin</field>
+            <field name="description">Maintaining the platform — the 6 nightly orchestration crons, the QNAP backup pipeline, and the external Hermes Console recommendation queue.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">public</field>
+            <field name="enroll">public</field>
+            <field name="sequence">70</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">2</field>
+        </record>
+    </data>
+</odoo>
