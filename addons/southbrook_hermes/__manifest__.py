@@ -11,12 +11,13 @@ AI/tool orchestration can submit draft recommendations through an API key, but
 business changes remain gated by Odoo users who approve, reject, and apply the
 recommendation.
 """,
-    "version": "19.0.3.2.0",
+    "version": "19.0.4.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
     "category": "Productivity",
     "depends": [
+        "crm",
         "mail",
         "project",
         "southbrook_api",

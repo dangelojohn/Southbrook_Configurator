@@ -24,6 +24,11 @@ class SouthbrookHermesRecommendation(models.Model):
         ("risk", "Risk"),
         ("note", "Note"),
         ("followup", "Follow-up"),
+        # Sales prospect discovered by the external Hermes Console
+        # lead_prospector agent loop (Gemini-grounded Google search).
+        # On apply, creates a crm.lead record from the payload —
+        # company / city / source_url / why_fit / contact_hint.
+        ("prospect", "Sales Prospect"),
     ], default="task", required=True, tracking=True)
     priority = fields.Selection([
         ("low", "Low"),
@@ -53,6 +58,12 @@ class SouthbrookHermesRecommendation(models.Model):
     applied_date = fields.Datetime(readonly=True, copy=False)
     created_task_id = fields.Many2one(
         "project.task", readonly=True, copy=False,
+    )
+    # Set when a recommendation_type='prospect' recommendation is applied —
+    # the freshly-created crm.lead record. Stays NULL for non-prospect
+    # recommendation types.
+    created_crm_lead_id = fields.Many2one(
+        "crm.lead", readonly=True, copy=False,
     )
 
     @api.model
@@ -118,6 +129,9 @@ class SouthbrookHermesRecommendation(models.Model):
             if rec.recommendation_type == "task":
                 task = rec._create_project_task()
                 values["created_task_id"] = task.id
+            elif rec.recommendation_type == "prospect":
+                lead = rec._create_crm_lead()
+                values["created_crm_lead_id"] = lead.id
             rec.write(values)
             rec.message_post(body=_("Fabio recommendation applied."))
         return True
@@ -153,3 +167,102 @@ class SouthbrookHermesRecommendation(models.Model):
         if self.rationale:
             parts.append(_("Rationale: %s") % self.rationale)
         return "\n\n".join(parts)
+
+    def _create_crm_lead(self):
+        """Create a crm.lead from a recommendation_type='prospect' payload.
+
+        Payload contract (set by the hermes-console lead_prospector loop):
+
+            {
+                "company":       str,   # business name
+                "lead_type":     str,   # construction_renovation_project / kitchen_manufacturer / ...
+                "city":          str,   # "Toronto, ON"
+                "source_url":    str,   # citable URL Gemini surfaced
+                "contact_hint":  str,   # email / phone / form URL (optional)
+                "why_fit":       str,   # 1-2 sentence rationale
+                ...
+            }
+
+        Mapping:
+          * partner_name = company (the lead's company name on crm.lead)
+          * name         = title — Odoo's crm.lead.name is the opportunity title
+          * city         = first token of payload.city (everything before the comma)
+          * description  = why_fit + proposed_action + source_url + contact_hint
+                           (a single human-readable block for the salesperson)
+          * website      = source_url IF it looks like a real domain
+          * tag_ids      = synthesise a tag for the lead_type so sales can
+                           filter the pipeline by where Hermes found them
+          * priority     = map from recommendation.priority (high/normal/low/blocker)
+          * referred     = 'Hermes Lead Prospector' (free-text attribution)
+        """
+        self.ensure_one()
+        payload = self._payload()
+
+        company = (payload.get("company") or "").strip() or _("Unknown company")
+        city_raw = (payload.get("city") or "").strip()
+        # "Toronto, ON" → city="Toronto"; we leave the province in the
+        # description rather than guessing a state_id m2o lookup.
+        city = city_raw.split(",")[0].strip() if city_raw else ""
+
+        why_fit = (payload.get("why_fit") or "").strip()
+        source_url = (payload.get("source_url") or "").strip()
+        contact_hint = (payload.get("contact_hint") or "").strip()
+        lead_type = (payload.get("lead_type") or "").strip()
+
+        # Build the description block — sales rep gets one self-contained read.
+        desc_parts = []
+        if why_fit:
+            desc_parts.append(_("Why this prospect fits Southbrook:"))
+            desc_parts.append(why_fit)
+        if self.proposed_action:
+            desc_parts.append("")
+            desc_parts.append(_("Proposed next step: %s") % self.proposed_action)
+        if source_url:
+            desc_parts.append("")
+            desc_parts.append(_("Source: %s") % source_url)
+        if contact_hint:
+            desc_parts.append(_("Contact hint: %s") % contact_hint)
+        if lead_type:
+            desc_parts.append(_("Lead type: %s") % lead_type)
+        description = "\n".join(desc_parts) if desc_parts else self.summary
+
+        priority_map = {
+            "low": "0",
+            "normal": "1",
+            "high": "2",
+            "blocker": "3",
+        }
+        lead_vals = {
+            "name": self.name,
+            "partner_name": company,
+            "city": city,
+            "description": description,
+            "priority": priority_map.get(self.priority, "1"),
+            "referred": _("Hermes Lead Prospector"),
+            "type": "lead",
+        }
+        # Set website if source_url looks like a real domain (filter out
+        # Google's grounding redirector which carries no salespable value).
+        if source_url and "vertexaisearch.cloud.google.com" not in source_url:
+            lead_vals["website"] = source_url
+
+        # Synthesise a crm.tag for the lead_type so the sales pipeline can
+        # filter "all Hermes-found construction projects" with one click.
+        if lead_type:
+            tag = self.env["crm.tag"].search(
+                [("name", "=", _("Hermes: %s") % lead_type)], limit=1,
+            )
+            if not tag:
+                tag = self.env["crm.tag"].create(
+                    {"name": _("Hermes: %s") % lead_type}
+                )
+            lead_vals["tag_ids"] = [(4, tag.id)]
+
+        lead = self.env["crm.lead"].create(lead_vals)
+        lead.message_post(
+            body=_(
+                "Created from Fabio prospect recommendation %s "
+                "(Hermes Lead Prospector — Gemini-grounded discovery)."
+            ) % self.display_name,
+        )
+        return lead
