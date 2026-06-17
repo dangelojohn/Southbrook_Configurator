@@ -484,3 +484,93 @@ That's the brief. Build deliberately, ask early, and keep the receipts.
        ~/.claude/projects/-Users-naadmin/memory/sami_southbrook_full_platform_build.md
      This file stays scoped to the Estimating Application surface.
 -->
+
+---
+
+## Amendment 2026-06-16 — Hermes platform shipped
+
+The Estimating brief above is unchanged and remains canonical for the
+Estimating Application. What follows catches a fresh session up to the
+state of the Hermes trade-partner platform that was built on top of it.
+
+### What's live
+
+- **`southbrook_os` 19.0.1.0.0** — canonical, governed knowledge layer
+  (canonical markdown + Odoo-mirrored generators + OSRO state machine +
+  dated publications). Public read: `GET /southbrook/os.json` returns
+  the full doc as JSON. 10 canonical sections, 4 generated sections.
+- **`southbrook_hermes` 19.0.3.2.0** — Hermes trade-partner Odoo surface.
+  Tools, JWT auth, controllers, OWL chat panel:
+  - `utils/jwt_helper` — HS256 mint/verify, `resolve_persona` from
+    `res.users.share` + group membership.
+  - `tools/decorator` — `@hermes_tool` registers slug, personas, tier,
+    scope into a process-level `TOOL_REGISTRY`.
+  - `tools/read_tools` + `tools/write_tools` — 13 trade-partner tools
+    (9 read, 1 T0 write, 2 T1, 1 T2 = `propose_recommendation`).
+  - `controllers/hermes_proxy` — POST `/hermes/v1/ask` mints JWT + (when
+    `southbrook_hermes.sidecar_enabled=true`) streams from the Vercel
+    sidecar; falls back to a JSON stub otherwise.
+  - `controllers/hermes_tools_api` — GET `/api/hermes/tools` registry,
+    POST `/api/hermes/tools/<slug>` dispatch. ACL is enforced by
+    persona+tier from JWT + record-rule scoping via
+    `env(user=portal_user)`. Claim-bound args (`persona`, `partner_id`,
+    `tenant`) override caller-supplied values via signature
+    introspection.
+  - `controllers/hermes_conversation_api` — POST `/api/hermes/conversation/log`
+    persists Q+A turns including `order_id`.
+  - OWL chat panel auto-mounts via `[data-hermes-chat-mount]` injected
+    into the Order Builder portal page.
+- **Sidecar code** (Vercel/Next.js) — committed at `sidecar/`. Not
+  deployed yet — `vercel link && vercel env add … && vercel deploy --prod`
+  from your terminal closes that last gate.
+
+### Source-of-truth documents (read these before touching Hermes code)
+
+- `docs/superpowers/specs/2026-06-16-southbrook-os-and-hermes-platform-design.md`
+  — the brainstorm-validated v1 spec (architecture, personas, tier model,
+  RAG, tools, phasing). Authoritative for ANY Hermes work.
+- `docs/superpowers/plans/2026-06-16-southbrook-os-v1.md` — Plan A
+  (executed; the OS addon).
+- `docs/superpowers/plans/2026-06-16-hermes-trade-partner-b1-odoo.md` —
+  Plan B1 (executed; Odoo side).
+- `docs/superpowers/plans/2026-06-16-hermes-trade-partner-b2-sidecar.md`
+  — Plan B2 (code complete; deploy pending).
+
+### Daily operations
+
+- **Smoke test:** `./scripts/smoke_hermes.sh` mints a fresh JWT and
+  exercises every Hermes route end-to-end against prod. Green run
+  confirms PyJWT install, JWT secret, ACL, dispatch, conversation log,
+  and `/southbrook/os.json` + `/commercial` regression baselines.
+- **Going live with chat:** flip `southbrook_hermes.sidecar_enabled` to
+  `true` in Settings → Technical → System Parameters AFTER the Vercel
+  sidecar is deployed and `southbrook_hermes.sidecar_url` points at it.
+- **Deploy:** `./scripts/deploy_to_qnap.sh southbrook_hermes` (the
+  script's false-FAIL grep was patched 2026-06-16 — `py.warnings`
+  stacks no longer kill the verdict).
+- **PyJWT + markdown** are pinned in `services/odoo/Dockerfile`; the
+  current container has them installed ad-hoc via `--break-system-packages`,
+  so they'll re-install on the next image rebuild.
+
+### Non-goals (per spec § 11)
+
+- No billing/payments in Hermes (v1).
+- No cross-tenant data flow (Overseer is v1.x).
+- No autonomous T2 writes for trade partners (always via draft
+  recommendation + human approve + apply pipeline).
+- No external chat integrations (no Slack/Teams) in v1.
+- No mobile-native client.
+- No image/file uploads in chat.
+
+### Open spec questions (none blocking v1; see § 12 of the spec)
+
+1. Embedding model freeze (current: `text-embedding-3-small`).
+2. OWL panel placement (current: inline below order header card).
+3. JWT secret rotation policy (current: manual via system parameter).
+4. Sidecar repo location (current: subdirectory of southbrook-v19cr).
+5. Generator markdown style (current: plain tables).
+
+Everything in this amendment was deployed end-to-end on 2026-06-16; the
+session memory file `~/.claude/projects/-Users-naadmin/memory/hermes_v1_deploy.md`
+is the operational hand-off note.
+
