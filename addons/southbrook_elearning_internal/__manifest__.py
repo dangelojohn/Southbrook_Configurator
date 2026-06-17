@@ -74,6 +74,7 @@ flip ``visibility`` to ``members`` in the XML and re-upgrade.
         "data/elearning_slides_13.xml",
         "data/elearning_slides_14.xml",
         "data/elearning_slides_15.xml",
+        "data/elearning_slides_16.xml",
     ],
     "installable": True,
     "application": False,

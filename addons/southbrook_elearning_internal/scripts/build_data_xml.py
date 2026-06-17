@@ -184,6 +184,18 @@ COURSE_META: List[Tuple[int, str, str, str, int]] = [
         "the MO↔cut-list↔hardware-package linkage.",
         7,
     ),
+    (
+        16,
+        "course_whmis_base",
+        "WHMIS Base Training (Cabinet Shop)",
+        "Six base-training lessons on Workplace Hazardous Materials "
+        "Information System (WHMIS 2015 / GHS) for Southbrook cabinet "
+        "manufacturing — overview, pictograms, labels, Safety Data "
+        "Sheets, cabinet-shop-specific hazards, and worker rights + "
+        "emergency response. Required for every employee on hire + "
+        "annual refresher.",
+        9,
+    ),
 ]
 
 

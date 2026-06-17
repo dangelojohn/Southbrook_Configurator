@@ -1,0 +1,1333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_16_whmis_overview" model="slide.slide">
+            <field name="name">WHMIS Overview — What It Is and Why It Matters</field>
+            <field name="channel_id" ref="course_whmis_base"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Every Southbrook employee on hire + annual refresher.</field>
+            <field name="html_content"><![CDATA[<h1 id="whmis-overview-what-it-is-and-why-it-matters">WHMIS Overview — What It Is and Why It Matters</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You. Every person who works at Southbrook Cabinetry — shop floor, finishing
+room, warehouse, office, delivery driver, summer student — takes this
+lesson on hire and once a year after that. It does not matter whether you
+ever pour a litre of lacquer thinner; if you set foot in the shop, you are
+covered by WHMIS and you need to know what it is.</p>
+<p>This is a <strong>base awareness</strong> lesson. It does <strong>not</strong> make you certified to
+run the spray booth, to operate the forklift, or to handle the acid
+catalysts used with some conversion varnishes. Those tasks have their own
+hands-on training and sign-off. WHMIS is the foundation everyone shares.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>This course is delivered through Southbrook's online learning portal:</p>
+<blockquote>
+<p><strong>southbrookcabinetry.space → eLearning → WHMIS Base Training</strong></p>
+</blockquote>
+<p>The supporting paperwork lives in the shop, not online:</p>
+<blockquote>
+<p><strong>Floor Office → SDS Binder</strong> <em>(physical binder — exact shelf location: </em><em>TBD, trainer to fill in</em><em>)</em></p>
+<p><strong>Shared drive → Safety → SDS</strong> <em>(electronic backup of every binder sheet)</em></p>
+</blockquote>
+<p>You sign an attendance record after the in-person walkthrough of this
+course; the record is kept for at least three years per Ontario OHS
+expectations.</p>
+<h2 id="what-youll-see-in-the-shop">What you'll see in the shop</h2>
+<p>WHMIS shows up in three places on the floor. Once you know what they look
+like, you stop missing them.</p>
+<ul>
+<li><strong>Labels</strong> on every container of a hazardous product. A 4 L can of
+  lacquer thinner from the supplier has a printed label with red-diamond
+  pictograms, a signal word ("Danger" or "Warning"), and a list of
+  precautions. When you decant some of that thinner into a smaller squirt
+  bottle for cleanup, that bottle gets a <strong>workplace label</strong> — see
+  lesson 16.3.</li>
+<li><strong>Safety Data Sheets</strong> (SDS) — one paper sheet per product, filed in
+  the SDS binder. Each is a 16-section document the supplier writes.
+  Lesson 16.4 walks you through it.</li>
+<li><strong>Training</strong> — this course, plus job-specific training when your role
+  involves handling a particular product (spray booth, finishing, glue
+  line). Training is the third pillar; without it, the labels and SDSs
+  are just paper.</li>
+</ul>
+<h2 id="recognition-response">Recognition + response</h2>
+<p><strong>What WHMIS is.</strong> WHMIS stands for <strong>Workplace Hazardous Materials
+Information System</strong>. It is the Canada-wide system that tells you what
+hazardous chemicals are in your workplace and how to use them safely. It
+has been law since 1988. The current version — <strong>WHMIS 2015</strong> — aligns
+Canada with the <strong>Globally Harmonized System (GHS)</strong>, which is the
+international standard the United Nations adopted so a chemical labelled
+in Germany or Japan looks the same to a Canadian worker reading the
+container.</p>
+<p><strong>The three pillars.</strong> WHMIS works because three things happen together:</p>
+<ol>
+<li><strong>Labels</strong> on every container.</li>
+<li><strong>Safety Data Sheets</strong> (SDSs) available to every worker.</li>
+<li><strong>Education and training</strong> so workers can read both.</li>
+</ol>
+<p>Remove any one of the three and the system fails. A perfect label on a
+sealed drum is useless if you cannot read it. A binder full of SDSs is
+useless if no one ever opens it.</p>
+<p><strong>The legal frame.</strong> WHMIS is split across federal and provincial law:</p>
+<ul>
+<li><strong>Federal</strong> — the <strong>Hazardous Products Act</strong> and the <strong>Hazardous
+  Products Regulations</strong> set the rules suppliers and importers must
+  follow when they sell a hazardous product into Canada. That is why the
+  label on a can of lacquer thinner shipped from Ohio looks the way it
+  does — the importer had to bring it into compliance.</li>
+<li><strong>Provincial / territorial</strong> — each province's <strong>Occupational Health
+  and Safety Act</strong> sets the rules <strong>employers and workers</strong> must follow
+  once the product is in the workplace. Southbrook operates in Ontario,
+  so Ontario's OHS Act and Reg. 860 (WHMIS) govern what we do here.</li>
+</ul>
+<p>If you ever move to a shop in another province, the federal piece is
+identical and the provincial piece will look very similar — the three
+pillars do not change.</p>
+<p><strong>Employer responsibilities.</strong> Southbrook (your employer) must:</p>
+<ul>
+<li>Make sure every hazardous product in the shop has a current supplier
+  label or a workplace label.</li>
+<li>Keep a current SDS for every hazardous product, accessible to workers.</li>
+<li>Provide WHMIS education (this course) and job-specific training.</li>
+<li>Review the training at least annually and whenever a new hazard is
+  introduced.</li>
+</ul>
+<p><strong>Your responsibilities.</strong> As an employee you must:</p>
+<ul>
+<li>Complete WHMIS training and the annual refresher.</li>
+<li>Read labels and follow the precautions before you use a product.</li>
+<li>Use the personal protective equipment (PPE) specified for the job.</li>
+<li>Report damaged labels, missing SDSs, leaks, spills, or unsafe
+  conditions to your supervisor — without waiting.</li>
+<li>Ask if you do not know. There is never a wrong time to ask about a
+  chemical.</li>
+</ul>
+<p><strong>Bilingual rule.</strong> In Canada, supplier labels and SDSs must be available
+in <strong>both English and French</strong>. If you find a container with only one
+language, that is a compliance gap — tell your supervisor.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"It's just a small amount, I don't need to read the label."</strong></p>
+<p>The amount in the container has nothing to do with the hazard of the
+product. A 250 mL squirt bottle of lacquer thinner is just as flammable
+as a 4 L can. Read the label.</p>
+<p><strong>"I've used this product for years, I know what it does."</strong></p>
+<p>Formulations change. The chemistry of a finish product can be updated by
+the supplier between batches. The label and the SDS are the source of
+truth, not your memory. Skim them when a new batch shows up.</p>
+<p><strong>"There's no SDS in the binder for this product."</strong></p>
+<p>Stop using the product. Tell your supervisor. Southbrook is legally
+required to have one and the supplier is legally required to provide it.
+This is not a small problem — it is the system failing.</p>
+<p><strong>"My English is weak and the label is hard for me to read."</strong></p>
+<p>The label has to be in English <strong>and</strong> French. Pictograms are designed to
+be understood without words. Ask your supervisor for the French label or
+for someone to walk through it with you. WHMIS is built so that no worker
+ever has to guess.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A coworker hands you a clear plastic squeeze bottle of liquid and
+says "use this to wipe down the panels before staining." There is no
+label on the bottle. What do you do?</p>
+<blockquote>
+<p>Do not use it. An unlabelled container is a WHMIS violation. Ask the
+coworker what is in it and have them apply a proper workplace label
+(product name, safe-handling precautions, reference to the SDS) before
+you go near it. If they cannot tell you what is in it, treat it as
+unknown and tell your supervisor.</p>
+</blockquote>
+<p><strong>2.</strong> Which of the following is <strong>not</strong> one of the three pillars of
+WHMIS? (a) Labels, (b) Safety Data Sheets, (c) Education and training,
+(d) First-aid kits.</p>
+<blockquote>
+<p>(d) First-aid kits. First aid is required under provincial OHS law but
+it is not a WHMIS pillar. The three WHMIS pillars are labels, SDSs,
+and education/training.</p>
+</blockquote>
+<p><strong>3.</strong> A new can of contact cement arrives from the supplier. The label
+is printed only in English — there is no French. Is this a problem?</p>
+<blockquote>
+<p>Yes. WHMIS 2015 requires supplier labels to be in both English and
+French. Tell your supervisor; Southbrook may need to apply a
+bilingual workplace label or contact the supplier for a corrected
+label.</p>
+</blockquote>
+<p><strong>4.</strong> Whose job is it to make sure the SDS binder is up to date?</p>
+<blockquote>
+<p>The employer's — Southbrook's. The supplier provides the SDSs at
+point of sale; Southbrook maintains the binder and keeps it
+accessible to workers. Your job is to use it and to report when an
+SDS is missing.</p>
+</blockquote>
+<p><strong>5.</strong> A summer student starts on Monday and is sent to help in the
+finishing room. They have not taken WHMIS training yet. What does
+Southbrook owe them before they handle any product?</p>
+<blockquote>
+<p>WHMIS education before they work with or near hazardous products.
+Ontario OHS does not allow "we'll train you later." The student
+takes this base lesson first, then the job-specific finishing-room
+training, then they can go near the product.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The 9 GHS pictograms in detail → lesson 16.2.</li>
+<li>Supplier vs workplace label specifics → lesson 16.3.</li>
+<li>How to read an SDS → lesson 16.4.</li>
+<li>The specific hazardous products you'll meet at Southbrook → lesson 16.5.</li>
+<li>Your right to refuse unsafe work and the emergency-response steps →
+  lesson 16.6.</li>
+<li>Hands-on certification for the spray booth, forklift, or any specific
+  machine — those have separate training programs.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_16_pictograms" model="slide.slide">
+            <field name="name">The 9 WHMIS Pictograms — What They Mean</field>
+            <field name="channel_id" ref="course_whmis_base"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Every Southbrook employee.</field>
+            <field name="html_content"><![CDATA[<h1 id="the-9-whmis-pictograms-what-they-mean">The 9 WHMIS Pictograms — What They Mean</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>Every person at Southbrook. Pictograms are the fastest way to identify
+a hazard — they are designed so you can recognise the risk across the
+shop floor without reading the label up close. You should be able to
+look at a container at three metres and know whether it is flammable,
+toxic, corrosive, or none of the above.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Pictograms appear on every supplier label and on every SDS (Section 2).
+Reference posters are on the wall:</p>
+<blockquote>
+<p><strong>Finishing Room → wall by the SDS binder</strong> <em>(WHMIS pictogram poster)</em></p>
+<p><strong>Shop entrance → safety board</strong> <em>(WHMIS pictogram poster)</em></p>
+</blockquote>
+<p>If a poster is missing or damaged, tell your supervisor — Southbrook is
+required to keep the visual reference posted.</p>
+<h2 id="what-youll-see-in-the-shop">What you'll see in the shop</h2>
+<p>Each pictogram is a <strong>black symbol inside a red diamond on a white
+background</strong>, points up and down. A black-and-white diamond is not a
+current WHMIS 2015 pictogram — it is either an obsolete WHMIS 1988
+symbol (suppliers were required to transition by Dec 2018) or a
+non-WHMIS warning. Flag it.</p>
+<h2 id="recognition-response">Recognition + response</h2>
+<h3 id="1-flame">1. Flame</h3>
+<p><strong>Visual.</strong> A flame shape inside the red diamond.
+<strong>Means.</strong> Flammable gases, liquids, solids; pyrophoric materials;
+self-heating substances; self-reactive compounds.
+<strong>At Southbrook.</strong> Lacquer thinner, mineral spirits, nitrocellulose
+lacquers, denatured alcohol, acetone, contact cement, most aerosols,
+propane cylinders.
+<strong>Response.</strong> No open flames, no sparks, no smoking. Use only in
+ventilated areas. Bond and ground when transferring. Know the nearest
+fire extinguisher (Class B for flammable liquids).</p>
+<h3 id="2-flame-over-circle">2. Flame Over Circle</h3>
+<p><strong>Visual.</strong> A flame on top of a circle (the circle = oxygen).
+<strong>Means.</strong> Oxidizer. The product itself may not burn, but it feeds a
+fire so it burns hotter and faster.
+<strong>At Southbrook.</strong> Less common — some bleaches, peroxide wood-bleach
+products, warehoused pool/spa chemicals.
+<strong>Response.</strong> Keep oxidizers physically away from flammables — not in
+the same cabinet or shelf. Fires involving oxidizers are hotter and
+harder to put out.</p>
+<h3 id="3-gas-cylinder">3. Gas Cylinder</h3>
+<p><strong>Visual.</strong> A pressurized gas cylinder.
+<strong>Means.</strong> Gases under pressure — compressed, liquefied, refrigerated,
+or dissolved. The hazard is the pressure itself plus whatever the gas
+does.
+<strong>At Southbrook.</strong> Propane cylinders for the forklift. Some aerosols.
+<strong>Response.</strong> Cylinders stored upright, chained, valve caps on when
+not in use. Never drop, never expose to heat. Forklift-propane changes
+require certification — get trained first.</p>
+<h3 id="4-corrosion">4. Corrosion</h3>
+<p><strong>Visual.</strong> Two test tubes pouring liquid onto a hand and a metal bar,
+both being eaten away.
+<strong>Means.</strong> Destroys metals and burns skin and eyes on contact.
+<strong>At Southbrook.</strong> <strong>Acid catalysts</strong> used with conversion varnishes.
+Some metal-prep chemicals. Strong cleaners.
+<strong>Response.</strong> Chemical-resistant gloves (not leather), face shield,
+apron. <strong>Know where the eye-wash station is before you open the
+container.</strong> Splash to the eye is a 15-minute flush, immediately.</p>
+<h3 id="5-exploding-bomb">5. Exploding Bomb</h3>
+<p><strong>Visual.</strong> A black explosion with chunks flying outward.
+<strong>Means.</strong> Explosive. Self-reactive substances (Type A/B) and organic
+peroxides (Type A/B) that can detonate or undergo violent runaway
+reactions.
+<strong>At Southbrook.</strong> Very rare. Some organic-peroxide finish catalysts
+carry this in concentration. <strong>If you ever see this on a container,
+stop and call your supervisor</strong> — it should not be a routine item.
+<strong>Response.</strong> Treat as the most hazardous thing in the room. No heat,
+shock, or friction.</p>
+<h3 id="6-skull-and-crossbones">6. Skull and Crossbones</h3>
+<p><strong>Visual.</strong> A human skull with two crossed bones.
+<strong>Means.</strong> <strong>Acute</strong> toxicity — a single short exposure (swallowing,
+skin contact, or vapour inhalation) can kill or seriously injure.
+<strong>At Southbrook.</strong> Rare but real. High-concentration acid catalysts,
+some stripping chemicals, methanol if used as a solvent.
+<strong>Response.</strong> Full PPE per the SDS — gloves, respirator (correct
+cartridge), eye protection, sometimes face shield. Use only in the
+spray booth or other properly ventilated area. Wash hands before
+eating, drinking, smoking. If exposed: SDS Section 4 (first aid) +
+eye-wash or shower immediately.</p>
+<h3 id="7-health-hazard">7. Health Hazard</h3>
+<p><strong>Visual.</strong> A human torso silhouette with a starburst on the chest,
+suggesting internal-organ damage.
+<strong>Means.</strong> Longer-term or chronic effects. <strong>Carcinogens</strong> (cancer),
+<strong>mutagens</strong> (genetic damage), <strong>reproductive toxins</strong>, <strong>respiratory
+sensitizers</strong> (cause asthma after repeated exposure), aspiration
+hazards, organ toxicity from repeated exposure.
+<strong>At Southbrook.</strong> <strong>Solvent-based contact cement.</strong> Some lacquers
+and stains with isocyanates or formaldehyde-releasing resins.
+Methylene chloride strippers (legacy stock). Petroleum distillates
+in older mineral spirits.
+<strong>Response.</strong> Engineering controls first — spray-booth ventilation,
+local exhaust. PPE second — respirator with the SDS-specified
+cartridge, gloves. The hazard is cumulative — every exposure
+matters.</p>
+<h3 id="8-exclamation-mark">8. Exclamation Mark</h3>
+<p><strong>Visual.</strong> A single black exclamation mark.
+<strong>Means.</strong> Lower-severity hazards. Skin and eye <strong>irritation</strong>, skin
+<strong>sensitization</strong> (allergic dermatitis from repeated contact), acute
+toxicity that is harmful but not fatal at typical exposures,
+respiratory irritation.
+<strong>At Southbrook.</strong> Most water-based finishes. PVA / yellow wood glue.
+Many cleaning solvents. Some edge-banding hot-melt adhesives. <strong>Wood
+dust</strong> is treated under this category in some SDSs.
+<strong>Response.</strong> Skin and eye protection, good ventilation. This is the
+"won't put you in hospital today, but will mess you up over a career"
+warning. Wear gloves even when "it's just glue."</p>
+<h3 id="9-biohazardous-infectious-materials">9. Biohazardous Infectious Materials</h3>
+<p><strong>Visual.</strong> The trefoil biohazard symbol (three interlocking arcs).
+<strong>Means.</strong> Biological agents — bacteria, viruses, fungi, parasites,
+or the toxins they produce. This is the one pictogram Canada kept
+from WHMIS 1988 that is <strong>not</strong> in international GHS.
+<strong>At Southbrook.</strong> Effectively never. If you see it here, stop and
+call your supervisor.
+<strong>Response.</strong> Do not handle without specific training.</p>
+<hr>
+<p><strong>Note on the "environment" pictogram.</strong> GHS includes an optional
+<strong>Environment</strong> pictogram (dead fish + dead tree) for aquatic
+hazards. Canada <strong>did not adopt</strong> this for workplace WHMIS — you
+will not see it on Canadian WHMIS 2015 supplier labels. It may
+appear on SDS Section 12 or transport documents, but not in the red
+diamond on the container.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The container has two pictograms — which one matters more?"</strong>
+Both do. A can of lacquer thinner often carries Flame, Exclamation
+Mark, and Health Hazard together. Follow the precautions for all.</p>
+<p><strong>"It's an old can from 2012 and the symbols look different."</strong> That
+can carries WHMIS 1988 symbols (circles, not diamonds). Suppliers
+were required to transition by Dec 2018. Flag it — outdated symbols
+may also mean outdated hazard info.</p>
+<p><strong>"The label is damaged and I can only see one pictogram."</strong> Apply
+a workplace label or replace the supplier label. Do not guess at
+missing information. See lesson 16.3.</p>
+<p><strong>"I confuse Skull and Crossbones with Health Hazard."</strong> The split
+is timing. <strong>Skull and Crossbones</strong> = a single exposure can hurt you
+now. <strong>Health Hazard</strong> = repeated exposure damages you over time. A
+product can carry both.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You walk past a 1 L bottle in the finishing room and see two
+red diamonds: Flame and Health Hazard. Without reading any words,
+what does that tell you?</p>
+<blockquote>
+<p>The product is flammable (no sparks, ventilate) and causes long-term
+health damage on repeated exposure (use the respirator specified on
+the SDS — never skip PPE because "it's only a little"). Both apply
+at the same time.</p>
+</blockquote>
+<p><strong>2.</strong> A can of contact cement shows Flame, Exclamation Mark, and
+Health Hazard. Skull and Crossbones is <strong>not</strong> present. Does that
+mean it is safe to drink?</p>
+<blockquote>
+<p>No. Skull and Crossbones marks <strong>acute</strong> toxicity — short, severe
+exposures. Many things are not in the acute category and are still
+toxic to swallow. Check SDS Sections 4 (first aid) and 11
+(toxicology). Never drink anything in the shop.</p>
+</blockquote>
+<p><strong>3.</strong> You see the <strong>Exploding Bomb</strong> pictogram on a small bottle on
+the finishing-room shelf. What do you do?</p>
+<blockquote>
+<p>Stop. Call your supervisor. The Exploding Bomb is rare in a cabinet
+shop and should not be a routine item. Verify with the SDS what is
+in the bottle and whether it should be there at all.</p>
+</blockquote>
+<p><strong>4.</strong> A coworker tells you "this can has the Corrosion pictogram, but
+it's only Category 2, so the gloves we use for staining are fine."
+How do you respond?</p>
+<blockquote>
+<p>Check the SDS, not the assumption. The Corrosion pictogram means the
+product burns skin and damages metals — solvent-rated gloves are not
+necessarily corrosive-rated. SDS Section 8 specifies the correct
+glove material (often nitrile, neoprene, sometimes butyl) and the
+eye-wash must be in reach before you open the container.</p>
+</blockquote>
+<p><strong>5.</strong> You see a pictogram with the trefoil biohazard symbol on a
+container in the warehouse. Is this a normal Southbrook product?</p>
+<blockquote>
+<p>No. The Biohazardous Infectious Materials pictogram is for
+biological agents. It has no routine use in cabinet manufacturing.
+Stop and call your supervisor — something is mis-shelved or
+mis-shipped.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Supplier vs workplace labels → lesson 16.3.</li>
+<li>How to read an SDS for the exact glove, respirator, and first aid
+  → lesson 16.4.</li>
+<li>The specific Southbrook products that carry each pictogram, with
+  PPE detail → lesson 16.5.</li>
+<li>Emergency exposure or spill response → lesson 16.6.</li>
+<li>Hands-on PPE fit-testing — your job-specific training covers that.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_16_labels" model="slide.slide">
+            <field name="name">Labels — Supplier and Workplace</field>
+            <field name="channel_id" ref="course_whmis_base"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Every Southbrook employee.</field>
+            <field name="html_content"><![CDATA[<h1 id="labels-supplier-and-workplace">Labels — Supplier and Workplace</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>Every Southbrook employee. You read labels every time you pick up a
+container of finish, glue, solvent, or cleaner. You apply labels
+whenever you pour a product into a smaller container — for the spray
+gun, for a wipe bottle, for a touch-up jar. Getting the label right is
+the easiest part of WHMIS to do wrong, and the easiest to fix.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Workplace-label blanks (pre-printed peel-and-stick sheets) live next to
+the relevant decanting stations:</p>
+<blockquote>
+<p><strong>Finishing room → solvent decant station → workplace-label dispenser</strong> <em>(exact location: </em><em>TBD, trainer to fill in</em><em>)</em></p>
+<p><strong>Glue area → adhesive decant station → workplace-label dispenser</strong></p>
+</blockquote>
+<p>If a dispenser is empty, ask your supervisor for a fresh roll before you
+decant.</p>
+<h2 id="what-youll-see-in-the-shop">What you'll see in the shop</h2>
+<p>There are <strong>two kinds</strong> of WHMIS labels at Southbrook:</p>
+<ol>
+<li><strong>Supplier labels</strong> — printed by the manufacturer or importer, on the
+   container the product arrived in. Big, glossy, bilingual.</li>
+<li><strong>Workplace labels</strong> — printed or written on at Southbrook, applied
+   when we pour the product into a different container. Small, plain,
+   may be hand-written.</li>
+</ol>
+<p>You also see <strong>transport / hazard placards</strong> on shipping pallets and
+delivery trucks. Those are governed by Transport Canada (TDG), not WHMIS,
+and are out of scope for this lesson — but if you see one on a delivery
+that does not match the supplier label, flag it.</p>
+<h2 id="recognition-response">Recognition + response</h2>
+<h3 id="supplier-label-the-six-required-elements">Supplier label — the six required elements</h3>
+<p>Every WHMIS 2015 supplier label, by law, contains six things. If any one
+of them is missing, the label is incomplete and the product should not
+be used until corrected.</p>
+<ol>
+<li><strong>Product identifier</strong> — the name of the product. Brand, chemical,
+   common, or trade name. It must match what is in the SDS Section 1.
+   Example: "M.L. Campbell Magnamax Pre-Cat Lacquer."</li>
+<li><strong>Initial supplier identifier</strong> — name, address, and telephone of the
+   Canadian manufacturer or importer. This is who is legally accountable
+   for the product on the Canadian market.</li>
+<li><strong>Pictogram(s)</strong> — the red-diamond hazard symbols (lesson 16.2). Zero,
+   one, or several depending on the hazard profile.</li>
+<li><strong>Signal word</strong> — exactly one of <strong>"Danger"</strong> or <strong>"Warning"</strong>.
+   - <strong>"Danger"</strong> is for the more severe hazard categories.
+   - <strong>"Warning"</strong> is for the less severe ones.
+   - If the product has no signal word, it is not classified as
+     hazardous under WHMIS.</li>
+<li><strong>Hazard statement(s)</strong> — standardized phrases describing the
+   nature of the hazard. Example: <em>"Highly flammable liquid and
+   vapour. May cause respiratory irritation."</em> These phrases are not
+   freeform — they come from a fixed list set by the regulations.</li>
+<li><strong>Precautionary statement(s)</strong> — what to do to use the product
+   safely. Example: <em>"Keep away from heat / sparks / open flames /
+   hot surfaces. No smoking. Wear protective gloves / eye protection."</em></li>
+</ol>
+<p>A typical Southbrook supplier label also carries the <strong>product code /
+batch number</strong> and <strong>fill date</strong> — useful but not legally required.</p>
+<h3 id="bilingual-rule">Bilingual rule</h3>
+<p>Supplier labels in Canada must appear in <strong>both English and French</strong>.
+Either on one bilingual label or on two labels (English on one side,
+French on the other) attached to the same container. A unilingual
+supplier label is <strong>not compliant</strong> — tell your supervisor; Southbrook
+will need to apply a bilingual workplace label or get a corrected label
+from the supplier.</p>
+<h3 id="workplace-label-what-we-apply-at-southbrook">Workplace label — what we apply at Southbrook</h3>
+<p>When you pour a product out of the supplier container into a smaller
+container — squirt bottle, jar, cup, secondary tank — that smaller
+container needs a <strong>workplace label</strong> unless one of two exceptions
+applies (covered below).</p>
+<p>A workplace label needs <strong>three</strong> elements:</p>
+<ol>
+<li><strong>Product identifier</strong> — the same name that appears on the SDS, so
+   anyone reading the workplace label can look up the SDS.</li>
+<li><strong>Safe handling precautions</strong> — basic precautions (may include
+   pictograms). Does not have to be the full list from the supplier
+   label, but should cover the headline hazard.</li>
+<li><strong>Reference to the SDS</strong> — wording that points the reader to the
+   SDS for full information (e.g. <em>"See SDS for full handling
+   instructions."</em>).</li>
+</ol>
+<p>Workplace labels do <strong>not</strong> need to be bilingual unless your workforce
+needs both languages. Southbrook applies bilingual workplace labels by
+default — it is good practice and removes ambiguity.</p>
+<p><strong>Two exceptions</strong> where you do not need a workplace label:</p>
+<ul>
+<li><strong>Decant for immediate use.</strong> You pour the product, you use it in the
+  same shift, the container stays under your control the whole time, and
+  the leftover is properly disposed of or returned at end of shift. The
+  spray-booth pot is the classic case.</li>
+<li><strong>The original container is undisturbed.</strong> Obvious — supplier label
+  still attached, still legible, still intact.</li>
+</ul>
+<p>If the product is sitting overnight in a smaller container, even one you
+plan to finish tomorrow, it needs a workplace label.</p>
+<h3 id="danger-vs-warning-a-closer-look">"Danger" vs "Warning" — a closer look</h3>
+<p>These are not interchangeable. The supplier picked one based on the
+hazard category and you should react to it:</p>
+<ul>
+<li><strong>Danger</strong> = high-severity category. Lacquer thinner gets "Danger" for
+  flammability. An acid catalyst gets "Danger" for corrosion or acute
+  toxicity. Treat the precautions as non-negotiable.</li>
+<li><strong>Warning</strong> = lower-severity category. PVA glue typically gets
+  "Warning" for skin/eye irritation. Still real, still requires PPE,
+  but the failure mode is irritation rather than acute injury.</li>
+</ul>
+<h3 id="damaged-missing-or-illegible-labels">Damaged, missing, or illegible labels</h3>
+<p>If you pick up a container and the supplier label is torn, faded, washed
+off, painted over, or written in a language you cannot read — <strong>stop</strong>.</p>
+<p>The procedure is:</p>
+<ol>
+<li>Do not use the product.</li>
+<li>Set the container aside in a safe location (not on the spray-booth
+   bench, not next to an ignition source).</li>
+<li>Tell your supervisor.</li>
+<li>Your supervisor confirms what is in the container — by checking the
+   stock record, the SDS binder, or the supplier — and either applies a
+   new workplace label or quarantines the container for disposal.</li>
+</ol>
+<p>Do not try to identify the contents by smell, colour, or "what we
+usually keep here." The whole point of the labelling system is that
+nobody guesses.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I'm decanting lacquer into a small jar for touch-up — but I'm using
+it right now, so I don't need a label."</strong></p>
+<p>Correct only if the jar stays with you and gets disposed of (or poured
+back) at the end of your shift. If you leave it on the bench overnight,
+the next person to pick it up has no way to know what is in it. Label
+it.</p>
+<p><strong>"The supplier label got soaked in lacquer thinner and the words are
+gone. I know it's lacquer thinner — I just opened it."</strong></p>
+<p>It does not matter that you know. The next person to walk up to the
+container does not. Apply a workplace label or replace the supplier
+label.</p>
+<p><strong>"I cut the supplier label off and threw it away because it was peeling
+— I'll put a workplace label on later."</strong></p>
+<p>You created an unlabelled hazardous container. The few minutes between
+"now" and "later" are when something goes wrong. Label it before you set
+it down.</p>
+<p><strong>"This label only has English on it — but I can read English so it's
+fine."</strong></p>
+<p>It is not fine. The next worker who picks it up may not read English.
+Bilingual is a legal requirement for the supplier label, not a politeness.</p>
+<p><strong>"It's a workplace label, so I'll just write the product name and skip
+the safe-handling precautions."</strong></p>
+<p>A workplace label needs three things, not one. If the safe-handling
+precautions section is missing, the label does not meet WHMIS
+requirements. The pre-printed peel-and-stick blanks have all three
+fields — fill them all in.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You decant 500 mL of lacquer thinner from the 4 L supplier can
+into a clean glass jar so you can take it to the assembly bench for
+cleanup. You will use roughly half of it today, then put the jar in your
+cabinet at the end of shift to use again tomorrow. Does the jar need a
+workplace label?</p>
+<blockquote>
+<p>Yes. Because the jar will sit unattended (in your cabinet, after
+shift), the "immediate use" exception does not apply. Apply a
+workplace label with product name, safe-handling precautions, and a
+reference to the SDS before you leave for the day. Bilingual is
+Southbrook's standard practice.</p>
+</blockquote>
+<p><strong>2.</strong> A new shipment of contact cement arrives. The supplier label
+shows pictograms, a signal word "Danger," hazard statements, and
+precautionary statements — but no manufacturer address or phone number.
+Is the label compliant?</p>
+<blockquote>
+<p>No. The <strong>initial supplier identifier</strong> (name, address, telephone of
+the Canadian manufacturer or importer) is one of the six required
+elements. Tell your supervisor; Southbrook needs to follow up with
+the supplier for a corrected label.</p>
+</blockquote>
+<p><strong>3.</strong> A coworker hands you a bottle with a workplace label that says
+only <em>"Glue."</em> The bottle is sitting on the assembly bench. What is
+missing, and what do you do?</p>
+<blockquote>
+<p>The workplace label needs the <strong>product name as it appears on the
+SDS</strong>, <strong>safe-handling precautions</strong>, and a <strong>reference to the SDS</strong>.
+"Glue" is not a product name (PVA, contact cement, hot melt, and
+epoxy are all "glue"). Have the coworker re-label with the actual
+product or replace the label before you use it.</p>
+</blockquote>
+<p><strong>4.</strong> Two pictograms appear on a container — Flame and Health Hazard —
+with the signal word <strong>Warning</strong>. Are you safe to skip the respirator
+because the signal word is not "Danger"?</p>
+<blockquote>
+<p>No. The signal word reflects the highest severity category among the
+hazards classified. "Warning" still means real hazard. The Health
+Hazard pictogram drives respirator use — check SDS Section 8 for the
+required cartridge regardless of whether the signal word is "Danger"
+or "Warning."</p>
+</blockquote>
+<p><strong>5.</strong> You find a 250 mL squeeze bottle in the spray booth with a
+faded, illegible label. The liquid inside smells like solvent. What is
+the right next step?</p>
+<blockquote>
+<p>Do not use it. Set it aside in a safe location. Tell your supervisor.
+Identifying by smell is not allowed under WHMIS — your supervisor
+verifies the contents from the stock record or the SDS binder and
+either applies a new workplace label or disposes of the container.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The 9 WHMIS pictograms in detail → lesson 16.2.</li>
+<li>How to read and use an SDS → lesson 16.4.</li>
+<li>The specific hazardous products you'll meet at Southbrook → lesson 16.5.</li>
+<li>Transport Canada (TDG) shipping placards — different system, see
+  Southbrook's Receiving training.</li>
+<li>What to do when there is a spill, an exposure, or a fire → lesson 16.6.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_16_safety_data_sheets" model="slide.slide">
+            <field name="name">Safety Data Sheets — Reading the SDS</field>
+            <field name="channel_id" ref="course_whmis_base"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Every Southbrook employee.</field>
+            <field name="html_content"><![CDATA[<h1 id="safety-data-sheets-reading-the-sds">Safety Data Sheets — Reading the SDS</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>Every Southbrook employee. The SDS is the document you open <strong>before</strong>
+you use a new product, <strong>when</strong> something goes wrong, and <strong>after</strong> an
+exposure to give to the medical responder. It is your primary reference.
+It is also the document most workers have never actually read — this
+lesson fixes that.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Southbrook keeps SDSs in two places, both kept in sync:</p>
+<blockquote>
+<p><strong>Floor Office → SDS Binder</strong> <em>(physical binder, alphabetised by product name — exact shelf location: </em><em>TBD, trainer to fill in</em><em>)</em></p>
+<p><strong>Shared drive → Safety → SDS</strong> <em>(electronic backup, searchable by product name)</em></p>
+</blockquote>
+<p>The physical binder is the version you grab in an emergency — it does
+not need power or a login. The electronic version is for quick lookup
+from your computer when you are planning work.</p>
+<p>If an SDS is missing for a product on the shelf, that is a compliance
+gap. Tell your supervisor — they will pull it from the supplier and
+file it.</p>
+<h2 id="what-youll-see-in-the-shop">What you'll see in the shop</h2>
+<p>Every SDS in Canada follows the same structure: <strong>16 sections in a
+fixed order</strong>, set by WHMIS 2015 / GHS. The format does not vary by
+supplier — Sherwin-Williams, M.L. Campbell, Titebond, and 3M all
+publish the same 16 sections in the same order. Once you know the
+order, you can find anything in any SDS in under 30 seconds.</p>
+<p>The SDS is bilingual — English and French. Both languages must be
+provided, either as one bilingual document or as two simultaneous
+unilingual documents.</p>
+<h2 id="recognition-response">Recognition + response</h2>
+<h3 id="the-16-sections-what-is-in-each">The 16 sections — what is in each</h3>
+<p>The first nine sections are the ones a shop-floor worker uses. The
+last seven (10–16) are technical and regulatory — useful for the
+supervisor, the safety officer, and emergency responders.</p>
+<p><strong>Sections 1–9 — work-floor essentials:</strong></p>
+<ol>
+<li><strong>Identification.</strong> Product name, supplier name + address + phone,
+   emergency telephone number, recommended use. This is the section
+   you read to confirm you have the SDS for the right product.</li>
+<li><strong>Hazard identification.</strong> Classification, pictograms, signal word
+   ("Danger" / "Warning"), hazard statements, precautionary statements.
+   This is the "what's the worst thing this can do to me" summary.</li>
+<li><strong>Composition / information on ingredients.</strong> Chemical names, CAS
+   numbers, concentration ranges of the hazardous ingredients. Useful
+   if you ever have to tell a doctor what is in the product.</li>
+<li><strong>First-aid measures.</strong> What to do for inhalation, skin contact,
+   eye contact, and ingestion. <strong>Read this before you open the
+   container</strong> so you know the response if something happens. Also
+   tells you when to call a doctor and what symptoms to watch for.</li>
+<li><strong>Fire-fighting measures.</strong> Suitable extinguishing media (water?
+   foam? CO2? dry chemical?), unsuitable extinguishing media, special
+   fire-fighting hazards. <strong>Critical</strong> if you ever face a fire
+   involving the product.</li>
+<li><strong>Accidental release measures.</strong> What to do for a small spill vs a
+   large spill. Containment. Cleanup. PPE for the cleanup.</li>
+<li><strong>Handling and storage.</strong> Safe handling practices. Storage
+   conditions — temperature, ventilation, incompatibilities (what
+   can't go on the same shelf).</li>
+<li><strong>Exposure controls / personal protection.</strong> Exposure limits
+   (e.g. 8-hour TWA), engineering controls (spray booth, local
+   exhaust), and <strong>the exact PPE you need</strong> — glove material, eye
+   protection, respirator cartridge type, body protection.</li>
+<li><strong>Physical and chemical properties.</strong> Appearance, odour, flash
+   point, viscosity, vapour pressure. Useful for confirming you have
+   the right product, and the flash point tells you how easily it
+   ignites.</li>
+</ol>
+<p><strong>Sections 10–16 — technical / regulatory:</strong></p>
+<ol start="10">
+<li><strong>Stability and reactivity.</strong> Conditions to avoid, incompatible
+    materials, hazardous decomposition products.</li>
+<li><strong>Toxicological information.</strong> Routes of exposure, symptoms, acute
+    and chronic effects, LD50 data.</li>
+<li><strong>Ecological information.</strong> Environmental impact. (Disclosure
+    optional in some cases.)</li>
+<li><strong>Disposal considerations.</strong> How to dispose of the product and
+    contaminated packaging.</li>
+<li><strong>Transport information.</strong> UN number, shipping name, transport
+    hazard class.</li>
+<li><strong>Regulatory information.</strong> Applicable safety, health, and
+    environmental regulations.</li>
+<li><strong>Other information.</strong> Date of preparation or last revision. <strong>An
+    SDS older than 3 years should be flagged</strong> — the supplier is
+    required to update it on a 3-year cycle (or sooner if significant
+    new info comes to light).</li>
+</ol>
+<h3 id="the-five-sections-you-actually-use-as-a-worker">The five sections you actually use as a worker</h3>
+<p>If you remember only five, remember these:</p>
+<ul>
+<li><strong>Section 2 — hazards.</strong> What is the worst this can do.</li>
+<li><strong>Section 4 — first aid.</strong> What to do if it lands on you, in you, or
+  in your eye.</li>
+<li><strong>Section 6 — accidental release.</strong> What to do if it spills.</li>
+<li><strong>Section 7 — handling and storage.</strong> How to use it without it
+  going wrong.</li>
+<li><strong>Section 8 — PPE.</strong> What to wear so it does not go wrong in the
+  first place.</li>
+</ul>
+<p>If you have 60 seconds before starting a new product, read these five.</p>
+<h3 id="how-to-look-up-an-sds-at-southbrook">How to look up an SDS at Southbrook</h3>
+<ol>
+<li>Find the <strong>product name</strong> on the supplier label (Section 1 of the
+   SDS will match it). The product name, not the brand — "Magnamax
+   Pre-Cat Lacquer," not "Campbell."</li>
+<li>Open the <strong>Floor Office SDS Binder</strong> to that letter. Alphabetised
+   by product name.</li>
+<li>Pull the sheet. Read the five core sections (2, 4, 6, 7, 8).</li>
+<li>Return the sheet to the binder when done — do <strong>not</strong> take it back
+   to the shop floor and lose it.</li>
+</ol>
+<p>If you cannot find the SDS, do not open the container. Use the
+electronic copy on the shared drive instead, or ask the supervisor to
+pull it from the supplier.</p>
+<h3 id="when-to-read-an-sds">When to read an SDS</h3>
+<ul>
+<li><strong>First time</strong> you use a product.</li>
+<li>When a new shipment arrives and the <strong>date of revision</strong> (Section 16)
+  is newer than the one in your binder.</li>
+<li><strong>Annually</strong>, as part of this refresher.</li>
+<li><strong>Immediately</strong> if there is a spill, an exposure, a fire, or a near
+  miss involving the product.</li>
+<li><strong>Before</strong> any non-routine handling (transferring large quantities,
+  mixing two products, disposing).</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I've used this lacquer for 5 years, I don't need to look at the SDS."</strong></p>
+<p>Suppliers reformulate. A change of resin chemistry can change the
+respirator cartridge type, the glove material, or the flash point.
+Skim Section 16 of the new shipment's SDS — if the revision date is
+newer than your binder copy, replace the binder copy and re-read
+Sections 2 and 8 before use.</p>
+<p><strong>"The product spilled, I'll look up the cleanup procedure after I
+mop it up."</strong></p>
+<p>No. Read Section 6 first — some products require neutralization, some
+must not be mopped (creates more vapour), some require a respirator
+for cleanup. Cleaning up wrong can be worse than the spill.</p>
+<p><strong>"The doctor asked what I was exposed to — I just told him 'lacquer
+thinner.'"</strong></p>
+<p>That is a start, but the SDS is what the doctor actually needs.
+Section 3 (composition) and Section 11 (toxicology) tell the doctor
+what to watch for and how to treat. <strong>Bring or send the SDS with the
+person to the hospital.</strong></p>
+<p><strong>"There's no SDS for this product."</strong></p>
+<p>Then the product cannot be used at Southbrook. The employer is
+legally required to have one; the supplier is legally required to
+provide one. Tell your supervisor — this is a fix-today problem.</p>
+<p><strong>"The SDS is dated 2018 — five years old."</strong></p>
+<p>WHMIS 2015 requires SDSs to be updated <strong>within 3 months</strong> when
+significant new hazard information becomes available, and reviewed
+regularly. A 5-year-old SDS may not reflect the current formulation
+or current regulatory classification. Tell your supervisor to request
+the latest revision from the supplier.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You're about to spray a new conversion varnish you've never used
+before. You have 5 minutes before the booth is free. Which sections of
+the SDS do you read in that 5 minutes?</p>
+<blockquote>
+<p>Sections <strong>2</strong> (hazards — pictograms, signal word, hazard statements),
+<strong>8</strong> (PPE — which respirator cartridge, glove material, eye/face
+protection), and <strong>4</strong> (first aid — what to do if you splash it on
+yourself). Section 6 (spill) and Section 7 (handling) are next if
+you have time. Save 10, 11, 12, 13, 14, 15, 16 for your supervisor.</p>
+</blockquote>
+<p><strong>2.</strong> A coworker has a chemical splash to the eye. Which SDS section
+tells you what to do?</p>
+<blockquote>
+<p>Section <strong>4 — first-aid measures</strong>. It will tell you the eye-wash
+duration (typically 15 minutes minimum), whether to remove contact
+lenses, and when to call a doctor. Get to the eye-wash station first,
+read the section while the eye is being flushed, do not delay the
+flush.</p>
+</blockquote>
+<p><strong>3.</strong> You spill 4 L of lacquer thinner on the finishing-room floor.
+You reach for the mop. What should you have done first?</p>
+<blockquote>
+<p>Read Section <strong>6 — accidental release measures</strong>. Lacquer thinner is
+flammable; mopping it spreads the vapour and the vapour can ignite
+from any spark. Section 6 will tell you to ventilate, eliminate
+ignition sources, and use absorbent (not water and not a mop) to
+contain it. Many spills also require a respirator for cleanup —
+Section 8 of the same SDS specifies which cartridge.</p>
+</blockquote>
+<p><strong>4.</strong> The SDS for a product is dated July 2018. Today is June 2026.
+What do you do?</p>
+<blockquote>
+<p>Tell your supervisor and request the latest revision from the
+supplier. Suppliers are required to keep SDSs current. An 8-year-old
+SDS may not reflect the current formulation, current hazard
+classification, or current first-aid practice. Until the new
+revision arrives, the 2018 sheet is the reference you have — use
+it, but do not assume it is up to date.</p>
+</blockquote>
+<p><strong>5.</strong> Whose responsibility is it to make sure the SDS binder has a
+current SDS for every hazardous product on the Southbrook shop floor?</p>
+<blockquote>
+<p>The <strong>employer</strong> — Southbrook. The supplier is required to provide
+SDSs at point of sale; the employer is required to maintain them
+and keep them accessible to workers. Your job as a worker is to use
+the binder, report missing or outdated sheets to your supervisor,
+and follow the instructions inside.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The 9 WHMIS pictograms in detail → lesson 16.2.</li>
+<li>Supplier vs workplace label rules → lesson 16.3.</li>
+<li>The specific Southbrook products, their hazards, and their PPE
+  → lesson 16.5.</li>
+<li>Emergency response — spills, fires, exposures, evacuation
+  → lesson 16.6.</li>
+<li>The technical detail in SDS sections 10–16 — that is for the
+  supervisor and the safety officer, not required for base awareness.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_16_cabinet_shop_hazards" model="slide.slide">
+            <field name="name">Hazardous Materials in YOUR Cabinet Shop</field>
+            <field name="channel_id" ref="course_whmis_base"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Every Southbrook employee — shop floor focus.</field>
+            <field name="html_content"><![CDATA[<h1 id="hazardous-materials-in-your-cabinet-shop">Hazardous Materials in YOUR Cabinet Shop</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>Every Southbrook employee, with extra attention from anyone on the shop
+floor. By the end of this lesson you can name every significant chemical
+and physical hazard in your normal day, recognise the pictograms it
+carries, and know what to do if it lands on you, catches fire, or spills.
+This is about <strong>our specific products</strong>, not a generic list.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Floor Office → SDS Binder</strong> <em>(</em><em>exact shelf location: TBD, trainer to fill in</em><em>)</em></p>
+<p><strong>Shared drive → Safety → SDS</strong> <em>(electronic backup)</em></p>
+<p><strong>Finishing room → respirator cabinet + glove dispenser</strong></p>
+<p><strong>Glue area → safety-glasses + nitrile-glove dispenser</strong></p>
+</blockquote>
+<h2 id="what-youll-see-in-the-shop">What you'll see in the shop</h2>
+<p>Below are the nine hazards grouped by where they show up in workflow.
+For each: <strong>what it is</strong>, <strong>hazard type + pictograms</strong>, <strong>PPE</strong>, and
+<strong>what to do if exposed or spilled</strong>.</p>
+<h2 id="recognition-response">Recognition + response</h2>
+<h3 id="1-wood-dust">1. Wood dust</h3>
+<p><strong>What it is.</strong> Particulate from sawing, routing, sanding, edge-banding
+trim-back. Includes hardwood dust (oak, maple, walnut, cherry, cedar)
+and engineered-product dust (MDF, particleboard, melamine).</p>
+<p><strong>Hazard + pictograms.</strong> <strong>Combustible dust</strong> — fine dust suspended in
+air ignites readily; cyclones and ducts are explosion-rated for a
+reason. <strong>Respiratory carcinogen</strong> — oak, walnut, cedar, beech are
+classified as nasal/sinus carcinogens with long-term exposure. <strong>MDF
+dust</strong> contains formaldehyde resin binders (respiratory irritant). Some
+species cause skin sensitization. Pictograms on packaged MDF: Health
+Hazard, Exclamation Mark.</p>
+<p><strong>PPE.</strong> Safety glasses, <strong>N95 minimum</strong> for sanding (higher-rated
+respirator for prolonged work or when dust collection is down), long
+sleeves, hearing protection at sanders. Wash hands before eating.</p>
+<p><strong>If exposed.</strong> Eye: flush. Skin reaction: wash, note the species, tell
+supervisor. Heavy inhalation: fresh air, doctor if breathing affected.</p>
+<p><strong>If spilled / accumulated.</strong> <strong>Never use compressed air</strong> (re-suspends
+dust, explosion risk). HEPA vacuum or sweep with dust-suppressing
+compound. Keep collection bin from overflowing.</p>
+<h3 id="2-solvent-based-finishes-lacquers-stains-conversion-varnishes">2. Solvent-based finishes (lacquers, stains, conversion varnishes)</h3>
+<p><strong>What it is.</strong> Nitrocellulose and pre-cat lacquers, post-cat (acid-cured)
+conversion varnishes, oil-based stains, solvent dyes.</p>
+<p><strong>Hazard + pictograms.</strong> Flame (flash points often below 25 °C),
+Exclamation Mark (irritation, sensitization), Health Hazard (toluene,
+xylene, glycol ethers — chronic liver/kidney/CNS effects).</p>
+<p><strong>PPE.</strong> <strong>Half-face or full-face respirator with organic-vapour
+cartridges</strong> (cartridge type is on SDS Section 8). <strong>Nitrile or
+solvent-rated chemical gloves</strong> — leather is not solvent-rated. Safety
+glasses, face shield for high-volume spray.</p>
+<p><strong>If exposed.</strong> Skin: wash with soap and water, do not use solvent. Eye:
+15-minute eye-wash, medical attention. Inhalation: fresh air, supervisor
+notified. Ingestion: do <strong>not</strong> induce vomiting, call Poison Control,
+bring SDS.</p>
+<p><strong>If spilled.</strong> Small (under ~1 L): eliminate ignition sources,
+ventilate, absorb with clay/vermiculite, dispose in approved metal
+waste container. <strong>Large: evacuate, alert supervisor.</strong> Never mop,
+never use water, no electrical switches in vapour area.</p>
+<h3 id="3-acid-catalysts-for-conversion-varnishes">3. Acid catalysts (for conversion varnishes)</h3>
+<p><strong>What it is.</strong> Catalysts (often para-toluene sulfonic acid) mixed into
+post-cat varnishes to cure them. Sold in small bottles.</p>
+<p><strong>Hazard + pictograms.</strong> <strong>Corrosion</strong> (skin/eye burns), sometimes
+<strong>Skull and Crossbones</strong> (acute toxicity), <strong>Health Hazard</strong>
+(respiratory sensitization).</p>
+<p><strong>PPE.</strong> <strong>Butyl or neoprene gloves</strong> (not standard nitrile — check
+SDS), <strong>face shield</strong>, chemical apron, respirator with cartridge
+specified on the SDS. <strong>Eye-wash within 10 seconds reach before opening
+the bottle.</strong></p>
+<p><strong>If exposed.</strong> Skin: 15-minute flush, remove contaminated clothing,
+seek medical attention. Eye: 15-minute eye-wash, immediate medical
+attention. Ingestion: do <strong>not</strong> induce vomiting, call Poison Control,
+bring SDS.</p>
+<p><strong>If spilled.</strong> Small: neutralize per SDS Section 6 (often sodium
+bicarbonate slurry), absorb, dispose as hazardous waste. Large:
+evacuate, alert supervisor, do not approach without full PPE.</p>
+<h3 id="4-contact-cement-edge-banding-adhesives">4. Contact cement / edge-banding adhesives</h3>
+<p><strong>What it is.</strong> Solvent-based contact cement (laminate work), hot-melt
+EVA or PUR adhesives (edge banding).</p>
+<p><strong>Hazard + pictograms.</strong> Solvent contact cement: Flame, Health Hazard,
+Exclamation Mark. Hot melt: primarily thermal burn; some carry
+Exclamation Mark.</p>
+<p><strong>PPE.</strong> Contact cement: nitrile gloves, eye protection, organic-vapour
+respirator in unventilated areas. Hot melt: heat-resistant gloves near
+applicator, eye protection.</p>
+<p><strong>If exposed.</strong> Contact-cement skin contact: soap and water before it
+cures, never use solvent. Hot-melt burn: cool with running water 10–15
+min, <strong>do not peel the hardened adhesive off</strong> (takes skin with it),
+medical attention if burn is larger than a quarter.</p>
+<p><strong>If spilled.</strong> Contact cement: same as solvent finishes (flammable
+liquid procedure). Hot melt: let cool and solidify, scrape, dispose.</p>
+<h3 id="5-pva-yellow-wood-glue">5. PVA / yellow wood glue</h3>
+<p><strong>What it is.</strong> Polyvinyl acetate (Titebond II/III etc.). The everyday
+assembly glue.</p>
+<p><strong>Hazard + pictograms.</strong> Low overall, but skin sensitization and eye
+irritation with daily contact. Exclamation Mark (some products carry
+none).</p>
+<p><strong>PPE.</strong> Nitrile gloves, safety glasses, eye-wash within reach.</p>
+<p><strong>If exposed.</strong> Skin: soap and water. Eye: 15-minute flush, medical
+attention if irritation persists.</p>
+<p><strong>If spilled.</strong> Wipe with water before it cures; peel/scrape after.</p>
+<h3 id="6-lacquer-thinner-and-mineral-spirits">6. Lacquer thinner and mineral spirits</h3>
+<p><strong>What it is.</strong> Solvent blends used for thinning, cleanup, gun-flushing.
+Lacquer thinner is the aggressive one (acetone / toluene / MEK blend);
+mineral spirits is the milder petroleum distillate.</p>
+<p><strong>Hazard + pictograms.</strong> Flame (very low flash point on lacquer
+thinner), Exclamation Mark (defatting, irritation), Health Hazard
+(chronic inhalation). <strong>Aspiration hazard</strong> if swallowed — chemical
+pneumonia.</p>
+<p><strong>PPE.</strong> Nitrile or solvent-rated gloves, safety glasses, organic-vapour
+respirator for sustained use.</p>
+<p><strong>If exposed.</strong> Skin: soap and water — <strong>never use more solvent to
+clean off solvent</strong>. Eye: 15-minute flush. Inhalation: fresh air,
+medical if dizziness persists. Ingestion: do <strong>not</strong> induce vomiting,
+Poison Control, bring SDS.</p>
+<p><strong>If spilled.</strong> Same flammable-liquid protocol as item 2.</p>
+<h3 id="7-cleaning-solvents-denatured-alcohol-acetone-isopropanol">7. Cleaning solvents (denatured alcohol, acetone, isopropanol)</h3>
+<p><strong>What it is.</strong> Surface-prep and hand-cleanup solvents.</p>
+<p><strong>Hazard + pictograms.</strong> Flame (acetone is particularly volatile),
+Exclamation Mark.</p>
+<p><strong>PPE.</strong> Nitrile gloves, safety glasses, ventilation.</p>
+<p><strong>If exposed / spilled.</strong> Same flammable-liquid protocol as lacquer
+thinner.</p>
+<h3 id="8-compressed-air-and-pneumatic-systems">8. Compressed air and pneumatic systems</h3>
+<p><strong>What it is.</strong> Shop air at 90–120 psi plus the pneumatic tools and
+spray guns it drives.</p>
+<p><strong>Hazard.</strong> <strong>Physical, not chemical</strong> — but serious. Air injected
+through skin can cause embolism (life-threatening). Eye injury from
+debris when blowing off a workpiece. Hearing damage from sustained
+exhaust noise.</p>
+<p><strong>PPE.</strong> Safety glasses <strong>always</strong> when using compressed air, hearing
+protection, gloves.</p>
+<p><strong>If exposed.</strong> Air-injection injury: <strong>call 911 even if the entry
+wound looks small</strong>. Do not wait and see. Eye debris: eye-wash, medical
+attention if anything is embedded.</p>
+<h3 id="9-forklift-propane-and-forklift-batteries">9. Forklift propane and forklift batteries</h3>
+<p><strong>What it is.</strong> LPG cylinders for propane forklifts; lead-acid
+batteries for electric forklifts.</p>
+<p><strong>Hazard + pictograms.</strong> Propane: Flame, Gas Cylinder (flammable +
+pressure + asphyxiant). Lead-acid battery: Corrosion (sulfuric acid),
+Flame (hydrogen gas during charging).</p>
+<p><strong>PPE.</strong> Propane changeover: safety glasses, gloves — <strong>specific
+forklift-propane certification required first</strong>. Battery charging /
+fluid check: safety glasses, face shield, acid-resistant apron and
+gloves; do not bypass charging-area ventilation.</p>
+<p><strong>If exposed.</strong> Propane leak (smell of gas): leave the area, no
+ignition sources, alert supervisor. Battery-acid skin/eye contact:
+immediate 15-minute flush, medical attention.</p>
+<p><strong>If spilled.</strong> Battery acid: neutralize with sodium bicarbonate
+slurry per SDS, hazardous-waste disposal. Propane leak: evacuate,
+ventilate, no electrical switches.</p>
+<hr>
+<h3 id="quick-ppe-reference">Quick PPE reference</h3>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Eyes</th>
+<th>Hands</th>
+<th>Lungs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sanding / CNC</td>
+<td>Safety glasses</td>
+<td>Gloves</td>
+<td>N95 minimum</td>
+</tr>
+<tr>
+<td>Edge banding (hot melt)</td>
+<td>Safety glasses</td>
+<td>Heat-resistant near applicator</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Assembly / PVA glue</td>
+<td>Safety glasses</td>
+<td>Nitrile</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Spray finishing</td>
+<td>Glasses + face shield (high volume)</td>
+<td>Solvent-rated</td>
+<td>Organic-vapour respirator</td>
+</tr>
+<tr>
+<td>Acid catalyst mixing</td>
+<td>Face shield</td>
+<td>Butyl / neoprene</td>
+<td>Vapour respirator per SDS</td>
+</tr>
+<tr>
+<td>Solvent cleanup</td>
+<td>Safety glasses</td>
+<td>Nitrile / solvent-rated</td>
+<td>Organic-vapour respirator sustained</td>
+</tr>
+<tr>
+<td>Forklift propane / battery</td>
+<td>Glasses (battery: face shield)</td>
+<td>Gloves (battery: acid-resistant)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"My respirator is on the wrong cartridge — but it's the same brand."</strong>
+Cartridges are colour-coded for hazard class. An organic-vapour cartridge
+will not stop ammonia; a dust filter will not stop solvent vapour. Check
+the cartridge against SDS Section 8 every time.</p>
+<p><strong>"I used solvent to clean lacquer off my hands."</strong> Now you have solvent
+absorbing into your skin. Soap and water for skin cleanup, not solvent.</p>
+<p><strong>"The dust collector is making a weird noise but I have panels to cut."</strong>
+Stop the job. A failing dust collector is a combustible-dust explosion
+risk. Tell your supervisor.</p>
+<p><strong>"I'll only use the contact cement for 30 seconds — I don't need the
+respirator."</strong> A 30-second exposure can trigger a sensitization reaction.
+Sensitization is not reversible. Wear the respirator every time.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You're sanding solid walnut for two hours on the random-orbit
+sander with dust collection running. Do you need a respirator?</p>
+<blockquote>
+<p>Yes — N95 minimum. Walnut dust is a recognized carcinogen and
+sensitizer. Dust collection reduces but does not eliminate exposure.</p>
+</blockquote>
+<p><strong>2.</strong> A coworker spills about 2 L of lacquer thinner on the finishing
+room floor and reaches for a mop. What do you tell them?</p>
+<blockquote>
+<p>Stop — do not mop (spreads vapour, fire risk). Eliminate ignition
+sources, do not flip electrical switches. Ventilate. Get the spill
+kit, absorb with clay/vermiculite (not water). Dispose in the metal
+waste container. Tell the supervisor and log the incident.</p>
+</blockquote>
+<p><strong>3.</strong> You're about to mix acid catalyst into a conversion varnish for
+the first time. What is your first PPE step and what must be within
+reach?</p>
+<blockquote>
+<p>Face shield + chemical apron + butyl or neoprene gloves (not standard
+nitrile — confirm in SDS Section 8) + respirator with cartridge from
+the SDS. The <strong>eye-wash station and emergency shower must be within
+10 seconds reach</strong> before you open the bottle.</p>
+</blockquote>
+<p><strong>4.</strong> A nail gun misfires and you feel a sting on your palm. The
+puncture is barely visible and there is no nail. What do you do?</p>
+<blockquote>
+<p>Treat as compressed-air injection injury and <strong>call 911</strong>. Do not
+wait — air under the skin can cause embolism or serious tissue
+damage. Notify your supervisor.</p>
+</blockquote>
+<p><strong>5.</strong> Hot-melt adhesive drips onto your hand at the edge bander and
+hardens. What do you do?</p>
+<blockquote>
+<p>Cold running water 10–15 minutes. <strong>Do not peel the adhesive off</strong> —
+it takes skin with it. First-aid responder decides whether to leave
+it until it releases naturally or whether medical attention is
+needed.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The 9 WHMIS pictograms in detail → lesson 16.2.</li>
+<li>Supplier vs workplace labels → lesson 16.3.</li>
+<li>The 16 sections of an SDS → lesson 16.4.</li>
+<li>Your rights, the IRS, evacuation and emergency response → lesson 16.6.</li>
+<li>Hands-on certified training for the spray booth, forklift, or
+  acid-catalyst mixing — separate training programs with sign-off.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_16_rights_responsibilities_emergency" model="slide.slide">
+            <field name="name">Your Rights, Responsibilities, and Emergency Response</field>
+            <field name="channel_id" ref="course_whmis_base"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Every Southbrook employee.</field>
+            <field name="html_content"><![CDATA[<h1 id="your-rights-responsibilities-and-emergency-response">Your Rights, Responsibilities, and Emergency Response</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>Every Southbrook employee. This is the last lesson of the WHMIS base
+course and it covers two things you need cold: <strong>what you are legally
+entitled to</strong> (and obligated to do) under Canadian occupational health
+and safety law, and <strong>what to do in the first 60 seconds</strong> when
+something goes wrong.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Physical locations matter here. <strong>Your trainer will walk you to each
+of these during the in-person session and mark them on a printed
+shop-floor map</strong> posted in the floor office.</p>
+<blockquote>
+<p><strong>Eye-wash station — TBD, trainer to fill in</strong> <em>(typical: finishing room, near solvent decant)</em></p>
+<p><strong>Emergency shower — TBD, trainer to fill in</strong> <em>(typical: finishing room or chemical storage)</em></p>
+<p><strong>Fire extinguishers</strong> <em>(Class ABC at each station; Class B in finishing room for flammable liquids)</em></p>
+<p><strong>First-aid kit + AED — TBD, trainer to fill in</strong></p>
+<p><strong>Spill kits</strong> <em>(finishing room, glue area, warehouse)</em></p>
+<p><strong>Muster point — TBD, trainer to fill in</strong> <em>(typical: parking lot, away from building)</em></p>
+<p><strong>Joint Health and Safety Committee notice board → Floor Office</strong></p>
+<p><strong>Emergency contact list → at every phone + shop entrance</strong></p>
+</blockquote>
+<p>If any of these is blocked, covered, broken, or out of supply, that is
+a stop-the-job problem. Tell your supervisor immediately.</p>
+<h2 id="recognition-response">Recognition + response</h2>
+<h3 id="part-1-your-three-rights-under-canadian-ohs">Part 1 — Your three rights under Canadian OHS</h3>
+<p>Guaranteed to every worker by occupational health and safety
+legislation. Not perks Southbrook grants you — legal rights you cannot
+sign away.</p>
+<p><strong>Right 1 — The right to know.</strong> You have the right to know about the
+hazards in your workplace and how to handle them safely. You are
+entitled to <strong>training</strong> on every hazardous product you work with or
+near, <strong>access to the SDS</strong> for every product on site, <strong>legible
+labels</strong> on every container, and <strong>information about new hazards</strong> as
+they are introduced. If your supervisor blocks any of these — that
+violates your right to know. Escalate.</p>
+<p><strong>Right 2 — The right to participate.</strong> You can ask questions, raise
+hazards, suggest improvements. You can participate in the <strong>Joint
+Health and Safety Committee (JHSC)</strong> — Ontario law requires one at
+workplaces with 20+ workers. The JHSC inspects the workplace,
+investigates incidents, and recommends improvements. You can be a
+member; the committee notice board lists current members and how to
+nominate yourself.</p>
+<p><strong>Right 3 — The right to refuse unsafe work.</strong> You can refuse work you
+believe is dangerous to yourself or another worker. This is the
+strongest right and the most misunderstood. The Ontario OHS Act
+process:</p>
+<ol>
+<li>You believe work is unsafe (equipment, environment, or another
+   person's behaviour creates a likely danger).</li>
+<li><strong>Report the refusal to your supervisor</strong>, verbally is fine.</li>
+<li><strong>Stay at a safe place near the workstation</strong> while the
+   investigation happens — you are still on the clock; refusal is not
+   walking off the job.</li>
+<li><strong>Your supervisor investigates</strong> in the presence of a JHSC worker
+   representative (or another worker chosen by you).</li>
+<li><strong>Hazard resolved</strong> → back to work. <strong>Still unsafe</strong> → the
+   <strong>Ministry of Labour, Immigration, Training and Skills Development</strong>
+   is called; an inspector decides.</li>
+</ol>
+<p>You <strong>cannot be punished</strong> for refusing in good faith. Reprisal —
+firing, demotion, worse hours, worse station — is a separate offence.</p>
+<h3 id="part-2-internal-responsibility-system-irs">Part 2 — Internal Responsibility System (IRS)</h3>
+<p>The three rights live inside the IRS: everyone in the workplace has a
+role in safety, scaled to their authority.</p>
+<ul>
+<li><strong>Workers</strong> — follow safe procedures, use PPE, report hazards.</li>
+<li><strong>Supervisors</strong> — enforce procedures, train, respond to reports,
+  fix what they can.</li>
+<li><strong>Employer (Southbrook)</strong> — provide safe workplaces, equipment,
+  procedures, training, PPE.</li>
+<li><strong>JHSC</strong> — keep the system honest by inspecting, investigating,
+  recommending.</li>
+</ul>
+<p>The IRS is layered. Everyone contributes. Everyone is accountable.</p>
+<h3 id="part-3-emergency-response">Part 3 — Emergency response</h3>
+<p>The first 60 seconds determine the outcome. Memorise these.</p>
+<p><strong>Small chemical spill (under ~1 L, non-acutely-toxic):</strong>
+Eliminate ignition sources → ventilate → spill kit + PPE per SDS
+Sections 6 + 8 → contain with absorbent → scoop into approved waste
+container → tell supervisor → log the incident.</p>
+<p><strong>Large spill, or any spill of acutely toxic / corrosive / unknown
+product:</strong>
+Evacuate the immediate area (move upwind / to fresh air) → alert the
+supervisor → sound the building alarm if the spill threatens the area
+beyond the room → <strong>do not attempt cleanup</strong> unless trained for that
+product with the right PPE on → account for everyone at the muster
+point.</p>
+<p><strong>Skin exposure:</strong>
+Remove contaminated clothing (cut it off if it sticks) → flush with
+water at emergency shower or sink → <strong>15 minutes minimum for
+corrosives</strong>, time specified on the SDS for others → tell supervisor →
+medical attention per SDS Section 4 → <strong>bring the SDS</strong> to the medical
+responder.</p>
+<p><strong>Eye exposure:</strong>
+Get to the eye-wash <strong>immediately</strong> — do not stop to ask permission.
+Hold eyelids open and flush <strong>15 minutes minimum</strong>. Remove contact
+lenses if present and you can do so without delaying the flush. Get
+medical attention. Bring the SDS.</p>
+<p><strong>Inhalation:</strong>
+Get the person to fresh air. <strong>If you cannot enter without your own
+PPE, do not go in — call for help.</strong> Loosen tight clothing. If not
+breathing: CPR if trained, call 911. Get medical attention; bring the
+SDS. Some inhalation effects are delayed and need observation.</p>
+<p><strong>Ingestion:</strong>
+<strong>Do not induce vomiting</strong> unless SDS Section 4 specifically says to
+(most solvents — vomiting is the wrong response; aspiration into the
+lungs is worse). Call <strong>Poison Control</strong> (Ontario: 1-800-268-9017) or
+911. Bring the SDS.</p>
+<p><strong>Fire — wood dust:</strong>
+Different from a normal fire. Heat and air movement can flash dust
+into an explosion. Sound the alarm → evacuate → call 911. <strong>Do not
+use compressed air or a fan</strong> to clear smoke (re-suspends dust). Class
+ABC extinguisher for small surface fires. <strong>For a dust-collector
+fire: evacuate and wait for the fire department</strong> — opening the
+collector can cause a flash.</p>
+<p><strong>Fire — solvent / flammable liquid:</strong>
+Sound the alarm → evacuate → call 911. Class B extinguisher if the
+fire is smaller than a wastebasket and you have an escape route at
+your back. <strong>Never use water</strong> on a solvent fire — spreads burning
+liquid. Get out if it is bigger than you can handle in 30 seconds.</p>
+<p><strong>Chain of report.</strong> Every incident — exposure, spill, fire, near miss
+— goes up this chain: <strong>immediate supervisor → safety officer / JHSC →
+911</strong> for medical / fire / hazardous-materials release beyond a small
+spill → <strong>Ministry of Labour</strong> for serious workplace injuries (the
+safety officer handles this notification; your job is to make sure the
+safety officer knows). Filing a report does not get you in trouble.
+Not filing one does.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I'd feel like a snitch if I called the JHSC about my supervisor."</strong>
+The JHSC exists for exactly this. Concerns are confidential when you
+ask. Not raising a hazard because you are uncomfortable is how people
+get hurt.</p>
+<p><strong>"I refused to do a task and I'm worried I'll get fired."</strong> Refusing
+unsafe work in good faith is protected. Firing or punishing you for
+that is <strong>reprisal</strong> — a separate offence. Document everything (date,
+time, what you refused, who you told). Talk to the JHSC.</p>
+<p><strong>"I splashed something in my eye but it doesn't hurt much — I'll
+finish my task first."</strong> Get to the eye-wash now. Chemical eye damage
+is often painless until the damage is done. The 15-minute window is
+in regulation for a reason.</p>
+<p><strong>"There was a small lacquer-thinner spill and I cleaned it up with a
+mop, then went on with my day."</strong> Mopping is wrong (spreads vapour,
+fire risk). And the incident must be logged even if nobody was hurt —
+a near miss this week is an injury next week if uncorrected.</p>
+<p><strong>"The eye-wash station was being used as a coat rack and I didn't
+say anything."</strong> That is the single most dangerous WHMIS failure on a
+shop floor. The eye-wash must be unobstructed and tested weekly. Move
+the coats; tell your supervisor.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> Your supervisor asks you to spray a new conversion varnish in
+the spray booth. The booth exhaust fan is not working — you can see
+the booth fogging up within seconds. What are your options under
+Ontario OHS?</p>
+<blockquote>
+<p>Exercise your <strong>right to refuse unsafe work</strong>. Tell the supervisor
+verbally that you refuse because the exhaust is not functioning.
+Stay nearby — you are still on the clock. The supervisor
+investigates with a JHSC worker representative. Fixed → you resume.
+Still unsafe in your judgement → Ministry of Labour is called. You
+cannot be punished for refusing in good faith.</p>
+</blockquote>
+<p><strong>2.</strong> A coworker gets contact cement on the back of their hand and
+says "it's fine, I'll keep going." What do you tell them?</p>
+<blockquote>
+<p>Wash it off with soap and water before it cures. Solvent-based
+contact cement is a skin sensitizer; repeated contact builds a
+chronic reaction. Thirty seconds of washing is cheaper than the
+medical leave later.</p>
+</blockquote>
+<p><strong>3.</strong> You walk past the finishing room and see lacquer thinner
+spreading across the floor — maybe 4 L. The supervisor is on break.
+What do you do, in order?</p>
+<blockquote>
+<p>(a) Do not enter the spill area; do not flip electrical switches
+nearby. (b) Yell to clear the immediate area. (c) Call the
+supervisor — phone, radio, or send a coworker. (d) Open doors /
+ventilation upstream. (e) If the spill is growing toward an
+ignition source, <strong>sound the alarm</strong>. (f) Stay out until trained
+responders arrive with the spill kit and respirators. Do not
+attempt cleanup yourself.</p>
+</blockquote>
+<p><strong>4.</strong> You're a JHSC member. The committee notices three incidents in
+two months involving the same edge-banding adhesive. What can the
+committee do?</p>
+<blockquote>
+<p>Recommend the employer investigate and correct — change product,
+change procedure, add PPE, add training. If the employer does not
+respond, the committee can raise it with the Ministry of Labour.
+Right to participate is exercised through exactly this mechanism.</p>
+</blockquote>
+<p><strong>5.</strong> Someone collapses in the finishing room after spraying for two
+hours. They are conscious but disoriented and breathing rapidly. You
+are not sure what they sprayed. What is your first call and what do
+you bring to the responders?</p>
+<blockquote>
+<p>Call <strong>911</strong> first. Move them to fresh air only if you can do so
+without exposing yourself (do not enter if the air is still vapour-
+heavy and you have no respirator). Grab the <strong>SDS</strong> for the product
+they were spraying — responders need it for treatment. Tell the
+supervisor. Account for everyone else who was in the room.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Pictograms → lesson 16.2. Labels → 16.3. SDS → 16.4. Shop hazards →
+  16.5.</li>
+<li>Hands-on first aid, CPR, AED training — separate certified courses.</li>
+<li>Spill-team training (full PPE + procedure for major spills) —
+  separate certified training for designated responders.</li>
+<li>Forklift, spray-booth, and acid-catalyst certifications — separate
+  training with sign-off.</li>
+</ul>
+<hr>
+<h2 id="end-of-course">End of course</h2>
+<p>This is the last lesson in WHMIS Base Training. You have covered:</p>
+<ul>
+<li>16.1 — What WHMIS is, three pillars, legal frame, responsibilities.</li>
+<li>16.2 — The 9 pictograms.</li>
+<li>16.3 — Supplier labels (6 elements) and workplace labels (3 elements).</li>
+<li>16.4 — How to read an SDS in 60 seconds.</li>
+<li>16.5 — The actual hazardous products at Southbrook.</li>
+<li>16.6 — Your three rights, the IRS, and emergency response.</li>
+</ul>
+<p>You refresh <strong>annually</strong>, sooner if a new hazard is introduced. You
+take <strong>job-specific</strong> training for any station that requires it —
+spray booth, forklift, acid-catalyst mixing — separately, with sign-off.</p>
+<p>WHMIS is not a one-time stamp on a form. It is how everyone in this
+shop goes home in the same condition they came in.</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>
