@@ -64,7 +64,7 @@ Phase 5 — Tests + a11y
     engine, ARIA roles on chip selectors and import modal,
     keyboard navigation.
 """,
-    "version": "19.0.6.1.0",
+    "version": "19.0.6.2.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -124,6 +124,9 @@ Phase 5 — Tests + a11y
             # Vanilla JS for Phase 1 — refactored to OWL Component in
             # Phase 2 when wiring to live attribute data via JSON-RPC.
             "southbrook_configurator_ux/static/src/js/configurator.esm.js",
+        ],
+        "web.assets_web": [
+            "southbrook_configurator_ux/static/src/js/website_builder_iframe_guard.esm.js",
         ],
     },
     "installable": True,
