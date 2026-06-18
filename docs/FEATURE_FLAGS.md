@@ -63,7 +63,28 @@ Rollback:
 - `git revert` of the per-task commit removes both the sync method and
   the boolean cleanly.
 
-(P5 already shipped; P8 adds its own entry.)
+### P8 — Floor traveler
+
+P8 is **always-on** when the new `southbrook_floor_traveler` addon is
+installed. There is no behaviour change unless that addon is installed
++ a user prints the traveler PDF or POSTs to the scan endpoint.
+
+Endpoints + side effects:
+
+- `ir.actions.report` `southbrook_floor_traveler.action_floor_traveler_report`
+  renders one PDF per `sb.production.package`, with a QR code encoding
+  `sb-package:<id>`. Degrades gracefully without the `qrcode` Python
+  lib (the report renders, the QR area shows a "QR unavailable" stub).
+- `POST /southbrook/api/floor-traveler/scan` body
+  `{qr_payload, workcenter_code}` → calls
+  `sb.production.package.record_scan(workcenter_code)`, which appends
+  to the JSON scan log and calls the **existing**
+  `mrp.workorder.button_finish` so the existing tool-consumption debit
+  fires exactly once. Audit's load-bearing acceptance.
+
+Rollback: uninstalling the addon removes the report + endpoint;
+existing scan logs survive in `x_scan_log_json` as opaque JSON and are
+ignored.
 
 ## Rollback
 
