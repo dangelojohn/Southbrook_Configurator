@@ -4,9 +4,11 @@
 Removes:
   - sb.production.package id 23 (E2E-SCAN-TEST-MO85)
   - sb.production.package id 34 (E2E-SCAN-TEST-MO86)
-  - Resets prematurely-finished 'Cut Panels' WOs on WH/MO/00085
-    and WH/MO/00086 to ready state (clears consumption rows, lifecycle
-    latch, finish/start timestamps, qty_produced, duration).
+  - sb.production.package id 36 (E2E-SCAN-TEST-MO88)
+  - Resets prematurely-finished 'Cut Panels' WOs on WH/MO/00085,
+    WH/MO/00086, and WH/MO/00088 to ready state (clears consumption
+    rows, lifecycle latch, finish/start timestamps, qty_produced,
+    duration).
 
 Run via Odoo shell against the southbrook DB:
 
@@ -17,8 +19,8 @@ Run via Odoo shell against the southbrook DB:
 
 Idempotent — running it twice is a no-op the second time.
 """
-TEST_PACKAGE_IDS = [23, 34]
-RESET_MO_NAMES = ["WH/MO/00085", "WH/MO/00086"]
+TEST_PACKAGE_IDS = [23, 34, 36]
+RESET_MO_NAMES = ["WH/MO/00085", "WH/MO/00086", "WH/MO/00088"]
 RESET_OPERATION_NAME = "Cut Panels"
 
 # Package cleanup — capture FK targets first so ondelete=restrict on
