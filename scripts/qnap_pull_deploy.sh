@@ -140,12 +140,41 @@ else
   log "running cold Odoo upgrade under flock"
 fi
 
-set +e
-$QNAP_DOCKER exec "$CONTAINER" bash -c \
-  "(: > '$LOCK_PATH' 2>/dev/null || true) && flock -E 75 -w '$LOCK_WAIT_SEC' '$LOCK_PATH' odoo ${ODOO_RUN_FLAGS[*]} && echo '$SENTINEL'" \
-  > "$UPGRADE_LOG" 2>&1
-rc=$?
-set -e
+# Retry the cold upgrade on transient postgres SerializationFailure
+# errors. Live cron workers inside southbrook-odoo occasionally grab
+# `ir_cron` rows with SELECT … FOR NO KEY UPDATE while our -u is
+# trying to write them. Without retry, the cron-driven flow would
+# leave the deploy marked failed (poller would re-trigger next
+# minute anyway, but that's wasted load + noise). 4 attempts with
+# linear backoff covers the typical case.
+MAX_ATTEMPTS="${MAX_ATTEMPTS:-4}"
+attempt=1
+while true; do
+  : > "$UPGRADE_LOG"
+  set +e
+  $QNAP_DOCKER exec "$CONTAINER" bash -c \
+    "(: > '$LOCK_PATH' 2>/dev/null || true) && flock -E 75 -w '$LOCK_WAIT_SEC' '$LOCK_PATH' odoo ${ODOO_RUN_FLAGS[*]} && echo '$SENTINEL'" \
+    > "$UPGRADE_LOG" 2>&1
+  rc=$?
+  set -e
+  if [[ "$rc" -eq 0 ]]; then
+    break
+  fi
+  # Only retry on the specific postgres concurrent-update race; all
+  # other failures are surfaced immediately.
+  if ! grep -qE "could not serialize access due to concurrent update|SerializationFailure" \
+       "$UPGRADE_LOG"; then
+    break
+  fi
+  if [[ "$attempt" -ge "$MAX_ATTEMPTS" ]]; then
+    log "upgrade hit SerializationFailure $attempt times; giving up"
+    break
+  fi
+  backoff=$((attempt * 5))
+  log "upgrade hit SerializationFailure (attempt $attempt); retrying in ${backoff}s"
+  sleep "$backoff"
+  attempt=$((attempt + 1))
+done
 grep -E 'Modules loaded|Registry loaded|ParseError|CRITICAL|ValidationError|AssertionError|Failed to load registry|Traceback|Starting .*test_|post-tests|^FAIL|tests\.stats|__SBK_PULL_COLD_OK__' "$UPGRADE_LOG" \
   | sed 's/^/[odoo] /' >&2 || true
 [[ "$rc" -ne 75 ]] || fail "another Odoo upgrade is holding $LOCK_PATH"

@@ -7,8 +7,21 @@
 
 set -euo pipefail
 
-REQUEST_URL="${REQUEST_URL:-https://raw.githubusercontent.com/dangelojohn/Southbrook_Configurator/feature/configurator-loop-p1-p8/deploy/qnap/request.env}"
-PULL_SCRIPT_URL="${PULL_SCRIPT_URL:-https://raw.githubusercontent.com/dangelojohn/Southbrook_Configurator/feature/configurator-loop-p1-p8/scripts/qnap_pull_deploy.sh}"
+# Hardcoded against the `deploy/release` branch — separate from
+# day-to-day developer branches. ONLY commits to `deploy/release`
+# trigger a production deploy. Day-to-day work on feature branches
+# does NOT, even if a developer pushes a malformed request.env
+# elsewhere. The deploy-release branch is intended to be branch-
+# protected (PR + review required); see deploy/qnap/README.md.
+#
+# An override from `request.env` is honored for REPO_ARCHIVE_BASE
+# (which only chooses WHERE to pull addon code from), but NOT for
+# PULL_SCRIPT_URL (which controls WHAT script the QNAP runs).
+# Allowing the request to swap the script would defeat the
+# branch-protection model.
+RELEASE_BRANCH="${RELEASE_BRANCH:-deploy/release}"
+REQUEST_URL="${REQUEST_URL:-https://raw.githubusercontent.com/dangelojohn/Southbrook_Configurator/$RELEASE_BRANCH/deploy/qnap/request.env}"
+PULL_SCRIPT_URL="${PULL_SCRIPT_URL:-https://raw.githubusercontent.com/dangelojohn/Southbrook_Configurator/$RELEASE_BRANCH/scripts/qnap_pull_deploy.sh}"
 REPO_ARCHIVE_BASE="${REPO_ARCHIVE_BASE:-https://github.com/dangelojohn/Southbrook_Configurator/archive}"
 STATE_DIR="${STATE_DIR:-/share/CACHEDEV3_DATA/Container/southbrook/deploy-state}"
 LOCK_PID_FILE="${LOCK_PID_FILE:-/tmp/sbk-qnap-deploy-poller.pid}"
@@ -49,7 +62,6 @@ REF=""
 MODULES=""
 TEST_TAGS=""
 REQUEST_REPO_ARCHIVE_BASE=""
-REQUEST_PULL_SCRIPT_URL=""
 
 while IFS='=' read -r key value; do
   case "$key" in
@@ -58,7 +70,14 @@ while IFS='=' read -r key value; do
     MODULES) MODULES="$value" ;;
     TEST_TAGS) TEST_TAGS="$value" ;;
     REPO_ARCHIVE_BASE) REQUEST_REPO_ARCHIVE_BASE="$value" ;;
-    PULL_SCRIPT_URL) REQUEST_PULL_SCRIPT_URL="$value" ;;
+    PULL_SCRIPT_URL)
+      # IGNORED. The script the QNAP runs is controlled by the
+      # poller's hardcoded RELEASE_BRANCH only; honoring a request-
+      # supplied override would defeat the branch-protection model.
+      # Surface the attempted override so the operator notices.
+      log "ignoring request-supplied PULL_SCRIPT_URL override"
+      ;;
+    REQUESTED_AT) ;;  # metadata only; not used by the poller
     ""|"#"*) ;;
     *) log "ignoring unknown request key: $key" ;;
   esac
@@ -73,9 +92,8 @@ fi
 if [[ -n "$REQUEST_REPO_ARCHIVE_BASE" ]]; then
   REPO_ARCHIVE_BASE="$REQUEST_REPO_ARCHIVE_BASE"
 fi
-if [[ -n "$REQUEST_PULL_SCRIPT_URL" ]]; then
-  PULL_SCRIPT_URL="$REQUEST_PULL_SCRIPT_URL"
-fi
+# PULL_SCRIPT_URL is deliberately NOT overridable from the request
+# — see the case-statement comment above.
 
 state_file="$STATE_DIR/last_request_id"
 last_request_id="$(cat "$state_file" 2>/dev/null || true)"

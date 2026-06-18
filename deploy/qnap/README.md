@@ -7,6 +7,21 @@ It is created by `scripts/request_qnap_deploy.sh` and read by
 Do not put secrets in this directory. The request file contains only a commit
 ref, addon module names, optional Odoo test tags, and public GitHub URLs.
 
+## Release branch model
+
+The poller is hardcoded to watch the **`deploy/release`** branch — separate
+from day-to-day developer branches. Day-to-day work on feature branches does
+NOT trigger a production deploy, even if a developer pushes a malformed
+`request.env` elsewhere. The deploy-release branch should be branch-protected
+(PR + review required); see `deploy/qnap/TESTING.md` "Branch protection".
+
+The poller honors `REPO_ARCHIVE_BASE` overrides in the request file (which only
+chooses where to pull addon code from) but **does NOT honor `PULL_SCRIPT_URL`
+overrides** — the deploy script itself is always loaded from `deploy/release`
+to keep the supply-chain surface tied to the branch-protection boundary.
+
+For testing the pipeline end-to-end, see `deploy/qnap/TESTING.md`.
+
 ## How the pipeline works
 
 ```
