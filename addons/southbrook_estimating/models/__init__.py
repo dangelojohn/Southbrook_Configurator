@@ -16,3 +16,4 @@ from . import product_config_line
 from . import product_template
 from . import mrp_bom
 from . import southbrook_order_analytics
+from . import cabinet_archetype

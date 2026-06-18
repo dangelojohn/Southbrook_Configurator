@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.2.3.0",
+    "version": "19.0.3.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -161,6 +161,10 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # Southbrook Estimating. Bypasses the product form button entirely.
         # MUST load AFTER sale_order_views.xml (which defines menu_southbrook_root).
         "views/launch_3d_menu.xml",
+        # A1 (2026-06-18) — Prodboard cabinet-archetype taxonomy seed.
+        # Loads after security so the access rules exist when the seed
+        # creates archetype records. Idempotent.
+        "data/prodboard_taxonomy_seed.xml",
     ],
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).
@@ -221,6 +225,10 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "demo/southbrook_demo_variants.xml",
         "demo/southbrook_demo_orders.xml",
     ],
+    # REG-C1 (2026-06-18) — heal companies missing a default Sales journal.
+    # See _ensure_sales_journal in __init__.py for the why; runs on
+    # -i AND -u so live DBs upgrade-heal automatically.
+    "post_init_hook": "_ensure_sales_journal",
     "installable": True,
     "application": True,
     "auto_install": False,

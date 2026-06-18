@@ -3,6 +3,25 @@
 All notable changes to the Southbrook Estimating addon are documented here.
 Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
+## [19.0.2.4.0] — 2026-06-18
+
+### REG fixes — Claude Chrome end-to-end Run 1 + Run 2 findings
+
+- **REG-C1**: `_ensure_sales_journal` post-init hook seeds a default
+  Sales journal (`type=sale`, code `INV`) for any company that lacks
+  one. Heals the live Southbrook DB which skipped Odoo's onboarding
+  wizard and was returning *"No journal could be found … for any of
+  those types: sale"* on Create Invoice. Idempotent — companies with
+  an existing sale journal are skipped. Runs on `-i` AND `-u` so the
+  upgrade-deploy path heals automatically. For an immediate prod
+  unblock without redeploy, see `scripts/heal_sales_journal.py`.
+- **REG-C2**: `menu_southbrook_root` now carries
+  `action="action_order_builder"` so the app-drawer tile lands users
+  on the Order Builder grid instead of falling through to the
+  lowest-sequence child menu (which was `menu_southbrook_launch_3d`,
+  popping the SB-BASE-1DR configurator wizard). Order Builder child
+  also re-sequenced to 4 (defence in depth).
+
 ## [19.0.1.0.0] — 2026-05-30
 
 ### Phase 1 — Initial Release
