@@ -153,5 +153,5 @@ After enabling, the `test_qnap_deploy.sh` script won't be able to direct-push to
 | `remote branch github-southbrook/deploy/release does not exist` | One-time setup not done | Run the `git push github-southbrook github-southbrook/main:refs/heads/deploy/release` command in Prerequisites. |
 | `GitHub raw never surfaced REQUEST_ID after 120s` | Push failed silently OR DNS issue | Re-run `git push github-southbrook deploy/release` manually, watch the output. |
 | `QNAP did not mark REQUEST_ID applied after 480s` | Poller cron disabled, OR the deploy is hanging | SSH to the QNAP and check `ps -ef \| grep qnap_pull_deploy` and `tail /tmp/qnap_pull_deploy_upgrade.log`. |
-| Poller log shows `SerializationFailure … giving up` | postgres concurrency race exhausted retries | Bump `MAX_ATTEMPTS` in `scripts/qnap_pull_deploy.sh`. Or re-run the test (transient). |
+| Poller log shows `SerializationFailure … giving up` | postgres concurrency race exhausted retries | The deploy script pauses module-owned `ir.cron` rows during `-u` by default, then restores them on exit. If this still recurs, inspect live workers and consider increasing `MAX_ATTEMPTS`. |
 | Deploy applies but `/web/login` returns non-200 | Real registry-load failure post-upgrade | Read `/tmp/qnap_pull_deploy_upgrade.log` on the QNAP for the Odoo error trace. |

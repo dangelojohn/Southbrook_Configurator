@@ -36,7 +36,8 @@ the request's --ref / --modules / --test-tags
                               │
                               ▼
 qnap_pull_deploy.sh: download GitHub archive → replace addons →
-cold-upgrade Odoo (with embedded targeted tests if requested) →
+cold-upgrade Odoo (temporarily pausing active `ir.cron` rows owned by
+the modules being upgraded, with restore-on-exit; embedded targeted tests if requested) →
 HTTP-probe /web/login → mark request applied if all green
 ```
 
