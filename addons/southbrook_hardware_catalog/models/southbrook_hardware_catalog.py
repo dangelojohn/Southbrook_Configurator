@@ -43,6 +43,18 @@ class SouthbrookHardwareCatalog(models.AbstractModel):
             self.pool._southbrook_hardware_map = _load_hardware_map()
         return self.pool._southbrook_hardware_map
 
+    # P2 — Known drawer-slide SKUs. The resolver swaps any of these in the
+    # per_drawer aggregation when the caller passes an explicit slide_sku
+    # (the configurator's "Drawer Slide" pick). All slides outside this
+    # set continue to use the per_drawer default from the JSON map.
+    _DRAWER_SLIDE_SKUS = frozenset({
+        "BLM-MOV-450",     # Blum MOVENTO 450 mm (legacy default)
+        "KS-K2832-21",     # King Slide 21" Soft-Close Undermount
+        "KS-3032-18",      # King Slide 18" Ball-Bearing
+        "HET-ACTRO-500",   # Hettich Actro 5D 500 mm
+        "PR-602728",       # Salice Progressa+ Undermount
+    })
+
     @api.model
     def resolve(
         self,
@@ -55,6 +67,7 @@ class SouthbrookHardwareCatalog(models.AbstractModel):
         pull_size_mm: int = 128,
         handle_style: str = "pull",
         mount_appliance: bool = False,
+        slide_sku: str = None,
     ) -> List[Tuple]:
         """Return a list of (product.product, qty) tuples for the configured carcass.
 
@@ -98,8 +111,17 @@ class SouthbrookHardwareCatalog(models.AbstractModel):
 
         for sku, qty_per in (m.get(per_door_section) or {}).items():
             rules.append(("per_door", sku, qty_per * door_count))
+        # P2 — honour an explicit slide brand override. When the caller
+        # passes slide_sku and the per_drawer rule entry is a slide
+        # (member of _DRAWER_SLIDE_SKUS), swap to the requested SKU so
+        # the resolved BoM binds to the actual product the customer
+        # configured. Non-slide per_drawer entries (handles, etc.)
+        # flow through unchanged.
         for sku, qty_per in (m.get("per_drawer") or {}).items():
-            rules.append(("per_drawer", sku, qty_per * drawer_count))
+            effective_sku = sku
+            if slide_sku and sku in self._DRAWER_SLIDE_SKUS:
+                effective_sku = slide_sku
+            rules.append(("per_drawer", effective_sku, qty_per * drawer_count))
         for sku, qty_per in (m.get("per_shelf") or {}).items():
             rules.append(("per_shelf", sku, qty_per * shelf_count))
         for sku, qty in (m.get("per_cabinet") or {}).items():

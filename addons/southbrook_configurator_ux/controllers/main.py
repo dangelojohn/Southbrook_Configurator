@@ -508,15 +508,55 @@ class SouthbrookConfiguratorAPI(http.Controller):
                     break
         disabled_ids = sorted(refined_disabled)
 
+        # P2 — Soft-Close derivation. When a brand-aware Drawer Slide is
+        # picked AND the legacy "Accessories: Soft-Close" +$15 line is
+        # still in the session, the audit asks us to suppress the +$15
+        # (no double charge) and surface a derived badge instead.
+        price = float(session.price or 0.0)
+        weight = float(getattr(session, "weight", 0.0) or 0.0)
+        soft_close_derived, sc_offset = self._p2_softclose_derivation(session)
+        if soft_close_derived and sc_offset:
+            price = max(0.0, price - sc_offset[0])
+            weight = max(0.0, weight - sc_offset[1])
+
         return {
             "ok": True,
             "selected_value_ids": session.value_ids.ids,
-            "price": float(session.price or 0.0),
-            "weight": float(getattr(session, "weight", 0.0) or 0.0),
+            "price": price,
+            "weight": weight,
             "disabled_value_ids": disabled_ids,
             "live_sku": self._compute_sku_from_session(session),
+            "soft_close_derived": bool(soft_close_derived),
             "warnings": [],
         }
+
+    # ------------------------------------------------------------------
+    # P2 — Soft-Close derivation helper.
+    # Returns (derived_bool, (price_offset, weight_offset)) — offset is
+    # the amount to subtract from the displayed price/weight when both
+    # a soft-close slide and the legacy +$15 Accessories pick are
+    # present. The seed module is the single source of truth for which
+    # slide values are soft-close.
+    # ------------------------------------------------------------------
+    _SOFTCLOSE_LEGACY_OFFSET = (15.0, 0.0)
+
+    def _p2_softclose_derivation(self, session):
+        if not session or not session.value_ids:
+            return False, None
+        Seed = request.env["southbrook.configurator_ux.drawer_slide_seed"]
+        slide_is_sc = Seed.is_soft_close_slide_picked(session.value_ids)
+        has_legacy_pick = any(
+            v.attribute_id.name == "Accessories" and v.name == "Soft-Close"
+            for v in session.value_ids
+        )
+        if slide_is_sc and has_legacy_pick:
+            return True, self._SOFTCLOSE_LEGACY_OFFSET
+        if slide_is_sc:
+            # Slide is soft-close but legacy pick absent — badge still
+            # derives (UI shows "Soft-Close" as a derived chip), no
+            # price adjustment needed.
+            return True, None
+        return False, None
 
     # ------------------------------------------------------------------
     # Live SKU composer — shared between /select and /commit.

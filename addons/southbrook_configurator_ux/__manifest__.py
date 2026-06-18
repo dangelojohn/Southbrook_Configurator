@@ -64,7 +64,7 @@ Phase 5 — Tests + a11y
     engine, ARIA roles on chip selectors and import modal,
     keyboard navigation.
 """,
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -110,6 +110,9 @@ Phase 5 — Tests + a11y
         # that were only mentioned in Contractor / Signature rules.
         # Loads LAST so the catalog templates are fully wired first.
         "data/rule_completion.xml",
+        # P2 — Brand-aware Drawer Slide attribute. Loads after the
+        # catalog so per-template wiring finds the drawer templates.
+        "data/p2_drawer_slide.xml",
     ],
     "assets": {
         "web.assets_frontend": [

@@ -22,6 +22,18 @@ PRODUCTION_PACKAGE_STATES = [
     ("done", "Done"),
 ]
 
+# P2 — Brand-aware Drawer Slide bindings. Same table the configurator UX
+# carries in its drawer_slide_p2 module; duplicated here to avoid a
+# manifest dep on configurator_ux just to read 5 rows of constants.
+# Each row: (configurator_value_name, x_marathon_sku, is_soft_close).
+_SLIDE_VALUE_TO_SKU = [
+    ("King Slide K2832 21\" Soft-Close",  "KS-K2832-21",   True),
+    ("King Slide 3032 18\" Ball-Bearing", "KS-3032-18",    False),
+    ("Blum MOVENTO 450",                  "BLM-MOV-450",   True),
+    ("Hettich Actro 5D 500",              "HET-ACTRO-500", True),
+    ("Salice Progressa+ (PR-602728)",     "PR-602728",     False),
+]
+
 
 class SbProductionPackage(models.Model):
     _name = "sb.production.package"
@@ -107,6 +119,7 @@ class SbProductionPackage(models.Model):
         door_count: int = 1,
         drawer_count: int = 0,
         soft_close: bool = True,
+        slide_sku: Optional[str] = None,
     ):
         """Build (or rebuild) the complete production package for an MO.
 
@@ -153,7 +166,10 @@ class SbProductionPackage(models.Model):
         cutlist = Cutlist.create({"mo_id": mo.id})
         Cutlist.generate_lines_from_panel_dict(cutlist, panel_dict)
 
-        # 2. Hardware — resolve picks and build the package.
+        # 2. Hardware — resolve picks and build the package. P2 threads
+        # the configurator's chosen Drawer Slide SKU through so the BoM
+        # binds to the real product (King Slide K2832 etc.) rather than
+        # the legacy per_drawer default.
         shelf_count = int(panel_dict.get("shelf_count") or 0)
         picks = Catalog.resolve(
             cabinet_family=cabinet_family,
@@ -161,6 +177,7 @@ class SbProductionPackage(models.Model):
             drawer_count=drawer_count,
             shelf_count=shelf_count,
             soft_close=soft_close,
+            slide_sku=slide_sku,
         )
         hardware_package = HardwarePackage.create({"mo_id": mo.id})
         HardwarePackage.generate_lines_from_resolution(hardware_package, picks)
@@ -241,6 +258,7 @@ class SbProductionPackage(models.Model):
             door_count=dims["door_count"],
             drawer_count=dims["drawer_count"],
             soft_close=dims["soft_close"],
+            slide_sku=dims.get("slide_sku"),
         )
         package.sale_order_line_id = order_line.id
         _logger.info(
@@ -308,6 +326,13 @@ class SbProductionPackage(models.Model):
         drawer_count = self._infer_drawer_count(attr_map, order_line)
         door_count = 0 if drawer_count else self._infer_door_count(attr_map, width_mm)
         soft_close = self._infer_soft_close(attr_map)
+        slide_sku, slide_is_soft_close = self._resolve_slide_sku_from_attr_map(attr_map)
+        # P2 — when a brand-aware slide is picked, soft-close becomes a
+        # *derivation* of the slide's is_soft_close rather than a separate
+        # billable add-on. This keeps the resolver consistent with the
+        # configurator's suppression of the legacy +$15 Accessories pick.
+        if slide_sku:
+            soft_close = bool(slide_is_soft_close)
 
         return {
             "width_mm": width_mm,
@@ -317,6 +342,7 @@ class SbProductionPackage(models.Model):
             "door_count": door_count,
             "drawer_count": drawer_count,
             "soft_close": soft_close,
+            "slide_sku": slide_sku,
         }
 
     def _parse_dim_to_mm(self, raw):
@@ -387,6 +413,20 @@ class SbProductionPackage(models.Model):
         if 540.0 < width_mm <= 920.0:
             return 2
         return 1
+
+    def _resolve_slide_sku_from_attr_map(self, attr_map):
+        """P2 — Resolve the configured Drawer Slide pick to its SKU.
+
+        Returns ``(sku, is_soft_close)``. ``(None, None)`` when no slide
+        is configured (the legacy per_drawer default fires through).
+        """
+        picked = (attr_map.get("drawer slide") or "").strip()
+        if not picked:
+            return (None, None)
+        for value_name, sku, is_sc in _SLIDE_VALUE_TO_SKU:
+            if value_name == picked:
+                return (sku, is_sc)
+        return (None, None)
 
     def _infer_soft_close(self, attr_map):
         """Soft-close inference: explicit 'Soft-Close' add-on OR a brand-aware
