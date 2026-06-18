@@ -47,7 +47,7 @@ found." This script encodes that knowledge.
 
 Sandbox-friendly deploy path. Instead of rsyncing files from this
 machine, it sends one short SSH command to the QNAP. The QNAP then
-downloads the committed repository archive from Forgejo, replaces only
+downloads the committed repository archive from GitHub by default, replaces only
 the requested addon directories, runs the cold Odoo upgrade gate, and
 optionally runs targeted tests.
 
@@ -70,7 +70,8 @@ TEST_TAGS=/southbrook_floor_traveler:TestP8FloorTraveler.test_record_scan_create
 | `QNAP_HOST` | `admin@192.168.68.108` | ssh target |
 | `REF` | current `git rev-parse HEAD` | commit/archive ref to deploy |
 | `SCRIPT_REF` | same as `REF` | commit containing `scripts/qnap_pull_deploy.sh` |
-| `RAW_SCRIPT_URL` | Forgejo raw URL for `SCRIPT_REF` | script URL the QNAP curls |
+| `RAW_SCRIPT_URL` | GitHub raw URL for `SCRIPT_REF` | script URL the QNAP curls |
+| `REPO_ARCHIVE_BASE` | `https://github.com/dangelojohn/Southbrook_Configurator/archive` | archive base passed to the QNAP-side script |
 | `TEST_TAGS` | empty | optional Odoo `--test-tags` value |
 
 ## Other scripts (pre-existing)
