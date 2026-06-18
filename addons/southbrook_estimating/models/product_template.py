@@ -103,6 +103,43 @@ class ProductTemplate(models.Model):
         ),
     )
 
+    # ------------------------------------------------------------------
+    # A4 (2026-06-18) — UUID-versioned image references.
+    # ------------------------------------------------------------------
+    # Pattern borrowed from the Prodboard catalogue (blobs.prodboard.com/
+    # betterkitchens/icon/{uuid}/{filename}.png). The UUID + filename
+    # combination lets us serve cabinet icons via the stable controller
+    # route /southbrook/catalog/icon/<uuid>/<filename>. When uuid is set,
+    # the configurator's catalog tile uses that URL instead of the
+    # default /web/image/product.template/<id>/image_128 — the controller
+    # internally resolves uuid -> template -> image_1920 attachment
+    # (or returns 404 if not present).
+    #
+    # The image content stays in product.template.image_1920 (the stock
+    # field). UUID is an opaque content-version key — purpose is cache-
+    # busting: when the UUID changes the browser fetches afresh; when
+    # it doesn't, CDN/edge caching honours it. The seed in A1
+    # (southbrook.cabinet.archetype.image_uuid) provides the catalogue
+    # of known UUIDs; an admin can map a template to an archetype via
+    # x_image_uuid + x_image_filename to opt into the pattern.
+    x_image_uuid = fields.Char(
+        string="Image UUID (cache key)",
+        index=True,
+        copy=False,
+        help="Opaque UUID used to construct a stable, cache-bustable "
+             "image URL for this template. Pattern: /southbrook/catalog/"
+             "icon/<uuid>/<filename>. The controller resolves the URL "
+             "back to product.template.image_1920. Leaving this blank "
+             "falls back to the default /web/image/ URL pattern.",
+    )
+    x_image_filename = fields.Char(
+        string="Image Filename",
+        help="Filename component of the stable image URL (e.g. "
+             "'500mm Highline Base Unit.png'). Cosmetic — preserved "
+             "for human-readable URLs. The controller does not require "
+             "it to match the underlying attachment's filename.",
+    )
+
     def action_southbrook_launch_3d_configurator(self):
         """Launch the OCA configurator wizard for this template.
 
