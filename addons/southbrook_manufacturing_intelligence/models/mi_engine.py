@@ -450,10 +450,15 @@ class SouthbrookMiEngine(models.AbstractModel):
         picks = order_line.product_id.product_template_attribute_value_ids
         if not picks:
             return False
-        # The audit's ambiguity disqualifiers — value names containing
-        # "Custom" hint at signature/bespoke specs that the deterministic
-        # builder can't safely fill in.
+        # The audit's ambiguity disqualifier — Door Style = "Custom"
+        # (e.g. "Custom (Signature)") is the canonical case the
+        # deterministic builder can't safely fill in. Other "Custom"
+        # picks (e.g. "Custom Edge Profile" on Door Edge Profile) are
+        # cosmetic and don't change cutlist geometry, so we scope the
+        # filter to Door Style.
         for ptav in picks:
+            if (ptav.attribute_id.name or "").strip().lower() != "door style":
+                continue
             val_name = (ptav.product_attribute_value_id.name or "").lower()
             if "custom" in val_name:
                 return False

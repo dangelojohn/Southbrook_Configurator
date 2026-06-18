@@ -79,6 +79,44 @@ class TestP8FloorTraveler(TransactionCase):
         self.assertEqual(codes, ["PANEL-SAW", "EDGE-BANDER", "CNC"])
 
     # ------------------------------------------------------------------
+    # Acceptance — record_scan calls the EXISTING button_finish path
+    # *exactly once* per scan. This is the audit's load-bearing
+    # "no duplicate telemetry" criterion: we must not re-implement the
+    # tool-consumption debit, only route a scan event through it.
+    # ------------------------------------------------------------------
+    def test_record_scan_calls_button_finish_exactly_once(self):
+        from unittest.mock import patch
+        pkg = self._make_package()
+        # Stub _sbk_next_workorder to return a recordset whose
+        # button_finish is a no-op we can count. Using patch.object on
+        # the model class is the canonical Odoo unit-test seam — same
+        # pattern the existing test_mi_engine uses.
+        FakeWO = self.env["mrp.workorder"]
+        # Create a stand-in WO via direct ORM. Real MRP setup
+        # (routing/workcenter) is heavyweight; here we just need the
+        # record reference + button_finish hook.
+        wc = self.env["mrp.workcenter"].create({
+            "name": "P8-test wc", "code": "P8WC",
+        })
+        wo = FakeWO.create({
+            "name": "P8-test wo",
+            "workcenter_id": wc.id,
+            "production_id": pkg.mo_id.id,
+            "product_uom_id": pkg.mo_id.product_uom_id.id,
+        })
+        # Force the WO into a state record_scan will pick up.
+        wo.state = "progress"
+        with patch.object(
+            type(wo), "button_finish", autospec=True,
+            return_value=True,
+        ) as finish_mock:
+            pkg.record_scan(workcenter_code="P8WC")
+        self.assertEqual(
+            finish_mock.call_count, 1,
+            "record_scan must call mrp.workorder.button_finish exactly "
+            "once per scan — the audit's no-duplicate-telemetry criterion")
+
+    # ------------------------------------------------------------------
     # Acceptance — PDF report renders (smoke test)
     # ------------------------------------------------------------------
     def test_traveler_pdf_renders(self):

@@ -41,9 +41,11 @@ External dependencies:
         "southbrook_premium_orchestration",
         "southbrook_mrp_pm",
     ],
-    "external_dependencies": {
-        "python": ["qrcode"],
-    },
+    # qrcode is a soft dependency. The QR computation gracefully falls
+    # back to an empty image when the lib is missing (the traveler PDF
+    # still renders with a "QR unavailable" placeholder). Declaring it
+    # under external_dependencies would block installs on environments
+    # without the lib — we'd rather degrade gracefully.
     "data": [
         # No security/ir.model.access.csv: this addon extends an existing
         # model (sb.production.package) via _inherit; existing ACLs apply.

@@ -768,11 +768,29 @@ class SouthbrookConfiguratorAPI(http.Controller):
             extensions.append(f"{drawer_count}DR")
 
         # Drawer construction (joinery style) — DT / MP / PR / BX. Falls
-        # back to first-3-alnum if the value name is outside the table,
-        # preserving uniqueness for catalog-expansion values.
+        # back to a substring match on common joinery keywords before
+        # using a generic first-3-alnum truncation. The substring layer
+        # exists because real catalog names typically wrap the joinery
+        # in parentheses (e.g. "3-Drawer Stack (Dovetail)") and a naive
+        # truncation collapses both Dovetail and Plywood variants to
+        # "3DR", silently re-colliding on the P5 acceptance.
         construction_val = picked_by_attr_name.get("Drawer Construction")
         if construction_val:
             code = self._DRAWER_CONSTRUCTION_CODES.get(construction_val.name)
+            if not code:
+                name_lower = (construction_val.name or "").lower()
+                joinery_keywords = (
+                    ("dovetail", "DT"),
+                    ("plywood", "PR"),
+                    ("particleboard", "MP"),
+                    ("melamine", "MP"),
+                    ("legrabox", "BX"),
+                    ("metal", "BX"),
+                )
+                for needle, label in joinery_keywords:
+                    if needle in name_lower:
+                        code = label
+                        break
             if not code:
                 code = "".join(
                     c for c in (construction_val.name or "") if c.isalnum()

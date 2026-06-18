@@ -374,14 +374,15 @@ class SaleOrder(models.Model):
     def _southbrook_emit_cutlists(self):
         """Per-line auto-emit of (cutlist + production package) on confirm.
 
-        Gated behind ir.config_parameter ``%s`` (default False). Idempotent
-        per sale.order.line — the package model carries a back-reference
-        so a re-confirm is a no-op.
+        Gated behind ir.config_parameter
+        ``southbrook_premium_orchestration.auto_emit_cutlist`` (default
+        False). Idempotent per sale.order.line — the package model
+        carries a back-reference so a re-confirm is a no-op.
 
         Skips section/note lines and lines with no MO yet (the orphan-MO
         case the spine backlink already handles; that backlink fires
         before this method via ``_create_kitchen_project_task``).
-        """ % _AUTO_EMIT_FLAG
+        """
         self.ensure_one()
         flag = self.env["ir.config_parameter"].sudo().get_param(
             self._AUTO_EMIT_FLAG, default="False")
