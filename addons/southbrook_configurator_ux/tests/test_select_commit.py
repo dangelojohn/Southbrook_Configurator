@@ -512,9 +512,11 @@ class TestConfiguratorSelectCommit(TransactionCase):
             [("name", "=", "Width")], limit=1)
         series = self.env["product.attribute"].search(
             [("name", "=", "Series")], limit=1)
+        species = self.env["product.attribute"].search(
+            [("name", "=", "Wood Species")], limit=1)
         finish = self.env["product.attribute"].search(
             [("name", "=", "Finish")], limit=1)
-        if not (width and series and finish):
+        if not (width and series and species and finish):
             self.skipTest("required attributes not seeded")
         w21 = self.env["product.attribute.value"].search(
             [("attribute_id", "=", width.id),
@@ -522,15 +524,18 @@ class TestConfiguratorSelectCommit(TransactionCase):
         sig = self.env["product.attribute.value"].search(
             [("attribute_id", "=", series.id),
              ("name", "=", "Signature")], limit=1)
+        walnut_species = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", species.id),
+             ("name", "=", "Walnut (American Black)")], limit=1)
         wal = self.env["product.attribute.value"].search(
             [("attribute_id", "=", finish.id),
              ("name", "=", "Walnut Stain")], limit=1)
-        if not (w21 and sig and wal):
+        if not (w21 and sig and walnut_species and wal):
             self.skipTest("required values not seeded")
         with stubbed_request(self.env, user=self.user):
             r = self.controller.configurator_select(
                 session_id=sess.id,
-                value_ids=[w21.id, sig.id, wal.id])
+                value_ids=[w21.id, sig.id, walnut_species.id, wal.id])
         self.assertTrue(r["ok"])
         self.assertIn("live_sku", r,
                       "/select response must carry live_sku")
@@ -569,9 +574,11 @@ class TestConfiguratorSelectCommit(TransactionCase):
             [("name", "=", "Width")], limit=1)
         series = self.env["product.attribute"].search(
             [("name", "=", "Series")], limit=1)
+        species = self.env["product.attribute"].search(
+            [("name", "=", "Wood Species")], limit=1)
         finish = self.env["product.attribute"].search(
             [("name", "=", "Finish")], limit=1)
-        if not (width and series and finish):
+        if not (width and series and species and finish):
             self.skipTest("attributes not seeded")
         # Round 1: 12 in / Contractor / White
         w12 = self.env["product.attribute.value"].search(
@@ -595,13 +602,18 @@ class TestConfiguratorSelectCommit(TransactionCase):
         ele = self.env["product.attribute.value"].search(
             [("attribute_id", "=", series.id),
              ("name", "=", "Elegance")], limit=1)
+        cherry_species = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", species.id),
+             ("name", "=", "Cherry")], limit=1)
         chy = self.env["product.attribute.value"].search(
             [("attribute_id", "=", finish.id),
              ("name", "=", "Cherry Stain")], limit=1)
+        if not (w18 and ele and cherry_species and chy):
+            self.skipTest("required round-2 values not seeded")
         with stubbed_request(self.env, user=self.user):
             r2 = self.controller.configurator_select(
                 session_id=sess.id,
-                value_ids=[w18.id, ele.id, chy.id])
+                value_ids=[w18.id, ele.id, cherry_species.id, chy.id])
         self.assertEqual(r2["live_sku"], "SB-18I-ELE-CHE")
         self.assertNotEqual(r1["live_sku"], r2["live_sku"],
                             "SKU must change between calls when picks "
