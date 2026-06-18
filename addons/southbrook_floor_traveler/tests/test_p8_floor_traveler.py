@@ -23,6 +23,13 @@ class TestP8FloorTraveler(TransactionCase):
         cls.Cutlist = cls.env["sb.cutlist"]
         cls.Hardware = cls.env["sb.hardware.package"]
         cls.Product = cls.env["product.product"]
+        cls.Bom = cls.env["mrp.bom"]
+        cls.Asset = cls.env["southbrook.tool.asset"]
+        cls.Crib = cls.env["southbrook.tool.crib"]
+        cls.OpReq = cls.env["southbrook.operation.tool.requirement"]
+        cls.Consumption = cls.env["southbrook.workorder.tool.consumption"]
+        cls.category = cls.env.ref(
+            "southbrook_mrp_kitchen_tools.cat_blade_melamine")
 
     def _make_package(self):
         product = self.Product.create({
@@ -40,6 +47,82 @@ class TestP8FloorTraveler(TransactionCase):
             "hardware_package_id": hardware.id,
             "state": "ready",
         })
+
+    def _make_package_with_tool_required_wo(self):
+        wc = self.env["mrp.workcenter"].create({
+            "name": "P8 scan saw",
+            "code": "P8-SAW",
+        })
+        crib = self.Crib.create({
+            "code": "P8-SCAN-CRIB",
+            "name": "P8 scan crib",
+        })
+        tool_product = self.Product.create({
+            "name": "P8 scan panel saw blade",
+            "default_code": "P8-SCAN-BLADE",
+            "type": "consu",
+            "x_southbrook_is_tool": True,
+            "x_southbrook_is_reusable_tool": True,
+            "x_southbrook_tool_category_id": self.category.id,
+        })
+        asset = self.Asset.create({
+            "name": "P8 scan blade asset",
+            "product_id": tool_product.id,
+            "tool_crib_id": crib.id,
+            "workcenter_id": wc.id,
+            "lifecycle_state": "available",
+            "condition": "good",
+            "estimated_life_qty": 100.0,
+            "remaining_life_qty": 100.0,
+            "life_unit": "cuts",
+            "purchase_cost": 3.0,
+        })
+        finished = self.Product.create({
+            "name": "P8 scan finished cabinet",
+            "type": "consu",
+            "is_storable": True,
+        })
+        component = self.Product.create({
+            "name": "P8 scan component",
+            "type": "consu",
+            "is_storable": True,
+        })
+        bom = self.Bom.create({
+            "product_tmpl_id": finished.product_tmpl_id.id,
+            "product_qty": 1.0,
+            "bom_line_ids": [(0, 0, {
+                "product_id": component.id,
+                "product_qty": 1.0,
+            })],
+            "operation_ids": [(0, 0, {
+                "name": "P8 scan cut panels",
+                "workcenter_id": wc.id,
+                "time_cycle_manual": 1.0,
+            })],
+        })
+        mo = self.MO.create({
+            "product_id": finished.id,
+            "product_qty": 1.0,
+            "bom_id": bom.id,
+        })
+        mo.action_confirm()
+        wo = mo.workorder_ids[:1]
+        wo.qty_produced = 1.0
+        self.OpReq.create({
+            "operation_id": wo.operation_id.id,
+            "tool_category_id": self.category.id,
+            "quantity": 1,
+            "consume_qty_per_unit": 1.0,
+        })
+        cutlist = self.Cutlist.create({"mo_id": mo.id})
+        hardware = self.Hardware.create({"mo_id": mo.id})
+        package = self.Package.create({
+            "mo_id": mo.id,
+            "cutlist_id": cutlist.id,
+            "hardware_package_id": hardware.id,
+            "state": "ready",
+        })
+        return package, wo, asset
 
     # ------------------------------------------------------------------
     # Acceptance — QR encodes the package id
@@ -115,6 +198,35 @@ class TestP8FloorTraveler(TransactionCase):
             finish_mock.call_count, 1,
             "record_scan must call mrp.workorder.button_finish exactly "
             "once per scan — the audit's no-duplicate-telemetry criterion")
+
+    def test_record_scan_creates_one_consumption_and_logs_workcenter(self):
+        pkg, wo, asset = self._make_package_with_tool_required_wo()
+
+        pkg.record_scan()
+
+        consumptions = self.Consumption.search([
+            ("workorder_id", "=", wo.id),
+        ])
+        self.assertEqual(
+            len(consumptions), 1,
+            "scan-driven finish must create one tool consumption row")
+        self.assertEqual(consumptions.asset_id, asset)
+        self.assertEqual(consumptions.quantity, 1.0)
+        self.assertTrue(wo.sbk_lifecycle_processed)
+
+        log = json.loads(pkg.x_scan_log_json or "[]")
+        self.assertEqual(log[-1]["wo_id"], wo.id)
+        self.assertEqual(
+            log[-1]["workcenter"], wo.workcenter_id.name,
+            "scan log should fall back to the finished WO's workcenter")
+
+        pkg.record_scan()
+        consumptions_after_second_scan = self.Consumption.search([
+            ("workorder_id", "=", wo.id),
+        ])
+        self.assertEqual(
+            len(consumptions_after_second_scan), 1,
+            "re-scanning must not duplicate lifecycle debit")
 
     # ------------------------------------------------------------------
     # Acceptance — PDF report renders (smoke test)

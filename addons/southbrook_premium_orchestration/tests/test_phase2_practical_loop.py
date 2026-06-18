@@ -104,7 +104,9 @@ class TestPhase2PracticalLoop(TransactionCase):
         vals.update(overrides)
         return self.Asset.create(vals)
 
-    def _new_mo_with_wo(self, op_qty_per_unit=2.0, qty_produced=10.0):
+    def _new_mo_with_wo(
+        self, op_qty_per_unit=2.0, qty_produced=10.0, create_req=True,
+    ):
         """Build a minimal MO with one WO whose operation requires the
         configured tool category at ``op_qty_per_unit`` per produced unit.
 
@@ -133,12 +135,14 @@ class TestPhase2PracticalLoop(TransactionCase):
         # Wire a category-based operation tool requirement. The hook
         # resolves the requirement → asset by picking the in-service
         # asset in the category with the most remaining life.
-        op_req = self.OpReq.create({
-            "operation_id": wo.operation_id.id,
-            "tool_category_id": self.category.id,
-            "quantity": 1,
-            "consume_qty_per_unit": op_qty_per_unit,
-        })
+        op_req = self.OpReq.browse()
+        if create_req:
+            op_req = self.OpReq.create({
+                "operation_id": wo.operation_id.id,
+                "tool_category_id": self.category.id,
+                "quantity": 1,
+                "consume_qty_per_unit": op_qty_per_unit,
+            })
         # qty_produced isn't auto-set by action_confirm; the practical
         # loop multiplies it by per-unit consumption so we set it
         # explicitly.
@@ -246,6 +250,47 @@ class TestPhase2PracticalLoop(TransactionCase):
         asset.invalidate_recordset()
         self.assertEqual(asset.remaining_life_qty, 80.0)
         self.assertEqual(asset.total_usage_qty, 20.0)
+
+    def test_matching_operation_requirement_used_for_cloned_operation(self):
+        asset = self._new_asset()
+        _template_mo, template_wo, template_req = self._new_mo_with_wo(
+            op_qty_per_unit=2.0, qty_produced=10.0,
+        )
+        _mo, wo, _empty_req = self._new_mo_with_wo(
+            op_qty_per_unit=2.0, qty_produced=10.0, create_req=False,
+        )
+        self.assertNotEqual(template_wo.operation_id, wo.operation_id)
+        self.assertFalse(self.OpReq.search([
+            ("operation_id", "=", wo.operation_id.id),
+        ]))
+
+        wo._sbk_debit_tool_lifecycle()
+
+        consumptions = self.Consumption.search([
+            ("workorder_id", "=", wo.id),
+        ])
+        self.assertEqual(
+            len(consumptions), 1,
+            "Generated/cloned operations should reuse the matching "
+            "source operation requirement instead of latching with no debit",
+        )
+        self.assertEqual(consumptions.asset_id, asset)
+        self.assertEqual(consumptions.quantity, 20.0)
+        self.assertEqual(template_req.workcenter_id, wo.workcenter_id)
+        self.assertTrue(wo.sbk_lifecycle_processed)
+
+    def test_no_resolved_consumption_leaves_lifecycle_unprocessed(self):
+        _mo, wo, _empty_req = self._new_mo_with_wo(create_req=False)
+
+        wo._sbk_debit_tool_lifecycle()
+
+        consumptions = self.Consumption.search([
+            ("workorder_id", "=", wo.id),
+        ])
+        self.assertFalse(consumptions)
+        self.assertFalse(
+            wo.sbk_lifecycle_processed,
+            "No-debit runs must not close the lifecycle latch")
 
     # ──────────────────────────────────────────────────────────────────
     # 4. Sharpening activity raised at ≤10% remaining life

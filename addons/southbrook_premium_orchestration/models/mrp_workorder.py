@@ -124,14 +124,10 @@ class MrpWorkorder(models.Model):
         if self.sbk_lifecycle_processed:
             return
 
-        OpReq = self.env["southbrook.operation.tool.requirement"]
         WcReq = self.env["southbrook.workcenter.tool.requirement"]
         Consumption = self.env["southbrook.workorder.tool.consumption"]
 
-        op_reqs = (
-            OpReq.search([("operation_id", "=", self.operation_id.id)])
-            if self.operation_id else OpReq.browse()
-        )
+        op_reqs = self._sbk_operation_tool_requirements()
         wc_reqs = (
             WcReq.search([("workcenter_id", "=", self.workcenter_id.id)])
             if self.workcenter_id else WcReq.browse()
@@ -151,6 +147,7 @@ class MrpWorkorder(models.Model):
         employee = self.env.user.employee_id
 
         seen_assets = set()
+        created_consumption = False
         for req in all_reqs:
             asset = self._sbk_resolve_asset_for_req(req)
             if not asset or asset.id in seen_assets:
@@ -171,13 +168,45 @@ class MrpWorkorder(models.Model):
             # consumption.create() already reduced remaining_life_qty,
             # bumped total_usage_qty, and stamped last_used_workorder_id.
             # We only need to maybe-raise an activity here.
+            created_consumption = True
             self._sbk_maybe_raise_sharpening_activity(consumption.asset_id)
+
+        if not created_consumption:
+            _logger.warning(
+                "Southbrook lifecycle debit created no consumption rows "
+                "for WO %s; leaving lifecycle latch open.",
+                self.id,
+            )
+            return
 
         self.sbk_lifecycle_processed = True
 
     # ──────────────────────────────────────────────────────────────────
     # Helpers
     # ──────────────────────────────────────────────────────────────────
+    def _sbk_operation_tool_requirements(self):
+        """Return operation requirements for this WO.
+
+        Generated MOs can carry cloned ``mrp.routing.workcenter`` records
+        while the tool requirement remains attached to the matching
+        source operation. Prefer the exact operation; when none exist,
+        fall back to same operation name + workcenter so scan-driven
+        finishes use the same requirement operators see in the normal UI.
+        """
+        self.ensure_one()
+        OpReq = self.env["southbrook.operation.tool.requirement"]
+        if not self.operation_id:
+            return OpReq.browse()
+
+        exact = OpReq.search([("operation_id", "=", self.operation_id.id)])
+        if exact or not self.workcenter_id or not self.operation_id.name:
+            return exact
+
+        return OpReq.search([
+            ("operation_id.name", "=", self.operation_id.name),
+            ("workcenter_id", "=", self.workcenter_id.id),
+        ])
+
     def _sbk_qty_per_unit(self, req):
         """Brief calls this ``qty_per_unit``; the real field on the
         operation requirement model is ``consume_qty_per_unit``. Accept

@@ -96,7 +96,13 @@ class SbProductionPackage(models.Model):
 
         # Call the existing path — never duplicate the debit.
         wo.button_finish()
-        self._append_scan_event(workcenter_code, wo.id)
+        logged_workcenter = (
+            workcenter_code
+            or wo.workcenter_id.name
+            or wo.workcenter_id.display_name
+            or ""
+        )
+        self._append_scan_event(logged_workcenter, wo.id)
         return wo
 
     def _sbk_next_workorder(self):
