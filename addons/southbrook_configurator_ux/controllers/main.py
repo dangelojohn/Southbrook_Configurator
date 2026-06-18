@@ -710,6 +710,33 @@ class SouthbrookConfiguratorAPI(http.Controller):
     # default_code (P4 gap #3 fix) so the variant carries a code from
     # the moment of creation rather than blanking.
     # ------------------------------------------------------------------
+    # P5 — Lossless SKU grammar extensions. The legacy 3-segment grammar
+    # (SB-{Width}-{Series}-{Finish}) collided whenever two configs
+    # differed only in drawer construction or slide brand. The audit
+    # named this gap: a sales-rep demo that picked a Dovetail box and
+    # one that picked a Plywood box generated the same default_code,
+    # masking the downstream variant divergence.
+    #
+    # The extension appends three optional segments — drawer count,
+    # drawer construction code, slide model code — only when present.
+    # Backwards-compat: a non-drawer cabinet's SKU still ends at the
+    # legacy 3-segment form, so any external system that grepped on
+    # SB-24I-CON-WHI still matches. Each segment is short (2–6 chars)
+    # and case-stable.
+    _DRAWER_CONSTRUCTION_CODES = {
+        "Melamine Particleboard":   "MP",
+        "5/8 in Plywood (Routed)":  "PR",
+        "Dovetail Solid Hardwood":  "DT",
+        "Metal (Blum Legrabox)":    "BX",
+    }
+    _SLIDE_CODES = {
+        "King Slide K2832 21\" Soft-Close":  "KS21SC",
+        "King Slide 3032 18\" Ball-Bearing": "KS18BB",
+        "Blum MOVENTO 450":                  "BMV450",
+        "Hettich Actro 5D 500":              "HA5500",
+        "Salice Progressa+ (PR-602728)":     "SPP602",
+    }
+
     def _compute_sku_from_session(self, session):
         # Resolve picked values by attribute name. session.value_ids
         # holds the global product.attribute.value records, so we
@@ -729,7 +756,59 @@ class SouthbrookConfiguratorAPI(http.Controller):
         # If Width (first slot) isn't picked, no SKU yet.
         if parts[0] == "XXX":
             return "—"
-        return f"SB-{'-'.join(parts)}"
+
+        # P5 — Optional extension segments. Append only when present so
+        # the legacy 3-segment form is a strict prefix.
+        extensions = []
+
+        # Drawer count from a literal Drawer Count attribute OR derived
+        # from the Drawer Construction value name (e.g. "3-Drawer Stack").
+        drawer_count = self._p5_extract_drawer_count(picked_by_attr_name)
+        if drawer_count:
+            extensions.append(f"{drawer_count}DR")
+
+        # Drawer construction (joinery style) — DT / MP / PR / BX. Falls
+        # back to first-3-alnum if the value name is outside the table,
+        # preserving uniqueness for catalog-expansion values.
+        construction_val = picked_by_attr_name.get("Drawer Construction")
+        if construction_val:
+            code = self._DRAWER_CONSTRUCTION_CODES.get(construction_val.name)
+            if not code:
+                code = "".join(
+                    c for c in (construction_val.name or "") if c.isalnum()
+                )[:3].upper() or "XX"
+            extensions.append(code)
+
+        # Drawer slide model — KS21SC / BMV450 / etc.
+        slide_val = picked_by_attr_name.get("Drawer Slide")
+        if slide_val:
+            code = self._SLIDE_CODES.get(slide_val.name)
+            if not code:
+                code = "".join(
+                    c for c in (slide_val.name or "") if c.isalnum()
+                )[:6].upper() or "XXXXXX"
+            extensions.append(code)
+
+        head = f"SB-{'-'.join(parts)}"
+        if extensions:
+            return head + "-" + "-".join(extensions)
+        return head
+
+    def _p5_extract_drawer_count(self, picked_by_attr_name):
+        explicit = picked_by_attr_name.get("Drawer Count")
+        if explicit:
+            try:
+                return int("".join(c for c in (explicit.name or "")
+                                   if c.isdigit())[:1] or "0")
+            except (TypeError, ValueError):
+                pass
+        construction = picked_by_attr_name.get("Drawer Construction")
+        if construction:
+            name = (construction.name or "").lower()
+            for n in range(9, 0, -1):
+                if f"{n}-drawer" in name or f"{n} drawer" in name:
+                    return n
+        return 0
 
     # ------------------------------------------------------------------
     # /commit — materialise variant + add to user's draft sale.order.
