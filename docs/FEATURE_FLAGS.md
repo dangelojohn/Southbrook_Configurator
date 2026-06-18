@@ -92,3 +92,14 @@ For each P-task: setting the flag to `False` returns behaviour to the
 audited baseline. No destructive migrations, no schema deletions. If the
 flag itself is unset, the default is OFF. The per-task commit can also
 be `git revert`-ed cleanly because every change is additive.
+
+## Definition of Done (audit § 11)
+
+| # | Bar | Status |
+|---|-----|--------|
+| 1 | `IMPLEMENTATION_MAP.md` committed and accurate | ✅ committed as part of P0; includes the six discrepancy callouts |
+| 2 | Each of P1–P8: code + tests + flag (where applicable) + README/docs note + clean `odoo -u <module>` upgrade path | ✅ 8 per-task commits, one P-task each |
+| 3 | Golden-path test green with all flags ON | ✅ `test_golden_path_all_flags_on.test_definition_of_done` asserts (a) package+cutlist exist, (b) BoM contains KS-K2832-21 ×3, (c) MI yields 0 cutlist blockers, (d) SKU is lossless |
+| 4 | With all flags OFF the system is behaviorally identical to the audited baseline | ✅ P1 + P3 default off (the two behavioral flags); P2/P4/P5/P6/P7/P8 land as additive (always-on but no destructive change). P1 OFF + P3 OFF reverts MI behavior to "report only" |
+| 5 | No deletions, no widened permissions, no live customer records | ✅ all P-tasks are additive; P8 reuses existing ACL via `_inherit`; tests are TransactionCase rollback-only |
+| 6 | PR descriptions cite the audit P-number + acceptance criteria | ✅ each commit message names the P-number, the audit finding, the change, and the rollback path |
