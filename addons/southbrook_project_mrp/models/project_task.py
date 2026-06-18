@@ -202,6 +202,7 @@ class ProjectTask(models.Model):
         ],
         string="Readiness Decision",
         compute="_compute_phase1_operational_context",
+        store=True,
         readonly=True,
     )
     readiness_score = fields.Integer(
@@ -369,6 +370,7 @@ class ProjectTask(models.Model):
         ],
         string="Production Release",
         compute="_compute_southbrook_production_release",
+        store=True,
         search="_search_southbrook_production_release_state",
         readonly=True,
     )
@@ -483,6 +485,7 @@ class ProjectTask(models.Model):
         ],
         string="Install Readiness",
         compute="_compute_southbrook_install_readiness",
+        store=True,
         search="_search_southbrook_install_readiness_state",
         readonly=True,
     )
@@ -607,6 +610,7 @@ class ProjectTask(models.Model):
         [("ready", "Ready"), ("review", "Review"), ("blocked", "Blocked")],
         string="Readiness Decision",
         compute="_compute_manufacturing_readiness",
+        store=True,
         search="_search_manufacturing_readiness_state")
     manufacturing_waterfall_summary = fields.Text(
         string="Waterfall Readiness",

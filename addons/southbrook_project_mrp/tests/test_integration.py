@@ -336,6 +336,20 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("top_blocker", list_view.arch_db)
         self.assertIn("next_best_action", list_view.arch_db)
 
+    def test_readiness_groupby_fields_are_stored(self):
+        Task = self.env["project.task"]
+        for field_name in (
+            "readiness_decision",
+            "manufacturing_readiness_state",
+            "southbrook_production_release_state",
+            "southbrook_install_readiness_state",
+        ):
+            self.assertTrue(
+                Task._fields[field_name].store,
+                "%s is used by dashboard group-by filters and must be stored"
+                % field_name,
+            )
+
     def test_project_task_form_has_phase1_command_center_fields(self):
         view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
         arch = view.arch_db
