@@ -50,6 +50,20 @@ class SbProductionPackage(models.Model):
     has_pricing_pending = fields.Boolean(
         related="hardware_package_id.has_pricing_pending", store=True,
     )
+    # P1 — back-reference to the sale.order.line that emitted this package.
+    # Indexed because the audit P1 idempotency key is (sale_order_line_id).
+    # Nullable: legacy packages created via generate_from_mo() before P1
+    # carry no line reference and that's fine.
+    sale_order_line_id = fields.Many2one(
+        comodel_name="sale.order.line",
+        string="Source Order Line",
+        ondelete="set null",
+        index=True,
+        copy=False,
+        help="Set when the package was auto-emitted from a confirmed "
+             "sale.order.line by the Premium Orchestration auto_emit_cutlist "
+             "flag (audit P1). Used as the idempotency key on re-confirm.",
+    )
 
     @api.constrains("mo_id")
     def _check_unique_mo(self):
@@ -159,3 +173,230 @@ class SbProductionPackage(models.Model):
             "state": "ready",
         })
         return package
+
+    # ------------------------------------------------------------------
+    # P1 — Configurator -> Cutlist + Production Package on order confirm
+    # ------------------------------------------------------------------
+    # The audit found 0 cutlists in the DB and 63/63 MOs tripping the MI
+    # "Missing cutlist" blocker. The configurator already knows enough
+    # (Width + Drawer Construction + Box Material + drawer count + slide)
+    # to derive panel sizes deterministically — so we close the loop by
+    # emitting one production package per kitchen-cabinet order line on
+    # confirm. Premium Orchestration gates the call behind the flag
+    # ``southbrook_premium_orchestration.auto_emit_cutlist`` (default off).
+
+    # Heuristic defaults for a Southbrook base-cabinet carcass when the
+    # configurator hasn't surfaced the dim. Sourced from the company's
+    # standard frameless euro base (24" / 36" / 24" approx, in mm).
+    _DEFAULT_HEIGHT_MM = 720.0
+    _DEFAULT_DEPTH_MM = 580.0
+    _DEFAULT_FAMILY = "base"
+
+    @api.model
+    def build_from_order_line(self, order_line, mo=None):
+        """Emit a production package (cutlist + hardware) for a confirmed
+        configured kitchen-cabinet line.
+
+        Idempotent. Returns the package (existing or newly created), or an
+        empty recordset when the line is not configurable / has no MO.
+
+        :param order_line: sale.order.line
+        :param mo:         optional pre-resolved mrp.production. When omitted
+                           we look for an MO already linked to the line.
+        """
+        if not order_line:
+            return self.browse()
+
+        # Idempotency: a package already exists for this line.
+        existing = self.search(
+            [("sale_order_line_id", "=", order_line.id)], limit=1,
+        )
+        if existing:
+            return existing
+
+        if mo is None:
+            mo = self._resolve_mo_for_order_line(order_line)
+        if not mo:
+            _logger.info(
+                "P1 auto-emit: no MO yet for sale.order.line %s — skipping",
+                order_line.id,
+            )
+            return self.browse()
+
+        # Idempotency tier 2: an MO already carries a package (e.g. set up
+        # manually). Adopt it by setting the back-reference and return.
+        same_mo = self.search([("mo_id", "=", mo.id)], limit=1)
+        if same_mo:
+            if not same_mo.sale_order_line_id:
+                same_mo.sale_order_line_id = order_line.id
+            return same_mo
+
+        dims = self._resolve_dims_from_order_line(order_line)
+        package = self.generate_from_mo(
+            mo,
+            width_mm=dims["width_mm"],
+            height_mm=dims["height_mm"],
+            depth_mm=dims["depth_mm"],
+            cabinet_family=dims["family"],
+            door_count=dims["door_count"],
+            drawer_count=dims["drawer_count"],
+            soft_close=dims["soft_close"],
+        )
+        package.sale_order_line_id = order_line.id
+        _logger.info(
+            "P1 auto-emit: emitted production package %s (cutlist %d lines) "
+            "for sale.order.line %s (MO %s)",
+            package.name, package.cutlist_id.line_count, order_line.id, mo.name,
+        )
+        return package
+
+    @api.model
+    def _resolve_mo_for_order_line(self, order_line):
+        """Find the mrp.production that materialised this configured line.
+
+        Two probes: ``sale_line_id`` (the canonical Odoo link) and
+        ``origin`` (covers MOs created manually that only carry the SO
+        name). Returns the first hit or an empty recordset."""
+        MO = self.env["mrp.production"]
+        mo = MO.search([("sale_line_id", "=", order_line.id)], limit=1)
+        if mo:
+            return mo
+        # Origin fallback: same heuristic the spine backlink uses.
+        if order_line.order_id and order_line.order_id.name:
+            mo = MO.search(
+                [("origin", "=", order_line.order_id.name),
+                 ("product_id", "=", order_line.product_id.id)],
+                limit=1,
+            )
+            if mo:
+                return mo
+        return MO
+
+    @api.model
+    def _resolve_dims_from_order_line(self, order_line):
+        """Pull cabinet dimensions + counts off the configured variant.
+
+        We read ``product_template_attribute_value_ids`` on the variant —
+        Odoo's first-class accessor for "what did the user pick" — and
+        match attribute names against the canonical Southbrook attribute
+        set. Unknown values fall back to the company-standard base.
+
+        Returns a dict: width_mm, height_mm, depth_mm, family, door_count,
+        drawer_count, soft_close.
+        """
+        product = order_line.product_id
+        picks = product.product_template_attribute_value_ids if product else False
+        attr_map = {}  # attr_name_lower -> value name
+        if picks:
+            for ptav in picks:
+                attr = ptav.attribute_id
+                val = ptav.product_attribute_value_id
+                if attr and val:
+                    attr_map[(attr.name or "").strip().lower()] = (val.name or "").strip()
+
+        width_mm = self._parse_dim_to_mm(attr_map.get("width")) or self._DEFAULT_HEIGHT_MM
+        # Height is rarely a configurator attribute (cabinets share standard
+        # 720mm carcass height); honour the rare case where it is exposed.
+        height_mm = self._parse_dim_to_mm(attr_map.get("height")) or self._DEFAULT_HEIGHT_MM
+        depth_mm = self._parse_dim_to_mm(attr_map.get("depth")) or self._DEFAULT_DEPTH_MM
+        if width_mm == self._DEFAULT_HEIGHT_MM and "width" not in attr_map:
+            # No Width attribute at all — fall back to a standard 600mm so
+            # geometry isn't accidentally pegged to the cabinet height.
+            width_mm = 600.0
+
+        family = self._infer_family(attr_map, order_line) or self._DEFAULT_FAMILY
+        drawer_count = self._infer_drawer_count(attr_map, order_line)
+        door_count = 0 if drawer_count else self._infer_door_count(attr_map, width_mm)
+        soft_close = self._infer_soft_close(attr_map)
+
+        return {
+            "width_mm": width_mm,
+            "height_mm": height_mm,
+            "depth_mm": depth_mm,
+            "family": family,
+            "door_count": door_count,
+            "drawer_count": drawer_count,
+            "soft_close": soft_close,
+        }
+
+    def _parse_dim_to_mm(self, raw):
+        """Best-effort '24 in' / '600mm' / '600' -> millimetres float."""
+        if not raw:
+            return 0.0
+        s = str(raw).strip().lower().replace(",", "")
+        # Strip parenthetical, e.g. '24 in (Standard)'
+        if "(" in s:
+            s = s.split("(", 1)[0].strip()
+        is_inches = ("in" in s) or ("\"" in s)
+        s = s.replace("mm", "").replace("in", "").replace("\"", "").replace(" ", "")
+        try:
+            n = float(s)
+        except (TypeError, ValueError):
+            return 0.0
+        return n * 25.4 if is_inches else n
+
+    def _infer_family(self, attr_map, order_line):
+        """Heuristic family inference (base / wall / tall / sink / vanity)."""
+        fam = (attr_map.get("family") or "").lower()
+        if fam:
+            for needle in ("base", "wall", "tall", "sink", "vanity"):
+                if needle in fam:
+                    return needle
+        if order_line.product_id:
+            name = (order_line.product_id.display_name or "").lower()
+            for needle in ("base", "wall", "tall", "sink", "vanity"):
+                if needle in name:
+                    return needle
+        return None
+
+    def _infer_drawer_count(self, attr_map, order_line):
+        """Drawer count from Drawer Construction / explicit Drawer Count /
+        product display name. 3-drawer base cabinet is the audit's sample."""
+        explicit = attr_map.get("drawer count") or attr_map.get("drawers")
+        if explicit:
+            try:
+                return int(str(explicit).split()[0])
+            except (TypeError, ValueError):
+                pass
+        # The construction string typically encodes count ('3-Drawer Stack').
+        construction = (attr_map.get("drawer construction") or "").lower()
+        for n in range(9, 0, -1):
+            if f"{n}-drawer" in construction or f"{n} drawer" in construction:
+                return n
+        # Fall back to the product display name.
+        if order_line.product_id:
+            name = (order_line.product_id.display_name or "").lower()
+            for n in range(9, 0, -1):
+                if f"{n}-drawer" in name or f"{n} drawer" in name:
+                    return n
+        return 0
+
+    def _infer_door_count(self, attr_map, width_mm):
+        """Width -> door count rule (Southbrook_Excel_to_Odoo_Mapping §3.4):
+        9-21" => 1 door; 24-36" => 2 doors. Applied only when the line is
+        a door cabinet (drawer_count = 0)."""
+        explicit = attr_map.get("door count") or attr_map.get("doors")
+        if explicit:
+            try:
+                return int(str(explicit).split()[0])
+            except (TypeError, ValueError):
+                pass
+        # 9" = 228.6 mm, 21" = 533.4 mm, 24" = 609.6 mm, 36" = 914.4 mm.
+        if 200.0 <= width_mm <= 540.0:
+            return 1
+        if 540.0 < width_mm <= 920.0:
+            return 2
+        return 1
+
+    def _infer_soft_close(self, attr_map):
+        """Soft-close inference: explicit 'Soft-Close' add-on OR a brand-aware
+        slide whose name signals soft-close. Default True for kitchen cabinets
+        (matches the existing generate_from_mo() default and demo behaviour).
+        """
+        slide = (attr_map.get("drawer slide") or "").lower()
+        if slide:
+            return "soft" in slide or "k2832" in slide or "movento" in slide or "actro" in slide
+        accessories = (attr_map.get("accessories") or "").lower()
+        if "soft" in accessories:
+            return True
+        return True

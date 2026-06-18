@@ -93,6 +93,16 @@ class SaleOrder(models.Model):
                     body=_("Premium Orchestration: failed to create kitchen "
                            "project.task spine. Run 'Backfill Kitchen Task' "
                            "from the order to retry."))
+            # P1 — Configurator -> Cutlist + Production Package on confirm.
+            # Gated behind the auto_emit_cutlist flag; default off so the
+            # baseline is byte-identical until enabled per environment.
+            try:
+                order._southbrook_emit_cutlists()
+            except Exception:  # noqa: BLE001
+                order.message_post(
+                    body=_("Premium Orchestration: auto-emit cutlist failed. "
+                           "Run the manual generator from the production "
+                           "package menu to retry."))
         return result
 
     # ------------------------------------------------------------------
@@ -335,6 +345,40 @@ class SaleOrder(models.Model):
         if orphans:
             orphans.write({"project_task_id": task.id})
         return orphans
+
+    # ------------------------------------------------------------------
+    # P1 — auto-emit cutlist + production package on confirm
+    # ------------------------------------------------------------------
+    _AUTO_EMIT_FLAG = "southbrook_premium_orchestration.auto_emit_cutlist"
+
+    def _southbrook_emit_cutlists(self):
+        """Per-line auto-emit of (cutlist + production package) on confirm.
+
+        Gated behind ir.config_parameter ``%s`` (default False). Idempotent
+        per sale.order.line — the package model carries a back-reference
+        so a re-confirm is a no-op.
+
+        Skips section/note lines and lines with no MO yet (the orphan-MO
+        case the spine backlink already handles; that backlink fires
+        before this method via ``_create_kitchen_project_task``).
+        """ % _AUTO_EMIT_FLAG
+        self.ensure_one()
+        flag = self.env["ir.config_parameter"].sudo().get_param(
+            self._AUTO_EMIT_FLAG, default="False")
+        if str(flag).strip().lower() not in ("1", "true", "yes", "on"):
+            return self.env["sb.production.package"]
+
+        Package = self.env["sb.production.package"]
+        emitted = Package.browse()
+        for line in self.order_line:
+            if line.display_type:  # section / note
+                continue
+            if not line.product_id:
+                continue
+            pkg = Package.build_from_order_line(line)
+            if pkg:
+                emitted |= pkg
+        return emitted
 
     def action_open_kitchen_job(self):
         """Open the linked project.task spine record. Wired to the

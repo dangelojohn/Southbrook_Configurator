@@ -53,3 +53,7 @@ dist/
 .venv/
 venv/
 env/
+
+# Claude Code session state — local-only
+.claude/
+

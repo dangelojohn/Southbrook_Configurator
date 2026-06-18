@@ -1,6 +1,6 @@
 {
     'name': 'Southbrook Premium MRP Orchestration',
-    'version': '19.0.1.0.0',
+    'version': '19.0.2.0.0',
     'summary': 'Closes the loop: cron-driven readiness/MI/analytics, always-on project-task spine, '
                'practical-intelligence telemetry, generative + planning activation.',
     'description': """
@@ -44,6 +44,7 @@ PHASE 3 — Generative + Planning Activation
         'southbrook_project_mrp',
         'southbrook_mrp_pm',
         'southbrook_manufacturing_intelligence',
+        'southbrook_kitchen_mrp',
         'southbrook_mrp_kitchen_tools',
         'southbrook_mrp_kitchen_workcenters',
         'southbrook_plm',
