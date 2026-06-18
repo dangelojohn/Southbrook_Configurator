@@ -226,6 +226,10 @@ class SaleOrder(models.Model):
                 "product_qty": line.product_uom_qty,
                 "bom_id": bom.id,
                 "origin": self.name,
+                # Canonical sale→MRP backlink from sale_mrp. The
+                # project readiness engine uses this to attach the MO
+                # to the existing Kitchen Job task at create time.
+                "sale_line_id": line.id,
                 "date_start": start,
                 "date_deadline": deadline,
             })

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from collections import Counter
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 # project.task.stage names (lowercased) that imply production has begun / finished.
@@ -39,6 +39,57 @@ def _first_meaningful_line(*texts):
 
 class ProjectTask(models.Model):
     _inherit = "project.task"
+
+    def write(self, vals):
+        self._southbrook_check_readiness_stage_gate(vals)
+        return super().write(vals)
+
+    def _southbrook_check_readiness_stage_gate(self, vals):
+        """Block kitchen jobs from entering production stages before ready."""
+        if self.env.context.get("southbrook_skip_readiness_stage_gate"):
+            return
+        if "stage_id" not in vals or not vals.get("stage_id"):
+            return
+        stage = self.env["project.task.type"].browse(vals["stage_id"]).exists()
+        if not stage:
+            return
+        stage_name = (stage.name or "").lower()
+        production_stage = any(
+            hint in stage_name
+            for hint in (_STARTED_STAGE_HINTS + _DELIVERY_STAGE_HINTS)
+        )
+        if not production_stage:
+            return
+        for task in self:
+            if not task._southbrook_is_kitchen_job():
+                continue
+            if task.manufacturing_readiness_state == "ready":
+                continue
+            reason = (
+                _first_meaningful_line(
+                    task.manufacturing_blocker_summary,
+                    task.southbrook_production_release_reason,
+                    task.manufacturing_warning_summary,
+                )
+                or "Manufacturing readiness is not ready."
+            )
+            raise UserError(_(
+                "Cannot move '%(task)s' to '%(stage)s' while readiness is "
+                "%(state)s. %(reason)s"
+            ) % {
+                "task": task.display_name,
+                "stage": stage.display_name,
+                "state": task.manufacturing_readiness_state or "unknown",
+                "reason": reason,
+            })
+
+    def _southbrook_is_kitchen_job(self):
+        self.ensure_one()
+        if self.production_ids:
+            return True
+        if "x_southbrook_sale_order_id" in self._fields:
+            return bool(self.x_southbrook_sale_order_id)
+        return False
 
     # --- B1: a real person owns the job -------------------------------------
     pm_id = fields.Many2one(

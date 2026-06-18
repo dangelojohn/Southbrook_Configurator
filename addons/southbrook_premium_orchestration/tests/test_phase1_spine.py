@@ -177,6 +177,46 @@ class TestPhase1Spine(TransactionCase):
         self.assertEqual(orphan_mo.project_task_id, task,
             "orphan MO with matching origin must be backlinked")
 
+    def test_production_approval_links_created_mo_to_kitchen_task(self):
+        """Run-4 H3 regression.
+
+        Approving production creates an MO, but that MO must also be
+        linked back to the kitchen job task; otherwise the readiness row
+        stays blocked with "No linked manufacturing orders" even though
+        manufacturing exists.
+        """
+        so = self._make_so()
+        so.action_confirm()
+        task = self._task_for(so)
+        self.assertEqual(len(task), 1,
+            "precondition: confirmation created the kitchen job task")
+
+        component = self.env["product.product"].create({
+            "name": "Phase1 Approval Component",
+            "type": "consu",
+            "is_storable": True,
+        })
+        self.env["mrp.bom"].create({
+            "product_tmpl_id": self.kitchen_product.product_tmpl_id.id,
+            "product_qty": 1.0,
+            "bom_line_ids": [(0, 0, {
+                "product_id": component.id,
+                "product_qty": 1.0,
+            })],
+        })
+
+        so.action_request_production()
+        mos = so.action_approve_production()
+
+        self.assertTrue(mos, "approval should create at least one MO")
+        self.assertEqual(mos.mapped("sale_line_id"), so.order_line,
+            "approval-created MOs must carry the source sale.order.line")
+        self.assertEqual(set(mos.mapped("project_task_id").ids), {task.id},
+            "approval-created MOs must link back to the kitchen job task")
+        task.invalidate_recordset()
+        self.assertIn(mos[:1].id, task.production_ids.ids,
+            "readiness must be able to see the approval-created MO")
+
     # ------------------------------------------------------------------
     # AC-5 — readiness cron stamps the timestamp
     # ------------------------------------------------------------------

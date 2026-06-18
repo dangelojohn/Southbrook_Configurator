@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from odoo import fields
+from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -285,6 +286,30 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("Scheduling", task.manufacturing_blocker_summary)
         self.assertIn("not scheduled", task.manufacturing_blocker_summary)
         self.assertIn("Scheduling", task.manufacturing_waterfall_summary)
+
+    def test_blocked_kitchen_job_cannot_move_to_production_stage(self):
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {"product_id": self.fp.id,
+                                   "product_uom_qty": 1.0})],
+        })
+        task = self.env["project.task"].create({
+            "name": "Blocked Kitchen Job",
+            "project_id": self.project.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        cutting = self.env["project.task.type"].create({
+            "name": "Cutting & Machining",
+            "sequence": 20,
+            "project_ids": [(4, self.project.id)],
+        })
+        task.invalidate_recordset()
+        self.assertEqual(task.manufacturing_readiness_state, "blocked")
+
+        with self.assertRaises(UserError):
+            task.stage_id = cutting.id
+
+        self.assertNotEqual(task.stage_id, cutting)
 
     def test_project_task_form_has_manufacturing_readiness_panel(self):
         view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
