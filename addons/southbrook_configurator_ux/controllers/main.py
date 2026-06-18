@@ -308,6 +308,15 @@ class SouthbrookConfiguratorAPI(http.Controller):
         currency = ((website and website.currency_id)
                     or request.env.company.currency_id)
 
+        # P6 — completeness payload: chosen chips grouped by section,
+        # the explicit list of required-but-missing attributes, and a
+        # boolean the UI consults to enable / disable the Add-to-Quote
+        # CTA. Server-side single source of truth so the UI is purely
+        # a renderer.
+        completeness = self._build_completeness_payload(
+            tmpl, session, group_payload, attributes,
+        )
+
         return {
             "ok": True,
             "product": {
@@ -327,6 +336,78 @@ class SouthbrookConfiguratorAPI(http.Controller):
             "groups": group_payload,
             "attributes": attributes,
             "selected_value_ids": selected,
+            "chosen_chips": completeness["chosen_chips"],
+            "required_missing": completeness["required_missing"],
+            "add_to_quote_enabled": completeness["add_to_quote_enabled"],
+        }
+
+    # ------------------------------------------------------------------
+    # P6 — completeness payload
+    # ------------------------------------------------------------------
+    def _build_completeness_payload(self, tmpl, session, groups, attributes):
+        """Return chosen chips (grouped by P4 section) + the explicit
+        list of REQUIRED unsatisfied attribute names + a boolean for
+        the Add-to-Quote enable state.
+
+        The audit pinned the 17/18 -> name-the-one-missing case as the
+        load-bearing acceptance — so we emit the missing attribute by
+        name, not just count.
+        """
+        # Index: attribute_id -> (attribute_name, is_required)
+        attr_meta = {}
+        for line in tmpl.attribute_line_ids:
+            attr_meta[line.attribute_id.id] = {
+                "name": line.attribute_id.name,
+                "required": bool(getattr(line, "required", False)),
+            }
+
+        # Index: attribute_id -> group_title (per P4 grouping).
+        attr_id_to_group = {}
+        for g in groups:
+            for aid in g.get("attribute_ids", []):
+                attr_id_to_group[aid] = g["title"]
+
+        # Picked values by attribute.
+        picked_by_attr = {}
+        if session:
+            for v in session.value_ids:
+                picked_by_attr.setdefault(v.attribute_id.id, []).append(v)
+
+        # Build the chips list — grouped, deterministic order.
+        chosen_chips = []
+        for g in groups:
+            for aid in g.get("attribute_ids", []):
+                values = picked_by_attr.get(aid) or []
+                meta = attr_meta.get(aid)
+                if not meta or not values:
+                    continue
+                for val in values:
+                    chosen_chips.append({
+                        "group_title": g["title"],
+                        "attribute_id": aid,
+                        "attribute_name": meta["name"],
+                        "value_id": val.id,
+                        "value_name": val.name,
+                    })
+
+        # Required-but-unsatisfied.
+        required_missing = []
+        for aid, meta in attr_meta.items():
+            if not meta["required"]:
+                continue
+            if not picked_by_attr.get(aid):
+                required_missing.append({
+                    "attribute_id": aid,
+                    "attribute_name": meta["name"],
+                    "group_title": attr_id_to_group.get(aid, "Other"),
+                })
+        # Stable order — alphabetical by attribute_name for UX.
+        required_missing.sort(key=lambda r: r["attribute_name"])
+
+        return {
+            "chosen_chips": chosen_chips,
+            "required_missing": required_missing,
+            "add_to_quote_enabled": not required_missing,
         }
 
     # ------------------------------------------------------------------
@@ -544,6 +625,16 @@ class SouthbrookConfiguratorAPI(http.Controller):
             price = max(0.0, price - sc_offset[0])
             weight = max(0.0, weight - sc_offset[1])
 
+        # P6 — completeness payload on every /select tick so the UI
+        # can keep the chosen-chips summary and the missing-attributes
+        # checklist in sync with each pick. Server is the single source
+        # of truth for "ready to submit?".
+        tmpl = session.product_tmpl_id
+        select_groups = self._build_group_payload_for_template(tmpl)
+        completeness = self._build_completeness_payload(
+            tmpl, session, select_groups, attributes={},
+        )
+
         return {
             "ok": True,
             "selected_value_ids": session.value_ids.ids,
@@ -552,8 +643,28 @@ class SouthbrookConfiguratorAPI(http.Controller):
             "disabled_value_ids": disabled_ids,
             "live_sku": self._compute_sku_from_session(session),
             "soft_close_derived": bool(soft_close_derived),
+            "chosen_chips": completeness["chosen_chips"],
+            "required_missing": completeness["required_missing"],
+            "add_to_quote_enabled": completeness["add_to_quote_enabled"],
             "warnings": [],
         }
+
+    def _build_group_payload_for_template(self, tmpl):
+        """Compute the same group_payload list /state builds, given a
+        template. Reusable from /select so completeness is consistent."""
+        all_attr_ids = {a.attribute_id.id: a.attribute_id.name
+                        for a in tmpl.attribute_line_ids}
+        groups = []
+        used = set()
+        for title, names in ATTRIBUTE_GROUPS:
+            ids = [aid for aid, nm in all_attr_ids.items() if nm in names]
+            if ids:
+                groups.append({"title": title, "attribute_ids": ids})
+                used.update(ids)
+        leftover = [aid for aid in all_attr_ids if aid not in used]
+        if leftover:
+            groups.append({"title": "Other", "attribute_ids": leftover})
+        return groups
 
     # ------------------------------------------------------------------
     # P2 — Soft-Close derivation helper.
