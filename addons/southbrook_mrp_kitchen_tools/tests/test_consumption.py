@@ -121,3 +121,93 @@ class TestWorkorderToolConsumption(TransactionCase):
             "unit_cost": 2.5,
         })
         self.assertEqual(cons.total_cost, 10.0)
+
+    # ------------------------------------------------------------------
+    # Acceptance — unlink restores asset life (P8 rollback 2026-06-18).
+    # The latent gap surfaced during the P8 fix verify: create() debits
+    # the asset but unlink() previously did not credit it back, leaving
+    # the asset permanently under-counted after any consumption-row
+    # cleanup (test scans, mistaken debits, manual ledger trims).
+    # ------------------------------------------------------------------
+    def test_unlink_restores_remaining_life_and_usage(self):
+        asset = self._new_asset(
+            remaining_life_qty=100.0, estimated_life_qty=100.0)
+        wo = self._new_workorder()
+        cons = self.Consumption.create({
+            "workorder_id": wo.id,
+            "asset_id": asset.id,
+            "quantity": 30.0,
+        })
+        # Sanity — create() debited
+        self.assertEqual(asset.remaining_life_qty, 70.0)
+        self.assertEqual(asset.total_usage_qty, 30.0)
+        self.assertEqual(asset.last_used_workorder_id, wo)
+
+        cons.unlink()
+        # Inverse should restore both fields
+        self.assertEqual(
+            asset.remaining_life_qty, 100.0,
+            "unlink must add back the qty it debited")
+        self.assertEqual(
+            asset.total_usage_qty, 0.0,
+            "unlink must reverse the usage bump")
+        # last_used_workorder_id was pointing at THIS consumption's WO,
+        # so it should clear (no remaining consumption rows for asset).
+        self.assertFalse(
+            asset.last_used_workorder_id,
+            "no remaining consumption -> last_used_workorder cleared")
+        self.assertFalse(asset.last_used_date)
+
+    def test_unlink_caps_remaining_at_estimated_life(self):
+        asset = self._new_asset(
+            remaining_life_qty=80.0, estimated_life_qty=100.0,
+            total_usage_qty=20.0,
+        )
+        wo = self._new_workorder()
+        cons = self.Consumption.create({
+            "workorder_id": wo.id, "asset_id": asset.id, "quantity": 30.0,
+        })
+        # After create: remaining=50, usage=50
+        self.assertEqual(asset.remaining_life_qty, 50.0)
+        cons.unlink()
+        # Restoring 30 to 50 should give 80 — already below cap, no clamp
+        self.assertEqual(asset.remaining_life_qty, 80.0)
+
+    def test_unlink_does_not_flip_lifecycle_state(self):
+        # Asset crossed zero life mid-create (flipped to needs_sharpening).
+        # Operator marked it as sharpened back to in_use. Unlink the
+        # original consumption — must NOT clobber the operator's
+        # explicit state change.
+        asset = self._new_asset(
+            remaining_life_qty=10.0, estimated_life_qty=100.0)
+        wo = self._new_workorder()
+        cons = self.Consumption.create({
+            "workorder_id": wo.id, "asset_id": asset.id, "quantity": 15.0,
+        })
+        self.assertEqual(asset.lifecycle_state, "needs_sharpening")
+        asset.lifecycle_state = "in_use"  # operator action between
+        cons.unlink()
+        # State remains in_use — unlink only restores numeric fields
+        self.assertEqual(asset.lifecycle_state, "in_use")
+
+    def test_unlink_falls_back_to_next_most_recent_consumption(self):
+        asset = self._new_asset(
+            remaining_life_qty=100.0, estimated_life_qty=100.0)
+        wo_first = self._new_workorder()
+        wo_second = self._new_workorder()
+        cons_first = self.Consumption.create({
+            "workorder_id": wo_first.id, "asset_id": asset.id,
+            "quantity": 10.0,
+        })
+        cons_second = self.Consumption.create({
+            "workorder_id": wo_second.id, "asset_id": asset.id,
+            "quantity": 5.0,
+        })
+        # last_used now points at wo_second (most recent)
+        self.assertEqual(asset.last_used_workorder_id, wo_second)
+        cons_second.unlink()
+        # After unlink: cons_first remains; last_used should fall back to it
+        self.assertEqual(
+            asset.last_used_workorder_id, wo_first,
+            "unlinking the most-recent consumption falls back to "
+            "the next-most-recent")
