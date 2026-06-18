@@ -60,6 +60,31 @@
       </field>
     </record>
 
+  </data>
+
+  <!--
+    REG-R1.1 extension records — MUST live OUTSIDE the noupdate=1 data
+    block above. Background: the noupdate=1 semantics in Odoo 19 are
+    "load once on -i, skip silently on every -u if the xmlid already
+    exists". The two records below target xmlids (base.user_admin,
+    sales_team.group_sale_manager) that EXIST BEFORE -u of this module
+    runs — so under noupdate=1 they'd be silently skipped, which is
+    exactly what happened on the first attempted ship of this fix
+    (state file marked deploy OK; admin group still empty in the DB).
+
+    By placing them in a default <data> block (no noupdate), Odoo treats
+    them as standard upgrade-time writes. The (4, ref(...)) tuple is
+    idempotent — adding an already-present link is a no-op — so
+    re-running -u doesn't churn.
+
+    The tradeoff: a manual revocation of admin's approver group will
+    be re-applied on the next -u of this module. If SOX-style
+    separation-of-duty matters, override by moving these records to a
+    noupdate=1 site-local module (or removing the imply at the
+    sale_manager → approver edge instead of at admin's membership).
+  -->
+  <data>
+
     <!--
       REG-R1.1 (2026-06-18): admin (base.user_admin) is NOT auto-
       added to custom-module groups in Odoo 19 (see session memory
@@ -69,15 +94,8 @@
       methods all ship correctly — caught by Claude Chrome end-to-end
       Run 1 report (finding 1.1).
 
-      Pattern: extend the upstream base.user_admin record by giving
-      this <record> the fully-qualified xmlid as its id attribute.
-      The (4, ref(...)) tuple appends without replacing other groups,
-      so this composes cleanly with whatever the user already has.
-
-      noupdate="1" (block-level above) means a later manual revocation
-      (e.g. for SOX-style separation of duty) survives subsequent
-      -u southbrook_mrp_pm. Field name is `group_ids` on res.users in
-      v19 (renamed from `groups_id`; see memory note).
+      Field name is `group_ids` on res.users in v19 (renamed from
+      `groups_id`; see memory note).
     -->
     <record id="base.user_admin" model="res.users">
       <field name="group_ids"
@@ -87,12 +105,9 @@
     <!--
       REG-R1.1 part 2: imply the Production Approver group from
       Sales Manager. Anyone who can manage sales orders is, by
-      default, also able to approve production for them. This is
-      the same imply-chain pattern Odoo core uses (Sales User →
-      Sales Manager → Accounting Manager). Companies that want a
-      stricter separation can break the imply by hand from
-      Settings → Users & Companies → Groups; noupdate=1 means
-      that edit survives upgrades.
+      default, also able to approve production for them. Matches
+      Odoo core's own imply-chain pattern (Sales User → Sales
+      Manager → Accounting Manager).
     -->
     <record id="sales_team.group_sale_manager" model="res.groups">
       <field name="implied_ids"
@@ -100,4 +115,5 @@
     </record>
 
   </data>
+
 </odoo>
