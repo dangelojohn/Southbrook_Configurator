@@ -86,23 +86,49 @@ class SbProductionPackage(models.Model):
         The existing ``mrp.workorder.button_finish`` override in
         southbrook_premium_orchestration handles tool-consumption
         debit. We deliberately call ``button_finish`` so the audit's
-        "no duplicate telemetry" criterion holds.
+        "no duplicate telemetry" criterion holds — the debit fires
+        exactly once via the existing path, not a re-implementation
+        here.
+
+        Sudo + pre-finish snapshot — defensive against two production
+        bugs surfaced in manual E2E testing 2026-06-18:
+
+        BUG 1 — without ``.sudo()``, the downstream
+        ``southbrook.workorder.tool.consumption`` ``create()`` raises
+        AccessError when the scan endpoint is invoked by a caller
+        who isn't in ``group_tool_operator`` (most shop-floor
+        workflows). The override's ``except Exception`` swallows
+        that into a WARNING log, leaving an empty
+        ``sbk_consumption_ids`` and zero ``sbk_consumption_total_cost``
+        on the finished WO. Sudo here makes the consumption write
+        an implementation detail of the closure path, not an ACL
+        prerequisite for every scan caller.
+
+        BUG 2 — resolving ``wo.workcenter_id.name`` after
+        ``button_finish`` can return empty because the state
+        transition invalidates the cache. Snapshot the workcenter
+        BEFORE the call so the log entry always carries an
+        attributable name for the MI dashboard.
         """
         self.ensure_one()
         wo = self._sbk_next_workorder()
         if not wo:
-            self._append_scan_event(workcenter_code, None)
+            self._append_scan_event(workcenter_code or "", None)
             return self.env["mrp.workorder"]
 
-        # Call the existing path — never duplicate the debit.
-        wo.button_finish()
-        logged_workcenter = (
+        # BUG 2 fix — snapshot the workcenter pre-finish.
+        pre_finish_workcenter = (
             workcenter_code
-            or wo.workcenter_id.name
-            or wo.workcenter_id.display_name
+            or (wo.workcenter_id.name if wo.workcenter_id else "")
+            or (wo.workcenter_id.display_name if wo.workcenter_id else "")
             or ""
         )
-        self._append_scan_event(logged_workcenter, wo.id)
+
+        # BUG 1 fix — sudo so the downstream consumption row can be
+        # created regardless of caller ACL.
+        wo.sudo().button_finish()
+
+        self._append_scan_event(pre_finish_workcenter, wo.id)
         return wo
 
     def _sbk_next_workorder(self):
