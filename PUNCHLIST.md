@@ -253,6 +253,14 @@ on `product.attribute.value` for any dimensional attribute:
 **Do not compute one from the other.** Spec wins over literal conversion
 (21″ may be 533 mm by Southbrook spec, not 533.4 mm by 21 × 25.4).
 
+**Q3-A · Prodboard catalogue-ingestion carve-out.** The cloned Prodboard
+catalogue layer (`southbrook.cabinet.archetype`) and the private asset importer
+are support infrastructure, not an 8th pricing/configurator business routine.
+They ingest Southbrook-licensed catalogue metadata/assets, store source image
+UUIDs/filenames/URLs as internal references, and cache binaries as private
+`ir.attachment` records. Public UI remains on Southbrook-owned
+`product.template.image_1920`; no Prodboard CDN URL is rendered to customers.
+
 **Q5 · Contractor naming disambiguation.**
 
 | Surface | Technical key | UI label |
