@@ -18,6 +18,7 @@ CONTAINER="${CONTAINER:-southbrook-odoo}"
 DB="${DB:-southbrook}"
 LOCK_PATH="${LOCK_PATH:-/var/lib/odoo/.southbrook-odoo-upgrade.lock}"
 LOCK_WAIT_SEC="${LOCK_WAIT_SEC:-600}"
+PAUSE_CRON_DURING_UPGRADE="${PAUSE_CRON_DURING_UPGRADE:-1}"
 
 log() { printf "[qnap-pull-deploy] %s\n" "$*" >&2; }
 fail() { printf "[qnap-pull-deploy] ERROR: %s\n" "$*" >&2; exit 1; }
@@ -33,6 +34,7 @@ Environment:
   QNAP_DOCKER        default: /share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker
   CONTAINER          default: southbrook-odoo
   DB                 default: southbrook
+  PAUSE_CRON_DURING_UPGRADE default: 1
   TEST_TAGS          optional Odoo --test-tags value
 EOF
 }
@@ -63,8 +65,24 @@ ARCHIVE_URL="${REPO_ARCHIVE_BASE}/${REF}.tar.gz"
 WORKDIR="$(mktemp -d /tmp/sbk-pull-deploy.XXXXXX)"
 ARCHIVE="$WORKDIR/repo.tar.gz"
 EXTRACT="$WORKDIR/extract"
+PAUSED_CRON_IDS_FILE="$WORKDIR/paused_cron_ids"
 mkdir -p "$EXTRACT"
-cleanup() { rm -rf "$WORKDIR"; }
+
+restore_paused_crons() {
+  [[ -s "$PAUSED_CRON_IDS_FILE" ]] || return 0
+  ids_csv="$(tr '\n' ',' < "$PAUSED_CRON_IDS_FILE" | sed 's/,$//')"
+  [[ -n "$ids_csv" ]] || return 0
+  log "restoring paused module cron rows: $ids_csv"
+  $QNAP_DOCKER exec -e PGPASSWORD="${PG_PW:-}" "$CONTAINER" \
+    psql -h southbrook-postgres -U odoo -d "$DB" -v ON_ERROR_STOP=1 -c \
+      "UPDATE ir_cron SET active = TRUE WHERE id IN ($ids_csv);" \
+    >/dev/null 2>&1 || log "WARNING: failed to restore paused cron rows: $ids_csv"
+}
+
+cleanup() {
+  restore_paused_crons
+  rm -rf "$WORKDIR"
+}
 trap cleanup EXIT
 
 log "ref: $REF"
@@ -96,6 +114,26 @@ PG_PW="$($QNAP_DOCKER exec "$CONTAINER" bash -c "grep -E '^db_password' /etc/odo
 mod_in_list="$(printf "'%s'," "${MODULES[@]}" | sed 's/,$//')"
 classify_query="SELECT name || ':' || state FROM ir_module_module WHERE name IN ($mod_in_list);"
 known_states="$($QNAP_DOCKER exec -e PGPASSWORD="$PG_PW" "$CONTAINER" psql -h southbrook-postgres -U odoo -d "$DB" -At -c "$classify_query" 2>/dev/null || true)"
+
+if [[ "$PAUSE_CRON_DURING_UPGRADE" == "1" ]]; then
+  log "pausing active module cron rows during upgrade"
+  pause_query="SELECT c.id FROM ir_cron c JOIN ir_model_data d ON d.model = 'ir.cron' AND d.res_id = c.id WHERE d.module IN ($mod_in_list) AND c.active IS TRUE ORDER BY c.id;"
+  paused_cron_ids="$($QNAP_DOCKER exec -e PGPASSWORD="$PG_PW" "$CONTAINER" \
+    psql -h southbrook-postgres -U odoo -d "$DB" -At -c "$pause_query" 2>/dev/null || true)"
+  if [[ -n "$paused_cron_ids" ]]; then
+    printf "%s\n" "$paused_cron_ids" > "$PAUSED_CRON_IDS_FILE"
+    paused_ids_csv="$(tr '\n' ',' < "$PAUSED_CRON_IDS_FILE" | sed 's/,$//')"
+    log "paused module cron rows: $paused_ids_csv"
+    $QNAP_DOCKER exec -e PGPASSWORD="$PG_PW" "$CONTAINER" \
+      psql -h southbrook-postgres -U odoo -d "$DB" -v ON_ERROR_STOP=1 -c \
+        "UPDATE ir_cron SET active = FALSE WHERE id IN ($paused_ids_csv);" \
+      >/dev/null || fail "could not pause module cron rows: $paused_ids_csv"
+  else
+    log "no active module cron rows to pause"
+  fi
+else
+  log "module cron pause disabled by PAUSE_CRON_DURING_UPGRADE=$PAUSE_CRON_DURING_UPGRADE"
+fi
 
 to_install=()
 to_upgrade=()
