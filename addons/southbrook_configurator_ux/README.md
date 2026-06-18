@@ -90,7 +90,7 @@ immediately. Nothing else is affected.
 
 See `CHANGELOG.md` and `__manifest__.py` for the full phase plan.
 
-## Onshape CAD Link (v19.0.6.0.0+)
+## Onshape CAD Link (v19.0.6.1.0+)
 
 ### Overview
 
@@ -100,7 +100,8 @@ of "Add to Quote ->". Products without a URL show no button.
 
 ### How it works
 
-1. A `x_onshape_cad_url` Char field is stored on `product.template`.
+1. A Python-defined `x_onshape_cad_url` Char field is stored on
+   `product.template`.
 2. The QWeb configurator template renders the value as a
    `data-onshape-cad-url` attribute on `#sb_cfg_v2_root` at server render time.
 3. A small inline script reads the attribute after page load and injects an

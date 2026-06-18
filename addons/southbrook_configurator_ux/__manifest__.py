@@ -64,7 +64,7 @@ Phase 5 — Tests + a11y
     engine, ARIA roles on chip selectors and import modal,
     keyboard navigation.
 """,
-    "version": "19.0.6.0.0",
+    "version": "19.0.6.1.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -90,7 +90,6 @@ Phase 5 — Tests + a11y
         "python": ["openpyxl"],
     },
     "data": [
-        "data/product_template_fields.xml",
         # Phase 1 — template inheritance that swaps the configurator
         # body markup. Loads AFTER the OCA module's
         # data/config_form_templates.xml because of the dependency

@@ -47,5 +47,7 @@ found." This script encodes that knowledge.
 
 - `gen_phase1_data.py` — generator for the Phase 1 seed data
 - `lint-xml.sh` — XML validation pre-commit hook
+- `verify_onshape_cad_link.sh` — static checks plus optional Docker/Odoo
+  upgrade and `southbrook,onshape` tests for the per-product Onshape CAD link
 - `smoke_browser.py` / `smoke_customer_flow.sh` — older smoke checks
   (the Playwright suite at `e2e/` is the canonical replacement)

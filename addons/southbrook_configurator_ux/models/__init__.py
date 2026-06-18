@@ -3,3 +3,4 @@ from . import tactical_price_seed
 from . import catalog_expansion
 from . import rule_completion
 from . import drawer_slide_p2
+from . import product_template
