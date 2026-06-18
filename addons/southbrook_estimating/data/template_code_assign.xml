@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A5 — Type-encoded default_code assignment.
+
+  Fires assign_codes() on install / -u. Idempotent — only writes when
+  default_code is empty, never overwrites an existing manual code.
+  Must load AFTER product_templates.xml so the Southbrook Q8 cabinets
+  exist as xml_id targets when we call ref() on them.
+-->
+<odoo noupdate="0">
+  <function model="southbrook.estimating.template_code"
+            name="assign_codes"/>
+</odoo>

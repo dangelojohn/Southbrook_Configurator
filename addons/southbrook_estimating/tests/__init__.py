@@ -16,3 +16,4 @@ from . import test_catalog_metadata_seed
 from . import test_audit_phase2
 from . import test_a1_prodboard_taxonomy
 from . import test_a4_image_uuid
+from . import test_a5_template_code
