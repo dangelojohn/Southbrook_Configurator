@@ -3,3 +3,4 @@ from . import test_mi_engine
 from . import test_mi_mrp
 from . import test_mi_views
 from . import test_mi_workcenter
+from . import test_p3_auto_remediate

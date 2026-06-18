@@ -38,7 +38,13 @@ The behaviours are still rollback-safe:
 - The configurator state endpoint's `soft_close_derived` field is purely
   additive in the JSON payload; older clients ignore unknown keys.
 
-(P3, P5, P6, P7, P8 add their own entries as they land.)
+### P3 — MI auto-remediation
+
+| # | Key | Default | Effect when ON | Audit task |
+|---|-----|---------|----------------|------------|
+| 2 | `southbrook_manufacturing_intelligence.auto_remediate_cutlist` | `False` | When `southbrook.mi.engine._recompute_production` would create a "Missing cutlist" blocker AND the source `sale.order.line` carries a complete configuration (Width present; no value name contains "Custom"), the engine calls `sb.production.package.build_from_order_line(order_line, mo=production)`. On success: the blocker is suppressed and an info-severity "Cutlist auto-generated" check carries the audit note ("audit P3 — configurator config was complete; …"). Ambiguous configurations and missing-Width templates still surface the blocker. "CAD not complete" warnings are NEVER auto-cleared — only the cutlist blocker is remediable. | P3 |
+
+(P5, P7, P8 add their own entries as they land.)
 
 ## Rollback
 
