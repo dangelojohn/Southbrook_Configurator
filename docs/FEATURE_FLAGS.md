@@ -44,7 +44,26 @@ The behaviours are still rollback-safe:
 |---|-----|---------|----------------|------------|
 | 2 | `southbrook_manufacturing_intelligence.auto_remediate_cutlist` | `False` | When `southbrook.mi.engine._recompute_production` would create a "Missing cutlist" blocker AND the source `sale.order.line` carries a complete configuration (Width present; no value name contains "Custom"), the engine calls `sb.production.package.build_from_order_line(order_line, mo=production)`. On success: the blocker is suppressed and an info-severity "Cutlist auto-generated" check carries the audit note ("audit P3 — configurator config was complete; …"). Ambiguous configurations and missing-Width templates still surface the blocker. "CAD not complete" warnings are NEVER auto-cleared — only the cutlist blocker is remediable. | P3 |
 
-(P5, P7, P8 add their own entries as they land.)
+### P7 — Specs single source of truth
+
+P7 is **always-on** and **per-record opt-out** via a field. After
+`action_confirm`, `project.task._southbrook_p7_sync_from_so()` pulls
+material species + unit count + hardware specs from the originating
+`sale.order`. To preserve a manual deviation, tick
+`project.task.x_southbrook_specs_override`; the auto-sync then skips
+that task on every subsequent confirm and refresh.
+
+Rollback:
+
+- `x_southbrook_specs_override` defaults False; existing records are
+  unaffected until `action_confirm` re-fires.
+- The hook in `_create_kitchen_project_task` is wrapped in a try/except
+  that posts a message and lets the spine creation succeed even when
+  the sync raises (keeps the platform installable on partial deps).
+- `git revert` of the per-task commit removes both the sync method and
+  the boolean cleanly.
+
+(P5 already shipped; P8 adds its own entry.)
 
 ## Rollback
 

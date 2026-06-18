@@ -141,6 +141,14 @@ class SaleOrder(models.Model):
         if existing:
             self._stamp_managed_flag(existing)
             self._backlink_orphan_mos(existing)
+            # P7 — Re-confirm path: refresh the canonical specs on the
+            # existing task in case the underlying order configuration
+            # was edited between confirmations.
+            if hasattr(existing, "_southbrook_p7_sync_from_so"):
+                try:
+                    existing._southbrook_p7_sync_from_so()
+                except Exception:  # noqa: BLE001
+                    pass
             return existing
 
         project = self._resolve_kitchen_project()
@@ -153,6 +161,18 @@ class SaleOrder(models.Model):
         task = Task.create(vals)
         self._stamp_managed_flag(task)
         self._backlink_orphan_mos(task)
+        # P7 — Sync canonical specs (material species / unit count /
+        # hardware specs) from the originating sale.order so the task
+        # mirrors the configurator's truth. Skipped per-task by the
+        # x_southbrook_specs_override boolean.
+        if hasattr(task, "_southbrook_p7_sync_from_so"):
+            try:
+                task._southbrook_p7_sync_from_so()
+            except Exception:  # noqa: BLE001
+                self.message_post(
+                    body=_("Premium Orchestration: P7 specs sync failed "
+                           "for task %s; the manual Cabinetry Specs "
+                           "fields are unaffected.") % task.display_name)
         return task
 
     # ------------------------------------------------------------------
