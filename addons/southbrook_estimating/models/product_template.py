@@ -140,6 +140,37 @@ class ProductTemplate(models.Model):
              "it to match the underlying attachment's filename.",
     )
 
+    # ------------------------------------------------------------------
+    # Prodboard catalogue-archetype mapping.
+    # ------------------------------------------------------------------
+    # The 12 Southbrook Q8 product templates remain the price-bearing,
+    # configurable Odoo products. This optional pointer lets the templates
+    # borrow richer catalogue taxonomy from the cloned Prodboard archetype
+    # layer without creating 223 sellable product.template rows.
+    x_prodboard_archetype_id = fields.Many2one(
+        "southbrook.cabinet.archetype",
+        string="Prodboard Catalogue Archetype",
+        copy=False,
+        help=(
+            "Internal mapping from this locked Southbrook template to the "
+            "nearest cloned catalogue archetype. Used for taxonomy, "
+            "reference metadata, and internal asset management only; public "
+            "imagery still comes from product.template.image_1920."
+        ),
+    )
+    x_prodboard_archetype_code = fields.Char(
+        string="Prodboard Archetype Code",
+        related="x_prodboard_archetype_id.code",
+        store=True,
+        readonly=True,
+    )
+    x_prodboard_body_class = fields.Selection(
+        related="x_prodboard_archetype_id.body_class",
+        string="Prodboard Body Class",
+        store=True,
+        readonly=True,
+    )
+
     def action_southbrook_launch_3d_configurator(self):
         """Launch the OCA configurator wizard for this template.
 

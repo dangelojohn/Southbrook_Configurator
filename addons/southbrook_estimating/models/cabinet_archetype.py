@@ -19,9 +19,13 @@ idempotent.
 """
 import json
 import logging
+import base64
+import hashlib
+import mimetypes
 import os
 import re
 from urllib.parse import unquote
+from urllib.request import Request, urlopen
 
 from odoo import api, fields, models
 
@@ -171,6 +175,57 @@ class SouthbrookCabinetArchetype(models.Model):
     )
     image_filename = fields.Char()
     image_url = fields.Char(string="Image URL (reference)")
+    prodboard_source_package = fields.Char(
+        string="Source Package",
+        default="betterkitchens",
+        help="Internal source package key for the cloned catalogue metadata. "
+             "Not rendered in the public UI.",
+    )
+    prodboard_source_collection_key = fields.Char(
+        string="Source Collection Key",
+        help="JSON section key from the source catalogue, e.g. "
+             "classic_collection or true_handleless.",
+    )
+    prodboard_asset_attachment_id = fields.Many2one(
+        "ir.attachment",
+        string="Imported Asset Attachment",
+        copy=False,
+        ondelete="set null",
+        help="Private Odoo attachment containing the licensed source image "
+             "binary for this archetype. Public pages do not serve this "
+             "attachment directly.",
+    )
+    prodboard_asset_status = fields.Selection(
+        [("not_imported", "Not Imported"),
+         ("imported", "Imported"),
+         ("missing_source", "Missing Source"),
+         ("failed", "Failed")],
+        string="Asset Import Status",
+        default="not_imported",
+        copy=False,
+        index=True,
+    )
+    prodboard_asset_sha256 = fields.Char(
+        string="Asset SHA-256",
+        copy=False,
+        index=True,
+    )
+    prodboard_asset_mimetype = fields.Char(
+        string="Asset MIME Type",
+        copy=False,
+    )
+    prodboard_asset_bytes = fields.Integer(
+        string="Asset Bytes",
+        copy=False,
+    )
+    prodboard_asset_imported_at = fields.Datetime(
+        string="Asset Imported At",
+        copy=False,
+    )
+    prodboard_asset_error = fields.Text(
+        string="Asset Import Error",
+        copy=False,
+    )
     active = fields.Boolean(default=True)
 
     _name_uniq = models.Constraint(
@@ -265,6 +320,14 @@ class SouthbrookProdboardTaxonomy(models.AbstractModel):
             "code": code,
             "name": prod.get("name") or code,
             "collection": collection,
+            "prodboard_source_package": "betterkitchens",
+            "prodboard_source_collection_key": (
+                "classic_collection"
+                if collection == "classic"
+                else "true_handleless"
+                if collection == "handleless"
+                else collection
+            ),
             "body_class": body_class,
             "cabinet_type": cabinet_type,
             "width_default_mm": int(prod.get("width_default") or 0),
@@ -323,3 +386,209 @@ class SouthbrookProdboardTaxonomy(models.AbstractModel):
         if not m:
             return (None, None)
         return (m.group("uuid"), unquote(m.group("filename")))
+
+
+class SouthbrookProdboardAssetImporter(models.AbstractModel):
+    _name = "southbrook.estimating.prodboard_asset_importer"
+    _description = (
+        "Importer for licensed Prodboard image binaries. Assets are cached "
+        "as private ir.attachment rows linked to cabinet archetypes; public "
+        "UI routes continue serving Southbrook-owned product.template images."
+    )
+
+    @api.model
+    def import_assets(self, limit=None, offline_dir=None, allow_network=False):
+        """Import image assets for seeded archetypes.
+
+        Network access is disabled by default. In production, pass
+        allow_network=True only when the deployment environment is allowed to
+        fetch the licensed source images. For locked-down environments, place
+        files in offline_dir named by image_uuid (for example
+        {uuid}.png) or by image_filename.
+
+        Returns a summary dict with imported/missing/failed counts.
+        """
+        domain = [("image_uuid", "!=", False), ("image_url", "!=", False)]
+        archetypes = self.env["southbrook.cabinet.archetype"].search(
+            domain,
+            limit=limit or None,
+        )
+        summary = {"imported": 0, "missing_source": 0, "failed": 0}
+        for archetype in archetypes:
+            ok = self._import_one(
+                archetype,
+                offline_dir=offline_dir,
+                allow_network=allow_network,
+            )
+            archetype.flush_recordset()
+            if ok:
+                summary["imported"] += 1
+            elif archetype.prodboard_asset_status == "missing_source":
+                summary["missing_source"] += 1
+            else:
+                summary["failed"] += 1
+        return summary
+
+    @api.model
+    def _import_one(self, archetype, offline_dir=None, allow_network=False,
+                    fetcher=None):
+        """Import one archetype image.
+
+        `fetcher` is a test seam accepting the source URL and returning either
+        bytes or `(bytes, mimetype)`. It avoids live network calls in tests.
+        """
+        archetype.ensure_one()
+        if not archetype.image_uuid or not archetype.image_url:
+            self._write_asset_failure(
+                archetype,
+                "missing_source",
+                "Missing image UUID or image URL",
+            )
+            return False
+
+        try:
+            payload = self._read_offline_asset(archetype, offline_dir)
+            if payload is None and fetcher:
+                payload = fetcher(archetype.image_url)
+            if payload is None and allow_network:
+                payload = self._fetch_url(archetype.image_url)
+            if payload is None:
+                self._write_asset_failure(
+                    archetype,
+                    "missing_source",
+                    "No offline asset found and network disabled",
+                )
+                return False
+
+            content, mimetype = self._normalise_payload(
+                payload,
+                filename=archetype.image_filename,
+            )
+            if not content:
+                self._write_asset_failure(
+                    archetype,
+                    "failed",
+                    "Imported asset was empty",
+                )
+                return False
+            attachment = self._upsert_attachment(
+                archetype,
+                content,
+                mimetype,
+            )
+            archetype.write({
+                "prodboard_asset_attachment_id": attachment.id,
+                "prodboard_asset_status": "imported",
+                "prodboard_asset_sha256": hashlib.sha256(content).hexdigest(),
+                "prodboard_asset_mimetype": mimetype,
+                "prodboard_asset_bytes": len(content),
+                "prodboard_asset_imported_at": fields.Datetime.now(),
+                "prodboard_asset_error": False,
+            })
+            return True
+        except Exception as exc:  # pragma: no cover - exercised by Odoo env
+            _logger.exception(
+                "Prodboard asset import failed for archetype %s",
+                archetype.display_name,
+            )
+            self._write_asset_failure(archetype, "failed", str(exc))
+            return False
+
+    @api.model
+    def _read_offline_asset(self, archetype, offline_dir):
+        if not offline_dir or not os.path.isdir(offline_dir):
+            return None
+        candidates = []
+        if archetype.image_filename:
+            candidates.append(os.path.basename(archetype.image_filename))
+            ext = os.path.splitext(archetype.image_filename)[1]
+            if ext:
+                candidates.append(archetype.image_uuid + ext)
+        candidates.extend([
+            archetype.image_uuid + ".png",
+            archetype.image_uuid + ".jpg",
+            archetype.image_uuid + ".jpeg",
+            archetype.image_uuid + ".webp",
+            archetype.image_uuid,
+        ])
+        seen = set()
+        for name in candidates:
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            path = os.path.join(offline_dir, name)
+            if not os.path.isfile(path):
+                continue
+            with open(path, "rb") as fh:
+                content = fh.read()
+            return (
+                content,
+                self._guess_mimetype(path, content),
+            )
+        return None
+
+    @api.model
+    def _fetch_url(self, url):
+        request = Request(
+            url,
+            headers={"User-Agent": "Southbrook-Odoo-Prodboard-Importer/1.0"},
+        )
+        with urlopen(request, timeout=20) as response:
+            content = response.read()
+            mimetype = response.headers.get_content_type() or None
+        return (content, mimetype)
+
+    @api.model
+    def _normalise_payload(self, payload, filename=None):
+        if isinstance(payload, tuple):
+            content, mimetype = payload
+        else:
+            content, mimetype = payload, None
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        mimetype = mimetype or self._guess_mimetype(filename, content)
+        return (content, mimetype)
+
+    @api.model
+    def _guess_mimetype(self, filename=None, content=None):
+        if content and content.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if content and content.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if content and content.startswith(b"RIFF") and b"WEBP" in content[:16]:
+            return "image/webp"
+        guessed = mimetypes.guess_type(filename or "")[0]
+        return guessed or "application/octet-stream"
+
+    @api.model
+    def _upsert_attachment(self, archetype, content, mimetype):
+        Attachment = self.env["ir.attachment"].sudo()
+        attachment = archetype.prodboard_asset_attachment_id.sudo()
+        if not attachment:
+            attachment = Attachment.search([
+                ("res_model", "=", "southbrook.cabinet.archetype"),
+                ("res_id", "=", archetype.id),
+                ("name", "=", archetype.image_filename or archetype.code),
+            ], limit=1)
+        vals = {
+            "name": archetype.image_filename or archetype.code,
+            "type": "binary",
+            "datas": base64.b64encode(content).decode("ascii"),
+            "mimetype": mimetype,
+            "res_model": "southbrook.cabinet.archetype",
+            "res_id": archetype.id,
+            "public": False,
+        }
+        if attachment:
+            attachment.write(vals)
+        else:
+            attachment = Attachment.create(vals)
+        return attachment
+
+    @api.model
+    def _write_asset_failure(self, archetype, status, error):
+        archetype.write({
+            "prodboard_asset_status": status,
+            "prodboard_asset_error": error,
+            "prodboard_asset_imported_at": False,
+        })

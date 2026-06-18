@@ -17,3 +17,6 @@ from . import test_audit_phase2
 from . import test_a1_prodboard_taxonomy
 from . import test_a4_image_uuid
 from . import test_a5_template_code
+from . import test_prodboard_asset_importer
+from . import test_template_archetype_mapping
+from . import test_t2_door_area

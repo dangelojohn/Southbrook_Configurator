@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Prodboard catalogue mapping.
+
+  Fires assign_archetypes() on install / -u. Idempotent — writes the
+  nearest cloned catalogue archetype onto the 12 locked Southbrook Q8
+  templates without replacing or mutating their configurator definitions.
+  Must load AFTER product_templates.xml and prodboard_taxonomy_seed.xml.
+-->
+<odoo noupdate="0">
+  <function model="southbrook.estimating.template_archetype"
+            name="assign_archetypes"/>
+</odoo>

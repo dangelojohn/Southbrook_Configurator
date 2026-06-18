@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.3.2.0",
+    "version": "19.0.4.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -170,6 +170,10 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # an existing default_code. Must load AFTER product_templates.xml
         # so the xml_id targets exist.
         "data/template_code_assign.xml",
+        # Prodboard catalogue mapping — assigns cloned archetype refs to
+        # the locked 12 Q8 templates. Must load after product templates
+        # and after the taxonomy seed has upserted archetypes.
+        "data/template_archetype_assign.xml",
     ],
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).

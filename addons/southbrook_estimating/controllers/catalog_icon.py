@@ -7,9 +7,9 @@ GET /southbrook/catalog/icon/<uuid>/<filename> -> 200 image bytes (filename igno
 The UUID is looked up on product.template.x_image_uuid. When matched,
 the template's image_1920 attachment is served with a far-future Cache-
 Control header (the UUID changes whenever the content changes; pattern
-borrowed from Prodboard's blobs.prodboard.com CDN strategy). When no
-template matches, returns HTTP 404. Public route — catalog icons are
-publicly visible product imagery.
+borrowed from the source catalogue's content-addressed image strategy).
+When no template matches, returns HTTP 404. Public route — catalog icons
+are publicly visible product imagery.
 """
 import logging
 
