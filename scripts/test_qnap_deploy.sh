@@ -31,7 +31,7 @@ set -euo pipefail
 MODULES="${MODULES:-southbrook_floor_traveler,southbrook_premium_orchestration}"
 TEST_TAGS="${TEST_TAGS:-/southbrook_floor_traveler:TestP8FloorTraveler.test_record_scan_creates_one_consumption_and_logs_workcenter}"
 BRANCH="${BRANCH:-deploy/release}"
-TIMEOUT_S="${TIMEOUT_S:-480}"
+TIMEOUT_S="${TIMEOUT_S:-600}"
 QNAP_HOST="${QNAP_HOST:-admin@192.168.68.108}"
 SKIP_SSH=0
 
@@ -98,24 +98,36 @@ git push "$REMOTE" "_test-deploy-tmp:$BRANCH" --quiet
 git checkout "$CURRENT_BRANCH" --quiet
 git branch -D "_test-deploy-tmp" --quiet
 
-# ── 2. Confirm GitHub raw sees the new REQUEST_ID.
-RAW_URL="https://raw.githubusercontent.com/dangelojohn/Southbrook_Configurator/$BRANCH/deploy/qnap/request.env"
-log "waiting for GitHub raw to surface our REQUEST_ID …"
+# ── 2. Confirm GitHub sees the new REQUEST_ID.
+#
+# raw.githubusercontent.com is CDN-cached and can take 5+ minutes to
+# propagate after a push. Use the contents API instead — it returns
+# the latest commit's content directly without CDN, and one
+# unauthenticated call per test is well under the 60-req/hour rate
+# limit.
+API_URL="https://api.github.com/repos/dangelojohn/Southbrook_Configurator/contents/deploy/qnap/request.env?ref=$BRANCH"
+log "verifying push landed on $BRANCH via GitHub contents API …"
 START_T=$(date +%s)
-SAW_GITHUB=0
 while true; do
-  if curl -fsSL --max-time 10 "$RAW_URL" 2>/dev/null \
-       | grep -q "^REQUEST_ID=$REQUEST_ID$"; then
-    SAW_GITHUB=1
+  if curl -fsSL --max-time 10 "$API_URL" 2>/dev/null \
+       | python3 -c "
+import json, sys, base64
+d = json.load(sys.stdin)
+text = base64.b64decode(d.get('content', '')).decode('utf-8', 'replace')
+sys.exit(0 if 'REQUEST_ID=$REQUEST_ID' in text else 1)
+" 2>/dev/null; then
     break
   fi
   ELAPSED=$(( $(date +%s) - START_T ))
-  if [[ "$ELAPSED" -gt 120 ]]; then
-    fail "GitHub raw never surfaced REQUEST_ID after 120s"
+  if [[ "$ELAPSED" -gt 60 ]]; then
+    fail "GitHub contents API never surfaced REQUEST_ID after 60s"
   fi
   sleep 5
 done
-pass "GitHub raw shows REQUEST_ID after $(( $(date +%s) - START_T ))s"
+pass "GitHub contents API shows REQUEST_ID after $(( $(date +%s) - START_T ))s"
+log "(NOTE: raw.githubusercontent.com is CDN-cached and may lag the API"
+log " by up to 5 minutes. The QNAP poller reads from raw, so the apply"
+log " step below may take that long to start.)"
 
 # ── 3. If SSH is allowed, watch the QNAP-side state file.
 if [[ "$SKIP_SSH" -eq 1 ]]; then
