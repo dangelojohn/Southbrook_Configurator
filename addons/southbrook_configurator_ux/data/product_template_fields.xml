@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="field_product_template__x_onshape_cad_url" model="ir.model.fields">
+    <field name="model_id" ref="product.model_product_template"/>
+    <field name="name">x_onshape_cad_url</field>
+    <field name="field_description">Onshape CAD URL</field>
+    <field name="ttype">char</field>
+    <field name="store">True</field>
+    <field name="copied">True</field>
+    <field name="help">Onshape document URL for this cabinet product. When set, the product page shows an "Open in Onshape CAD" button linking to this URL in a new tab. Leave blank to hide the button.</field>
+  </record>
+</odoo>

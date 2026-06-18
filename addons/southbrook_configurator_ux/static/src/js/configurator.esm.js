@@ -187,6 +187,27 @@ class ConfiguratorV2 extends Component {
             <b>Your build:</b>
             <span t-esc="specLine"/>
           </div>
+          <!-- P6 — every chosen attribute as a chip, grouped by P4 section.
+               Replaces the prior 4-line specLine which truncated the user's
+               selections (audit found it showed 4 of 17 picks). -->
+          <t t-if="state.chosenChips.length">
+            <div class="sb_cfg_chiplist" role="list">
+              <t t-foreach="state.chosenChips" t-as="chip" t-key="chip.value_id">
+                <span class="sb_cfg_pickchip" role="listitem">
+                  <small t-esc="chip.attribute_name"/>
+                  <b t-esc="chip.value_name"/>
+                </span>
+              </t>
+              <!-- P2 — Soft-Close as a derived badge when a soft-close
+                   slide is picked. Not a billable chip; visual only. -->
+              <t t-if="state.softCloseDerived">
+                <span class="sb_cfg_pickchip sb_cfg_chip_derived" role="listitem">
+                  <small>Soft-Close</small>
+                  <b>auto (slide-derived)</b>
+                </span>
+              </t>
+            </div>
+          </t>
           <div class="sb_cfg_completion">
             <div class="sb_cfg_ring"
                  t-attf-style="--p:{{completionPct}}">
@@ -194,15 +215,42 @@ class ConfiguratorV2 extends Component {
             </div>
             <span t-esc="completionText"/>
           </div>
+          <!-- P6 — explicit "X options still needed" checklist that NAMES
+               the missing required attributes (the audit's 17/18 ->
+               name-the-missing-one case). -->
+          <t t-if="state.requiredMissing.length">
+            <div class="sb_cfg_missinglist" role="region" aria-label="Options still needed">
+              <b>
+                <t t-esc="state.requiredMissing.length"/>
+                <t t-if="state.requiredMissing.length === 1"> option still needed</t>
+                <t t-else=""> options still needed</t>
+              </b>
+              <ul>
+                <t t-foreach="state.requiredMissing" t-as="miss" t-key="miss.attribute_id">
+                  <li>
+                    <t t-esc="miss.attribute_name"/>
+                    <small t-if="miss.group_title">
+                      (under <t t-esc="miss.group_title"/>)
+                    </small>
+                  </li>
+                </t>
+              </ul>
+            </div>
+          </t>
         </div>
 
         <div class="sb_cfg_actionbar">
           <span t-att-class="validationClass"
                 role="status" aria-live="polite"
                 t-out="validationText"/>
+          <!-- P6 — Add-to-Quote disable is driven by server-authoritative
+               add_to_quote_enabled. Required-missing => disabled; the
+               missing-options checklist above is the affordance.
+               state.adding still wins for the in-flight RPC state. -->
           <button type="button"
                   class="sb_cfg_btn sb_cfg_btn_primary"
-                  t-att-disabled="state.adding ? 'disabled' : null"
+                  t-att-disabled="(state.adding or not state.addToQuoteEnabled) ? 'disabled' : null"
+                  t-att-aria-disabled="state.addToQuoteEnabled ? null : 'true'"
                   t-on-click="onAddToQuote">
             <t t-if="state.adding">Adding…</t>
             <t t-else="">Add to Quote ➞</t>
@@ -311,6 +359,15 @@ class ConfiguratorV2 extends Component {
             serverWeight: null,
             liveSku: null,                  // SKU composed server-side from picks (P3)
             disabledValueIds: [],           // value_ids forbidden by OCA rule engine
+            // P6 — server-authoritative completeness payload. The OWL
+            // template reads these directly so the chip grid + missing
+            // checklist + CTA-disable state are all driven by /state
+            // and /select responses (no client re-derivation).
+            chosenChips: [],                // [{group_title, attribute_name, value_name, ...}]
+            requiredMissing: [],            // [{attribute_name, group_title, ...}]
+            addToQuoteEnabled: true,        // Add-to-Quote disabled until requireds satisfied
+            // P2 — soft-close derivation flag from /state and /select.
+            softCloseDerived: false,
             selecting: false,               // /select RPC in flight
             // 2c: /commit state.
             adding: false,                  // /commit RPC in flight
@@ -402,6 +459,14 @@ class ConfiguratorV2 extends Component {
         for (const g of r.groups) {
             this.state.closedGroups[g.title] = false;
         }
+        // P6 — capture the completeness payload up front so the
+        // chip-summary and missing-options checklist render on first
+        // paint (no flash of empty UI before the first /select).
+        this.state.chosenChips = r.chosen_chips || [];
+        this.state.requiredMissing = r.required_missing || [];
+        this.state.addToQuoteEnabled =
+            r.add_to_quote_enabled === undefined ? true : !!r.add_to_quote_enabled;
+        this.state.softCloseDerived = !!r.soft_close_derived;
     }
 
     // ------------------------------------------------------------------
@@ -450,11 +515,15 @@ class ConfiguratorV2 extends Component {
         // per P4 gap #3, so the UI label matches the eventual SKU).
         // Fall back to client computation between mount and the
         // first /select response, or if the server response somehow
-        // drops the field.
+        // drops the field. P5 — the client fallback now mirrors the
+        // server's extended grammar so the brief pre-/select window
+        // is also collision-proof.
         if (this.state.liveSku) return this.state.liveSku;
         const parts = SKU_ATTR_NAMES.map((name) => this._abbrPickedByName(name));
         if (parts[0] === "XXX") return "—";
-        return `SB-${parts.join("-")}`;
+        const head = `SB-${parts.join("-")}`;
+        const ext = this._p5SkuExtensions();
+        return ext.length ? `${head}-${ext.join("-")}` : head;
     }
 
     _abbrPickedByName(attrName) {
@@ -467,6 +536,87 @@ class ConfiguratorV2 extends Component {
         const val = attr.values.find((v) => v.id === valId);
         if (!val) return "XXX";
         return val.name.replace(/[^A-Za-z0-9]/g, "").substring(0, 3).toUpperCase();
+    }
+
+    // P5 — client mirror of the server's extension-segment encoder.
+    // Must stay in sync with controllers/main.py
+    // _compute_sku_from_session + the _DRAWER_CONSTRUCTION_CODES /
+    // _SLIDE_CODES tables.
+    _pickedValueName(attrName) {
+        const attrId = Object.keys(this.state.attributes)
+            .find((id) => this.state.attributes[id].name === attrName);
+        if (!attrId) return null;
+        const valId = this.state.picked[attrId];
+        if (valId === null || valId === undefined) return null;
+        const attr = this.state.attributes[attrId];
+        const val = attr.values.find((v) => v.id === valId);
+        return val ? val.name : null;
+    }
+
+    _p5SkuExtensions() {
+        const exts = [];
+        const constructionName = this._pickedValueName("Drawer Construction");
+        const slideName = this._pickedValueName("Drawer Slide");
+        const drawerCountName = this._pickedValueName("Drawer Count");
+
+        // Drawer count (from explicit Drawer Count attribute or from
+        // a "N-Drawer" substring on Drawer Construction).
+        let drawerCount = 0;
+        if (drawerCountName) {
+            const m = String(drawerCountName).match(/^(\d)/);
+            if (m) drawerCount = parseInt(m[1], 10);
+        } else if (constructionName) {
+            const m = constructionName.toLowerCase().match(/(\d)[\s-]drawer/);
+            if (m) drawerCount = parseInt(m[1], 10);
+        }
+        if (drawerCount) exts.push(`${drawerCount}DR`);
+
+        // Drawer construction — exact-name table; substring fallback;
+        // alnum-3 last resort. Mirrors server.
+        if (constructionName) {
+            const CODES = {
+                "Melamine Particleboard":  "MP",
+                "5/8 in Plywood (Routed)": "PR",
+                "Dovetail Solid Hardwood": "DT",
+                "Metal (Blum Legrabox)":   "BX",
+            };
+            let code = CODES[constructionName];
+            if (!code) {
+                const n = constructionName.toLowerCase();
+                const KW = [
+                    ["dovetail", "DT"],
+                    ["plywood", "PR"],
+                    ["particleboard", "MP"],
+                    ["melamine", "MP"],
+                    ["legrabox", "BX"],
+                    ["metal", "BX"],
+                ];
+                for (const [needle, label] of KW) {
+                    if (n.includes(needle)) { code = label; break; }
+                }
+            }
+            if (!code) {
+                code = constructionName
+                    .replace(/[^A-Za-z0-9]/g, "").substring(0, 3).toUpperCase() || "XX";
+            }
+            exts.push(code);
+        }
+
+        // Drawer slide — exact-name table; alnum-6 fallback.
+        if (slideName) {
+            const CODES = {
+                "King Slide K2832 21\" Soft-Close":  "KS21SC",
+                "King Slide 3032 18\" Ball-Bearing": "KS18BB",
+                "Blum MOVENTO 450":                  "BMV450",
+                "Hettich Actro 5D 500":              "HA5500",
+                "Salice Progressa+ (PR-602728)":     "SPP602",
+            };
+            const code = CODES[slideName]
+                || slideName.replace(/[^A-Za-z0-9]/g, "").substring(0, 6).toUpperCase()
+                || "XXXXXX";
+            exts.push(code);
+        }
+        return exts;
     }
 
     get specLine() {
@@ -704,6 +854,19 @@ class ConfiguratorV2 extends Component {
                 this.state.serverPrice = r.price;
                 this.state.serverWeight = r.weight;
                 this.state.liveSku = r.live_sku || null;
+                // P6 — refresh the completeness payload on every tick.
+                if (r.chosen_chips !== undefined) {
+                    this.state.chosenChips = r.chosen_chips || [];
+                }
+                if (r.required_missing !== undefined) {
+                    this.state.requiredMissing = r.required_missing || [];
+                }
+                if (r.add_to_quote_enabled !== undefined) {
+                    this.state.addToQuoteEnabled = !!r.add_to_quote_enabled;
+                }
+                if (r.soft_close_derived !== undefined) {
+                    this.state.softCloseDerived = !!r.soft_close_derived;
+                }
                 // The server may have cleared picks the rule engine
                 // marks as invalid — reconcile our local picked map
                 // back to what the server actually kept.

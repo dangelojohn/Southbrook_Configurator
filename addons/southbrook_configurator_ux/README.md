@@ -89,3 +89,54 @@ immediately. Nothing else is affected.
   dealer-only actions.
 
 See `CHANGELOG.md` and `__manifest__.py` for the full phase plan.
+
+## Onshape CAD Link (v19.0.6.0.0+)
+
+### Overview
+
+Each cabinet product can display an **"Open in Onshape CAD"** button on its
+configurator page. The button appears in the left-pane action bar, to the left
+of "Add to Quote ->". Products without a URL show no button.
+
+### How it works
+
+1. A `x_onshape_cad_url` Char field is stored on `product.template`.
+2. The QWeb configurator template renders the value as a
+   `data-onshape-cad-url` attribute on `#sb_cfg_v2_root` at server render time.
+3. A small inline script reads the attribute after page load and injects an
+   `<a>` element with `target="_blank" rel="noopener noreferrer"` into
+   `.sb_cfg_actionbar`.
+
+### Setting a product's Onshape URL
+
+Backend: Configurator -> Configurable Products -> [any product] ->
+General Information tab -> **CAD & Engineering Links -> Onshape CAD URL**
+
+Paste the full Onshape document URL, e.g.:
+
+```text
+https://cad.onshape.com/documents/<docId>/w/<workspaceId>/e/<elementId>
+```
+
+Save; the button appears on the live product page immediately.
+
+### No secrets exposed
+
+The field stores only the public document URL. No Onshape API keys, OAuth
+tokens, or credentials are used or stored anywhere in the frontend.
+
+### MCP recommendation (deferred)
+
+A Model Context Protocol server bridging Southbrook product SKUs to Onshape
+document/workspace/element IDs would be appropriate if:
+
+- You want auto-resolution of Onshape links from cabinet SKUs at build time.
+- You want to pull CAD metadata (thumbnail, revision, BOM) into Odoo.
+
+For the current requirement (per-product URL link), MCP adds unnecessary
+complexity. Defer until SKU-to-Onshape auto-resolution is needed.
+
+### Required environment variables
+
+None. This feature requires no environment variables, API keys, or server-side
+credentials.

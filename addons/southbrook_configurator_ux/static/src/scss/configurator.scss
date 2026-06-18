@@ -170,6 +170,13 @@ $sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
         color: $sb-cfg-blue;
         border: 1px solid $sb-cfg-blue-rule;
     }
+    .sb_cfg_cad_link {
+        margin-left: auto;
+        white-space: nowrap;
+    }
+    .sb_cfg_cad_link + .sb_cfg_btn_primary {
+        margin-left: 8px;
+    }
     .sb_cfg_btn_imp {
         background: $sb-cfg-blue;
         color: white;
@@ -328,6 +335,56 @@ $sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
         padding: 2px 7px;
         border-radius: 20px;
         margin-left: 6px;
+    }
+
+    // ===== P6 — chosen-chips list =====
+    .sb_cfg_chiplist {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .sb_cfg_pickchip {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 6px 9px;
+        border-radius: 8px;
+        background: #f1f5fb;
+        border: 1px solid $sb-cfg-rule-soft;
+        font-size: 11px;
+        line-height: 1.2;
+        color: $sb-cfg-ink-mid;
+        max-width: 100%;
+
+        small { color: $sb-cfg-ink-dim; font-size: 10px; }
+        b { color: $sb-cfg-ink-mid; }
+    }
+    .sb_cfg_chip_derived {
+        background: $sb-cfg-ok-soft;
+        border-color: $sb-cfg-ok;
+        small { color: $sb-cfg-ok; }
+    }
+
+    // ===== P6 — required-missing checklist =====
+    .sb_cfg_missinglist {
+        margin-top: 10px;
+        padding: 9px 11px;
+        background: #fff7ed;
+        border-radius: 8px;
+        border: 1px solid #f59e0b;
+        font-size: 12px;
+        color: $sb-cfg-ink-mid;
+
+        b { color: #92400e; }
+        ul {
+            margin: 6px 0 0 0;
+            padding-left: 16px;
+        }
+        li {
+            margin: 2px 0;
+        }
+        small { color: $sb-cfg-ink-dim; }
     }
 
     // ===== Completion ring =====
