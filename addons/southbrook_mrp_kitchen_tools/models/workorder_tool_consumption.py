@@ -96,3 +96,75 @@ class WorkorderToolConsumption(models.Model):
                         asset.lifecycle_state = "needs_sharpening"
             asset.last_used_date = fields.Datetime.now()
             asset.last_used_workorder_id = rec.workorder_id.id
+
+    def unlink(self):
+        """Inverse of ``_apply_to_asset_life`` — when a consumption row
+        is deleted, restore the life and usage it took from the asset.
+
+        Surfaced by the P8 rollback 2026-06-18: ``create()`` decrements
+        ``remaining_life_qty`` and bumps ``total_usage_qty`` but
+        ``unlink()`` left them where they were, so deleting a consumption
+        row left the asset permanently depleted. Any test scan, mistaken
+        debit, or manual cleanup of consumption ledger entries silently
+        burned real asset life.
+
+        Inverse semantics:
+
+        * ``total_usage_qty`` — genuine inverse, clamped at 0.
+        * ``remaining_life_qty`` — add back the quantity, clamped at
+          ``estimated_life_qty`` if known (else uncapped).
+        * ``lifecycle_state`` — **deliberately untouched.** Flipping
+          back from ``needs_sharpening`` to ``in_use`` would mask
+          legitimate state transitions (e.g. asset was sharpened
+          between create and unlink). Operators set lifecycle state
+          explicitly; this method only reverses what create() did
+          numerically.
+        * ``last_used_workorder_id`` / ``last_used_date`` — if the
+          deleted row was the asset's most-recent consumption (i.e. the
+          field points at that row's WO), fall back to the next-most-
+          recent remaining consumption; clear when none remain.
+        """
+        # Snapshot the inverse-relevant state BEFORE super().unlink()
+        # removes the records — fields become unreadable after delete.
+        snapshots = [
+            {
+                "consumption_id": rec.id,
+                "asset_id": rec.asset_id.id if rec.asset_id else False,
+                "workorder_id": rec.workorder_id.id if rec.workorder_id else False,
+                "quantity": rec.quantity or 0.0,
+            }
+            for rec in self
+        ]
+        res = super().unlink()
+        Asset = self.env["southbrook.tool.asset"]
+        for snap in snapshots:
+            if not snap["asset_id"] or not snap["quantity"]:
+                continue
+            asset = Asset.browse(snap["asset_id"]).exists()
+            if not asset:
+                continue
+            # Inverse 1: total_usage_qty
+            asset.total_usage_qty = max(
+                0.0, (asset.total_usage_qty or 0.0) - snap["quantity"])
+            # Inverse 2: remaining_life_qty (clamp at estimated_life_qty
+            # if set, else uncapped — restoring beyond original is
+            # safer than leaving the asset under-credited).
+            new_remaining = (asset.remaining_life_qty or 0.0) + snap["quantity"]
+            if asset.estimated_life_qty:
+                new_remaining = min(new_remaining, asset.estimated_life_qty)
+            asset.remaining_life_qty = new_remaining
+            # Inverse 3: last_used_workorder_id / last_used_date — only
+            # touch when this consumption row was the most-recent.
+            if (asset.last_used_workorder_id
+                    and asset.last_used_workorder_id.id == snap["workorder_id"]):
+                next_recent = self.search(
+                    [("asset_id", "=", asset.id)],
+                    order="create_date desc, id desc", limit=1,
+                )
+                if next_recent:
+                    asset.last_used_workorder_id = next_recent.workorder_id.id
+                    asset.last_used_date = next_recent.create_date
+                else:
+                    asset.last_used_workorder_id = False
+                    asset.last_used_date = False
+        return res
