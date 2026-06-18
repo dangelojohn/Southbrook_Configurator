@@ -74,6 +74,44 @@ TEST_TAGS=/southbrook_floor_traveler:TestP8FloorTraveler.test_record_scan_create
 | `REPO_ARCHIVE_BASE` | `https://github.com/dangelojohn/Southbrook_Configurator/archive` | archive base passed to the QNAP-side script |
 | `TEST_TAGS` | empty | optional Odoo `--test-tags` value |
 
+## `request_qnap_deploy.sh` + `qnap_deploy_poller.sh`
+
+No-SSH deploy path. Use this when the sandbox blocks outbound SSH entirely.
+The local script commits a deploy request to GitHub. A small QNAP-side poller
+reads that request and runs `qnap_pull_deploy.sh` locally.
+
+One-time QNAP install:
+
+```sh
+mkdir -p /share/CACHEDEV3_DATA/Container/southbrook/deploy-state
+/sbin/curl -fsSL https://raw.githubusercontent.com/dangelojohn/Southbrook_Configurator/feature/configurator-loop-p1-p8/scripts/qnap_deploy_poller.sh \
+  -o /share/CACHEDEV3_DATA/Container/southbrook/qnap_deploy_poller.sh
+chmod +x /share/CACHEDEV3_DATA/Container/southbrook/qnap_deploy_poller.sh
+printf '* * * * * /share/CACHEDEV3_DATA/Container/southbrook/qnap_deploy_poller.sh >> /share/CACHEDEV3_DATA/Container/southbrook/deploy-state/poller.log 2>&1\n' >> /etc/config/crontab
+crontab /etc/config/crontab
+```
+
+Request a deploy from this checkout:
+
+```sh
+./scripts/request_qnap_deploy.sh southbrook_floor_traveler,southbrook_premium_orchestration
+
+TEST_TAGS=/southbrook_floor_traveler:TestP8FloorTraveler.test_record_scan_creates_one_consumption_and_logs_workcenter \
+  ./scripts/request_qnap_deploy.sh southbrook_floor_traveler,southbrook_premium_orchestration
+```
+
+**Knobs (env vars):**
+
+| Var | Default | Meaning |
+|---|---|---|
+| `REMOTE` | `github-southbrook` | Git remote to push the request commit |
+| `BRANCH` | current branch | branch containing `deploy/qnap/request.env` |
+| `REF` | current `git rev-parse HEAD` | code commit/archive ref to deploy |
+| `REQUEST_URL` | GitHub raw URL for `deploy/qnap/request.env` | QNAP poller request source |
+| `PULL_SCRIPT_URL` | GitHub raw URL for `scripts/qnap_pull_deploy.sh` | script URL the QNAP curls |
+| `REPO_ARCHIVE_BASE` | `https://github.com/dangelojohn/Southbrook_Configurator/archive` | archive base passed to `qnap_pull_deploy.sh` |
+| `TEST_TAGS` | empty | optional Odoo `--test-tags` value |
+
 ## Other scripts (pre-existing)
 
 - `gen_phase1_data.py` — generator for the Phase 1 seed data
