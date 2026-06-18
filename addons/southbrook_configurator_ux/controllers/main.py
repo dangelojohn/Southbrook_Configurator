@@ -123,11 +123,36 @@ _REF_SHEETS = ("Instructions", "REF_CATEGORIES", "REF_ATTRIBUTES",
 _SKU_ATTR_NAMES = ("Width", "Series", "Finish")
 
 
+# P4 — Re-sharded "Other" by manufacturing meaning. The pre-audit
+# grouping dropped nine attributes — including the BoM-routing
+# Drawer Construction — into a flat "Other" sink. The new grouping
+# surfaces the manufacturing-critical "Construction" group above the
+# novelty Add-ons (Lighting, Interior Storage), and pulls Family
+# into Size & Layout because it is structural. No attribute or option
+# value is removed; only group titles and per-group membership change.
+#
+# Empty groups are filtered out at render time (see /state endpoint
+# group_payload loop), so a template that doesn't expose Frame Style
+# (e.g. wall cabinets) won't show an empty Construction box.
 ATTRIBUTE_GROUPS = [
-    ("Size & Layout",         ["Width", "Door Count"]),
+    # Structural — what the cabinet IS.
+    ("Size & Layout",         ["Width", "Door Count", "Family"]),
+    # Manufacturing-critical Construction — what determines routing,
+    # joinery, and the cut spec. Sits above any novelty.
+    ("Construction",          ["Frame Style", "Door Overlay", "Drawer Construction"]),
+    # Series + box material + door style still belong together (channel
+    # pricelist + box-material-by-series rule both key on this trio).
     ("Series & Materials",    ["Series", "Box Material", "Door Style"]),
+    # Materials & Finish — the per-species + per-pull-finish premium
+    # surface, plus the door edge profile that affects machining time.
+    ("Materials & Finish",    ["Wood Species", "Pull Finish", "Door Edge Profile"]),
+    # Visible finish + symmetry + gables (kept name to minimise churn).
     ("Finish & Construction", ["Finish", "Hinge Side", "Finished Sides", "Gables"]),
-    ("Hardware & Add-ons",    ["Handle", "Accessories"]),
+    # Hardware — Drawer Slide (P2) sits alongside Handle + Accessories.
+    ("Hardware & Add-ons",    ["Drawer Slide", "Handle", "Accessories"]),
+    # Novelty Add-ons — Lighting and Interior Storage. Splitting these
+    # off prevents them from masking the structural Construction items.
+    ("Add-ons",               ["Lighting", "Interior Storage"]),
 ]
 
 
