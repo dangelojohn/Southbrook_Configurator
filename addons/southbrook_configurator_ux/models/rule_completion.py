@@ -40,6 +40,7 @@ Per-value allow sets (CLAUDE.md §5 + workbook spec):
     Thermofoil:     Contractor, Contemporary,           Signature
     Five-Piece:                  Contemporary, Elegance, Signature
     Custom:                                              Signature
+    Maple (Hard):                Contemporary, Elegance, Signature
 """
 from odoo import api, models
 
@@ -55,6 +56,9 @@ _DOOR_STYLE_ALLOW = {
                                   "Signature"],
     "Five-Piece Woodgrain":     ["Contemporary", "Elegance", "Signature"],
     "Custom (Signature)":       ["Signature"],
+}
+_WOOD_SPECIES_ALLOW = {
+    "Maple (Hard)": ["Contemporary", "Elegance", "Signature"],
 }
 
 
@@ -88,10 +92,13 @@ class RuleCompletion(models.AbstractModel):
 
         box_attr = Attr.search([("name", "=", "Box Material")], limit=1)
         door_attr = Attr.search([("name", "=", "Door Style")], limit=1)
+        species_attr = Attr.search([("name", "=", "Wood Species")], limit=1)
         box_vals = {v.name: v for v in AttrVal.search(
             [("attribute_id", "=", box_attr.id)])} if box_attr else {}
         door_vals = {v.name: v for v in AttrVal.search(
             [("attribute_id", "=", door_attr.id)])} if door_attr else {}
+        species_vals = {v.name: v for v in AttrVal.search(
+            [("attribute_id", "=", species_attr.id)])} if species_attr else {}
 
         # Ensure per-value "Series allows V" domains exist.
         def ensure_domain(value_name, allowed_series_names):
@@ -122,23 +129,28 @@ class RuleCompletion(models.AbstractModel):
             domains_by_value_name[v_name] = ensure_domain(v_name, allowed)
         for v_name, allowed in _DOOR_STYLE_ALLOW.items():
             domains_by_value_name[v_name] = ensure_domain(v_name, allowed)
+        for v_name, allowed in _WOOD_SPECIES_ALLOW.items():
+            domains_by_value_name[v_name] = ensure_domain(v_name, allowed)
 
-        # Scope every product.template that exposes Box Material OR
-        # Door Style to its customers — that covers the Q8 locked
+        # Scope every product.template that exposes Box Material, Door
+        # Style, OR Wood Species to its customers — that covers the Q8 locked
         # templates AND the catalog_expansion's 40 common-category
         # templates AND any future template wired through the OCA
         # configurator. Each template gets exactly the rules it needs:
         # templates without Door Style (open shelves, drawer banks,
         # accessories) get only Box Material rules; templates without
         # Box Material (none in current scope, but defensive) get only
-        # Door Style rules.
+        # Door Style / Wood Species rules.
         box_lines = AttrLine.search(
             [("attribute_id", "=", box_attr.id)]) if box_attr else AttrLine
         door_lines = AttrLine.search(
             [("attribute_id", "=", door_attr.id)]) if door_attr else AttrLine
+        species_lines = AttrLine.search(
+            [("attribute_id", "=", species_attr.id)]
+        ) if species_attr else AttrLine
         scoped_tmpl_ids = sorted({
             l.product_tmpl_id.id
-            for l in (box_lines | door_lines)
+            for l in (box_lines | door_lines | species_lines)
         })
 
         deleted, created = 0, 0
@@ -149,19 +161,22 @@ class RuleCompletion(models.AbstractModel):
                 lambda l, a=box_attr: a and l.attribute_id.id == a.id)
             door_line = tmpl_lines.filtered(
                 lambda l, a=door_attr: a and l.attribute_id.id == a.id)
+            species_line = tmpl_lines.filtered(
+                lambda l, a=species_attr: a and l.attribute_id.id == a.id)
 
             # NUKE only the config.lines THIS method owns (sequence 20000
-            # for box_material, 20010 for door_style). Audit gating rules
+            # for box_material, 20010 for door_style, 20020 for wood_species).
+            # Audit gating rules
             # at sequences 40xxx-46xxx (ruleA1-A7) target the same
             # attribute_lines but are restriction rules layered on top
             # and must be preserved. Phase 2I fix (2026-06-09) — without
             # the sequence filter, A5 rules at 43000-43070 got destroyed
             # silently every upgrade.
-            for line in (box_line | door_line):
+            for line in (box_line | door_line | species_line):
                 stale = ConfigLine.search([
                     ("product_tmpl_id", "=", tmpl_id),
                     ("attribute_line_id", "=", line.id),
-                    ("sequence", "in", [20000, 20010]),
+                    ("sequence", "in", [20000, 20010, 20020]),
                 ])
                 deleted += len(stale)
                 stale.unlink()
@@ -200,6 +215,21 @@ class RuleCompletion(models.AbstractModel):
                         "domain_id": domains_by_value_name[v_name].id,
                         "value_ids": [(6, 0, [attr_val.id])],
                         "sequence": 20010,
+                    })
+                    created += 1
+            if species_line:
+                species_line_value_ids = set(species_line.value_ids.ids)
+                for v_name, attr_val in species_vals.items():
+                    if v_name not in _WOOD_SPECIES_ALLOW:
+                        continue
+                    if attr_val.id not in species_line_value_ids:
+                        continue
+                    ConfigLine.create({
+                        "product_tmpl_id": tmpl_id,
+                        "attribute_line_id": species_line.id,
+                        "domain_id": domains_by_value_name[v_name].id,
+                        "value_ids": [(6, 0, [attr_val.id])],
+                        "sequence": 20020,
                     })
                     created += 1
 

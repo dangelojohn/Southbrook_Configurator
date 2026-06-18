@@ -350,6 +350,52 @@ class TestConfiguratorSelectCommit(TransactionCase):
                       "Maple should be disabled under Contractor "
                       "(Maple is NOT in the Contractor allow list)")
 
+    def test_select_contractor_disables_hard_maple_wood_species(self):
+        """Run-3 regression: Contractor Series must not allow Hard Maple
+        as the first-class Wood Species pick.
+
+        Box Material already had a Series allow-list, but Wood Species
+        was introduced later as a separate manufacturing/customer-facing
+        attribute. If no config.line exists for Wood Species, the UI
+        offers Maple (Hard), accepts it, and carries a non-manufacturable
+        Contractor + Maple species configuration forward.
+        """
+        sess = self._fresh_session()
+        series = self.env["product.attribute"].search(
+            [("name", "=", "Series")], limit=1)
+        species = self.env["product.attribute"].search(
+            [("name", "=", "Wood Species")], limit=1)
+        if not (series and species):
+            self.skipTest("Series / Wood Species attributes not seeded")
+        contractor = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", series.id),
+             ("name", "=", "Contractor Series")], limit=1)
+        hard_maple = self.env["product.attribute.value"].search(
+            [("attribute_id", "=", species.id),
+             ("name", "=", "Maple (Hard)")], limit=1)
+        if not (contractor and hard_maple):
+            self.skipTest("Required values not seeded")
+
+        with stubbed_request(self.env, user=self.user):
+            r1 = self.controller.configurator_select(
+                session_id=sess.id, value_ids=[contractor.id])
+        self.assertTrue(r1["ok"])
+        self.assertIn(
+            hard_maple.id, set(r1["disabled_value_ids"]),
+            "Maple (Hard) Wood Species must be disabled under "
+            "Contractor Series")
+
+        with stubbed_request(self.env, user=self.user):
+            r2 = self.controller.configurator_select(
+                session_id=sess.id,
+                value_ids=[contractor.id, hard_maple.id])
+        self.assertTrue(r2["ok"], f"server should prune, not crash: {r2}")
+        self.assertIn(contractor.id, r2["selected_value_ids"])
+        self.assertNotIn(
+            hard_maple.id, r2["selected_value_ids"],
+            "A direct client submission must not persist the invalid "
+            "Contractor + Maple (Hard) Wood Species combination")
+
     def test_select_series_then_white_melamine_succeeds(self):
         """The completion path the customer was blocked from: pick
         Contractor, then pick White Melamine. The /select call must
