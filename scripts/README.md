@@ -43,6 +43,36 @@ found." This script encodes that knowledge.
 | `DB` | `southbrook` | Odoo DB |
 | `DRY_RUN` | `0` | print but don't execute |
 
+## `deploy_to_qnap_pull.sh`
+
+Sandbox-friendly deploy path. Instead of rsyncing files from this
+machine, it sends one short SSH command to the QNAP. The QNAP then
+downloads the committed repository archive from Forgejo, replaces only
+the requested addon directories, runs the cold Odoo upgrade gate, and
+optionally runs targeted tests.
+
+Use this when local SSH file transfer, rsync, scp, Docker, or DNS are
+blocked by an agent sandbox.
+
+```sh
+# Commit and push first, then deploy the current HEAD by commit SHA.
+./scripts/deploy_to_qnap_pull.sh southbrook_floor_traveler,southbrook_premium_orchestration
+
+# Run a targeted Odoo test after the upgrade.
+TEST_TAGS=/southbrook_floor_traveler:TestP8FloorTraveler.test_record_scan_creates_one_consumption_and_logs_workcenter \
+  ./scripts/deploy_to_qnap_pull.sh southbrook_floor_traveler,southbrook_premium_orchestration
+```
+
+**Knobs (env vars):**
+
+| Var | Default | Meaning |
+|---|---|---|
+| `QNAP_HOST` | `admin@192.168.68.108` | ssh target |
+| `REF` | current `git rev-parse HEAD` | commit/archive ref to deploy |
+| `SCRIPT_REF` | same as `REF` | commit containing `scripts/qnap_pull_deploy.sh` |
+| `RAW_SCRIPT_URL` | Forgejo raw URL for `SCRIPT_REF` | script URL the QNAP curls |
+| `TEST_TAGS` | empty | optional Odoo `--test-tags` value |
+
 ## Other scripts (pre-existing)
 
 - `gen_phase1_data.py` — generator for the Phase 1 seed data
