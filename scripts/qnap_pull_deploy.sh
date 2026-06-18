@@ -123,14 +123,30 @@ fi
 
 SENTINEL="__SBK_PULL_COLD_OK__"
 UPGRADE_LOG="/tmp/qnap_pull_deploy_upgrade.log"
-log "running cold Odoo upgrade under flock"
+
+# Combine cold upgrade + targeted tests into ONE Odoo invocation. The
+# previous design ran two separate `-u` passes (one cold-upgrade,
+# one test-enable) which redundantly loaded the registry twice
+# (~3 min/pass on the southbrook DB). Combining them halves the
+# wall-clock and removes a class of "passed in pass 1, failed in
+# pass 2 with a stale registry" foot-guns.
+ODOO_RUN_FLAGS=("${ODOO_FLAGS[@]}" -d "$DB" --stop-after-init --no-http
+                "--logfile=/dev/stderr")
+if [[ -n "$TEST_TAGS" ]]; then
+  ODOO_RUN_FLAGS+=("--test-enable" "--test-tags=$TEST_TAGS")
+  log "running cold Odoo upgrade + targeted tests under flock"
+  log "test-tags: $TEST_TAGS"
+else
+  log "running cold Odoo upgrade under flock"
+fi
+
 set +e
 $QNAP_DOCKER exec "$CONTAINER" bash -c \
-  "(: > '$LOCK_PATH' 2>/dev/null || true) && flock -E 75 -w '$LOCK_WAIT_SEC' '$LOCK_PATH' odoo ${ODOO_FLAGS[*]} -d '$DB' --stop-after-init --no-http --logfile=/dev/stderr && echo '$SENTINEL'" \
+  "(: > '$LOCK_PATH' 2>/dev/null || true) && flock -E 75 -w '$LOCK_WAIT_SEC' '$LOCK_PATH' odoo ${ODOO_RUN_FLAGS[*]} && echo '$SENTINEL'" \
   > "$UPGRADE_LOG" 2>&1
 rc=$?
 set -e
-grep -E 'Modules loaded|Registry loaded|ParseError|CRITICAL|ValidationError|AssertionError|Failed to load registry|Traceback|__SBK_PULL_COLD_OK__' "$UPGRADE_LOG" \
+grep -E 'Modules loaded|Registry loaded|ParseError|CRITICAL|ValidationError|AssertionError|Failed to load registry|Traceback|Starting .*test_|post-tests|^FAIL|tests\.stats|__SBK_PULL_COLD_OK__' "$UPGRADE_LOG" \
   | sed 's/^/[odoo] /' >&2 || true
 [[ "$rc" -ne 75 ]] || fail "another Odoo upgrade is holding $LOCK_PATH"
 [[ "$rc" -eq 0 ]] || fail "cold Odoo upgrade failed with rc=$rc; see $UPGRADE_LOG"
@@ -139,30 +155,24 @@ grep -q "$SENTINEL" "$UPGRADE_LOG" || grep -q 'Modules loaded' "$UPGRADE_LOG" \
 if grep -qE 'Failed to load registry|CRITICAL|AssertionError' "$UPGRADE_LOG"; then
   fail "cold Odoo upgrade hit a registry/load error; see $UPGRADE_LOG"
 fi
-
+# Test-failure surface: --test-enable returns 0 even when individual
+# tests fail (it only flips on registry-load problems). Promote any
+# test FAIL line or post-test ERROR to a script failure here.
 if [[ -n "$TEST_TAGS" ]]; then
-  TEST_LOG="/tmp/qnap_pull_deploy_tests.log"
-  log "running tests: $TEST_TAGS"
-  set +e
-  $QNAP_DOCKER exec "$CONTAINER" odoo "${ODOO_FLAGS[@]}" -d "$DB" \
-    --test-enable --test-tags="$TEST_TAGS" --stop-after-init --no-http \
-    --logfile=/dev/stderr > "$TEST_LOG" 2>&1
-  test_rc=$?
-  set -e
-  grep -E 'Starting .*test_|post-tests|ERROR|FAIL|Traceback|tests.stats' "$TEST_LOG" \
-    | tail -120 | sed 's/^/[test] /' >&2 || true
-  [[ "$test_rc" -eq 0 ]] || fail "targeted tests failed with rc=$test_rc; see $TEST_LOG"
+  if grep -qE '^FAIL: |Test .* failed|post-tests .* with [1-9][0-9]* errors' \
+       "$UPGRADE_LOG"; then
+    fail "targeted tests failed; see $UPGRADE_LOG"
+  fi
 fi
 
 log "checking live health"
-health="$($QNAP_DOCKER exec "$CONTAINER" python3 - <<'PY'
-import urllib.request
-try:
-    r = urllib.request.urlopen("http://127.0.0.1:8069/web/login", timeout=20)
-    print(r.status)
-except Exception as exc:
-    print("ERR:%s" % exc)
-PY
-)"
+# `docker exec` (without `-i`) closes stdin → any heredoc to a
+# command-line python `-` reads empty and prints nothing, which
+# was the v1 health-check bug (`live /web/login health check
+# failed: ` with an empty health value). Switching to a curl
+# inside the container avoids the stdin question entirely.
+health="$($QNAP_DOCKER exec "$CONTAINER" curl -s -o /dev/null \
+  -w '%{http_code}' --max-time 20 http://127.0.0.1:8069/web/login 2>&1 \
+  || echo ERR)"
 [[ "$health" == "200" ]] || fail "live /web/login health check failed: $health"
 log "deploy OK"

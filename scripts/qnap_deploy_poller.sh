@@ -11,20 +11,29 @@ REQUEST_URL="${REQUEST_URL:-https://raw.githubusercontent.com/dangelojohn/Southb
 PULL_SCRIPT_URL="${PULL_SCRIPT_URL:-https://raw.githubusercontent.com/dangelojohn/Southbrook_Configurator/feature/configurator-loop-p1-p8/scripts/qnap_pull_deploy.sh}"
 REPO_ARCHIVE_BASE="${REPO_ARCHIVE_BASE:-https://github.com/dangelojohn/Southbrook_Configurator/archive}"
 STATE_DIR="${STATE_DIR:-/share/CACHEDEV3_DATA/Container/southbrook/deploy-state}"
-LOCK_PATH="${LOCK_PATH:-/tmp/sbk-qnap-deploy-poller.lock}"
+LOCK_PID_FILE="${LOCK_PID_FILE:-/tmp/sbk-qnap-deploy-poller.pid}"
 
 log() { printf "[qnap-deploy-poller] %s\n" "$*" >&2; }
 fail() { printf "[qnap-deploy-poller] ERROR: %s\n" "$*" >&2; exit 1; }
 
 command -v curl >/dev/null || fail "curl not found on QNAP"
-command -v flock >/dev/null || fail "flock not found on QNAP"
+# Note: QTS busybox does NOT ship `flock` on the host (only inside
+# containers at /usr/bin/flock). We use a PID-file based single-
+# instance guard instead. Keeps the poller portable to any QTS
+# build without forcing util-linux on the host.
 mkdir -p "$STATE_DIR"
 
-exec 9>"$LOCK_PATH"
-if ! flock -n 9; then
-  log "another poller is running; skip"
-  exit 0
+if [[ -f "$LOCK_PID_FILE" ]]; then
+  prev_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
+  if [[ -n "$prev_pid" ]] && kill -0 "$prev_pid" 2>/dev/null; then
+    log "another poller (pid $prev_pid) is running; skip"
+    exit 0
+  fi
+  # Stale PID file (prior poller died without clean exit). Drop it.
+  rm -f "$LOCK_PID_FILE"
 fi
+echo "$$" > "$LOCK_PID_FILE"
+trap 'rm -f "$LOCK_PID_FILE"' EXIT
 
 request_file="$(mktemp /tmp/sbk-qnap-request.XXXXXX)"
 cleanup() { rm -f "$request_file"; }
