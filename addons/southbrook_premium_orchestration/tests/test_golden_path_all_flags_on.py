@@ -126,9 +126,23 @@ class TestGoldenPathAllFlagsOn(TransactionCase):
             "(a) exactly one production package per configured line")
         self.assertTrue(packages.cutlist_id,
                         "(a) the package carries a cutlist")
-        self.assertGreaterEqual(
-            packages.cutlist_id.line_count, 5,
-            "(a) cutlist enumerates the standard panel set")
+        # (a) cont. — semantic check on the panel set rather than a
+        # numeric threshold. The audit brief §2 named "≥ 10 lines" but
+        # assumed per-piece enumeration; the implementation models cuts
+        # at the panel-TYPE layer (panel_cut_list in shared.southbrook_dims),
+        # so a base cabinet emits ≤7 type rows even when its physical
+        # piece count is much higher. The honest assertion is: the
+        # carcass panel set is present. Sister test
+        # test_base_cabinet_emits_six_panels_plus_door enforces the
+        # exact mapping; here we assert the load-bearing subset that
+        # any drawer or door base must carry.
+        carcass_panels = set(packages.cutlist_id.line_ids.mapped("panel_name"))
+        required_carcass = {"side_L", "side_R", "top", "bottom",
+                            "back", "adjustable_shelf"}
+        self.assertTrue(
+            required_carcass.issubset(carcass_panels),
+            "(a) cutlist must enumerate the carcass panel set "
+            f"{required_carcass}; got {carcass_panels}")
 
         # (b) BoM (hardware package) contains the K2832 slide x 3.
         ks_lines = packages.hardware_package_id.line_ids.filtered(
