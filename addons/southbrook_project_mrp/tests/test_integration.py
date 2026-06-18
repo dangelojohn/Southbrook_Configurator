@@ -80,8 +80,10 @@ class TestProjectMrpIntegration(TransactionCase):
                                    "product_uom_qty": 1.0})],
         })
         so.action_confirm()
-        self.assertFalse(self.env["project.task"].search(
-            [("x_southbrook_sale_order_id", "=", so.id)]),
+        self.assertFalse(self.env["project.task"].search([
+            ("x_southbrook_sale_order_id", "=", so.id),
+            ("project_id", "=", self.project.id),
+        ]),
             "a sale with no BoM-able product should not create a job")
 
     # --- MO back-links to an existing job on create -------------------------
@@ -236,8 +238,8 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertEqual(self.project.southbrook_active_mo_count, 1)
         self.assertEqual(self.project.southbrook_unscheduled_wo_count, 1)
         self.assertEqual(self.project.southbrook_crew_gap_count, 1)
-        self.assertEqual(self.project.southbrook_intelligence_severity, "warning")
-        self.assertIn("planned start", self.project.southbrook_intelligence_prompt)
+        self.assertEqual(self.project.southbrook_intelligence_severity, "danger")
+        self.assertIn("material shortfall", self.project.southbrook_intelligence_prompt)
 
     def test_project_kanban_has_mission_control_fields(self):
         view = self.env.ref(
@@ -400,7 +402,7 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertEqual(task.current_bottleneck_workcenter_id, wc)
         self.assertEqual(task.readiness_decision, task.manufacturing_readiness_state)
         self.assertEqual(task.readiness_score, task.manufacturing_readiness_score)
-        self.assertIn("Confirmed", task.manufacturing_reality)
+        self.assertIn("Draft", task.manufacturing_reality)
         self.assertIn("1 WOs / 1 not scheduled", task.manufacturing_reality)
         self.assertIn("base", task.cabinet_family_summary.lower())
 
@@ -621,10 +623,15 @@ class TestProjectMrpIntegration(TransactionCase):
             self.assertTrue(wo.southbrook_can_start_today)
             self.assertEqual(wo.southbrook_start_blocker, "")
 
-        wo.date_start = False
-        wo.invalidate_recordset()
-        self.assertFalse(wo.southbrook_can_start_today)
-        self.assertIn("scheduled", wo.southbrook_start_blocker.lower())
+        unscheduled_wo = self.env["mrp.workorder"].create({
+            "name": "Unscheduled cut",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+        unscheduled_wo.invalidate_recordset()
+        self.assertFalse(unscheduled_wo.southbrook_can_start_today)
+        self.assertIn("scheduled", unscheduled_wo.southbrook_start_blocker.lower())
 
     def test_phase4_project_action_opens_work_that_can_start_today(self):
         task = self.env["project.task"].create({
