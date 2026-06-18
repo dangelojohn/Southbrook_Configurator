@@ -394,6 +394,11 @@ class SouthbrookMiEngine(models.AbstractModel):
                 }
             )
 
+        # T1 — Open-side detection (default OFF). When enabled, flags
+        # cabinets whose Finished Sides pick is missing or "None" so the
+        # operator can confirm whether the cabinet sits at a run-end.
+        self._t1_check_open_sides(production)
+
         checks = self.env["southbrook.mi.check"].sudo().search(
             [("production_id", "=", production.id)]
         )
@@ -407,6 +412,74 @@ class SouthbrookMiEngine(models.AbstractModel):
             }
         )
         return True
+
+    # ------------------------------------------------------------------
+    # T1 — Open-side detection (Prodboard pattern, 2026-06-18)
+    # ------------------------------------------------------------------
+    # Prodboard detects exposed cabinet sides geometrically. Southbrook
+    # doesn't ship a spatial layout yet, so the equivalent rule is
+    # configuration-side: when the order line carries no "Finished Sides"
+    # pick (or the pick is "None"), surface a warning prompting the
+    # operator to confirm whether the cabinet IS at a run-end and
+    # therefore needs a finished side.
+    #
+    # Always a warning (never a blocker) — operators can ship cabinets
+    # without finished sides intentionally (run-mid placements). The
+    # warning is a heads-up, not a gate.
+    _OPEN_SIDE_FLAG = (
+        "southbrook_manufacturing_intelligence.detect_open_sides"
+    )
+
+    @api.model
+    def _t1_open_side_detection_enabled(self):
+        flag = self.env["ir.config_parameter"].sudo().get_param(
+            self._OPEN_SIDE_FLAG, default="False")
+        return str(flag).strip().lower() in ("1", "true", "yes", "on")
+
+    @api.model
+    def _t1_check_open_sides(self, production):
+        """When the source order line's Finished Sides attribute is
+        unset or "None", create a warning check (category=assembly).
+        Skipped when the flag is OFF or when the order line carries
+        no attribute picks at all (uncoupled MOs)."""
+        if not self._t1_open_side_detection_enabled():
+            return
+        order_line = self._p3_source_order_line(production)
+        if not order_line or not order_line.product_id:
+            return
+        picks = order_line.product_id.product_template_attribute_value_ids
+        if not picks:
+            return
+        finished_sides_pick = None
+        for ptav in picks:
+            attr = (ptav.attribute_id.name or "").strip().lower()
+            if attr == "finished sides":
+                finished_sides_pick = (
+                    ptav.product_attribute_value_id.name or "").strip().lower()
+                break
+        # "None" / missing both warrant the warning. "Left" / "Right" /
+        # "Both" suppress it (the customer covered the visible face).
+        if finished_sides_pick in (None, "", "none"):
+            self._create_check(
+                {
+                    "production_id": production.id,
+                    "name": "Possible open cabinet side",
+                    "severity": "warning",
+                    "category": "assembly",
+                    "message": (
+                        "This cabinet has no Finished Sides selection. "
+                        "If the cabinet sits at a run-end, the exposed "
+                        "side will be unfinished. Confirm Finished Sides "
+                        "= Left / Right / Both, or accept the open side "
+                        "for run-mid placement."
+                    ),
+                    "recommendation": (
+                        "Add Finished Sides to the configurator pick, "
+                        "or document the run position so production knows "
+                        "the open side is intentional."
+                    ),
+                }
+            )
 
     # ------------------------------------------------------------------
     # P3 — Auto-remediation helpers
