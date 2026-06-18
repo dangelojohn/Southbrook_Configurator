@@ -47,7 +47,7 @@ Outstanding:
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "depends": [
         "product",
         "purchase",
@@ -73,6 +73,11 @@ Outstanding:
         # Southbrook products). Brand record brand_southbrook_inhouse is
         # in southbrook_hardware_brands.xml above.
         "data/end_panel_seed.xml",
+        # A3 (2026-06-18) — Corner-solution catalogue (10 specialty
+        # mechanisms across LAVA / Vauth-Sagel / Häfele / Southbrook
+        # in-house brands). brand_lava and brand_vauth_sagel are
+        # already in southbrook_hardware_brands.xml.
+        "data/corner_solutions_seed.xml",
         "views/southbrook_hardware_brand_views.xml",
         "views/product_template_views.xml",
         "wizards/southbrook_hardware_import_views.xml",
