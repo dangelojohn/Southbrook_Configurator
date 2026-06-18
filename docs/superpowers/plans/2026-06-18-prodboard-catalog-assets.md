@@ -31,7 +31,7 @@
 - Create `addons/southbrook_estimating/models/template_archetype.py`
   - Add an idempotent mapping helper from the 12 locked template XML IDs to Prodboard archetype codes.
 - Create `addons/southbrook_estimating/data/template_archetype_assign.xml`
-  - Call the mapping helper after taxonomy seed and after product templates load.
+  - Call the mapping and placeholder-image helpers after taxonomy seed and after product templates load.
 - Modify `addons/southbrook_estimating/__manifest__.py`
   - Load the new mapping function after `data/prodboard_taxonomy_seed.xml` and `data/template_code_assign.xml`.
 - Modify `addons/southbrook_estimating/models/__init__.py`
@@ -39,7 +39,7 @@
 - Create `addons/southbrook_estimating/tests/test_prodboard_asset_importer.py`
   - Test mock asset import, idempotency, source URL privacy expectations, and offline import.
 - Create `addons/southbrook_estimating/tests/test_template_archetype_mapping.py`
-  - Test field existence, mapped templates, unmapped Southbrook-only placeholders, and preservation of all 12 locked templates.
+  - Test field existence, mapped templates, unmapped Southbrook-only placeholders, generated PNG placeholders, and preservation of all 12 locked templates.
 - Modify `addons/southbrook_estimating/README.md`
   - Document the cloned catalogue layer, internal asset cache, and public image serving rule.
 
@@ -136,6 +136,36 @@
 - [ ] **Step 4: Review diff**
   - Run: `git diff --stat && git diff -- addons/southbrook_estimating docs/superpowers/plans/2026-06-18-prodboard-catalog-assets.md`
   - Expected: only planned files changed.
+
+### Task 4: Southbrook-Owned Placeholder Images
+
+**Files:**
+- Modify: `addons/southbrook_estimating/models/template_archetype.py`
+- Modify: `addons/southbrook_estimating/data/template_archetype_assign.xml`
+- Modify: `addons/southbrook_estimating/tests/test_template_archetype_mapping.py`
+- Modify: `addons/southbrook_estimating/README.md`
+
+**Interfaces:**
+- Produces: `southbrook.estimating.template_archetype.assign_placeholder_images(force=False)`
+- Produces: deterministic `product.template.image_1920`, `x_image_uuid`, and `x_image_filename` values for the 12 locked templates.
+
+- [ ] **Step 1: Write failing tests**
+  - Assert `assign_placeholder_images(force=True)` gives all 12 locked templates PNG `image_1920` data and `southbrook-<xml_id>.png` filenames.
+  - Assert `assign_placeholder_images()` preserves an existing product image while still assigning UUID/filename metadata.
+
+- [ ] **Step 2: Verify tests fail**
+  - Run: `odoo -d <test_db> --test-tags southbrook,prodboard_mapping --stop-after-init`
+  - Expected: fail because `assign_placeholder_images()` does not exist yet.
+
+- [ ] **Step 3: Implement placeholder generator**
+  - Generate deterministic Southbrook-owned PNG bytes in Python.
+  - Fill blank `image_1920` fields only by default.
+  - Wire the helper into `data/template_archetype_assign.xml`.
+
+- [ ] **Step 4: Verify locally**
+  - Run: `python3 -m compileall -q addons/southbrook_estimating/models/template_archetype.py addons/southbrook_estimating/tests/test_template_archetype_mapping.py`
+  - Run: `xmllint --noout addons/southbrook_estimating/data/template_archetype_assign.xml`
+  - Expected: both pass.
 
 ## Self-Review
 

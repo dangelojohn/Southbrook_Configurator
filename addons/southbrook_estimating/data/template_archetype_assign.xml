@@ -10,4 +10,6 @@
 <odoo noupdate="0">
   <function model="southbrook.estimating.template_archetype"
             name="assign_archetypes"/>
+  <function model="southbrook.estimating.template_archetype"
+            name="assign_placeholder_images"/>
 </odoo>

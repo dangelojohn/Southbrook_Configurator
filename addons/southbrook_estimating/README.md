@@ -186,6 +186,13 @@ from `product.template.image_1920`, including through
 `/southbrook/catalog/icon/<uuid>/<filename>`. Do not render
 `blobs.prodboard.com` URLs or archetype attachments directly in public pages.
 
+The same data seed calls
+`southbrook.estimating.template_archetype.assign_placeholder_images()` to give
+each of the 12 locked templates a deterministic Southbrook-owned PNG
+placeholder when `image_1920` is blank. Existing product images are preserved by
+default; the helper only fills empty images and assigns stable
+`x_image_uuid`/`x_image_filename` values for the public catalog-icon route.
+
 ## Canonical design docs
 
 Read these before changing anything in this addon:

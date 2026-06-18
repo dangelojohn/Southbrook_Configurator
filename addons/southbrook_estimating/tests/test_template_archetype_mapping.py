@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
-"""Template-to-Prodboard-archetype mapping tests."""
+"""Template-to-Prodboard-archetype mapping and placeholder-image tests."""
+import base64
 
 from odoo.tests.common import TransactionCase, tagged
 
@@ -36,6 +37,12 @@ _INTENTIONALLY_UNMAPPED = [
     "accessory",
     "worktop",
 ]
+
+_TINY_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xcf"
+    b"\xc0\x00\x00\x00\x03\x00\x01\xe3]\xc5\x06\x00\x00\x00\x00IEND\xaeB`\x82"
+)
 
 
 @tagged("post_install", "-at_install", "southbrook", "prodboard_mapping")
@@ -97,3 +104,33 @@ class TestTemplateArchetypeMapping(TransactionCase):
 
         self.assertEqual(before, after)
 
+    def test_generated_placeholder_images_cover_all_locked_templates(self):
+        self.Mapper.assign_placeholder_images(force=True)
+
+        for xml_id in _LOCKED_TEMPLATE_IDS:
+            tmpl = self._ref(xml_id)
+            self.assertTrue(tmpl.image_1920, f"{xml_id} has no image_1920")
+            image_bytes = base64.b64decode(tmpl.image_1920)
+            self.assertTrue(
+                image_bytes.startswith(b"\x89PNG\r\n\x1a\n"),
+                f"{xml_id}.image_1920 is not a PNG placeholder",
+            )
+            self.assertTrue(tmpl.x_image_uuid, f"{xml_id} has no image UUID")
+            self.assertEqual(
+                tmpl.x_image_filename,
+                f"southbrook-{xml_id}.png",
+            )
+
+    def test_placeholder_seed_does_not_overwrite_existing_image_by_default(self):
+        tmpl = self._ref("base_1dr")
+        tmpl.write({
+            "image_1920": base64.b64encode(_TINY_PNG).decode("ascii"),
+            "x_image_uuid": False,
+            "x_image_filename": False,
+        })
+
+        self.Mapper.assign_placeholder_images()
+
+        self.assertEqual(base64.b64decode(tmpl.image_1920), _TINY_PNG)
+        self.assertTrue(tmpl.x_image_uuid)
+        self.assertEqual(tmpl.x_image_filename, "southbrook-base_1dr.png")
