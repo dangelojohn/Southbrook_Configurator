@@ -200,8 +200,25 @@ log "checking live health"
 # was the v1 health-check bug (`live /web/login health check
 # failed: ` with an empty health value). Switching to a curl
 # inside the container avoids the stdin question entirely.
-health="$($QNAP_DOCKER exec "$CONTAINER" curl -s -o /dev/null \
-  -w '%{http_code}' --max-time 20 http://127.0.0.1:8069/web/login 2>&1 \
-  || echo ERR)"
-[[ "$health" == "200" ]] || fail "live /web/login health check failed: $health"
+#
+# The persistent HTTP workers in southbrook-odoo reload their
+# registry when a -u completes, and during that ~10-30s reload
+# window the front-door socket returns connection-refused (curl
+# code 000). Retry a few times so the health check rides through
+# that window without flapping the deploy. Total budget ~70s.
+HEALTH_ATTEMPTS="${HEALTH_ATTEMPTS:-7}"
+health=""
+for attempt in $(seq 1 "$HEALTH_ATTEMPTS"); do
+  health="$($QNAP_DOCKER exec "$CONTAINER" curl -s -o /dev/null \
+    -w '%{http_code}' --max-time 20 http://127.0.0.1:8069/web/login 2>&1 \
+    || echo ERR)"
+  if [[ "$health" == "200" ]]; then
+    break
+  fi
+  if [[ "$attempt" -lt "$HEALTH_ATTEMPTS" ]]; then
+    log "health attempt $attempt: $health; retrying in 10s"
+    sleep 10
+  fi
+done
+[[ "$health" == "200" ]] || fail "live /web/login health check failed after ${HEALTH_ATTEMPTS} attempts: $health"
 log "deploy OK"
