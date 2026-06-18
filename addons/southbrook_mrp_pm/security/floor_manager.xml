@@ -60,5 +60,44 @@
       </field>
     </record>
 
+    <!--
+      REG-R1.1 (2026-06-18): admin (base.user_admin) is NOT auto-
+      added to custom-module groups in Odoo 19 (see session memory
+      odoo19_res_users_group_ids_rename.md). Without this record the
+      Approve / Reject buttons on the Production Approval header are
+      hidden from the admin user, even though the buttons + state +
+      methods all ship correctly — caught by Claude Chrome end-to-end
+      Run 1 report (finding 1.1).
+
+      Pattern: extend the upstream base.user_admin record by giving
+      this <record> the fully-qualified xmlid as its id attribute.
+      The (4, ref(...)) tuple appends without replacing other groups,
+      so this composes cleanly with whatever the user already has.
+
+      noupdate="1" (block-level above) means a later manual revocation
+      (e.g. for SOX-style separation of duty) survives subsequent
+      -u southbrook_mrp_pm. Field name is `group_ids` on res.users in
+      v19 (renamed from `groups_id`; see memory note).
+    -->
+    <record id="base.user_admin" model="res.users">
+      <field name="group_ids"
+             eval="[(4, ref('southbrook_mrp_pm.group_southbrook_production_approver'))]"/>
+    </record>
+
+    <!--
+      REG-R1.1 part 2: imply the Production Approver group from
+      Sales Manager. Anyone who can manage sales orders is, by
+      default, also able to approve production for them. This is
+      the same imply-chain pattern Odoo core uses (Sales User →
+      Sales Manager → Accounting Manager). Companies that want a
+      stricter separation can break the imply by hand from
+      Settings → Users & Companies → Groups; noupdate=1 means
+      that edit survives upgrades.
+    -->
+    <record id="sales_team.group_sale_manager" model="res.groups">
+      <field name="implied_ids"
+             eval="[(4, ref('southbrook_mrp_pm.group_southbrook_production_approver'))]"/>
+    </record>
+
   </data>
 </odoo>
