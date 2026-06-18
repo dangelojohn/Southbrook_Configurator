@@ -339,6 +339,13 @@ class SouthbrookConfiguratorAPI(http.Controller):
             "chosen_chips": completeness["chosen_chips"],
             "required_missing": completeness["required_missing"],
             "add_to_quote_enabled": completeness["add_to_quote_enabled"],
+            # T3 (2026-06-18) — commit-with-warnings payload. CTA stays
+            # enabled even when warnings exist; only required_missing
+            # disables. The UI surfaces "X warnings to review" as a
+            # subtitle on the CTA button.
+            "commit_warnings": completeness["commit_warnings"],
+            "add_to_quote_warning_count":
+                len(completeness["commit_warnings"]),
         }
 
     # ------------------------------------------------------------------
@@ -404,11 +411,82 @@ class SouthbrookConfiguratorAPI(http.Controller):
         # Stable order — alphabetical by attribute_name for UX.
         required_missing.sort(key=lambda r: r["attribute_name"])
 
+        # T3 — Configurator-side warnings. These do NOT disable the CTA
+        # (unlike required_missing). The UI renders them as a heads-up
+        # subtitle: "3 warnings to review". MI-engine warnings only
+        # attach to MOs that don't exist pre-commit; so the pre-commit
+        # warning surface is configurator-side heuristics only.
+        commit_warnings = self._build_commit_warnings(picked_by_attr, attr_meta)
+
         return {
             "chosen_chips": chosen_chips,
             "required_missing": required_missing,
             "add_to_quote_enabled": not required_missing,
+            "commit_warnings": commit_warnings,
         }
+
+    def _build_commit_warnings(self, picked_by_attr, attr_meta):
+        """Configurator-side warnings raised on the current session
+        state. CTA gating uses required_missing; these are heads-ups.
+
+        Heuristic set (extendable, all default-on; flip per-rule via
+        ir.config_parameter if a customer asks):
+
+          - Door Style contains "Custom" -> manufacturing will follow up.
+          - Drawer Construction set but Drawer Slide unpicked -> defaults
+            to BLM-MOV-450 on the BoM.
+          - Finished Sides = None on a configurable cabinet template ->
+            confirm run-mid intent vs run-end exposed face.
+        """
+        warnings = []
+
+        # Index by attribute NAME, lowercased, for tolerant lookup.
+        picked_by_name = {}
+        for aid, values in picked_by_attr.items():
+            attr_name = (attr_meta.get(aid, {}).get("name") or "").lower()
+            if attr_name and values:
+                picked_by_name[attr_name] = (values[0].name or "")
+
+        # 1. Custom door style.
+        door_style = picked_by_name.get("door style") or ""
+        if "custom" in door_style.lower():
+            warnings.append({
+                "name": "custom_door_style",
+                "severity": "warning",
+                "message": (
+                    "You selected a Custom door style. Manufacturing will "
+                    "reach out to confirm the spec before production."
+                ),
+            })
+
+        # 2. Drawer Construction without Drawer Slide.
+        if picked_by_name.get("drawer construction") and not picked_by_name.get(
+                "drawer slide"):
+            warnings.append({
+                "name": "drawer_slide_default",
+                "severity": "info",
+                "message": (
+                    "No Drawer Slide selected. The BoM will default to "
+                    "Blum MOVENTO 450 mm soft-close slides. Pick a brand "
+                    "above (Hardware & Add-ons) to override."
+                ),
+            })
+
+        # 3. Finished Sides = None or unpicked.
+        fs = (picked_by_name.get("finished sides") or "").strip().lower()
+        if fs in ("", "none"):
+            warnings.append({
+                "name": "finished_sides_missing",
+                "severity": "info",
+                "message": (
+                    "Finished Sides not selected. If this cabinet sits at "
+                    "a run-end, the exposed face will be unfinished — "
+                    "select Left / Right / Both above to add a finished "
+                    "side panel."
+                ),
+            })
+
+        return warnings
 
     # ------------------------------------------------------------------
     # Helpers
@@ -646,6 +724,10 @@ class SouthbrookConfiguratorAPI(http.Controller):
             "chosen_chips": completeness["chosen_chips"],
             "required_missing": completeness["required_missing"],
             "add_to_quote_enabled": completeness["add_to_quote_enabled"],
+            # T3 — commit-with-warnings payload on every /select tick.
+            "commit_warnings": completeness["commit_warnings"],
+            "add_to_quote_warning_count":
+                len(completeness["commit_warnings"]),
             "warnings": [],
         }
 
