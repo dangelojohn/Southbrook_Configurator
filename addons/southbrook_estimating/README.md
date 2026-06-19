@@ -193,6 +193,20 @@ placeholder when `image_1920` is blank. Existing product images are preserved by
 default; the helper only fills empty images and assigns stable
 `x_image_uuid`/`x_image_filename` values for the public catalog-icon route.
 
+## Configuration Sets Decision
+
+Product Configurator's MRP layer includes BoM-line Configuration Sets under
+Product Configurator -> Configuration -> Configuration Sets. Southbrook now
+seeds starter sets for the main reusable manufacturing conditions: series, box
+material, door style, drawer construction, soft-close, pull-out trash, and
+under-cabinet LED lighting.
+
+These are intentionally seeded as reusable condition records only. They are not
+attached to any `mrp.bom.line` records during install or upgrade because that
+would immediately change BoM explosion behavior. Production should attach them
+line by line after confirming which parts are conditional for each cabinet
+construction rule.
+
 ## Canonical design docs
 
 Read these before changing anything in this addon:

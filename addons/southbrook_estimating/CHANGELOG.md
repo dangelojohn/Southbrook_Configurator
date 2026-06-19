@@ -3,6 +3,24 @@
 All notable changes to the Southbrook Estimating addon are documented here.
 Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 
+## [19.0.4.2.0] — 2026-06-18
+
+### Added
+
+- Seeded Product Configurator/MRP BoM-line Configuration Sets for
+  Southbrook's main reusable manufacturing conditions: series, box
+  material, door style, drawer construction, soft-close, pull-out
+  trash, and under-cabinet LED lighting.
+- Added regression coverage proving the seeded sets exist, point to the
+  expected product attribute values, and start unattached to BoM lines.
+
+### Decision
+
+- Configuration Sets are intentionally seeded as reusable conditions
+  only. They are not auto-linked to `mrp.bom.line` records because that
+  would change BoM explosion behavior before production confirms which
+  component lines are conditional.
+
 ## [19.0.2.4.0] — 2026-06-18
 
 ### REG fixes — Claude Chrome end-to-end Run 1 + Run 2 findings

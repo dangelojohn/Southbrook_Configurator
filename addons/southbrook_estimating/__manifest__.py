@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.4.1.0",
+    "version": "19.0.4.2.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -114,6 +114,10 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "views/res_partner_views.xml",
         # Commit 3 — configurator attribute vocabulary
         "data/attributes.xml",
+        # 19.0.4.2.0 (2026-06-18) — Product Configurator/MRP
+        # BoM-line Configuration Sets. These seed reusable manufacturing
+        # conditions but intentionally do not attach to BoM lines yet.
+        "data/configuration_sets.xml",
         # Commit 4 — 6 channel pricelists + 3 tradesperson sub-tiers
         "data/pricelists.xml",
         # Commit 7 — 12 cabinet templates + 132 attribute_lines
