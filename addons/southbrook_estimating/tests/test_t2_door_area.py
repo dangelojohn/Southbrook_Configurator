@@ -106,6 +106,35 @@ class TestT2DoorArea(TransactionCase):
         self.assertAlmostEqual(variant.x_door_area_m2, 0.4310, delta=0.002)
 
     # ------------------------------------------------------------------
+    # Acceptance — width -> door count fallback (Q22(a) hides Door Count)
+    # ------------------------------------------------------------------
+    # The canonical seed (data/attributes.xml) hides the explicit Door
+    # Count attribute per locked decision Q22(a). Real wall_2dr / base_2dr
+    # variants therefore carry NO Door Count pick — the door count is
+    # derived from Width via the §3.4 rule. Without the fallback the
+    # door-area metric silently halved on every 2-door cabinet.
+    def test_24in_wide_no_door_count_pick_resolves_to_two_doors(self):
+        variant = self._make_variant({
+            "Width": ["24 in"],  # 609.6 mm — in the 540-920mm 2-door band
+        })
+        # door_height = 720 - 6 = 714 (Base default)
+        # door_width = (609.6 - 9)/2 = 300.3 each
+        # area = 2 * 300.3 * 714 / 1e6 ≈ 0.4288
+        self.assertAlmostEqual(
+            variant.x_door_area_m2, 0.4288, delta=0.005,
+            msg="24\" cabinet must derive 2 doors from Width when "
+                "Door Count is hidden per Q22(a)")
+
+    def test_18in_wide_no_door_count_pick_stays_one_door(self):
+        variant = self._make_variant({
+            "Width": ["18 in"],  # 457.2 mm — below the 540mm threshold
+        })
+        # door_height = 714; door_width = 457.2 - 6 = 451.2
+        # area = 451.2 * 714 / 1e6 ≈ 0.3222
+        self.assertAlmostEqual(
+            variant.x_door_area_m2, 0.3222, delta=0.005)
+
+    # ------------------------------------------------------------------
     # Acceptance — no picks -> 0
     # ------------------------------------------------------------------
     def test_no_picks_zero(self):

@@ -130,6 +130,8 @@ class ProductProduct(models.Model):
         return n * 25.4 if is_inches else n
 
     def _t2_door_count(self, by_attr):
+        # Explicit pick wins — but attr_door_count is hidden per Q22(a)
+        # in the canonical seed, so real cabinets rarely carry one.
         explicit = by_attr.get("door count") or by_attr.get("doors")
         if explicit:
             try:
@@ -141,4 +143,14 @@ class ProductProduct(models.Model):
         construction = (by_attr.get("drawer construction") or "").lower()
         if construction and "drawer" in construction:
             return 0
+        # Width -> door count derivation, matching the documented rule in
+        # Southbrook_Excel_to_Odoo_Mapping §3.4 (and the P1 inference at
+        # sb_production_package._infer_door_count). 9-21" (~228-533mm)
+        # = 1 door; 24-36" (~609-914mm) = 2 doors. Without this fallback
+        # the door-area metric silently halves on every wall_2dr /
+        # base_2dr template because Q22(a) hides the explicit Door Count
+        # attribute on most catalogue cabinets.
+        width_mm = self._t2_parse_dim_mm(by_attr.get("width"))
+        if 540.0 < width_mm <= 920.0:
+            return 2
         return 1

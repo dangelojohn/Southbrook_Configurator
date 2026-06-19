@@ -120,13 +120,23 @@ class TestT3CommitWarnings(TransactionCase):
     # Acceptance — add_to_quote_enabled stays TRUE even with warnings
     # ------------------------------------------------------------------
     def test_warnings_do_not_disable_cta(self):
+        # Setup creates attributes with no required flag, so
+        # required_missing must stay empty for the load-bearing
+        # assertion below. Explicit assert documents the precondition.
         tmpl, session = self._make_template_and_session({
             "Door Style": "Custom (Signature)",
             "Finished Sides": "None",  # fire 2 warnings
         })
         payload = self._completeness(tmpl, session)
-        self.assertGreater(len(payload["commit_warnings"]), 0)
-        # No required attributes -> CTA stays enabled despite warnings.
-        if not payload["required_missing"]:
-            self.assertTrue(payload["add_to_quote_enabled"],
-                            "warnings must not disable the CTA")
+        self.assertGreater(len(payload["commit_warnings"]), 0,
+                           "fixture must produce >=1 warning")
+        self.assertEqual(
+            payload["required_missing"], [],
+            "this fixture must have no required-missing — the test's "
+            "load-bearing claim is that WARNINGS alone don't disable "
+            "the CTA. If required_missing has entries here, rewrite "
+            "the fixture, don't paper over it with a conditional.")
+        self.assertTrue(
+            payload["add_to_quote_enabled"],
+            "warnings must not disable the CTA — only required_missing "
+            "does (Prodboard 'Continue with warnings' pattern)")
