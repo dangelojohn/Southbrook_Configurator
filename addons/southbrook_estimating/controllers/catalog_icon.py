@@ -37,28 +37,21 @@ class SouthbrookCatalogIcon(http.Controller):
             [("x_image_uuid", "=", uuid)], limit=1)
         if not tmpl:
             return request.not_found()
-        if not tmpl.image_1920:
-            return request.not_found()
+        # Don't read tmpl.image_1920 here — touching an Image field
+        # triggers variant-size compute (image_128/256/512/1024) which
+        # writes back to the row and conflicts with concurrent updates
+        # on the same template. Let /web/image/ handle the
+        # missing-image case itself (it returns its own placeholder).
 
-        # Stream image_1920 with a long Cache-Control max-age. Since the
-        # UUID changes when content changes, the URL itself is the cache
-        # key — safe to cache for a year.
-        from odoo.tools import image_process
-        image_b64 = tmpl.image_1920
-        # We don't transform — full-quality image as stored. Odoo's
-        # generic image-handling utility returns base64-decoded bytes.
-        import base64
-        try:
-            content = base64.b64decode(image_b64)
-        except Exception:
-            _logger.warning(
-                "Failed to b64-decode image_1920 for template %s (uuid=%s)",
-                tmpl.id, uuid)
-            return request.not_found()
-
-        headers = [
-            ("Content-Type", "image/png"),
-            ("Cache-Control", "public, max-age=31536000, immutable"),
-            ("X-Southbrook-Template-Id", str(tmpl.id)),
-        ]
-        return request.make_response(content, headers=headers)
+        # Hand the bytes off to Odoo's well-tested binary-streaming
+        # path via /web/image/. That route handles variant compute,
+        # ETag headers, range requests, and serialization-conflict
+        # retries — all of which the manual base64-decode in the
+        # original A4 patch did NOT. The UUID is preserved at the
+        # cache-key layer (Cloudflare + browser keyed on the
+        # /southbrook/catalog/icon/<uuid>/* URL, the redirect target
+        # is hot in Odoo's binary cache once warmed).
+        return request.redirect(
+            "/web/image/product.template/%d/image_1920" % tmpl.id,
+            local=True,
+        )
