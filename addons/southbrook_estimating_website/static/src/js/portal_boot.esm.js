@@ -1,7 +1,8 @@
 /** @odoo-module **/
-// Bundle hash bump 2026-06-02T11:50Z — filter v2: single-row tab bar
-// (underline-active, superscript counts, horizontal-scroll on overflow)
-// + alternative <select> dropdown behind state.filterMode flag.
+// Bundle hash bump 2026-06-22 — UX bugfix pass: poll no longer wipes
+// transient UI state ("Loading order…" only on initial load + payload
+// hash + modal-open pause); CatalogPicker defaults to Base; Add button
+// gets a synchronous lock + a confirmation toast (single-add only).
 /*
  * SPDX-License-Identifier: LGPL-3.0-only
  *
@@ -1509,8 +1510,19 @@ class CatalogPicker extends Component {
                     <h3 class="o_owl_modal_title">
                         Add a cabinet to your order
                     </h3>
-                    <button class="o_owl_modal_close"
-                            t-on-click="props.onClose"
+                    <!-- P1 / UX 2026-06-22: persistent cart counter in
+                         the modal header. Updates live as _onPickCabinet
+                         finishes and the parent's _loadOrder mutates
+                         state.lines. Singular/plural handled inline. -->
+                    <span class="o_owl_modal_cart_count"
+                          t-if="props.cartCount !== null">
+                        <strong t-esc="props.cartCount"/>
+                        <t t-if="props.cartCount === 1"> cabinet</t>
+                        <t t-else=""> cabinets</t>
+                        on order
+                    </span>
+                    <button type="button" class="o_owl_modal_close"
+                            t-on-click="_onCloseClick"
                             aria-label="Close">×</button>
                 </div>
 
@@ -1761,6 +1773,12 @@ class CatalogPicker extends Component {
         zoneFilter: {
             type: [String, { value: null }], optional: true,
         },
+        // UX 2026-06-22 — live count of cabinets already on the order,
+        // surfaced in the modal header so the user knows when their
+        // click actually added a line. null hides the chip.
+        cartCount: {
+            type: [Number, { value: null }], optional: true,
+        },
     };
 
     // Module-level helpers exposed as instance fields so the template
@@ -1807,7 +1825,13 @@ class CatalogPicker extends Component {
         this.state = useState({
             // 2026-06-02 redesign — reactive filter + view state.
             searchQuery: "",
-            activeCategory: "All",
+            // UX 2026-06-22: default to "Base" — base cabinets are the
+            // most common starting point of a kitchen order, so opening
+            // the catalog already on that filter gets the trade user
+            // straight to the cards they want. zoneFilter (from a
+            // "+ Add to <zone>" entry point) still wins over this in
+            // setup() below; the "All" tab remains one click away.
+            activeCategory: "Base",
             viewMode: "grid",          // 'grid' | 'list'
             // 2026-06-02 filter v2 — UI variant for the category
             // filter. 'tabs' renders the underlined single-row tab
@@ -1826,14 +1850,35 @@ class CatalogPicker extends Component {
         this._onBackdropClick = this._onBackdropClick.bind(this);
         this._onSearch = this._onSearch.bind(this);
         this._resetFilters = this._resetFilters.bind(this);
+        // P2 bugfix 2026-06-22: a pre-bound close handler we own (rather
+        // than passing `props.onClose` straight to the template's
+        // t-on-click) so the click hits a stable function reference
+        // across re-renders. Also lets us gate on `props.busy` here
+        // before forwarding — that ensures the × never opens-then-
+        // -immediately-closes mid-add.
+        this._onCloseClick = this._onCloseClick.bind(this);
+        this._onKeydown = this._onKeydown.bind(this);
 
         // Phase 3 Sprint C1 — react to zoneFilter prop changes.
         // When OrderBuilder opens the picker with a zone pre-filter
         // (e.g. user clicked "+ Add to Wall"), pre-select the matching
         // category tab so the first cards the user sees are wall
-        // cabinets. Falls back to "All" for unknown / null zones.
+        // cabinets. Falls back to "Base" (UX 2026-06-22 default) for
+        // unknown / null zones.
         const initial = this._zoneToCategory(this.props.zoneFilter);
         if (initial) this.state.activeCategory = initial;
+
+        // P2 bugfix 2026-06-22 — Escape-key handler attached at the
+        // document level so it works regardless of which child element
+        // currently has focus. Single global listener for the whole
+        // lifetime of the component; the `props.open` guard inside
+        // _onKeydown makes it a no-op when the modal is closed.
+        onMounted(() => {
+            document.addEventListener("keydown", this._onKeydown);
+        });
+        onWillUnmount(() => {
+            document.removeEventListener("keydown", this._onKeydown);
+        });
     }
 
     /** Phase 3 Sprint C1 — map a zone code to a CatalogPicker category
@@ -1978,6 +2023,28 @@ class CatalogPicker extends Component {
         }
     }
 
+    // P2 bugfix 2026-06-22: stable × handler. Important: stop event
+    // propagation so it doesn't bubble to the backdrop and double-fire
+    // (some browsers fire both with overlapping z-stacks), and prevent
+    // default so any wrapping form/anchor doesn't navigate.
+    _onCloseClick(ev) {
+        if (ev) {
+            ev.stopPropagation();
+            ev.preventDefault();
+        }
+        if (this.props.busy) return;
+        this.props.onClose();
+    }
+
+    // P2 bugfix 2026-06-22: Escape key closes the modal. Wired via the
+    // global document keydown listener attached only while the modal is
+    // open (see onPatched / onMounted below).
+    _onKeydown(ev) {
+        if (ev.key === "Escape" && this.props.open && !this.props.busy) {
+            this.props.onClose();
+        }
+    }
+
     _onSearch(ev) {
         this.state.searchQuery = ev.target.value;
     }
@@ -2038,15 +2105,18 @@ class CatalogPicker extends Component {
     }
 
     async _addItem(item) {
-        if (this.props.busy) return;
+        // P1 bugfix 2026-06-22: synchronous re-entry guard *inside* the
+        // CatalogPicker too — props.busy lags by a render tick, so a
+        // fast second click on the same card otherwise sneaks past it.
+        if (this.props.busy || this._adding) return;
+        this._adding = true;
         const qty = this.getQty(item.sku);
         // Reuses the parent's existing add-line path — onPick now
-        // accepts an optional second qty arg (parent passes it
-        // through to /southbrook/api/order/<id>/add-line). The
-        // ORIGINAL contract — onPick(templateId) — still works
-        // because the qty arg is optional on both sides.
+        // accepts (templateId, qty, label). The original 1- and 2-arg
+        // call shapes still work because the new args are optional on
+        // both sides.
         try {
-            await this.props.onPick(item.id, qty);
+            await this.props.onPick(item.id, qty, item.name || item.sku);
             this.state.lastAddedSku = item.sku;
             // Clear the 'Added' indicator after 1.5s so the user can
             // re-add the same cabinet if they want a second one of it.
@@ -2056,7 +2126,9 @@ class CatalogPicker extends Component {
                 }
             }, 1500);
         } catch (e) {
-            // Parent surfaces the error via state.error.
+            // Parent surfaces the error via state.error + toast.
+        } finally {
+            this._adding = false;
         }
     }
 }
@@ -2068,6 +2140,22 @@ class CatalogPicker extends Component {
 
 const TEMPLATE = xml`
     <div class="o_southbrook_owl_root">
+
+        <!-- P1 / UX 2026-06-22: toast stack. Lives outside the
+             loading/error/loaded t-if chain so a confirmation that fires
+             during a background re-render stays mounted. role=status +
+             aria-live=polite so screen readers announce each toast
+             without stealing focus. -->
+        <div class="o_owl_toast_stack" role="status" aria-live="polite"
+             t-if="state.toasts.length">
+            <div t-foreach="state.toasts" t-as="toast" t-key="toast.id"
+                 t-attf-class="o_owl_toast o_owl_toast_{{ toast.kind }}">
+                <span class="o_owl_toast_text" t-esc="toast.text"/>
+                <button type="button" class="o_owl_toast_close"
+                        t-on-click="() => this._dismissToast(toast.id)"
+                        aria-label="Dismiss">×</button>
+            </div>
+        </div>
 
         <!-- Loading -->
         <div t-if="state.loading" class="o_owl_loading_card">
@@ -2114,6 +2202,7 @@ const TEMPLATE = xml`
                            busy="state.catalog_busy"
                            channelLabel="state.channel_label"
                            zoneFilter="state.ui.catalog_zone_filter"
+                           cartCount="state.lines.length"
                            onClose="_closeCatalog"
                            onPick="_onPickCabinet"/>
 
@@ -2310,11 +2399,27 @@ class OrderBuilder extends Component {
 
     setup() {
         this.state = useState({
+            // P0 bugfix 2026-06-22: split "first-page-paint loading" from
+            // "background poll loading". `loading` only flips true on the
+            // very first _loadOrder(); the 5-second poll updates state in
+            // place without ever showing the "Loading order…" card, so
+            // CatalogPicker and other children keep their transient UI
+            // state (search query, active category, scroll, modal-open).
             loading: false,
+            initial_load: true,
+            // Stable hash of the order payload — when an unchanged poll
+            // response comes back, we skip the state write entirely so
+            // OWL doesn't even reconcile (avoids any chance of resetting
+            // child reactivity on a no-op).
+            payload_hash: "",
             error: null,
             order: null,
             lines: [],
             zones: [],
+            // P1 bugfix 2026-06-22: confirmation toasts. Each toast is
+            // {id, text, kind: 'success'|'error'}; renders top-right and
+            // auto-dismisses after ~3s via setTimeout.
+            toasts: [],
             // T2C11 — BoM rollup + validation issues. Both populated
             // by /api/order/<id>. Default rollup matches the empty
             // shape so the BoMPreview component never sees undefined
@@ -2377,12 +2482,41 @@ class OrderBuilder extends Component {
         this._setSelectedLine = this._setSelectedLine.bind(this);
         this._onLineSaved = this._onLineSaved.bind(this);
 
+        // P1 bugfix: synchronous lock prevents double-add on rapid clicks
+        // (the reactive `state.catalog_busy` flag flips inside an async
+        // function, so OWL's re-render-driven disabled-attribute update
+        // arrives after a fast second click. The instance flag is set
+        // before the first `await` so re-entry is impossible).
+        this._addInFlight = false;
+        // Counter for unique toast ids — useState array keys.
+        this._toastSeq = 0;
+
         onMounted(() => {
             this._loadOrder();
             this._loadCatalog();
             this._startRealtimeSync();
         });
         onWillUnmount(() => this._stopRealtimeSync());
+    }
+
+    // ------------------------------------------------------------------
+    // P1 bugfix 2026-06-22 — toast helpers. _pushToast spawns a transient
+    // status banner that disappears after `ttl` ms (default 3s); the
+    // template renders them in a fixed-position stack.
+    // ------------------------------------------------------------------
+    _pushToast(text, kind = "success", ttl = 3000) {
+        this._toastSeq += 1;
+        const id = this._toastSeq;
+        this.state.toasts.push({ id, text, kind });
+        setTimeout(() => {
+            const idx = this.state.toasts.findIndex((t) => t.id === id);
+            if (idx >= 0) this.state.toasts.splice(idx, 1);
+        }, ttl);
+    }
+
+    _dismissToast(id) {
+        const idx = this.state.toasts.findIndex((t) => t.id === id);
+        if (idx >= 0) this.state.toasts.splice(idx, 1);
     }
 
     // ------------------------------------------------------------------
@@ -2417,6 +2551,13 @@ class OrderBuilder extends Component {
             if (this.state.loading || this.state.action_busy) {
                 return;
             }
+            // P0 bugfix 2026-06-22: pause the poll while the user is in
+            // the middle of an interaction. The catalog modal is the big
+            // one (a re-render that wipes filter state mid-browse is the
+            // worst UX hit), but also skip during an in-flight add so
+            // the optimistic UI doesn't fight an interleaved refresh.
+            if (this.state.ui.catalog_open) return;
+            if (this._addInFlight) return;
             this._loadOrder();
         };
         this._realtimeTimer = setInterval(tick, POLL_MS);
@@ -2482,8 +2623,16 @@ class OrderBuilder extends Component {
         }
     }
 
-    async _onPickCabinet(productTmplId, qty) {
+    async _onPickCabinet(productTmplId, qty, label) {
         if (!this.state.order) return;
+        // P1 bugfix 2026-06-22: synchronous re-entry guard. The reactive
+        // `catalog_busy` flag below still drives the visual disabled
+        // state on the button, but OWL re-render is async, so a fast
+        // second click can sneak through before the DOM attribute
+        // updates. Setting `_addInFlight` before the first `await`
+        // closes that race window — re-entry returns immediately.
+        if (this._addInFlight) return;
+        this._addInFlight = true;
         this.state.catalog_busy = true;
         const qtyArg = (typeof qty === "number" && qty > 0)
             ? Math.floor(qty)
@@ -2500,6 +2649,9 @@ class OrderBuilder extends Component {
                 },
             );
             if (result && result.ok) {
+                // Force the next _loadOrder to apply (the add changed
+                // server state in a way the hash MUST observe).
+                this.state.payload_hash = "";
                 // Refresh the order so the new line appears + totals
                 // re-compute. Bumps payload_version, which makes the
                 // KitchenViewport refetch its 3D payload as a bonus.
@@ -2511,12 +2663,22 @@ class OrderBuilder extends Component {
                 // when done. The error path still surfaces via
                 // state.error and skips the success-state pulse.
                 await this._loadOrder();
+                // P1 bugfix 2026-06-22: visible confirmation toast.
+                // Quantity prefix only when qty>1 to keep the common
+                // case short. `label` comes from the catalog card so
+                // the user sees what they actually picked.
+                const qtyPrefix = qtyArg > 1 ? `${qtyArg} × ` : "";
+                this._pushToast(
+                    `Added ${qtyPrefix}${label || "cabinet"}`,
+                    "success",
+                );
             } else {
                 this.state.error = (
                     result?.error === "order_locked"
                     ? `Cannot add cabinets — this order is ${result.state}.`
                     : result?.error || "Could not add the cabinet."
                 );
+                this._pushToast(this.state.error, "error", 5000);
                 throw new Error(this.state.error);
             }
         } catch (e) {
@@ -2524,10 +2686,12 @@ class OrderBuilder extends Component {
             // don't overwrite it with a generic message.
             if (!this.state.error) {
                 this.state.error = e?.message || String(e);
+                this._pushToast(this.state.error, "error", 5000);
             }
             throw e;
         } finally {
             this.state.catalog_busy = false;
+            this._addInFlight = false;
         }
     }
 
@@ -2536,24 +2700,51 @@ class OrderBuilder extends Component {
         if (!orderId) {
             // No id in URL → render the empty-state card. Not an error.
             this.state.loading = false;
+            this.state.initial_load = false;
             return;
         }
-        this.state.loading = true;
-        this.state.error = null;
+        const isInitial = this.state.initial_load;
+        // P0 bugfix 2026-06-22: only flip the global loading card on the
+        // initial paint. Background polls update reactive state in place
+        // — OWL reconciles the DOM, child components (CatalogPicker)
+        // keep their setup() state, and the "Loading order…" branch
+        // (which tears down the entire loaded subtree) never appears.
+        if (isInitial) {
+            this.state.loading = true;
+            this.state.error = null;
+        }
         try {
             const payload = await rpcJsonCall(
                 `/southbrook/api/order/${encodeURIComponent(orderId)}`,
             );
             if (payload && payload.error) {
-                this.state.error = (
-                    payload.error === "forbidden"
-                        ? "Access denied. This order is not visible to your account."
-                        : payload.error === "not_found"
-                        ? "Order not found."
-                        : payload.error
-                );
+                // Only surface a structured error on the initial paint.
+                // Background polls swallow it (network blip / 401 from
+                // a stale session would otherwise blank the UI mid-edit).
+                if (isInitial) {
+                    this.state.error = (
+                        payload.error === "forbidden"
+                            ? "Access denied. This order is not visible to your account."
+                            : payload.error === "not_found"
+                            ? "Order not found."
+                            : payload.error
+                    );
+                }
                 return;
             }
+            // P0 bugfix 2026-06-22: compute a stable hash of the payload
+            // slice that the UI actually reads, and bail before writing
+            // to reactive state when nothing changed. Avoids a no-op OWL
+            // reconcile that — in some browser frames — interleaves with
+            // an in-flight user gesture and momentarily clears focus or
+            // selection. Hash covers everything that drives visible
+            // pixels: order header version+state+totals, line count +
+            // per-line id/qty/price triplets, validation count.
+            const newHash = this._computePayloadHash(payload);
+            if (!isInitial && newHash === this.state.payload_hash) {
+                return;
+            }
+            this.state.payload_hash = newHash;
             this.state.order = payload.order;
             this.state.lines = payload.lines || [];
             this.state.zones = payload.zones || [];
@@ -2567,10 +2758,55 @@ class OrderBuilder extends Component {
             // (KitchenViewport) re-fetch their slice.
             this.state.payload_version = (this.state.payload_version || 0) + 1;
         } catch (e) {
-            this.state.error = e?.message || String(e);
+            // P0 bugfix: only surface the error on the initial paint;
+            // background-poll exceptions are silent (a transient network
+            // hiccup must not blow away the user's open modal). Errors
+            // raised by the user-driven _onPickCabinet / _onFooterAction
+            // paths reach state.error / state.action_message via their
+            // own try/catch blocks.
+            if (isInitial) {
+                this.state.error = e?.message || String(e);
+            }
         } finally {
-            this.state.loading = false;
+            if (isInitial) {
+                this.state.loading = false;
+                this.state.initial_load = false;
+            }
         }
+    }
+
+    // P0 bugfix 2026-06-22 — payload hash for the unchanged-poll fast
+    // path. JSON.stringify of the load-bearing fields only; the entire
+    // payload is too noisy (timestamps drift, derived fields jitter).
+    _computePayloadHash(payload) {
+        const o = (payload && payload.order) || {};
+        const lines = payload && payload.lines ? payload.lines : [];
+        // Line fingerprint must mirror the field names emitted by the
+        // /southbrook/api/order/<id> controller (main.py around line
+        // 1789): id, product_id, qty (NOT product_uom_qty — the
+        // controller exposes the user-facing alias), price_unit,
+        // price_subtotal. Mismatching the names here would silently
+        // produce a constant hash and we'd never refresh the lines
+        // grid on qty/price edits.
+        const lineFingerprints = lines.map((l) => [
+            l.id,
+            l.product_id,
+            l.qty,
+            l.price_unit,
+            l.price_subtotal,
+        ]);
+        return JSON.stringify([
+            o.id,
+            o.state,
+            o.version,
+            o.line_count,
+            o.channel_total,
+            o.retail_subtotal,
+            o.savings,
+            o.lead_time_days,
+            lineFingerprints,
+            (payload.validation || []).length,
+        ]);
     }
 
     async _onRetry() {

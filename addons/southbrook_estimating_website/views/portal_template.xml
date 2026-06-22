@@ -95,6 +95,13 @@
                 </li>
             </ol>
 
+            <!-- 2026-06-22 P3 bugfix: page-level wrapper so the desktop
+                 reflow @media rule in portal_root.scss can widen the
+                 OrderBuilder past the default portal_layout column cap
+                 on viewports >= 992px. The class also pins a body-style
+                 marker that's safe for SCSS targeting. -->
+            <div class="o_southbrook_order_builder_page">
+
             <!-- Header card with order info -->
             <div class="o_southbrook_portal_header card mb-3">
                 <div class="card-body">
@@ -157,6 +164,9 @@
                     </t>
                 </div>
             </div>
+
+            </div>
+            <!-- /.o_southbrook_order_builder_page (2026-06-22 P3) -->
         </t>
     </template>
 

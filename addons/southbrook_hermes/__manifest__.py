@@ -11,7 +11,7 @@ AI/tool orchestration can submit draft recommendations through an API key, but
 business changes remain gated by Odoo users who approve, reject, and apply the
 recommendation.
 """,
-    "version": "19.0.4.0.0",
+    "version": "19.0.4.1.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -42,8 +42,18 @@ recommendation.
     ],
     "assets": {
         "web.assets_frontend": [
-            "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.esm.js",
+            # 2026-06-22 bugfix: XML BEFORE JS so the OWL templates
+            # registry has `southbrook_hermes.HermesChat` populated by
+            # the time autoMount() runs. The opposite ordering used to
+            # race the templates loader on the Order Builder portal
+            # page (manifested as
+            #   `OwlError: Missing template: "southbrook_hermes.HermesChat"`
+            # + `TypeError: ... reading 'add'`). The autoMount() in
+            # hermes_chat.esm.js also try/catches the mount so a
+            # similar race in a future bundle can't break the host
+            # page — but ordering first is the cheaper fix.
             "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.xml",
+            "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.esm.js",
             "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.scss",
         ],
     },

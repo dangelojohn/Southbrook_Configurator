@@ -129,6 +129,16 @@ export class HermesChat extends Component {
  * Auto-mount: find any <div data-hermes-chat-mount> on the page and mount
  * a HermesChat into it. Lets us drop the panel anywhere in QWeb without
  * a JS edit.
+ *
+ * 2026-06-22 bugfix: each mount is wrapped in a try/catch so a missing
+ * template (or any other OWL error during this optional chat panel)
+ * cannot bring down the page that hosts it — most importantly the
+ * Order Builder, which used to throw
+ *   `OwlError: Missing template: "southbrook_hermes.HermesChat"`
+ *   `TypeError: Cannot read properties of undefined (reading 'add')`
+ * on hosts where the Hermes XML asset hadn't been loaded yet. The
+ * graceful degrade leaves the mount-point empty + a single console.warn
+ * so the bug is still discoverable from DevTools.
  */
 function autoMount() {
     const mounts = document.querySelectorAll("[data-hermes-chat-mount]");
@@ -136,13 +146,32 @@ function autoMount() {
         if (el.dataset.hermesMounted === "1") continue;
         el.dataset.hermesMounted = "1";
         const orderId = el.dataset.orderId || null;
-        mount(HermesChat, el, { props: { orderId } });
+        try {
+            mount(HermesChat, el, { props: { orderId } });
+        } catch (err) {
+            // Strip the mount-point from the DOM so a half-broken
+            // wrapper doesn't push the surrounding layout around.
+            el.style.display = "none";
+            // eslint-disable-next-line no-console
+            console.warn(
+                "[southbrook_hermes] HermesChat mount failed — "
+                + "hiding the chat panel and leaving the page intact:",
+                err,
+            );
+        }
     }
 }
 
+// 2026-06-22 bugfix: defer autoMount to the next microtask even on
+// already-loaded pages. The Odoo frontend bundle parses inline XML
+// templates as it loads the bundle JS; a synchronous autoMount() at
+// the bottom of this file occasionally races the templates loader
+// (template "southbrook_hermes.HermesChat" not yet registered when
+// the mount call lands → OwlError on the order-builder page). One
+// queueMicrotask is enough to land after the bundle's template
+// registration pass — and is still cheap on cold loads.
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", autoMount);
 } else {
-    // Already loaded (e.g., bundle injected late) — mount immediately.
-    autoMount();
+    queueMicrotask(autoMount);
 }
