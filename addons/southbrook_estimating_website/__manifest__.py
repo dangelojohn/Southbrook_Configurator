@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.2.7.0",
+    "version": "19.0.2.8.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -64,6 +64,15 @@
             # southbrook_estimating Track 1. Same vendored r160 bundle.
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
+            # 2026-06-22 — Tier-1 cabinet GLB pipeline (see
+            # static/lib/cabinets/README.md). The GLTFLoader entry is
+            # COMMENTED until the vendor lib is dropped at
+            # static/lib/three/GLTFLoader.js. The loader module stays
+            # registered either way — it degrades to a console.warn +
+            # BoxGeometry fallback when GLTFLoader is missing.
+            #
+            # "southbrook_estimating/static/lib/three/GLTFLoader.js",
+            "southbrook_estimating/static/src/js/cabinet_glb_loader.esm.js",
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
             # G1 + G2 (2026-06-01) — homepage hero + features SCSS.
             "southbrook_estimating_website/static/src/scss/homepage.scss",

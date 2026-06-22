@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.4.2.0",
+    "version": "19.0.4.3.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -197,6 +197,17 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
             "southbrook_estimating/static/src/scss/_southbrook_design_tokens.scss",
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
+            # 2026-06-22 — Tier-1 cabinet GLB pipeline. The GLTFLoader
+            # entry is COMMENTED until the vendor lib is dropped at
+            # static/lib/three/GLTFLoader.js (see
+            # static/lib/cabinets/README.md "Vendoring THREE.GLTFLoader"
+            # for the one-line curl command). The loader module below
+            # is safe to ship even when GLTFLoader is absent — it
+            # console.warn's once and returns null from loadCabinet so
+            # every cabinet falls back to BoxGeometry.
+            #
+            # "southbrook_estimating/static/lib/three/GLTFLoader.js",
+            "southbrook_estimating/static/src/js/cabinet_glb_loader.esm.js",
             "southbrook_estimating/static/src/scss/cabinet_viewport.scss",
             "southbrook_estimating/static/src/js/cabinet_viewport.esm.js",
             "southbrook_estimating/static/src/xml/cabinet_viewport.xml",

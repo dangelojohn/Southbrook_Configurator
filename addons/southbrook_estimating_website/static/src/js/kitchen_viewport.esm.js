@@ -33,6 +33,13 @@ import {
     useState,
     xml,
 } from "@odoo/owl";
+// 2026-06-22: Tier-1 cabinet GLB loader (see cabinet_glb_loader.esm.js).
+// When a designer drops a `.glb` into static/lib/cabinets/ and adds an
+// entry to cabinets.json, the corresponding cabinet renders as the
+// vendor mesh INSTEAD of the per-panel BoxGeometry below. With an
+// empty manifest (initial state) or a missing GLTFLoader vendor lib,
+// every findGlbUrlFor() returns null and we render boxes as before.
+import { GlbRegistry } from "@southbrook_estimating/js/cabinet_glb_loader.esm";
 
 async function rpcCall(url, params = {}) {
     const res = await fetch(url, {
@@ -440,6 +447,10 @@ export class KitchenViewport extends Component {
             this._cabinetGroup.remove(child);
             if (child.geometry) child.geometry.dispose();
         }
+        // Track per-line bounding boxes as we go so the async GLB pass
+        // below can position vendor models without re-walking panels.
+        // {<lineId>: {minX, maxX, minY, maxY, minZ, maxZ}}
+        const lineBounds = {};
 
         if (!payload || !Array.isArray(payload.panels)) return;
 
@@ -468,9 +479,48 @@ export class KitchenViewport extends Component {
             // get_kitchen_3d_payload backend prefixes each panel name
             // with L{id}_ — so /^L(\d+)_/ pulls the id reliably.
             const m = (p.name || "").match(/^L(\d+)_/);
-            if (m) mesh.userData.lineId = m[1];
+            if (m) {
+                mesh.userData.lineId = m[1];
+                // Accumulate the line's axis-aligned bounding box from
+                // panel centres + half-extents. Used by the Tier-1 GLB
+                // pass to place the vendor mesh at the cabinet's
+                // bottom-front-left corner (matches the asset-
+                // authoring origin in static/lib/cabinets/README.md).
+                const id = m[1];
+                const hx = d.width / 2;
+                const hy = d.height / 2;
+                const hz = d.depth / 2;
+                const b = lineBounds[id] || (lineBounds[id] = {
+                    minX:  Infinity, maxX: -Infinity,
+                    minY:  Infinity, maxY: -Infinity,
+                    minZ:  Infinity, maxZ: -Infinity,
+                });
+                if (p.pos.x - hx < b.minX) b.minX = p.pos.x - hx;
+                if (p.pos.x + hx > b.maxX) b.maxX = p.pos.x + hx;
+                if (p.pos.y - hy < b.minY) b.minY = p.pos.y - hy;
+                if (p.pos.y + hy > b.maxY) b.maxY = p.pos.y + hy;
+                if (p.pos.z - hz < b.minZ) b.minZ = p.pos.z - hz;
+                if (p.pos.z + hz > b.maxZ) b.maxZ = p.pos.z + hz;
+            }
             this._cabinetGroup.add(mesh);
         }
+
+        // 2026-06-22 — Tier-1 cabinet GLB pass.
+        //
+        // The per-panel BoxGeometry loop above is the always-on
+        // fallback. AFTER it runs, kick off an async pass that asks
+        // GlbRegistry for a vendor GLB per line and — for any line
+        // that has one — removes the per-panel boxes for that line
+        // and adds the GLB scene in their place. With an empty
+        // cabinets.json (initial state), or a missing GLTFLoader,
+        // every lookup returns null and this is a silent no-op.
+        //
+        // Build-sequence guard prevents an in-flight load from
+        // attaching to a now-cleared scene (rapid prop changes / a
+        // new _build call). Each _build bumps the counter; the async
+        // attach checks it before mutating _cabinetGroup.
+        this._buildSeq = (this._buildSeq || 0) + 1;
+        this._attachTier1GlbsAsync(this._buildSeq, lineBounds);
 
         // P25C2 — rebuild dimension chains for the new bounds.
         this._buildDimensionLines(payload);
@@ -485,6 +535,74 @@ export class KitchenViewport extends Component {
             } else {
                 this._camera.lookAt(new THREE.Vector3(...tgt));
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 2026-06-22 — Tier-1 cabinet GLB attach pass.
+    //
+    // Fires AFTER _build's per-panel BoxGeometry loop. For each line
+    // with a registered GLB, removes that line's per-panel meshes and
+    // places the vendor model at the cabinet's bottom-front-left
+    // corner (computed in _build via lineBounds). Lines with no
+    // registered GLB keep their box meshes.
+    //
+    // Build-sequence guard: if another _build call has fired during
+    // our await, mySeq !== this._buildSeq and we drop the work — the
+    // newer _build is mid-flight against a freshly-cleared scene.
+    //
+    // Mode swap: when the user toggles blueline mode, _build is NOT
+    // re-run (onToggleMode just swaps materials in place). Tier-1 GLBs
+    // therefore stay solid even in blueline mode for now — a real
+    // shader swap is a Phase-3 polish item, not part of this scaffold.
+    // ------------------------------------------------------------------
+    async _attachTier1GlbsAsync(mySeq, lineBounds) {
+        const THREE = this._THREE;
+        if (!THREE || !this._cabinetGroup) return;
+        if (!lineBounds || !Object.keys(lineBounds).length) return;
+        await GlbRegistry.load();
+        if (mySeq !== this._buildSeq || !this._cabinetGroup) return;
+
+        for (const lineId of Object.keys(lineBounds)) {
+            const lineInfo = this._linesIndex[lineId];
+            if (!lineInfo || !lineInfo.sku) continue;
+            const url = GlbRegistry.findGlbUrlFor(lineInfo.sku);
+            if (!url) continue;
+            const scene = await GlbRegistry.loadCabinet(THREE, url);
+            // Re-check the seq after every await — a newer _build may
+            // have invalidated our scene.
+            if (mySeq !== this._buildSeq || !this._cabinetGroup) return;
+            if (!scene) continue;
+
+            // Remove the per-panel box meshes for this line. Iterate a
+            // shallow copy because removing from the underlying
+            // children array mid-loop would skip elements.
+            const stale = this._cabinetGroup.children.filter(
+                (c) => c.userData && c.userData.lineId === lineId,
+            );
+            for (const c of stale) {
+                this._cabinetGroup.remove(c);
+                if (c.geometry) c.geometry.dispose();
+            }
+
+            // Place the GLB at the cabinet's bottom-front-left corner.
+            // SketchUp-authored origin convention is documented in
+            // static/lib/cabinets/README.md: X = width, Y = height,
+            // Z = depth toward the viewer (+Z front). The +X span
+            // is minX..maxX, +Y is 0..maxY (floor), +Z is minZ..maxZ.
+            const b = lineBounds[lineId];
+            scene.position.set(b.minX, b.minY, b.maxZ);
+            scene.userData.lineId = lineId;
+            // Tag every child mesh too so the existing hover/raycast
+            // path (which reads mesh.userData.lineId) keeps working.
+            scene.traverse((obj) => {
+                if (obj.isMesh) {
+                    obj.userData.lineId = lineId;
+                    obj.castShadow = true;
+                    obj.receiveShadow = true;
+                }
+            });
+            this._cabinetGroup.add(scene);
         }
     }
 
