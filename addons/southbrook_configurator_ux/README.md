@@ -141,3 +141,45 @@ complexity. Defer until SKU-to-Onshape auto-resolution is needed.
 
 None. This feature requires no environment variables, API keys, or server-side
 credentials.
+
+## URL surface — customer vs editor
+
+The configurator page lives at exactly **one** customer-visible URL per
+product:
+
+    https://southbrookcabinetry.space/shop/<cabinet-slug>
+
+This is the clean public storefront route owned by the Odoo `website_sale`
+module. A trade customer reaches it by:
+
+1. Hitting the shop catalog at `/shop`, OR following a link from the
+   `/my/southbrook/order-builder/*` quick-reorder list, OR clicking a
+   "Quick reorder" entry from their account home (see P3 work below).
+2. Picking a cabinet — the link target is `/shop/<slug>` (the slug is
+   the product template's `website_url` field, e.g.
+   `/shop/sb-wall-1dr-wall-cabinet-single-door-36`).
+3. Configuring + clicking **Add to Quote ➞** — the OWL bundle POSTs
+   `/southbrook/api/configurator/commit` and on success navigates the
+   customer to their Order Builder (`/my/southbrook/order-builder/<id>`).
+
+**Editor previews look different.** When an internal staff member opens
+the page via *Website → Edit*, Odoo wraps the same content in the
+website-builder chrome at `/odoo/website/<id>` (the iframe-wrapped editor
+preview). That URL is **never** reachable for portal or anonymous
+visitors — access is gated by `base.group_user`.
+
+End-user verification that the page is the clean URL, not the editor:
+
+- Anonymous + portal users see `/shop/<slug>` in the address bar, no
+  edit/translate toolbar overlay, and no `data-internal-user="1"`
+  attribute on `#sb_cfg_v2_main_mount` in DevTools.
+- Internal users at `/shop/<slug>` see the same clean URL but DO get
+  `data-internal-user="1"` (which unlocks the OWL Bulk-tools bar with
+  Template Layout / Import Product). They only see the editor chrome
+  if they explicitly enter edit mode from the dropdown.
+
+`tests/test_bulkbar_gating.py` locks the server-side derivation of
+`data-internal-user` (default "0", flipped to "1" only when
+`request.env.user.share` is False, i.e. an internal user); the same
+test also asserts the JS bundle's strict `=== "1"` comparison so a
+truthy-coercion regression on the client can't open the gate either.

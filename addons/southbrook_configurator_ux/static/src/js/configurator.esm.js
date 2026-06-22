@@ -50,7 +50,8 @@
 // =====================================================================
 
 import {
-    Component, mount, markup, onMounted, onWillStart, useRef, useState, xml,
+    Component, mount, markup, onError, onMounted, onWillStart,
+    useRef, useState, xml,
 } from "@odoo/owl";
 
 
@@ -110,10 +111,33 @@ class ConfiguratorV2 extends Component {
     </div>
   </t>
   <t t-elif="state.loadError">
+    <!-- P1 bugfix 2026-06-22: customer-safe error fallback. Never
+         renders state.loadError directly — a backend stack trace, a
+         compile error, or worse a chunk of generated JS would leak
+         to the storefront. The real error is logged to the browser
+         console in setup() for DevTools. The customer gets a
+         non-technical message + a path to /contactus so the sale
+         doesn't die at the broken page. -->
     <div class="sb_cfg_titlebar">
       <div class="sb_cfg_titlebar_l">
-        <h1 class="sb_cfg_h1">Couldn't load this configurator</h1>
-        <p class="sb_cfg_sub" t-esc="state.loadError"/>
+        <h1 class="sb_cfg_h1">This configurator is temporarily unavailable</h1>
+        <p class="sb_cfg_sub">
+          We can still help you spec this cabinet. Send us the model
+          you were looking at and any dimensions you have in mind —
+          our team will turn it around as a written quote.
+        </p>
+        <p class="sb_cfg_sub" style="margin-top: 12px;">
+          <a class="sb_cfg_btn sb_cfg_btn_primary"
+             t-att-href="contactQuoteHref"
+             role="button">
+            Request a quote ➞
+          </a>
+          <a class="sb_cfg_btn"
+             href="/shop"
+             style="margin-left: 10px;">
+            Back to catalog
+          </a>
+        </p>
       </div>
     </div>
   </t>
@@ -168,10 +192,22 @@ class ConfiguratorV2 extends Component {
 
         <div class="sb_cfg_summary">
           <div class="sb_cfg_sumrow">
+            <!-- P3 2026-06-22: distinguish client-side estimate from
+                 server-confirmed price. priceIsEstimate is true between
+                 mount and the first /select response (client-side
+                 recalculation only); after that the chip flips to
+                 LIVE because the server's price computation has
+                 reconciled with our pick set. -->
             <span class="sb_cfg_k">
-              Price <span class="sb_cfg_livetag">LIVE</span>
+              <t t-if="priceIsEstimate">
+                Price <span class="sb_cfg_livetag sb_cfg_livetag_est"
+                            title="Estimated from your current picks — final price confirmed by the server after any selection.">EST.</span>
+              </t>
+              <t t-else="">
+                Price <span class="sb_cfg_livetag">LIVE</span>
+              </t>
             </span>
-            <span class="sb_cfg_price">
+            <span t-att-class="priceIsEstimate ? 'sb_cfg_price sb_cfg_price_estimate' : 'sb_cfg_price'">
               <t t-esc="formattedPrice"/>
             </span>
           </div>
@@ -225,6 +261,23 @@ class ConfiguratorV2 extends Component {
                 <t t-if="state.requiredMissing.length === 1"> option still needed</t>
                 <t t-else=""> options still needed</t>
               </b>
+              <!-- P3 2026-06-22: tie the checklist explicitly to the
+                   disabled Add-to-Quote button so the user understands
+                   why the CTA isn't clickable. Customer-safe copy;
+                   never names server fields. -->
+              <p class="sb_cfg_missinglist_hint">
+                Pick one in each of the items below to enable the
+                <b>Add to Quote</b> button —
+                or use
+                <button type="button"
+                        class="sb_cfg_quickbuild_btn"
+                        t-on-click="onQuickBuild"
+                        t-att-disabled="state.selecting ? 'disabled' : null"
+                        title="Pre-fill every remaining option with our most-common choice. You can change anything afterwards.">
+                  ⚡ Quick build
+                </button>
+                to pre-fill them with our most common choices.
+              </p>
               <ul>
                 <t t-foreach="state.requiredMissing" t-as="miss" t-key="miss.attribute_id">
                   <li>
@@ -246,11 +299,22 @@ class ConfiguratorV2 extends Component {
           <!-- P6 — Add-to-Quote disable is driven by server-authoritative
                add_to_quote_enabled. Required-missing => disabled; the
                missing-options checklist above is the affordance.
-               state.adding still wins for the in-flight RPC state. -->
+               state.adding still wins for the in-flight RPC state.
+
+               2026-06-22 P0 bugfix: the OWL template compiler compiles
+               attribute expressions to JavaScript, so Python-style
+               bare-word operators ('or', 'not', 'and') get emitted
+               verbatim as identifiers and the bundle fails with
+               'OwlError: Failed to compile template ... Unexpected
+               identifier ctx' — site-wide on every product detail
+               page. Must use || / ! / and-and here. (Do NOT put the
+               JS operators or backticked words inside this comment —
+               this whole block lives inside an xml-tagged template
+               literal, and backticks would terminate it.) -->
           <button type="button"
                   class="sb_cfg_btn sb_cfg_btn_primary"
-                  t-att-disabled="(state.adding or not state.addToQuoteEnabled) ? 'disabled' : null"
-                  t-att-aria-disabled="state.addToQuoteEnabled ? null : 'true'"
+                  t-att-disabled="(state.adding || !state.addToQuoteEnabled) ? 'disabled' : null"
+                  t-att-aria-disabled="(state.adding || !state.addToQuoteEnabled) ? 'true' : null"
                   t-on-click="onAddToQuote">
             <t t-if="state.adding">Adding…</t>
             <t t-else="">Add to Quote ➞</t>
@@ -340,6 +404,32 @@ class ConfiguratorV2 extends Component {
         isInternalUser: { type: Boolean, optional: true },
     };
 
+    // P1 bugfix 2026-06-22: getter the loadError branch reads to build
+    // the "Request a quote" CTA. Pre-fills the contact subject with the
+    // product name when we got far enough to hydrate it; otherwise
+    // falls back to a generic subject. Never includes the error
+    // message — that goes to the console, not the URL.
+    get contactQuoteHref() {
+        const subject = this.state.product && this.state.product.name
+            ? "Quote request — " + this.state.product.name
+            : "Quote request";
+        return "/contactus?subject=" + encodeURIComponent(subject);
+    }
+
+    // P1 bugfix 2026-06-22: centralise loadError handling. Always logs
+    // the real error to console; never lets it reach state.loadError
+    // (the template only reads the boolean truthiness, not the value).
+    _captureLoadError(err, source) {
+        // eslint-disable-next-line no-console
+        console.error(
+            `[sb_cfg] configurator load failed (${source}):`, err,
+        );
+        // Sentinel boolean — the template checks truthiness, not value,
+        // so a stack trace or compiled-JS chunk can never end up in
+        // the DOM through this code path.
+        this.state.loadError = true;
+    }
+
     setup() {
         this.state = useState({
             // RPC + load state
@@ -389,6 +479,16 @@ class ConfiguratorV2 extends Component {
         this.viewerRef = useRef("viewer");
         this.imgInputRef = useRef("imgInput");
 
+        // P1 bugfix 2026-06-22: top-level error boundary. ANY runtime
+        // throw inside this component (template render, lifecycle hook,
+        // handler) lands here and flips to the friendly loadError
+        // branch instead of leaving a broken / blank page on a public
+        // storefront URL. The original error goes to the console for
+        // DevTools — never to the customer's screen.
+        onError((err) => {
+            this._captureLoadError(err, "runtime");
+        });
+
         // Fetch the configurator state from the Phase-2a endpoint before
         // the first render so the user never sees a flash of empty UI.
         onWillStart(async () => {
@@ -398,13 +498,19 @@ class ConfiguratorV2 extends Component {
                     { product_tmpl_id: this.props.productTmplId },
                 );
                 if (!r || !r.ok) {
-                    this.state.loadError = (r && r.message)
-                        || "The server didn't return a configurator state.";
+                    // P1 bugfix 2026-06-22: don't surface r.message —
+                    // it can carry server-side detail we don't want on
+                    // the storefront. Set a generic sentinel and log
+                    // the real payload to the console.
+                    this._captureLoadError(
+                        (r && r.message) || "no-ok response",
+                        "state_endpoint",
+                    );
                     return;
                 }
                 this._hydrateFromState(r);
             } catch (err) {
-                this.state.loadError = err.message || String(err);
+                this._captureLoadError(err, "state_endpoint");
             } finally {
                 this.state.loading = false;
             }
@@ -498,6 +604,15 @@ class ConfiguratorV2 extends Component {
         return cur.position === "after"
             ? `${amt}${cur.symbol}`
             : `${cur.symbol}${amt}`;
+    }
+
+    // P3 2026-06-22: drives the EST. vs LIVE chip in the summary header
+    // and the .sb_cfg_price_estimate styling on the price itself. True
+    // until the first /select round-trip lands (state.serverPrice goes
+    // non-null); after that, the displayed price is the server's
+    // canonical answer and the chip flips to LIVE.
+    get priceIsEstimate() {
+        return this.state.serverPrice === null;
     }
 
     get weightText() {
@@ -797,6 +912,36 @@ class ConfiguratorV2 extends Component {
     onSelectChange(attrId, ev) {
         const v = ev.target.value;
         this._pick(attrId, v === "" ? null : parseInt(v, 10));
+    }
+
+    // P3 2026-06-22: one-click defaults handler. Walks the
+    // server-authoritative requiredMissing list, picks the first
+    // available (non-disabled) value for each, and triggers a single
+    // batched /select. Result: a customer who landed on a 0/N build
+    // can be at "Add to Quote enabled" in two clicks total (Quick
+    // build → Add to Quote). All defaults are still user-overridable
+    // — Quick build only fills *missing* required slots; it never
+    // changes a value the user already picked.
+    async onQuickBuild() {
+        if (this.state.selecting) return;
+        const disabled = new Set(this.state.disabledValueIds || []);
+        for (const miss of this.state.requiredMissing) {
+            const attr = this.state.attributes[miss.attribute_id];
+            if (!attr || !attr.values || !attr.values.length) continue;
+            // Skip if the user already has a pick for this attribute
+            // (defensive — the server's requiredMissing shouldn't
+            // include picked attributes, but a stale render could).
+            if (this.state.picked[miss.attribute_id]) continue;
+            // Pick the first non-disabled value. attr.values is
+            // already sequence-sorted server-side, so "first" = the
+            // sequence-canonical default.
+            const choice = attr.values.find((v) => !disabled.has(v.id));
+            if (choice) {
+                this.state.picked[miss.attribute_id] = choice.id;
+            }
+        }
+        // Single reconcile fires /select with the combined pick set.
+        await this._serverReconcile();
     }
 
     toggleGroup(title) {
@@ -1446,16 +1591,43 @@ async function bootstrapConfiguratorV2() {
             props: { productTmplId, isInternalUser },
         });
     } catch (err) {
-        // Last-resort: surface the mount failure in the fallback area
-        // so a visitor sees something explicit rather than a blank space.
+        // P1 bugfix 2026-06-22: customer-safe mount-failure fallback.
+        // The previous version interpolated err.message directly into
+        // innerHTML — which on a template-compile failure spills the
+        // generated JS body onto the storefront. The error goes to
+        // the console only; the visitor sees a friendly message + a
+        // /contactus link so the sale survives.
+        //
+        // No template variables here — pure static HTML — so a future
+        // bug in the same code path cannot reintroduce the leak.
+        // eslint-disable-next-line no-console
+        console.error("[sb_cfg] mount failed:", err);
+        // Use textContent for the dynamic-looking subject parameter
+        // — there isn't one here, but the pattern keeps a future
+        // editor honest if they want to add product context.
+        const subject = "Quote request — Product page unavailable";
         target.innerHTML = `
             <div class="sb_cfg_titlebar">
               <div class="sb_cfg_titlebar_l">
-                <h1 class="sb_cfg_h1">Couldn't load this configurator</h1>
-                <p class="sb_cfg_sub">${(err && err.message) || String(err)}</p>
+                <h1 class="sb_cfg_h1">This configurator is temporarily unavailable</h1>
+                <p class="sb_cfg_sub">
+                  We can still help you spec this cabinet. Tell us the
+                  model and any dimensions you have in mind — our team
+                  will turn it around as a written quote.
+                </p>
+                <p class="sb_cfg_sub" style="margin-top: 12px;">
+                  <a class="sb_cfg_btn sb_cfg_btn_primary"
+                     href="/contactus?subject=${encodeURIComponent(subject)}"
+                     role="button">Request a quote ➞</a>
+                  <a class="sb_cfg_btn" href="/shop"
+                     style="margin-left: 10px;">Back to catalog</a>
+                </p>
               </div>
             </div>`;
-        throw err;
+        // Don't re-throw — the error has been handled (logged + visible
+        // fallback). Re-throwing would surface in unhandledrejection,
+        // which is just noise on a public page that already shows the
+        // user a working escape hatch.
     }
 }
 

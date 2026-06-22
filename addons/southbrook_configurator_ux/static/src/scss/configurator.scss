@@ -336,6 +336,55 @@ $sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
         border-radius: 20px;
         margin-left: 6px;
     }
+    // P3 2026-06-22: the price is a client-side estimate until the
+    // first /select response. Visual distinction is a muted chip
+    // colour (amber-on-cream) and a dotted underline on the figure
+    // — enough to draw a glance without alarming the customer.
+    .sb_cfg_livetag_est {
+        color: #8a5a00;
+        background: #fff4d6;
+    }
+    .sb_cfg_price_estimate {
+        text-decoration: underline dotted #c08a00;
+        text-underline-offset: 4px;
+    }
+    // P3 2026-06-22: short explainer paragraph under the missing-
+    // options checklist header that ties the disabled CTA to the
+    // remaining picks. Reads as muted body copy, not as an alert.
+    .sb_cfg_missinglist_hint {
+        margin: 6px 0 8px;
+        font-size: 12px;
+        color: $sb-cfg-ink-dim;
+        line-height: 1.4;
+
+        b { color: $sb-cfg-ink-mid; }
+    }
+    // P3 2026-06-22: inline "Quick build" pill in the explainer. Pre-
+    // fills every missing required attribute with the sequence-default
+    // value. Visually a chip — not a primary CTA — so the Add-to-Quote
+    // button remains the primary visual hit.
+    .sb_cfg_quickbuild_btn {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 600;
+        color: $sb-cfg-blue;
+        background: #eef4ff;
+        border: 1px solid #c9d8f0;
+        padding: 2px 9px;
+        border-radius: 999px;
+        margin: 0 2px;
+        cursor: pointer;
+        line-height: 1.4;
+
+        &:hover {
+            background: #dbe6ff;
+            border-color: #a8c0e8;
+        }
+        &:disabled {
+            opacity: 0.5;
+            cursor: progress;
+        }
+    }
 
     // ===== P6 — chosen-chips list =====
     .sb_cfg_chiplist {

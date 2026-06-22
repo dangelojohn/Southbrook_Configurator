@@ -8,3 +8,6 @@ from . import test_p6_completeness
 from . import test_p5_sku_lossless
 from . import test_onshape_cad_url
 from . import test_t3_commit_warnings
+from . import test_bulkbar_gating
+from . import test_loaderror_safety
+from . import test_template_compile
