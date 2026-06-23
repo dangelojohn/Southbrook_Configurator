@@ -40,10 +40,14 @@ class SouthbrookApiKey(models.Model):
     revoked_at = fields.Datetime(copy=False)
     revoked_reason = fields.Char()
 
-    _sql_constraints = [
-        ("key_hash_uniq", "unique(key_hash)",
-         "Two API keys cannot share the same hash."),
-    ]
+    # Odoo 19 deprecated _sql_constraints (silently ignored, no warning,
+    # no PG enforcement). Use models.Constraint per the new ORM API —
+    # the leading underscore on the attribute name follows the Odoo
+    # core convention (decimal_precision.py, ir_actions.py, etc.).
+    _key_hash_uniq = models.Constraint(
+        'unique(key_hash)',
+        "Two API keys cannot share the same hash.",
+    )
 
     # ------------------------------------------------------------------
     # Issuance

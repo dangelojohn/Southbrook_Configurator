@@ -45,7 +45,6 @@ class SouthbrookKitchenFinish(models.Model):
     )
     note = fields.Char(help="Free-form planning note.")
 
-    _sql_constraints = [
-        ("name_uniq", "unique(name)", "Finish name must be unique."),
-        ("code_uniq", "unique(code)", "Finish code must be unique."),
-    ]
+    # Odoo 19: models.Constraint (legacy _sql_constraints silently no-op'd).
+    _name_uniq = models.Constraint('unique(name)', "Finish name must be unique.")
+    _code_uniq = models.Constraint('unique(code)', "Finish code must be unique.")

@@ -204,10 +204,13 @@ class SouthbrookKitchenOperationTemplate(models.Model):
 
     notes = fields.Text()
 
-    _sql_constraints = [
-        ("name_uniq", "unique(name)", "Operation template name must be unique."),
-        ("code_uniq", "unique(code)", "Operation template code must be unique."),
-    ]
+    # Odoo 19: models.Constraint (legacy _sql_constraints silently no-op'd).
+    _name_uniq = models.Constraint(
+        'unique(name)', "Operation template name must be unique.",
+    )
+    _code_uniq = models.Constraint(
+        'unique(code)', "Operation template code must be unique.",
+    )
 
     # ==================================================================
     # Duration formula — the function the M4 mrp.workorder button calls.

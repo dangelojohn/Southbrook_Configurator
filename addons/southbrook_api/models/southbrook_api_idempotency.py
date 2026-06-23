@@ -31,11 +31,11 @@ class SouthbrookApiIdempotency(models.Model):
     status_code = fields.Integer(required=True)
     response_body = fields.Text(required=True)
 
-    _sql_constraints = [
-        ("api_idempotency_uniq",
-         "unique(api_key_hash, route_scope, idempotency_key)",
-         "Duplicate idempotency record for this API key + route + key."),
-    ]
+    # Odoo 19: models.Constraint (legacy _sql_constraints silently no-op'd).
+    _api_idempotency_uniq = models.Constraint(
+        'unique(api_key_hash, route_scope, idempotency_key)',
+        "Duplicate idempotency record for this API key + route + key.",
+    )
 
     @api.model
     def _ttl_hours(self) -> int:
