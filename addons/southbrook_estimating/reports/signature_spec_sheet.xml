@@ -7,17 +7,24 @@
   kitchen with cabinet list, totals, and lead time.
 
   Visual target: docs/southbrook_book_templates.pdf (when #7 lands).
-  Current styling: TBD-marked named CSS variables in
-  reports/southbrook_report_styles.xml (see NF15).
 
-  Data binding: sale.order. The customer sees their order.
+  19.0.4.5.0 (2026-06-23) — captured John's live-DB invoice improvements
+  back into git. Two-page → one-page; table-based layout (wkhtmltopdf
+  flexbox is broken in the Odoo-bundled ancient WebKit); dedicated
+  paperformat (Southbrook Invoice A4 — 28/16/7/7 mm margins) so the
+  default A4's 52mm top + 52mm header_spacing don't blow out a second
+  page; scoped border reset on .sb-layout-table because the global
+  southbrook_report_styles rule forces borders on every td.
 
-  19.0.4.4.0 (2026-06-22) — turned into a branded invoice: INVOICE header
-  band with real Southbrook logo (sourced from website.logo, base64 in
-  place so image_data_uri works in wkhtmltopdf), Prepared For block with
-  right-side QR (via /report/barcode controller URL — NOT base64; QWeb
-  safe_eval blocks base64 and the barcode() helper returns raw PNG bytes
-  that break utf-8 decoding), and centered footer.
+  The body-band logo from 19.0.4.4.0 was removed: the standard external
+  layout already renders it once in the page header, so showing it again
+  in the body was a duplicate that ate vertical space.
+
+  19.0.4.4.0 (earlier) — initial INVOICE-band concept with flexbox; did
+  not survive contact with wkhtmltopdf (collapsed/stacked in PDF). See
+  memory note southbrook_spec_sheet_invoice_v19_4_4_0.md for the gotcha
+  catalog (QWeb safe_eval excludes base64, barcode() returns raw PNG
+  bytes, /report/barcode controller URL is the only working QR path).
 -->
 <odoo>
 
@@ -35,76 +42,85 @@
         <t t-call="web.external_layout">
           <t t-call="southbrook_estimating.southbrook_report_styles"/>
           <div class="page southbrook-report">
+            <!-- Scoped border reset for layout tables. The global
+                 .southbrook-report table rule in southbrook_report_styles
+                 forces border+padding+background on every td — fine for
+                 the Cabinets table, ugly for the layout/meta tables.
+                 Descendant selectors only (not `>`) — wkhtmltopdf's old
+                 WebKit handles child combinators poorly. -->
+            <style>
+              .southbrook-report .sb-layout-table,
+              .southbrook-report .sb-layout-table td,
+              .southbrook-report .sb-layout-table tr,
+              .southbrook-report .sb-layout-table th,
+              .southbrook-report .sb-meta-table,
+              .southbrook-report .sb-meta-table td,
+              .southbrook-report .sb-meta-table tr,
+              .southbrook-report .sb-meta-table th {
+                border: 0 !important;
+                border-collapse: collapse !important;
+                background: transparent !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
+              }
+            </style>
 
             <div class="sb-illustrative-banner"
                  t-if="env['ir.config_parameter'].sudo().get_param('southbrook.seed_mode') == 'illustrative'">
               ILLUSTRATIVE SEED — demo numbers, not production data.
             </div>
 
-            <!-- B1: INVOICE header band — brand left, INVOICE meta right -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6e5b4f;padding-bottom:14px;margin-bottom:18px;">
-              <div class="sb-brand">
-                <img t-if="web_logo" t-att-src="image_data_uri(web_logo)"
-                     style="max-height:64px;max-width:260px;"
-                     alt="Southbrook Cabinetry"/>
-                <div t-else="">Southbrook Cabinetry</div>
-              </div>
-              <div class="sb-doc-meta" style="text-align:right;">
-                <div style="font-size:20px;font-weight:bold;letter-spacing:1px;color:#6e5b4f;text-transform:uppercase;">INVOICE</div>
-                <table style="border:none;margin-left:auto;margin-top:6px;">
-                  <tr>
-                    <td style="text-align:right;padding:2px 6px 2px 0;border:none;"><strong>Reference</strong></td>
-                    <td style="text-align:left;padding:2px 0;border:none;" t-out="o.name"/>
-                  </tr>
-                  <tr>
-                    <td style="text-align:right;padding:2px 6px 2px 0;border:none;"><strong>Version</strong></td>
-                    <td style="text-align:left;padding:2px 0;border:none;" t-out="o.version"/>
-                  </tr>
-                  <tr>
-                    <td style="text-align:right;padding:2px 6px 2px 0;border:none;"><strong>Date</strong></td>
-                    <td style="text-align:left;padding:2px 0;border:none;"
-                        t-out="o.date_order" t-options="{'widget':'date'}"/>
-                  </tr>
-                </table>
-              </div>
-            </div>
+            <!-- Title strip: "Your Southbrook Kitchen / Signature Spec Sheet"
+                 left, "INVOICE" right. Table layout (NOT flexbox — flexbox
+                 collapses in wkhtmltopdf). -->
+            <table class="sb-layout-table" style="width:100%;border-collapse:collapse;border:none;margin-bottom:4px;">
+              <tr>
+                <td style="border:none;vertical-align:top;padding:0;">
+                  <div style="font-size:24px;font-weight:bold;color:#3d3d3d;line-height:1.1;">Your Southbrook Kitchen</div>
+                  <div style="font-size:14px;color:#8a8a8a;margin-top:2px;">Signature Spec Sheet</div>
+                </td>
+                <td style="border:none;vertical-align:top;padding:0;text-align:right;white-space:nowrap;">
+                  <div style="font-size:22px;font-weight:bold;letter-spacing:2px;color:#6e5b4f;text-transform:uppercase;">Invoice</div>
+                </td>
+              </tr>
+            </table>
+            <hr class="sb-rule" style="margin:6px 0 12px 0;border:0;border-top:2px solid #6e5b4f;"/>
 
-            <!-- B2: Document title -->
-            <h1>Your Southbrook Kitchen</h1>
-            <h2>Signature Spec Sheet</h2>
-            <hr class="sb-rule"/>
+            <!-- Two-column meta: customer (left) · meta values + QR (right).
+                 Right-cell meta is stacked DIVs, NOT a nested table, so the
+                 global td-border rule has nothing to grab onto. -->
+            <table class="sb-layout-table" style="width:100%;border-collapse:collapse;border:none;margin-bottom:6px;">
+              <tr>
+                <td style="border:none;vertical-align:top;padding:0;">
+                  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:3px;">Prepared For</div>
+                  <div style="font-size:13px;line-height:1.7;"><strong>Customer:</strong> <span t-out="o.partner_id.name"/></div>
+                  <div style="font-size:13px;line-height:1.7;"><strong>Reference:</strong> <span t-out="o.name"/> <span class="sb-muted">(v<span t-out="o.version"/>)</span></div>
+                  <div style="font-size:13px;line-height:1.7;"><strong>Quote Date:</strong> <span t-out="o.date_order" t-options="{'widget': 'date'}"/></div>
+                </td>
+                <td style="border:none;vertical-align:top;padding:0;text-align:right;width:230px;">
+                  <div style="text-align:right;font-size:11px;line-height:1.7;margin-bottom:10px;">
+                    <div><span style="color:#777;">Reference&#160;&#160;</span><strong><span t-out="o.name"/></strong></div>
+                    <div><span style="color:#777;">Version&#160;&#160;</span><span t-out="o.version"/></div>
+                    <div><span style="color:#777;">Date&#160;&#160;</span><span t-out="o.date_order" t-options="{'widget': 'date'}"/></div>
+                  </div>
+                  <div class="sb-qr" style="text-align:right;">
+                    <!-- QR via /report/barcode controller URL — see gotcha
+                         catalog in memory/southbrook_spec_sheet_invoice_v19_4_4_0.md
+                         for why this is the only form that works (NOT base64). -->
+                    <t t-set="qr_url" t-value="'/report/barcode/?barcode_type=QR&amp;value=' + page_url + '&amp;width=240&amp;height=240'"/>
+                    <img t-att-src="qr_url"
+                         style="width:92px;height:92px;border:1px solid #e2dcd4;padding:4px;background:#fff;display:inline-block;"
+                         alt="Scan to view online"/>
+                    <div style="font-size:8px;color:#999;margin-top:2px;letter-spacing:.5px;">SCAN TO VIEW ONLINE</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
 
-            <!-- B3: Prepared For (left) + QR (right) -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-              <div class="sb-billto-fields">
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#777;">PREPARED FOR</div>
-                <div><strong>Customer:</strong> <span t-out="o.partner_id.name"/></div>
-                <div>
-                  <strong>Reference:</strong>
-                  <span t-out="o.name"/>
-                  <span class="sb-muted">(v<span t-out="o.version"/>)</span>
-                </div>
-                <div>
-                  <strong>Quote Date:</strong>
-                  <span t-out="o.date_order" t-options="{'widget':'date'}"/>
-                </div>
-              </div>
-              <div class="sb-qr" style="text-align:center;min-width:96px;margin-left:auto;">
-                <!-- QR via the barcode controller URL. Built with simple
-                     concatenation (not %-formatting) — see template
-                     header comment + memory note owl-tokenizer-constraints
-                     siblings for the known-bad alternatives. -->
-                <t t-set="qr_url" t-value="'/report/barcode/?barcode_type=QR&amp;value=' + page_url + '&amp;width=240&amp;height=240'"/>
-                <img t-att-src="qr_url"
-                     style="width:84px;height:84px;border:1px solid #e2dcd4;padding:3px;background:#fff;"
-                     alt="Scan to view online"/>
-                <div style="font-size:8px;color:#999;margin-top:3px;letter-spacing:.5px;">SCAN TO VIEW ONLINE</div>
-              </div>
-            </div>
+            <hr class="sb-rule" style="margin:4px 0 12px 0;"/>
 
-            <hr class="sb-rule"/>
-
-            <!-- B4: Cabinets table -->
+            <!-- Cabinets table — KEEPS the global td-border styling (no
+                 sb-layout-table class on this one). -->
             <h2>Cabinets</h2>
             <table>
               <thead>
@@ -141,7 +157,6 @@
               </tfoot>
             </table>
 
-            <!-- B5: Disclaimer + centered footer -->
             <p class="sb-muted">
               This spec sheet was generated by the Southbrook Estimating
               Application. The cabinet specifications and pricing reflect
@@ -160,7 +175,25 @@
     </t>
   </template>
 
-  <!-- ir.actions.report — binds the template to sale.order -->
+  <!-- Dedicated paperformat: tight margins so the invoice fits on ONE A4 page.
+       The default company A4 has margin_top=52 + header_spacing=52, which
+       leaves an enormous empty gap and pushes the doc to page 2. Scoped only
+       to this report via the paperformat_id below — global A4 untouched. -->
+  <record id="paperformat_southbrook_invoice_a4" model="report.paperformat">
+    <field name="name">Southbrook Invoice A4</field>
+    <field name="format">A4</field>
+    <field name="orientation">Portrait</field>
+    <field name="dpi">90</field>
+    <field name="margin_top">28</field>
+    <field name="margin_bottom">16</field>
+    <field name="margin_left">7</field>
+    <field name="margin_right">7</field>
+    <field name="header_spacing">16</field>
+    <field name="header_line" eval="False"/>
+  </record>
+
+  <!-- ir.actions.report — binds the template to sale.order, with the
+       dedicated Southbrook Invoice A4 paperformat. -->
   <record id="action_report_signature_spec_sheet" model="ir.actions.report">
     <field name="name">Signature Spec Sheet</field>
     <field name="model">sale.order</field>
@@ -168,6 +201,7 @@
     <field name="report_name">southbrook_estimating.report_signature_spec_sheet_doc</field>
     <field name="report_file">southbrook_estimating.report_signature_spec_sheet_doc</field>
     <field name="print_report_name">'Spec Sheet - %s' % (object.name)</field>
+    <field name="paperformat_id" ref="paperformat_southbrook_invoice_a4"/>
     <field name="binding_model_id" ref="sale.model_sale_order"/>
     <field name="binding_type">report</field>
   </record>
