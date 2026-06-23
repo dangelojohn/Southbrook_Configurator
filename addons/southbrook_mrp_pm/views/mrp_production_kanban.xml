@@ -38,7 +38,7 @@
             model="ir.ui.view">
       <field name="name">mrp.production.kanban.southbrook</field>
       <field name="model">mrp.production</field>
-      <field name="inherit_id" ref="mrp.mrp_production_view_kanban"/>
+      <field name="inherit_id" ref="mrp.mrp_production_kanban_view"/>
       <field name="arch" type="xml">
 
         <!-- 1. Pipeline columns + draggable -->
@@ -48,16 +48,19 @@
           <attribute name="class">o_sb_mo_kanban</attribute>
         </xpath>
 
-        <!-- 2. Surface the fields the redesigned card reads. The
-             core view already exposes name + state + product_qty +
-             priority + product_uom_id + date_planned_start +
-             activity_ids; we add the rest so the OWL kanban knows
-             to fetch them. The position="after" of name is the
-             standard pattern for safely adding sibling fields. -->
-        <xpath expr="//field[@name='name']" position="after">
+        <!-- 2. Surface the fields the redesigned card reads.
+             The core mrp.production_kanban_view (verified against
+             ir_ui_view at deploy time) exposes only date_start +
+             state at the kanban root, with name/product_id/
+             product_qty/product_uom_id/priority/activity_ids
+             scoped INSIDE <templates>. We append the extra fields
+             our card needs as siblings of `state` (a real kanban-
+             root element). Using //field[@name='state'] is more
+             surgical than //kanban position="inside" because it
+             keeps the field list contiguous in arch order. -->
+        <xpath expr="//field[@name='state']" position="after">
           <field name="user_id"/>
-          <field name="product_tmpl_id"/>
-          <field name="date_planned_finished"/>
+          <field name="product_id"/>
           <field name="origin"/>
         </xpath>
 
@@ -89,9 +92,9 @@
                          default_code (display_name lacks the
                          bracketed prefix). -->
                     <span class="o_sb_mo_code"
-                          t-if="record.product_tmpl_id.value
-                                and record.product_tmpl_id.value.startsWith('[')">
-                      <t t-out="record.product_tmpl_id.value.split(']')[0].slice(1)"/>
+                          t-if="record.product_id.value
+                                and record.product_id.value.startsWith('[')">
+                      <t t-out="record.product_id.value.split(']')[0].slice(1)"/>
                     </span>
                     <!-- Primary title — product name only (strip the
                          [code] prefix once it's been promoted to a
@@ -99,8 +102,8 @@
                          show in a native tooltip when truncated by
                          the 2-line clamp. -->
                     <h4 class="o_sb_mo_title"
-                        t-att-title="record.product_tmpl_id.value">
-                      <t t-out="(record.product_tmpl_id.value or '').replace(/^\[[^\]]+\]\s*/, '')"/>
+                        t-att-title="record.product_id.value">
+                      <t t-out="(record.product_id.value or '').replace(/^\[[^\]]+\]\s*/, '')"/>
                     </h4>
                   </header>
 
@@ -114,7 +117,7 @@
                            "2 days ago" + colours itself red/amber
                            when overdue/due-soon. The audit-asked
                            date urgency cue with zero custom code. -->
-                      <field name="date_planned_start"
+                      <field name="date_start"
                              widget="remaining_days"/>
                     </span>
                   </div>
