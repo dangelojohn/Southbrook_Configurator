@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Historical-regression fixture for scripts/lint-owl-expr.py.
+  Each line below is a VERBATIM (or close-to-verbatim) bug shape from the
+  three OWL incidents on 2026-06-22. The scanner must flag each one;
+  100% catch rate is the bar for empirical proof the hook works.
+
+  Provenance:
+  - H01 from f05b99d (configurator-ux site-wide /shop compile failure)
+  - H02 from ab45954 / f3d13dd (mrp_pm kanban hotfix — word op + regex)
+  - H03 from ab45954 (same expression, second occurrence)
+  - H04 from ab45954 (record.product_uom_id.value similar pattern)
+-->
+<odoo>
+  <templates>
+    <button t-att-disabled="(state.adding or not state.addToQuoteEnabled)">H01 f05b99d storefront</button>
+    <t t-out="(record.product_id.value or '').replace(/^\[[^\]]+\]\s*/, '')">H02 ab45954 kanban</t>
+    <t t-out="(record.product_tmpl_id.value or '').replace(/^\[[^\]]+\]\s*/, '')">H03 f3d13dd intro</t>
+    <t t-if="record.product_id.value and record.product_id.value.length">H04 ab45954 word-op</t>
+  </templates>
+</odoo>

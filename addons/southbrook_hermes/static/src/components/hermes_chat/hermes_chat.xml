@@ -40,7 +40,7 @@
           t-att-disabled="state.sending"/>
         <button
           t-on-click="submit"
-          t-att-disabled="state.sending or not state.inputValue.trim()">
+          t-att-disabled="state.sending || !state.inputValue.trim()">
           <t t-if="state.sending">…</t>
           <t t-else="">Ask</t>
         </button>

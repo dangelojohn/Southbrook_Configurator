@@ -19,10 +19,11 @@ cd "$ROOT"
 
 # Limit scope to the southbrook addons. The vendored OCA modules are
 # treated as immutable upstream.
-TARGETS=(
-    "addons/southbrook_estimating"
-    "addons/southbrook_estimating_website"
-)
+# Widened 2026-06-22 from {estimating, estimating_website} to all
+# southbrook_* via glob — covers the full deployed surface (~25 addons,
+# 198 XML files). Dry-run was clean before widening. New addons matching
+# the glob are auto-included.
+TARGETS=(addons/southbrook_*)
 
 FAIL=0
 for dir in "${TARGETS[@]}"; do

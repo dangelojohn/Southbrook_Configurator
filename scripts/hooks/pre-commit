@@ -1,0 +1,57 @@
+#!/bin/sh
+# scripts/hooks/pre-commit — canonical pre-commit hook for southbrook-v19cr.
+#
+# Install via:  scripts/install-hooks.sh
+# .git/hooks/pre-commit is a relative symlink to this file so the hook is
+# version-controlled and travels with the repo.
+#
+# Checks run only when XML files are staged:
+#   1. XML well-formedness  (scripts/lint-xml.sh — existing narrow check)
+#   2. OWL tokenizer rules  (scripts/lint-owl-expr.py — staged files only)
+#
+# Bypass (last resort, with a good reason): git commit --no-verify
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+
+STAGED_XML=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.xml$' || true)
+if [ -z "$STAGED_XML" ]; then
+    exit 0
+fi
+
+# Check 1: XML well-formedness
+if [ -x "$ROOT/scripts/lint-xml.sh" ]; then
+    if ! "$ROOT/scripts/lint-xml.sh"; then
+        echo
+        echo "(blocked: XML well-formedness — fix the parse error above)"
+        echo "Bypass: git commit --no-verify"
+        exit 1
+    fi
+fi
+
+# Check 2: OWL tokenizer rules (staged files only — fast)
+if [ -x "$ROOT/scripts/lint-owl-expr.py" ]; then
+    FAILED=0
+    for f in $STAGED_XML; do
+        # Skip linter self-test fixtures — they intentionally contain
+        # known-bad shapes so the scanner can be tested against them.
+        case "$f" in
+            scripts/_test_fixtures/lint-owl/*) continue ;;
+        esac
+        if [ -f "$ROOT/$f" ]; then
+            if ! "$ROOT/scripts/lint-owl-expr.py" "$ROOT/$f"; then
+                FAILED=1
+            fi
+        fi
+    done
+    if [ "$FAILED" -ne 0 ]; then
+        echo
+        echo "(blocked: OWL tokenizer rules — these bugs pass XML lint and"
+        echo " Odoo install but throw OwlError in the browser)"
+        echo "See memory note: owl-tokenizer-constraints"
+        echo "Bypass (last resort): git commit --no-verify"
+        exit 1
+    fi
+fi
+
+exit 0

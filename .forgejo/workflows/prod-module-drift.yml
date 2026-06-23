@@ -1,0 +1,53 @@
+name: prod-module-drift
+
+# WHY THIS EXISTS
+# Cold-install gaps recur. Feature addons (Hermes, Premium Orchestration,
+# project, project_mrp, ...) get deployed to prod without backfilling the
+# Makefile MODULES list that CI cold-install-validates against. The net
+# effect: silent loss of disaster-recovery coverage as the platform grows.
+#
+# This workflow asserts the inverse loop is closed: every southbrook_*
+# module installed in the live prod database must be in MODULES, or
+# explicitly EXCLUDE'd in scripts/check-prod-modules-drift.sh with a reason.
+#
+# Same runner pattern as cold-boot-canary: runs ON the QNAP host (not in
+# a build container) so `docker exec southbrook-postgres ...` works against
+# the live system-docker daemon. Read-only — never mutates anything.
+#
+# Triggers:
+#   - on push to main (so a merge that ships a new addon flags drift immediately)
+#   - daily at :17 (catches manual prod installs / uninstalls between pushes)
+#   - workflow_dispatch (manual button)
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '17 4 * * *'      # daily at 04:17 UTC, off-peak
+  workflow_dispatch: {}
+
+concurrency:
+  group: prod-module-drift
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    runs-on: linux-amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Detect MODULES vs prod drift
+        run: bash scripts/check-prod-modules-drift.sh --local
+
+      # OPTIONAL — chat/webhook alert on drift. Add a repo secret
+      # CANARY_WEBHOOK_URL, then uncomment:
+      # - name: Alert on failure
+      #   if: failure()
+      #   run: |
+      #     curl -fsS -X POST "${{ secrets.CANARY_WEBHOOK_URL }}" \
+      #       -H 'Content-Type: application/json' \
+      #       --data '{"text":"southbrook prod-module-drift FAILED — Makefile MODULES no longer matches what is actually installed in prod. Cold-install CI coverage is regressing."}'

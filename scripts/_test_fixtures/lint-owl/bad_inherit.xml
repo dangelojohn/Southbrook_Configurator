@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Negative fixture for the inherit-view escape hatch.
+  No <templates> block; OWL-only record.X.raw_value access in the xpath body
+  must trigger the OWL_RECORD_RE heuristic so the word op 'and' is flagged.
+
+  Mirrors the real shape of files like:
+    addons/southbrook_manufacturing_intelligence/views/pm_kanban_inherit.xml
+-->
+<odoo>
+  <record id="kanban_inherit_with_bug" model="ir.ui.view">
+    <field name="arch" type="xml">
+      <xpath expr="//header" position="after">
+        <t t-if="record.x_count.raw_value and not record.x_done.raw_value">BI01 inherit-word-op</t>
+      </xpath>
+    </field>
+  </record>
+</odoo>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Negative fixtures for scripts/lint-owl-expr.py.
+  Each violation is on its own line so line-number output is deterministic.
+  Wrapped in <templates>...</templates> so the scanner treats these as OWL.
+  Tag prefixes (B01..) match assertions in scripts/test_lint_owl_expr.sh.
+
+  See: memory note owl-tokenizer-constraints (Triple-fault history).
+-->
+<odoo>
+  <templates>
+    <t t-if="active or selected">B01 word-op-or</t>
+    <t t-if="user.verified and !user.guest">B02 word-op-and</t>
+    <t t-if="not state.loaded">B03 word-op-not</t>
+    <button t-att-disabled="(state.adding or not state.addToQuoteEnabled)">B04 ux-real</button>
+    <span t-out="name.replace(/^[A-Z]/, '')">B05 regex-replace</span>
+    <div t-att-class="/^admin/.test(role) ? 'red' : ''">B06 regex-test</div>
+    <a t-attf-href="record-#{record.id and record.name}">B07 word-op-in-attf-interp</a>
+  </templates>
+</odoo>

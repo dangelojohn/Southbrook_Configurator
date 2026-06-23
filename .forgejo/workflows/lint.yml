@@ -1,0 +1,63 @@
+name: lint
+
+# WHY THIS EXISTS
+# Defence-in-depth past the local pre-commit hook (scripts/hooks/pre-commit):
+#  - Catches contributors who never installed the hook (scripts/install-hooks.sh).
+#  - Catches `git commit --no-verify` bypasses.
+#  - Re-checks history on every branch push so a lurking violation in an old
+#    commit doesn't survive a rebase that re-introduces it.
+#
+# Runs two cheap checks (no Odoo, no docker):
+#   1. scripts/lint-xml.sh             — XML well-formedness across all
+#                                        southbrook_* addons (~198 files).
+#   2. scripts/test_lint_owl_expr.sh   — self-test for the OWL scanner.
+#   3. scripts/lint-owl-expr.py        — OWL tokenizer rules across addons/.
+#
+# All three should finish in well under 30 seconds combined.
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+      - "chore/**"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  xml-and-owl:
+    runs-on: linux-amd64
+    container:
+      # python:3.13-slim is debian-slim with cpython 3.13. ~50MB pull, cached
+      # by the runner after the first run. The scanner only uses stdlib (re,
+      # pathlib), so no pip install needed.
+      image: python:3.13-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install git (needed by some checkout actions in slim images)
+        run: |
+          if ! command -v git >/dev/null 2>&1; then
+            apt-get update -qq
+            apt-get install -y --no-install-recommends git
+          fi
+          python3 --version
+          git --version
+
+      - name: XML well-formedness (all southbrook_* addons)
+        run: bash scripts/lint-xml.sh
+
+      - name: OWL scanner self-test
+        run: bash scripts/test_lint_owl_expr.sh
+
+      - name: OWL tokenizer rules (all addons/)
+        run: python3 scripts/lint-owl-expr.py addons/
