@@ -1032,27 +1032,84 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             return {"error": "forbidden"}
 
         tmpl = line.product_id.product_tmpl_id
-        # The variant's value set — empty for the default fast-path
-        # variant created by /add-line. We use it to mark 'current'.
+        PAV = request.env["product.attribute.value"].sudo()
+
+        # Effective current values for the line — two sources.
+        # Primary: variant attribute values (empty for default fast-path
+        # variants created by /add-line).
         current_ptav = line.product_id.product_template_attribute_value_ids
-        current_value_ids = current_ptav.product_attribute_value_id.ids
+        line_value_ids = set(current_ptav.product_attribute_value_id.ids)
+        # Fallback: dimensional sb_*_mm fields on sale.order.line. The
+        # default fast-path variant has no PTAVs, but sb_width_mm (etc.)
+        # still carries the chosen dimension. Map mm → "<N> in" attribute
+        # value name so the picker can pre-select even before any /set-
+        # attribute call resolves a configured variant.
+        def _value_for_mm(attr_xmlid, mm):
+            if not mm:
+                return None
+            attr = request.env.ref(attr_xmlid, raise_if_not_found=False)
+            if not attr:
+                return None
+            v = PAV.search(
+                [
+                    ("attribute_id", "=", attr.id),
+                    ("name", "=", "%d in" % round(mm / 25.4)),
+                ],
+                limit=1,
+            )
+            return v.id if v else None
+
+        fallback_width = _value_for_mm(
+            "southbrook_estimating.attr_width", line.sb_width_mm,
+        )
+        if fallback_width:
+            line_value_ids.add(fallback_width)
+        # Future: extend with sb_height_mm / sb_depth_mm once attr_height
+        # / attr_depth ship in the data. Same pattern.
+
+        # Group line_value_ids by attribute_id for per-attribute lookup.
+        line_values_by_attr = {}
+        for v in PAV.browse(list(line_value_ids)):
+            line_values_by_attr.setdefault(
+                v.attribute_id.id, set(),
+            ).add(v.id)
 
         attributes = []
         for attr_line in tmpl.attribute_line_ids:
             # Hide attributes with a single option — nothing to pick.
             if len(attr_line.value_ids) < 2:
                 continue
+            attr_id = attr_line.attribute_id.id
+            # Union: template-allowed values + the line's effective current
+            # value. Without the union, a line whose stored value sits
+            # outside the template's allowed set (e.g. SB-BASE-1DR at 24 in,
+            # outside the 9-21 in band the business rule keeps for 1-doors)
+            # would render with the current value missing, defaulting to
+            # "— pick —". The union keeps whatever the line actually has
+            # selectable so users can keep it or switch.
+            extra_ids = (
+                line_values_by_attr.get(attr_id, set())
+                - set(attr_line.value_ids.ids)
+            )
+            all_values = attr_line.value_ids + PAV.browse(list(extra_ids))
+            # Sort by sequence (Odoo standard) then id — keeps 24 in AFTER
+            # 21 in in the Width picker, etc.
+            all_values = all_values.sorted(
+                key=lambda v: (v.sequence or 0, v.id),
+            )
             attributes.append({
-                "attribute_id": attr_line.attribute_id.id,
+                "attribute_id": attr_id,
                 "name": attr_line.attribute_id.name,
-                "display_type": attr_line.attribute_id.display_type or "select",
+                "display_type": (
+                    attr_line.attribute_id.display_type or "select"
+                ),
                 "values": [
                     {
                         "value_id": v.id,
                         "name": v.name,
-                        "current": v.id in current_value_ids,
+                        "current": v.id in line_value_ids,
                     }
-                    for v in attr_line.value_ids
+                    for v in all_values
                 ],
             })
         return {"ok": True, "attributes": attributes}
