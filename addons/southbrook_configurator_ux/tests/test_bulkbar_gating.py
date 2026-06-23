@@ -41,7 +41,11 @@ class TestBulkBarGating(TransactionCase):
         cls.portal_user = cls.env["res.users"].create({
             "name": "Trade Customer (test)",
             "login": "test_trade_cust_bulkbar@example.invalid",
-            "groups_id": [(6, 0, [cls.env.ref("base.group_portal").id])],
+            # Odoo 19 renamed res.users.groups_id → group_ids; old name
+            # was silently accepted by create() but the M2M write was a
+            # no-op, leaving the portal_user as a regular internal user
+            # and failing the share=True assertion downstream.
+            "group_ids": [(6, 0, [cls.env.ref("base.group_portal").id])],
         })
         # base.user_admin is share=False (internal), the natural
         # opposite for this test.

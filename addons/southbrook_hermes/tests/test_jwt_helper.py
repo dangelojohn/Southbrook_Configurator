@@ -45,7 +45,12 @@ class TestJwtHelper(TransactionCase):
         portal_user = self.env["res.users"].create({
             "login": f"hermes_test_{int(time.time())}@example.com",
             "name": "Hermes Test Portal",
-            "groups_id": [(6, 0, [self.env.ref("base.group_portal").id])],
+            # Odoo 19 renamed res.users.groups_id → group_ids; old name
+            # was silently no-op'd, leaving the user without the portal
+            # group and routing them through the internal-user branch of
+            # resolve_persona (returning 'employee' instead of
+            # 'trade_partner', which would fail this assertion).
+            "group_ids": [(6, 0, [self.env.ref("base.group_portal").id])],
         })
         result = self.helper.resolve_persona(portal_user)
         self.assertEqual(result, "trade_partner")
