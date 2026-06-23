@@ -78,18 +78,18 @@
         </record>
 
         <!-- ============================================================
-             4. Weekly MRP planning baseline — every 7 days, Sun ~02:00
+             4. Weekly MRP planning baseline — DISABLED 2026-06-23
              ============================================================
-             Creates and runs a single mrp.planning.run as a fresh
-             weekly baseline. ``nextcall`` is staggered to the next
-             upcoming Sunday at 02:00 local time so the first execution
-             lands in the off-hours window rather than at install time.
-             Owned by B2 (this addon).
-
-             The eval expression: take today at 02:00 in server time,
-             advance to the next Sunday (weekday() == 6); if today is
-             already Sunday past 02:00, advance a full week.
-        -->
+             Original intent: create + run a weekly mrp.planning.run.
+             Disabled because mrp.planning.run lives in OpenValue's
+             openvalue_mrp_planning_engine, which is NOT installed on
+             this stack. Without the base model the cron's model_id
+             reference fails to resolve at install (xmlid
+             model_mrp_planning_run cannot be created when the model
+             doesn't exist). The Python sibling
+             models/mrp_planning_run_cron.py was removed in the same
+             commit. Restore by un-commenting both when OpenValue is
+             vendored or otherwise present in the addon path.
         <record id="cron_weekly_planning_baseline" model="ir.cron">
             <field name="name">Southbrook: Weekly Planning Baseline</field>
             <field name="model_id" ref="model_mrp_planning_run"/>
@@ -101,6 +101,8 @@
             <field name="user_id" ref="base.user_root"/>
             <field name="nextcall" eval="(DateTime.now().replace(hour=2, minute=0, second=0, microsecond=0) + timedelta(days=((6 - DateTime.now().weekday()) % 7) or 7))"/>
         </record>
+        -->
+        <!-- 4 was: weekly planning baseline (see comment above) -->
 
         <!-- ============================================================
              5. Project data-quality nightly dry-run — every day ~03:00
