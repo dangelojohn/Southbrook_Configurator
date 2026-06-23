@@ -33,7 +33,15 @@ class MrpWorkorder(models.Model):
         "production_id.user_id",
         "working_user_ids",
         "last_working_user_id",
-        "workcenter_id.equipment_ids.maintenance_ids.stage_id.done",
+        # Odoo 19 removed mrp.workcenter.equipment_ids (the reverse
+        # of maintenance.equipment.workcenter_id). The maintenance-
+        # request check inside _southbrook_start_blocker now searches
+        # maintenance.request directly; depending on workcenter_id
+        # alone re-fires when the WC link changes. Maintenance state
+        # changes won't auto-invalidate this unstored computed field,
+        # but every read re-runs the compute so the next view refresh
+        # picks them up.
+        "workcenter_id",
     )
     def _compute_southbrook_can_start_today(self):
         today = fields.Date.context_today(self)
@@ -70,10 +78,18 @@ class MrpWorkorder(models.Model):
         if not crew:
             return "Crew is not assigned."
 
-        requests = self.workcenter_id.equipment_ids.mapped(
-            "maintenance_ids").filtered(lambda request: not request.stage_id.done)
-        if requests:
-            return "Equipment has open maintenance."
+        # Odoo 19: mrp.workcenter.equipment_ids no longer exists. Walk
+        # the forward path maintenance.equipment.workcenter_id instead,
+        # filtered to open requests (stage_id.done == False). Single
+        # search rather than the old equipment-iteration + filter.
+        MaintenanceRequest = self.env["maintenance.request"].sudo()
+        if self.workcenter_id and MaintenanceRequest._fields.get("equipment_id"):
+            open_count = MaintenanceRequest.search_count([
+                ("equipment_id.workcenter_id", "=", self.workcenter_id.id),
+                ("stage_id.done", "=", False),
+            ])
+            if open_count:
+                return "Equipment has open maintenance."
 
         return ""
 
