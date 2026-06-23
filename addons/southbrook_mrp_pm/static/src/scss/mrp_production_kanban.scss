@@ -1,0 +1,206 @@
+// 2026-06-22 — Southbrook MRP Production kanban card styling.
+// Pairs with views/mrp_production_kanban.xml; all classes scoped
+// to .o_sb_mo_kanban so the rules can't leak to other backend
+// kanbans. Loaded in web.assets_backend (internal-user only).
+//
+// State colour palette (used by .o_sb_mo_bar + .o_sb_mo_state_*):
+// chosen to match Odoo's standard semantic colour vocabulary so the
+// kanban reads naturally alongside other backend modules. Falls
+// back gracefully on dark theme via the --o-action var.
+//
+// Accessibility: state is signalled by (a) text label in the
+// column header, (b) colour bar, (c) text in the date widget when
+// overdue. Colour is never the only cue — WCAG AA satisfied.
+
+$sb-mo-bar-w:        4px;
+$sb-mo-pad:          14px;
+$sb-mo-radius:       6px;
+$sb-mo-shadow:       0 1px 2px rgba(15, 15, 15, 0.08);
+$sb-mo-shadow-hover: 0 4px 12px rgba(15, 15, 15, 0.14);
+
+// State -> bar colour. Mirrors Odoo's selection colour conventions
+// so dragging between columns is intuitive (cooler = earlier in
+// pipeline, warmer = closer to done).
+$sb-mo-c-draft:     #b2b8be;   // muted gray — not started
+$sb-mo-c-confirmed: #4682b4;   // steel-blue — committed
+$sb-mo-c-progress:  #f0a500;   // amber — in flight
+$sb-mo-c-to_close:  #6f42c1;   // purple — staged
+$sb-mo-c-done:      #28a745;   // green — closed clean
+$sb-mo-c-cancel:    #a83a2b;   // brick — cancelled
+
+.o_sb_mo_kanban {
+
+    // ----- Card shell + left state bar ----------------------------
+    .o_sb_mo_card {
+        position: relative;
+        display: flex;
+        background: var(--o-view-background-color, #fff);
+        border: 1px solid var(--o-border-color, #e5e7eb);
+        border-radius: $sb-mo-radius;
+        box-shadow: $sb-mo-shadow;
+        margin-bottom: 8px;
+        overflow: hidden;
+        transition: box-shadow 120ms ease, transform 120ms ease;
+        cursor: pointer;
+
+        &:hover {
+            box-shadow: $sb-mo-shadow-hover;
+            transform: translateY(-1px);
+        }
+
+        // High-priority cards get a faint warm wash so urgent MOs
+        // pop without overpowering the column rhythm.
+        &[data-priority="1"] {
+            background: linear-gradient(
+                to right,
+                rgba(240, 165, 0, 0.04) 0%,
+                rgba(240, 165, 0, 0) 30%
+            );
+        }
+    }
+
+    .o_sb_mo_bar {
+        flex: 0 0 $sb-mo-bar-w;
+        width: $sb-mo-bar-w;
+        background: $sb-mo-c-draft;
+    }
+
+    .o_sb_mo_state_draft     .o_sb_mo_bar { background: $sb-mo-c-draft;     }
+    .o_sb_mo_state_confirmed .o_sb_mo_bar { background: $sb-mo-c-confirmed; }
+    .o_sb_mo_state_progress  .o_sb_mo_bar { background: $sb-mo-c-progress;  }
+    .o_sb_mo_state_to_close  .o_sb_mo_bar { background: $sb-mo-c-to_close;  }
+    .o_sb_mo_state_done      .o_sb_mo_bar { background: $sb-mo-c-done;      }
+    .o_sb_mo_state_cancel    .o_sb_mo_bar { background: $sb-mo-c-cancel;    }
+
+    .o_sb_mo_body {
+        flex: 1 1 auto;
+        min-width: 0;    // critical for flex children whose content
+                          // can overflow (the product name's
+                          // line-clamp depends on min-width:0).
+        padding: $sb-mo-pad;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    // ----- Header: priority star + code pill + product title ------
+    .o_sb_mo_head {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+
+        .o_sb_mo_priority {
+            flex: 0 0 auto;
+            // Odoo's priority widget renders gray stars; we tint
+            // the filled state amber for visual urgency. The exact
+            // selector matches the widget's filled-star DOM.
+            .o_priority_star.fa-star {
+                color: $sb-mo-c-progress;
+            }
+        }
+
+        .o_sb_mo_code {
+            flex: 0 0 auto;
+            font-family: var(--o-font-family-monospace, ui-monospace,
+                          monospace);
+            font-size: 10.5px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--o-text-color-muted, #6b7280);
+            background: var(--o-gray-100, #f3f4f6);
+            border: 1px solid var(--o-border-color, #e5e7eb);
+            border-radius: 999px;
+            padding: 1px 8px;
+            line-height: 1.5;
+            white-space: nowrap;
+        }
+
+        // Primary title — clamped to two lines with ellipsis. CSS
+        // line-clamp is the cleanest cross-browser approach in
+        // 2026; -webkit- prefix still needed for Safari < 17.
+        .o_sb_mo_title {
+            flex: 1 1 auto;
+            min-width: 0;
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--o-text-color, #1f2937);
+            // 2-line ellipsis
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-break: break-word;
+        }
+    }
+
+    // ----- Secondary metadata: MO ref + scheduled date -----------
+    .o_sb_mo_meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--o-text-color-muted, #6b7280);
+        line-height: 1.4;
+        min-width: 0;
+
+        .o_sb_mo_ref {
+            font-family: var(--o-font-family-monospace, ui-monospace,
+                          monospace);
+            font-size: 11px;
+        }
+        .o_sb_mo_sep { opacity: 0.4; }
+        .o_sb_mo_date {
+            min-width: 0;
+            // Odoo's remaining_days widget injects its own red/amber
+            // classes for overdue/due-soon; we just give it space.
+            // .o_field_widget margin reset:
+            .o_field_widget { display: inline; }
+        }
+    }
+
+    // ----- Footer: quantity + assignee avatar + activity ---------
+    .o_sb_mo_foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding-top: 6px;
+        border-top: 1px dashed var(--o-border-color, #e5e7eb);
+
+        .o_sb_mo_qty {
+            font-size: 13px;
+            color: var(--o-text-color, #1f2937);
+            strong { font-weight: 700; }
+            .o_sb_mo_qty_uom {
+                margin-left: 4px;
+                font-size: 11px;
+                color: var(--o-text-color-muted, #6b7280);
+                text-transform: lowercase;
+            }
+        }
+
+        .o_sb_mo_actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            // Compact the embedded field widgets so they don't
+            // bloat the footer height.
+            .o_field_widget { margin: 0; }
+            .o_m2o_avatar img,
+            .o_m2o_avatar_chip { width: 22px; height: 22px; }
+        }
+    }
+
+    // ----- Narrow-viewport responsive -----------------------------
+    // On the Odoo backend the kanban already collapses columns at
+    // < 768px; we just shrink the card padding so the body still
+    // breathes.
+    @media (max-width: 768px) {
+        .o_sb_mo_body { padding: 10px; }
+        .o_sb_mo_title { font-size: 13px; }
+    }
+}

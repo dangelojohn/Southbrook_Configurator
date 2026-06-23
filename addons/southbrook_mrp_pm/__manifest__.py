@@ -40,7 +40,7 @@ analysis. Layered build:
       M17 Floor Manager access group
       M20 ECO → in-flight MO notification rule
 """,
-    "version": "19.0.1.2.0",
+    "version": "19.0.1.3.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -101,6 +101,11 @@ analysis. Layered build:
         # in the DB without a tracked file; re-shipping properly so
         # the model + view stay in sync.
         "views/sale_order_production_approval.xml",
+        # 2026-06-22 — MRP Production kanban UX redesign. Inherit-
+        # only; pipeline columns by state + restructured card. See
+        # the file's header docstring for the full design rationale
+        # (audit asks 1-7).
+        "views/mrp_production_kanban.xml",
     ],
     "assets": {
         "web.assets_frontend": [
@@ -112,6 +117,10 @@ analysis. Layered build:
             # M10 — PM KPI dashboard kanban styling. Backend bundle
             # because the dashboard is an internal-user view.
             "southbrook_mrp_pm/static/src/scss/dashboard.scss",
+            # 2026-06-22 — MRP Production kanban card styling.
+            # Scoped to .o_sb_mo_kanban so it can't leak into
+            # other backend kanban views.
+            "southbrook_mrp_pm/static/src/scss/mrp_production_kanban.scss",
         ],
     },
     "installable": True,

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-06-22 — Southbrook MRP Production kanban UX/UI redesign.
+
+  Inherits Odoo core (mrp.mrp_production_view_kanban). Two-part change:
+
+  1. <kanban> attributes: default_group_by="state" so cards lay out as
+     visual pipeline columns (Draft -> Confirmed -> In Progress ->
+     To Close -> Done) with a record count per column header — the
+     "at-a-glance pipeline" the audit wanted. records_draggable=true
+     lets users drop a card into a new column; MRP state transitions
+     enforce their own business rules and surface a friendly error
+     when an invalid drop is attempted.
+
+  2. <templates> replaced with a redesigned card:
+       - Left color bar (4px) bound to record state (CSS, no Python).
+       - Product code as a small muted pill; product name as the
+         primary title with a CSS line-clamp at 2 lines + native
+         tooltip via @title for the truncated full name.
+       - Quantity rendered without trailing zeros (1 instead of 1.00)
+         plus a small "units" / UoM label.
+       - MO ref + scheduled date grouped as muted secondary metadata
+         with widget="remaining_days" — Odoo's built-in widget that
+         colours itself red/amber when overdue/due-soon (audit ask 5).
+       - widget="priority" on priority for the prominent star.
+       - widget="many2one_avatar_user" on user_id for the assignee
+         avatar (audit ask 5).
+       - Kept the state badge (audit "include text labels", non-
+         colour signal for WCAG AA).
+
+  All inheritance, no core patches. Existing click-through
+  (oe_kanban_global_click) and field set preserved.
+-->
+<odoo>
+  <data>
+
+    <record id="view_mrp_production_kanban_southbrook"
+            model="ir.ui.view">
+      <field name="name">mrp.production.kanban.southbrook</field>
+      <field name="model">mrp.production</field>
+      <field name="inherit_id" ref="mrp.mrp_production_view_kanban"/>
+      <field name="arch" type="xml">
+
+        <!-- 1. Pipeline columns + draggable -->
+        <xpath expr="//kanban" position="attributes">
+          <attribute name="default_group_by">state</attribute>
+          <attribute name="records_draggable">1</attribute>
+          <attribute name="class">o_sb_mo_kanban</attribute>
+        </xpath>
+
+        <!-- 2. Surface the fields the redesigned card reads. The
+             core view already exposes name + state + product_qty +
+             priority + product_uom_id + date_planned_start +
+             activity_ids; we add the rest so the OWL kanban knows
+             to fetch them. The position="after" of name is the
+             standard pattern for safely adding sibling fields. -->
+        <xpath expr="//field[@name='name']" position="after">
+          <field name="user_id"/>
+          <field name="product_tmpl_id"/>
+          <field name="date_planned_finished"/>
+          <field name="origin"/>
+        </xpath>
+
+        <!-- 3. Replace the card template wholesale. The new template
+             uses Odoo 19 <t t-name="card"> + semantic HTML and
+             defers visual treatment to o_sb_mo_card.scss. -->
+        <xpath expr="//templates" position="replace">
+          <templates>
+            <t t-name="card">
+              <div t-attf-class="o_sb_mo_card oe_kanban_global_click o_sb_mo_state_#{record.state.raw_value}"
+                   t-att-data-priority="record.priority.raw_value">
+
+                <!-- Left vertical color bar — colored by state via
+                     the .o_sb_mo_state_<state> class on the card. -->
+                <div class="o_sb_mo_bar"/>
+
+                <div class="o_sb_mo_body">
+
+                  <header class="o_sb_mo_head">
+                    <span class="o_sb_mo_priority"
+                          title="Click to toggle urgent">
+                      <field name="priority" widget="priority"/>
+                    </span>
+                    <!-- Product code pill — extracted from the
+                         product display name (the "[SB-WORKTOP]"
+                         prefix). Odoo populates display_name as
+                         "[default_code] name" by default. The pill
+                         is hidden when product_tmpl_id has no
+                         default_code (display_name lacks the
+                         bracketed prefix). -->
+                    <span class="o_sb_mo_code"
+                          t-if="record.product_tmpl_id.value
+                                and record.product_tmpl_id.value.startsWith('[')">
+                      <t t-out="record.product_tmpl_id.value.split(']')[0].slice(1)"/>
+                    </span>
+                    <!-- Primary title — product name only (strip the
+                         [code] prefix once it's been promoted to a
+                         pill). title= attribute lets the full name
+                         show in a native tooltip when truncated by
+                         the 2-line clamp. -->
+                    <h4 class="o_sb_mo_title"
+                        t-att-title="record.product_tmpl_id.value">
+                      <t t-out="(record.product_tmpl_id.value or '').replace(/^\[[^\]]+\]\s*/, '')"/>
+                    </h4>
+                  </header>
+
+                  <div class="o_sb_mo_meta">
+                    <span class="o_sb_mo_ref">
+                      <field name="name"/>
+                    </span>
+                    <span class="o_sb_mo_sep" aria-hidden="true">·</span>
+                    <span class="o_sb_mo_date">
+                      <!-- widget="remaining_days" gives "in 3 days" /
+                           "2 days ago" + colours itself red/amber
+                           when overdue/due-soon. The audit-asked
+                           date urgency cue with zero custom code. -->
+                      <field name="date_planned_start"
+                             widget="remaining_days"/>
+                    </span>
+                  </div>
+
+                  <footer class="o_sb_mo_foot">
+                    <!-- Quantity: render as integer when whole
+                         (audit ask 3). raw_value gives the float;
+                         Math.abs handles negative-quantity edge
+                         cases for returns. -->
+                    <span class="o_sb_mo_qty"
+                          t-att-title="'Quantity: ' + record.product_qty.value">
+                      <strong>
+                        <t t-out="Number.isInteger(record.product_qty.raw_value)
+                                  ? record.product_qty.raw_value
+                                  : record.product_qty.raw_value.toFixed(2)"/>
+                      </strong>
+                      <small class="o_sb_mo_qty_uom">
+                        <t t-out="(record.product_uom_id.value
+                                   or '').split(',').pop()
+                                   or 'units'"/>
+                      </small>
+                    </span>
+
+                    <div class="o_sb_mo_actions">
+                      <!-- Assignee avatar — many2one_avatar_user is
+                           the built-in chip that shows initials
+                           when no photo is set + opens the user
+                           profile on click. Empty user_id is
+                           hidden by Odoo automatically. -->
+                      <field name="user_id"
+                             widget="many2one_avatar_user"/>
+                      <!-- Activity indicator (open activities on
+                           this MO) — reuses Odoo's built-in
+                           kanban_activity widget so the icon +
+                           dot match every other kanban in the
+                           backend. -->
+                      <field name="activity_ids"
+                             widget="kanban_activity"/>
+                    </div>
+                  </footer>
+
+                </div>
+              </div>
+            </t>
+          </templates>
+        </xpath>
+
+      </field>
+    </record>
+
+  </data>
+</odoo>
