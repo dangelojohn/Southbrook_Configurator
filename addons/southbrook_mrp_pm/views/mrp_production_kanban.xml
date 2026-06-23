@@ -48,19 +48,25 @@
           <attribute name="class">o_sb_mo_kanban</attribute>
         </xpath>
 
-        <!-- 2. Surface the fields the redesigned card reads.
-             The core mrp.production_kanban_view (verified against
-             ir_ui_view at deploy time) exposes only date_start +
-             state at the kanban root, with name/product_id/
-             product_qty/product_uom_id/priority/activity_ids
-             scoped INSIDE <templates>. We append the extra fields
-             our card needs as siblings of `state` (a real kanban-
-             root element). Using //field[@name='state'] is more
-             surgical than //kanban position="inside" because it
-             keeps the field list contiguous in arch order. -->
+        <!-- 2. Surface every field the redesigned card reads via
+             `record.<field>.value` or `record.<field>.raw_value`.
+             OWL only auto-adds a field to the fetch set if it
+             appears as a LITERAL <field name="..."/> tag — t-out /
+             t-set expressions referencing record.X are NOT
+             auto-detected. Since we wholesale-replaced the core
+             <templates> (which had its own product_qty / priority
+             / product_uom_id / etc literal field tags) those
+             fields stopped being fetched and record.<field>
+             became undefined → TypeError on .value access.
+             Re-declaring them at the kanban root makes the
+             fetch set explicit + decoupled from the template body. -->
         <xpath expr="//field[@name='state']" position="after">
           <field name="user_id"/>
           <field name="product_id"/>
+          <field name="product_qty"/>
+          <field name="product_uom_id"/>
+          <field name="priority"/>
+          <field name="activity_ids"/>
           <field name="origin"/>
         </xpath>
 
