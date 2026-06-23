@@ -12,9 +12,12 @@
 
   Data binding: sale.order. The customer sees their order.
 
-  Phase-1 minimum: header + customer info + line table + total + lead time.
-  Phase-2 polish: cover page, Signature Series typographic treatment,
-  per-cabinet detail thumbnails.
+  19.0.4.4.0 (2026-06-22) — turned into a branded invoice: INVOICE header
+  band with real Southbrook logo (sourced from website.logo, base64 in
+  place so image_data_uri works in wkhtmltopdf), Prepared For block with
+  right-side QR (via /report/barcode controller URL — NOT base64; QWeb
+  safe_eval blocks base64 and the barcode() helper returns raw PNG bytes
+  that break utf-8 decoding), and centered footer.
 -->
 <odoo>
 
@@ -23,33 +26,85 @@
             name="Signature Spec Sheet Document">
     <t t-call="web.html_container">
       <t t-foreach="docs" t-as="o">
+        <!-- Helper variables. Defined before t-call so they flow into
+             the external_layout's body content via QWeb scope. -->
+        <t t-set="company" t-value="o.company_id or env.company"/>
+        <t t-set="web_logo" t-value="env['website'].sudo().search([], limit=1).logo"/>
+        <t t-set="base_url" t-value="env['ir.config_parameter'].sudo().get_param('web.base.url')"/>
+        <t t-set="page_url" t-value="base_url + '/my/southbrook/order-builder/' + str(o.id)"/>
         <t t-call="web.external_layout">
           <t t-call="southbrook_estimating.southbrook_report_styles"/>
           <div class="page southbrook-report">
+
             <div class="sb-illustrative-banner"
                  t-if="env['ir.config_parameter'].sudo().get_param('southbrook.seed_mode') == 'illustrative'">
               ILLUSTRATIVE SEED — demo numbers, not production data.
             </div>
 
+            <!-- B1: INVOICE header band — brand left, INVOICE meta right -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6e5b4f;padding-bottom:14px;margin-bottom:18px;">
+              <div class="sb-brand">
+                <img t-if="web_logo" t-att-src="image_data_uri(web_logo)"
+                     style="max-height:64px;max-width:260px;"
+                     alt="Southbrook Cabinetry"/>
+                <div t-else="">Southbrook Cabinetry</div>
+              </div>
+              <div class="sb-doc-meta" style="text-align:right;">
+                <div style="font-size:20px;font-weight:bold;letter-spacing:1px;color:#6e5b4f;text-transform:uppercase;">INVOICE</div>
+                <table style="border:none;margin-left:auto;margin-top:6px;">
+                  <tr>
+                    <td style="text-align:right;padding:2px 6px 2px 0;border:none;"><strong>Reference</strong></td>
+                    <td style="text-align:left;padding:2px 0;border:none;" t-out="o.name"/>
+                  </tr>
+                  <tr>
+                    <td style="text-align:right;padding:2px 6px 2px 0;border:none;"><strong>Version</strong></td>
+                    <td style="text-align:left;padding:2px 0;border:none;" t-out="o.version"/>
+                  </tr>
+                  <tr>
+                    <td style="text-align:right;padding:2px 6px 2px 0;border:none;"><strong>Date</strong></td>
+                    <td style="text-align:left;padding:2px 0;border:none;"
+                        t-out="o.date_order" t-options="{'widget':'date'}"/>
+                  </tr>
+                </table>
+              </div>
+            </div>
+
+            <!-- B2: Document title -->
             <h1>Your Southbrook Kitchen</h1>
             <h2>Signature Spec Sheet</h2>
             <hr class="sb-rule"/>
 
-            <div>
-              <strong>Customer:</strong>
-              <span t-out="o.partner_id.name"/><br/>
-              <strong>Reference:</strong>
-              <span t-out="o.name"/>
-              <span class="sb-muted">
-                (v<span t-out="o.version"/>)
-              </span><br/>
-              <strong>Quote Date:</strong>
-              <span t-out="o.date_order"
-                    t-options="{'widget': 'date'}"/>
+            <!-- B3: Prepared For (left) + QR (right) -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div class="sb-billto-fields">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#777;">PREPARED FOR</div>
+                <div><strong>Customer:</strong> <span t-out="o.partner_id.name"/></div>
+                <div>
+                  <strong>Reference:</strong>
+                  <span t-out="o.name"/>
+                  <span class="sb-muted">(v<span t-out="o.version"/>)</span>
+                </div>
+                <div>
+                  <strong>Quote Date:</strong>
+                  <span t-out="o.date_order" t-options="{'widget':'date'}"/>
+                </div>
+              </div>
+              <div class="sb-qr" style="text-align:center;min-width:96px;margin-left:auto;">
+                <!-- QR via the barcode controller URL. Built with simple
+                     concatenation (not %-formatting) — see template
+                     header comment + memory note owl-tokenizer-constraints
+                     siblings for the known-bad alternatives. -->
+                <t t-set="qr_url" t-value="'/report/barcode/?barcode_type=QR&amp;value=' + page_url + '&amp;width=240&amp;height=240'"/>
+                <img t-att-src="qr_url"
+                     style="width:84px;height:84px;border:1px solid #e2dcd4;padding:3px;background:#fff;"
+                     alt="Scan to view online"/>
+                <div style="font-size:8px;color:#999;margin-top:3px;letter-spacing:.5px;">SCAN TO VIEW ONLINE</div>
+              </div>
             </div>
 
             <hr class="sb-rule"/>
 
+            <!-- B4: Cabinets table -->
             <h2>Cabinets</h2>
             <table>
               <thead>
@@ -86,6 +141,7 @@
               </tfoot>
             </table>
 
+            <!-- B5: Disclaimer + centered footer -->
             <p class="sb-muted">
               This spec sheet was generated by the Southbrook Estimating
               Application. The cabinet specifications and pricing reflect
@@ -93,6 +149,11 @@
               manufacturing lead times and any adjustments will be
               confirmed by your assigned dealer.
             </p>
+            <div class="sb-invoice-footer"
+                 style="margin-top:24px;border-top:1px solid #ddd;padding-top:10px;text-align:center;font-size:10px;color:#999;">
+              Southbrook Cabinetry &#160;·&#160; info@southbrookcabinetry.space &#160;·&#160; southbrookcabinetry.space
+            </div>
+
           </div>
         </t>
       </t>

@@ -7,6 +7,13 @@ from . import controllers
 _logger = logging.getLogger(__name__)
 
 
+_SOUTHBROOK_COMPANY_DETAILS = (
+    "<span>Southbrook Cabinetry</span><br/>"
+    "<span>info@southbrookcabinetry.space</span><br/>"
+    "<span>southbrookcabinetry.space</span>"
+)
+
+
 def _ensure_sales_journal(env):
     """Create a default Sales journal for any company that lacks one.
 
@@ -52,3 +59,56 @@ def _ensure_sales_journal(env):
             "company_id": company.id,
             "show_on_dashboard": True,
         })
+
+
+def _configure_southbrook_report_branding(env):
+    """Configure res.company so PDF reports show the real Southbrook
+    branding instead of Odoo's "Your logo" placeholder.
+
+    Set per company, idempotently (only writes fields that drifted):
+      - external_report_layout_id  → web.external_layout_standard
+      - logo                       → copy of website.logo (the real
+                                      "southbrook CABINETRY" wordmark)
+      - company_details            → name + info@ + website (HTML)
+
+    Deliberately does NOT fabricate street/phone/zip: no real address
+    exists. The standard layout guards those fields with t-if so they
+    silently omit when unset.
+
+    Safe to re-run: each field is only written when it differs from the
+    target, so this is a no-op on a correctly-configured DB.
+    """
+    Company = env["res.company"].sudo()
+    Website = env["website"].sudo()
+
+    standard_layout = env.ref(
+        "web.external_layout_standard", raise_if_not_found=False,
+    )
+    website = Website.search([], limit=1)
+    web_logo = website.logo if website else False
+
+    for company in Company.search([]):
+        updates = {}
+        if standard_layout and company.external_report_layout_id != standard_layout:
+            updates["external_report_layout_id"] = standard_layout.id
+        if web_logo and company.logo != web_logo:
+            updates["logo"] = web_logo
+        if company.company_details != _SOUTHBROOK_COMPANY_DETAILS:
+            updates["company_details"] = _SOUTHBROOK_COMPANY_DETAILS
+        if updates:
+            _logger.info(
+                "Southbrook branding: updating %s on company %s (id=%s)",
+                sorted(updates.keys()), company.display_name, company.id,
+            )
+            company.write(updates)
+
+
+def _southbrook_estimating_post_init(env):
+    """Combined post-init hook for southbrook_estimating.
+
+    Chained so adding new idempotent post-install steps is one
+    function call here, not a manifest edit. Each step is independent;
+    each handles its own idempotency.
+    """
+    _ensure_sales_journal(env)
+    _configure_southbrook_report_branding(env)

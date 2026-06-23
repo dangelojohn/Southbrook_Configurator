@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.4.3.0",
+    "version": "19.0.4.4.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -252,7 +252,9 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
     # REG-C1 (2026-06-18) — heal companies missing a default Sales journal.
     # See _ensure_sales_journal in __init__.py for the why; runs on
     # -i AND -u so live DBs upgrade-heal automatically.
-    "post_init_hook": "_ensure_sales_journal",
+    # Combined hook (chains _ensure_sales_journal + _configure_southbrook_report_branding).
+    # See __init__.py for the why; both steps are independent and idempotent.
+    "post_init_hook": "_southbrook_estimating_post_init",
     "installable": True,
     "application": True,
     "auto_install": False,
