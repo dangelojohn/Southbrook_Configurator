@@ -2138,7 +2138,14 @@ class ProjectTask(models.Model):
                     unavailable += 1
                 lines.append("%s: %s" % (mo.name, label))
 
-            po_lines = PurchaseLine.search([("production_id", "in", mos.ids)])
+            # Odoo 19 removed the direct `production_id` field from
+            # purchase.order.line. The linkage is now indirect via
+            # stock.move: po_line.move_dest_ids → mo.move_raw_ids.
+            # The move-based lookup below already covers what the old
+            # `[("production_id", "in", mos.ids)]` search would return,
+            # so start from an empty recordset and let the move path
+            # populate it.
+            po_lines = PurchaseLine.browse()
             raw_moves = mos.mapped("move_raw_ids")
             if raw_moves:
                 po_lines |= raw_moves.mapped("created_purchase_line_ids")
