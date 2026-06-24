@@ -1,6 +1,6 @@
 {
     'name': 'Southbrook Premium MRP Orchestration',
-    'version': '19.0.3.1.0',
+    'version': '19.0.3.2.0',
     'summary': 'Closes the loop: cron-driven readiness/MI/analytics, always-on project-task spine, '
                'practical-intelligence telemetry, generative + planning activation.',
     'description': """
@@ -63,7 +63,15 @@ PHASE 3 — Generative + Planning Activation
         # phase 3 data
         'data/job_template_seed_links.xml',
         # views — kitchen ops surface
-        'views/menus.xml',
+        # Action-defining view files MUST load BEFORE menus.xml. Odoo
+        # resolves action="..." in <menuitem> at parse time, not at
+        # end-of-data (the old comment in menus.xml claiming otherwise
+        # was wrong — fresh installs failed with ParseError at menus.xml
+        # while warm-registry upgrades succeeded because the records
+        # were already in the DB from a prior install). Surfaced
+        # 2026-06-23 by the cold-install-test.sh survey for Tier B
+        # floor_traveler. Same load-order rule applies to wizards
+        # referenced by menus.xml (test_user_archive_views).
         'views/kitchen_jobs_views.xml',
         'views/production_release_views.xml',
         'views/install_risk_views.xml',
@@ -74,10 +82,12 @@ PHASE 3 — Generative + Planning Activation
         'views/sale_order_views.xml',
         'views/mrp_workorder_views.xml',
         'views/cut_spec_override_views.xml',
-        # wizards
+        # wizards (action_test_user_archive_wizard is referenced by menus.xml)
         'wizards/test_user_archive_views.xml',
         'wizards/gemini_activation_views.xml',
         'wizards/freecad_activation_views.xml',
+        # menus LAST — every action it references must already be loaded.
+        'views/menus.xml',
     ],
     'demo': [],
     'installable': True,

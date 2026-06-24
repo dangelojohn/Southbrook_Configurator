@@ -4,13 +4,16 @@
     <!--
         Kitchen Ops top-level menu — Phase 1.4.
 
-        The action references for MI Engine Status (action_mi_engine_status),
-        Cut-Spec Overrides (action_cut_spec_override_list), and the Test
-        User Archive wizard (action_test_user_archive_wizard) are defined
-        in sibling view files owned by other agents (B3, B8, B5). Odoo
-        resolves the action lookup at menuitem load time so as long as
-        those records exist by the time the manifest's `data:` list
-        finishes loading, the menu binds correctly.
+        Every action= reference below points at a record DEFINED in a
+        sibling view/wizard file. Odoo resolves these at parse time,
+        NOT at end-of-data — so this file MUST load AFTER every file
+        that defines an action it references. The __manifest__.py
+        `data` list places this file last for that reason. The
+        previous comment here claimed end-of-data resolution; that was
+        wrong and fresh installs ParseError'd at the first menuitem
+        (warm-registry upgrades hid it because the records already
+        existed). Corrected 2026-06-23 by the Tier B floor_traveler
+        cold-install survey.
     -->
     <menuitem id="menu_kitchen_ops_root"
               name="Kitchen Ops"
