@@ -29,7 +29,10 @@ cd "$ROOT"
 # yes, CI can't cold-install it, here's why" — and the Makefile header
 # comment must match.
 EXCLUDE=(
-    "southbrook_plm_productgraph"   # depends on unvendored product_graph_release
+    # (formerly: southbrook_plm_productgraph — dropped from prod 2026-06-23
+    # along with the ECO-to-ProductGraph bridge; vendor decision deferred. The
+    # 4-addon vendor chain (product_graph_base/revision/ebom/release) lives in
+    # ~/product_graph_v19/ if anyone restores the bridge later.)
 )
 
 LOCAL_FLAG="${1:-}"
@@ -45,8 +48,9 @@ if ! ./scripts/list-prod-southbrook-modules.sh $LOCAL_FLAG > /tmp/prod-modules.l
     exit 2
 fi
 
-# 3) Subtract EXCLUDE from prod.
-printf '%s\n' "${EXCLUDE[@]}" | sort -u > /tmp/excludes.list
+# 3) Subtract EXCLUDE from prod. The ${arr[@]+"${arr[@]}"} form expands to
+# nothing when the array is empty (default behavior trips `set -u`).
+printf '%s\n' ${EXCLUDE[@]+"${EXCLUDE[@]}"} | sort -u > /tmp/excludes.list
 comm -23 /tmp/prod-modules.list /tmp/excludes.list > /tmp/prod-validatable.list
 
 # 4) Symmetric diff.
