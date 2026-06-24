@@ -52,16 +52,25 @@ for mo in mos:
                   and w.state == "done"
     )
     for wo in cut_wos:
+        # Phase 1: ORM-unlink consumption rows so the unlink() hook
+        # (shipped in southbrook_mrp_kitchen_tools 19.0.0.2.0) restores
+        # asset life cleanly. Skips when there are zero rows.
         consumption_count = len(wo.sbk_consumption_ids)
         wo.sbk_consumption_ids.unlink()
-        wo.write({
-            "state": "ready",
-            "date_finished": False,
-            "date_start": False,
-            "qty_produced": 0.0,
-            "duration": 0.0,
-            "sbk_lifecycle_processed": False,
-        })
+        # Phase 2: SQL-direct state reset — bypasses Odoo's MRP
+        # "cannot unplan a single WO" + "cannot change qty_produced on
+        # done/cancel" guards. Safe for orphan test MOs being restored
+        # to a pre-scan state; do NOT use this on real production WOs.
+        env.cr.execute("""
+            UPDATE mrp_workorder
+            SET state = 'ready',
+                date_finished = NULL,
+                date_start = NULL,
+                qty_produced = 0.0,
+                duration = 0.0,
+                sbk_lifecycle_processed = false
+            WHERE id = %s
+        """, (wo.id,))
         print("[cleanup]   reset WO %d on %s "
               "(removed %d consumption row(s))" % (
                   wo.id, mo.name, consumption_count))
