@@ -150,14 +150,66 @@ export class CabinetViewport extends Component {
         this._scene = new THREE.Scene();
         this._scene.background = new THREE.Color(0xfbf7ef);
 
+        // Phase 1 (2026-06-24): PMREM-baked environment map.
+        // Without one, MeshStandardMaterial renders flat — the door
+        // (dark walnut #6b3f2a) reads as cardboard, sides (warm tan)
+        // look matte-painted, the "dark undefined" complaint from
+        // end-to-end testing. The env map gives PBR materials
+        // something to reflect, producing the subtle specular
+        // highlights that make the cabinet read as finished wood.
+        //
+        // No HDR file vendored (network access not assumed at deploy
+        // time). Instead we build a tiny studio scene in code (warm
+        // ceiling for sunlight bounce, neutral warm walls, darker
+        // floor) and bake it into a 256² PMREM cube map. One-time
+        // cost at mount (~50ms); the texture is then used by every
+        // PBR material in the scene for the rest of the session.
+        const pmrem = new THREE.PMREMGenerator(this._renderer);
+        pmrem.compileCubemapShader();
+        const envScene = new THREE.Scene();
+        const envColors = {
+            ceiling: 0xfff5e6,   // warm white — simulated sun bounce
+            walls:   0xe8e2d5,   // neutral warm — wall bounce
+            floor:   0x6b5a48,   // medium walnut — warm floor bounce
+        };
+        const plane = (color) => new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 2),
+            new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+        );
+        const ceiling = plane(envColors.ceiling);
+        ceiling.position.y = 1; ceiling.rotation.x = Math.PI / 2;
+        envScene.add(ceiling);
+        const envFloor = plane(envColors.floor);
+        envFloor.position.y = -1; envFloor.rotation.x = -Math.PI / 2;
+        envScene.add(envFloor);
+        for (const [x, ry] of [[-1, Math.PI / 2], [1, -Math.PI / 2]]) {
+            const w = plane(envColors.walls);
+            w.position.x = x; w.rotation.y = ry;
+            envScene.add(w);
+        }
+        for (const [z, ry] of [[-1, 0], [1, Math.PI]]) {
+            const w = plane(envColors.walls);
+            w.position.z = z; w.rotation.y = ry;
+            envScene.add(w);
+        }
+        // sigma=0.04 gives a softly-blurred env map; PMREM applies
+        // its own mip filtering on top for realistic roughness response.
+        this._envTexture = pmrem.fromScene(envScene, 0.04).texture;
+        this._scene.environment = this._envTexture;
+        pmrem.dispose();
+        // The envScene's meshes/materials/geometries are GC'd when
+        // envScene goes out of scope; only the baked texture persists.
+
         // Camera — sane defaults; payload.camera overrides on first build.
         this._camera = new THREE.PerspectiveCamera(35, 1, 10, 10000);
         this._camera.position.set(1200, 900, 1500);
 
-        // Lights — 2 directional + 1 hemi (Phase 1 simplification of the
-        // 6-light setup from PRODBOARD_MANIFEST §10; full set lands in
-        // Phase 3 polish).
-        const hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbf, 0.5);
+        // Lights — 3 directional + 1 hemi. 2026-06-24 update: added
+        // a front-fill light to address the "front face crushed to
+        // black" complaint from end-to-end testing. HemisphereLight
+        // intensity dropped slightly because the env map (above) now
+        // contributes most of the ambient.
+        const hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbf, 0.4);
         this._scene.add(hemi);
         const dirA = new THREE.DirectionalLight(0xffffff, 0.9);
         dirA.position.set(800, 1200, 600);
@@ -179,9 +231,17 @@ export class CabinetViewport extends Component {
         // own panels self-shadow with stripey artifacts.
         dirA.shadow.bias = -0.0005;
         this._scene.add(dirA);
-        const dirB = new THREE.DirectionalLight(0xffffff, 0.3);
+        const dirB = new THREE.DirectionalLight(0xffffff, 0.4);
         dirB.position.set(-500, 500, 800);
         this._scene.add(dirB);
+        // Front-fill — directly in front of the cabinet (camera-side),
+        // slightly above. The "key" dirA at upper-right only grazes
+        // the front face; this light hits it head-on. No shadows —
+        // we keep dirA's shadow as the single grounding shadow so a
+        // softer secondary doesn't muddy it.
+        const dirFront = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirFront.position.set(0, 800, 2000);
+        this._scene.add(dirFront);
 
         // T1C4: floor plane — receives the cabinet's shadow.
         // 20m × 20m so OrbitControls panning never reveals an edge;
@@ -339,6 +399,8 @@ export class CabinetViewport extends Component {
         // material swap doesn't touch the floor).
         if (this._floorGeom) this._floorGeom.dispose();
         if (this._floorMat) this._floorMat.dispose();
+        // Phase 1 (2026-06-24): PMREM env map texture.
+        if (this._envTexture) this._envTexture.dispose();
         // T1C5: dimension overlay — clears all line geometries, sprite
         // textures, sprite materials, and the shared line material.
         this._clearDimensionGroup();
