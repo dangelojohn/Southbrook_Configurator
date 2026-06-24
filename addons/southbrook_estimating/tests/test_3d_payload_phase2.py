@@ -189,6 +189,7 @@ class TestPhase23DPayload(SouthbrookTestCase):
             "finished_sides": finished_sides,
             "door_style": "slab", "handle": "none",
             "crown_molding": crown_molding,
+            "finish": "",
         }
         cut = {"shelf": None, "shelf_count": 0}
         payload = self.ConfigSession._cut_list_to_3d_payload(cab, cut)
@@ -204,6 +205,7 @@ class TestPhase23DPayload(SouthbrookTestCase):
             "finished_sides": "none",
             "door_style": "slab", "handle": "none",
             "crown_molding": "none",
+            "finish": "",
         }
         cab.update(cab_overrides)
         cut = {"shelf": None, "shelf_count": 0}
@@ -259,6 +261,52 @@ class TestPhase23DPayload(SouthbrookTestCase):
         payload = self._build_full_payload(family="wall", crown_molding="simple")
         crowns = [p for p in payload["panels"] if p["name"] == "crown_molding"]
         self.assertEqual(crowns[0]["material"], "door")
+
+    # ---------- Finish-driven door material ----------
+
+    def test_no_finish_uses_generic_door_material(self):
+        payload = self._build_full_payload(family="base", finish="",
+                                            door_count=1, drawer_count=0)
+        door_panels = [p for p in payload["panels"]
+                       if p.get("material") == "door"]
+        # The single door + (no crown / no finished sides on base) = 1 door panel
+        self.assertGreater(len(door_panels), 0)
+
+    def test_finish_white_emits_door_white(self):
+        payload = self._build_full_payload(family="base", finish="white",
+                                            door_count=1, drawer_count=0)
+        door_white = [p for p in payload["panels"]
+                      if p.get("material") == "door_white"]
+        self.assertGreater(len(door_white), 0)
+        # No panels still tagged as generic "door"
+        generic = [p for p in payload["panels"]
+                   if p.get("material") == "door"]
+        self.assertEqual(len(generic), 0)
+
+    def test_finish_walnut_stain_applies_to_crown(self):
+        payload = self._build_full_payload(
+            family="wall", finish="walnut_stain", crown_molding="ogee",
+        )
+        crowns = [p for p in payload["panels"] if p["name"] == "crown_molding"]
+        self.assertEqual(len(crowns), 1)
+        self.assertEqual(crowns[0]["material"], "door_walnut_stain")
+
+    def test_finish_applies_to_finished_sides(self):
+        payload = self._build_full_payload(
+            family="base", finish="cherry_stain", finished_sides="both",
+        )
+        sides = [p for p in payload["panels"]
+                 if p["name"] in ("side_L", "side_R")]
+        self.assertEqual(len(sides), 2)
+        for side in sides:
+            self.assertEqual(side["material"], "door_cherry_stain")
+
+    def test_unknown_finish_falls_back_to_generic_door(self):
+        payload = self._build_full_payload(family="base", finish="some_unknown",
+                                            door_count=1, drawer_count=0)
+        generic = [p for p in payload["panels"]
+                   if p.get("material") == "door"]
+        self.assertGreater(len(generic), 0)
 
     def test_two_door_with_handles(self):
         panels = self._emit_doors_panels(

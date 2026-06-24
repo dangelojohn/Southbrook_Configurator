@@ -301,8 +301,26 @@ export class CabinetViewport extends Component {
             carcass: new THREE.MeshStandardMaterial({
                 color: 0xc89e85, roughness: 0.85, metalness: 0.0,
             }),
+            // Generic "door" = walnut default (back-compat with every
+            // panel emitted before the Phase 2 Round 4 finish split).
             door: new THREE.MeshStandardMaterial({
                 color: 0x6b3f2a, roughness: 0.7, metalness: 0.05,
+            }),
+            // Phase 2 Round 4 (2026-06-24) — Finish-driven door
+            // materials. Color + roughness tuned per finish family.
+            // Painted (white) reads matte-cool; stained woods read
+            // satin-warm with grain-tight roughness.
+            door_white: new THREE.MeshStandardMaterial({
+                color: 0xfafafa, roughness: 0.50, metalness: 0.02,
+            }),
+            door_maple_stain: new THREE.MeshStandardMaterial({
+                color: 0xd9bb86, roughness: 0.60, metalness: 0.05,
+            }),
+            door_cherry_stain: new THREE.MeshStandardMaterial({
+                color: 0x8b4a2f, roughness: 0.55, metalness: 0.05,
+            }),
+            door_walnut_stain: new THREE.MeshStandardMaterial({
+                color: 0x4d2f1f, roughness: 0.65, metalness: 0.05,
             }),
             back: new THREE.MeshStandardMaterial({
                 color: 0xa68872, roughness: 0.9, metalness: 0.0,
@@ -705,12 +723,15 @@ export class CabinetViewport extends Component {
             }
             const matName =
                 this.state.mode === "blueline" ? "blueline" : (p.material || "carcass");
-            // Material lookup with hardware-family fallback: an
-            // unknown "hardware_<finish>" key falls back to the
-            // generic "hardware" before defaulting to carcass.
+            // Material lookup with family fallback:
+            //   hardware_<finish>  → hardware → carcass
+            //   door_<finish>      → door     → carcass
             let material = this._materials[matName];
             if (!material && matName.startsWith("hardware_")) {
                 material = this._materials.hardware;
+            }
+            if (!material && matName.startsWith("door_")) {
+                material = this._materials.door;
             }
             if (!material) material = this._materials.carcass;
             const mesh = new THREE.Mesh(geom, material);
