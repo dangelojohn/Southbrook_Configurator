@@ -123,6 +123,45 @@ class TestPhase23DPayload(SouthbrookTestCase):
         hardware = [p for p in panels if p.get("material") == "hardware"]
         self.assertEqual(len(hardware), 3)
 
+    # ---------- Finished sides material swap ----------
+
+    def _build_payload(self, finished_sides):
+        """Drive _cut_list_to_3d_payload with a synthetic cabinet
+        + cut-list dict — covers the side-panel material swap that
+        only fires inside the full payload pipeline, not the
+        per-face helpers."""
+        cab = {
+            "width_mm": 600, "height_mm": 720, "depth_mm": 609,
+            "family": "base", "door_count": 1, "drawer_count": 0,
+            "finished_sides": finished_sides,
+            "door_style": "slab", "handle": "none",
+        }
+        cut = {"shelf": None, "shelf_count": 0}
+        payload = self.ConfigSession._cut_list_to_3d_payload(cab, cut)
+        sides = {p["name"]: p for p in payload["panels"]
+                 if p["name"] in ("side_L", "side_R")}
+        return sides
+
+    def test_finished_sides_none_both_carcass(self):
+        sides = self._build_payload("none")
+        self.assertEqual(sides["side_L"]["material"], "carcass")
+        self.assertEqual(sides["side_R"]["material"], "carcass")
+
+    def test_finished_sides_left_only_L_is_door(self):
+        sides = self._build_payload("left")
+        self.assertEqual(sides["side_L"]["material"], "door")
+        self.assertEqual(sides["side_R"]["material"], "carcass")
+
+    def test_finished_sides_right_only_R_is_door(self):
+        sides = self._build_payload("right")
+        self.assertEqual(sides["side_L"]["material"], "carcass")
+        self.assertEqual(sides["side_R"]["material"], "door")
+
+    def test_finished_sides_both_door(self):
+        sides = self._build_payload("both")
+        self.assertEqual(sides["side_L"]["material"], "door")
+        self.assertEqual(sides["side_R"]["material"], "door")
+
     def test_two_door_with_handles(self):
         panels = self._emit_doors_panels(
             door_style="slab", handle="knob", door_count=2,

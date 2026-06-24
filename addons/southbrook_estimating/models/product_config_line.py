@@ -297,15 +297,27 @@ class ProductConfigSession(models.Model):
         # ---- Sides: vertical, BOX_TH thick. For toekick families the
         #      side panels extend the full visible height (door + toekick);
         #      we approximate by keeping sides at H tall and lifting them.
+        #
+        # Phase 2 (2026-06-24) — Finished Sides material swap.
+        # Default = carcass (matches interior plywood). When the
+        # customer picks Left / Right / Both for the Finished Sides
+        # attribute, the corresponding side panel(s) render with the
+        # door material so the exposed face reads as matched cabinetry
+        # instead of raw construction grade.
+        finished_sides = (cab.get("finished_sides") or "none").lower()
+        side_L_mat = "door" if finished_sides in ("left", "both") else "carcass"
+        side_R_mat = "door" if finished_sides in ("right", "both") else "carcass"
         panels.append({
             "name": "side_L",
             "dims": {"width": BOX_TH, "height": H, "depth": D},
             "pos":  {"x": -(W - BOX_TH) / 2, "y": y0 + H / 2, "z": -D / 2},
+            "material": side_L_mat,
         })
         panels.append({
             "name": "side_R",
             "dims": {"width": BOX_TH, "height": H, "depth": D},
             "pos":  {"x": (W - BOX_TH) / 2, "y": y0 + H / 2, "z": -D / 2},
+            "material": side_R_mat,
         })
 
         # ---- Top + bottom: horizontal, captured between sides.
