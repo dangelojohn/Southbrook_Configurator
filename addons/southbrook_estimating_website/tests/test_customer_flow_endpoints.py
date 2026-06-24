@@ -256,6 +256,62 @@ class TestCustomerFlowEndpoints(TransactionCase):
             "24 in must come after 21 in in the dropdown; got %r" % names,
         )
 
+    def test_add_line_merges_identical_configurations_into_one_line(self):
+        """Bug fix 2026-06-23 (user-chosen Option B): two /add-line
+        calls for the same template (default variant, no attribute
+        config yet) must produce ONE line with summed qty, not two
+        duplicate lines. This is the server-side guarantee that
+        backstops the client-side debounce — if the JS race ever lets
+        a second click through, the server still de-duplicates.
+
+        Identity for merge = same product_id (the variant). Odoo
+        encodes attribute combination into variant identity, so
+        configured lines (specific variant) won't merge with
+        default-variant adds (the template's product_variant_ids[:1])
+        — preserving the user's intent that a configured line is
+        distinct from a fresh add."""
+        # Use a fresh order so other tests' lines don't interfere.
+        order = self.env["sale.order"].create({
+            "partner_id": self.partner_customer.id,
+        })
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_order = lambda _id: order
+        tmpl_id = self.tmpl_base_1dr.id
+
+        with stubbed_request(self.env):
+            r1 = controller.southbrook_api_order_add_line(
+                order.id, product_tmpl_id=tmpl_id, qty=2,
+            )
+            r2 = controller.southbrook_api_order_add_line(
+                order.id, product_tmpl_id=tmpl_id, qty=3,
+            )
+
+        self.assertTrue(r1.get("ok"), "first add should succeed: %r" % r1)
+        self.assertTrue(r2.get("ok"), "second add should succeed: %r" % r2)
+        # The second call should report merged=True and reference the
+        # same line_id as the first.
+        self.assertEqual(
+            r1.get("line_id"), r2.get("line_id"),
+            "second add must merge into the first line, not create a new one",
+        )
+        self.assertTrue(
+            r2.get("merged"), "merged flag missing on second add: %r" % r2,
+        )
+        # Exactly ONE line should exist on the order, with qty 2+3=5.
+        lines = self.env["sale.order.line"].search(
+            [("order_id", "=", order.id)],
+        )
+        self.assertEqual(
+            len(lines), 1,
+            "expected one merged line, got %d: %r"
+            % (len(lines), [(l.id, l.product_id.display_name, l.product_uom_qty)
+                            for l in lines]),
+        )
+        self.assertEqual(
+            lines.product_uom_qty, 5.0,
+            "merged line qty should be 2+3=5, got %s" % lines.product_uom_qty,
+        )
+
     def test_g15_set_attribute_swaps_variant_with_new_combination(self):
         # Reuse the template's existing default variant (one is auto-
         # created on template install). Creating a second variant with

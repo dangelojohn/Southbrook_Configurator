@@ -1272,6 +1272,41 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         if order.state not in ("draft", "sent"):
             return {"error": "order_locked", "state": order.state}
 
+        # UX bugfix 2026-06-23 (Option B): merge identical configurations.
+        # If this order already has a line for the SAME variant
+        # (same product_id ≡ same template + same attribute combination,
+        # since Odoo encodes attribute choices into variant identity),
+        # increment the existing line's qty instead of creating a
+        # duplicate. Fixes the "I clicked Add twice and got two
+        # identical lines totalling qty 4" UX bug.
+        #
+        # Default-variant adds (no attributes configured yet) all share
+        # product_variant_ids[:1] for the template, so two clicks of
+        # the same catalog card merge with each other. Once a user
+        # configures attributes on a line (via /set-attribute → variant
+        # swap), the line's variant becomes specific and won't merge
+        # with the default-variant counterpart — preserving the user's
+        # intent that "this configured line is distinct".
+        existing = (
+            request.env["sale.order.line"]
+            .sudo()
+            .search(
+                [
+                    ("order_id", "=", order.id),
+                    ("product_id", "=", variant.id),
+                ],
+                limit=1,
+            )
+        )
+        if existing:
+            existing.product_uom_qty = existing.product_uom_qty + qty_int
+            return {
+                "ok": True,
+                "line_id": existing.id,
+                "merged": True,
+                "qty": existing.product_uom_qty,
+            }
+
         line = (
             request.env["sale.order.line"]
             .sudo()

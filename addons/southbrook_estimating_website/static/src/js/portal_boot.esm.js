@@ -2665,6 +2665,22 @@ class OrderBuilder extends Component {
         const qtyArg = (typeof qty === "number" && qty > 0)
             ? Math.floor(qty)
             : 1;
+        // UX bugfix 2026-06-23: optimistic counter bump. The "N
+        // cabinets" counter reads state.order.line_count which is
+        // server-side `len(sale.order.line[])` — i.e. count of LINES,
+        // not sum of qty. So we bump by 1 per click regardless of qty.
+        // With Option B merge enabled (server-side at /add-line), a
+        // duplicate-template add merges into the existing line — the
+        // optimistic +1 over-shoots by 1 briefly, but _loadOrder()
+        // after the server response reconciles to truth. The catch
+        // path reverts on failure. Grand total is intentionally NOT
+        // optimistic — pricelist/channel discounts make a naive
+        // qtyArg * list_price wrong; the toast confirms the add and
+        // the total catches up on reload.
+        const _optimisticBump = 1;
+        if (this.state.order && typeof this.state.order.line_count === "number") {
+            this.state.order.line_count += _optimisticBump;
+        }
         try {
             const result = await rpcJsonCall(
                 `/southbrook/api/order/${encodeURIComponent(this.state.order.id)}/add-line`,
@@ -2710,6 +2726,16 @@ class OrderBuilder extends Component {
                 throw new Error(this.state.error);
             }
         } catch (e) {
+            // UX bugfix 2026-06-23: revert the optimistic counter bump
+            // when the add failed. (_loadOrder did NOT run, so the
+            // counter would otherwise stay artificially high until the
+            // next refresh.) Floored at 0 in case the optimistic state
+            // got further corrupted somehow.
+            if (this.state.order && typeof this.state.order.line_count === "number") {
+                this.state.order.line_count = Math.max(
+                    0, this.state.order.line_count - _optimisticBump,
+                );
+            }
             // If the error was already set by the !ok branch above,
             // don't overwrite it with a generic message.
             if (!this.state.error) {
