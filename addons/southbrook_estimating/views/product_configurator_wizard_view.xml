@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!--
+        Bug #4 (end-to-end test 2026-06-22): the OCA configurator
+        wizard's terminal step still shows "Next", but clicking it
+        materialises the variant + closes the wizard. Customers expect
+        "Confirm" or "Done" here. Fix: hide Next on the final step
+        and show a Confirm button instead. Both call the same OCA
+        action_next_step which routes to action_config_done() when
+        no next step exists.
+
+        The is_last_step compute lives on the southbrook override of
+        product.configurator (see models/product_configurator.py).
+    -->
+    <record id="product_configurator_form_southbrook"
+            model="ir.ui.view">
+        <field name="name">product.configurator.form.southbrook</field>
+        <field name="model">product.configurator</field>
+        <field name="inherit_id"
+               ref="product_configurator.product_configurator_form"/>
+        <field name="arch" type="xml">
+            <!-- Carry is_last_step into the client so the button
+                 invisible attrs can resolve. -->
+            <xpath expr="//field[@name='value_ids']" position="after">
+                <field name="is_last_step" invisible="1"/>
+            </xpath>
+            <!-- Hide the stock Next button on the final step. -->
+            <xpath expr="//button[@name='action_next_step']"
+                   position="attributes">
+                <attribute name="invisible">is_last_step</attribute>
+            </xpath>
+            <!-- Add a Confirm button that surfaces only on the last
+                 step. Same action_next_step target (OCA already
+                 routes to action_config_done when next_step is
+                 falsy). -->
+            <xpath expr="//button[@name='action_next_step']"
+                   position="after">
+                <button
+                    type="object"
+                    name="action_next_step"
+                    class="oe_highlight"
+                    string="Confirm"
+                    invisible="not is_last_step"
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>

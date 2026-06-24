@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.4.9.0",
+    "version": "19.0.4.10.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -165,6 +165,11 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # Southbrook Estimating. Bypasses the product form button entirely.
         # MUST load AFTER sale_order_views.xml (which defines menu_southbrook_root).
         "views/launch_3d_menu.xml",
+        # Bug #4 (2026-06-22) — wizard Next→Confirm on the final step.
+        # Inherits product_configurator.product_configurator_form so it
+        # must load after that addon is installed (depends list already
+        # guarantees this).
+        "views/product_configurator_wizard_view.xml",
         # A1 (2026-06-18) — Prodboard cabinet-archetype taxonomy seed.
         # Loads after security so the access rules exist when the seed
         # creates archetype records. Idempotent.
