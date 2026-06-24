@@ -79,17 +79,35 @@ class TestPhase23DPayload(SouthbrookTestCase):
 
     # ---------- Handles ----------
 
-    def test_bar_pull_emits_one_hardware_panel(self):
+    def test_bar_pull_on_door_is_vertical_cylinder(self):
+        # Phase 2 Round 2: bar pull is now a cylinder on the Y axis
+        # (vertical) when on a door.
         panels = self._emit_doors_panels(door_style="slab", handle="bar_pull")
         hardware = [p for p in panels if p.get("material") == "hardware"]
         self.assertEqual(len(hardware), 1)
+        h = hardware[0]
+        self.assertEqual(h.get("shape"), "cylinder")
+        self.assertEqual(h.get("axis"), "y")
 
-    def test_knob_emits_one_hardware_panel(self):
+    def test_bar_pull_on_drawer_is_horizontal_cylinder(self):
+        panels = self._emit_drawer_panels(
+            door_style="slab", handle="bar_pull", drawer_count=1,
+        )
+        hardware = [p for p in panels if p.get("material") == "hardware"]
+        self.assertEqual(len(hardware), 1)
+        h = hardware[0]
+        self.assertEqual(h.get("shape"), "cylinder")
+        self.assertEqual(h.get("axis"), "x")
+
+    def test_knob_emits_sphere_shape(self):
+        # Phase 2 Round 2: knob is a sphere; isometric dims so the
+        # client SphereGeometry takes min/2 as radius.
         panels = self._emit_doors_panels(door_style="slab", handle="knob")
         hardware = [p for p in panels if p.get("material") == "hardware"]
         self.assertEqual(len(hardware), 1)
-        # Knob is roughly cubic
-        d = hardware[0]["dims"]
+        h = hardware[0]
+        self.assertEqual(h.get("shape"), "sphere")
+        d = h["dims"]
         self.assertEqual(d["width"], d["height"])
         self.assertEqual(d["height"], d["depth"])
 

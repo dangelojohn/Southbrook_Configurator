@@ -616,46 +616,53 @@ class ProductConfigSession(models.Model):
         if handle in ("none", "integrated"):
             return
         if handle == "bar_pull":
+            # Phase 2 Round 2 (2026-06-24): emit as cylinder shape.
+            # The client interprets `shape: cylinder` + `axis` to pick
+            # length and radius from dims:
+            #   axis="x" → length=width,  radius=min(height,depth)/2
+            #   axis="y" → length=height, radius=min(width,depth)/2
+            # 18mm diameter is a common cabinet bar-pull size.
+            DIAM = 18
+            STAND_OFF = 25  # how far the bar stands off the face
             if on_drawer:
-                # Horizontal bar across the drawer, centered, near top
-                bar_w = min(face_w * 0.5, 200)
-                bar_h = 18
-                bar_d = 25
-                hy = y + face_h / 2 - face_h * 0.15
-                if bar_w < 30 or bar_h < 5:
+                bar_len = min(face_w * 0.5, 200)
+                if bar_len < 30:
                     return
+                hy = y + face_h / 2 - face_h * 0.15
                 panels.append({
                     "name": name_prefix,
-                    "dims": {"width": bar_w, "height": bar_h, "depth": bar_d},
-                    "pos": {"x": x, "y": hy, "z": z},
+                    "shape": "cylinder", "axis": "x",
+                    "dims": {"width": bar_len, "height": DIAM, "depth": DIAM},
+                    "pos": {"x": x, "y": hy, "z": z + STAND_OFF / 2},
                     "material": "hardware",
                 })
             else:
-                # Vertical bar on the door, centered, upper-middle
-                bar_w = 18
-                bar_h = min(face_h * 0.35, 200)
-                bar_d = 25
-                hy = y + face_h * 0.15
-                if bar_h < 30 or bar_w < 5:
+                bar_len = min(face_h * 0.35, 200)
+                if bar_len < 30:
                     return
+                hy = y + face_h * 0.15
                 panels.append({
                     "name": name_prefix,
-                    "dims": {"width": bar_w, "height": bar_h, "depth": bar_d},
-                    "pos": {"x": x, "y": hy, "z": z},
+                    "shape": "cylinder", "axis": "y",
+                    "dims": {"width": DIAM, "height": bar_len, "depth": DIAM},
+                    "pos": {"x": x, "y": hy, "z": z + STAND_OFF / 2},
                     "material": "hardware",
                 })
             return
         if handle == "knob":
-            # Small cube, slightly less prominent than a bar pull
-            size = 32
+            # Phase 2 Round 2: emit as sphere shape.
+            # Radius = min(dim)/2 = 16mm (32mm diameter, common
+            # cabinet-knob size). Client uses SphereGeometry.
+            DIAM = 32
             if on_drawer:
                 hy = y + face_h / 2 - face_h * 0.18
             else:
                 hy = y + face_h * 0.25
             panels.append({
                 "name": name_prefix,
-                "dims": {"width": size, "height": size, "depth": size},
-                "pos": {"x": x, "y": hy, "z": z},
+                "shape": "sphere",
+                "dims": {"width": DIAM, "height": DIAM, "depth": DIAM},
+                "pos": {"x": x, "y": hy, "z": z + DIAM / 4},
                 "material": "hardware",
             })
             return

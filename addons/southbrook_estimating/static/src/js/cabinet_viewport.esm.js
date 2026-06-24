@@ -633,7 +633,53 @@ export class CabinetViewport extends Component {
         for (const p of payload.panels) {
             const d = p.dims;
             if (!d || d.width <= 0 || d.height <= 0 || d.depth <= 0) continue;
-            const geom = new THREE.BoxGeometry(d.width, d.height, d.depth);
+            // 2026-06-24 Phase 2 Round 2 — shape dispatcher.
+            // Defaults to box (back-compat with every panel emitted by
+            // server-side code before today). Cylinder + sphere are
+            // wrapped in try/catch + fall through to BoxGeometry so a
+            // malformed shape hint never blanks the canvas.
+            let geom;
+            const shape = p.shape || "box";
+            try {
+                if (shape === "cylinder") {
+                    // axis: "y" (default — vertical cylinder, length=height)
+                    //       "x" (horizontal X — bar pull on a drawer)
+                    //       "z" (horizontal Z — rare)
+                    const axis = p.axis || "y";
+                    const segments = 18;
+                    let len, rad;
+                    if (axis === "x") {
+                        len = d.width;
+                        rad = Math.min(d.height, d.depth) / 2;
+                    } else if (axis === "z") {
+                        len = d.depth;
+                        rad = Math.min(d.width, d.height) / 2;
+                    } else {
+                        len = d.height;
+                        rad = Math.min(d.width, d.depth) / 2;
+                    }
+                    geom = new THREE.CylinderGeometry(rad, rad, len, segments);
+                    // CylinderGeometry's default axis is Y. Rotate to
+                    // align with the requested axis at mesh-build time
+                    // (below, via mesh.rotation).
+                } else if (shape === "sphere") {
+                    const radius = Math.min(d.width, d.height, d.depth) / 2;
+                    geom = new THREE.SphereGeometry(radius, 24, 16);
+                } else {
+                    geom = new THREE.BoxGeometry(d.width, d.height, d.depth);
+                }
+            } catch (e) {
+                // Defensive: malformed shape hint or vendored Three.js
+                // missing the geometry class → fall back to box and
+                // log once. Cabinet renders something, the user does
+                // not see a blank canvas.
+                // eslint-disable-next-line no-console
+                console.warn(
+                    "[CabinetViewport] geometry build failed for "
+                    + "shape '" + shape + "'; falling back to box. Error:", e,
+                );
+                geom = new THREE.BoxGeometry(d.width, d.height, d.depth);
+            }
             const matName =
                 this.state.mode === "blueline" ? "blueline" : (p.material || "carcass");
             const material = this._materials[matName] || this._materials.carcass;
@@ -641,6 +687,13 @@ export class CabinetViewport extends Component {
             mesh.position.set(p.pos.x, p.pos.y, p.pos.z);
             if (p.rot) {
                 mesh.rotation.set(p.rot.x || 0, p.rot.y || 0, p.rot.z || 0);
+            } else if (shape === "cylinder" && p.axis === "x") {
+                // Default cylinder axis is Y; rotate 90° around Z to lay
+                // it along X. (No explicit rot needed for axis=y.)
+                mesh.rotation.set(0, 0, Math.PI / 2);
+            } else if (shape === "cylinder" && p.axis === "z") {
+                // Rotate 90° around X to lay it along Z.
+                mesh.rotation.set(Math.PI / 2, 0, 0);
             }
             // T1C4: every panel casts AND receives shadows. Cast =
             // floor shadow grounding. Receive = inter-panel shadows
