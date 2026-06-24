@@ -8,11 +8,15 @@
                 <button class="btn btn-sm btn-outline-secondary o_cv_btn"
                         t-on-click="onToggleMode"
                         t-att-disabled="!state.threeLoaded">
-                    <t t-if="state.mode === 'solid'">Blueline</t>
-                    <t t-else="">Solid</t>
+                    <t t-if="state.mode === 'solid'">Blueprint view</t>
+                    <t t-else="">Realistic view</t>
                 </button>
                 <button class="btn btn-sm btn-outline-secondary o_cv_btn"
-                        title="Refresh"
+                        title="Reset camera to the default 3/4 view"
+                        t-on-click="onResetCamera"
+                        t-att-disabled="!state.threeLoaded">⟲ View</button>
+                <button class="btn btn-sm btn-outline-secondary o_cv_btn"
+                        title="Refresh the rendered cabinet from the latest configuration"
                         t-on-click="onRefresh"
                         t-att-disabled="!state.threeLoaded">↻</button>
                 <span class="o_cv_status flex-grow-1" t-if="state.loading">

@@ -671,6 +671,11 @@ export class CabinetViewport extends Component {
             } else {
                 this._camera.lookAt(new THREE.Vector3(...tgt));
             }
+            // 2026-06-24 Phase 3 polish — stash the payload's framing
+            // so onResetCamera can snap back. Stored as plain arrays
+            // so a later config change overwrites cleanly.
+            this._defaultCameraPosition = [...payload.camera.position];
+            this._defaultCameraTarget = [...tgt];
         }
     }
 
@@ -696,6 +701,19 @@ export class CabinetViewport extends Component {
         // toggle is just a visibility flip — no rebuild needed.
         if (this._dimensionGroup) {
             this._dimensionGroup.visible = this.state.mode === "blueline";
+        }
+    }
+
+    // 2026-06-24 Phase 3 polish — Reset Camera toolbar action.
+    // Snaps back to the framing the last payload requested (the 3/4
+    // view set in get_3d_payload). No-op until first payload lands;
+    // OrbitControls drag positions reset cleanly.
+    onResetCamera() {
+        if (!this._defaultCameraPosition || !this._camera) return;
+        this._camera.position.set(...this._defaultCameraPosition);
+        if (this._controls && this._defaultCameraTarget) {
+            this._controls.target.set(...this._defaultCameraTarget);
+            this._controls.update();
         }
     }
 
