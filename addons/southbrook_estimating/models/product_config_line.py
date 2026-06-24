@@ -165,6 +165,11 @@ class ProductConfigSession(models.Model):
             # attributes render exactly as before (no regression).
             "door_style": "slab",
             "handle": "none",
+            # Phase 2 Round 2.5 (2026-06-24): Pull Finish drives the
+            # hardware material color on the client. Default falls back
+            # to the generic "hardware" (brushed-nickel) material when
+            # no pick is set.
+            "pull_finish": "",
         }
         # 2. SKU lookup.
         sku = (self.product_tmpl_id and self.product_tmpl_id.default_code) or ""
@@ -189,6 +194,7 @@ class ProductConfigSession(models.Model):
         attr_finished_sides = attr_xml("attr_finished_sides")
         attr_door_style = attr_xml("attr_door_style")
         attr_handle = attr_xml("attr_handle")
+        attr_pull_finish = attr_xml("attr_pull_finish")
 
         for val in self.value_ids:
             attr = val.attribute_id
@@ -238,6 +244,24 @@ class ProductConfigSession(models.Model):
                     out["handle"] = "integrated"
                 else:
                     out["handle"] = "none"
+            elif attr_pull_finish and attr == attr_pull_finish:
+                # Phase 2 Round 2.5 — pull-finish key maps to the
+                # client-registered material name. Slugify the value
+                # name: "Polished Nickel" → "polished_nickel" → material
+                # "hardware_polished_nickel". The 8 known finishes
+                # (polished_nickel, brushed_nickel, matte_black,
+                # antique_bronze, brushed_brass, polished_chrome,
+                # oil_rubbed_bronze, champagne_bronze) are pre-
+                # registered on the client; unknown keys fall back to
+                # the generic "hardware" material.
+                slug = (val.name or "").lower().strip()
+                slug = (
+                    slug.replace("—", " ")
+                        .replace("–", " ")
+                        .replace("-", " ")
+                )
+                slug = "_".join(slug.split())
+                out["pull_finish"] = slug
         return out
 
     @api.model
@@ -374,15 +398,18 @@ class ProductConfigSession(models.Model):
         # ---- Door OR drawer-front stack, depending on family.
         door_style = cab.get("door_style", "slab")
         handle = cab.get("handle", "none")
+        pull_finish = cab.get("pull_finish") or ""
         if family == "drawer":
             self._emit_drawer_fronts(
                 panels, W, H, y0, DOOR_TH, DOOR_REVEAL,
                 drawer_count=cab["drawer_count"] or door_count or 3,
                 door_style=door_style, handle=handle,
+                pull_finish=pull_finish,
             )
         else:
             self._emit_doors(panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count,
-                             door_style=door_style, handle=handle)
+                             door_style=door_style, handle=handle,
+                             pull_finish=pull_finish)
 
         # ---- Camera framing — 3/4 view, slightly elevated; include the
         #      toe-kick in the framing height for base/tall/sink/vanity.
@@ -478,7 +505,7 @@ class ProductConfigSession(models.Model):
 
     @api.model
     def _emit_doors(self, panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count,
-                    door_style="slab", handle="none"):
+                    door_style="slab", handle="none", pull_finish=""):
         """Append the door panel(s) for a non-drawer carcass.
 
         Phase-1 NF14 conventions:
@@ -504,6 +531,7 @@ class ProductConfigSession(models.Model):
                 z=DOOR_TH + DOOR_REVEAL + 6,
                 face_w=W - 2 * DOOR_REVEAL, face_h=H - 2 * DOOR_REVEAL,
                 handle=handle, on_drawer=False, name_prefix="door_handle",
+                pull_finish=pull_finish,
             )
         elif door_count == 2:
             half_w = (W - 3 * DOOR_REVEAL) / 2
@@ -522,6 +550,7 @@ class ProductConfigSession(models.Model):
                     face_w=half_w, face_h=H - 2 * DOOR_REVEAL,
                     handle=handle, on_drawer=False,
                     name_prefix=f"door_{idx}_handle",
+                    pull_finish=pull_finish,
                 )
 
     @api.model
@@ -596,7 +625,7 @@ class ProductConfigSession(models.Model):
 
     @api.model
     def _emit_handle(self, panels, x, y, z, face_w, face_h,
-                     handle, on_drawer, name_prefix):
+                     handle, on_drawer, name_prefix, pull_finish=""):
         """Emit a handle mesh in front of a door or drawer face.
 
         Round 1 approximation: all handles are thin boxes (no cylinder
@@ -615,6 +644,22 @@ class ProductConfigSession(models.Model):
         """
         if handle in ("none", "integrated"):
             return
+        # Phase 2 Round 2.5: resolve hardware material name from
+        # the pull_finish slug. Known finishes get a dedicated
+        # client material (color + roughness/metalness tuned per
+        # finish family); unknown/empty fall back to the generic
+        # brushed-nickel "hardware" material so legacy panels and
+        # cabinets without a Pull Finish pick still render.
+        _KNOWN_FINISHES = {
+            "polished_nickel", "brushed_nickel", "matte_black",
+            "antique_bronze", "brushed_brass", "polished_chrome",
+            "oil_rubbed_bronze", "champagne_bronze",
+        }
+        hw_mat = (
+            f"hardware_{pull_finish}"
+            if pull_finish in _KNOWN_FINISHES
+            else "hardware"
+        )
         if handle == "bar_pull":
             # Phase 2 Round 2 (2026-06-24): emit as cylinder shape.
             # The client interprets `shape: cylinder` + `axis` to pick
@@ -634,7 +679,7 @@ class ProductConfigSession(models.Model):
                     "shape": "cylinder", "axis": "x",
                     "dims": {"width": bar_len, "height": DIAM, "depth": DIAM},
                     "pos": {"x": x, "y": hy, "z": z + STAND_OFF / 2},
-                    "material": "hardware",
+                    "material": hw_mat,
                 })
             else:
                 bar_len = min(face_h * 0.35, 200)
@@ -646,7 +691,7 @@ class ProductConfigSession(models.Model):
                     "shape": "cylinder", "axis": "y",
                     "dims": {"width": DIAM, "height": bar_len, "depth": DIAM},
                     "pos": {"x": x, "y": hy, "z": z + STAND_OFF / 2},
-                    "material": "hardware",
+                    "material": hw_mat,
                 })
             return
         if handle == "knob":
@@ -663,7 +708,7 @@ class ProductConfigSession(models.Model):
                 "shape": "sphere",
                 "dims": {"width": DIAM, "height": DIAM, "depth": DIAM},
                 "pos": {"x": x, "y": hy, "z": z + DIAM / 4},
-                "material": "hardware",
+                "material": hw_mat,
             })
             return
         if handle == "cup_pull":
@@ -683,12 +728,13 @@ class ProductConfigSession(models.Model):
                 "name": name_prefix,
                 "dims": {"width": cup_w, "height": cup_h, "depth": cup_d},
                 "pos": {"x": x, "y": hy, "z": z},
-                "material": "hardware",
+                "material": hw_mat,
             })
 
     @api.model
     def _emit_drawer_fronts(self, panels, W, H, y0, DOOR_TH, DOOR_REVEAL,
-                            drawer_count, door_style="slab", handle="none"):
+                            drawer_count, door_style="slab", handle="none",
+                            pull_finish=""):
         """Append `drawer_count` evenly-divided drawer fronts.
 
         Algorithm (Phase-1 simplification: all fronts the same height):
@@ -721,4 +767,5 @@ class ProductConfigSession(models.Model):
                 face_w=face_w, face_h=front_h,
                 handle=handle, on_drawer=True,
                 name_prefix=f"drawer_front_{i + 1}_handle",
+                pull_finish=pull_finish,
             )

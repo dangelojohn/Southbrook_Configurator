@@ -322,15 +322,38 @@ export class CabinetViewport extends Component {
             worktop: new THREE.MeshStandardMaterial({
                 color: 0xb5b0a8, roughness: 0.4, metalness: 0.05,
             }),
-            // Phase 2 (2026-06-24) — hardware material for handle
-            // meshes (Bar Pull, Knob, Cup Pull). Brushed-nickel default;
-            // higher metalness + lower roughness so it picks up the
-            // PMREM env map (when available) as a polished surface.
-            // When the canonical Pull Finish catalog drives this it
-            // becomes attribute-keyed (Polished Nickel → 0.05 rough,
-            // Matte Black → 0.6 rough, etc.).
+            // Phase 2 Round 2.5 (2026-06-24) — Pull Finish-driven
+            // hardware materials. 8 known finishes pre-registered
+            // with color + roughness + metalness tuned per family.
+            // "hardware" (the generic) stays as brushed-nickel default
+            // so panels emitted without a finish pick (or with an
+            // unknown finish) still render correctly.
             hardware: new THREE.MeshStandardMaterial({
                 color: 0xa6a8ad, roughness: 0.35, metalness: 0.85,
+            }),
+            hardware_polished_nickel: new THREE.MeshStandardMaterial({
+                color: 0xc8cad0, roughness: 0.15, metalness: 0.95,
+            }),
+            hardware_brushed_nickel: new THREE.MeshStandardMaterial({
+                color: 0xa6a8ad, roughness: 0.40, metalness: 0.85,
+            }),
+            hardware_matte_black: new THREE.MeshStandardMaterial({
+                color: 0x1a1a1a, roughness: 0.60, metalness: 0.20,
+            }),
+            hardware_antique_bronze: new THREE.MeshStandardMaterial({
+                color: 0x6e4a2c, roughness: 0.50, metalness: 0.70,
+            }),
+            hardware_brushed_brass: new THREE.MeshStandardMaterial({
+                color: 0xc9a64a, roughness: 0.35, metalness: 0.90,
+            }),
+            hardware_polished_chrome: new THREE.MeshStandardMaterial({
+                color: 0xd8dade, roughness: 0.05, metalness: 1.00,
+            }),
+            hardware_oil_rubbed_bronze: new THREE.MeshStandardMaterial({
+                color: 0x3a2618, roughness: 0.55, metalness: 0.40,
+            }),
+            hardware_champagne_bronze: new THREE.MeshStandardMaterial({
+                color: 0xb09575, roughness: 0.40, metalness: 0.75,
             }),
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
@@ -682,7 +705,14 @@ export class CabinetViewport extends Component {
             }
             const matName =
                 this.state.mode === "blueline" ? "blueline" : (p.material || "carcass");
-            const material = this._materials[matName] || this._materials.carcass;
+            // Material lookup with hardware-family fallback: an
+            // unknown "hardware_<finish>" key falls back to the
+            // generic "hardware" before defaulting to carcass.
+            let material = this._materials[matName];
+            if (!material && matName.startsWith("hardware_")) {
+                material = this._materials.hardware;
+            }
+            if (!material) material = this._materials.carcass;
             const mesh = new THREE.Mesh(geom, material);
             mesh.position.set(p.pos.x, p.pos.y, p.pos.z);
             if (p.rot) {

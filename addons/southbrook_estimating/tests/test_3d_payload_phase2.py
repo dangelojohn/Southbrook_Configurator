@@ -21,22 +21,24 @@ class TestPhase23DPayload(SouthbrookTestCase):
         cls.ConfigSession = cls.env["product.config.session"]
 
     def _emit_doors_panels(self, door_style="slab", handle="none",
-                           door_count=1, W=600, H=720):
+                           door_count=1, W=600, H=720, pull_finish=""):
         panels = []
         self.ConfigSession._emit_doors(
             panels=panels, W=W, H=H, y0=0, DOOR_TH=18, DOOR_REVEAL=3,
             door_count=door_count,
             door_style=door_style, handle=handle,
+            pull_finish=pull_finish,
         )
         return panels
 
     def _emit_drawer_panels(self, door_style="slab", handle="none",
-                            drawer_count=3, W=600, H=720):
+                            drawer_count=3, W=600, H=720, pull_finish=""):
         panels = []
         self.ConfigSession._emit_drawer_fronts(
             panels=panels, W=W, H=H, y0=0, DOOR_TH=18, DOOR_REVEAL=3,
             drawer_count=drawer_count,
             door_style=door_style, handle=handle,
+            pull_finish=pull_finish,
         )
         return panels
 
@@ -78,6 +80,39 @@ class TestPhase23DPayload(SouthbrookTestCase):
         self.assertEqual(len(panels), 10)
 
     # ---------- Handles ----------
+
+    def test_pull_finish_drives_hardware_material(self):
+        # Phase 2 Round 2.5: each Pull Finish maps to its dedicated
+        # hardware_<slug> client material name.
+        for finish, expected in [
+            ("polished_nickel",   "hardware_polished_nickel"),
+            ("matte_black",       "hardware_matte_black"),
+            ("brushed_brass",     "hardware_brushed_brass"),
+            ("oil_rubbed_bronze", "hardware_oil_rubbed_bronze"),
+        ]:
+            panels = self._emit_doors_panels(
+                door_style="slab", handle="knob", pull_finish=finish,
+            )
+            hardware = [p for p in panels if "hardware" in (p.get("material") or "")]
+            self.assertEqual(len(hardware), 1, f"finish={finish}")
+            self.assertEqual(hardware[0]["material"], expected,
+                             f"finish={finish}")
+
+    def test_unknown_pull_finish_falls_back_to_generic_hardware(self):
+        panels = self._emit_doors_panels(
+            door_style="slab", handle="knob", pull_finish="some_unknown_finish",
+        )
+        hardware = [p for p in panels if "hardware" in (p.get("material") or "")]
+        self.assertEqual(len(hardware), 1)
+        self.assertEqual(hardware[0]["material"], "hardware")
+
+    def test_empty_pull_finish_uses_generic_hardware(self):
+        panels = self._emit_doors_panels(
+            door_style="slab", handle="knob",
+        )
+        hardware = [p for p in panels if "hardware" in (p.get("material") or "")]
+        self.assertEqual(len(hardware), 1)
+        self.assertEqual(hardware[0]["material"], "hardware")
 
     def test_bar_pull_on_door_is_vertical_cylinder(self):
         # Phase 2 Round 2: bar pull is now a cylinder on the Y axis
