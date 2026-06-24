@@ -23,3 +23,4 @@ from . import test_template_archetype_mapping
 from . import test_t2_door_area
 from . import test_sales_journal_hook
 from . import test_variant_sku_cost
+from . import test_3d_payload_phase2

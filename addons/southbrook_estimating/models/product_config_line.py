@@ -160,6 +160,11 @@ class ProductConfigSession(models.Model):
             "door_count": 1,
             "drawer_count": 0,
             "finished_sides": "none",
+            # Phase 2 (2026-06-24): door style + handle picks. Default
+            # to "slab" + "none" so legacy cabinets without these
+            # attributes render exactly as before (no regression).
+            "door_style": "slab",
+            "handle": "none",
         }
         # 2. SKU lookup.
         sku = (self.product_tmpl_id and self.product_tmpl_id.default_code) or ""
@@ -182,6 +187,8 @@ class ProductConfigSession(models.Model):
         attr_family = attr_xml("attr_family")
         attr_door_count = attr_xml("attr_door_count")
         attr_finished_sides = attr_xml("attr_finished_sides")
+        attr_door_style = attr_xml("attr_door_style")
+        attr_handle = attr_xml("attr_handle")
 
         for val in self.value_ids:
             attr = val.attribute_id
@@ -202,6 +209,35 @@ class ProductConfigSession(models.Model):
                     pass
             elif attr_finished_sides and attr == attr_finished_sides:
                 out["finished_sides"] = (val.name or "none").lower()
+            elif attr_door_style and attr == attr_door_style:
+                # Door Style values today: "Thermofoil Slab — White",
+                # "Five-Piece Woodgrain", "Custom (Signature)". Normalize
+                # via substring match — Phase 2 geometry only branches
+                # on slab vs five-piece; custom renders as slab pending
+                # a canonical signature-door profile.
+                name = (val.name or "").lower()
+                if "five" in name or "shaker" in name:
+                    out["door_style"] = "five_piece"
+                elif "slab" in name or "thermofoil" in name:
+                    out["door_style"] = "slab"
+                else:
+                    out["door_style"] = "slab"
+            elif attr_handle and attr == attr_handle:
+                # Handle values today: "Bar Pull", "Knob", "Cup Pull",
+                # "Integrated", "None". Order matters in the substring
+                # check (Cup before Bar because "Cup Pull" contains
+                # "pull" but not "bar").
+                name = (val.name or "").lower()
+                if "cup" in name:
+                    out["handle"] = "cup_pull"
+                elif "bar" in name:
+                    out["handle"] = "bar_pull"
+                elif "knob" in name:
+                    out["handle"] = "knob"
+                elif "integrated" in name:
+                    out["handle"] = "integrated"
+                else:
+                    out["handle"] = "none"
         return out
 
     @api.model
@@ -324,13 +360,17 @@ class ProductConfigSession(models.Model):
             })
 
         # ---- Door OR drawer-front stack, depending on family.
+        door_style = cab.get("door_style", "slab")
+        handle = cab.get("handle", "none")
         if family == "drawer":
             self._emit_drawer_fronts(
                 panels, W, H, y0, DOOR_TH, DOOR_REVEAL,
                 drawer_count=cab["drawer_count"] or door_count or 3,
+                door_style=door_style, handle=handle,
             )
         else:
-            self._emit_doors(panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count)
+            self._emit_doors(panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count,
+                             door_style=door_style, handle=handle)
 
         # ---- Camera framing — 3/4 view, slightly elevated; include the
         #      toe-kick in the framing height for base/tall/sink/vanity.
@@ -425,46 +465,211 @@ class ProductConfigSession(models.Model):
         }
 
     @api.model
-    def _emit_doors(self, panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count):
+    def _emit_doors(self, panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count,
+                    door_style="slab", handle="none"):
         """Append the door panel(s) for a non-drawer carcass.
 
         Phase-1 NF14 conventions:
           • 1-door: door spans (W − 2*DOOR_REVEAL) × (H − 2*DOOR_REVEAL).
           • 2-door: each leaf spans ((W − 3*DOOR_REVEAL)/2) × (H − 2*DOOR_REVEAL),
             with a centre reveal of DOOR_REVEAL between them.
+
+        Phase-2 (2026-06-24) — `door_style` + `handle` elaboration.
+        Slab = current single-quad behaviour. Five-piece adds a Shaker
+        frame extrusion (4 rails protruding ~6mm in front of the inset
+        panel). Handle dispatch via _emit_handle (drawer=False).
         """
         if door_count == 1:
-            panels.append({
-                "name": "door",
-                "dims": {
-                    "width": W - 2 * DOOR_REVEAL,
-                    "height": H - 2 * DOOR_REVEAL,
-                    "depth": DOOR_TH,
-                },
-                "pos":  {"x": 0, "y": y0 + H / 2, "z": DOOR_TH / 2 + DOOR_REVEAL},
-                "material": "door",
-            })
+            self._emit_single_door_face(
+                panels, x=0, y=y0 + H / 2,
+                z=DOOR_TH / 2 + DOOR_REVEAL,
+                w=W - 2 * DOOR_REVEAL, h=H - 2 * DOOR_REVEAL,
+                DOOR_TH=DOOR_TH, door_style=door_style,
+                name_prefix="door",
+            )
+            self._emit_handle(
+                panels, x=0, y=y0 + H / 2,
+                z=DOOR_TH + DOOR_REVEAL + 6,
+                face_w=W - 2 * DOOR_REVEAL, face_h=H - 2 * DOOR_REVEAL,
+                handle=handle, on_drawer=False, name_prefix="door_handle",
+            )
         elif door_count == 2:
             half_w = (W - 3 * DOOR_REVEAL) / 2
             for idx, sign in enumerate((-1, 1), start=1):
+                cx = sign * (half_w / 2 + DOOR_REVEAL / 2)
+                self._emit_single_door_face(
+                    panels, x=cx, y=y0 + H / 2,
+                    z=DOOR_TH / 2 + DOOR_REVEAL,
+                    w=half_w, h=H - 2 * DOOR_REVEAL,
+                    DOOR_TH=DOOR_TH, door_style=door_style,
+                    name_prefix=f"door_{idx}",
+                )
+                self._emit_handle(
+                    panels, x=cx, y=y0 + H / 2,
+                    z=DOOR_TH + DOOR_REVEAL + 6,
+                    face_w=half_w, face_h=H - 2 * DOOR_REVEAL,
+                    handle=handle, on_drawer=False,
+                    name_prefix=f"door_{idx}_handle",
+                )
+
+    @api.model
+    def _emit_single_door_face(self, panels, x, y, z, w, h,
+                               DOOR_TH, door_style, name_prefix):
+        """Emit one door's face geometry — slab or shaker frame.
+
+        Slab: a single full-area panel (current behaviour).
+        Five-piece (Shaker): 1 inset panel at door depth + 4 frame
+        rails (top, bottom, left, right) protruding ~PROTRUSION in
+        front of the panel, each rail FRAME wide. The center panel
+        sits at the same z as the slab would; the 4 rails sit at
+        z + PROTRUSION/2 so they read as Shaker frame from any
+        camera angle.
+        """
+        if door_style != "five_piece":
+            panels.append({
+                "name": name_prefix,
+                "dims": {"width": w, "height": h, "depth": DOOR_TH},
+                "pos": {"x": x, "y": y, "z": z},
+                "material": "door",
+            })
+            return
+        FRAME = 60        # Rail width — typical Shaker stile/rail
+        PROTRUSION = 4    # Rails protrude this far in front of panel
+        if w <= 2 * FRAME or h <= 2 * FRAME:
+            # Too small for a frame extrusion — fall back to slab so
+            # geometry stays sane on small accessory doors.
+            panels.append({
+                "name": name_prefix,
+                "dims": {"width": w, "height": h, "depth": DOOR_TH},
+                "pos": {"x": x, "y": y, "z": z},
+                "material": "door",
+            })
+            return
+        # Inset center panel at base depth
+        panels.append({
+            "name": f"{name_prefix}_panel",
+            "dims": {"width": w, "height": h, "depth": DOOR_TH},
+            "pos": {"x": x, "y": y, "z": z},
+            "material": "door",
+        })
+        rail_z = z + PROTRUSION / 2
+        rail_depth = DOOR_TH + PROTRUSION
+        # Top + bottom rails span full width
+        panels.append({
+            "name": f"{name_prefix}_rail_top",
+            "dims": {"width": w, "height": FRAME, "depth": rail_depth},
+            "pos": {"x": x, "y": y + h / 2 - FRAME / 2, "z": rail_z},
+            "material": "door",
+        })
+        panels.append({
+            "name": f"{name_prefix}_rail_bottom",
+            "dims": {"width": w, "height": FRAME, "depth": rail_depth},
+            "pos": {"x": x, "y": y - h / 2 + FRAME / 2, "z": rail_z},
+            "material": "door",
+        })
+        # Left + right stiles span the inset (between rails)
+        stile_h = h - 2 * FRAME
+        panels.append({
+            "name": f"{name_prefix}_stile_L",
+            "dims": {"width": FRAME, "height": stile_h, "depth": rail_depth},
+            "pos": {"x": x - w / 2 + FRAME / 2, "y": y, "z": rail_z},
+            "material": "door",
+        })
+        panels.append({
+            "name": f"{name_prefix}_stile_R",
+            "dims": {"width": FRAME, "height": stile_h, "depth": rail_depth},
+            "pos": {"x": x + w / 2 - FRAME / 2, "y": y, "z": rail_z},
+            "material": "door",
+        })
+
+    @api.model
+    def _emit_handle(self, panels, x, y, z, face_w, face_h,
+                     handle, on_drawer, name_prefix):
+        """Emit a handle mesh in front of a door or drawer face.
+
+        Round 1 approximation: all handles are thin boxes (no cylinder
+        or sphere geometry yet — keeps client-side dispatcher simple).
+        Round 2 may swap to proper CylinderGeometry / SphereGeometry
+        when the client gains a `shape` dispatcher.
+
+        Positioning conventions:
+          • Doors: handle centered horizontally on the door, ~80% up
+            (closer to the top for vertical Bar Pulls; upper third
+            for Knobs). Center-x doesn't depend on hinge side because
+            the door is typically not so wide that this matters
+            visually at the configurator scale.
+          • Drawers: handle centered horizontally, near the top of the
+            drawer front.
+        """
+        if handle in ("none", "integrated"):
+            return
+        if handle == "bar_pull":
+            if on_drawer:
+                # Horizontal bar across the drawer, centered, near top
+                bar_w = min(face_w * 0.5, 200)
+                bar_h = 18
+                bar_d = 25
+                hy = y + face_h / 2 - face_h * 0.15
+                if bar_w < 30 or bar_h < 5:
+                    return
                 panels.append({
-                    "name": f"door_{idx}",
-                    "dims": {
-                        "width": half_w,
-                        "height": H - 2 * DOOR_REVEAL,
-                        "depth": DOOR_TH,
-                    },
-                    "pos":  {
-                        "x": sign * (half_w / 2 + DOOR_REVEAL / 2),
-                        "y": y0 + H / 2,
-                        "z": DOOR_TH / 2 + DOOR_REVEAL,
-                    },
-                    "material": "door",
+                    "name": name_prefix,
+                    "dims": {"width": bar_w, "height": bar_h, "depth": bar_d},
+                    "pos": {"x": x, "y": hy, "z": z},
+                    "material": "hardware",
                 })
+            else:
+                # Vertical bar on the door, centered, upper-middle
+                bar_w = 18
+                bar_h = min(face_h * 0.35, 200)
+                bar_d = 25
+                hy = y + face_h * 0.15
+                if bar_h < 30 or bar_w < 5:
+                    return
+                panels.append({
+                    "name": name_prefix,
+                    "dims": {"width": bar_w, "height": bar_h, "depth": bar_d},
+                    "pos": {"x": x, "y": hy, "z": z},
+                    "material": "hardware",
+                })
+            return
+        if handle == "knob":
+            # Small cube, slightly less prominent than a bar pull
+            size = 32
+            if on_drawer:
+                hy = y + face_h / 2 - face_h * 0.18
+            else:
+                hy = y + face_h * 0.25
+            panels.append({
+                "name": name_prefix,
+                "dims": {"width": size, "height": size, "depth": size},
+                "pos": {"x": x, "y": hy, "z": z},
+                "material": "hardware",
+            })
+            return
+        if handle == "cup_pull":
+            # Drawer-only convention; on a door it falls back to knob-ish
+            # geometry (no real-world doors take cup pulls, but render
+            # something so the configurator doesn't silently swallow it).
+            cup_w = min(face_w * 0.4, 120)
+            cup_h = 24
+            cup_d = 22
+            if cup_w < 30:
+                return
+            if on_drawer:
+                hy = y + face_h / 2 - face_h * 0.15
+            else:
+                hy = y + face_h * 0.25
+            panels.append({
+                "name": name_prefix,
+                "dims": {"width": cup_w, "height": cup_h, "depth": cup_d},
+                "pos": {"x": x, "y": hy, "z": z},
+                "material": "hardware",
+            })
 
     @api.model
     def _emit_drawer_fronts(self, panels, W, H, y0, DOOR_TH, DOOR_REVEAL,
-                            drawer_count):
+                            drawer_count, door_style="slab", handle="none"):
         """Append `drawer_count` evenly-divided drawer fronts.
 
         Algorithm (Phase-1 simplification: all fronts the same height):
@@ -472,6 +677,9 @@ class ProductConfigSession(models.Model):
             front_h      = (total_face_h − (n−1)*DOOR_REVEAL) / n
             Front i (0-indexed from bottom) sits at:
               y_centre = y0 + DOOR_REVEAL + front_h/2 + i*(front_h + DOOR_REVEAL)
+
+        Phase-2 (2026-06-24) — each drawer front gets door_style elaboration
+        (Shaker frame on five-piece) and one handle mesh.
 
         Phase-3 polish: graduated front heights (deeper drawers at bottom
         per real cabinetry practice) — pulled from the BoM workbook when
@@ -482,9 +690,16 @@ class ProductConfigSession(models.Model):
         front_h = (H - 2 * DOOR_REVEAL - (n - 1) * DOOR_REVEAL) / n
         for i in range(n):
             y_centre = y0 + DOOR_REVEAL + front_h / 2 + i * (front_h + DOOR_REVEAL)
-            panels.append({
-                "name": f"drawer_front_{i + 1}",
-                "dims": {"width": face_w, "height": front_h, "depth": DOOR_TH},
-                "pos":  {"x": 0, "y": y_centre, "z": DOOR_TH / 2 + DOOR_REVEAL},
-                "material": "door",
-            })
+            z_face = DOOR_TH / 2 + DOOR_REVEAL
+            self._emit_single_door_face(
+                panels, x=0, y=y_centre, z=z_face,
+                w=face_w, h=front_h,
+                DOOR_TH=DOOR_TH, door_style=door_style,
+                name_prefix=f"drawer_front_{i + 1}",
+            )
+            self._emit_handle(
+                panels, x=0, y=y_centre, z=DOOR_TH + DOOR_REVEAL + 6,
+                face_w=face_w, face_h=front_h,
+                handle=handle, on_drawer=True,
+                name_prefix=f"drawer_front_{i + 1}_handle",
+            )

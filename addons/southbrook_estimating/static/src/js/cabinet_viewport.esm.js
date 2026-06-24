@@ -322,6 +322,16 @@ export class CabinetViewport extends Component {
             worktop: new THREE.MeshStandardMaterial({
                 color: 0xb5b0a8, roughness: 0.4, metalness: 0.05,
             }),
+            // Phase 2 (2026-06-24) — hardware material for handle
+            // meshes (Bar Pull, Knob, Cup Pull). Brushed-nickel default;
+            // higher metalness + lower roughness so it picks up the
+            // PMREM env map (when available) as a polished surface.
+            // When the canonical Pull Finish catalog drives this it
+            // becomes attribute-keyed (Polished Nickel → 0.05 rough,
+            // Matte Black → 0.6 rough, etc.).
+            hardware: new THREE.MeshStandardMaterial({
+                color: 0xa6a8ad, roughness: 0.35, metalness: 0.85,
+            }),
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
             }),
