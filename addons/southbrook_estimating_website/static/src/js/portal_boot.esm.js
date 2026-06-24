@@ -1727,7 +1727,7 @@ class CatalogPicker extends Component {
                                         <button type="button"
                                                 class="o_owl_catalog_add_btn"
                                                 t-att-class="state.lastAddedSku === item.sku ? 'o_owl_catalog_add_btn_added' : ''"
-                                                t-att-disabled="props.busy"
+                                                t-att-disabled="props.busy || state.addingSku || state.lastAddedSku === item.sku"
                                                 t-on-click="() => this._addItem(item)">
                                             <t t-if="state.lastAddedSku === item.sku">
                                                 <svg viewBox="0 0 24 24"
@@ -1741,6 +1741,7 @@ class CatalogPicker extends Component {
                                                 </svg>
                                                 Added
                                             </t>
+                                            <t t-elif="state.addingSku === item.sku">Adding…</t>
                                             <t t-else="">Add</t>
                                         </button>
                                     </div>
@@ -1842,6 +1843,14 @@ class CatalogPicker extends Component {
             // initial value here to "select".
             filterMode: "tabs",        // 'tabs' | 'select'
             qtyBySku: {},              // sku -> integer qty (default 1)
+            // UX bugfix 2026-06-23: track which SKU is mid-add (replaces
+            // the old non-reactive this._adding). Reactive so the button
+            // can both visually feedback ("Adding…") and be t-att-disabled
+            // through the entire click→server→render window — the lag
+            // between server response and parent state.lines refresh
+            // was tricking users into double-clicking and creating
+            // duplicate sale.order.line rows.
+            addingSku: null,
             lastAddedSku: null,        // briefly set after successful add
         });
         // Pre-bind handlers passed by plain reference (same pattern as
@@ -1991,7 +2000,15 @@ class CatalogPicker extends Component {
         // Fast path: no criteria → return the list unchanged.
         if (!category && !q) return items;
         return items.filter((item) => {
-            if (category) {
+            // UX bugfix 2026-06-23: when a search query is active,
+            // ignore the category filter so users searching "SB-TALL"
+            // find tall cabinets even when the Wall tab is selected.
+            // Previously search was AND-ed with the category → users
+            // hit "No cabinets match" and didn't realize the result
+            // was hiding behind a tab they hadn't selected. The
+            // category state is preserved; clearing the search returns
+            // the user to their category view.
+            if (category && !q) {
                 const c = item.category || "Extras";
                 if (c !== category) return false;
             }
@@ -2105,11 +2122,18 @@ class CatalogPicker extends Component {
     }
 
     async _addItem(item) {
-        // P1 bugfix 2026-06-22: synchronous re-entry guard *inside* the
-        // CatalogPicker too — props.busy lags by a render tick, so a
-        // fast second click on the same card otherwise sneaks past it.
-        if (this.props.busy || this._adding) return;
-        this._adding = true;
+        // UX bugfix 2026-06-23: reactive addingSku replaces the old
+        // non-reactive this._adding. The previous guard was reset as
+        // soon as props.onPick resolved, but parent state.lines didn't
+        // refresh until the next render tick — during that gap, a user
+        // who clicked again (because the UI showed no change) hit a
+        // re-armed guard. Result: duplicate lines (e.g. two qty=2 lines
+        // for the same cabinet, totalling qty 4). Tying the guard to
+        // the same 1500ms timeout that clears the "Added" badge means
+        // the button stays disabled + showing visual feedback through
+        // the parent re-render, eliminating the race.
+        if (this.props.busy || this.state.addingSku) return;
+        this.state.addingSku = item.sku;
         const qty = this.getQty(item.sku);
         // Reuses the parent's existing add-line path — onPick now
         // accepts (templateId, qty, label). The original 1- and 2-arg
@@ -2118,17 +2142,21 @@ class CatalogPicker extends Component {
         try {
             await this.props.onPick(item.id, qty, item.name || item.sku);
             this.state.lastAddedSku = item.sku;
-            // Clear the 'Added' indicator after 1.5s so the user can
-            // re-add the same cabinet if they want a second one of it.
+            // Clear both the 'Added' indicator AND the in-flight lock
+            // after 1.5s — single timer keeps the visual feedback
+            // window and the click guard in lockstep.
             setTimeout(() => {
                 if (this.state.lastAddedSku === item.sku) {
                     this.state.lastAddedSku = null;
                 }
+                if (this.state.addingSku === item.sku) {
+                    this.state.addingSku = null;
+                }
             }, 1500);
         } catch (e) {
-            // Parent surfaces the error via state.error + toast.
-        } finally {
-            this._adding = false;
+            // Reset immediately on error so the user can retry. Parent
+            // surfaces the message via state.error + toast.
+            this.state.addingSku = null;
         }
     }
 }
