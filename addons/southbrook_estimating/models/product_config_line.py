@@ -170,6 +170,11 @@ class ProductConfigSession(models.Model):
             # to the generic "hardware" (brushed-nickel) material when
             # no pick is set.
             "pull_finish": "",
+            # Phase 2 Round 3 (2026-06-24): crown molding profile.
+            # "none" = no crown. Other values map to crown heights:
+            # simple=38mm (1.5in cove), ogee=76mm (3in), stacked=114mm,
+            # dental=76mm (3in dental). Emitted only on wall + tall.
+            "crown_molding": "none",
         }
         # 2. SKU lookup.
         sku = (self.product_tmpl_id and self.product_tmpl_id.default_code) or ""
@@ -195,6 +200,7 @@ class ProductConfigSession(models.Model):
         attr_door_style = attr_xml("attr_door_style")
         attr_handle = attr_xml("attr_handle")
         attr_pull_finish = attr_xml("attr_pull_finish")
+        attr_crown_molding = attr_xml("attr_crown_molding")
 
         for val in self.value_ids:
             attr = val.attribute_id
@@ -244,6 +250,21 @@ class ProductConfigSession(models.Model):
                     out["handle"] = "integrated"
                 else:
                     out["handle"] = "none"
+            elif attr_crown_molding and attr == attr_crown_molding:
+                # Crown molding values: "None", "Simple Cove (1.5 in)",
+                # "Ogee (3 in)", "Stacked Two-Tier (4.5 in)",
+                # "Dental (Traditional)". Normalize to short keys.
+                name = (val.name or "").lower()
+                if "simple" in name or "cove" in name:
+                    out["crown_molding"] = "simple"
+                elif "ogee" in name:
+                    out["crown_molding"] = "ogee"
+                elif "stacked" in name:
+                    out["crown_molding"] = "stacked"
+                elif "dental" in name:
+                    out["crown_molding"] = "dental"
+                else:
+                    out["crown_molding"] = "none"
             elif attr_pull_finish and attr == attr_pull_finish:
                 # Phase 2 Round 2.5 — pull-finish key maps to the
                 # client-registered material name. Slugify the value
@@ -410,6 +431,36 @@ class ProductConfigSession(models.Model):
             self._emit_doors(panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count,
                              door_style=door_style, handle=handle,
                              pull_finish=pull_finish)
+
+        # ---- Crown molding — wall + tall families only. Sits on top of
+        #      the carcass, overhangs sides (10mm each) and front (20mm).
+        #      Back stays flush against the wall. Material = door so the
+        #      crown reads as matching the cabinet's visible finish.
+        crown_molding = (cab.get("crown_molding") or "none").lower()
+        if crown_molding != "none" and family in ("wall", "tall"):
+            CROWN_HEIGHTS = {
+                "simple": 38,    # 1.5 in cove
+                "ogee": 76,      # 3 in
+                "stacked": 114,  # 4.5 in two-tier
+                "dental": 76,    # 3 in dental
+            }
+            crown_h = CROWN_HEIGHTS.get(crown_molding, 50)
+            SIDE_OVERHANG = 10
+            FRONT_OVERHANG = 20
+            crown_w = W + 2 * SIDE_OVERHANG
+            crown_d = D + FRONT_OVERHANG
+            # Centered over the cabinet but shifted forward by half the
+            # front overhang so the back stays flush at z = -D.
+            crown_z = -D / 2 + FRONT_OVERHANG / 2
+            crown_y = y0 + H + crown_h / 2
+            panels.append({
+                "name": "crown_molding",
+                "dims": {"width": crown_w, "height": crown_h, "depth": crown_d},
+                "pos": {"x": 0, "y": crown_y, "z": crown_z},
+                "material": "door",
+            })
+            # Lift the camera framing so the crown is in frame.
+            H = H + crown_h
 
         # ---- Camera framing — 3/4 view, slightly elevated; include the
         #      toe-kick in the framing height for base/tall/sink/vanity.

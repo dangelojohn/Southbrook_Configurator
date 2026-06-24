@@ -178,22 +178,36 @@ class TestPhase23DPayload(SouthbrookTestCase):
 
     # ---------- Finished sides material swap ----------
 
-    def _build_payload(self, finished_sides):
+    def _build_payload(self, finished_sides, family="base",
+                        crown_molding="none"):
         """Drive _cut_list_to_3d_payload with a synthetic cabinet
-        + cut-list dict — covers the side-panel material swap that
-        only fires inside the full payload pipeline, not the
-        per-face helpers."""
+        + cut-list dict — covers panel emission that fires inside the
+        full payload pipeline."""
         cab = {
             "width_mm": 600, "height_mm": 720, "depth_mm": 609,
-            "family": "base", "door_count": 1, "drawer_count": 0,
+            "family": family, "door_count": 1, "drawer_count": 0,
             "finished_sides": finished_sides,
             "door_style": "slab", "handle": "none",
+            "crown_molding": crown_molding,
         }
         cut = {"shelf": None, "shelf_count": 0}
         payload = self.ConfigSession._cut_list_to_3d_payload(cab, cut)
         sides = {p["name"]: p for p in payload["panels"]
                  if p["name"] in ("side_L", "side_R")}
         return sides
+
+    def _build_full_payload(self, **cab_overrides):
+        """Return the whole payload dict for crown / general assertions."""
+        cab = {
+            "width_mm": 600, "height_mm": 720, "depth_mm": 350,
+            "family": "wall", "door_count": 2, "drawer_count": 0,
+            "finished_sides": "none",
+            "door_style": "slab", "handle": "none",
+            "crown_molding": "none",
+        }
+        cab.update(cab_overrides)
+        cut = {"shelf": None, "shelf_count": 0}
+        return self.ConfigSession._cut_list_to_3d_payload(cab, cut)
 
     def test_finished_sides_none_both_carcass(self):
         sides = self._build_payload("none")
@@ -214,6 +228,37 @@ class TestPhase23DPayload(SouthbrookTestCase):
         sides = self._build_payload("both")
         self.assertEqual(sides["side_L"]["material"], "door")
         self.assertEqual(sides["side_R"]["material"], "door")
+
+    # ---------- Crown molding ----------
+
+    def test_crown_none_emits_no_panel(self):
+        payload = self._build_full_payload(family="wall", crown_molding="none")
+        crowns = [p for p in payload["panels"] if p["name"] == "crown_molding"]
+        self.assertEqual(len(crowns), 0)
+
+    def test_crown_simple_on_wall(self):
+        payload = self._build_full_payload(family="wall", crown_molding="simple")
+        crowns = [p for p in payload["panels"] if p["name"] == "crown_molding"]
+        self.assertEqual(len(crowns), 1)
+        self.assertEqual(crowns[0]["dims"]["height"], 38)  # 1.5 in cove
+
+    def test_crown_ogee_on_tall(self):
+        payload = self._build_full_payload(family="tall", crown_molding="ogee")
+        crowns = [p for p in payload["panels"] if p["name"] == "crown_molding"]
+        self.assertEqual(len(crowns), 1)
+        self.assertEqual(crowns[0]["dims"]["height"], 76)  # 3 in
+
+    def test_crown_skipped_on_base_family(self):
+        # Crown molding never applies to base cabinets (they're under
+        # a worktop, not the topmost element). Emission gated.
+        payload = self._build_full_payload(family="base", crown_molding="ogee")
+        crowns = [p for p in payload["panels"] if p["name"] == "crown_molding"]
+        self.assertEqual(len(crowns), 0)
+
+    def test_crown_uses_door_material(self):
+        payload = self._build_full_payload(family="wall", crown_molding="simple")
+        crowns = [p for p in payload["panels"] if p["name"] == "crown_molding"]
+        self.assertEqual(crowns[0]["material"], "door")
 
     def test_two_door_with_handles(self):
         panels = self._emit_doors_panels(
