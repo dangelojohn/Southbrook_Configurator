@@ -103,6 +103,47 @@ def _configure_southbrook_report_branding(env):
             company.write(updates)
 
 
+def _backfill_single_value_attribute_defaults(env):
+    """Auto-set default_val on every configurable attribute_line that
+    has exactly one value option.
+
+    Phase 3 follow-up (2026-06-24): the wizard renders a field per
+    attribute_line even when the line has just one option, forcing the
+    user to click through a no-choice picker (e.g. "Cabinet Style:
+    Base — Base"). OCA's `product.config.session.create()` already
+    auto-applies `default_val` to value_ids at session creation, so the
+    safest way to skip those clicks is to backfill default_val on every
+    single-value line.
+
+    Once default_val is set, a companion view inherit (see
+    views/product_configurator_wizard_view.xml) hides the field — but
+    ONLY when default_val is set, so a line that never got backfilled
+    still renders (never strand the user with no way to submit).
+
+    Idempotent: only writes lines where default_val is currently unset.
+    Safe to re-run on every -u. Skips:
+      - lines with len(value_ids) != 1
+      - lines that already have default_val
+      - non-config templates (config_ok = False)
+    """
+    AttrLine = env["product.template.attribute.line"].sudo()
+    lines = AttrLine.search([
+        ("default_val", "=", False),
+        ("product_tmpl_id.config_ok", "=", True),
+    ])
+    updated = 0
+    for line in lines:
+        if len(line.value_ids) != 1:
+            continue
+        line.default_val = line.value_ids[0].id
+        updated += 1
+    if updated:
+        _logger.info(
+            "Backfilled default_val on %s single-value attribute "
+            "line(s) — wizard click-through eliminated.", updated,
+        )
+
+
 def _southbrook_estimating_post_init(env):
     """Combined post-init hook for southbrook_estimating.
 
@@ -112,3 +153,4 @@ def _southbrook_estimating_post_init(env):
     """
     _ensure_sales_journal(env)
     _configure_southbrook_report_branding(env)
+    _backfill_single_value_attribute_defaults(env)
