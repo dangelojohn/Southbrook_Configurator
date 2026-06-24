@@ -18,12 +18,12 @@ class TestPhase23DPayload(SouthbrookTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.ConfigLine = cls.env["product.config.line"]
+        cls.ConfigSession = cls.env["product.config.session"]
 
     def _emit_doors_panels(self, door_style="slab", handle="none",
                            door_count=1, W=600, H=720):
         panels = []
-        self.ConfigLine._emit_doors(
+        self.ConfigSession._emit_doors(
             panels=panels, W=W, H=H, y0=0, DOOR_TH=18, DOOR_REVEAL=3,
             door_count=door_count,
             door_style=door_style, handle=handle,
@@ -33,7 +33,7 @@ class TestPhase23DPayload(SouthbrookTestCase):
     def _emit_drawer_panels(self, door_style="slab", handle="none",
                             drawer_count=3, W=600, H=720):
         panels = []
-        self.ConfigLine._emit_drawer_fronts(
+        self.ConfigSession._emit_drawer_fronts(
             panels=panels, W=W, H=H, y0=0, DOOR_TH=18, DOOR_REVEAL=3,
             drawer_count=drawer_count,
             door_style=door_style, handle=handle,
