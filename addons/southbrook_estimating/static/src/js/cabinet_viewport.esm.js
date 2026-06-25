@@ -781,6 +781,13 @@ export class CabinetViewport extends Component {
             this._defaultCameraPosition = [...payload.camera.position];
             this._defaultCameraTarget = [...tgt];
         }
+        // 2026-06-25 — stash payload bounds for preset camera angles.
+        if (payload.bounds) {
+            this._payloadBounds = {
+                min: [...payload.bounds.min],
+                max: [...payload.bounds.max],
+            };
+        }
     }
 
     // ------------------------------------------------------------------
@@ -820,6 +827,46 @@ export class CabinetViewport extends Component {
             this._controls.update();
         }
     }
+
+    // 2026-06-25 — Preset camera angles derived from payload bounds.
+    // Center of the cabinet on the floor footprint; distance scaled to
+    // the cabinet's largest dimension so different families frame
+    // consistently (a wall cabinet doesn't sit lost in a tall-cabinet
+    // shot).
+    _presetCamera(view) {
+        if (!this._camera || !this._payloadBounds) return;
+        const min = this._payloadBounds.min;
+        const max = this._payloadBounds.max;
+        const w = Math.max(1, max[0] - min[0]);
+        const h = Math.max(1, max[1] - min[1]);
+        const d = Math.max(1, max[2] - min[2]);
+        // Target = center of the bounding box.
+        const cx = (min[0] + max[0]) / 2;
+        const cy = (min[1] + max[1]) / 2;
+        const cz = (min[2] + max[2]) / 2;
+        // Distance heuristic: ~2.5x the largest in-frame dim.
+        const span = Math.max(w, h, d);
+        let pos;
+        if (view === "front") {
+            pos = [cx, cy, cz + span * 2.5];
+        } else if (view === "top") {
+            pos = [cx, cy + span * 2.5, cz + 0.01];
+        } else {
+            // "three_quarter" — match the get_3d_payload default vibe.
+            pos = [cx + w * 1.4, cy + h * 0.6, cz + d * 1.8];
+        }
+        this._camera.position.set(...pos);
+        if (this._controls) {
+            this._controls.target.set(cx, cy, cz);
+            this._controls.update();
+        } else {
+            this._camera.lookAt(new THREE.Vector3(cx, cy, cz));
+        }
+    }
+
+    onPresetFront() { this._presetCamera("front"); }
+    onPresetThreeQuarter() { this._presetCamera("three_quarter"); }
+    onPresetTop() { this._presetCamera("top"); }
 
     async onRefresh() {
         const dispatch = this._rpcDispatch();
