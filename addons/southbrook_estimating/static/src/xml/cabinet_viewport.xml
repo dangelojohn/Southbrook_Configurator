@@ -38,6 +38,10 @@
                         title="Download a PNG snapshot of the current view"
                         t-on-click="onDownloadSnapshot"
                         t-att-disabled="!state.threeLoaded">⤓ PNG</button>
+                <span class="o_cv_sku badge bg-secondary"
+                      t-if="state.templateCode"
+                      title="Template SKU prefix"
+                      t-esc="state.templateCode"/>
                 <span class="o_cv_dims badge bg-light text-dark"
                       t-if="state.dimsLabel"
                       title="Cabinet dimensions (W × H × D)"

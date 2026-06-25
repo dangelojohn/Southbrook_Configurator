@@ -55,10 +55,11 @@ export class CabinetViewport extends Component {
             hoveredLineId: null,
             hoveredLineInfo: null,
             // Phase 3 (2026-06-25) — live configured price summary +
-            // dim summary chip.
+            // dim summary chip + template SKU prefix chip.
             priceLabel: null,
             priceTooltip: null,
             dimsLabel: null,
+            templateCode: null,
         });
 
         // Three.js scene handles — populated in _initThreeScene().
@@ -730,6 +731,10 @@ export class CabinetViewport extends Component {
         } else {
             this.state.dimsLabel = null;
         }
+        // Template SKU chip: shown only when the template carries a
+        // default_code (every Q8 template does, every accessory variant
+        // does as of A5).
+        this.state.templateCode = meta.template_code || null;
 
         // Build each panel.
         for (const p of payload.panels) {

@@ -135,6 +135,9 @@ class ProductConfigSession(models.Model):
                 self.pricelist_id.display_name
                 if self.pricelist_id else ""
             )
+            payload["metadata"]["template_code"] = (
+                self.product_tmpl_id.default_code or ""
+            )
         except Exception:
             payload.setdefault("metadata", {})
             payload["metadata"]["price"] = None
