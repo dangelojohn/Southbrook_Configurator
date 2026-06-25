@@ -198,6 +198,26 @@ class MrpProduction(models.Model):
             rec._post_cad_render_job()
         return True
 
+    def action_reset_cad_status(self):
+        """Reset x_cad_status to pending for stuck MOs.
+
+        Operational use: when an MO is parked at "rendering" because
+        the bridge never called back, or at "error" from a failed
+        POST, an operator can use this button to put the MO back in
+        the activator's pending queue. The xml_id binds this to the
+        Bridge Operators group so only those users see the button.
+        """
+        for rec in self:
+            old = rec.x_cad_status
+            rec.write({"x_cad_status": "pending"})
+            rec.message_post(
+                body=_(
+                    "CAD status reset from %s → pending by %s."
+                ) % (old, rec.env.user.name),
+                subtype_xmlid="mail.mt_log_note",
+            )
+        return True
+
     # ──────────────────────────────────────────────────────────────────
     # MO confirm hook
     # ──────────────────────────────────────────────────────────────────

@@ -27,6 +27,12 @@
                             type="object" class="btn-secondary"
                             groups="mrp.group_mrp_manager"
                             confirm="Post a fresh render job to the FreeCAD bridge for this MO? Existing artifacts will be superseded."/>
+                    <button name="action_reset_cad_status"
+                            string="Reset to Pending"
+                            type="object" class="btn-secondary"
+                            groups="mrp.group_mrp_manager"
+                            invisible="x_cad_status == 'pending'"
+                            confirm="Reset CAD status to pending? Use this to clear an MO stuck at 'rendering' (bridge never called back) or 'error' (failed POST)."/>
                     <field name="x_cad_attachment_ids" widget="many2many_binary"/>
                 </page>
             </xpath>
