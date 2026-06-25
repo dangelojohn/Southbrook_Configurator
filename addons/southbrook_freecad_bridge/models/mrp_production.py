@@ -85,6 +85,17 @@ class MrpProduction(models.Model):
         Reads the cabinet family + envelope from the MO's product
         template (Phase 1 mapping); a future Module-2 enhancement
         will swap in the configurator's per-MO spec when available.
+
+        2026-06-25: bridge v2 schema requires a `template` field
+        (the FreeCAD .FCStd template basename — e.g. SB-BASE-1DR).
+        Live fire on WH/MO/00023 returned HTTP 422
+        `{"loc":["body","template"],"msg":"Field required"}`. The
+        Odoo side was still on the v1 schema (family/door_count only).
+        Default to product_tmpl_id.default_code; that's "SB-BASE-1DR"
+        for the locked Q8 templates which matches the planned FCStd
+        naming. Override via ir.config_parameter
+        `freecad_bridge.template_field_name` if the bridge changes
+        which value it keys on.
         """
         self.ensure_one()
         tmpl = self.product_id.product_tmpl_id
@@ -96,8 +107,10 @@ class MrpProduction(models.Model):
             "height_mm": float(getattr(tmpl, "x_default_height_mm", 720.0)),
             "depth_mm":  float(getattr(tmpl, "x_default_depth_mm", 580.0)),
         }
+        template = (tmpl.default_code or family or "").strip().upper()
         return {
             "production_id": self.id,
+            "template": template,
             "dimensions": dims,
             "family": family,
             "door_count": int(getattr(tmpl, "x_default_door_count", 1)),
