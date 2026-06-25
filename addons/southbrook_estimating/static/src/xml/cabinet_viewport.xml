@@ -34,9 +34,13 @@
                         title="Refresh the rendered cabinet from the latest configuration"
                         t-on-click="onRefresh"
                         t-att-disabled="!state.threeLoaded">↻</button>
+                <span class="o_cv_dims badge bg-light text-dark"
+                      t-if="state.dimsLabel"
+                      title="Cabinet dimensions (W × H × D)"
+                      t-esc="state.dimsLabel"/>
                 <span class="o_cv_price badge bg-light text-dark fw-semibold"
                       t-if="state.priceLabel"
-                      title="Configured price (current selection)"
+                      t-att-title="state.priceTooltip"
                       t-esc="state.priceLabel"/>
                 <span class="o_cv_status flex-grow-1" t-if="state.loading">
                     Loading…

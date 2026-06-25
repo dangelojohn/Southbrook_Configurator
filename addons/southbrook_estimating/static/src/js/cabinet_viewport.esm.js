@@ -54,8 +54,11 @@ export class CabinetViewport extends Component {
             // T1C8 — per-line hover state (kitchen view only).
             hoveredLineId: null,
             hoveredLineInfo: null,
-            // Phase 3 (2026-06-25) — live configured price summary.
+            // Phase 3 (2026-06-25) — live configured price summary +
+            // dim summary chip.
             priceLabel: null,
+            priceTooltip: null,
+            dimsLabel: null,
         });
 
         // Three.js scene handles — populated in _initThreeScene().
@@ -672,22 +675,48 @@ export class CabinetViewport extends Component {
         this.state.hoveredLineId = null;
         this.state.hoveredLineInfo = null;
 
-        // Phase 3 (2026-06-25) — live price summary in the toolbar.
-        // get_3d_payload embeds price + currency in metadata; format
-        // here so the OWL template can just t-esc state.priceLabel.
+        // Phase 3 (2026-06-25) — live price + dimension summary in the
+        // toolbar. get_3d_payload embeds price + breakdown + currency;
+        // format once here so OWL can just t-esc state.priceLabel.
         const meta = payload.metadata || {};
-        if (typeof meta.price === "number" && !Number.isNaN(meta.price)) {
+        const fmtPrice = (n) => {
             const symbol = meta.currency_symbol || "$";
             const before = meta.currency_position !== "after";
-            const formatted = meta.price.toLocaleString(undefined, {
+            const formatted = n.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
             });
-            this.state.priceLabel = before
-                ? `${symbol}${formatted}`
-                : `${formatted} ${symbol}`;
+            return before ? `${symbol}${formatted}` : `${formatted} ${symbol}`;
+        };
+        if (typeof meta.price === "number" && !Number.isNaN(meta.price)) {
+            this.state.priceLabel = fmtPrice(meta.price);
+            // Tooltip: only show breakdown when there's a non-zero extra
+            // (otherwise the tooltip would say "Base $545 = $545" which
+            // adds nothing).
+            const extras = meta.extras_sum;
+            if (typeof extras === "number" && extras > 0
+                && typeof meta.list_price === "number") {
+                this.state.priceTooltip =
+                    `Base ${fmtPrice(meta.list_price)} `
+                    + `+ Options ${fmtPrice(extras)} `
+                    + `= ${fmtPrice(meta.price)}`;
+            } else {
+                this.state.priceTooltip = "Configured price";
+            }
         } else {
             this.state.priceLabel = null;
+            this.state.priceTooltip = null;
+        }
+        // Dimension chip: W × H × D mm. These are integer mm, no need
+        // for locale formatting. Skip if any axis is missing/zero
+        // (worktop short-circuit, accessory).
+        if (meta.width_mm > 0 && meta.height_mm > 0 && meta.depth_mm > 0) {
+            this.state.dimsLabel =
+                `${Math.round(meta.width_mm)} × `
+                + `${Math.round(meta.height_mm)} × `
+                + `${Math.round(meta.depth_mm)} mm`;
+        } else {
+            this.state.dimsLabel = null;
         }
 
         // Build each panel.

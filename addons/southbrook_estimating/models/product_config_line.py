@@ -109,15 +109,21 @@ class ProductConfigSession(models.Model):
         # Phase 3 (2026-06-25) — embed current configured price + currency
         # in the payload so the client can show a live read-out next to
         # the cabinet. Defensive: any computation error degrades to
-        # null price (toolbar then hides the chip).
+        # null price (toolbar then hides the chip). Breakdown
+        # (list_price + extras) goes through too so the client tooltip
+        # can show the customer where the total comes from.
         try:
-            price = self.get_cfg_price()
+            total = self.get_cfg_price()
+            list_price = float(self.product_tmpl_id.list_price or 0.0)
+            extras_sum = max(0.0, float(total) - list_price)
             currency = (
                 self.pricelist_id.currency_id
                 or self.env.company.currency_id
             )
             payload.setdefault("metadata", {})
-            payload["metadata"]["price"] = float(price)
+            payload["metadata"]["price"] = float(total)
+            payload["metadata"]["list_price"] = list_price
+            payload["metadata"]["extras_sum"] = extras_sum
             payload["metadata"]["currency_symbol"] = currency.symbol or "$"
             payload["metadata"]["currency_position"] = currency.position or "before"
         except Exception:
