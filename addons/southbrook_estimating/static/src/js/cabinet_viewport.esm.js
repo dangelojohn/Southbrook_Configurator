@@ -136,6 +136,12 @@ export class CabinetViewport extends Component {
             canvas,
             antialias: true,
             alpha: false,
+            // 2026-06-25 — preserveDrawingBuffer keeps the rendered
+            // framebuffer addressable for onDownloadSnapshot's
+            // canvas.toDataURL() call. Slight perf hit on continuous
+            // re-rendering (the GPU can't ditch the buffer between
+            // composites), negligible for a single-cabinet scene.
+            preserveDrawingBuffer: true,
         });
         if (THREE.SRGBColorSpace) {
             this._renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -916,6 +922,37 @@ export class CabinetViewport extends Component {
     onPresetFront() { this._presetCamera("front"); }
     onPresetThreeQuarter() { this._presetCamera("three_quarter"); }
     onPresetTop() { this._presetCamera("top"); }
+
+    // 2026-06-25 — Snapshot. Renders one fresh frame then exports
+    // the canvas as a downloadable PNG. Sales reps can grab a hero
+    // shot of the current spec without taking an OS screenshot.
+    // File name embeds the cabinet's dim summary if available (the
+    // toolbar formats it; we reuse the same value).
+    onDownloadSnapshot() {
+        const canvas = this.canvasRef.el;
+        if (!canvas || !this._renderer || !this._scene || !this._camera) return;
+        try {
+            // Force a fresh render — the animation loop may have left
+            // a stale framebuffer if the page tab was throttled.
+            this._renderer.render(this._scene, this._camera);
+            const data = canvas.toDataURL("image/png");
+            const dimsTag = (this.state.dimsLabel || "cabinet")
+                .replace(/[^\w×x]/g, "_");
+            const a = document.createElement("a");
+            a.href = data;
+            a.download = `southbrook_${dimsTag}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn(
+                "[CabinetViewport] snapshot failed; canvas may be tainted "
+                + "(cross-origin texture?) or the renderer is mid-mount.",
+                e,
+            );
+        }
+    }
 
     async onRefresh() {
         const dispatch = this._rpcDispatch();

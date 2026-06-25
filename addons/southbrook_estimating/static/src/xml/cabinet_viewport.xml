@@ -34,6 +34,10 @@
                         title="Refresh the rendered cabinet from the latest configuration"
                         t-on-click="onRefresh"
                         t-att-disabled="!state.threeLoaded">↻</button>
+                <button class="btn btn-sm btn-outline-secondary o_cv_btn"
+                        title="Download a PNG snapshot of the current view"
+                        t-on-click="onDownloadSnapshot"
+                        t-att-disabled="!state.threeLoaded">⤓ PNG</button>
                 <span class="o_cv_dims badge bg-light text-dark"
                       t-if="state.dimsLabel"
                       title="Cabinet dimensions (W × H × D)"
