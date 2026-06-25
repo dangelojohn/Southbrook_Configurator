@@ -486,6 +486,7 @@ class ProductConfigSession(models.Model):
                 "pos":  {"x": 0, "y": TOEKICK_H / 2, "z": DOOR_TH - 30},
                 "material": "toekick",
             })
+            self._emit_base_feet(panels, W, D, TOEKICK_H, BOX_TH)
 
         # ---- Door OR drawer-front stack, depending on family.
         # door_mat resolved above (alongside the finished-sides logic).
@@ -493,11 +494,16 @@ class ProductConfigSession(models.Model):
         handle = cab.get("handle", "none")
         pull_finish = cab.get("pull_finish") or ""
         if family == "drawer":
+            n_drawers = cab["drawer_count"] or door_count or 3
             self._emit_drawer_fronts(
                 panels, W, H, y0, DOOR_TH, DOOR_REVEAL,
-                drawer_count=cab["drawer_count"] or door_count or 3,
+                drawer_count=n_drawers,
                 door_style=door_style, handle=handle,
                 pull_finish=pull_finish, door_mat=door_mat,
+            )
+            self._emit_drawer_rails(
+                panels, W, H, D, y0, DOOR_TH, DOOR_REVEAL,
+                BOX_TH, BACK_TH, drawer_count=n_drawers,
             )
         else:
             self._emit_doors(panels, W, H, y0, DOOR_TH, DOOR_REVEAL, door_count,
@@ -894,3 +900,85 @@ class ProductConfigSession(models.Model):
                 name_prefix=f"drawer_front_{i + 1}_handle",
                 pull_finish=pull_finish,
             )
+
+    def _emit_base_feet(self, panels, W, D, TOEKICK_H, BOX_TH):
+        """Append 4 adjustable plastic levelers under a toekick family.
+
+        Industry-default base "feet": Ø40mm × 75mm black plastic
+        levelers sitting on the floor behind the toekick face panel.
+        Inset 50mm from each side and front/back so they're tucked
+        out of the customer's eye line in the centred 3/4 view.
+
+        Approximated as 40×75×40mm boxes (the viewport only renders
+        BoxGeometry — square footprint reads identically at this
+        scale). Material `toekick` (matte black) — no new viewport
+        material needed.
+
+        Geometry note: foot top sits at y=75 (its centre y=37.5);
+        the carcass bottom sits at y=TOEKICK_H (default 90mm), so
+        the levelers physically lift the bottom panel with a small
+        gap for the foot mount plate — matches real construction.
+        """
+        FOOT_DIM = 40
+        FOOT_H = 75
+        INSET = 50
+        cy = FOOT_H / 2
+        x_inset = (W / 2) - BOX_TH - INSET
+        # Behind the toekick (which sits ~30mm back from door plane at
+        # z = -18/2 ≈ -9), feet inset 50mm further from front + 50mm
+        # from back so they fall in the hidden volume under the box.
+        z_front = -INSET
+        z_back = -D + INSET
+        positions = [
+            ( x_inset, cy, z_front),
+            (-x_inset, cy, z_front),
+            ( x_inset, cy, z_back),
+            (-x_inset, cy, z_back),
+        ]
+        for i, (x, y, z) in enumerate(positions):
+            panels.append({
+                "name": f"foot_{i + 1}",
+                "dims": {"width": FOOT_DIM, "height": FOOT_H, "depth": FOOT_DIM},
+                "pos":  {"x": x, "y": y, "z": z},
+                "material": "toekick",
+            })
+
+    def _emit_drawer_rails(self, panels, W, H, D, y0, DOOR_TH, DOOR_REVEAL,
+                           BOX_TH, BACK_TH, drawer_count):
+        """Append left + right side-mount slides for every drawer.
+
+        Side-mount ball-bearing slides (Accuride/Knape & Vogt style):
+        12mm × 50mm cross-section, full drawer depth minus a 30mm
+        back gap (the standard clearance for the rear bracket).
+        Mounted just inside each side panel at the drawer's vertical
+        centreline — visible through the drawer opening when the
+        front is open, peeks out at the back edge in solid mode.
+
+        Y-spacing mirrors _emit_drawer_fronts exactly so each rail
+        aligns with its matching drawer face. Material `hardware`
+        (gunmetal, low roughness, high metalness — added to the
+        viewport material dict in the same commit).
+        """
+        n = max(1, int(drawer_count))
+        front_h = (H - 2 * DOOR_REVEAL - (n - 1) * DOOR_REVEAL) / n
+        RAIL_TH = 12
+        RAIL_H = 50
+        RAIL_GAP = 6           # clearance between rail and side panel
+        REAR_CLEAR = 30        # rail stops 30mm short of back panel
+        # Rail extends from the front opening back to the rear clearance.
+        # Front edge of the drawer cavity ≈ z = 0 (carcass front face);
+        # rear ≈ z = -D + BACK_TH + REAR_CLEAR. Mid-point + depth:
+        rail_d = D - BACK_TH - REAR_CLEAR
+        rail_z = -(rail_d / 2) - 0  # centred in the cavity
+        # X: just inside the side panel — side panel inside face is
+        # at x = ±((W/2) - BOX_TH); rail sits RAIL_GAP further in.
+        x_in = (W / 2) - BOX_TH - RAIL_GAP - (RAIL_TH / 2)
+        for i in range(n):
+            y_centre = y0 + DOOR_REVEAL + front_h / 2 + i * (front_h + DOOR_REVEAL)
+            for side, x in (("L", -x_in), ("R", x_in)):
+                panels.append({
+                    "name": f"drawer_rail_{i + 1}_{side}",
+                    "dims": {"width": RAIL_TH, "height": RAIL_H, "depth": rail_d},
+                    "pos":  {"x": x, "y": y_centre, "z": rail_z},
+                    "material": "hardware",
+                })

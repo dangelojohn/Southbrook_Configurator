@@ -272,6 +272,12 @@ export class KitchenViewport extends Component {
             worktop: new THREE.MeshStandardMaterial({
                 color: 0xb5b0a8, roughness: 0.4, metalness: 0.05,
             }),
+            // Drawer slides + other metal hardware bodies. Gunmetal /
+            // zinc — added 2026-06-25 alongside the base-feet + drawer-
+            // rails geometry. Feet reuse `toekick` (matte black plastic).
+            hardware: new THREE.MeshStandardMaterial({
+                color: 0x8a8a8e, roughness: 0.35, metalness: 0.85,
+            }),
             // P25C2 — blueline wireframe overlay.
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
