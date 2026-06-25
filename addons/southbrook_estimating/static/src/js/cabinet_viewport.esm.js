@@ -54,6 +54,8 @@ export class CabinetViewport extends Component {
             // T1C8 — per-line hover state (kitchen view only).
             hoveredLineId: null,
             hoveredLineInfo: null,
+            // Phase 3 (2026-06-25) — live configured price summary.
+            priceLabel: null,
         });
 
         // Three.js scene handles — populated in _initThreeScene().
@@ -669,6 +671,24 @@ export class CabinetViewport extends Component {
         this._hoveredLineId = null;
         this.state.hoveredLineId = null;
         this.state.hoveredLineInfo = null;
+
+        // Phase 3 (2026-06-25) — live price summary in the toolbar.
+        // get_3d_payload embeds price + currency in metadata; format
+        // here so the OWL template can just t-esc state.priceLabel.
+        const meta = payload.metadata || {};
+        if (typeof meta.price === "number" && !Number.isNaN(meta.price)) {
+            const symbol = meta.currency_symbol || "$";
+            const before = meta.currency_position !== "after";
+            const formatted = meta.price.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            this.state.priceLabel = before
+                ? `${symbol}${formatted}`
+                : `${formatted} ${symbol}`;
+        } else {
+            this.state.priceLabel = null;
+        }
 
         // Build each panel.
         for (const p of payload.panels) {

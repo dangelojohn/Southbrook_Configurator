@@ -105,7 +105,25 @@ class ProductConfigSession(models.Model):
             drawer_count=cab["drawer_count"],
             finished_sides=cab["finished_sides"],
         )
-        return self._cut_list_to_3d_payload(cab, cut)
+        payload = self._cut_list_to_3d_payload(cab, cut)
+        # Phase 3 (2026-06-25) — embed current configured price + currency
+        # in the payload so the client can show a live read-out next to
+        # the cabinet. Defensive: any computation error degrades to
+        # null price (toolbar then hides the chip).
+        try:
+            price = self.get_cfg_price()
+            currency = (
+                self.pricelist_id.currency_id
+                or self.env.company.currency_id
+            )
+            payload.setdefault("metadata", {})
+            payload["metadata"]["price"] = float(price)
+            payload["metadata"]["currency_symbol"] = currency.symbol or "$"
+            payload["metadata"]["currency_position"] = currency.position or "before"
+        except Exception:
+            payload.setdefault("metadata", {})
+            payload["metadata"]["price"] = None
+        return payload
 
     # ---- helpers ----------------------------------------------------
 

@@ -34,6 +34,10 @@
                         title="Refresh the rendered cabinet from the latest configuration"
                         t-on-click="onRefresh"
                         t-att-disabled="!state.threeLoaded">↻</button>
+                <span class="o_cv_price badge bg-light text-dark fw-semibold"
+                      t-if="state.priceLabel"
+                      title="Configured price (current selection)"
+                      t-esc="state.priceLabel"/>
                 <span class="o_cv_status flex-grow-1" t-if="state.loading">
                     Loading…
                 </span>
