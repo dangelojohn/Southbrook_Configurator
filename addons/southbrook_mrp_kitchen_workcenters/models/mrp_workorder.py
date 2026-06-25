@@ -97,6 +97,22 @@ class MrpWorkorder(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # Labor productivity (SAMI PRD N-13, 2026-06-25)
+    # qty_producing / (duration / 60.0) → units per operator-hour.
+    # Stored so MI dashboards + per-workcenter aggregations work.
+    # ------------------------------------------------------------------
+    x_sbk_units_per_op_hour = fields.Float(
+        string="Units / Operator-Hour",
+        compute="_compute_x_sbk_units_per_op_hour",
+        store=True,
+        digits=(8, 3),
+        help="qty_producing divided by actual duration in hours. "
+             "Cell-level productivity KPI per SAMI PRD N-13. "
+             "Zero if duration is zero (WO not yet started or finished "
+             "with no time logged).",
+    )
+
+    # ------------------------------------------------------------------
     # Downtime aggregates
     # ------------------------------------------------------------------
     x_sbk_downtime_min = fields.Float(
@@ -155,6 +171,14 @@ class MrpWorkorder(models.Model):
                 if c.x_sbk_rework_workorder_id else 0.0
             ))
             wo.x_sbk_rework_cost = rework_duration / 60.0 * hourly
+
+    @api.depends("qty_producing", "duration")
+    def _compute_x_sbk_units_per_op_hour(self):
+        for wo in self:
+            hours = (wo.duration or 0.0) / 60.0
+            wo.x_sbk_units_per_op_hour = (
+                (wo.qty_producing or 0.0) / hours if hours > 0 else 0.0
+            )
 
     @api.depends("workcenter_id")
     def _compute_x_sbk_downtime(self):
