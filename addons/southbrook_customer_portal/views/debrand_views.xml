@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only
+
+     Site-wide removal of Odoo brand promotion from customer-facing pages.
+     Targets Odoo core templates by id; no edits to core files.
+
+     2026-06-25 — first cut covers the universal footer "Powered by Odoo"
+     block (web.brand_promotion). The portal "Connect with your software"
+     button needs its v19 template id confirmed before override; deferred
+     to a follow-up rather than shipping a speculative inherit_id that
+     would fail the module upgrade.
+-->
+<odoo>
+
+    <!--
+      Footer "Powered by Odoo" — strip the brand-promotion snippet
+      site-wide. web.brand_promotion is the small block t-called from
+      website.footer_copyright on every website-frontend page and from
+      portal.frontend_layout on every /my/* portal page. Removing it
+      here debrands the footer everywhere.
+    -->
+    <template id="brand_promotion_remove"
+              inherit_id="web.brand_promotion"
+              name="Southbrook: hide Odoo brand promo">
+        <xpath expr="//*" position="replace">
+            <t/>
+        </xpath>
+    </template>
+
+</odoo>
