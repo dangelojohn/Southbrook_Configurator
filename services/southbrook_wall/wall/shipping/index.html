@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<!--
+  /wall/shipping — Southbrook shipping dock kiosk (POC).
+  Implements the 1-day proof-of-concept from
+  ~/Downloads/southbrook_kiosk_dashboard_spec.md §11.
+
+  Architecture: vanilla HTML/CSS/JS, no build step, single file
+  serves both wall TVs (landscape grid) and handhelds (stacked
+  cards) via CSS Grid + 2 media queries (spec §2.1, §2.3).
+
+  Data: polls /southbrook/wall/shipping.json every 30s. Shows the
+  "Updated Xs ago" stamp in the toolbar; stamp goes amber after
+  valid_for_seconds, red after 3x valid_for (spec §5.1).
+
+  Reload self every 4 hours to recover from browser drift (spec
+  §5.4). Pinned to 2 AM by adding a random jitter so multiple
+  kiosks don't reload simultaneously.
+
+  This file is intended to be served by alfacore-caddy under
+  display.southbrookcabinetry.space/wall/shipping. See
+  services/southbrook_wall/caddy_snippet.example for the Caddyfile
+  bits to wire up.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Shipping Dock — Southbrook</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 16px;
+      min-height: 100vh;
+    }
+    body { display: flex; flex-direction: column; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 24px;
+      background: #0f0f0f;
+      border-bottom: 2px solid #2a2a2a;
+    }
+    .toolbar h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .stamp {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+      font-size: 13px;
+      color: #888;
+    }
+    .stamp.amber { color: #d4a634; }
+    .stamp.red   { color: #d44; font-weight: 600; }
+    .stale-banner {
+      display: none;
+      padding: 12px 24px;
+      background: #d44;
+      color: #fff;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+    .stale-banner.show { display: block; }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      padding: 24px;
+    }
+    .kpi {
+      background: #242424;
+      border-radius: 6px;
+      padding: 20px;
+      text-align: left;
+    }
+    .kpi .n {
+      font-size: 56px;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi .l {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #999;
+      margin-top: 8px;
+    }
+    .kpi.amber .n { color: #d4a634; }
+    .kpi.red .n   { color: #d44; }
+    .kpi.green .n { color: #6bb86b; }
+
+    .rows-wrap {
+      flex: 1;
+      padding: 0 24px 24px 24px;
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      background: #1f1f1f;
+      color: #999;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      border-bottom: 1px solid #333;
+      position: sticky;
+      top: 0;
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #2a2a2a;
+      font-variant-numeric: tabular-nums;
+    }
+    tr.s-pending td.status  { color: #d4a634; font-weight: 600; }
+    tr.s-ready   td.status  { color: #6bb8ff; font-weight: 600; }
+    tr.s-departed td.status { color: #6bb86b; font-weight: 600; }
+    tr.s-pending.late td.status::before {
+      content: "⚠ LATE — ";
+      color: #d44;
+    }
+    td.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 13px; }
+    td.dim { color: #777; }
+
+    .empty {
+      padding: 60px 24px;
+      text-align: center;
+      color: #666;
+      font-size: 18px;
+    }
+
+    /* Tablet / phone: collapse 4-col KPI to 2x2, drop to single-col on phone */
+    @media (max-width: 1024px) {
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      .kpi .n { font-size: 44px; }
+      .toolbar h1 { font-size: 18px; }
+      th, td { padding: 8px 10px; font-size: 13px; }
+    }
+    @media (max-width: 480px) {
+      .kpis { grid-template-columns: 1fr; }
+      /* Hide less-critical columns on phone */
+      th:nth-child(5), td:nth-child(5) { display: none; }  /* tracking */
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>SHIPPING DOCK</h1>
+    <span class="stamp" id="stamp">…</span>
+  </div>
+  <div class="stale-banner" id="stale">DATA STALE — connection lost</div>
+
+  <div class="kpis">
+    <div class="kpi" id="kpi-total"><div class="n">—</div><div class="l">Rows Today</div></div>
+    <div class="kpi" id="kpi-trucks"><div class="n">—</div><div class="l">Trucks Ready at Dock</div></div>
+    <div class="kpi" id="kpi-pending"><div class="n">—</div><div class="l">Pending Loading</div></div>
+    <div class="kpi red" id="kpi-late"><div class="n">—</div><div class="l">Late</div></div>
+  </div>
+
+  <div class="rows-wrap">
+    <table id="rows">
+      <thead>
+        <tr>
+          <th>Picking #</th>
+          <th>Customer</th>
+          <th>Carrier</th>
+          <th>Scheduled</th>
+          <th>Tracking</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="rows-body">
+        <tr><td colspan="6" class="empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    "use strict";
+
+    // Spec §2.4 dual-layer feed. Live first; on failure, fall back
+    // to /wall/static/shipping.json (cron-dropped snapshot). On
+    // both-fail, render the "DATA STALE" banner with last-known.
+    const FEED_LIVE   = "/wall/api/shipping.json";
+    const FEED_STATIC = "/wall/static/shipping.json";
+    const REFRESH_MS  = 30 * 1000;
+    const RELOAD_MS   = 4 * 60 * 60 * 1000;   // spec §5.4
+
+    let lastEnvelope = null;
+
+    function fmtSched(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+      const isTomorrow = d.toDateString() === tomorrow.toDateString();
+      const hhmm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      if (sameDay) return "Today " + hhmm;
+      if (isTomorrow) return "Tmrw " + hhmm;
+      return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + hhmm;
+    }
+
+    function renderEnvelope(env) {
+      const p = (env && env.payload) || {};
+      const k = p.kpis || {};
+      const rows = p.rows || [];
+
+      document.getElementById("kpi-total").querySelector(".n").textContent =
+        k.rows_total != null ? k.rows_total : "—";
+      document.getElementById("kpi-trucks").querySelector(".n").textContent =
+        k.trucks_at_dock != null ? k.trucks_at_dock : "—";
+      document.getElementById("kpi-pending").querySelector(".n").textContent =
+        k.pending != null ? k.pending : "—";
+
+      const lateTile = document.getElementById("kpi-late");
+      lateTile.querySelector(".n").textContent = k.late != null ? k.late : "—";
+      lateTile.classList.toggle("red", (k.late || 0) > 0);
+
+      const tbody = document.getElementById("rows-body");
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No outbound shipments scheduled.</td></tr>';
+        return;
+      }
+      const now = new Date();
+      tbody.innerHTML = rows.map(function (r) {
+        const cls = ["s-" + (r.status || "").toLowerCase()];
+        const schedDt = r.scheduled_at ? new Date(r.scheduled_at) : null;
+        if (r.status === "Pending" && schedDt && schedDt < now) cls.push("late");
+        return ""
+          + '<tr class="' + cls.join(" ") + '">'
+          +   '<td class="mono">' + escape(r.picking || "") + '</td>'
+          +   '<td>' + escape(r.customer || "") + '</td>'
+          +   '<td>' + escape(r.carrier || "—") + '</td>'
+          +   '<td>' + escape(fmtSched(r.scheduled_at)) + '</td>'
+          +   '<td class="mono dim">' + escape(r.tracking || "—") + '</td>'
+          +   '<td class="status">' + escape(r.status || "") + '</td>'
+          + '</tr>';
+      }).join("");
+    }
+
+    function escape(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
+      });
+    }
+
+    function updateStamp() {
+      const stamp = document.getElementById("stamp");
+      const banner = document.getElementById("stale");
+      if (!lastEnvelope || !lastEnvelope.generated_at) {
+        stamp.textContent = "no data";
+        stamp.className = "stamp red";
+        banner.classList.add("show");
+        return;
+      }
+      const gen = new Date(lastEnvelope.generated_at);
+      const age = Math.round((Date.now() - gen.getTime()) / 1000);
+      const validFor = lastEnvelope.valid_for_seconds || 60;
+      stamp.textContent = "Updated " + age + "s ago";
+      let cls = "stamp";
+      if (age >= validFor * 3)      { cls = "stamp red";   banner.classList.add("show"); }
+      else if (age >= validFor)     { cls = "stamp amber"; banner.classList.remove("show"); }
+      else                          { cls = "stamp";       banner.classList.remove("show"); }
+      stamp.className = cls;
+    }
+
+    async function fetchFeed() {
+      let env = null;
+      try {
+        const r = await fetch(FEED_LIVE, { cache: "no-store" });
+        if (r.ok) env = await r.json();
+      } catch (e) { /* fall through to static */ }
+      if (!env) {
+        try {
+          const r = await fetch(FEED_STATIC, { cache: "no-store" });
+          if (r.ok) env = await r.json();
+        } catch (e) { /* both layers failed */ }
+      }
+      if (env) {
+        lastEnvelope = env;
+        renderEnvelope(env);
+      }
+      updateStamp();
+    }
+
+    fetchFeed();
+    setInterval(fetchFeed, REFRESH_MS);
+    setInterval(updateStamp, 1000);
+    // Spec §5.4 — schedule a self-reload at ~4hr to recover from
+    // browser drift / memory leaks. The +Math.random()*30min jitter
+    // keeps multiple kiosks from thundering Odoo at the same moment.
+    setTimeout(function () { location.reload(); },
+      RELOAD_MS + Math.floor(Math.random() * 30 * 60 * 1000));
+  </script>
+</body>
+</html>
