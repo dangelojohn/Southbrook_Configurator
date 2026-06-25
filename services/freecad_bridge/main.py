@@ -340,6 +340,138 @@ def _run_render_job(job_id: str) -> None:
         job.error = str(exc)
         logger.exception("render failed: job_id=%s", job_id)
 
-    # XML-RPC + Odoo callback intentionally deferred until ODOO_API_KEY is
-    # actually set on a real deployment. For Module 2 G2a (owner-confirm
-    # before deploy), the bridge never reaches Odoo from the dev clone.
+    # 2026-06-25 — implementation of the Odoo callback (Module 2 phase 2).
+    # Gates on ODOO_API_KEY being set; back-compat with prior "deferred"
+    # behaviour — if the env var is missing the bridge silently keeps the
+    # job locally and Odoo never hears about it (same as before).
+    try:
+        _post_callback_to_odoo(job)
+    except Exception:  # never let the callback crash the worker
+        logger.exception("callback to Odoo failed: job_id=%s", job_id)
+
+
+def _post_callback_to_odoo(job: "JobRecord") -> None:
+    """Upload artifacts via XML-RPC, then POST /plm/cad_callback.
+
+    Stdlib-only (xmlrpc.client + urllib.request) — keeps the bridge image
+    free of an extra `requests` dependency. The controller side
+    (/plm/cad_callback) accepts a list of attachment_ids that this
+    function returns; the Odoo controller then writes them onto the MO's
+    x_cad_attachment_ids and flips x_cad_status.
+    """
+    import base64
+    import json as _json
+    import os
+    import urllib.request
+    import xmlrpc.client
+    from pathlib import Path
+    from urllib.error import HTTPError, URLError
+
+    odoo_url = os.environ.get("ODOO_URL", "http://odoo:8069").rstrip("/")
+    odoo_db = os.environ.get("ODOO_DB", "southbrook")
+    odoo_user = os.environ.get("ODOO_USER", "admin")
+    odoo_api_key = os.environ.get("ODOO_API_KEY", "")
+    bridge_secret = os.environ.get("FREECAD_BRIDGE_SECRET", "")
+    if not odoo_api_key:
+        logger.info("ODOO_API_KEY unset — skipping callback for job %s",
+                    job.job_id)
+        return
+
+    # Step 1 — upload every artifact as an ir.attachment via XML-RPC.
+    # We do this even on `error` jobs (manifest may be empty, but the
+    # callback still tells Odoo the MO failed).
+    attachment_ids = []
+    if job.status == "done" and job.artifacts:
+        common = xmlrpc.client.ServerProxy(f"{odoo_url}/xmlrpc/2/common")
+        try:
+            uid = common.authenticate(
+                odoo_db, odoo_user, odoo_api_key, {}
+            )
+        except Exception as exc:  # pragma: no cover — auth failure
+            logger.error(
+                "XML-RPC authenticate failed for job %s: %s",
+                job.job_id, exc,
+            )
+            uid = None
+        if uid:
+            models = xmlrpc.client.ServerProxy(
+                f"{odoo_url}/xmlrpc/2/object", allow_none=True,
+            )
+            mimetype_for = {
+                "dxf": "application/dxf",
+                "svg": "image/svg+xml",
+                "step": "model/step",
+            }
+            # job.artifacts is shape {kind: [path, ...]}.
+            for kind, paths in (job.artifacts or {}).items():
+                if not isinstance(paths, (list, tuple)):
+                    continue
+                for raw_path in paths:
+                    p = Path(raw_path)
+                    if not p.exists():
+                        logger.warning(
+                            "artifact missing on disk: %s", raw_path,
+                        )
+                        continue
+                    try:
+                        with open(p, "rb") as fh:
+                            payload_bytes = fh.read()
+                        attachment_id = models.execute_kw(
+                            odoo_db, uid, odoo_api_key,
+                            "ir.attachment", "create", [{
+                                "name": p.name,
+                                "res_model": "mrp.production",
+                                "res_id": job.spec.production_id,
+                                "datas": base64.b64encode(payload_bytes).decode("ascii"),
+                                "mimetype": mimetype_for.get(kind, "application/octet-stream"),
+                            }],
+                        )
+                        if isinstance(attachment_id, int):
+                            attachment_ids.append(attachment_id)
+                            logger.info(
+                                "uploaded artifact: kind=%s name=%s id=%s",
+                                kind, p.name, attachment_id,
+                            )
+                    except Exception:  # don't stop the loop on one failure
+                        logger.exception(
+                            "ir.attachment.create failed for %s", p.name,
+                        )
+
+    # Step 2 — fire the callback POST. Even on render error we tell
+    # Odoo so the MO flips out of `rendering` purgatory.
+    callback_payload = {
+        "job_id": job.job_id,
+        "production_id": job.spec.production_id,
+        "status": job.status if job.status in ("done", "error") else "error",
+        "attachment_ids": attachment_ids,
+    }
+    if job.error:
+        callback_payload["error"] = str(job.error)[:1000]
+    body = _json.dumps(callback_payload).encode("utf-8")
+    req = urllib.request.Request(
+        f"{odoo_url}/plm/cad_callback",
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "X-Bridge-Secret": bridge_secret,
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp_body = resp.read().decode("utf-8", "replace")
+            logger.info(
+                "callback delivered: job_id=%s status=%s http=%s body=%s",
+                job.job_id, callback_payload["status"], resp.status,
+                resp_body[:200],
+            )
+    except HTTPError as exc:
+        logger.error(
+            "callback HTTP %s for job %s: %s",
+            exc.code, job.job_id, exc.read()[:300],
+        )
+    except URLError as exc:
+        logger.error(
+            "callback URL error for job %s: %s",
+            job.job_id, exc.reason,
+        )
