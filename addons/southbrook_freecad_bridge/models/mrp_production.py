@@ -87,19 +87,25 @@ class MrpProduction(models.Model):
         will swap in the configurator's per-MO spec when available.
 
         2026-06-25: bridge v2 schema requires a `template` field
-        (the FreeCAD .FCStd template basename — e.g. SB-BASE-1DR).
+        (the FreeCAD .FCStd template basename — e.g. base_default).
         Live fire on WH/MO/00023 returned HTTP 422
-        `{"loc":["body","template"],"msg":"Field required"}`. The
-        Odoo side was still on the v1 schema (family/door_count only).
-        Default to product_tmpl_id.default_code; that's "SB-BASE-1DR"
-        for the locked Q8 templates which matches the planned FCStd
-        naming. Override via ir.config_parameter
-        `freecad_bridge.template_field_name` if the bridge changes
-        which value it keys on.
+        `{"loc":["body","template"],"msg":"Field required"}`.
+
+        2026-06-25 (Option A): the template name is derived from the
+        cabinet family, matching the 6 master generators in
+        services/freecad_bridge/cabinet_masters/:
+          base_default, wall_default, drawer_bank_default,
+          tall_default, corner_default, vanity_default.
+        The bridge parameterizes those masters with the MO dimensions,
+        so a single FCStd per family covers all SKU variations.
+        Worktop / accessory have no FreeCAD master (they're slabs /
+        single panels); their POST will fail with "unknown_template:
+        worktop_default" — that's the correct outcome until those
+        families gain real masters.
         """
         self.ensure_one()
         tmpl = self.product_id.product_tmpl_id
-        family = getattr(tmpl, "x_cabinet_family", None) or "base"
+        family = (getattr(tmpl, "x_cabinet_family", None) or "base").lower()
         # Sensible defaults so a missing template attribute doesn't
         # break the POST.
         dims = {
@@ -107,7 +113,17 @@ class MrpProduction(models.Model):
             "height_mm": float(getattr(tmpl, "x_default_height_mm", 720.0)),
             "depth_mm":  float(getattr(tmpl, "x_default_depth_mm", 580.0)),
         }
-        template = (tmpl.default_code or family or "").strip().upper()
+        # Family → FCStd master mapping. Keys cover the variants seen
+        # in both x_cabinet_family ("drawer_bank") and the configurator
+        # short-form ("drawer"). Sink falls back to base since the
+        # sink-base carcass is a base-class cabinet with a cutout —
+        # the FreeCAD master can render it correctly.
+        FAMILY_TO_MASTER = {
+            "drawer": "drawer_bank_default",
+            "drawer_bank": "drawer_bank_default",
+            "sink": "base_default",
+        }
+        template = FAMILY_TO_MASTER.get(family, f"{family}_default")
         return {
             "production_id": self.id,
             "template": template,
