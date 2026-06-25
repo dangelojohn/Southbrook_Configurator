@@ -18,7 +18,22 @@
     <menuitem id="menu_kitchen_ops_root"
               name="Kitchen Ops"
               sequence="20"
+              action="action_kitchen_ops_dashboard"
               web_icon="southbrook_premium_orchestration,static/description/icon.png"/>
+
+    <!--
+        Dashboard menu item — gives the dashboard a dedicated link in
+        the submenu (sequence=5 so it sorts above the existing views).
+        The root menu item ALSO opens the dashboard on click (the
+        action= above), so opening "Kitchen Ops" lands on the
+        dashboard by default. Child menu items remain navigable
+        and unchanged.
+    -->
+    <menuitem id="menu_kitchen_ops_dashboard"
+              name="Dashboard"
+              parent="menu_kitchen_ops_root"
+              action="action_kitchen_ops_dashboard"
+              sequence="5"/>
 
     <menuitem id="menu_kitchen_ops_jobs"
               name="Kitchen Jobs"

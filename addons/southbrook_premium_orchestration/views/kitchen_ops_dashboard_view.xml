@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--
+      Kitchen Ops dashboard — POC per proposals §3.1.
+      A single form view backed by southbrook.kitchen.ops.dashboard
+      (TransientModel). Form lifecycle: create=false, edit=false,
+      delete=false; tiles are display-only with action buttons that
+      drill into the corresponding list views.
+  -->
+
+  <record id="view_kitchen_ops_dashboard_form" model="ir.ui.view">
+    <field name="name">kitchen.ops.dashboard.form</field>
+    <field name="model">southbrook.kitchen.ops.dashboard</field>
+    <field name="arch" type="xml">
+      <form create="false" edit="false" delete="false"
+            string="Kitchen Operations" class="o_kops_dashboard">
+        <header>
+          <button name="action_refresh" type="object"
+                  string="↻ Refresh" class="btn-secondary"/>
+        </header>
+        <sheet>
+          <div class="oe_title">
+            <h1>Kitchen Operations</h1>
+            <p class="text-muted">
+              Manager overview — manufacturing, integrations, and recent activity.
+            </p>
+          </div>
+
+          <group>
+            <group string="Manufacturing">
+              <div class="o_kops_tile">
+                <button name="action_open_wip" type="object"
+                        class="btn btn-link p-0 text-start">
+                  <span class="display-4 fw-bold">
+                    <field name="wip_count" nolabel="1"/>
+                  </span>
+                  <div class="text-muted small">Cabinets in Progress</div>
+                </button>
+              </div>
+            </group>
+            <group string="FreeCAD Bridge">
+              <div class="o_kops_tile">
+                <button name="action_open_freecad_activator" type="object"
+                        class="btn btn-link p-0 text-start">
+                  <div class="fs-5">
+                    <field name="freecad_status_label" nolabel="1"/>
+                  </div>
+                </button>
+                <button name="action_open_pending_renders" type="object"
+                        class="btn btn-link p-0 text-start mt-2">
+                  <span class="fs-3 fw-bold">
+                    <field name="freecad_pending_count" nolabel="1"/>
+                  </span>
+                  <span class="text-muted small ms-2">pending renders</span>
+                </button>
+              </div>
+            </group>
+          </group>
+
+          <separator string="Recent Activity"/>
+          <div class="text-muted small mb-2">
+            <field name="recent_event_summary" nolabel="1" readonly="1"/>
+          </div>
+          <field name="recent_event_ids" nolabel="1" readonly="1">
+            <list create="false" delete="false" edit="false">
+              <field name="create_date" string="When"/>
+              <field name="event_type" string="Type"/>
+              <field name="severity" widget="badge"
+                     decoration-info="severity == 'info'"
+                     decoration-warning="severity == 'warn'"
+                     decoration-danger="severity == 'alert'"/>
+              <field name="summary"/>
+            </list>
+          </field>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_kitchen_ops_dashboard" model="ir.actions.act_window">
+    <field name="name">Kitchen Operations</field>
+    <field name="res_model">southbrook.kitchen.ops.dashboard</field>
+    <field name="view_mode">form</field>
+    <field name="target">current</field>
+    <!--
+        TransientModel needs a clean new record per open. No domain,
+        no context tweaks — Odoo creates a fresh row, computes fire,
+        manager sees the snapshot.
+    -->
+  </record>
+</odoo>

@@ -1,6 +1,6 @@
 {
     'name': 'Southbrook Premium MRP Orchestration',
-    'version': '19.0.3.2.0',
+    'version': '19.0.4.0.0',
     'summary': 'Closes the loop: cron-driven readiness/MI/analytics, always-on project-task spine, '
                'practical-intelligence telemetry, generative + planning activation.',
     'description': """
@@ -82,6 +82,10 @@ PHASE 3 — Generative + Planning Activation
         'views/sale_order_views.xml',
         'views/mrp_workorder_views.xml',
         'views/cut_spec_override_views.xml',
+        # Kitchen Ops manager dashboard (proposals §3.1 POC, 2026-06-25).
+        # Must load before menus.xml — menu_kitchen_ops_root's action="..."
+        # references action_kitchen_ops_dashboard defined here.
+        'views/kitchen_ops_dashboard_view.xml',
         # wizards (action_test_user_archive_wizard is referenced by menus.xml)
         'wizards/test_user_archive_views.xml',
         'wizards/gemini_activation_views.xml',

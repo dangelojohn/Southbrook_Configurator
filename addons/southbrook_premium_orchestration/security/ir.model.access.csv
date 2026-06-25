@@ -10,3 +10,6 @@ access_freecad_activator_system,southbrook.freecad.activator system,model_southb
 access_freecad_activator_user_read,southbrook.freecad.activator read,model_southbrook_freecad_activator,base.group_user,1,0,0,0
 access_mi_engine_state_system,southbrook.mi.engine.state system,model_southbrook_mi_engine_state,base.group_system,1,1,1,1
 access_mi_engine_state_user_read,southbrook.mi.engine.state read,model_southbrook_mi_engine_state,base.group_user,1,0,0,0
+access_kitchen_ops_dashboard_user,southbrook.kitchen.ops.dashboard user,model_southbrook_kitchen_ops_dashboard,base.group_user,1,1,1,1
+access_ops_event_user_read,southbrook.ops.event read,model_southbrook_ops_event,base.group_user,1,0,0,0
+access_ops_event_system_all,southbrook.ops.event system,model_southbrook_ops_event,base.group_system,1,1,1,1
