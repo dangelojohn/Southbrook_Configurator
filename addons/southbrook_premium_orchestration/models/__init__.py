@@ -21,3 +21,4 @@ from . import order_analytics_cron
 # Kitchen Ops dashboard POC (proposals §3.1) — 2026-06-25
 from . import southbrook_ops_event
 from . import southbrook_kitchen_ops_dashboard
+from . import mrp_production

@@ -103,6 +103,31 @@ class SaleOrder(models.Model):
                     body=_("Premium Orchestration: auto-emit cutlist failed. "
                            "Run the manual generator from the production "
                            "package menu to retry."))
+            # Kitchen Ops dashboard activity feed (proposals §3.4).
+            # Emit a so_confirm/mo_confirm pair so the dashboard's
+            # right column shows the manager what just happened.
+            # Wrapped — feed failure must NEVER block the workflow.
+            try:
+                Event = order.env["southbrook.ops.event"]
+                Event.emit(
+                    "mo_confirm",
+                    f"SO {order.name} confirmed for {order.partner_id.name or '?'}",
+                    res_model="sale.order",
+                    res_id=order.id,
+                    severity="info",
+                )
+                MO = order.env["mrp.production"].sudo()
+                mos = MO.search([("origin", "=", order.name)])
+                for mo in mos:
+                    Event.emit(
+                        "mo_confirm",
+                        f"MO {mo.name} created from {order.name}",
+                        res_model="mrp.production",
+                        res_id=mo.id,
+                        severity="info",
+                    )
+            except Exception:  # noqa: BLE001
+                pass
         return result
 
     # ------------------------------------------------------------------
