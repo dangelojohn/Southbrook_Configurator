@@ -1,6 +1,6 @@
 {
     'name': 'Southbrook Premium MRP Orchestration',
-    'version': '19.0.4.3.0',
+    'version': '19.0.4.4.0',
     'summary': 'Closes the loop: cron-driven readiness/MI/analytics, always-on project-task spine, '
                'practical-intelligence telemetry, generative + planning activation.',
     'description': """
@@ -94,6 +94,14 @@ PHASE 3 — Generative + Planning Activation
         'views/menus.xml',
     ],
     'demo': [],
+    'assets': {
+        'web.assets_backend': [
+            # SAMI PRD N-12 (2026-06-25): mobile-responsive Kitchen Ops
+            # dashboard. Stacks the two top tile groups vertically on
+            # phones, shrinks display-4 numbers, hides verbose columns.
+            'southbrook_premium_orchestration/static/src/scss/kitchen_ops_dashboard.scss',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': False,

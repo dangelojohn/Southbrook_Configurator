@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// Kitchen Ops dashboard — mobile-responsive polish (SAMI PRD N-12).
+// Targets supervisors checking the dashboard from a phone (typical
+// shop-floor walk-around) without losing the desktop layout.
+
+.o_kops_dashboard {
+
+    // Tiles: comfortable padding + clear hover affordance on touch.
+    .o_kops_tile {
+        padding: 0.5rem 0;
+
+        button {
+            border: 0;
+            text-align: left;
+
+            // Touch-friendly tap target (44px Apple HIG / 48px Material).
+            min-height: 48px;
+
+            // Don't let the big number push off-screen on small viewports.
+            .display-4 {
+                line-height: 1.1;
+            }
+        }
+    }
+
+    // ---- Phone / portrait tablet (≤768px) ----
+    //
+    // The two top groups ("Manufacturing", "FreeCAD Bridge") sit side-by-
+    // side by default. Stack them vertically so the numbers stay legible
+    // on narrow screens.
+    @media (max-width: 768px) {
+
+        .o_group {
+            // Each <group> becomes full width and they stack naturally.
+            display: block !important;
+
+            .o_inner_group {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+        }
+
+        // Shrink the huge tile numbers so they don't overflow.
+        .o_kops_tile .display-4 {
+            font-size: 2.5rem !important;
+        }
+
+        .o_kops_tile .fs-3 {
+            font-size: 1.5rem !important;
+        }
+
+        // Tighten the header padding so more content is above-the-fold.
+        .oe_title h1 {
+            font-size: 1.5rem;
+        }
+    }
+
+    // ---- Small phone (≤480px) ----
+    @media (max-width: 480px) {
+
+        .o_kops_tile .display-4 {
+            font-size: 2rem !important;
+        }
+
+        // Recent Activity list: hide the verbose "When" column on
+        // narrow screens — the badge + summary carry the load.
+        .o_list_view th[data-name="create_date"],
+        .o_list_view td[name="create_date"] {
+            display: none;
+        }
+    }
+}
