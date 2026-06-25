@@ -698,17 +698,23 @@ export class CabinetViewport extends Component {
             this.state.priceLabel = fmtPrice(meta.price);
             // Tooltip: only show breakdown when there's a non-zero extra
             // (otherwise the tooltip would say "Base $545 = $545" which
-            // adds nothing).
+            // adds nothing). Pricelist name appended if present —
+            // critical UX disclosure for the dealer flow.
             const extras = meta.extras_sum;
+            let tooltip;
             if (typeof extras === "number" && extras > 0
                 && typeof meta.list_price === "number") {
-                this.state.priceTooltip =
+                tooltip =
                     `Base ${fmtPrice(meta.list_price)} `
                     + `+ Options ${fmtPrice(extras)} `
                     + `= ${fmtPrice(meta.price)}`;
             } else {
-                this.state.priceTooltip = "Configured price";
+                tooltip = "Configured price";
             }
+            if (meta.pricelist_name) {
+                tooltip += `\n(${meta.pricelist_name})`;
+            }
+            this.state.priceTooltip = tooltip;
         } else {
             this.state.priceLabel = null;
             this.state.priceTooltip = null;

@@ -126,6 +126,15 @@ class ProductConfigSession(models.Model):
             payload["metadata"]["extras_sum"] = extras_sum
             payload["metadata"]["currency_symbol"] = currency.symbol or "$"
             payload["metadata"]["currency_position"] = currency.position or "before"
+            # 2026-06-25 — pricelist name in the metadata so the
+            # client tooltip discloses WHICH price scheme this is.
+            # Critical UX for the sales rep / dealer flow — Retail vs
+            # Dealer −50% vs Contractor −35% is the single highest-
+            # leverage info on the screen.
+            payload["metadata"]["pricelist_name"] = (
+                self.pricelist_id.display_name
+                if self.pricelist_id else ""
+            )
         except Exception:
             payload.setdefault("metadata", {})
             payload["metadata"]["price"] = None
