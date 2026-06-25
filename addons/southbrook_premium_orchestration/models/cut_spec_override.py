@@ -41,6 +41,27 @@ class CutSpecOverride(models.Model):
     recorded_at = fields.Datetime(default=fields.Datetime.now, required=True, index=True)
     eco_proposed_id = fields.Many2one('southbrook.eco', string='ECO proposed in response', readonly=True)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        rule_labels = dict(KNOWN_RULE_KEYS)
+        for rec in records:
+            try:
+                wo = rec.workorder_id
+                mo_name = wo.production_id.name if wo and wo.production_id else "?"
+                rule_label = rule_labels.get(rec.rule_key, rec.rule_key)
+                self.env["southbrook.ops.event"].emit(
+                    "override_flagged",
+                    f"Cut-spec override on {mo_name}: {rule_label} "
+                    f"({rec.rule_default_value} → {rec.actual_applied_value})",
+                    res_model="southbrook.cut.spec.override",
+                    res_id=rec.id,
+                    severity="warn",
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        return records
+
     @api.model
     def action_open_cut_spec_override_for_wo(self):
         ctx = dict(self.env.context)
@@ -114,4 +135,16 @@ class CutSpecOverride(models.Model):
             })
             sample_overrides.write({'eco_proposed_id': eco.id})
             proposed += 1
+            try:
+                rule_label = dict(KNOWN_RULE_KEYS).get(rk, rk)
+                self.env["southbrook.ops.event"].emit(
+                    "eco_proposed",
+                    f"ECO auto-proposed for rule '{rule_label}' "
+                    f"({cnt} overrides in {window_days}d)",
+                    res_model="southbrook.eco",
+                    res_id=eco.id,
+                    severity="warn",
+                )
+            except Exception:  # noqa: BLE001
+                pass
         return {'proposed': proposed}
