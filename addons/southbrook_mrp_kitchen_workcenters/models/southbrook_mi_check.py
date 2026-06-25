@@ -27,7 +27,8 @@ Added here (all x_sbk_ prefixed to grep-distinguish from upstream):
   x_sbk_rework_workcenter_id station the rework should be routed back to
   x_sbk_rework_workorder_id  link to the spawned rework WO (M4)
 """
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 CHECK_STAGES = [
@@ -162,6 +163,80 @@ class SouthbrookMiCheck(models.Model):
             check.x_sbk_rework_required = check.x_sbk_result in (
                 "fail", "rework",
             )
+
+    # --------------------------------------------------------------
+    # NCR → rework workorder spawn (SAMI PRD #8 + #9, ~2026-06-25)
+    #
+    # The framework around this method has existed since M3 (defect
+    # taxonomy + rework_required flag + rework_workcenter mapping).
+    # Action below is the missing piece that ACTUALLY creates the
+    # rework workorder. Idempotent: re-calling on a check whose
+    # rework WO already exists just opens it.
+    # --------------------------------------------------------------
+    def action_create_rework_workorder(self):
+        """Spawn a rework mrp.workorder at the rework_workcenter.
+
+        Re-routes the failed part back to the right station per the
+        defect-type → workcenter mapping. The new WO is on the SAME
+        production order (no MO split), and the original check holds
+        the link so an inspector can see the rework that came out of
+        their NCR.
+        """
+        self.ensure_one()
+        if self.x_sbk_rework_workorder_id:
+            return self._action_open_rework_workorder()
+        if not self.x_sbk_rework_required:
+            raise UserError(_("This check does not require rework."))
+        if not self.x_sbk_workorder_id:
+            raise UserError(
+                _("The original work order is required to spawn rework. "
+                  "Set x_sbk_workorder_id on this check first."))
+        if not self.x_sbk_rework_workcenter_id:
+            raise UserError(
+                _("Set 'Send Rework To' (rework workcenter) before "
+                  "creating the rework work order."))
+        src = self.x_sbk_workorder_id
+        wc = self.x_sbk_rework_workcenter_id
+        defect_label = dict(self._fields["x_sbk_defect_type"].selection).get(
+            self.x_sbk_defect_type, _("defect"))
+        new_wo = self.env["mrp.workorder"].create({
+            "production_id": src.production_id.id,
+            "product_id": src.product_id.id,
+            "workcenter_id": wc.id,
+            "operation_id": src.operation_id.id if src.operation_id else False,
+            "name": _("Rework: %(d)s @ %(wc)s",
+                      d=defect_label, wc=wc.name),
+            "qty_producing": src.qty_producing or src.qty_production or 0.0,
+            "state": "ready",
+        })
+        self.x_sbk_rework_workorder_id = new_wo.id
+        # Best-effort dashboard event — non-fatal if event model missing.
+        try:
+            self.env["southbrook.ops.event"].emit(
+                "override_flagged",
+                _("Rework WO %(name)s spawned for MO %(mo)s "
+                  "(defect: %(d)s → %(wc)s)",
+                  name=new_wo.name or "?",
+                  mo=src.production_id.name or "?",
+                  d=defect_label, wc=wc.name),
+                res_model="mrp.workorder",
+                res_id=new_wo.id,
+                severity="warn",
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return self._action_open_rework_workorder()
+
+    def _action_open_rework_workorder(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Rework Work Order"),
+            "res_model": "mrp.workorder",
+            "res_id": self.x_sbk_rework_workorder_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
     @api.onchange("x_sbk_defect_type")
     def _onchange_defect_type_suggests_rework_workcenter(self):

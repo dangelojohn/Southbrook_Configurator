@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.1.0",
+    "version": "19.0.4.2.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -74,6 +74,10 @@ southbrook_kitchen_workspace) without duplicating their models.
         "views/mrp_workorder_views.xml",
         "views/mrp_bom_views.xml",
         "views/southbrook_kitchen_menus.xml",
+        # NCR / Rework Queue surface (SAMI PRD #8 + #9, 2026-06-25).
+        # Loads AFTER menus.xml because it adds an entry under
+        # menu_sbk_ops_root.
+        "views/southbrook_ncr_views.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [
