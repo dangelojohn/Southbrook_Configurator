@@ -260,6 +260,23 @@ export class KitchenViewport extends Component {
             door: new THREE.MeshStandardMaterial({
                 color: 0x6b3f2a, roughness: 0.7, metalness: 0.05,
             }),
+            // Per-finish door materials. The backend payload emits
+            // material names like "door_white" / "door_maple_stain"
+            // when product_config_session resolves the customer's
+            // Finish attribute. Unknown finishes fall back to the
+            // generic `door` material above. Added 2026-06-25.
+            door_white: new THREE.MeshStandardMaterial({
+                color: 0xf0ebe3, roughness: 0.45, metalness: 0.05,
+            }),
+            door_maple_stain: new THREE.MeshStandardMaterial({
+                color: 0xc89e76, roughness: 0.70, metalness: 0.05,
+            }),
+            door_cherry_stain: new THREE.MeshStandardMaterial({
+                color: 0x6b2e1a, roughness: 0.65, metalness: 0.05,
+            }),
+            door_walnut_stain: new THREE.MeshStandardMaterial({
+                color: 0x3d2817, roughness: 0.70, metalness: 0.05,
+            }),
             back: new THREE.MeshStandardMaterial({
                 color: 0xa68872, roughness: 0.9, metalness: 0.0,
             }),
