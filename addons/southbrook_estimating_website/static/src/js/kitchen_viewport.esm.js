@@ -268,14 +268,24 @@ export class KitchenViewport extends Component {
             door_white: new THREE.MeshStandardMaterial({
                 color: 0xf0ebe3, roughness: 0.45, metalness: 0.05,
             }),
+            // The 3 stained finishes carry a procedural wood-grain
+            // CanvasTexture in `map` + a base color tint. Texture
+            // builder is _buildWoodGrainTexture below. White stays
+            // map-less — it's paint, not wood.
             door_maple_stain: new THREE.MeshStandardMaterial({
-                color: 0xc89e76, roughness: 0.70, metalness: 0.05,
+                color: 0xc89e76,
+                map: this._buildWoodGrainTexture(0xc89e76, 0x8c6a48),
+                roughness: 0.70, metalness: 0.05,
             }),
             door_cherry_stain: new THREE.MeshStandardMaterial({
-                color: 0x6b2e1a, roughness: 0.65, metalness: 0.05,
+                color: 0x6b2e1a,
+                map: this._buildWoodGrainTexture(0x6b2e1a, 0x401a0d),
+                roughness: 0.65, metalness: 0.05,
             }),
             door_walnut_stain: new THREE.MeshStandardMaterial({
-                color: 0x3d2817, roughness: 0.70, metalness: 0.05,
+                color: 0x3d2817,
+                map: this._buildWoodGrainTexture(0x3d2817, 0x1f130a),
+                roughness: 0.70, metalness: 0.05,
             }),
             back: new THREE.MeshStandardMaterial({
                 color: 0xa68872, roughness: 0.9, metalness: 0.0,
@@ -377,6 +387,80 @@ export class KitchenViewport extends Component {
      * surfaces; not appropriate for shiny metalwork. (Hardware finish
      * pass in Sprint B will revisit.)
      */
+    /**
+     * Phase 3 Sprint B (2026-06-25) — procedural wood-grain texture.
+     *
+     * Returns a Three.js CanvasTexture seeded from `baseHex`/`grainHex`
+     * suitable for use as `map` on a MeshStandardMaterial. The texture
+     * is a vertical grain pattern with 12 broad bands and ~60 fine
+     * striations of `grainHex` painted at varying opacity over a
+     * `baseHex` fill. Deterministic seed → same input pair always
+     * produces the same pattern (no per-frame jitter).
+     *
+     * Why procedural instead of bundled JPGs:
+     *   - air-gapped (no asset CDN dependency)
+     *   - no licensing concerns
+     *   - tiny code, no static-file weight per finish
+     *   - matches the precedent set by _installStudioEnvironment
+     *
+     * Texture is 256x512 (vertical grain orientation), repeat
+     * (2, 1.5) so a 600mm door doesn't show one stretched pattern.
+     */
+    _buildWoodGrainTexture(baseHex, grainHex) {
+        const THREE = this._THREE;
+        if (!THREE) return null;
+        const w = 256, h = 512;
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        const toHex = (n) => "#" + n.toString(16).padStart(6, "0");
+        const baseStr = toHex(baseHex);
+        const grainStr = toHex(grainHex);
+        // Base fill.
+        ctx.fillStyle = baseStr;
+        ctx.fillRect(0, 0, w, h);
+        // Deterministic PRNG seeded from baseHex so the same finish
+        // always renders the same grain pattern across reloads.
+        let seed = (baseHex ^ 0x9e3779b9) >>> 0;
+        const prng = () => {
+            seed = (seed * 1103515245 + 12345) >>> 0;
+            return (seed & 0x7fffffff) / 0x7fffffff;
+        };
+        // ---- Growth-ring bands: 12 broad vertical bars, low alpha. ----
+        ctx.fillStyle = grainStr;
+        for (let i = 0; i < 12; i++) {
+            const x = prng() * w;
+            const bw = 4 + prng() * 12;
+            ctx.globalAlpha = 0.07 + prng() * 0.10;
+            ctx.fillRect(x, 0, bw, h);
+        }
+        // ---- Fine grain striations: 60 thin lines with slight x-jitter ----
+        ctx.strokeStyle = grainStr;
+        for (let i = 0; i < 60; i++) {
+            const x = prng() * w;
+            const lw = 0.4 + prng() * 1.2;
+            ctx.globalAlpha = 0.06 + prng() * 0.16;
+            ctx.lineWidth = lw;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            const segs = 10;
+            for (let s = 1; s <= segs; s++) {
+                const sy = (s / segs) * h;
+                const sx = x + (prng() - 0.5) * 4;  // ~±2px jitter
+                ctx.lineTo(sx, sy);
+            }
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        // Wrap into a Three.js texture.
+        const tex = new THREE.CanvasTexture(canvas);
+        if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2, 1.5);  // tile so 600mm doors don't show one big pattern
+        return tex;
+    }
+
     _installStudioEnvironment() {
         if (!this._renderer || !this._scene) return;
         try {
