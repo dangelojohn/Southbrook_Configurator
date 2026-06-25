@@ -64,6 +64,40 @@
             font-size: 11px;
             font-family: 'JetBrains Mono', monospace;
         }
+
+        // Phase 3 chips (SKU, dims, price) — slightly tighter than the
+        // Bootstrap default and tuned for the warm-paper palette.
+        // 2026-06-25: added when the toolbar grew to 9 elements and
+        // started feeling crowded.
+        .o_cv_sku, .o_cv_dims, .o_cv_price {
+            font-size: 11px;
+            padding: 3px 8px;
+            line-height: 1.2;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .o_cv_sku {
+            font-family: 'JetBrains Mono', monospace;
+            background: #6b3f2a !important;   // --walnut
+            color: #fbf7ef !important;        // --paper
+        }
+        .o_cv_dims {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f4ede2 !important;
+            color: #6b665e !important;        // --ink-dim
+        }
+        .o_cv_price {
+            background: #2b4f6b !important;   // --sky
+            color: #fbf7ef !important;        // --paper
+            font-weight: 600;
+        }
+
+        // Camera-preset btn-group — slightly smaller than primary
+        // toolbar buttons so the chip cluster stays visually dominant.
+        .o_cv_preset_group .o_cv_btn {
+            font-size: 10px;
+            padding: 2px 8px;
+        }
     }
 
     .o_cv_stage {
