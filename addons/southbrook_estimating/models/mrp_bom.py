@@ -47,7 +47,9 @@ SHELF_VENT_GAP = 12.7
 TOEKICK_H = 101.6
 
 # Families that have a toe-kick (sides extend below bottom panel).
-TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity"})
+# Drawer banks are base cabinets with drawer fronts instead of doors —
+# they sit on a toekick and need feet too. Added 2026-06-25.
+TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity", "drawer"})
 
 
 class MrpBom(models.Model):
