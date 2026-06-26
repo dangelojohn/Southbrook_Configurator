@@ -1,25 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    v19 dropped res.groups.category_id and the linked ir.module.category
+    backref (see project memory note ``odoo19_res_users_group_ids_rename``);
+    we set name + implied_ids only and let the model-access CSV grant the
+    actual permissions. Same pattern as southbrook_quality.
+-->
 <odoo>
     <data noupdate="1">
 
-        <record id="module_category_training" model="ir.module.category">
-            <field name="name">Southbrook Training</field>
-            <field name="description">Training Hub access and curation rights.</field>
-            <field name="sequence">90</field>
-        </record>
-
         <record id="group_training_user" model="res.groups">
-            <field name="name">Training User</field>
-            <field name="category_id" ref="module_category_training"/>
-            <field name="comment">Reads the training catalogue + uses the in-app Help panel.</field>
+            <field name="name">Southbrook Training / User</field>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Reads the training catalogue + uses the in-app Help panel.</field>
         </record>
 
         <record id="group_training_curator" model="res.groups">
-            <field name="name">Training Curator</field>
-            <field name="category_id" ref="module_category_training"/>
-            <field name="comment">Pins lessons to menus, edits items + tags, manages the index.</field>
+            <field name="name">Southbrook Training / Curator</field>
             <field name="implied_ids" eval="[(4, ref('southbrook_training_hub.group_training_user'))]"/>
+            <field name="comment">Pins lessons to menus, edits items + tags, manages the index.</field>
         </record>
 
     </data>
