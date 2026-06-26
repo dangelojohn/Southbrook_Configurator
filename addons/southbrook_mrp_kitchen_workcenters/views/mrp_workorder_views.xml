@@ -29,6 +29,11 @@
                                 type="object"
                                 string="Recalc Kitchen Duration"
                                 class="oe_highlight"/>
+                        <button name="action_open_scrap_wizard"
+                                type="object"
+                                string="Record Scrap"
+                                class="btn-warning"
+                                help="Open the stock.scrap wizard prefilled with this WO + MO. Auto-debits inventory."/>
                     </group>
                 </group>
             </xpath>

@@ -32,7 +32,7 @@ kitchen reports need but Odoo doesn't:
   x_sbk_downtime_min           sum of attached downtime durations
   x_sbk_downtime_cost          sum of attached downtime costs
 """
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 
 
 class MrpWorkorder(models.Model):
@@ -195,6 +195,35 @@ class MrpWorkorder(models.Model):
     # Convenience — the operation-template duration helper, called via
     # an inherited button in M4.
     # ------------------------------------------------------------------
+
+    def action_open_scrap_wizard(self):
+        """SAMI PRD MO-06 — open the stock.scrap wizard prefilled with
+        this WO's production_id + workorder_id.
+
+        v19 stock.scrap auto-computes location_id from workorder_id
+        (uses production_id.location_src_id while MO is in-progress,
+        location_dest_id once done). Operator picks the product from
+        the MO's components/finished-goods, enters scrap qty + reason,
+        and confirms — Odoo handles the inventory debit natively.
+
+        We surface this as a button on the WO form to make it a
+        first-class shop-floor action instead of a hidden 'More'
+        item buried in the action menu.
+        """
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Record Scrap"),
+            "res_model": "stock.scrap",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_production_id": self.production_id.id,
+                "default_workorder_id": self.id,
+                "default_company_id": self.company_id.id,
+                "default_origin": _("Scrap: %(wo)s", wo=self.name or self.id),
+            },
+        }
 
     def action_sbk_recalc_kitchen_duration(self):
         """Recompute x_sbk_kitchen_expected_min from the operation
