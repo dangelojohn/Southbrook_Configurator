@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <menuitem id="menu_installer_root"
+              name="Installation"
+              web_icon="southbrook_installer,static/description/icon.png"
+              sequence="70"
+              groups="group_sami_installer_helper"/>
+
+    <menuitem id="menu_installer_jobs"
+              name="Jobs"
+              parent="menu_installer_root"
+              action="action_installer_job"
+              sequence="10"/>
+
+    <menuitem id="menu_installer_config"
+              name="Configuration"
+              parent="menu_installer_root"
+              sequence="90"
+              groups="group_sami_operations_mgr"/>
+
+    <menuitem id="menu_installer_config_stages"
+              name="Workflow Stages"
+              parent="menu_installer_config"
+              action="action_installer_stage"
+              sequence="10"/>
+
+    <menuitem id="menu_installer_config_phases"
+              name="Installation Phases"
+              parent="menu_installer_config"
+              action="action_installer_phase"
+              sequence="20"/>
+
+</odoo>

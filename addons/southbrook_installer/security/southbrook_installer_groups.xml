@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    Six roles per v1 PRD §14. Each user is in exactly one
+    installer-app role plus the optional Operations Manager
+    overlay (read-only across everything).
+
+    Inheritance:
+      group_sami_installer_helper  ⊂ group_sami_installer_lead
+      group_sami_installer_lead    ⊂ group_sami_dispatcher
+      group_sami_warehouse, group_sami_finance, group_sami_operations_mgr
+      are flat — dispatcher does NOT inherit from them.
+-->
+<odoo noupdate="0">
+
+    <record id="module_category_southbrook_installer" model="ir.module.category">
+        <field name="name">Southbrook Installer</field>
+        <field name="description">Roles for the cabinet installation
+            workflow — installers, dispatcher, warehouse, finance,
+            and operations.</field>
+        <field name="sequence">90</field>
+    </record>
+
+    <record id="group_sami_installer_helper" model="res.groups">
+        <field name="name">Installer / Helper</field>
+        <field name="category_id" ref="module_category_southbrook_installer"/>
+        <field name="comment">On-site helper. Can view assigned jobs
+            and update phase logs (start/complete a phase). Cannot
+            advance the stage workflow or edit job-level fields.</field>
+    </record>
+
+    <record id="group_sami_installer_lead" model="res.groups">
+        <field name="name">Installer / Lead</field>
+        <field name="category_id" ref="module_category_southbrook_installer"/>
+        <field name="implied_ids" eval="[(4, ref('group_sami_installer_helper'))]"/>
+        <field name="comment">Lead installer. Can advance stage
+            workflow, record arrival/departure, mark close-out done.</field>
+    </record>
+
+    <record id="group_sami_dispatcher" model="res.groups">
+        <field name="name">Installer / Dispatcher</field>
+        <field name="category_id" ref="module_category_southbrook_installer"/>
+        <field name="implied_ids" eval="[(4, ref('group_sami_installer_lead'))]"/>
+        <field name="comment">Installation coordinator. Can create and
+            schedule jobs, reassign crews, and resolve dispatch issues.</field>
+    </record>
+
+    <record id="group_sami_warehouse" model="res.groups">
+        <field name="name">Installer / Warehouse</field>
+        <field name="category_id" ref="module_category_southbrook_installer"/>
+        <field name="comment">Shipping &amp; receiving role. Reads
+            jobs to know what's going out, writes kit_picking_id
+            and confirms delivery readiness.</field>
+    </record>
+
+    <record id="group_sami_finance" model="res.groups">
+        <field name="name">Installer / Finance</field>
+        <field name="category_id" ref="module_category_southbrook_installer"/>
+        <field name="comment">Finance role. Reads jobs for invoicing
+            purposes (Phase 2.3 wires invoice trigger).</field>
+    </record>
+
+    <record id="group_sami_operations_mgr" model="res.groups">
+        <field name="name">Installer / Operations Manager</field>
+        <field name="category_id" ref="module_category_southbrook_installer"/>
+        <field name="implied_ids" eval="[(4, ref('group_sami_dispatcher'))]"/>
+        <field name="comment">Operations manager. Full read across
+            jobs, phases, and logs; configures stages and phases.</field>
+    </record>
+
+</odoo>

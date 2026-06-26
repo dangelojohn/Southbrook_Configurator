@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    The 11 installation sub-phases. Codes (PHASE_01..PHASE_11) are
+    stable enums used by diagrams + BOM lookups.
+
+    require_photo defaults True so every phase produces visual
+    evidence. min_photos defaults 1; bumped to 2 for the high-risk
+    structural phases (uppers, bases, tall, hardware) and to 3 for
+    final clean (cabinet interiors + exteriors + floor).
+-->
+<odoo noupdate="0">
+
+    <record id="phase_01_site_assessment" model="southbrook.installer.phase">
+        <field name="name">Site Condition Assessment</field>
+        <field name="code">PHASE_01</field>
+        <field name="sequence">10</field>
+        <field name="description">Photograph the empty kitchen — walls,
+            floor, plumbing/electrical rough-ins. Capture any pre-existing
+            damage or out-of-spec conditions before work begins.</field>
+        <field name="min_photos">2</field>
+        <field name="estimated_duration_mins">20</field>
+        <field name="diagram_tag">site_assessment</field>
+    </record>
+
+    <record id="phase_02_layout" model="southbrook.installer.phase">
+        <field name="name">Layout &amp; Reference Lines</field>
+        <field name="code">PHASE_02</field>
+        <field name="sequence">20</field>
+        <field name="description">Mark stud locations, plumb lines,
+            and cabinet reference heights (typically 54" for upper
+            soffit line). Photograph layout marks against wall.</field>
+        <field name="min_photos">1</field>
+        <field name="estimated_duration_mins">30</field>
+        <field name="diagram_tag">layout</field>
+    </record>
+
+    <record id="phase_03_upper_cabinets" model="southbrook.installer.phase">
+        <field name="name">Upper Cabinet Installation</field>
+        <field name="code">PHASE_03</field>
+        <field name="sequence">30</field>
+        <field name="description">Hang upper cabinets per the plan,
+            secured into studs. Photograph each run hung, with
+            visible cleat/screw lines.</field>
+        <field name="min_photos">2</field>
+        <field name="estimated_duration_mins">90</field>
+        <field name="diagram_tag">upper_cabinet</field>
+    </record>
+
+    <record id="phase_04_base_cabinets" model="southbrook.installer.phase">
+        <field name="name">Base Cabinet Installation</field>
+        <field name="code">PHASE_04</field>
+        <field name="sequence">40</field>
+        <field name="description">Set base cabinets level on shims;
+            secure to wall and each other. Confirm sink base / cooktop
+            base / corner placements.</field>
+        <field name="min_photos">2</field>
+        <field name="estimated_duration_mins">120</field>
+        <field name="diagram_tag">base_cabinet</field>
+    </record>
+
+    <record id="phase_05_tall_cabinets" model="southbrook.installer.phase">
+        <field name="name">Tall / Pantry Cabinet Installation</field>
+        <field name="code">PHASE_05</field>
+        <field name="sequence">50</field>
+        <field name="description">Set tall pantry/oven cabinets;
+            confirm appliance cut-outs and door swing clearance.</field>
+        <field name="min_photos">2</field>
+        <field name="estimated_duration_mins">60</field>
+        <field name="diagram_tag">tall_cabinet</field>
+    </record>
+
+    <record id="phase_06_fillers" model="southbrook.installer.phase">
+        <field name="name">Filler Strips &amp; Scribes</field>
+        <field name="code">PHASE_06</field>
+        <field name="sequence">60</field>
+        <field name="description">Scribe and cut filler strips for
+            wall junctions and end panels. Match grain/finish to
+            adjacent door faces.</field>
+        <field name="estimated_duration_mins">45</field>
+        <field name="diagram_tag">filler</field>
+    </record>
+
+    <record id="phase_07_doors" model="southbrook.installer.phase">
+        <field name="name">Door &amp; Drawer Front Hanging</field>
+        <field name="code">PHASE_07</field>
+        <field name="sequence">70</field>
+        <field name="description">Hang doors on hinges and align
+            drawer fronts; set reveals to spec (3mm or per project
+            standard). Photograph closed runs from the front.</field>
+        <field name="min_photos">2</field>
+        <field name="estimated_duration_mins">75</field>
+        <field name="diagram_tag">doors</field>
+    </record>
+
+    <record id="phase_08_hardware" model="southbrook.installer.phase">
+        <field name="name">Hardware Installation</field>
+        <field name="code">PHASE_08</field>
+        <field name="sequence">80</field>
+        <field name="description">Install pulls, knobs, slide-out
+            inserts, and any soft-close adjustments. Confirm count
+            against hardware pack manifest.</field>
+        <field name="min_photos">2</field>
+        <field name="estimated_duration_mins">60</field>
+        <field name="diagram_tag">hardware</field>
+    </record>
+
+    <record id="phase_09_lighting" model="southbrook.installer.phase">
+        <field name="name">Cabinet Lighting (Optional)</field>
+        <field name="code">PHASE_09</field>
+        <field name="sequence">90</field>
+        <field name="description">Install under-cabinet or in-cabinet
+            lighting per project spec. Coordinate with electrical
+            sub-trade. Skip this phase if not in scope.</field>
+        <field name="require_photo" eval="False"/>
+        <field name="min_photos">0</field>
+        <field name="estimated_duration_mins">45</field>
+        <field name="diagram_tag">lighting</field>
+    </record>
+
+    <record id="phase_10_crown_trim" model="southbrook.installer.phase">
+        <field name="name">Crown Moulding &amp; Trim</field>
+        <field name="code">PHASE_10</field>
+        <field name="sequence">100</field>
+        <field name="description">Install crown moulding, light rail,
+            and any finish trim along the top and bottom of cabinet
+            runs. Caulk seams as needed.</field>
+        <field name="min_photos">1</field>
+        <field name="estimated_duration_mins">60</field>
+        <field name="diagram_tag">trim</field>
+    </record>
+
+    <record id="phase_11_final_clean" model="southbrook.installer.phase">
+        <field name="name">Final Clean &amp; Punch-List Prep</field>
+        <field name="code">PHASE_11</field>
+        <field name="sequence">110</field>
+        <field name="description">Vacuum cabinet interiors, wipe
+            exterior surfaces, remove protective film, sweep floor.
+            Stage the site for builder walk-through.</field>
+        <field name="min_photos">3</field>
+        <field name="estimated_duration_mins">45</field>
+        <field name="diagram_tag">final_clean</field>
+    </record>
+
+</odoo>
