@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only
+
+     WO Traveler PDF — one page per mrp.workorder. Used by operators
+     to wallpaper the WO at the cell: scan once = open in tablet,
+     then tap Start/Pause/Finish from the form view (or use the wo
+     kind handler's REST endpoint).
+-->
+<odoo>
+
+    <template id="wo_traveler_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="wo">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h1 style="margin-bottom: 0.5rem"><span t-esc="wo.name"/></h1>
+                        <h3 class="text-muted" style="margin-top:0">
+                            <span t-esc="wo.production_id.name"/> —
+                            <span t-esc="wo.product_id.display_name"/>
+                        </h3>
+
+                        <div class="row mt-4">
+                            <div class="col-7">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th>Workcenter</th>
+                                        <td t-esc="wo.workcenter_id.display_name"/>
+                                    </tr>
+                                    <tr>
+                                        <th>Operation</th>
+                                        <td t-esc="wo.operation_id.name or '-'"/>
+                                    </tr>
+                                    <tr>
+                                        <th>Qty</th>
+                                        <td>
+                                            <span t-esc="wo.qty_producing or wo.qty_production or 0"/>
+                                            <span t-if="wo.product_uom_id">
+                                                <t t-esc="wo.product_uom_id.name"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Expected (min)</th>
+                                        <td>
+                                            <span t-esc="round(wo.x_sbk_kitchen_expected_min or wo.duration_expected or 0, 1)"/>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>State</th>
+                                        <td><span class="badge bg-secondary" t-esc="dict(wo._fields['state'].selection).get(wo.state)"/></td>
+                                    </tr>
+                                    <tr t-if="wo.production_id.x_sbk_kitchen_project_id">
+                                        <th>Kitchen Project</th>
+                                        <td t-esc="wo.production_id.x_sbk_kitchen_project_id.display_name"/>
+                                    </tr>
+                                    <tr t-if="wo.production_id.x_sbk_install_due_date">
+                                        <th>Install Due</th>
+                                        <td t-esc="wo.production_id.x_sbk_install_due_date"/>
+                                    </tr>
+                                    <tr t-if="wo.production_id.x_sbk_cabinet_code">
+                                        <th>Cabinet</th>
+                                        <td t-esc="wo.production_id.x_sbk_cabinet_code"/>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-5 text-center">
+                                <t t-if="wo.qr_image_base64">
+                                    <img
+                                        t-att-src="'data:image/png;base64,' + wo.qr_image_base64"
+                                        style="width: 220px; height: 220px; border: 1px solid #999; padding: 4px;"
+                                        alt="WO QR code"/>
+                                    <div class="mt-2" style="font-size:9pt; color:#666">
+                                        <strong>SCAN TO OPEN</strong>
+                                    </div>
+                                    <div style="font-size:8pt; color:#999; font-family:monospace">
+                                        <t t-esc="(wo.qr_payload or '')[:60]"/>...
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div style="border:1px dashed #999; padding:2rem; width:220px; height:220px;">
+                                        <small>QR unavailable (qrcode lib not installed)</small>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+
+                        <h4 class="mt-4">Operator Instructions</h4>
+                        <ol style="line-height: 1.8">
+                            <li>Scan QR to open this WO on your tablet.</li>
+                            <li>Tap <strong>Start</strong> when work begins.</li>
+                            <li>Tap <strong>Finish</strong> when work completes.</li>
+                            <li>If a defect is found:
+                                <ul>
+                                    <li>Scan the matching <strong>defect-type QR</strong> from the floor board.</li>
+                                    <li>NCR drafts automatically with this WO and the defect type pre-filled.</li>
+                                    <li>Supervisor will dispose: rework or quarantine.</li>
+                                </ul>
+                            </li>
+                            <li>Record time + scrap via the WO form's <strong>Record Scrap</strong> button.</li>
+                        </ol>
+
+                        <t t-if="wo.production_id.x_sbk_kitchen_room or wo.production_id.x_sbk_complexity_factor">
+                            <h4 class="mt-4">Job Context</h4>
+                            <table class="table table-sm">
+                                <tr t-if="wo.production_id.x_sbk_kitchen_room">
+                                    <th style="width: 30%">Room / Zone</th>
+                                    <td t-esc="wo.production_id.x_sbk_kitchen_room"/>
+                                </tr>
+                                <tr t-if="wo.production_id.x_sbk_complexity_factor">
+                                    <th>Complexity Factor</th>
+                                    <td t-esc="wo.production_id.x_sbk_complexity_factor"/>
+                                </tr>
+                            </table>
+                        </t>
+
+                        <div style="margin-top:3rem; border-top: 1px solid #ccc; padding-top:1rem;
+                                    font-size:8pt; color:#666; text-align:center">
+                            Southbrook WO Traveler — printed
+                            <t t-out="datetime.datetime.now().strftime('%Y-%m-%d %H:%M')"/>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="report_wo_traveler" model="ir.actions.report">
+        <field name="name">WO Traveler</field>
+        <field name="model">mrp.workorder</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">southbrook_mrp_kitchen_workcenters.wo_traveler_document</field>
+        <field name="report_file">southbrook_mrp_kitchen_workcenters.wo_traveler_document</field>
+        <field name="binding_model_id" ref="mrp.model_mrp_workorder"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>

@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.14.0",
+    "version": "19.0.4.15.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -98,6 +98,10 @@ southbrook_kitchen_workspace) without duplicating their models.
         "views/southbrook_shift_handover_views.xml",
         # OPC-UA gateway prototype (SAMI PRD IOT-02, 2026-06-26).
         "views/southbrook_opcua_views.xml",
+        # WO traveler PDF — printable per-WO with embedded scan QR
+        # (QR rollout Phase 3+, 2026-06-26). Action lives in
+        # mrp.workorder action menu via binding_model_id.
+        "reports/wo_traveler_report.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [
