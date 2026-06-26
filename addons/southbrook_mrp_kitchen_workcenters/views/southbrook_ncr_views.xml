@@ -138,4 +138,17 @@
               action="action_southbrook_ncr_queue"
               sequence="35"/>
 
+    <!-- Defect QR sheet printer — open in new tab.
+         Wraps /sb/qr/defect-sheet for one-click access. -->
+    <record id="action_defect_qr_sheet" model="ir.actions.act_url">
+        <field name="name">Print Defect QR Sheet</field>
+        <field name="url">/sb/qr/defect-sheet</field>
+        <field name="target">new</field>
+    </record>
+    <menuitem id="menu_sbk_ops_defect_qr_sheet"
+              name="Defect QR Sheet (print)"
+              parent="menu_sbk_ops_root"
+              action="action_defect_qr_sheet"
+              sequence="36"/>
+
 </odoo>
