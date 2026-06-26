@@ -20,7 +20,9 @@ HARDWARE_PACKAGE_STATES = [
 class SbHardwarePackage(models.Model):
     _name = "sb.hardware.package"
     _description = "Southbrook Hardware Package"
+    _inherit = ["southbrook.qr.mixin"]
     _order = "id desc"
+    _qr_kind = "hwpkg"
 
     name = fields.Char(required=True, default=lambda self: _("New"))
     mo_id = fields.Many2one(

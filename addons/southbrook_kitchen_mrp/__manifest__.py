@@ -41,13 +41,15 @@ contract, GAP-05 / SYN-02):
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.4.0",
+    "version": "19.0.0.5.0",
     "depends": [
         "mrp",
         "sale",
         "southbrook_estimating",
         "southbrook_hardware_catalog",
         "southbrook_freecad_bridge",
+        # QR foundation — qr.mixin for cutlist + hardware package.
+        "southbrook_qr_kit",
     ],
     "data": [
         "security/ir.model.access.csv",

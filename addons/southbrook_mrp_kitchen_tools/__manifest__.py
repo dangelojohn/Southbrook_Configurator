@@ -44,7 +44,7 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
     "author": "Southbrook Cabinetry / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.4.0",
     "depends": [
         "mrp",
         "stock",

@@ -12,8 +12,10 @@ from odoo import _, api, fields, models
 class SouthbrookToolKit(models.Model):
     _name = "southbrook.tool.kit"
     _description = "Southbrook Tool Kit"
+    _inherit = ["southbrook.qr.mixin"]
     _order = "code, name"
     _rec_name = "display_name"
+    _qr_kind = "kit"
 
     name = fields.Char(required=True, translate=True)
     code = fields.Char(required=True, index=True)

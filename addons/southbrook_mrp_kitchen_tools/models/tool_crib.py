@@ -17,8 +17,10 @@ from odoo import _, api, fields, models
 class SouthbrookToolCrib(models.Model):
     _name = "southbrook.tool.crib"
     _description = "Southbrook Tool Crib"
+    _inherit = ["southbrook.qr.mixin"]
     _order = "code, name"
     _rec_name = "display_name"
+    _qr_kind = "crib"
 
     name = fields.Char(string="Name", required=True, translate=True)
     code = fields.Char(string="Code", required=True, index=True)

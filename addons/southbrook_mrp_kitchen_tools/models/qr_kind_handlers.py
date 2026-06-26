@@ -3,6 +3,22 @@
 from odoo import _, api, fields, models
 
 
+class ToolKitQrKind(models.AbstractModel):
+    _name = "southbrook.qr.kind.kit"
+    _inherit = "southbrook.qr.kind"
+    _description = "QR Kind — Tool Kit"
+    _kind_name = "kit"
+    _target_model = "southbrook.tool.kit"
+
+
+class ToolCribQrKind(models.AbstractModel):
+    _name = "southbrook.qr.kind.crib"
+    _inherit = "southbrook.qr.kind"
+    _description = "QR Kind — Tool Crib"
+    _kind_name = "crib"
+    _target_model = "southbrook.tool.crib"
+
+
 class ToolQrKind(models.AbstractModel):
     _name = "southbrook.qr.kind.tool"
     _inherit = "southbrook.qr.kind"

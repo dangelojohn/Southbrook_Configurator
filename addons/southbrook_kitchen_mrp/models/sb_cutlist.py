@@ -70,7 +70,9 @@ DEFAULT_SUBSTRATE_BY_PANEL = {
 class SbCutlist(models.Model):
     _name = "sb.cutlist"
     _description = "Southbrook Cabinet Cut List"
+    _inherit = ["southbrook.qr.mixin"]
     _order = "id desc"
+    _qr_kind = "cutlist"
 
     name = fields.Char(required=True, default=lambda self: _("New"))
     mo_id = fields.Many2one(
