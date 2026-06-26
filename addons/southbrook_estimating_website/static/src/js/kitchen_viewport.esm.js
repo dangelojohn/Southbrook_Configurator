@@ -274,17 +274,17 @@ export class KitchenViewport extends Component {
             // map-less — it's paint, not wood.
             door_maple_stain: new THREE.MeshStandardMaterial({
                 color: 0xc89e76,
-                map: this._buildWoodGrainTexture(0xc89e76, 0x8c6a48),
+                ...this._buildWoodMaterialMaps(0xc89e76, 0x8c6a48),
                 roughness: 0.70, metalness: 0.05,
             }),
             door_cherry_stain: new THREE.MeshStandardMaterial({
                 color: 0x6b2e1a,
-                map: this._buildWoodGrainTexture(0x6b2e1a, 0x401a0d),
+                ...this._buildWoodMaterialMaps(0x6b2e1a, 0x401a0d),
                 roughness: 0.65, metalness: 0.05,
             }),
             door_walnut_stain: new THREE.MeshStandardMaterial({
                 color: 0x3d2817,
-                map: this._buildWoodGrainTexture(0x3d2817, 0x1f130a),
+                ...this._buildWoodMaterialMaps(0x3d2817, 0x1f130a),
                 roughness: 0.70, metalness: 0.05,
             }),
             back: new THREE.MeshStandardMaterial({
@@ -407,58 +407,187 @@ export class KitchenViewport extends Component {
      * (2, 1.5) so a 600mm door doesn't show one stretched pattern.
      */
     _buildWoodGrainTexture(baseHex, grainHex) {
+        // Legacy single-map helper — kept for callers that don't
+        // want the normal map. New door materials use
+        // _buildWoodMaterialMaps below.
+        return this._buildWoodMaterialMaps(baseHex, grainHex).map;
+    }
+
+    /**
+     * Phase 3.5 (2026-06-26) — procedural wood grain with normal map.
+     *
+     * Returns { map, normalMap } for a Three.js MeshStandardMaterial.
+     * The albedo map carries the color + grain. The normal map gives
+     * tactile depth so the studio rig's 6-light setup catches every
+     * pore + ring instead of rendering it as a flat decal.
+     *
+     * Grain pattern:
+     *   - 4-6 organic annular rings (vertical sine-distorted curves)
+     *   - 80 fine grain striations with ±2px x-jitter
+     *   - ~180 pore speckles (1-2px dark dots, simulate wood pores)
+     *   - 1-2 small knot blemishes per texture
+     *
+     * Normal map is derived from the albedo: brighter areas (base
+     * color) → flat normal (128, 128, 255); darker areas (grain) →
+     * subtle indentation. Computed as grayscale gradient sampled
+     * from a slightly-blurred copy of the albedo.
+     *
+     * Resolution: 512×1024 (2x prior). Anisotropic filter at 8x.
+     */
+    _buildWoodMaterialMaps(baseHex, grainHex) {
         const THREE = this._THREE;
-        if (!THREE) return null;
-        const w = 256, h = 512;
+        if (!THREE) return {};
+        const w = 512, h = 1024;
+        const albedo = this._drawWoodAlbedoCanvas(w, h, baseHex, grainHex);
+        const normal = this._deriveNormalMapCanvas(albedo, w, h);
+
+        const map = new THREE.CanvasTexture(albedo);
+        if (THREE.SRGBColorSpace) map.colorSpace = THREE.SRGBColorSpace;
+        map.wrapS = THREE.RepeatWrapping;
+        map.wrapT = THREE.RepeatWrapping;
+        map.repeat.set(1.5, 1.0);
+        map.anisotropy = 8;
+
+        const normalMap = new THREE.CanvasTexture(normal);
+        // Normal maps are LINEAR data, NOT sRGB. Setting colorSpace
+        // to sRGB on a normal map double-applies gamma + breaks the
+        // shader. Three.js defaults to NoColorSpace for non-color
+        // data, which is correct.
+        normalMap.wrapS = THREE.RepeatWrapping;
+        normalMap.wrapT = THREE.RepeatWrapping;
+        normalMap.repeat.set(1.5, 1.0);
+        normalMap.anisotropy = 8;
+
+        return { map, normalMap };
+    }
+
+    /**
+     * Draw the albedo (color) canvas. Organic wood-grain look using
+     * deterministic PRNG so the same finish always renders identically.
+     */
+    _drawWoodAlbedoCanvas(w, h, baseHex, grainHex) {
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext("2d");
         const toHex = (n) => "#" + n.toString(16).padStart(6, "0");
         const baseStr = toHex(baseHex);
         const grainStr = toHex(grainHex);
+        // Slightly-darker shade for shadows under grain peaks.
+        const shadowHex = (
+            ((((baseHex >> 16) & 0xff) * 0.85) << 16) |
+            ((((baseHex >> 8) & 0xff) * 0.85) << 8) |
+            (((baseHex & 0xff) * 0.85))
+        ) | 0;
+        const shadowStr = toHex(shadowHex);
         // Base fill.
         ctx.fillStyle = baseStr;
         ctx.fillRect(0, 0, w, h);
-        // Deterministic PRNG seeded from baseHex so the same finish
-        // always renders the same grain pattern across reloads.
+        // Deterministic PRNG seeded from baseHex.
         let seed = (baseHex ^ 0x9e3779b9) >>> 0;
         const prng = () => {
             seed = (seed * 1103515245 + 12345) >>> 0;
             return (seed & 0x7fffffff) / 0x7fffffff;
         };
-        // ---- Growth-ring bands: 12 broad vertical bars, low alpha. ----
-        ctx.fillStyle = grainStr;
-        for (let i = 0; i < 12; i++) {
-            const x = prng() * w;
-            const bw = 4 + prng() * 12;
-            ctx.globalAlpha = 0.07 + prng() * 0.10;
-            ctx.fillRect(x, 0, bw, h);
-        }
-        // ---- Fine grain striations: 60 thin lines with slight x-jitter ----
+        // ---- Annular rings: 5 broad sine-distorted vertical bands ----
+        // These read as growth rings on a quarter-sawn cabinet door.
         ctx.strokeStyle = grainStr;
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 5; i++) {
+            const baseX = prng() * w;
+            const ringW = 18 + prng() * 30;
+            const phase = prng() * Math.PI * 2;
+            const amp = 6 + prng() * 14;
+            const period = 200 + prng() * 200;
+            ctx.globalAlpha = 0.14 + prng() * 0.10;
+            ctx.lineWidth = ringW;
+            ctx.beginPath();
+            ctx.moveTo(baseX, 0);
+            for (let y = 0; y <= h; y += 4) {
+                const x = baseX + amp * Math.sin((y / period) * Math.PI * 2 + phase);
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+        // ---- Fine grain striations: 80 thin lines with x-jitter ----
+        ctx.strokeStyle = grainStr;
+        for (let i = 0; i < 80; i++) {
             const x = prng() * w;
             const lw = 0.4 + prng() * 1.2;
-            ctx.globalAlpha = 0.06 + prng() * 0.16;
+            ctx.globalAlpha = 0.06 + prng() * 0.18;
             ctx.lineWidth = lw;
             ctx.beginPath();
             ctx.moveTo(x, 0);
-            const segs = 10;
+            const segs = 12;
             for (let s = 1; s <= segs; s++) {
                 const sy = (s / segs) * h;
-                const sx = x + (prng() - 0.5) * 4;  // ~±2px jitter
+                const sx = x + (prng() - 0.5) * 5;
                 ctx.lineTo(sx, sy);
             }
             ctx.stroke();
         }
+        // ---- Pore speckles: ~180 small dark dots ----
+        ctx.fillStyle = grainStr;
+        for (let i = 0; i < 180; i++) {
+            const px = prng() * w;
+            const py = prng() * h;
+            const pr = 0.5 + prng() * 1.5;
+            ctx.globalAlpha = 0.18 + prng() * 0.20;
+            ctx.beginPath();
+            ctx.arc(px, py, pr, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // ---- Knot blemishes: 1-2 small dark elliptical knots ----
+        const knotCount = 1 + Math.floor(prng() * 2);
+        for (let i = 0; i < knotCount; i++) {
+            const kx = prng() * w;
+            const ky = (0.2 + prng() * 0.6) * h;
+            const krx = 4 + prng() * 8;
+            const kry = 6 + prng() * 12;
+            const grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, kry);
+            grad.addColorStop(0.0, shadowStr);
+            grad.addColorStop(0.6, grainStr);
+            grad.addColorStop(1.0, baseStr);
+            ctx.fillStyle = grad;
+            ctx.globalAlpha = 0.45;
+            ctx.beginPath();
+            ctx.ellipse(kx, ky, krx, kry, prng() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
         ctx.globalAlpha = 1;
-        // Wrap into a Three.js texture.
-        const tex = new THREE.CanvasTexture(canvas);
-        if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(2, 1.5);  // tile so 600mm doors don't show one big pattern
-        return tex;
+        return canvas;
+    }
+
+    /**
+     * Derive a tangent-space normal map from the albedo canvas via
+     * a Sobel-like edge gradient on the luminance channel. Brighter
+     * pixels = surface peaks; darker pixels = pores/rings. The shader
+     * uses this to perturb lighting normals, giving tactile depth.
+     */
+    _deriveNormalMapCanvas(albedoCanvas, w, h) {
+        const src = albedoCanvas.getContext("2d").getImageData(0, 0, w, h);
+        const out = document.createElement("canvas");
+        out.width = w; out.height = h;
+        const dst = out.getContext("2d").createImageData(w, h);
+        const lum = (i) => 0.299 * src.data[i] + 0.587 * src.data[i + 1] + 0.114 * src.data[i + 2];
+        const strength = 2.5;  // Normal-map intensity multiplier
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const xl = (x === 0) ? 0 : x - 1;
+                const xr = (x === w - 1) ? w - 1 : x + 1;
+                const yu = (y === 0) ? 0 : y - 1;
+                const yd = (y === h - 1) ? h - 1 : y + 1;
+                const dx = lum((y * w + xr) * 4) - lum((y * w + xl) * 4);
+                const dy = lum((yd * w + x) * 4) - lum((yu * w + x) * 4);
+                const i = (y * w + x) * 4;
+                // Pack the gradient as a tangent-space normal vector.
+                // R = +X (right of center 128), G = +Y, B = +Z (always up).
+                dst.data[i] = Math.max(0, Math.min(255, 128 + dx * strength));
+                dst.data[i + 1] = Math.max(0, Math.min(255, 128 - dy * strength));
+                dst.data[i + 2] = 255;
+                dst.data[i + 3] = 255;
+            }
+        }
+        out.getContext("2d").putImageData(dst, 0, 0);
+        return out;
     }
 
     _installStudioEnvironment() {
