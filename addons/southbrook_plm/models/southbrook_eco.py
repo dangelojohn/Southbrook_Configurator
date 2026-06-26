@@ -535,23 +535,22 @@ class SouthbrookEco(models.Model):
     # ------------------------------------------------------------------
     def _scan_and_flag_affected_mos(self):
         """Find live MOs that referenced the versioned target at the
-        moment this ECO was applied, populate affected_mo_ids, and
-        post a chatter notice on each MO so the floor lead knows.
+        moment this ECO was applied, populate affected_mo_ids.
 
         Live MO states scanned: 'confirmed', 'progress', 'to_close'.
         Done / cancel MOs are skipped — they're finished.
 
         BoM-kind ECOs:
             MO bom_id == self.bom_id (the now-archived BoM)
-        Cut-spec-kind ECOs:
-            MO product carries the cut_spec_id (related field on the
-            template). Skip for v1 — needs source-verify on the
-            cut_spec ↔ product attachment shape.
-        Rule / Document-kind ECOs:
-            No direct MO link — skip cleanly.
+        Cut-spec / Rule / Document-kind ECOs:
+            Skipped — none directly bind to mrp.production.
 
-        Idempotent: re-running on the same ECO finds the same MOs
-        and writes the same m2m. No duplicate chatter posts.
+        Chatter notification is handled by southbrook_mrp_pm's M20
+        override of action_apply (which posts a richer Markup-wrapped
+        notice with proper HTML rendering). This method ONLY populates
+        the m2m so the ECO form's smart button can drill into the list.
+
+        Idempotent: re-running writes the same m2m without duplication.
         """
         self.ensure_one()
         if self.target_kind != "bom" or not self.bom_id:
@@ -560,30 +559,8 @@ class SouthbrookEco(models.Model):
             ("bom_id", "=", self.bom_id.id),
             ("state", "in", ["confirmed", "progress", "to_close"]),
         ])
-        if not affected:
-            return affected
-        already = set(self.affected_mo_ids.ids)
-        new_mos = affected.filtered(lambda m: m.id not in already)
-        self.affected_mo_ids = [(4, mo.id) for mo in affected]
-        # Post chatter on each NEW MO (skip already-flagged to avoid
-        # double-noticing if the ECO is re-scanned).
-        for mo in new_mos:
-            try:
-                mo.message_post(body=_(
-                    "<b>ECO %(name)s applied</b><br/>"
-                    "The BoM <code>%(bom)s</code> that this MO references "
-                    "has been versioned. This MO continues to run off the "
-                    "archived version — no in-flight re-explosion. "
-                    "Future MOs created from this product will use the "
-                    "new BoM version.<br/>"
-                    "<a href='/odoo/action-southbrook_plm.action_southbrook_eco/%(eco_id)s'>"
-                    "Review ECO %(name)s</a>",
-                    name=self.name or "?",
-                    bom=self.bom_id.display_name,
-                    eco_id=self.id,
-                ))
-            except Exception:  # noqa: BLE001
-                pass
+        if affected:
+            self.affected_mo_ids = [(4, mo.id) for mo in affected]
         return affected
 
     def action_rescan_affected_mos(self):
