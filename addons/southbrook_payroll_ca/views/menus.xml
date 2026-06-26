@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Master-data actions used by Tax-Brackets / WSIB menus -->
+    <record id="action_southbrook_payroll_tax_bracket" model="ir.actions.act_window">
+        <field name="name">Tax Brackets</field>
+        <field name="res_model">southbrook.payroll.tax_bracket</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_southbrook_payroll_root"
+              name="Canadian Payroll"
+              parent="hr.menu_hr_root"
+              sequence="90"
+              groups="southbrook_payroll_ca.group_southbrook_payroll_user"/>
+
+    <menuitem id="menu_southbrook_payroll_contracts"
+              name="Payroll Contracts"
+              parent="menu_southbrook_payroll_root"
+              action="action_southbrook_payroll_contract"
+              sequence="5"/>
+    <menuitem id="menu_southbrook_payroll_runs"
+              name="Payroll Runs"
+              parent="menu_southbrook_payroll_root"
+              action="action_southbrook_payroll_run"
+              sequence="10"/>
+    <menuitem id="menu_southbrook_payroll_payslips"
+              name="Payslips"
+              parent="menu_southbrook_payroll_root"
+              action="action_southbrook_payroll_payslip"
+              sequence="20"/>
+    <menuitem id="menu_southbrook_payroll_t4"
+              name="T4 Previews"
+              parent="menu_southbrook_payroll_root"
+              action="action_southbrook_payroll_t4_preview"
+              sequence="30"/>
+    <menuitem id="menu_southbrook_payroll_roe"
+              name="Records of Employment"
+              parent="menu_southbrook_payroll_root"
+              action="action_southbrook_payroll_roe"
+              sequence="40"/>
+    <menuitem id="menu_southbrook_payroll_certifications"
+              name="Certifications"
+              parent="menu_southbrook_payroll_root"
+              action="action_southbrook_payroll_certification"
+              sequence="50"/>
+    <menuitem id="menu_southbrook_payroll_tax_brackets"
+              name="Tax Brackets"
+              parent="menu_southbrook_payroll_root"
+              action="action_southbrook_payroll_tax_bracket"
+              sequence="60"
+              groups="southbrook_payroll_ca.group_southbrook_payroll_manager"/>
+</odoo>

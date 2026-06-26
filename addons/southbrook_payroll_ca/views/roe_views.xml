@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_payroll_roe_list" model="ir.ui.view">
+        <field name="name">southbrook.payroll.roe.list</field>
+        <field name="model">southbrook.payroll.roe</field>
+        <field name="arch" type="xml">
+            <list string="Records of Employment">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="first_day_worked"/>
+                <field name="last_day_worked"/>
+                <field name="last_day_for_which_paid"/>
+                <field name="reason"/>
+                <field name="total_insurable_hours"/>
+                <field name="total_insurable_earnings"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_payroll_roe_form" model="ir.ui.view">
+        <field name="name">southbrook.payroll.roe.form</field>
+        <field name="model">southbrook.payroll.roe</field>
+        <field name="arch" type="xml">
+            <form string="Record of Employment">
+                <header>
+                    <button name="action_compute_box_15c" type="object"
+                            string="Compute Block 15C (last 27 periods)"
+                            class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="employee_id"/>
+                            <field name="reason"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="first_day_worked"/>
+                            <field name="last_day_worked"/>
+                            <field name="last_day_for_which_paid"/>
+                            <field name="final_pay_period_end"/>
+                        </group>
+                    </group>
+                    <group string="Block 15 — Insurable totals">
+                        <field name="total_insurable_hours"/>
+                        <field name="total_insurable_earnings"/>
+                    </group>
+                    <group string="Comments">
+                        <field name="comments" nolabel="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_payroll_roe" model="ir.actions.act_window">
+        <field name="name">Records of Employment</field>
+        <field name="res_model">southbrook.payroll.roe</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

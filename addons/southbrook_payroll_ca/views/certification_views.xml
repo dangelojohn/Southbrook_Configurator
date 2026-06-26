@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_payroll_certification_list" model="ir.ui.view">
+        <field name="name">southbrook.payroll.certification.list</field>
+        <field name="model">southbrook.payroll.certification</field>
+        <field name="arch" type="xml">
+            <list string="Certifications"
+                  decoration-danger="expiry_status == 'expired'"
+                  decoration-warning="expiry_status == 'expiring_soon'"
+                  decoration-success="expiry_status == 'valid'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="issued_at"/>
+                <field name="expires_at"/>
+                <field name="expiry_status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_payroll_certification_form" model="ir.ui.view">
+        <field name="name">southbrook.payroll.certification.form</field>
+        <field name="model">southbrook.payroll.certification</field>
+        <field name="arch" type="xml">
+            <form string="Certification">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="employee_id"/>
+                        </group>
+                        <group>
+                            <field name="issued_at"/>
+                            <field name="expires_at"/>
+                            <field name="expiry_status"/>
+                        </group>
+                    </group>
+                    <group string="Proof">
+                        <field name="proof_attachment_ids" widget="many2many_binary" nolabel="1"/>
+                    </group>
+                    <group string="Source">
+                        <field name="source_course_ref"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_payroll_certification_kanban" model="ir.ui.view">
+        <field name="name">southbrook.payroll.certification.kanban</field>
+        <field name="model">southbrook.payroll.certification</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="expiry_status">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="expires_at"/>
+                <field name="expiry_status"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card">
+                            <strong><field name="name"/></strong>
+                            <div><field name="employee_id"/></div>
+                            <div>Expires: <field name="expires_at"/></div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_southbrook_payroll_certification" model="ir.actions.act_window">
+        <field name="name">Certifications</field>
+        <field name="res_model">southbrook.payroll.certification</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+</odoo>

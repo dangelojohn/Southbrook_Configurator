@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_payroll_payslip_list" model="ir.ui.view">
+        <field name="name">southbrook.payroll.payslip.list</field>
+        <field name="model">southbrook.payroll.payslip</field>
+        <field name="arch" type="xml">
+            <list string="Payslips" decoration-success="state == 'paid'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="payroll_run_id"/>
+                <field name="gross" sum="Gross"/>
+                <field name="cpp" sum="CPP"/>
+                <field name="ei" sum="EI"/>
+                <field name="federal_tax" sum="Federal"/>
+                <field name="provincial_tax" sum="Provincial"/>
+                <field name="total_deductions" sum="Total Ded"/>
+                <field name="net" sum="Net"/>
+                <field name="wsib_employer_premium" sum="WSIB"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_payroll_payslip_form" model="ir.ui.view">
+        <field name="name">southbrook.payroll.payslip.form</field>
+        <field name="model">southbrook.payroll.payslip</field>
+        <field name="arch" type="xml">
+            <form string="Payslip">
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,computed,posted,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="employee_id"/>
+                            <field name="contract_id"/>
+                            <field name="payroll_run_id"/>
+                        </group>
+                        <group string="Gross + Net">
+                            <field name="gross"/>
+                            <field name="total_deductions" readonly="1"/>
+                            <field name="net" readonly="1"/>
+                            <field name="wsib_employer_premium" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Employee Deductions">
+                        <field name="cpp" readonly="1"/>
+                        <field name="ei" readonly="1"/>
+                        <field name="federal_tax" readonly="1"/>
+                        <field name="provincial_tax" readonly="1"/>
+                        <field name="additional_tax" readonly="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_payroll_payslip" model="ir.actions.act_window">
+        <field name="name">Payslips</field>
+        <field name="res_model">southbrook.payroll.payslip</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
