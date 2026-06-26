@@ -42,7 +42,7 @@
                         <group>
                             <field name="security_policy"/>
                             <field name="username"/>
-                            <field name="password" password="True"/>
+                            <field name="password" widget="password"/>
                             <field name="polling_seconds"/>
                             <field name="last_poll_at" readonly="1"/>
                         </group>
