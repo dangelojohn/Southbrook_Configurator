@@ -105,9 +105,8 @@
         <field name="name">southbrook.training.item.search</field>
         <field name="model">southbrook.training.item</field>
         <field name="arch" type="xml">
-            <search>
+            <search string="Training Catalogue">
                 <field name="name"/>
-                <field name="summary"/>
                 <field name="tag_ids"/>
                 <field name="channel_id"/>
                 <separator/>
@@ -124,7 +123,7 @@
                         domain="[('kind','=','runbook')]"/>
                 <filter name="kind_tour" string="In-App Tours"
                         domain="[('kind','=','tour')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_kind" string="Kind"
                             context="{'group_by': 'kind'}"/>
                     <filter name="group_channel" string="Course"
