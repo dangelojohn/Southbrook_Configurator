@@ -2,30 +2,26 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-only
 
      Quarantine stock location (SAMI PRD INV-06). Internal child of
-     the first warehouse so the NCR auto-quarantine flow has a
-     well-known destination by xml_id. Failed-QC parts get moved here
-     via auto-created stock.picking from southbrook.mi.check.
+     WH/Stock so it's a natural sibling for inventory moves out of
+     saleable stock. noupdate="1" so a later upgrade can't bulldoze
+     this once it has quants attached.
 
-     noupdate="1" so a later code change can't bulldoze the location
-     (it'll have quants attached in prod after the first quarantine).
+     2026-06-26 — second cut. First cut failed to parse on prod with
+     ParseError at line 14; root cause was likely the parent xml_id
+     (stock.stock_location_locations is a view category, not a real
+     parent). Switched to stock.stock_location_stock (WH/Stock) which
+     is a real location and always present after stock module loads.
+     Also dropped scrap_location and active (defaults are correct)
+     and the verbose comment (which carried newlines that the
+     convert.parser was choking on).
 -->
 <odoo noupdate="1">
 
     <record id="stock_location_southbrook_quarantine" model="stock.location">
         <field name="name">Southbrook Quarantine</field>
         <field name="usage">internal</field>
-        <field name="location_id" ref="stock.stock_location_locations"/>
+        <field name="location_id" ref="stock.stock_location_stock"/>
         <field name="company_id" ref="base.main_company"/>
-        <field name="active">True</field>
-        <field name="scrap_location">False</field>
-        <field name="comment">Quarantine bin for parts flagged by an
-            NCR / quality check. Failed parts are auto-routed here from
-            southbrook.mi.check when result='fail' and severity meets
-            the threshold (default 'critical'). The destination picking
-            lands in draft state so the inspector can review and
-            confirm. Once a part is dispositioned (rework / scrap /
-            return-to-stock), it leaves via a separate manual move.
-        </field>
     </record>
 
 </odoo>
