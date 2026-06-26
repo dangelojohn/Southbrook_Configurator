@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+{
+    "name": "Southbrook Quality",
+    "summary": "NCR + SPC + Cpk + Supplier-defect quality module for Southbrook "
+               "(CE-native, no Odoo Enterprise quality_control dep)",
+    "version": "19.0.1.0.0",
+    "license": "LGPL-3",
+    "author": "Southbrook Cabinetry / OdooIQ",
+    "category": "Manufacturing/Quality",
+    "depends": [
+        "base",
+        "mail",
+        "mrp",
+        "stock",
+        "purchase",
+        "southbrook_manufacturing_intelligence",
+        "southbrook_kitchen_mrp",
+    ],
+    "data": [
+        "security/southbrook_quality_groups.xml",
+        "security/ir.model.access.csv",
+        "data/ncr_sequence.xml",
+        "data/spc_sequence.xml",
+        "data/supplier_defect_sequence.xml",
+        "data/spc_dimensions.xml",
+        "views/dimension_views.xml",
+        "views/ncr_views.xml",
+        "views/spc_views.xml",
+        "views/cpk_report_views.xml",
+        "views/supplier_defect_views.xml",
+        "views/mi_engine_ext_views.xml",
+        "views/menus.xml",
+    ],
+    "installable": True,
+    "application": False,
+}
