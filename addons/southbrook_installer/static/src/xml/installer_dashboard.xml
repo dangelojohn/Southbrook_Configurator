@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_installer.DispatchBoard">
+        <div class="sbi-dashboard">
+
+            <!-- ====================================================== -->
+            <!-- Header                                                  -->
+            <!-- ====================================================== -->
+            <header class="sbi-header">
+                <div class="sbi-header-title">
+                    <h1>Dispatch Board</h1>
+                    <div class="sbi-header-sub">
+                        <span t-if="state.busConnected"
+                              class="sbi-live-dot sbi-live-on"
+                              title="Live bus connection">●</span>
+                        <span t-if="!state.busConnected"
+                              class="sbi-live-dot sbi-live-off"
+                              title="Poll fallback">●</span>
+                        Refreshed
+                        <t t-esc="lastRefreshDisplay()"/>
+                        — <t t-esc="state.updateCount"/> live update(s)
+                    </div>
+                </div>
+                <div class="sbi-header-actions">
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-class="state.filter === 'active' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-secondary'"
+                            t-on-click="() => this.setFilter('active')">
+                        Active
+                    </button>
+                    <button t-att-class="state.filter === 'blocked' ? 'btn btn-sm btn-danger' : 'btn btn-sm btn-outline-danger'"
+                            t-on-click="() => this.setFilter('blocked')">
+                        Blocked
+                    </button>
+                    <button t-att-class="state.filter === 'today' ? 'btn btn-sm btn-info' : 'btn btn-sm btn-outline-info'"
+                            t-on-click="() => this.setFilter('today')">
+                        Today
+                    </button>
+                    <button t-att-class="state.filter === 'all' ? 'btn btn-sm btn-secondary' : 'btn btn-sm btn-outline-secondary'"
+                            t-on-click="() => this.setFilter('all')">
+                        All
+                    </button>
+                    <button class="btn btn-sm btn-primary sbi-refresh-btn"
+                            t-on-click="onRefresh"
+                            t-att-disabled="state.loading">
+                        <t t-if="state.loading">Refreshing…</t>
+                        <t t-else="">↻ Refresh</t>
+                    </button>
+                </div>
+            </header>
+
+            <!-- ====================================================== -->
+            <!-- Summary tiles                                          -->
+            <!-- ====================================================== -->
+            <div class="sbi-tiles" t-if="!state.error">
+                <div class="sbi-tile">
+                    <div class="sbi-tile-label">Total</div>
+                    <div class="sbi-tile-value"><t t-esc="summary.total"/></div>
+                </div>
+                <div class="sbi-tile sbi-tile-blocked" t-if="summary.blocked &gt; 0">
+                    <div class="sbi-tile-label">🔴 Blocked</div>
+                    <div class="sbi-tile-value"><t t-esc="summary.blocked"/></div>
+                </div>
+                <div class="sbi-tile sbi-tile-flagged" t-if="summary.flagged &gt; 0">
+                    <div class="sbi-tile-label">🟡 Open Flags</div>
+                    <div class="sbi-tile-value"><t t-esc="summary.flagged"/></div>
+                </div>
+                <div class="sbi-tile sbi-tile-ok">
+                    <div class="sbi-tile-label">🟢 On Track</div>
+                    <div class="sbi-tile-value"><t t-esc="summary.on_track"/></div>
+                </div>
+                <div class="sbi-tile">
+                    <div class="sbi-tile-label">🔧 Tools Out</div>
+                    <div class="sbi-tile-value"><t t-esc="summary.tools_out"/></div>
+                </div>
+            </div>
+
+            <!-- ====================================================== -->
+            <!-- Error                                                  -->
+            <!-- ====================================================== -->
+            <div class="sbi-error alert alert-danger" t-if="state.error">
+                <strong>Error:</strong> <t t-esc="state.error"/>
+            </div>
+
+            <!-- ====================================================== -->
+            <!-- Loading / empty                                        -->
+            <!-- ====================================================== -->
+            <div class="sbi-loading text-muted"
+                 t-if="state.loading &amp;&amp; state.jobs.length === 0">
+                Loading active jobs…
+            </div>
+            <div class="sbi-empty text-muted"
+                 t-if="!state.loading &amp;&amp; state.jobs.length === 0">
+                <p>No jobs match the current filter.</p>
+            </div>
+
+            <!-- ====================================================== -->
+            <!-- Job rows                                                -->
+            <!-- ====================================================== -->
+            <div class="sbi-board" t-if="state.jobs.length &gt; 0">
+                <div t-foreach="filteredJobs" t-as="job" t-key="job.id"
+                     t-att-class="rowClass(job)"
+                     t-on-click="() => this.openJob(job)">
+
+                    <div class="sbi-row-main">
+                        <div class="sbi-row-id">
+                            <strong t-esc="job.name"/>
+                            <small class="sbi-row-project"
+                                   t-if="job.project_id">
+                                · <t t-esc="job.project_id[1]"/>
+                                · Unit <t t-esc="job.unit_number"/>
+                            </small>
+                        </div>
+                        <div class="sbi-row-people">
+                            <i class="fa fa-user"/>
+                            <span t-if="job.lead_installer_id">
+                                <t t-esc="job.lead_installer_id[1]"/>
+                            </span>
+                            <span t-if="!job.lead_installer_id" class="text-muted">unassigned</span>
+                        </div>
+                        <div class="sbi-row-site">
+                            <i class="fa fa-map-marker"/>
+                            <t t-esc="job.site_address"/>
+                        </div>
+                    </div>
+
+                    <div class="sbi-row-progress">
+                        <div class="sbi-progress-segments">
+                            <span t-foreach="progressSegments(job)" t-as="seg"
+                                  t-key="seg_index"
+                                  t-att-class="seg"/>
+                        </div>
+                        <div class="sbi-progress-label">
+                            <t t-esc="job.stage_log_done_count"/>/<t t-esc="job.stage_log_count"/>
+                            phases (<t t-esc="job.completion_pct.toFixed(0)"/>%)
+                        </div>
+                    </div>
+
+                    <div class="sbi-row-status">
+                        <span t-att-class="stageBadgeClass(job)">
+                            <t t-if="job.stage_id"
+                               t-esc="job.stage_id[1]"/>
+                        </span>
+                        <span class="sbi-flag-badge"
+                              t-if="job.open_damage_count &gt; 0"
+                              t-att-class="job.is_blocked ? 'sbi-flag-badge sbi-flag-blocking' : 'sbi-flag-badge sbi-flag-open'">
+                            🚩 <t t-esc="job.open_damage_count"/>
+                        </span>
+                        <span class="sbi-deliv-badge"
+                              t-if="job.delivery_confirmed"
+                              title="Delivery confirmed">📦</span>
+                        <span class="sbi-tools-badge"
+                              t-if="job.tool_loan_open_count &gt; 0"
+                              title="Tools out">🔧 <t t-esc="job.tool_loan_open_count"/></span>
+                    </div>
+
+                    <div class="sbi-row-meta">
+                        <div class="sbi-row-schedule"
+                             t-if="job.scheduled_date">
+                            <i class="fa fa-clock-o"/>
+                            <t t-esc="job.scheduled_date"/>
+                        </div>
+                        <div class="sbi-row-updated text-muted">
+                            <t t-esc="timeSince(job)"/>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </t>
+
+</templates>

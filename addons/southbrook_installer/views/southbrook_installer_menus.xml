@@ -8,6 +8,13 @@
               sequence="70"
               groups="group_sami_installer_helper"/>
 
+    <menuitem id="menu_installer_dispatch_board"
+              name="Dispatch Board"
+              parent="menu_installer_root"
+              action="action_installer_dispatch_board"
+              sequence="5"
+              groups="group_sami_dispatcher"/>
+
     <menuitem id="menu_installer_jobs"
               name="Jobs"
               parent="menu_installer_root"
