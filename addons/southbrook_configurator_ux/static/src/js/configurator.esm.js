@@ -152,7 +152,38 @@ class ConfiguratorV2 extends Component {
 
         <div class="sb_cfg_viewer" t-ref="viewer">
           <div class="sb_cfg_badge" t-esc="state.previewBadge"/>
-          <div class="sb_cfg_cab" t-out="cabinetMarkup"/>
+          <div t-attf-class="sb_cfg_cab {{ state.previewDragging ? 'sb_cfg_cab_dragging' : '' }}"
+               t-attf-style="--cab-yaw: {{state.previewYaw}}deg; --cab-pitch: {{state.previewPitch}}deg;"
+               t-on-pointerdown="onPreviewPointerDown"
+               t-on-pointermove="onPreviewPointerMove"
+               t-on-pointerup="onPreviewPointerUp"
+               t-on-pointercancel="onPreviewPointerUp"
+               t-on-pointerleave="onPreviewPointerUp"
+               t-on-dblclick="onPreviewReset"
+               aria-label="Drag to rotate the cabinet preview. Double-click to reset.">
+            <t t-out="cabinetMarkup"/>
+          </div>
+          <div class="sb_cfg_preview_controls" t-if="!state.userPhoto">
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('front') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('front')"
+                    title="Front view">Front</button>
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('three_quarter') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('three_quarter')"
+                    title="3/4 view">3/4</button>
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('side') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('side')"
+                    title="Side view">Side</button>
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('top') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('top')"
+                    title="Top view">Top</button>
+            <button type="button"
+                    t-on-click="onPreviewReset"
+                    title="Reset to default view">↻</button>
+          </div>
           <button type="button"
                   class="sb_cfg_editimg"
                   t-on-click="onReplacePhoto"
@@ -319,6 +350,13 @@ class ConfiguratorV2 extends Component {
             closedGroups: {},               // {<title>: true}  — collapsed groups
             userPhoto: null,                // dataURL or null
             previewBadge: "LIVE PREVIEW",
+            // 3D-rotatable preview — yaw (Y-axis spin) + pitch
+            // (X-axis tilt) applied as CSS custom properties on
+            // the .sb_cfg_cab wrapper. Initial 3/4-view shows
+            // depth without obscuring the front-face controls.
+            previewYaw: -22,
+            previewPitch: -8,
+            previewDragging: false,
             // Bulk tools — Phase 4: full server-side preview/commit
             // pipeline. importReport caches the entire /preview or
             // /commit response so the commit step doesn't need to
@@ -984,11 +1022,85 @@ class ConfiguratorV2 extends Component {
             : `${doors === 2 ? "Two-door " : ""}${kind === "wall" ? "wall" : (kind === "tall" ? "tall" : "base")} cabinet`;
         const aria = `${kindLabel}${isFramed ? ", framed" : ", frameless"}${(kind === "base" || kind === "tall") ? ", on adjustable levelling feet" : ""}`;
 
+        // ── Depth in pixels — drives the 3D box thickness ───────────
+        const depthName = pickedNameOf("Depth", null);
+        let depthPx = null;
+        if (depthName) {
+            const m = depthName.match(/(\d+)/);
+            if (m) {
+                // Scale 1 inch ≈ 2.3px to match the width scale
+                // (9-36 in spans 70-214 px).
+                depthPx = Math.round(parseInt(m[1], 10) * 2.3);
+            }
+        }
+        if (!depthPx) {
+            depthPx = kind === "wall" ? 30 : 56;
+        }
+
+        // ── Darker side/back tone for visible depth at 3/4 view ─────
+        const sideColor = `color-mix(in srgb, ${color} 70%, #000)`;
+        const backColor = `color-mix(in srgb, ${color} 80%, #000)`;
+
+        const w = wpx, h = bodyHeight, d = depthPx;
+        // Faces — each is position:absolute, centered via translate
+        // (-50%, -50%), then rotated and pushed to the box surface.
+        const facePos = (extra) =>
+            `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) ${extra};box-sizing:border-box;`;
+
+        // Front carries all the existing dynamic content (doors /
+        // drawer fronts / handles / toe-kick).
+        const frontFaceStyle =
+            `${facePos(`translateZ(${d / 2}px)`)}`
+            + `width:${w}px;height:${h}px;background:${color};`
+            + `border-top:3px solid rgba(0,0,0,.08);border-radius:4px;`
+            + `box-shadow:0 18px 30px -12px rgba(40,55,80,.35);`;
+        const frontFace = `<div class="sb_cab_face sb_cab_face_front" style="${frontFaceStyle}">${frontHtml}${toeKickHtml}</div>`;
+
+        // Back face — plain panel of slightly darker hue.
+        const backFaceStyle =
+            `${facePos(`rotateY(180deg) translateZ(${d / 2}px)`)}`
+            + `width:${w}px;height:${h}px;background:${backColor};`
+            + `border-radius:4px;`;
+        const backFace = `<div class="sb_cab_face sb_cab_face_back" style="${backFaceStyle}"></div>`;
+
+        // Left side — D × H panel, rotated -90° around Y.
+        const leftFaceStyle =
+            `${facePos(`rotateY(-90deg) translateZ(${w / 2}px)`)}`
+            + `width:${d}px;height:${h}px;background:${sideColor};`
+            + `border-radius:3px;`;
+        const leftFace = `<div class="sb_cab_face sb_cab_face_left" style="${leftFaceStyle}"></div>`;
+
+        // Right side — symmetric.
+        const rightFaceStyle =
+            `${facePos(`rotateY(90deg) translateZ(${w / 2}px)`)}`
+            + `width:${d}px;height:${h}px;background:${sideColor};`
+            + `border-radius:3px;`;
+        const rightFace = `<div class="sb_cab_face sb_cab_face_right" style="${rightFaceStyle}"></div>`;
+
+        // Top — W × D panel, rotated 90° around X (visible when
+        // pitched downward).
+        const topFaceStyle =
+            `${facePos(`rotateX(90deg) translateZ(${h / 2}px)`)}`
+            + `width:${w}px;height:${d}px;background:${backColor};`
+            + `border-radius:3px;`;
+        const topFace = `<div class="sb_cab_face sb_cab_face_top" style="${topFaceStyle}"></div>`;
+
+        // Feet — rendered OUTSIDE the 3D box (below the box wrapper),
+        // so they always look right when the box rotates.
+        const boxWrapperStyle =
+            `position:relative;width:${w}px;height:${h}px;`;
+        const outerStyle =
+            `display:flex;flex-direction:column;align-items:center;`
+            + `min-height:${h + 30}px;`;
+
         return markup(
-            `<div role="img" aria-label="${aria}" style="display:flex;flex-direction:column;align-items:center">
-                <div style="width:${wpx}px;height:${bodyHeight}px;background:${color};position:relative;border-top:3px solid rgba(0,0,0,.08);border-radius:4px;box-shadow:0 18px 30px -12px rgba(40,55,80,.4)">
-                    ${frontHtml}
-                    ${toeKickHtml}
+            `<div role="img" aria-label="${aria}" style="${outerStyle}">
+                <div class="sb_cab_3d_box" style="${boxWrapperStyle}">
+                    ${frontFace}
+                    ${backFace}
+                    ${leftFace}
+                    ${rightFace}
+                    ${topFace}
                 </div>
                 ${feetHtml}
             </div>`
@@ -1012,6 +1124,87 @@ class ConfiguratorV2 extends Component {
             this.state.previewBadge = "CUSTOM PHOTO";
         };
         r.readAsDataURL(f);
+    }
+
+    // ------------------------------------------------------------------
+    // 3D preview rotation — pointer drag rotates the cabinet around
+    // Y (yaw) and X (pitch) axes. Touch and mouse both work via the
+    // unified Pointer Events API.
+    // ------------------------------------------------------------------
+    onPreviewPointerDown(ev) {
+        // Custom-photo branch is a flat <img>, don't rotate it.
+        if (this.state.userPhoto) return;
+        this.state.previewDragging = true;
+        this._previewDrag = {
+            startX: ev.clientX,
+            startY: ev.clientY,
+            startYaw: this.state.previewYaw,
+            startPitch: this.state.previewPitch,
+        };
+        if (ev.currentTarget && ev.currentTarget.setPointerCapture) {
+            try {
+                ev.currentTarget.setPointerCapture(ev.pointerId);
+            } catch (_) { /* ignore */ }
+        }
+    }
+
+    onPreviewPointerMove(ev) {
+        if (!this.state.previewDragging || !this._previewDrag) return;
+        const dx = ev.clientX - this._previewDrag.startX;
+        const dy = ev.clientY - this._previewDrag.startY;
+        // 0.45 deg per pixel — fast enough for full spin in a
+        // typical drag, slow enough that fine adjustments work.
+        const newYaw = this._previewDrag.startYaw + dx * 0.45;
+        // Clamp pitch to keep the cabinet legible (no upside-down).
+        const rawPitch = this._previewDrag.startPitch + dy * 0.30;
+        const newPitch = Math.max(-55, Math.min(40, rawPitch));
+        this.state.previewYaw = newYaw;
+        this.state.previewPitch = newPitch;
+    }
+
+    onPreviewPointerUp(ev) {
+        if (!this.state.previewDragging) return;
+        this.state.previewDragging = false;
+        this._previewDrag = null;
+        if (ev && ev.currentTarget && ev.currentTarget.releasePointerCapture) {
+            try {
+                ev.currentTarget.releasePointerCapture(ev.pointerId);
+            } catch (_) { /* ignore */ }
+        }
+    }
+
+    onPreviewReset() {
+        this.state.previewYaw = -22;
+        this.state.previewPitch = -8;
+    }
+
+    setPreviewView(view) {
+        // Preset angles for common views. Touch-target ergonomics.
+        if (view === "front") {
+            this.state.previewYaw = 0;
+            this.state.previewPitch = 0;
+        } else if (view === "side") {
+            this.state.previewYaw = -85;
+            this.state.previewPitch = 0;
+        } else if (view === "three_quarter") {
+            this.state.previewYaw = -28;
+            this.state.previewPitch = -10;
+        } else if (view === "top") {
+            this.state.previewYaw = 0;
+            this.state.previewPitch = -55;
+        }
+    }
+
+    isPreviewView(view) {
+        const eps = 3; // degrees of tolerance for "active" highlight
+        const yaw = this.state.previewYaw;
+        const pitch = this.state.previewPitch;
+        const same = (a, b) => Math.abs(a - b) <= eps;
+        if (view === "front") return same(yaw, 0) && same(pitch, 0);
+        if (view === "side") return same(yaw, -85) && same(pitch, 0);
+        if (view === "three_quarter") return same(yaw, -28) && same(pitch, -10);
+        if (view === "top") return same(yaw, 0) && same(pitch, -55);
+        return false;
     }
 
     _wireViewerDragDrop() {
