@@ -22,3 +22,4 @@ from . import cabinet_archetype
 from . import template_code
 from . import template_archetype
 from . import product_product
+from . import builder_po_intake

@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.4.27.0",
+    "version": "19.0.4.28.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -183,6 +183,9 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # the locked 12 Q8 templates. Must load after product templates
         # and after the taxonomy seed has upserted archetypes.
         "data/template_archetype_assign.xml",
+        # Builder PO intake stub (SAMI PRD #16, 2026-06-26).
+        "data/builder_po_intake_seed.xml",
+        "views/builder_po_intake_views.xml",
     ],
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).
