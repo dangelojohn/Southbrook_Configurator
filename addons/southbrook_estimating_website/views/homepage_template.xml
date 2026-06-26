@@ -53,11 +53,11 @@
                   </p>
                   <p class="o_sb_hero_cta_row">
                     <a href="/my/southbrook/order-builder/new"
-                       class="o_sb_btn o_sb_btn_primary o_sb_btn_lg">
+                       class="o_sb_btn o_sb_btn_primary o_sb_btn_lg sb-btn sb-btn--primary">
                       Design Your Kitchen →
                     </a>
                     <a href="/web/login"
-                       class="o_sb_btn o_sb_btn_ghost o_sb_btn_lg">
+                       class="o_sb_btn o_sb_btn_ghost o_sb_btn_lg sb-btn sb-btn--ghost">
                       Sign In
                     </a>
                   </p>
@@ -137,7 +137,7 @@
                 </div>
                 <div class="col-lg-4 text-lg-end">
                   <a href="/my/southbrook/order-builder/new"
-                     class="o_sb_btn o_sb_btn_primary o_sb_btn_lg">
+                     class="o_sb_btn o_sb_btn_primary o_sb_btn_lg sb-btn sb-btn--primary">
                     Start Now →
                   </a>
                 </div>

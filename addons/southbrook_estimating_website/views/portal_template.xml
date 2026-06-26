@@ -40,7 +40,7 @@
             <div class="row g-2 mb-3 o_southbrook_portal_quick_start">
                 <div class="col-12">
                     <a href="/my/southbrook/order-builder/new"
-                       class="card text-decoration-none o_southbrook_portal_cta">
+                       class="card text-decoration-none o_southbrook_portal_cta sb-card">
                         <div class="card-body d-flex align-items-center gap-3">
                             <span class="fa fa-cube fa-2x text-muted"/>
                             <div class="flex-grow-1">
@@ -52,7 +52,7 @@
                                     request a quote.
                                 </p>
                             </div>
-                            <span class="btn btn-primary">
+                            <span class="btn btn-primary sb-btn sb-btn--primary">
                                 Start New Quote →
                             </span>
                         </div>
@@ -94,6 +94,13 @@
                     <span t-esc="order_name"/>
                 </li>
             </ol>
+
+            <!-- 2026-06-22 P3 bugfix: page-level wrapper so the desktop
+                 reflow @media rule in portal_root.scss can widen the
+                 OrderBuilder past the default portal_layout column cap
+                 on viewports >= 992px. The class also pins a body-style
+                 marker that's safe for SCSS targeting. -->
+            <div class="o_southbrook_order_builder_page">
 
             <!-- Header card with order info -->
             <div class="o_southbrook_portal_header card mb-3">
@@ -157,6 +164,9 @@
                     </t>
                 </div>
             </div>
+
+            </div>
+            <!-- /.o_southbrook_order_builder_page (2026-06-22 P3) -->
         </t>
     </template>
 

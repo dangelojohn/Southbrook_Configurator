@@ -1,0 +1,115 @@
+// =====================================================================
+// _southbrook_design_overrides.scss
+//
+// Stage 3c cascade-tie resolver. Loaded AFTER portal_root.scss in the
+// asset bundle (see __manifest__.py) so equal-specificity .sb-* rules
+// win source-order ties against legacy .o_owl_* rules declared in
+// portal_root.scss.
+//
+// The brief's literal single-class selectors (.sb-btn--primary,
+// .sb-note--seed, etc.) are restated here verbatim. Once this file
+// loads, an element carrying BOTH the legacy class and the new sb-*
+// class picks up the new design.
+//
+// Scope is intentionally narrow — only rules that need to outrank
+// portal_root.scss live here. The component definitions remain in
+// _southbrook_design_tokens.scss (Section 7) for discoverability;
+// these are deliberate restatements that win the cascade.
+// =====================================================================
+
+// 1 · Primary button (gold + ink). Beats legacy .o_owl_btn_primary
+//    that paints walnut, including inside the Send-to-Production
+//    confirm modal where it was the only un-flipped surface.
+.sb-btn--primary {
+    background: var(--sb-gold);
+    color: var(--sb-ink);
+    border-color: var(--sb-gold);
+}
+.sb-btn--primary:hover {
+    background: var(--sb-gold-hover);
+    border-color: var(--sb-gold-hover);
+}
+.sb-btn--primary:active {
+    background: var(--sb-gold-hover);
+}
+.sb-btn--primary:focus-visible {
+    outline: none;
+    box-shadow: var(--sb-focus-ring-gold);
+}
+.sb-btn--primary:disabled,
+.sb-btn--primary[aria-disabled="true"] {
+    background: #E3D7C2;
+    border-color: #E3D7C2;
+    color: #fff;
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+[data-theme="dark"] .sb-btn--primary {
+    color: #1A140B;
+}
+
+// 2 · Ghost / danger restated for parity (defensive; should already work).
+.sb-btn--ghost {
+    background: #fff;
+    color: var(--sb-ink);
+    border-color: var(--sb-border);
+}
+[data-theme="dark"] .sb-btn--ghost {
+    background: var(--sb-surface);
+    color: var(--sb-ink);
+    border-color: var(--sb-border);
+}
+.sb-btn--danger {
+    background: transparent;
+    color: var(--sb-danger);
+    border-color: var(--sb-danger);
+}
+
+// 3 · ILLUSTRATIVE SEED banner — beats .o_owl_illus_banner which sets
+//    a 1px border, 2px radius, and var(--sb-hl) yellow background at
+//    equal (single-class) specificity.
+.sb-note--seed {
+    background: var(--sb-warn-bg);
+    border-left: 4px solid var(--sb-warn-border);
+    border-radius: var(--sb-radius-card);
+    padding: 12px 14px;
+    color: var(--sb-ink);
+}
+// The inner pill keeps its existing OWL styling — only the banner
+// wrapper is restyled. Override default border on non-left sides so
+// the 4px gold accent reads cleanly.
+.sb-note--seed {
+    border-top: 1px solid var(--sb-warn-border);
+    border-right: 1px solid var(--sb-warn-border);
+    border-bottom: 1px solid var(--sb-warn-border);
+}
+
+// 4 · Order-lines table header — portal_root.scss line 1213 paints
+//    .o_owl_line_head > div with a HARDCODED #faf4e8 cream (not a
+//    token), so the legacy-token dark-mode rebind doesn't catch it.
+//    Explicit override below for both themes (the cream stands out
+//    against the new cool light-blue surface in light mode too).
+.o_owl_line_head > div {
+    background: var(--sb-surface);
+    color: var(--sb-ink);
+    border-bottom-color: var(--sb-border);
+}
+[data-theme="dark"] .o_owl_line_head > div {
+    background: var(--sb-surface);
+    color: var(--sb-ink);
+    border-bottom-color: var(--sb-border);
+}
+
+// 5 · Page-level body background — paints the entire portal canvas in
+//    the new design system's surface color so the whole page reads as
+//    cool light-blue/white instead of inheriting Bootstrap's default
+//    white or a stale legacy beige. Light mode = --sb-surface,
+//    dark mode = --sb-bg (the dark mode section 8 rules already cover
+//    body, this one acts in light too).
+body,
+body.o_portal,
+body.o_website,
+body.o_website_with_header {
+    background: var(--sb-surface);
+    color: var(--sb-ink);
+}
