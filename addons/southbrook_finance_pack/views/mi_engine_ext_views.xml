@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_finance_mi_tiles_form" model="ir.ui.view">
+        <field name="name">southbrook.finance.mi_tiles.form</field>
+        <field name="model">southbrook.finance.mi_tiles</field>
+        <field name="arch" type="xml">
+            <form string="Finance Snapshot" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="label"/></h1>
+                    </div>
+                    <group>
+                        <group string="WIP / Production">
+                            <field name="wip_balance_current"/>
+                        </group>
+                        <group string="Budget">
+                            <field name="budget_variance_ytd_pct"/>
+                            <field name="revenue_vs_budget_30d_pct"/>
+                        </group>
+                        <group string="Tax">
+                            <field name="hst_owing_current_quarter"/>
+                        </group>
+                        <group string="Cash &amp; Revenue">
+                            <field name="cash_position"/>
+                            <field name="revenue_last_30d"/>
+                        </group>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_finance_mi_tiles_list" model="ir.ui.view">
+        <field name="name">southbrook.finance.mi_tiles.list</field>
+        <field name="model">southbrook.finance.mi_tiles</field>
+        <field name="arch" type="xml">
+            <list string="Finance Snapshot" create="true">
+                <field name="label"/>
+                <field name="wip_balance_current"/>
+                <field name="budget_variance_ytd_pct"/>
+                <field name="hst_owing_current_quarter"/>
+                <field name="cash_position"/>
+                <field name="revenue_last_30d"/>
+                <field name="revenue_vs_budget_30d_pct"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_finance_mi_tiles" model="ir.actions.act_window">
+        <field name="name">Finance Snapshot</field>
+        <field name="res_model">southbrook.finance.mi_tiles</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

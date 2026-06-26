@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_class_list" model="ir.ui.view">
+        <field name="name">southbrook.finance.cca_class.list</field>
+        <field name="model">southbrook.finance.cca_class</field>
+        <field name="arch" type="xml">
+            <list string="CCA Classes">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="rate_pct"/>
+                <field name="half_year_rule"/>
+                <field name="accelerated_investment_incentive"/>
+                <field name="straight_line"/>
+                <field name="straight_line_years"/>
+                <field name="max_capital_cost"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cca_class_form" model="ir.ui.view">
+        <field name="name">southbrook.finance.cca_class.form</field>
+        <field name="model">southbrook.finance.cca_class</field>
+        <field name="arch" type="xml">
+            <form string="CCA Class">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                        <h3><field name="code"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="rate_pct"/>
+                            <field name="half_year_rule"/>
+                            <field name="accelerated_investment_incentive"/>
+                        </group>
+                        <group>
+                            <field name="straight_line"/>
+                            <field name="straight_line_years" invisible="not straight_line"/>
+                            <field name="max_capital_cost"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cca_class" model="ir.actions.act_window">
+        <field name="name">CCA Classes</field>
+        <field name="res_model">southbrook.finance.cca_class</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

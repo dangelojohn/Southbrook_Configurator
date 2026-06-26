@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hst_return_list" model="ir.ui.view">
+        <field name="name">southbrook.finance.hst_return.list</field>
+        <field name="model">southbrook.finance.hst_return</field>
+        <field name="arch" type="xml">
+            <list string="HST Returns">
+                <field name="name"/>
+                <field name="tax_year"/>
+                <field name="quarter"/>
+                <field name="period_from"/>
+                <field name="period_to"/>
+                <field name="total_sales"/>
+                <field name="hst_collected"/>
+                <field name="hst_paid_itc"/>
+                <field name="net_hst_owing"/>
+                <field name="state"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hst_return_form" model="ir.ui.view">
+        <field name="name">southbrook.finance.hst_return.form</field>
+        <field name="model">southbrook.finance.hst_return</field>
+        <field name="arch" type="xml">
+            <form string="HST Return">
+                <header>
+                    <button name="action_compute" type="object"
+                            string="Compute" class="oe_highlight"/>
+                    <button name="action_file" type="object"
+                            string="Mark Filed" invisible="state != 'draft'"/>
+                    <button name="action_mark_paid" type="object"
+                            string="Mark Paid" invisible="state != 'filed'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,filed,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Period">
+                            <field name="tax_year"/>
+                            <field name="quarter"/>
+                            <field name="period_from"/>
+                            <field name="period_to"/>
+                        </group>
+                        <group string="Totals">
+                            <field name="total_sales" readonly="1"/>
+                            <field name="hst_collected" readonly="1"/>
+                            <field name="hst_paid_itc" readonly="1"/>
+                            <field name="net_hst_owing" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hst_return" model="ir.actions.act_window">
+        <field name="name">HST Returns</field>
+        <field name="res_model">southbrook.finance.hst_return</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
