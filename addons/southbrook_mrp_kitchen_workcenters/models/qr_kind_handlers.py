@@ -163,11 +163,69 @@ class DefectQrKind(models.AbstractModel):
         """
         return self.env[self._target_model]
 
+    # SAMI PRD (2026-06-26) — how long after a wo/mo/asbuilt/pkg scan
+    # does the next defect scan still inherit that record as context?
+    # Default 5 minutes covers realistic floor delays (operator
+    # spots defect, fetches sheet, beeps the relevant defect type).
+    # Tunable per-site via ir.config_parameter
+    # `southbrook.qr_kit.defect_context_window_seconds`.
+    _DEFAULT_DEFECT_CONTEXT_SEC = 300
+
+    @api.model
+    def _resolve_workorder_from_context(self):
+        """Find the WO most recently scanned by the current user
+        in the configurable context window. Walks wo/mo/asbuilt/pkg
+        kinds to find a WO id. Returns int WO id or False."""
+        from datetime import datetime, timedelta
+        Param = self.env["ir.config_parameter"].sudo()
+        try:
+            window = int(Param.get_param(
+                "southbrook.qr_kit.defect_context_window_seconds",
+                self._DEFAULT_DEFECT_CONTEXT_SEC))
+        except (TypeError, ValueError):
+            window = self._DEFAULT_DEFECT_CONTEXT_SEC
+        cutoff = datetime.now() - timedelta(seconds=window)
+        Log = self.env["southbrook.qr.scan.log"].sudo()
+        recent = Log.search([
+            ("user_id", "=", self.env.user.id),
+            ("result", "=", "ok"),
+            ("target_model", "in",
+             ["mrp.workorder", "mrp.production",
+              "southbrook.asbuilt", "sb.production.package"]),
+            ("create_date", ">=", cutoff),
+        ], limit=1, order="create_date desc")
+        if not recent or not recent.target_id:
+            return False
+        if recent.target_model == "mrp.workorder":
+            return recent.target_id
+        if recent.target_model == "mrp.production":
+            mo = self.env["mrp.production"].sudo().browse(
+                recent.target_id).exists()
+            return mo.workorder_ids[:1].id if mo and mo.workorder_ids else False
+        if recent.target_model == "southbrook.asbuilt":
+            ab = self.env["southbrook.asbuilt"].sudo().browse(
+                recent.target_id).exists()
+            if ab and ab.production_id and ab.production_id.workorder_ids:
+                return ab.production_id.workorder_ids[:1].id
+            return False
+        if recent.target_model == "sb.production.package":
+            pkg = self.env["sb.production.package"].sudo().browse(
+                recent.target_id).exists()
+            if pkg and pkg.mo_id and pkg.mo_id.workorder_ids:
+                return pkg.mo_id.workorder_ids[:1].id
+            return False
+        return False
+
     @api.model
     def handle_action(self, record, action, params):
         """Creates a new NCR pre-filled. The defect_type comes from
         the *ident* (encoded in the QR itself). `params` may carry
-        workorder_id for context attachment."""
+        workorder_id for context attachment.
+
+        Phase 8 (2026-06-26): if workorder_id not passed in params,
+        the handler walks the user's recent scan log to auto-resolve
+        the WO from a preceding wo/mo/asbuilt/pkg scan within the
+        configurable context window."""
         from odoo.http import request
         # Resolve defect_type from URL via request — the controller
         # passes it through after parsing. Fallback to params if a
@@ -183,7 +241,12 @@ class DefectQrKind(models.AbstractModel):
             raise UserError(_(
                 "Defect-type QR is missing the defect_type encoded "
                 "in the QR ident."))
+        # Caller-supplied workorder_id wins; else look at scan context.
         wo_id = (params or {}).get("workorder_id")
+        context_resolved = False
+        if not wo_id:
+            wo_id = self._resolve_workorder_from_context()
+            context_resolved = bool(wo_id)
         vals = {
             "name": _("NCR from defect scan: %s") % defect_type,
             "x_sbk_defect_type": str(defect_type),
@@ -195,6 +258,15 @@ class DefectQrKind(models.AbstractModel):
             except (TypeError, ValueError):
                 pass
         new_ncr = self.env["southbrook.mi.check"].sudo().create(vals)
+        # If we auto-filled WO from context, post a chatter note so the
+        # inspector knows which scan was used.
+        if context_resolved:
+            try:
+                new_ncr.message_post(body=_(
+                    "Auto-linked to WO from your previous scan within "
+                    "the defect-context window (5 min default)."))
+            except Exception:  # noqa: BLE001
+                pass
         return {
             "record_name": new_ncr.display_name,
             "record_id": new_ncr.id,
