@@ -98,6 +98,45 @@ class ShippingUnit(models.Model):
     )
     notes = fields.Text()
 
+    # Driver-facing POD QR — encodes the FULL /sb/qr/pod URL so a
+    # phone's camera scan opens the POD capture page directly. The
+    # standard qr_image_base64 (from the mixin) encodes the bare
+    # sb://ship/<id> payload for the warehouse open-in-form flow.
+    pod_qr_url = fields.Char(
+        string="POD QR URL",
+        compute="_compute_pod_qr",
+        store=False,
+    )
+    pod_qr_image_base64 = fields.Char(
+        string="POD QR (PNG base64)",
+        compute="_compute_pod_qr",
+        store=False,
+    )
+
+    @api.depends("qr_payload")
+    def _compute_pod_qr(self):
+        import base64, io
+        Param = self.env["ir.config_parameter"].sudo()
+        base = (Param.get_param("web.base.url") or "").rstrip("/")
+        for rec in self:
+            payload = rec.qr_payload or ""
+            if not payload or not base:
+                rec.pod_qr_url = ""
+                rec.pod_qr_image_base64 = ""
+                continue
+            from urllib.parse import quote
+            url = f"{base}/sb/qr/pod?p={quote(payload, safe='')}"
+            rec.pod_qr_url = url
+            try:
+                import qrcode
+                img = qrcode.make(url, box_size=4, border=2)
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                rec.pod_qr_image_base64 = base64.b64encode(
+                    buf.getvalue()).decode("ascii")
+            except Exception:  # noqa: BLE001
+                rec.pod_qr_image_base64 = ""
+
     @api.depends("length_mm", "width_mm", "height_mm")
     def _compute_oversize(self):
         for rec in self:

@@ -92,9 +92,24 @@
                             </group>
                         </page>
                         <page string="QR" name="qr">
-                            <field name="qr_payload" readonly="1"/>
-                            <field name="qr_image_base64" readonly="1"
-                                   widget="image"/>
+                            <group string="Internal warehouse QR (scan-to-form)">
+                                <field name="qr_payload" readonly="1"/>
+                                <field name="qr_image_base64" readonly="1"
+                                       widget="image"/>
+                            </group>
+                            <group string="Driver POD QR (scan-to-POD-page)">
+                                <field name="pod_qr_url" readonly="1"/>
+                                <field name="pod_qr_image_base64" readonly="1"
+                                       widget="image"/>
+                                <div class="alert alert-info" colspan="2">
+                                    <strong>Driver POD:</strong> print this QR
+                                    on the pallet label. Driver scans with phone
+                                    camera → opens
+                                    <em>POD signature + photo capture page</em>
+                                    in their browser. No Odoo login required —
+                                    HMAC signature is the identity check.
+                                </div>
+                            </group>
                         </page>
                         <page string="Notes" name="notes">
                             <field name="notes" nolabel="1"/>

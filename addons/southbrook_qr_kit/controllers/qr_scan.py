@@ -157,6 +157,257 @@ class QrScanController(http.Controller):
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
+    @http.route("/sb/qr/pod/submit", type="json", auth="public",
+                methods=["POST"], csrf=False)
+    def pod_submit(self, payload=None, signature=None, photo=None,
+                   recipient=None, **kw):
+        """Public POD submit. HMAC signature on the payload IS the
+        identity check — anyone with the QR is authorized to capture
+        POD for that unit. Re-verifies signature, ensures kind='ship',
+        then calls action_mark_delivered with sudo().
+
+        Returns {ok, message} on success, {ok:false, error} on fail.
+        """
+        if not payload:
+            return {"ok": False, "error": "missing payload"}
+        env = request.env
+        try:
+            parsed = env["southbrook.qr.payload"].sudo().parse(payload)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"parse: {exc}"}
+        if not parsed["valid_signature"]:
+            return {"ok": False, "error": "Invalid signature"}
+        if parsed["kind"] != "ship":
+            return {"ok": False, "error": "POD requires a 'ship' kind QR"}
+        Unit = env["southbrook.shipping.unit"].sudo()
+        unit = Unit.browse(int(parsed["ident"])).exists()
+        if not unit:
+            return {"ok": False, "error": "Shipping unit not found"}
+        if unit.state == "delivered":
+            return {"ok": False, "error":
+                    "Already delivered at %s" % unit.delivered_at}
+        # Capture POD via the existing model method.
+        try:
+            unit.action_mark_delivered(signature=signature, photo=photo)
+            # Log to scan log under a public "pod_submit" path.
+            try:
+                env["southbrook.qr.scan.log"].sudo().create({
+                    "kind": "ship", "ident": str(unit.id),
+                    "action": "delivered", "result": "ok",
+                    "target_model": "southbrook.shipping.unit",
+                    "target_id": unit.id,
+                    "payload": payload[:500],
+                    "source_ip": request.httprequest.remote_addr,
+                    "user_agent":
+                        (request.httprequest.headers.get("User-Agent") or "")[:255],
+                })
+            except Exception:  # noqa: BLE001
+                pass
+            return {"ok": True,
+                    "message": "POD captured. Thank you, %s." %
+                    (recipient or "driver")}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+
+    @http.route("/sb/qr/pod", type="http", auth="public",
+                methods=["GET"], website=False, csrf=False)
+    def pod_capture(self, p=None, **kw):
+        """Proof-of-delivery capture page.
+
+        Workflow: driver scans the pallet/carton QR; the GET handler
+        (above) detects kind=ship and redirects to /sb/qr/pod?p=<payload>.
+        This page renders:
+          - Big "Shipping unit <name>" header (parsed from the QR)
+          - Recipient name field (free-text)
+          - Canvas signature pad (touch + mouse)
+          - Camera-capture photo input (mobile gets back camera via
+            capture=environment hint)
+          - "Confirm Delivery" button that POSTs to /sb/qr/scan with
+            action=delivered + base64 signature + base64 photo
+
+        Lightweight HTML + vanilla JS — no Flutter, no React, no
+        third-party signature lib. Works on Safari/Chrome/Edge mobile
+        + desktop. Survives the /app/ Safari Content-Length bug
+        because this is an Odoo route, not Caddy-served static.
+        """
+        if not p:
+            return request.make_response(
+                "Missing ?p=<qr_payload>",
+                headers=[("Content-Type", "text/plain")])
+        # Parse + verify signature server-side so we don't render a
+        # POD form for a forged QR.
+        try:
+            parsed = request.env["southbrook.qr.payload"].sudo().parse(p)
+        except Exception as exc:  # noqa: BLE001
+            return request.make_response(
+                f"Bad QR: {exc}",
+                headers=[("Content-Type", "text/plain")])
+        if not parsed["valid_signature"]:
+            return request.make_response(
+                "Invalid QR signature — forged or tampered.",
+                headers=[("Content-Type", "text/plain")])
+        if parsed["kind"] != "ship":
+            return request.make_response(
+                f"This page only handles 'ship' kind QRs (got '{parsed['kind']}').",
+                headers=[("Content-Type", "text/plain")])
+        Unit = request.env["southbrook.shipping.unit"].sudo()
+        unit = Unit.browse(int(parsed["ident"])).exists()
+        if not unit:
+            return request.make_response(
+                f"Shipping unit id={parsed['ident']} not found",
+                headers=[("Content-Type", "text/plain")])
+        return self._render_pod_page(p, unit)
+
+    def _render_pod_page(self, payload, unit):
+        """Render the POD capture page."""
+        import html as html_lib
+        partner = unit.partner_id.display_name if unit.partner_id else "(no customer)"
+        builder = unit.builder_unit_ref or ""
+        kind_label = dict(unit._fields["kind"].selection).get(unit.kind, unit.kind)
+        contents = ", ".join(unit.product_ids.mapped("name"))[:300]
+        e = html_lib.escape
+        body = (
+            "<!DOCTYPE html><html><head>"
+            "<meta charset='utf-8'/>"
+            "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'/>"
+            "<title>POD — " + e(unit.name) + "</title>"
+            "<style>"
+            "* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }"
+            "body { font-family: -apple-system, system-ui, sans-serif; margin: 0; "
+            "       padding: 1rem; background: #f6f6f6; color: #222; }"
+            "h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }"
+            ".muted { color: #666; font-size: 0.95rem; }"
+            ".card { background: white; border-radius: 8px; padding: 1rem; "
+            "        margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }"
+            "label { display: block; font-weight: 600; margin-bottom: 0.4rem; }"
+            "input, textarea { width: 100%; padding: 0.7rem; font-size: 1rem; "
+            "                  border: 1px solid #ccc; border-radius: 6px; }"
+            "canvas { border: 2px dashed #888; background: white; "
+            "         touch-action: none; display: block; width: 100%; height: 200px; }"
+            ".btn { display: block; width: 100%; padding: 1rem; font-size: 1.1rem; "
+            "       font-weight: 600; border: 0; border-radius: 8px; cursor: pointer; "
+            "       margin-top: 1rem; }"
+            ".btn-primary { background: #2b8a3e; color: white; }"
+            ".btn-primary:disabled { background: #888; cursor: not-allowed; }"
+            ".btn-secondary { background: #e0e0e0; color: #222; }"
+            ".sig-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }"
+            ".sig-actions button { flex: 1; padding: 0.5rem; }"
+            "#status { padding: 1rem; border-radius: 8px; margin-top: 1rem; }"
+            ".status-ok { background: #d4edda; color: #155724; }"
+            ".status-err { background: #f8d7da; color: #721c24; }"
+            "img.preview { max-width: 100%; max-height: 200px; "
+            "              border-radius: 6px; margin-top: 0.5rem; }"
+            "</style></head><body>"
+            "<div class='card'>"
+            "<h1>" + e(unit.name) + " <span class='muted'>(" + e(kind_label) + ")</span></h1>"
+            "<div class='muted'>"
+            "<div><strong>Customer:</strong> " + e(partner) + "</div>"
+            + ("<div><strong>Builder Unit:</strong> " + e(builder) + "</div>" if builder else "")
+            + ("<div><strong>Contents:</strong> " + e(contents) + "</div>" if contents else "")
+            + "</div></div>"
+            "<form id='pod-form' onsubmit='return submitPod(event)'>"
+            "<div class='card'><label for='recipient'>Recipient Name</label>"
+            "<input type='text' id='recipient' name='recipient' "
+            "placeholder='Print name of person accepting delivery' required></div>"
+            "<div class='card'><label>Signature</label>"
+            "<canvas id='sig' width='600' height='200'></canvas>"
+            "<div class='sig-actions'>"
+            "<button type='button' class='btn btn-secondary' onclick='clearSig()'>Clear</button>"
+            "</div></div>"
+            "<div class='card'><label for='photo'>Delivery Photo</label>"
+            "<input type='file' id='photo' name='photo' accept='image/*' "
+            "capture='environment' onchange='previewPhoto(event)'>"
+            "<img id='photo-preview' class='preview' style='display:none'/></div>"
+            "<button type='submit' id='submit-btn' class='btn btn-primary'>"
+            "Confirm Delivery"
+            "</button>"
+            "<div id='status' style='display:none'></div>"
+            "</form>"
+            "<script>"
+            "const PAYLOAD = " + repr(payload) + ";"
+            "const canvas = document.getElementById('sig');"
+            "const ctx = canvas.getContext('2d');"
+            # Make the canvas backing-store match its rendered size
+            "function resizeCanvas() {"
+            "  const ratio = window.devicePixelRatio || 1;"
+            "  canvas.width = canvas.offsetWidth * ratio;"
+            "  canvas.height = canvas.offsetHeight * ratio;"
+            "  ctx.scale(ratio, ratio); ctx.lineWidth = 2.5;"
+            "  ctx.lineCap = 'round'; ctx.strokeStyle = '#222';"
+            "}"
+            "resizeCanvas();"
+            "let drawing = false, hasInk = false;"
+            "function start(e) { drawing = true; hasInk = true;"
+            "  const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);"
+            "  e.preventDefault(); }"
+            "function move(e) { if (!drawing) return;"
+            "  const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke();"
+            "  e.preventDefault(); }"
+            "function end(e) { drawing = false; }"
+            "function getPos(e) {"
+            "  const r = canvas.getBoundingClientRect();"
+            "  const t = e.touches && e.touches[0];"
+            "  const cx = t ? t.clientX : e.clientX;"
+            "  const cy = t ? t.clientY : e.clientY;"
+            "  return { x: cx - r.left, y: cy - r.top }; }"
+            "canvas.addEventListener('mousedown', start);"
+            "canvas.addEventListener('mousemove', move);"
+            "canvas.addEventListener('mouseup', end);"
+            "canvas.addEventListener('mouseleave', end);"
+            "canvas.addEventListener('touchstart', start);"
+            "canvas.addEventListener('touchmove', move);"
+            "canvas.addEventListener('touchend', end);"
+            "function clearSig() {"
+            "  ctx.clearRect(0, 0, canvas.width, canvas.height); hasInk = false; }"
+            "function previewPhoto(e) {"
+            "  const f = e.target.files[0]; if (!f) return;"
+            "  const img = document.getElementById('photo-preview');"
+            "  img.src = URL.createObjectURL(f); img.style.display = 'block'; }"
+            "function fileToB64(file) { return new Promise((resolve) => {"
+            "  const r = new FileReader();"
+            "  r.onload = () => resolve(r.result.split(',')[1]);"
+            "  r.readAsDataURL(file); }); }"
+            "async function submitPod(e) {"
+            "  e.preventDefault();"
+            "  const btn = document.getElementById('submit-btn');"
+            "  const status = document.getElementById('status');"
+            "  if (!hasInk) { alert('Please sign first.'); return false; }"
+            "  btn.disabled = true; btn.textContent = 'Submitting...';"
+            "  const recipient = document.getElementById('recipient').value;"
+            "  const sigB64 = canvas.toDataURL('image/png').split(',')[1];"
+            "  let photoB64 = '';"
+            "  const photoFile = document.getElementById('photo').files[0];"
+            "  if (photoFile) { photoB64 = await fileToB64(photoFile); }"
+            "  try {"
+            "    const resp = await fetch('/sb/qr/pod/submit', {"
+            "      method: 'POST',"
+            "      headers: { 'Content-Type': 'application/json' },"
+            "      body: JSON.stringify({ jsonrpc: '2.0', method: 'call',"
+            "        params: { payload: PAYLOAD,"
+            "          signature: sigB64, photo: photoB64,"
+            "          recipient: recipient } })"
+            "    });"
+            "    const data = await resp.json();"
+            "    const r = data.result || {};"
+            "    status.style.display = 'block';"
+            "    if (r.ok) { status.className = 'status-ok';"
+            "      status.innerHTML = '<strong>✅ Delivered!</strong><br/>' + (r.message || '');"
+            "      btn.style.display = 'none'; }"
+            "    else { status.className = 'status-err';"
+            "      status.innerHTML = '<strong>❌ Error:</strong> ' + (r.error || 'unknown');"
+            "      btn.disabled = false; btn.textContent = 'Try Again'; }"
+            "  } catch (err) {"
+            "    status.style.display = 'block'; status.className = 'status-err';"
+            "    status.textContent = 'Network error: ' + err;"
+            "    btn.disabled = false; btn.textContent = 'Try Again';"
+            "  }"
+            "  return false;"
+            "}"
+            "</script></body></html>"
+        )
+        return request.make_response(body, headers=[
+            ("Content-Type", "text/html; charset=utf-8")])
+
     @http.route("/sb/qr/labels", type="http", auth="user",
                 methods=["GET"], website=False)
     def labels(self, model=None, ids="", size="2x4", text="1", **kw):
