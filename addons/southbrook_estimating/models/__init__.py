@@ -23,3 +23,4 @@ from . import template_code
 from . import template_archetype
 from . import product_product
 from . import builder_po_intake
+from . import qr_kind_handlers

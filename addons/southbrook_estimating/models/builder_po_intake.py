@@ -56,8 +56,9 @@ INTAKE_STATES = [
 class BuilderPoIntake(models.Model):
     _name = "southbrook.builder.po.intake"
     _description = "Southbrook Builder PO Intake"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "southbrook.qr.mixin"]
     _order = "create_date desc"
+    _qr_kind = "intake"
 
     name = fields.Char(
         default=lambda self: _("New"),
