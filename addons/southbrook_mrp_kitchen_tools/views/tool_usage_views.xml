@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+    <record id="view_tool_usage_list" model="ir.ui.view">
+        <field name="name">southbrook.tool.usage.list</field>
+        <field name="model">southbrook.tool.usage</field>
+        <field name="arch" type="xml">
+            <list string="Tool Usage Log"
+                  decoration-warning="not checked_in_at"
+                  decoration-danger="return_condition == 'damaged'">
+                <field name="checked_out_at"/>
+                <field name="tool_id"/>
+                <field name="workorder_id" optional="show"/>
+                <field name="production_id" optional="show"/>
+                <field name="workcenter_id" optional="show"/>
+                <field name="checked_out_by"/>
+                <field name="checked_in_at"/>
+                <field name="checked_in_by" optional="hide"/>
+                <field name="duration_min"/>
+                <field name="return_condition" widget="badge"
+                       optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tool_usage_form" model="ir.ui.view">
+        <field name="name">southbrook.tool.usage.form</field>
+        <field name="model">southbrook.tool.usage</field>
+        <field name="arch" type="xml">
+            <form string="Tool Usage">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="tool_id"/>
+                            <field name="workorder_id"/>
+                            <field name="production_id" readonly="1"/>
+                            <field name="workcenter_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="checked_out_at"/>
+                            <field name="checked_out_by"/>
+                            <field name="checked_in_at"/>
+                            <field name="checked_in_by"/>
+                            <field name="duration_min" readonly="1"/>
+                            <field name="return_condition"
+                                   invisible="not checked_in_at"/>
+                        </group>
+                    </group>
+                    <field name="notes"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tool_usage_search" model="ir.ui.view">
+        <field name="name">southbrook.tool.usage.search</field>
+        <field name="model">southbrook.tool.usage</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="tool_id"/>
+                <field name="workorder_id"/>
+                <field name="checked_out_by"/>
+                <filter name="open" string="Still Out"
+                        domain="[('checked_in_at','=',False)]"/>
+                <filter name="returned_damaged" string="Returned Damaged"
+                        domain="[('return_condition','=','damaged')]"/>
+                <filter name="last7d" string="Last 7 Days"
+                        domain="[('checked_out_at','&gt;=', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                <group>
+                    <filter name="g_tool" string="Tool"
+                            context="{'group_by':'tool_id'}"/>
+                    <filter name="g_wo" string="Work Order"
+                            context="{'group_by':'workorder_id'}"/>
+                    <filter name="g_user" string="Checked Out By"
+                            context="{'group_by':'checked_out_by'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_tool_usage" model="ir.actions.act_window">
+        <field name="name">Tool Usage Log</field>
+        <field name="res_model">southbrook.tool.usage</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_last7d': 1}</field>
+    </record>
+</odoo>

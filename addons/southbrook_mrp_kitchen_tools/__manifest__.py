@@ -76,6 +76,8 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
         "views/tool_kit_views.xml",
         "views/mrp_workorder_views.xml",
         "views/workorder_tool_consumption_views.xml",
+        # QR-driven tool usage log (Phase 6, 2026-06-26).
+        "views/tool_usage_views.xml",
         "views/menus.xml",
     ],
     "demo": [

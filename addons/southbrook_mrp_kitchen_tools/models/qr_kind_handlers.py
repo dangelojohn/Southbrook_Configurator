@@ -28,23 +28,45 @@ class ToolQrKind(models.AbstractModel):
 
     @api.model
     def handle_action(self, record, action, params):
+        Usage = self.env["southbrook.tool.usage"]
         if action == "checkout":
+            # Create a real usage record so auditors can query
+            # tool→WO assignment + duration + return condition.
             wo_id = (params or {}).get("workorder_id")
-            # Append to chatter — actual checkout-to-WO depends on
-            # whether tool.asset has a usage log model. v1: log via
-            # chatter; v2: dedicated tool.usage record per WO.
-            record.message_post(body=_(
-                "Tool checked out for WO id=%(wo)s by %(u)s") % {
-                "wo": wo_id or "(no WO)",
-                "u": self.env.user.display_name,
-            })
+            vals = {"tool_id": record.id}
+            if wo_id:
+                try:
+                    vals["workorder_id"] = int(wo_id)
+                except (TypeError, ValueError):
+                    pass
+            usage = Usage.sudo().create(vals)
             return {"record_name": record.display_name,
                     "record_id": record.id, "model": self._target_model,
-                    "message": _("Tool checked out")}
+                    "message": _("Tool checked out → %s") % usage.name,
+                    "usage_id": usage.id}
         if action == "checkin":
-            record.message_post(body=_(
-                "Tool checked back in by %s") % self.env.user.display_name)
+            condition = (params or {}).get("condition")
+            # Find the most recent open usage record for this tool +
+            # check it in. Operator may need to specify return condition.
+            open_usage = Usage.sudo().search([
+                ("tool_id", "=", record.id),
+                ("checked_in_at", "=", False),
+            ], limit=1, order="checked_out_at desc")
+            if not open_usage:
+                # No open record — fall back to chatter log for the
+                # weird case where someone scans checkin without prior
+                # checkout.
+                record.message_post(body=_(
+                    "Checkin scan with no open checkout — logged by %s") %
+                    self.env.user.display_name)
+                return {"record_name": record.display_name,
+                        "record_id": record.id, "model": self._target_model,
+                        "message": _("Tool checkin (no open checkout — "
+                                     "logged to chatter)")}
+            open_usage.action_checkin(condition=condition)
             return {"record_name": record.display_name,
                     "record_id": record.id, "model": self._target_model,
-                    "message": _("Tool checked in")}
+                    "message": _("Tool checked in (duration: %.1f min)") %
+                    open_usage.duration_min,
+                    "usage_id": open_usage.id}
         return super().handle_action(record, action, params)

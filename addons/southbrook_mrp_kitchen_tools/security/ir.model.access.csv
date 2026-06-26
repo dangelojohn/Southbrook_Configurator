@@ -32,3 +32,5 @@ access_wo_consumption_user,WO consumption read for MRP users,model_southbrook_wo
 access_wo_consumption_operator,WO consumption CRUD for tool operators,model_southbrook_workorder_tool_consumption,group_tool_operator,1,1,1,0
 access_wo_consumption_crib,WO consumption CRUD for crib manager,model_southbrook_workorder_tool_consumption,group_tool_crib_manager,1,1,1,1
 access_wo_consumption_admin,WO consumption CRUD for system admin,model_southbrook_workorder_tool_consumption,base.group_system,1,1,1,1
+access_tool_usage_user,Tool usage read for MRP users,model_southbrook_tool_usage,mrp.group_mrp_user,1,1,1,0
+access_tool_usage_manager,Tool usage CRUD for MRP managers,model_southbrook_tool_usage,mrp.group_mrp_manager,1,1,1,1

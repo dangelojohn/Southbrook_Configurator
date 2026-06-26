@@ -17,4 +17,5 @@ from . import mrp_workorder
 from . import workorder_tool_consumption
 # Commit 6 — QC + downtime + reports + demo + docs
 from . import mrp_production
+from . import tool_usage
 from . import qr_kind_handlers
