@@ -1030,27 +1030,90 @@ class ConfiguratorV2 extends Component {
         const hinge = pickedNameOf("Hinge Side", "LH (Left Hand)");
         const isLH = hinge.startsWith("LH");
         const handle = pickedNameOf("Handle", "Bar Pull");
+
+        // Pull Finish → handle color. Mapped from the 8 finishes
+        // seeded on the Pull Finish attribute (per the audit
+        // 2026-06-26). Default falls back to brushed nickel grey.
+        const PULL_COLORS = {
+            "Polished Nickel":   "#c0c0c8",
+            "Brushed Nickel":    "#9ea2ab",
+            "Matte Black":       "#1a1a1a",
+            "Antique Bronze":    "#5e4a32",
+            "Brushed Brass":     "#b8a062",
+            "Polished Chrome":   "#d8dde2",
+            "Oil-Rubbed Bronze": "#3a2b1f",
+            "Champagne Bronze":  "#a8956a",
+        };
+        const pullFinish = pickedNameOf("Pull Finish", "Brushed Nickel");
+        const handleColor = PULL_COLORS[pullFinish] || "#2f3b52";
+
         const sideHandle = (side) => {
             if (handle === "None") return "";
             if (handle === "Knob") {
-                return `<div style="position:absolute;top:50%;${side}:8px;width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`;
+                return `<div style="position:absolute;top:50%;${side}:8px;width:7px;height:7px;border-radius:50%;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
             }
-            return `<div style="position:absolute;top:50%;${side}:7px;width:4px;height:26px;border-radius:3px;background:#2f3b52"></div>`;
+            if (handle === "Cup Pull") {
+                return `<div style="position:absolute;top:50%;${side}:5px;width:5px;height:14px;border-radius:0 4px 4px 0;background:${handleColor}"></div>`;
+            }
+            // Bar Pull / Integrated default
+            return `<div style="position:absolute;top:50%;${side}:7px;width:4px;height:26px;border-radius:3px;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
         };
         const centerHandle = () => {
             if (handle === "None") return "";
             if (handle === "Knob") {
-                return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`;
+                return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
             }
-            return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:28px;height:4px;border-radius:3px;background:#2f3b52"></div>`;
+            if (handle === "Cup Pull") {
+                return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:22px;height:5px;border-radius:0 0 6px 6px;background:${handleColor}"></div>`;
+            }
+            return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:28px;height:4px;border-radius:3px;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
         };
 
-        // ── Front face — drawer bank, two-door, or single door ──────
+        // ── Base cabinet sub-type detection ─────────────────────────
+        // Sinks have no top drawer (plumbing). Cooktops have no top
+        // drawer (cooktop above takes the space). Microwave drawer
+        // bases have a TALL top section (the mw itself). Default
+        // base cabinets have a small top drawer + door(s) below.
+        const isSinkBase = /\bsink\b/i.test(productName);
+        const isCooktopBase = /\bcooktop\b/i.test(productName);
+        const isMicrowaveDrawerBase = /microwave.*drawer/i.test(productName);
+        const isPullOutBase = /pull.?out/i.test(productName);
+        const isCornerBase = /\bcorner\b/i.test(productName);
+        const isStandardBaseWithDrawer = (
+            kind === "base"
+            && !isDrawerBank
+            && !isSinkBase
+            && !isCooktopBase
+            && !isMicrowaveDrawerBase
+            && !isPullOutBase
+            && !isCornerBase
+        );
+        // Top-drawer height as fraction of body (industry standard:
+        // a 6" drawer in a 34.5" cabinet = ~17%; microwave occupies
+        // the upper ~38% of the cabinet).
+        const topDrawerFrac = isMicrowaveDrawerBase ? 0.38 : 0.17;
+
+        const renderDoorArea = (doorsN, areaInsetGap) => {
+            if (doorsN === 2) {
+                return `<div style="position:absolute;inset:${areaInsetGap}px;display:flex;gap:4px">
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("right")}</div>
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("left")}</div>
+                </div>`;
+            }
+            // Single door — handle on the OPPOSITE side from the hinge.
+            // LH = hinged left, handle on right.
+            return `<div style="position:absolute;inset:${areaInsetGap}px;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle(isLH ? "right" : "left")}</div>`;
+        };
+
+        const renderDrawerStrip = (heightPct, areaInsetGap, label) => {
+            // A single drawer occupying the top heightPct of the front.
+            return `<div style="position:absolute;left:${areaInsetGap}px;right:${areaInsetGap}px;top:${areaInsetGap}px;height:calc(${heightPct * 100}% - ${areaInsetGap * 2}px);border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.14)"${label ? ` aria-label="${label}"` : ""}>${centerHandle()}</div>`;
+        };
+
+        // ── Front face — pick the right layout for the sub-type ─────
         let frontHtml;
         if (isDrawerBank) {
-            // 1–5 horizontal drawer fronts. Use the explicit count if
-            // present; otherwise the carcass kind dictates: tall=4,
-            // base=3 (1 false drawer + 2 deeper) by industry default.
+            // Pure drawer banks: 1-5 horizontal drawer fronts.
             const fallbackN = (kind === "tall" ? 4 : 3);
             const drawerN = Math.max(1, Math.min(5,
                 drawerCount || fallbackN));
@@ -1061,13 +1124,30 @@ class ConfiguratorV2 extends Component {
                 );
             }
             frontHtml = `<div style="position:absolute;inset:${insetGap}px;display:flex;flex-direction:column;gap:3px">${rows.join("")}</div>`;
+        } else if (isStandardBaseWithDrawer || isMicrowaveDrawerBase) {
+            // Top drawer + door(s) below — the standard base-cab
+            // pattern. Microwave drawer bases get a TALL top drawer.
+            const tdHeight = topDrawerFrac;
+            const dvDoorTop = `${tdHeight * 100}%`;
+            const doorsArea = doors === 2
+                ? `<div style="position:absolute;left:${insetGap}px;right:${insetGap}px;top:calc(${dvDoorTop} + 3px);bottom:${insetGap}px;display:flex;gap:4px">
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("right")}</div>
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("left")}</div>
+                </div>`
+                : `<div style="position:absolute;left:${insetGap}px;right:${insetGap}px;top:calc(${dvDoorTop} + 3px);bottom:${insetGap}px;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle(isLH ? "right" : "left")}</div>`;
+            frontHtml = renderDrawerStrip(
+                tdHeight,
+                insetGap,
+                isMicrowaveDrawerBase ? "Microwave compartment" : "Top drawer"
+            ) + doorsArea;
         } else if (doors === 2) {
-            frontHtml = `<div style="position:absolute;inset:${insetGap}px;display:flex;gap:4px">
-                <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("right")}</div>
-                <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("left")}</div>
-            </div>`;
+            // Sink Base / Cooktop with 2 doors — full-height doors,
+            // no top drawer.
+            frontHtml = renderDoorArea(2, insetGap);
         } else {
-            frontHtml = `<div style="position:absolute;inset:${insetGap}px;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.1)">${sideHandle(isLH ? "right" : "left")}</div>`;
+            // Single-door fall-through (sink-single, cooktop-single,
+            // pull-out, corner, anything else with doors=1)
+            frontHtml = renderDoorArea(1, insetGap);
         }
 
         // ── Toe-kick band (base cabs only) ──────────────────────────
