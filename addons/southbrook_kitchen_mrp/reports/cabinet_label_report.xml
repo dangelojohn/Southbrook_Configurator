@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    Cabinet Manufacturing Label — Avery Presta 94215 (3 × 4 in).
+
+    Replaces the legacy paper label the shop has used by hand for
+    years. Same layout as the user's sample photo:
+
+      ┌──────────────────────────────────────────────────────┐
+      │ SOUTHBROOK CABINETRY LOGO          [QR code square]   │
+      │ www.southbrookcabinetry.com    905-761-9801          │
+      ├──────────────────────────────────────────────────────┤
+      │ Customer:  | JOHN DEANGELO                           │
+      │ PO #:      |                                          │
+      │ TAG:       | JOHN DEANGELO                           │
+      │ Door Name: | NAPLES                                   │
+      │ Door Color:| SNOW WHITE                               │
+      │ Cabinet    | White: [X]    Maple: [ ]                │
+      │  Interior  |                                          │
+      ├──────────────────────────────────────────────────────┤
+      │       Code       │  Hinge  │     Fin                  │
+      │       B3D24      │   LH    │    B,L                   │
+      └──────────────────────────────────────────────────────┘
+
+    Page dimensions match Avery Presta 94215 landscape orientation
+    (4 in wide × 3 in tall = 101.6 mm × 76.2 mm). Print on plain
+    Avery 94215 label sheets — the printer aligns to the sheet's
+    pre-cut bounds.
+
+    Multi-MO selection on the list view: action_report calls render
+    once per record and concatenates pages, so a batch of 12 cabinets
+    yields a 12-page PDF that fills two Avery sheets at 6 labels/sheet.
+-->
+<odoo>
+
+    <record id="paperformat_avery_presta_94215" model="report.paperformat">
+        <field name="name">Avery Presta 94215 (3x4 in)</field>
+        <field name="format">custom</field>
+        <!-- v19 page_height/width are integer mm; 76.2 and 101.6
+             round to 76 and 102 (1 mm clip, well within label tolerance). -->
+        <field name="page_height">76</field>       <!-- 3 in ≈ 76 mm -->
+        <field name="page_width">102</field>       <!-- 4 in ≈ 102 mm -->
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">2</field>
+        <field name="margin_bottom">2</field>
+        <field name="margin_left">2</field>
+        <field name="margin_right">2</field>
+        <field name="header_line">0</field>
+        <field name="header_spacing">0</field>
+        <field name="dpi">300</field>
+    </record>
+
+    <record id="action_report_cabinet_label" model="ir.actions.report">
+        <field name="name">Cabinet Label (Avery 94215)</field>
+        <field name="model">mrp.production</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">southbrook_kitchen_mrp.report_cabinet_label</field>
+        <field name="report_file">southbrook_kitchen_mrp.report_cabinet_label</field>
+        <field name="paperformat_id" ref="paperformat_avery_presta_94215"/>
+        <field name="binding_model_id" ref="mrp.model_mrp_production"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Cabinet Label %s' % (object.name)</field>
+    </record>
+
+    <template id="report_cabinet_label">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="mo">
+                <div class="page sbk-label">
+                    <style>
+                        /* Letter-size constraints don't apply — we're
+                           on the 3x4 in custom paperformat. Force
+                           layout to that bounding box and tighten
+                           default Odoo report margins. */
+                        .sbk-label {
+                            font-family: Arial, sans-serif;
+                            color: #000;
+                            width: 96mm;
+                            height: 72mm;
+                            box-sizing: border-box;
+                            padding: 2mm;
+                            font-size: 9pt;
+                            line-height: 1.15;
+                        }
+                        .sbk-label-header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            border-bottom: 1px solid #000;
+                            padding-bottom: 2mm;
+                            margin-bottom: 2mm;
+                        }
+                        .sbk-label-brand {
+                            flex: 1;
+                        }
+                        .sbk-label-brand-name {
+                            font-size: 18pt;
+                            font-weight: 900;
+                            line-height: 1;
+                            letter-spacing: -0.5px;
+                        }
+                        .sbk-label-brand-sub {
+                            font-size: 18pt;
+                            font-weight: 900;
+                            line-height: 1;
+                            font-style: italic;
+                            margin-top: 1mm;
+                        }
+                        .sbk-label-contact {
+                            font-size: 7pt;
+                            margin-top: 1.5mm;
+                            display: flex;
+                            justify-content: space-between;
+                            font-weight: 600;
+                        }
+                        .sbk-label-qr {
+                            width: 22mm;
+                            height: 22mm;
+                            margin-left: 2mm;
+                        }
+                        .sbk-label-qr img {
+                            width: 100%;
+                            height: 100%;
+                            display: block;
+                        }
+                        .sbk-label-grid {
+                            border: 1px solid #000;
+                            border-collapse: collapse;
+                            width: 100%;
+                            font-size: 8.5pt;
+                        }
+                        .sbk-label-grid td {
+                            border: 1px solid #000;
+                            padding: 1mm 2mm;
+                            vertical-align: middle;
+                        }
+                        .sbk-label-grid .sbk-label-key {
+                            font-weight: 700;
+                            width: 28%;
+                            background: #f0f0f0;
+                        }
+                        .sbk-label-grid .sbk-label-val {
+                            font-weight: 700;
+                            font-size: 9pt;
+                        }
+                        .sbk-label-footer {
+                            margin-top: 1mm;
+                            border: 1px solid #000;
+                            border-collapse: collapse;
+                            width: 100%;
+                            font-size: 8.5pt;
+                            text-align: center;
+                        }
+                        .sbk-label-footer td {
+                            border: 1px solid #000;
+                            padding: 1mm;
+                            vertical-align: top;
+                        }
+                        .sbk-label-footer-h {
+                            font-weight: 700;
+                            background: #f0f0f0;
+                        }
+                        .sbk-label-code {
+                            font-size: 13pt;
+                            font-weight: 900;
+                            letter-spacing: 1px;
+                        }
+                        .sbk-checkbox {
+                            display: inline-block;
+                            width: 9pt;
+                            height: 9pt;
+                            border: 1px solid #000;
+                            text-align: center;
+                            font-weight: 900;
+                            line-height: 8pt;
+                            margin: 0 1mm;
+                            font-size: 8pt;
+                        }
+                    </style>
+
+                    <!-- Brand header + QR -->
+                    <div class="sbk-label-header">
+                        <div class="sbk-label-brand">
+                            <div class="sbk-label-brand-name">southbrook</div>
+                            <div class="sbk-label-brand-sub">cabinetry</div>
+                            <div class="sbk-label-contact">
+                                <span>www.southbrookcabinetry.com</span>
+                                <span>905-761-9801</span>
+                            </div>
+                        </div>
+                        <div class="sbk-label-qr">
+                            <img t-if="mo.sbk_label_qr_image"
+                                 t-att-src="'data:image/png;base64,%s' % mo.sbk_label_qr_image.decode('ascii')"
+                                 alt="QR code"/>
+                        </div>
+                    </div>
+
+                    <!-- Body grid -->
+                    <table class="sbk-label-grid">
+                        <tr>
+                            <td class="sbk-label-key">Customer</td>
+                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_customer_name"/>
+                        </tr>
+                        <tr>
+                            <td class="sbk-label-key">PO #</td>
+                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_po_ref"/>
+                        </tr>
+                        <tr>
+                            <td class="sbk-label-key">TAG</td>
+                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_tag"/>
+                        </tr>
+                        <tr>
+                            <td class="sbk-label-key">Door Name</td>
+                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_door_name"/>
+                        </tr>
+                        <tr>
+                            <td class="sbk-label-key">Door Color</td>
+                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_door_color"/>
+                        </tr>
+                        <tr>
+                            <td class="sbk-label-key" rowspan="1">Cabinet Interior</td>
+                            <td colspan="3" style="font-weight:700">
+                                White:
+                                <span class="sbk-checkbox">
+                                    <t t-if="mo.sbk_label_interior_is_white">X</t>
+                                </span>
+                                Maple:
+                                <span class="sbk-checkbox">
+                                    <t t-if="mo.sbk_label_interior_is_maple">X</t>
+                                </span>
+                                <t t-if="mo.sbk_label_interior and not mo.sbk_label_interior_is_white and not mo.sbk_label_interior_is_maple">
+                                    &#160;—&#160;<span t-out="mo.sbk_label_interior"/>
+                                </t>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Footer grid: Code / Hinge / Fin -->
+                    <table class="sbk-label-footer">
+                        <tr>
+                            <td class="sbk-label-footer-h" style="width:54%">Code</td>
+                            <td class="sbk-label-footer-h" style="width:23%">Hinge</td>
+                            <td class="sbk-label-footer-h" style="width:23%">Fin</td>
+                        </tr>
+                        <tr>
+                            <td class="sbk-label-code" t-out="mo.sbk_label_code"/>
+                            <td class="sbk-label-code" t-out="mo.sbk_label_hinge"/>
+                            <td class="sbk-label-code" t-out="mo.sbk_label_fin"/>
+                        </tr>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <!-- Smart button on the MO form -->
+    <record id="view_mrp_production_form_sbk_label" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_label_btn</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_print_cabinet_label"
+                        type="object"
+                        string="🏷 Print Cabinet Label"
+                        groups="mrp.group_mrp_user"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

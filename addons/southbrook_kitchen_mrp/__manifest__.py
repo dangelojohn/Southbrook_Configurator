@@ -41,7 +41,7 @@ contract, GAP-05 / SYN-02):
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.6.0",
+    "version": "19.0.0.7.0",
     "depends": [
         "mrp",
         "sale",
@@ -51,12 +51,18 @@ contract, GAP-05 / SYN-02):
         # QR foundation — qr.mixin for cutlist + hardware package.
         "southbrook_qr_kit",
     ],
+    "external_dependencies": {
+        # Cabinet manufacturing label embeds a QR PNG via qrcode +
+        # Pillow. Pre-installed on the Odoo 19 Debian image.
+        "python": ["qrcode"],
+    },
     "data": [
         "security/ir.model.access.csv",
         "views/sb_cutlist_views.xml",
         "views/sb_hardware_package_views.xml",
         "views/sb_production_package_views.xml",
         "views/southbrook_kitchen_mrp_menus.xml",
+        "reports/cabinet_label_report.xml",
     ],
     "installable": True,
     "application": False,
