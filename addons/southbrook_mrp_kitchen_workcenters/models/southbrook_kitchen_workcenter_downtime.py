@@ -105,6 +105,20 @@ class SouthbrookKitchenWorkcenterDowntime(models.Model):
         default=lambda self: self.env.user,
     )
 
+    # SAMI PRD MAINT-03 (2026-06-25) — auto-escalate operator downtime
+    # into a maintenance.request so the maintenance crew sees it without
+    # the operator having to switch apps.
+    maintenance_request_id = fields.Many2one(
+        comodel_name="maintenance.request",
+        string="Maintenance Request",
+        ondelete="set null",
+        readonly=True,
+        help="Auto-created when reason='machine_breakdown'. Operator "
+             "can also click 'Escalate to Maintenance' for other "
+             "reasons. Links so the original downtime row shows the "
+             "maintenance request status.",
+    )
+
     # Costing — populated lazily so the M3 downtime report can roll up
     # cost impact per workcenter / per reason. Reads workcenter.costs_
     # hour from the native mrp.workcenter field if present.
@@ -154,6 +168,93 @@ class SouthbrookKitchenWorkcenterDowntime(models.Model):
     # ------------------------------------------------------------------
     # State transitions — buttons surface on the form view.
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Maintenance escalation (SAMI PRD MAINT-03, 2026-06-25)
+    # ------------------------------------------------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        # Auto-escalate any breakdown to maintenance.request on create —
+        # the operator doesn't have to click anything.
+        for rec in records:
+            if rec.reason == "machine_breakdown" and not rec.maintenance_request_id:
+                try:
+                    rec._spawn_maintenance_request(reason_label=_("Machine Breakdown"))
+                except Exception:  # noqa: BLE001
+                    # Never block a downtime log on maintenance auto-
+                    # escalation. Operator can still hit the button.
+                    pass
+        return records
+
+    def action_escalate_to_maintenance(self):
+        """Operator-driven manual escalation for non-breakdown reasons.
+
+        Idempotent — re-clicking on a record that already has a request
+        just opens it instead of double-creating.
+        """
+        self.ensure_one()
+        if self.maintenance_request_id:
+            return self._action_open_maintenance_request()
+        reason_label = dict(self._fields["reason"].selection).get(
+            self.reason, self.reason)
+        self._spawn_maintenance_request(reason_label=reason_label)
+        return self._action_open_maintenance_request()
+
+    def _spawn_maintenance_request(self, reason_label):
+        self.ensure_one()
+        Request = self.env["maintenance.request"]
+        # mrp.workcenter has a related equipment_id via maintenance
+        # module's link; if absent, fall back to no equipment (the
+        # request still creates, just unassigned).
+        equipment = self.workcenter_id.equipment_id if hasattr(
+            self.workcenter_id, "equipment_id") else False
+        req = Request.create({
+            "name": _("Downtime escalation: %(r)s @ %(wc)s",
+                      r=reason_label, wc=self.workcenter_id.name or "?"),
+            "description": _(
+                "Auto-created from downtime log %(dt)s.\n"
+                "Workcenter: %(wc)s\n"
+                "Reason: %(r)s\n"
+                "Started: %(t)s\n"
+                "Notes: %(n)s",
+                dt=self.name or self.id,
+                wc=self.workcenter_id.display_name or "?",
+                r=reason_label,
+                t=self.date_start,
+                n=self.notes or "(none)",
+            ),
+            "maintenance_type": "corrective",
+            "equipment_id": equipment.id if equipment else False,
+            "user_id": self.workcenter_id.equipment_id.technician_user_id.id
+                if equipment and equipment.technician_user_id else False,
+        })
+        self.maintenance_request_id = req.id
+        # Emit ops.event so the Kitchen Ops dashboard activity feed
+        # picks it up — non-fatal if event model absent.
+        try:
+            self.env["southbrook.ops.event"].emit(
+                "install_risk",
+                _("Maintenance request %(r)s spawned from downtime at %(wc)s",
+                  r=req.name or "?", wc=self.workcenter_id.name or "?"),
+                res_model="maintenance.request",
+                res_id=req.id,
+                severity="alert",
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return req
+
+    def _action_open_maintenance_request(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Maintenance Request"),
+            "res_model": "maintenance.request",
+            "res_id": self.maintenance_request_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
     def action_start(self):
         for row in self:

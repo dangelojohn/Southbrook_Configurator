@@ -33,6 +33,14 @@
                     <button name="action_cancel" type="object"
                             string="Cancel"
                             invisible="state in ('closed', 'cancelled')"/>
+                    <button name="action_escalate_to_maintenance" type="object"
+                            string="Escalate to Maintenance"
+                            class="btn-warning"
+                            invisible="maintenance_request_id"/>
+                    <button name="action_escalate_to_maintenance" type="object"
+                            string="Open Maintenance Request"
+                            class="btn-secondary"
+                            invisible="not maintenance_request_id"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,active,closed"/>
                 </header>
@@ -51,6 +59,7 @@
                             <field name="date_end"/>
                             <field name="duration_min"/>
                             <field name="downtime_cost"/>
+                            <field name="maintenance_request_id" readonly="1"/>
                         </group>
                     </group>
                     <group string="Notes">
