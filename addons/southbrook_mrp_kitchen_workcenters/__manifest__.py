@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.10.1",
+    "version": "19.0.4.11.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -64,6 +64,8 @@ southbrook_kitchen_workspace) without duplicating their models.
         # As-built ID sequence (SAMI PRD W-08). Loaded before the views
         # that reference the model.
         "data/southbrook_asbuilt_sequence.xml",
+        # Shift handover sequence (SAMI PRD MES-10).
+        "data/southbrook_shift_handover_seed.xml",
         # Master data — materials + finishes the work-center fields
         # reference. Must load BEFORE the workcenter seed.
         "data/southbrook_kitchen_materials.xml",
@@ -90,6 +92,8 @@ southbrook_kitchen_workspace) without duplicating their models.
         # As-built records surface (SAMI PRD W-08, 2026-06-26). Also
         # hangs off menu_sbk_ops_root.
         "views/southbrook_asbuilt_views.xml",
+        # Shift handover surface (SAMI PRD MES-10, 2026-06-26).
+        "views/southbrook_shift_handover_views.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [
