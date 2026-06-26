@@ -25,6 +25,16 @@
                             string="Open Rework WO"
                             class="btn-secondary"
                             invisible="not x_sbk_rework_workorder_id"/>
+                    <button name="action_quarantine_failed_batch"
+                            type="object"
+                            string="Quarantine Batch"
+                            class="btn-warning"
+                            invisible="x_sbk_result != 'fail' or x_sbk_quarantine_picking_id"/>
+                    <button name="action_quarantine_failed_batch"
+                            type="object"
+                            string="Open Quarantine Transfer"
+                            class="btn-secondary"
+                            invisible="not x_sbk_quarantine_picking_id"/>
                     <field name="x_sbk_result" widget="statusbar"
                            statusbar_visible="pass,fail,rework,hold"/>
                 </header>
@@ -52,6 +62,11 @@
                         <field name="x_sbk_rework_workcenter_id"
                                invisible="not x_sbk_rework_required"/>
                         <field name="x_sbk_rework_workorder_id" readonly="1"/>
+                    </group>
+                    <group string="Quarantine"
+                           invisible="not x_sbk_quarantine_picking_id and x_sbk_result != 'fail'">
+                        <field name="x_sbk_quarantine_picking_id" readonly="1"/>
+                        <field name="x_sbk_quarantined_at" readonly="1"/>
                     </group>
                     <notebook>
                         <page string="Findings" name="findings">

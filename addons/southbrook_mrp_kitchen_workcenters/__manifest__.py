@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.4.0",
+    "version": "19.0.4.5.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -58,6 +58,9 @@ southbrook_kitchen_workspace) without duplicating their models.
     ],
     "data": [
         "security/ir.model.access.csv",
+        # Quarantine location seed (SAMI PRD INV-06). Loaded early so
+        # the NCR auto-quarantine flow can resolve it by xml_id.
+        "data/southbrook_quarantine_location.xml",
         # Master data — materials + finishes the work-center fields
         # reference. Must load BEFORE the workcenter seed.
         "data/southbrook_kitchen_materials.xml",

@@ -157,6 +157,150 @@ class SouthbrookMiCheck(models.Model):
              "shows the spawned rework.",
     )
 
+    # SAMI PRD INV-06 (2026-06-25) — NCR auto-quarantine.
+    x_sbk_quarantine_picking_id = fields.Many2one(
+        comodel_name="stock.picking",
+        string="Quarantine Transfer",
+        ondelete="set null",
+        readonly=True,
+        help="Auto-created internal transfer that moves the failed "
+             "batch to the Southbrook Quarantine location. Lands in "
+             "draft state so the inspector can review the qty + lot "
+             "before confirming the move.",
+    )
+    x_sbk_quarantined_at = fields.Datetime(
+        string="Quarantined At",
+        readonly=True,
+    )
+
+    # --------------------------------------------------------------
+    # NCR auto-quarantine (SAMI PRD INV-06, 2026-06-25)
+    # --------------------------------------------------------------
+    _QUARANTINE_SEVERITY_RANK = {
+        "minor": 1,
+        "major": 2,
+        "critical": 3,
+    }
+
+    def _should_auto_quarantine(self):
+        """True if this check's (result, severity) crosses the
+        configured threshold and a picking hasn't been created yet."""
+        self.ensure_one()
+        if self.x_sbk_quarantine_picking_id or self.x_sbk_result != "fail":
+            return False
+        Param = self.env["ir.config_parameter"].sudo()
+        threshold = (Param.get_param(
+            "southbrook.ncr_quarantine.severity_threshold", "critical")
+            or "critical").lower()
+        threshold_rank = self._QUARANTINE_SEVERITY_RANK.get(threshold, 3)
+        sev_rank = self._QUARANTINE_SEVERITY_RANK.get(
+            self.x_sbk_defect_severity or "minor", 1)
+        return sev_rank >= threshold_rank
+
+    def action_quarantine_failed_batch(self):
+        """Create a draft stock.picking that moves the failed batch
+        to the Southbrook Quarantine location. Idempotent — re-clicking
+        on a check that already has a picking just opens it."""
+        self.ensure_one()
+        if self.x_sbk_quarantine_picking_id:
+            return self._action_open_quarantine_picking()
+        wo = self.x_sbk_workorder_id
+        if not wo or not wo.production_id:
+            raise UserError(_(
+                "Quarantine needs a linked production order — set "
+                "x_sbk_workorder_id on this check first."))
+        try:
+            quarantine_loc = self.env.ref(
+                "southbrook_mrp_kitchen_workcenters."
+                "stock_location_southbrook_quarantine")
+        except ValueError:
+            raise UserError(_(
+                "Southbrook Quarantine location is missing. "
+                "Re-run module upgrade or restore data/southbrook_"
+                "quarantine_location.xml."))
+        mo = wo.production_id
+        Picking = self.env["stock.picking"]
+        Move = self.env["stock.move"]
+        # Source = MO's destination location (where finished goods land)
+        # OR fall back to its production location if dest isn't set.
+        src_loc = (mo.location_dest_id
+                   or mo.picking_type_id.default_location_dest_id
+                   or self.env.ref("stock.stock_location_stock"))
+        picking_type = self.env["stock.picking.type"].search([
+            ("code", "=", "internal"),
+            ("warehouse_id.company_id", "=", self.env.company.id),
+        ], limit=1)
+        if not picking_type:
+            raise UserError(_(
+                "No internal-transfer picking type found in the "
+                "active company — configure a warehouse first."))
+        picking = Picking.create({
+            "picking_type_id": picking_type.id,
+            "location_id": src_loc.id,
+            "location_dest_id": quarantine_loc.id,
+            "origin": _("NCR: %(check)s (MO %(mo)s)",
+                        check=self.name or self.id, mo=mo.name),
+            "company_id": self.env.company.id,
+        })
+        Move.create({
+            "name": _("NCR quarantine: %(p)s",
+                      p=mo.product_id.display_name),
+            "picking_id": picking.id,
+            "product_id": mo.product_id.id,
+            "product_uom_qty": wo.qty_producing or 1.0,
+            "product_uom": mo.product_uom_id.id,
+            "location_id": src_loc.id,
+            "location_dest_id": quarantine_loc.id,
+            "company_id": self.env.company.id,
+        })
+        self.write({
+            "x_sbk_quarantine_picking_id": picking.id,
+            "x_sbk_quarantined_at": fields.Datetime.now(),
+        })
+        # Emit dashboard event — non-fatal.
+        try:
+            self.env["southbrook.ops.event"].emit(
+                "install_risk",
+                _("Quarantine transfer %(p)s drafted for MO %(mo)s "
+                  "(defect: %(d)s)",
+                  p=picking.name or "?",
+                  mo=mo.name or "?",
+                  d=dict(self._fields["x_sbk_defect_type"].selection).get(
+                      self.x_sbk_defect_type, "?")),
+                res_model="stock.picking",
+                res_id=picking.id,
+                severity="alert",
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return self._action_open_quarantine_picking()
+
+    def _action_open_quarantine_picking(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Quarantine Transfer"),
+            "res_model": "stock.picking",
+            "res_id": self.x_sbk_quarantine_picking_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def write(self, vals):
+        result = super().write(vals)
+        # Auto-quarantine when result transitions to fail AND severity
+        # crosses the threshold (default 'critical'). Wrapped in
+        # try/except — quarantine MUST NEVER block the inspector from
+        # saving their finding.
+        if "x_sbk_result" in vals or "x_sbk_defect_severity" in vals:
+            for check in self:
+                if check._should_auto_quarantine():
+                    try:
+                        check.action_quarantine_failed_batch()
+                    except Exception:  # noqa: BLE001
+                        pass
+        return result
+
     @api.depends("x_sbk_result")
     def _compute_rework_required(self):
         for check in self:
