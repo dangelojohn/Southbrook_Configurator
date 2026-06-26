@@ -11,3 +11,9 @@ access_sbk_asbuilt_mrp_user,southbrook.asbuilt mrp user,model_southbrook_asbuilt
 access_sbk_asbuilt_mrp_manager,southbrook.asbuilt mrp manager,model_southbrook_asbuilt,mrp.group_mrp_manager,1,1,1,1
 access_sbk_handover_mrp_user,southbrook.shift.handover mrp user,model_southbrook_shift_handover,mrp.group_mrp_user,1,1,1,0
 access_sbk_handover_mrp_manager,southbrook.shift.handover mrp manager,model_southbrook_shift_handover,mrp.group_mrp_manager,1,1,1,1
+access_sbk_opcua_endpoint_user,southbrook.opcua.endpoint mrp user,model_southbrook_opcua_endpoint,mrp.group_mrp_user,1,0,0,0
+access_sbk_opcua_endpoint_manager,southbrook.opcua.endpoint mrp manager,model_southbrook_opcua_endpoint,mrp.group_mrp_manager,1,1,1,1
+access_sbk_opcua_tag_user,southbrook.opcua.tag.mapping mrp user,model_southbrook_opcua_tag_mapping,mrp.group_mrp_user,1,0,0,0
+access_sbk_opcua_tag_manager,southbrook.opcua.tag.mapping mrp manager,model_southbrook_opcua_tag_mapping,mrp.group_mrp_manager,1,1,1,1
+access_sbk_opcua_log_user,southbrook.opcua.log mrp user,model_southbrook_opcua_log,mrp.group_mrp_user,1,0,0,0
+access_sbk_opcua_log_manager,southbrook.opcua.log mrp manager,model_southbrook_opcua_log,mrp.group_mrp_manager,1,1,1,1

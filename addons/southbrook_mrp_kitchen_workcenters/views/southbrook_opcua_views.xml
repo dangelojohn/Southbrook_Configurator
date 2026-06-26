@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <!-- Endpoint list -->
+    <record id="view_southbrook_opcua_endpoint_list" model="ir.ui.view">
+        <field name="name">southbrook.opcua.endpoint.list</field>
+        <field name="model">southbrook.opcua.endpoint</field>
+        <field name="arch" type="xml">
+            <list string="OPC-UA Endpoints" decoration-muted="not active">
+                <field name="name"/>
+                <field name="url"/>
+                <field name="workcenter_id"/>
+                <field name="security_policy"/>
+                <field name="mapping_count" string="Mappings"/>
+                <field name="last_poll_at"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Endpoint form -->
+    <record id="view_southbrook_opcua_endpoint_form" model="ir.ui.view">
+        <field name="name">southbrook.opcua.endpoint.form</field>
+        <field name="model">southbrook.opcua.endpoint</field>
+        <field name="arch" type="xml">
+            <form string="OPC-UA Endpoint">
+                <header>
+                    <button name="action_simulate_poll" type="object"
+                            string="Simulate Poll" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. Homag CNC2"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="workcenter_id"/>
+                            <field name="url" placeholder="opc.tcp://homag-cell-1.shop.local:4840"/>
+                        </group>
+                        <group>
+                            <field name="security_policy"/>
+                            <field name="username"/>
+                            <field name="password" password="True"/>
+                            <field name="polling_seconds"/>
+                            <field name="last_poll_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Tag Mappings" name="mappings">
+                            <field name="mapping_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="active" widget="boolean_toggle"/>
+                                    <field name="name"/>
+                                    <field name="node_id"/>
+                                    <field name="target_model"/>
+                                    <field name="target_field"/>
+                                    <field name="target_workcenter_id"/>
+                                    <field name="transform"/>
+                                    <field name="json_path"
+                                           column_invisible="parent.transform != 'json_extract'"/>
+                                    <field name="stub_value"/>
+                                    <field name="last_applied_value" readonly="1"/>
+                                    <field name="last_applied_at" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Poll Log" name="log">
+                            <field name="log_ids" readonly="1">
+                                <list decoration-success="state == 'ok'"
+                                      decoration-danger="state == 'error'"
+                                      decoration-muted="state == 'skipped'">
+                                    <field name="create_date" string="When"/>
+                                    <field name="mapping_id"/>
+                                    <field name="node_id"/>
+                                    <field name="raw_value"/>
+                                    <field name="applied_value"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="error_message"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_opcua_endpoint" model="ir.actions.act_window">
+        <field name="name">OPC-UA Endpoints</field>
+        <field name="res_model">southbrook.opcua.endpoint</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No OPC-UA endpoints configured.
+            </p>
+            <p>
+                Each Homag iX cell (or other OPC-UA-capable machine) becomes
+                an endpoint here. Tag mappings declare which OPC-UA nodes
+                drive which Odoo fields. Use the <em>Simulate Poll</em>
+                button to exercise the wiring end-to-end with stub values
+                — real polling lands in Phase 4 when the asyncua dependency
+                is added.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_sbk_ops_opcua"
+              name="OPC-UA Endpoints"
+              parent="menu_sbk_ops_root"
+              action="action_southbrook_opcua_endpoint"
+              sequence="70"/>
+
+</odoo>

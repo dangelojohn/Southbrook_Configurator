@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.11.0",
+    "version": "19.0.4.12.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -94,6 +94,8 @@ southbrook_kitchen_workspace) without duplicating their models.
         "views/southbrook_asbuilt_views.xml",
         # Shift handover surface (SAMI PRD MES-10, 2026-06-26).
         "views/southbrook_shift_handover_views.xml",
+        # OPC-UA gateway prototype (SAMI PRD IOT-02, 2026-06-26).
+        "views/southbrook_opcua_views.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [

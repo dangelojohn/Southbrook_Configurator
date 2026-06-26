@@ -10,3 +10,4 @@ from . import mrp_workorder
 from . import mrp_production
 from . import southbrook_asbuilt
 from . import southbrook_shift_handover
+from . import southbrook_opcua
