@@ -63,6 +63,60 @@ class QrScanController(http.Controller):
         return request.make_response(body, headers=[
             ("Content-Type", "text/html; charset=utf-8")])
 
+    @http.route("/sb/qr/inventory/bin-scan", type="json", auth="user",
+                methods=["POST"])
+    def bin_scan(self, src=None, dst=None, product=None, qty=1.0, **kw):
+        """Bin-scan inventory move.
+
+        Body:
+          {
+            "src":      "sb://loc/<src_id>?...",
+            "dst":      "sb://loc/<dst_id>?...",
+            "product":  "sb://product/<product_id>?..." or int product_id,
+            "qty":      float (default 1.0)
+          }
+
+        Returns: {ok, move_id, message} or {ok:false, error}.
+        """
+        env = request.env
+        if not src or not dst:
+            return {"ok": False, "error": "src + dst required"}
+        if not product:
+            return {"ok": False, "error": "product required"}
+        Payload = env["southbrook.qr.payload"].sudo()
+        try:
+            src_p = Payload.parse(src)
+            dst_p = Payload.parse(dst)
+            if not src_p["valid_signature"] or not dst_p["valid_signature"]:
+                return {"ok": False, "error": "Invalid signature on src/dst"}
+            if src_p["kind"] != "loc" or dst_p["kind"] != "loc":
+                return {"ok": False, "error": "src/dst must be 'loc' kind"}
+            src_id = int(src_p["ident"])
+            dst_id = int(dst_p["ident"])
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"src/dst parse failed: {exc}"}
+        # Product may be a raw id OR an sb:// payload
+        if isinstance(product, str) and product.startswith("sb://"):
+            try:
+                p = Payload.parse(product)
+                if not p["valid_signature"]:
+                    return {"ok": False, "error": "Invalid signature on product"}
+                product_id = int(p["ident"])
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"product parse failed: {exc}"}
+        else:
+            try:
+                product_id = int(product)
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "product must be int or sb:// payload"}
+        try:
+            move = env["stock.move"].sudo()._scan_quick_move(
+                src_id, dst_id, product_id, qty=float(qty))
+            return {"ok": True, "move_id": move.id,
+                    "message": f"Moved {qty} of product {product_id} from {src_id} to {dst_id}"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+
     @http.route("/sb/qr/labels", type="http", auth="user",
                 methods=["GET"], website=False)
     def labels(self, model=None, ids="", size="2x4", text="1", **kw):

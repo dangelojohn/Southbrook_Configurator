@@ -43,16 +43,18 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
-    "depends": ["base", "web", "mail"],
+    "depends": ["base", "web", "mail", "stock"],
     "data": [
         "security/ir.model.access.csv",
-        "views/southbrook_qr_scan_log_views.xml",
-        "wizards/southbrook_qr_label_print_wizard_views.xml",
         "data/qr_kit_config_parameters.xml",
+        "data/shipping_unit_seed.xml",
+        "views/southbrook_qr_scan_log_views.xml",
+        "views/shipping_unit_views.xml",
+        "wizards/southbrook_qr_label_print_wizard_views.xml",
     ],
     "external_dependencies": {
         "python": ["qrcode"],

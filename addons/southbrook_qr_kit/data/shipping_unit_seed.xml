@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo noupdate="1">
+    <record id="seq_shipping_unit" model="ir.sequence">
+        <field name="name">Shipping Unit</field>
+        <field name="code">southbrook.shipping.unit</field>
+        <field name="prefix">SHU/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>
