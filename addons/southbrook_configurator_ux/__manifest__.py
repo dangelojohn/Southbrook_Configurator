@@ -64,7 +64,7 @@ Phase 5 — Tests + a11y
     engine, ARIA roles on chip selectors and import modal,
     keyboard navigation.
 """,
-    "version": "19.0.1.4.0",
+    "version": "19.0.1.5.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",

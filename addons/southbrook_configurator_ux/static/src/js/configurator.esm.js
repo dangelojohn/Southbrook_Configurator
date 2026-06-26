@@ -933,11 +933,63 @@ class ConfiguratorV2 extends Component {
         const wIdx = ["9 in", "12 in", "15 in", "18 in", "21 in", "24 in",
                       "27 in", "30 in", "33 in", "36 in"].indexOf(widthName);
         const wpx = 70 + Math.max(0, wIdx) * 16;
+        // Parsed numeric width (inches) — used by the door-count
+        // width fallback further down AND the dim model below.
+        const _widthInchesMatch = widthName.match(/(\d+(?:\.\d+)?)/);
+        const widthInches = _widthInchesMatch
+            ? parseFloat(_widthInchesMatch[1])
+            : 15;
 
-        // ── Body height varies by kind ──────────────────────────────
-        // Wall cabs are short (mounted up high), tall cabs are tall.
-        const bodyHeight = kind === "tall" ? 220
-            : (kind === "wall" ? 100 : 150);
+        // ── Real-world dimensions in inches → px at uniform scale ───
+        // Width keeps the existing sub-linear visual scale (the
+        // wpx formula above is tuned for page-pane ergonomics);
+        // depth + height use a uniform DH_SCALE so the depth:height
+        // ratio matches industry-standard cabinet dimensions.
+        //
+        // Industry standards (English-Canada cabinetry):
+        //   Base  cab : 24" deep, 34.5" tall (countertop sold separately)
+        //   Wall  cab : 12" deep, 30" tall
+        //   Tall  cab : 24" deep, 84" tall (clamped to viewer)
+        //   Drawer bank: same depth+height as base
+        const REAL_DIMS = {
+            base:        { depth: 24, height: 34.5 },
+            wall:        { depth: 12, height: 30 },
+            tall:        { depth: 24, height: 84 },
+            drawer_bank: { depth: 24, height: 34.5 },
+        };
+        // widthInches computed earlier (right after wpx) for the
+        // door-count width fallback to use.
+
+        const dimKey = isDrawerBank
+            ? (kind === "tall" ? "tall" : "drawer_bank")
+            : kind;
+
+        // Depth — Depth attribute beats industry default
+        const depthAttrName = pickedNameOf("Depth", null);
+        let depthInches = REAL_DIMS[dimKey].depth;
+        if (depthAttrName) {
+            const dm = depthAttrName.match(/(\d+(?:\.\d+)?)/);
+            if (dm) depthInches = parseFloat(dm[1]);
+        }
+
+        // Height — Height attribute beats industry default
+        const heightAttrName = pickedNameOf("Height", null);
+        let heightInches = REAL_DIMS[dimKey].height;
+        if (heightAttrName) {
+            const hm = heightAttrName.match(/(\d+(?:\.\d+)?)/);
+            if (hm) heightInches = parseFloat(hm[1]);
+        }
+
+        // 5 px/inch for depth + height — fits 30" base in 250px
+        // viewer cleanly while preserving the real width:depth:height
+        // ratio (30 × 24 × 34.5 → 150 × 120 × 173 px).
+        const DH_SCALE = 5;
+        const depthPx = Math.round(depthInches * DH_SCALE);
+        const MAX_BODY_PX = 200;  // viewer is 250 — leave headroom
+        const bodyHeight = Math.min(
+            MAX_BODY_PX,
+            Math.round(heightInches * DH_SCALE)
+        );
 
         // ── Finish color (existing) ─────────────────────────────────
         const finishName = pickedNameOf("Finish",
@@ -958,8 +1010,23 @@ class ConfiguratorV2 extends Component {
         const insetGap = /inset/i.test(overlay) ? 8 : 6;
 
         // ── Hinge + handle ──────────────────────────────────────────
-        const doorCountName = pickedNameOf("Door Count", "1");
-        const doors = doorCountName === "2" ? 2 : 1;
+        // Door Count — explicit attribute wins. When the template
+        // doesn't expose it (3 corner-base templates audited 2026-
+        // 06-26, plus drawer-only bases), fall back to width-based
+        // industry default: ≥24" base cabs are typically two-door.
+        // We DON'T attribute drawer-only kinds (isDrawerBank) to
+        // doors — those render rows instead.
+        const doorCountAttr = pickedNameOf("Door Count", null);
+        let doors;
+        if (doorCountAttr) {
+            doors = doorCountAttr === "2" ? 2 : 1;
+        } else if (kind === "base" && widthInches >= 24 && !isDrawerBank) {
+            doors = 2;
+        } else if (kind === "tall" && widthInches >= 24) {
+            doors = 2;
+        } else {
+            doors = 1;
+        }
         const hinge = pickedNameOf("Hinge Side", "LH (Left Hand)");
         const isLH = hinge.startsWith("LH");
         const handle = pickedNameOf("Handle", "Bar Pull");
@@ -1008,34 +1075,11 @@ class ConfiguratorV2 extends Component {
             ? `<div style="position:absolute;bottom:0;left:0;right:0;height:14px;background:rgba(0,0,0,.18);border-radius:0 0 4px 4px"></div>`
             : "";
 
-        // ── Adjustable levelling feet (base + tall) ─────────────────
-        const feetHtml = (kind === "base" || kind === "tall")
-            ? `<div aria-label="Adjustable levelling feet" style="display:flex;justify-content:space-between;width:${wpx}px;padding:0 12px;box-sizing:border-box;height:8px;margin-top:2px">
-                  <span style="width:5px;height:8px;background:#222;border-radius:0 0 2px 2px"></span>
-                  <span style="width:5px;height:8px;background:#222;border-radius:0 0 2px 2px"></span>
-              </div>`
-            : "";
-
         // ── Accessibility: spoken description matches drawing ───────
         const kindLabel = isDrawerBank
             ? `${drawerCount || (kind === "tall" ? 4 : 3)}-drawer ${kind === "tall" ? "tall" : "base"} bank`
             : `${doors === 2 ? "Two-door " : ""}${kind === "wall" ? "wall" : (kind === "tall" ? "tall" : "base")} cabinet`;
         const aria = `${kindLabel}${isFramed ? ", framed" : ", frameless"}${(kind === "base" || kind === "tall") ? ", on adjustable levelling feet" : ""}`;
-
-        // ── Depth in pixels — drives the 3D box thickness ───────────
-        const depthName = pickedNameOf("Depth", null);
-        let depthPx = null;
-        if (depthName) {
-            const m = depthName.match(/(\d+)/);
-            if (m) {
-                // Scale 1 inch ≈ 2.3px to match the width scale
-                // (9-36 in spans 70-214 px).
-                depthPx = Math.round(parseInt(m[1], 10) * 2.3);
-            }
-        }
-        if (!depthPx) {
-            depthPx = kind === "wall" ? 30 : 56;
-        }
 
         // ── Darker side/back tone for visible depth at 3/4 view ─────
         const sideColor = `color-mix(in srgb, ${color} 70%, #000)`;
@@ -1085,13 +1129,49 @@ class ConfiguratorV2 extends Component {
             + `border-radius:3px;`;
         const topFace = `<div class="sb_cab_face sb_cab_face_top" style="${topFaceStyle}"></div>`;
 
-        // Feet — rendered OUTSIDE the 3D box (below the box wrapper),
-        // so they always look right when the box rotates.
+        // ── 4 adjustable corner legs — INSIDE the 3D box so they ────
+        // rotate with the cabinet. Positioned at the 4 bottom corners
+        // (front-left, front-right, back-left, back-right), inset from
+        // the carcass sides + recessed behind the toe-kick at front.
+        //
+        // Real legs are ~3" tall × 0.5" wide × 0.5" deep; at DH_SCALE
+        // px/inch that is ~15 × 2.5 × 2.5 px. We slightly oversize to
+        // 18 × 5 × 5 px for visibility at the preview scale.
+        const legW = 5;
+        const legD = 5;
+        const legH = 18;
+        const sideInsetPx = Math.round(0.6 * DH_SCALE);          // 0.6" in from sides
+        const frontInsetPx = Math.round(3 * DH_SCALE);           // 3" behind toe-kick front edge
+        const backInsetPx = Math.round(0.75 * DH_SCALE);         // small inset from back face
+
+        const legXAbs = w / 2 - sideInsetPx - legW / 2;          // distance from center
+        const legZFront = d / 2 - frontInsetPx - legD / 2;       // toward +Z = front
+        const legZBack = -(d / 2) + backInsetPx + legD / 2;      // toward -Z = back
+        const legYTop = h / 2 + legH / 2;                        // sit just below box
+
+        const makeLeg = (xOff, zOff) => {
+            const tx = `translate(-50%, -50%) translate3d(${xOff}px, ${legYTop}px, ${zOff}px)`;
+            return `<div class="sb_cab_leg" style="position:absolute;top:50%;left:50%;width:${legW}px;height:${legH}px;background:#1c1c1c;border-radius:0 0 2px 2px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 1px 1px rgba(0,0,0,.35);transform:${tx};backface-visibility:hidden;"></div>`;
+        };
+
+        const legsHtml = (kind === "base" || kind === "tall" || isDrawerBank)
+            ? [
+                makeLeg(-legXAbs, legZFront),    // front-left
+                makeLeg(legXAbs, legZFront),     // front-right
+                makeLeg(-legXAbs, legZBack),     // back-left
+                makeLeg(legXAbs, legZBack),      // back-right
+            ].join("")
+            : "";
+
+        // Box wrapper has fixed pixel dimensions; legs extend below
+        // visually but are part of the rotated box so they spin
+        // with it. Outer wrapper gives layout room for the legs +
+        // perspective overhang.
         const boxWrapperStyle =
             `position:relative;width:${w}px;height:${h}px;`;
         const outerStyle =
             `display:flex;flex-direction:column;align-items:center;`
-            + `min-height:${h + 30}px;`;
+            + `min-height:${h + legH + 12}px;`;
 
         return markup(
             `<div role="img" aria-label="${aria}" style="${outerStyle}">
@@ -1101,8 +1181,8 @@ class ConfiguratorV2 extends Component {
                     ${leftFace}
                     ${rightFace}
                     ${topFace}
+                    ${legsHtml}
                 </div>
-                ${feetHtml}
             </div>`
         );
     }
