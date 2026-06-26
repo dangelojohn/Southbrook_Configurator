@@ -87,8 +87,9 @@ POLL_STATES = [
 class SouthbrookOpcuaEndpoint(models.Model):
     _name = "southbrook.opcua.endpoint"
     _description = "Southbrook OPC-UA Endpoint"
-    _inherit = ["mail.thread"]
+    _inherit = ["mail.thread", "southbrook.qr.mixin"]
     _order = "name"
+    _qr_kind = "opcua"
 
     name = fields.Char(required=True, tracking=True)
     active = fields.Boolean(default=True, tracking=True)

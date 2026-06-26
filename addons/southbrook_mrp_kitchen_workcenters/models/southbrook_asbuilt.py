@@ -48,8 +48,9 @@ QC_OVERALL_RESULTS = [
 class SouthbrookAsbuilt(models.Model):
     _name = "southbrook.asbuilt"
     _description = "Southbrook As-Built Record"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "southbrook.qr.mixin"]
     _order = "built_at desc, id desc"
+    _qr_kind = "asbuilt"
 
     name = fields.Char(
         string="As-Built ID",

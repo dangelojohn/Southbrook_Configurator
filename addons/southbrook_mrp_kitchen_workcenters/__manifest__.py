@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.12.2",
+    "version": "19.0.4.13.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -55,6 +55,8 @@ southbrook_kitchen_workspace) without duplicating their models.
         "southbrook_manufacturing_intelligence",
         "southbrook_kitchen_mrp",
         "southbrook_kitchen_workspace",
+        # QR foundation — provides qr.mixin + scan controller.
+        "southbrook_qr_kit",
     ],
     "data": [
         "security/ir.model.access.csv",

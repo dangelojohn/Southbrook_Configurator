@@ -78,7 +78,8 @@ CHECK_RESULTS = [
 
 
 class SouthbrookMiCheck(models.Model):
-    _inherit = "southbrook.mi.check"
+    _inherit = ["southbrook.mi.check", "southbrook.qr.mixin"]
+    _qr_kind = "ncr"
 
     x_sbk_check_stage = fields.Selection(
         CHECK_STAGES,

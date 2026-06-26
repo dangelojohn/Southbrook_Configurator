@@ -44,8 +44,9 @@ HANDOVER_STATES = [
 class SouthbrookShiftHandover(models.Model):
     _name = "southbrook.shift.handover"
     _description = "Southbrook Shift Handover Log"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "southbrook.qr.mixin"]
     _order = "shift_date desc, id desc"
+    _qr_kind = "shift"
 
     name = fields.Char(
         string="Reference",

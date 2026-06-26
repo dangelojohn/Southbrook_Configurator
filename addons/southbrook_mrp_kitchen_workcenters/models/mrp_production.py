@@ -24,7 +24,8 @@ PRIORITY_LEVELS = [
 
 
 class MrpProduction(models.Model):
-    _inherit = "mrp.production"
+    _inherit = ["mrp.production", "southbrook.qr.mixin"]
+    _qr_kind = "mo"
 
     x_sbk_kitchen_project_id = fields.Many2one(
         "sb.kitchen.project",

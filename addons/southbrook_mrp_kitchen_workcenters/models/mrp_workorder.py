@@ -36,7 +36,8 @@ from odoo import _, api, fields, models
 
 
 class MrpWorkorder(models.Model):
-    _inherit = "mrp.workorder"
+    _inherit = ["mrp.workorder", "southbrook.qr.mixin"]
+    _qr_kind = "wo"
 
     # ------------------------------------------------------------------
     # Duration variance (M2 formula vs native expected)
