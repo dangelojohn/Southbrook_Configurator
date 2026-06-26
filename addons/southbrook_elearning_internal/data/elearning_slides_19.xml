@@ -1,0 +1,1191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_19_payroll_menu_cadence" model="slide.slide">
+            <field name="name">Payroll Admin — Your Menu and the Bi-Weekly Cadence</field>
+            <field name="channel_id" ref="course_payroll_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">New payroll administrator onboarding to the Southbrook Canadian payroll module.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-admin-your-menu-and-the-bi-weekly-cadence">Payroll Admin — Your Menu and the Bi-Weekly Cadence</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're stepping into the payroll admin role. You'll run payroll every
+other Friday for Southbrook's bi-weekly employees. This lesson hands
+you the map: what menus, what cadence, what the deadlines look like.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Payroll</strong> (root menu, <code>menu_southbrook_payroll_root</code>).</p>
+<p>Submenus:</p>
+<table>
+<thead>
+<tr>
+<th>Submenu</th>
+<th>XML id</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Contracts</td>
+<td><code>menu_southbrook_payroll_contracts</code></td>
+<td>hr.contract records — wages, schedules, deductions</td>
+</tr>
+<tr>
+<td>Runs</td>
+<td><code>menu_southbrook_payroll_runs</code></td>
+<td>the bi-weekly payroll batch (<code>hr.payroll.run</code> extension)</td>
+</tr>
+<tr>
+<td>Payslips</td>
+<td><code>menu_southbrook_payroll_payslips</code></td>
+<td>individual slips inside a run</td>
+</tr>
+<tr>
+<td>T4</td>
+<td><code>menu_southbrook_payroll_t4</code></td>
+<td>year-end T4 slips</td>
+</tr>
+<tr>
+<td>ROE</td>
+<td><code>menu_southbrook_payroll_roe</code></td>
+<td>Records of Employment</td>
+</tr>
+<tr>
+<td>Certifications</td>
+<td><code>menu_southbrook_payroll_certifications</code></td>
+<td>employee certifications (WHMIS, first aid, etc.) — touches pay differentials</td>
+</tr>
+<tr>
+<td>Tax Brackets</td>
+<td><code>menu_southbrook_payroll_tax_brackets</code></td>
+<td>CRA 2026 federal + provincial brackets (read-only for most)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-southbrook-bi-weekly-cadence">The Southbrook bi-weekly cadence</h2>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>What happens</th>
+<th>Who acts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sunday EOD</td>
+<td>Pay period ends</td>
+<td>(auto)</td>
+</tr>
+<tr>
+<td>Monday</td>
+<td>Employees finish entering hours</td>
+<td>Employees</td>
+</tr>
+<tr>
+<td>Tuesday</td>
+<td>Supervisors approve timesheets</td>
+<td>Supervisors</td>
+</tr>
+<tr>
+<td>Wednesday</td>
+<td>You pull the run + spot-check</td>
+<td>Payroll admin</td>
+</tr>
+<tr>
+<td>Thursday</td>
+<td>Compute payroll + Plant GM approves</td>
+<td>Payroll admin + Plant GM</td>
+</tr>
+<tr>
+<td>Friday</td>
+<td>EFT file generated + uploaded to bank</td>
+<td>Payroll admin</td>
+</tr>
+<tr>
+<td>Friday EOD</td>
+<td>Payslips visible to employees on portal</td>
+<td>(auto)</td>
+</tr>
+<tr>
+<td>Following Monday</td>
+<td>First-Monday banking deposits</td>
+<td>(bank)</td>
+</tr>
+</tbody>
+</table>
+<p>Hard deadlines:
+- <strong>CPP / EI / income tax remittance</strong> to CRA: monthly (by the 15th
+  of the following month) for most employer sizes; quarterly only if
+  prior-year remittances were under $25k.
+- <strong>T4 distribution</strong> to employees: by Feb 28.
+- <strong>T4 Summary filing</strong> to CRA: by Feb 28.
+- <strong>ROE filing</strong> to Service Canada: within 5 calendar days of pay
+  period end (or 30 days from employment end if no pay period crosses
+  it).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="payroll-runs-list">Payroll Runs list</h3>
+<ul>
+<li>Decoration-info: state <code>draft</code></li>
+<li>Decoration-warning: state <code>pending_approval</code></li>
+<li>Decoration-success: state <code>done</code></li>
+</ul>
+<h3 id="payroll-run-form">Payroll Run form</h3>
+<ul>
+<li><code>name</code> — auto, "Bi-Weekly Run YYYY-MM-DD to YYYY-MM-DD"</li>
+<li><code>period_start</code>, <code>period_end</code>, <code>pay_date</code></li>
+<li><code>state</code> widget: draft → computing → pending_approval → approved → done</li>
+<li>Statusbar buttons gated on state</li>
+<li>Notebook tab <em>Payslips</em> — embedded list</li>
+<li>Notebook tab <em>Totals</em> — gross / CPP / EI / income tax / net per the
+  whole run</li>
+<li>Notebook tab <em>Audit Log</em> — chatter + activity history</li>
+</ul>
+<h3 id="payslip-form">Payslip form</h3>
+<ul>
+<li><code>employee_id</code>, <code>contract_id</code></li>
+<li>Notebook tab <em>Earnings</em> — regular, overtime, holiday, bonuses</li>
+<li>Notebook tab <em>Deductions</em> — CPP, EI, income tax, RRSP, benefits, garnishments</li>
+<li>Notebook tab <em>YTD Snapshot</em> — running totals for CPP / EI / income tax
+  caps</li>
+<li>Summary group at top — Gross / Total Deductions / Net</li>
+</ul>
+<h2 id="your-daily-flow-the-monday-friday-cycle">Your daily flow (the Monday-Friday cycle)</h2>
+<h3 id="monday-verify-timesheets-are-flowing">Monday — verify timesheets are flowing</h3>
+<ul>
+<li><em>Timesheets → Timesheets to Approve</em> (native) — you don't approve,
+  but you check the queue is moving.</li>
+<li>Watch for employees who haven't submitted by Monday EOD; nudge
+  their supervisors.</li>
+</ul>
+<h3 id="tuesday-supervisor-approval">Tuesday — supervisor approval</h3>
+<ul>
+<li>Same view; you watch for approvals being completed.</li>
+<li>Last-call EOD if anyone's still draft.</li>
+</ul>
+<h3 id="wednesday-pull-the-run-spot-check">Wednesday — pull the run + spot-check</h3>
+<ul>
+<li><em>Payroll → Payroll Runs → New</em>. Pick <code>period_start</code> (Sunday last
+  week) + <code>period_end</code> (Saturday this week) + <code>pay_date</code> (this
+  Friday).</li>
+<li>Click <em>Pull</em>. Payslip records create for every active employee
+  with bi-weekly contract.</li>
+<li>Spot-check 3 slips (lesson 19.2 walks the picks).</li>
+</ul>
+<h3 id="thursday-compute-approve">Thursday — compute + approve</h3>
+<ul>
+<li>Click <em>Compute</em> on the run. Math runs (lesson 19.3 explains).</li>
+<li>Read the <em>Totals</em> tab — gross + deductions should look like last
+  cycle ± expected variance.</li>
+<li>Click <em>Submit for Approval</em>. Plant GM gets an activity.</li>
+<li>Plant GM approves → state <code>approved</code>.</li>
+</ul>
+<h3 id="friday-generate-eft-upload-to-bank">Friday — generate EFT + upload to bank</h3>
+<ul>
+<li>Click <em>Generate EFT File</em> (lesson 19.4 walks).</li>
+<li>Download the <code>.aba</code> file. Upload to the bank business portal.</li>
+<li>Click <em>Mark Posted</em>. State → <code>done</code>. Payslips become visible to
+  employees on <code>/my/payroll</code>.</li>
+</ul>
+<h2 id="where-plant-gm-fits-in">Where Plant GM fits in</h2>
+<p>The Plant GM has approval rights on the payroll run. Their click is
+the gate between <em>compute done</em> and <em>EFT file generated</em>. They
+typically scan the totals + check no one's gross moved unexpectedly.</p>
+<h2 id="where-the-controller-fits-in">Where the Controller fits in</h2>
+<p>The Controller doesn't touch the run — but they verify:
+- The payroll journal entry posted to the right accounts (wages, CPP,
+  EI, income tax payable)
+- The bank reconciliation picks up the EFT debit
+- Month-end remittance journal entries to CRA tie to the run totals</p>
+<p>Two sides of the same coin; coordinate during the monthly close
+(Course 20).</p>
+<h2 id="where-hr-fits-in">Where HR fits in</h2>
+<p>HR maintains:
+- Employee record (<code>hr.employee</code>) — name, SIN, address, hire date,
+  manager
+- Contract (<code>hr.contract</code>) — wage, schedule, benefits, start/end
+- TD1 federal + provincial — tax credit amounts</p>
+<p>You consume what HR sets up. If HR is wrong, your run is wrong.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"My run pulled 47 employees but we have 50."</strong> Three employees
+  are likely missing an active contract. Open <em>Payroll →
+  Contracts</em>, filter state <code>running</code>; check who's missing.</p>
+</li>
+<li>
+<p><strong>"Payroll run says state <code>pending_approval</code> but Plant GM has
+  approved."</strong> Refresh; the activity may have closed without
+  triggering the state advance. Click <em>Refresh State</em> in the run
+  cog menu.</p>
+</li>
+<li>
+<p><strong>"EFT file generated but bank rejected the upload."</strong> Bank
+  format mismatch. The platform defaults to RBC <code>.aba</code>; if you bank
+  with TD or BMO, format differs. <em>Configuration → Banking → EFT
+  Format</em> fixes this once per session.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Pull</strong> queries <code>hr.contract</code> where <code>state = running</code> AND
+  <code>pay_frequency = bi_weekly</code> AND active employees.</li>
+<li><strong>Compute</strong> iterates payslips → for each, runs salary rules in
+  sequence per CRA 2026 brackets + employee TD1 + contract
+  deductions. Heavy work; CPU-bound for 60s on 50-employee runs.</li>
+<li><strong>EFT generation</strong> writes a <code>.aba</code> (or other bank format) file as
+  an <code>ir.attachment</code> on the run. Bank ICR + account number come from
+  <em>Settings → Companies → Banking</em>.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> It's Friday morning. You ran <em>Compute</em> yesterday. Plant GM
+hasn't approved yet. What's the right move?</p>
+<blockquote>
+<p>Walk to Plant GM or message them; do NOT click <em>Approve</em> as
+yourself — the gate exists for a reason. If they're unavailable, the
+backup approver is the Controller (per the <code>approval_chain</code> on the
+run).</p>
+</blockquote>
+<p><strong>Q2.</strong> Run pulled 50 employees. After compute, <em>Totals</em> shows gross
+$8k lower than last cycle. What's the likely explanation?</p>
+<blockquote>
+<p>Holiday in the period reduced regular hours OR new hire didn't start
+until mid-cycle OR a salaried employee was on unpaid leave. Drill
+into the <em>Payslips</em> tab sorted by gross delta vs prior period to find
+the source.</p>
+</blockquote>
+<p><strong>Q3.</strong> EFT file generated; bank reports the file uploaded but funds
+didn't move. What do you check?</p>
+<blockquote>
+<p>The file has a <em>Posting Date</em> line — verify it matches the pay
+date. Banks reject files with past dates and silently queue some
+formats; check the bank's confirmation screen for actual posting
+status.</p>
+</blockquote>
+<p><strong>Q4.</strong> Employee asks why their net pay is $30 less than last
+period. What do you check?</p>
+<blockquote>
+<p>Open their payslip → <em>Deductions</em> tab. CPP / EI may have caught up
+mid-period (employees front-loaded contributions); a benefit
+premium may have started; an income tax bracket may have crossed.
+Walk them through the deduction line that changed.</p>
+</blockquote>
+<p><strong>Q5.</strong> Your boss says "skip approval, the run is fine." What do you
+do?</p>
+<blockquote>
+<p>Don't skip. The approval is for audit + segregation of duties.
+If the boss is the approver, get the click in writing
+(<code>activity_done</code> posts to chatter as a record). If they want to
+push past, escalate to the Controller.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The pre-run checklist for timesheets, new hires, terminations —
+  lesson 19.2.</li>
+<li>The compute math + spot-check methodology — lesson 19.3.</li>
+<li>EFT file generation + bank upload mechanics — lesson 19.4.</li>
+<li>Mid-cycle garnishments + RRSP changes — lesson 19.5.</li>
+<li>Year-end T4 generation — Course 17 lesson 17.40 + future Course 24
+  deep-dive.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_19_payroll_prerun_checks" model="slide.slide">
+            <field name="name">Payroll Admin — Pre-Run Checks (Timesheets, New Hires, Terminations)</field>
+            <field name="channel_id" ref="course_payroll_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Payroll administrator preparing for Wednesday&#x27;s run pull.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-admin-pre-run-checks-timesheets-new-hires-terminations">Payroll Admin — Pre-Run Checks (Timesheets, New Hires, Terminations)</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the payroll admin on Wednesday morning of payroll week. Before
+you click <em>Pull</em> on the new payroll run, this lesson is the 12-minute
+checklist of what could go wrong and how to catch it.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Spread across three menu trees:</p>
+<ul>
+<li><strong>Timesheets → All Timesheets</strong> (native)</li>
+<li><strong>Employees → Employees</strong> (native)</li>
+<li><strong>Employees → Contracts</strong> (native) AND <strong>Payroll → Contracts</strong>
+  (<code>menu_southbrook_payroll_contracts</code>)</li>
+</ul>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="timesheet-status-query">Timesheet status query</h3>
+<ul>
+<li><code>state = draft</code> filter — anyone still draft = problem</li>
+<li>Group by <code>employee_id</code> — see who has 0 hours logged</li>
+<li>Filter by <code>date &gt;= period_start AND date &lt;= period_end</code></li>
+</ul>
+<h3 id="employee-record-sanity">Employee record sanity</h3>
+<ul>
+<li><code>active = True</code> — inactive employees skipped by Pull</li>
+<li><code>contract_id.state = running</code> — the contract must be active</li>
+<li><code>private_banking_info</code> populated — for EFT direct deposit</li>
+<li><code>tax_credit_amount</code> — TD1 federal value</li>
+<li><code>provincial_tax_credit_amount</code> — TD1 provincial value</li>
+<li><code>sin</code> — Social Insurance Number (encrypted at rest)</li>
+</ul>
+<h3 id="contract-record-sanity">Contract record sanity</h3>
+<ul>
+<li><code>wage</code> — hourly rate or salary base</li>
+<li><code>wage_type</code> — fixed / hourly / commission</li>
+<li><code>date_start</code> ≤ <code>period_end</code> AND (date_end IS NULL OR date_end &gt;=
+  period_start) — only contracts overlapping the period get pulled</li>
+<li><code>pay_frequency = bi_weekly</code> — must match the run</li>
+</ul>
+<h2 id="the-5-check-pre-run">The 5-check pre-run</h2>
+<h3 id="check-1-timesheets-fully-approved">Check 1: Timesheets fully approved</h3>
+<ul>
+<li><em>Timesheets → To Approve</em> — count should be zero by Wednesday AM</li>
+<li>If supervisors are behind, nudge them. Don't pull a run with draft
+  timesheets — hourly employees will get $0 gross.</li>
+<li>For salaried employees, timesheets are optional (they get the
+  fixed <code>wage</code> regardless), but verify the supervisor still
+  reviewed.</li>
+</ul>
+<h3 id="check-2-new-hires">Check 2: New hires</h3>
+<ul>
+<li><em>Employees → Employees</em> filter <code>hire_date &gt;= period_start</code></li>
+<li>For each new hire:</li>
+<li>Contract is in <code>running</code> state? (HR often forgets this step.)</li>
+<li>TD1 federal + provincial filled? (Defaults are <em>single, no
+    dependants</em>; under-withholds if employee has more credits.)</li>
+<li>Bank info filled? (No bank info = no EFT line = paper cheque
+    or delay.)</li>
+<li>SIN entered? (Mandatory for CRA reporting.)</li>
+</ul>
+<h3 id="check-3-terminations">Check 3: Terminations</h3>
+<ul>
+<li><em>Employees → Employees</em> filter <code>active = False</code> AND
+  <code>last_pay_date &gt;= period_start</code></li>
+<li>For each termination:</li>
+<li>Vacation pay paid out on the payslip? (Required by the relevant
+    province's ESA.)</li>
+<li>ROE drafted? (5-day deadline starts at pay period end; lesson
+    17.38.)</li>
+<li>Contract end date set? (If not, they'll continue pulling — even
+    though <code>active = False</code> filters them, the contract drives some
+    YTD math.)</li>
+</ul>
+<h3 id="check-4-wage-changes">Check 4: Wage changes</h3>
+<ul>
+<li><em>Payroll → Contracts</em> filter <code>wage_change_date &gt;= period_start</code></li>
+<li>For each contract with a recent wage change:</li>
+<li>Effective date is within the period? (If yes, the payslip
+    needs to split — old wage for days before, new wage for days
+    after.)</li>
+<li>The change was approved? (Confirm with HR + manager.)</li>
+</ul>
+<h3 id="check-5-leave-types-affecting-pay">Check 5: Leave types affecting pay</h3>
+<ul>
+<li>Unpaid leave reduces hours for hourly + may reduce salary for
+  salaried (depends on contract).</li>
+<li>Paid leave (vacation, sick) is paid at regular rate.</li>
+<li>Statutory holidays: extra pay differential; ESA varies by
+  province.</li>
+<li><em>Time Off → Leaves</em> filter date range — review.</li>
+</ul>
+<h2 id="spot-check-after-pull">Spot-check after Pull</h2>
+<p>After clicking <em>Pull</em>, before <em>Compute</em>, look at the payslip list:</p>
+<ul>
+<li><strong>Total count</strong> — does it match active bi-weekly employees minus
+  terminations + new hires?</li>
+<li><strong>Hourly employees</strong> — do their hours look right? Open one or two,
+  cross-check against the approved timesheet.</li>
+<li><strong>Salaried employees</strong> — does their gross match (base wage / pay
+  periods per year × applicable periods)?</li>
+<li><strong>Random sample</strong> — pick 3 random employees; open their payslip;
+  verify earnings + deductions look like last cycle.</li>
+</ul>
+<p>If anything's off, you can delete the payslip (or the whole run) and
+re-pull after fixing the upstream record.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Pulled with draft timesheets. Hourly employees have 0 hours."</strong>
+  Don't compute. Open <em>Timesheets → To Approve</em>, get the supervisor
+  to approve, then on the run click <em>Refresh Payslips</em> (or delete +
+  re-pull).</p>
+</li>
+<li>
+<p><strong>"New hire was missing from the pull."</strong> Their <code>hr.contract</code> is
+  <code>draft</code>, not <code>running</code>. Activate the contract (state change), then
+  <em>Refresh Payslips</em> on the run.</p>
+</li>
+<li>
+<p><strong>"Terminated employee was in the pull and got paid for a future
+  date."</strong> Their contract <code>date_end</code> is unset OR
+  <code>last_pay_date &gt; date_end</code>. Set <code>date_end</code> on the contract,
+  delete that payslip from the run, recompute.</p>
+</li>
+<li>
+<p><strong>"Holiday pay missing on hourly slips."</strong> <em>Compute</em> doesn't
+  auto-add stat holiday pay for hourly. Add via <em>Earnings → New →
+  Holiday Pay</em> on each affected slip. (Salary employees get it as
+  part of base.)</p>
+</li>
+<li>
+<p><strong>"Salaried employee on unpaid leave got full salary."</strong> The
+  contract didn't have an <code>unpaid_leave_reduction = True</code> flag.
+  Adjust the payslip's <em>Earnings → Salary</em> line manually + post
+  the reason in the chatter.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Pull</strong> queries <code>hr.contract</code> joined to <code>hr.employee</code>:
+  <code>sql
+  contract.state = 'running'
+    AND contract.pay_frequency = 'bi_weekly'
+    AND employee.active = True
+    AND contract.date_start &lt;= period_end
+    AND (contract.date_end IS NULL OR contract.date_end &gt;= period_start)</code></li>
+<li>One <code>hr.payslip</code> row per matched contract, linked to the run.</li>
+<li>For hourly contracts, Pull also fetches approved timesheet hours
+  in the period and stores them on the slip's <code>worked_hours_total</code>.</li>
+<li>Salaried contracts get a synthetic <code>worked_hours_total</code> based on
+  contract's <code>weekly_hours</code> × period_weeks.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Wednesday morning. Supervisor X hasn't approved their team's
+timesheets. Their team is 12 people. Do you pull anyway?</p>
+<blockquote>
+<p>No. If you pull, those 12 hourly employees get 0 gross or wrong
+gross. Nudge X, wait for approval, then pull. If X is out and
+the period is hard-blocked, escalate to Plant GM for delegate
+approval.</p>
+</blockquote>
+<p><strong>Q2.</strong> New hire started Monday of this pay period. Pull doesn't
+include them. Why?</p>
+<blockquote>
+<p>Their contract is likely still <code>draft</code>. HR forgot to activate
+when they finished onboarding. Open the contract, set
+<code>state = running</code>, then <em>Refresh Payslips</em> on the run.</p>
+</blockquote>
+<p><strong>Q3.</strong> Terminated employee. Last day was Friday of LAST pay period.
+ROE deadline?</p>
+<blockquote>
+<p>5 days from last day worked. Last Friday + 5 days = Wednesday this
+week. You need to issue the ROE today (lesson 17.38).</p>
+</blockquote>
+<p><strong>Q4.</strong> Wage change effective Wednesday of the pay period. How is
+the slip computed?</p>
+<blockquote>
+<p>The platform's salary rule respects the contract's
+<code>wage_change_date</code>. Days before use old wage, days from change
+forward use new. Verify by opening the slip → <em>Earnings</em> should
+show a split line for that period.</p>
+</blockquote>
+<p><strong>Q5.</strong> Holiday Monday in this period. Hourly employee's timesheet
+shows 0 hours for that day. Do you owe them holiday pay?</p>
+<blockquote>
+<p>Probably yes per provincial ESA. Add via <em>Earnings → New → Holiday
+Pay</em> with the regular rate × stat hours. Verify with HR if
+employee meets the eligibility threshold (some provinces require
+certain hours worked in the qualifying period).</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The compute math + CRA 2026 brackets — lesson 19.3.</li>
+<li>EFT file generation — lesson 19.4.</li>
+<li>Mid-cycle adjustments — lesson 19.5.</li>
+<li>New employee onboarding flow — Course 17 lesson 17.37.</li>
+<li>ROE filing — Course 17 lesson 17.38.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_19_payroll_compute_approve" model="slide.slide">
+            <field name="name">Payroll Admin — Compute + Approve with CRA 2026 Brackets</field>
+            <field name="channel_id" ref="course_payroll_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Payroll administrator computing the bi-weekly run + Plant GM approving.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-admin-compute-approve-with-cra-2026-brackets">Payroll Admin — Compute + Approve with CRA 2026 Brackets</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You've passed the pre-run checks. You're about to click <em>Compute</em> on
+the run. This lesson covers what the math does, how to spot-check the
+results, and what the Plant GM is looking for when they approve.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Payroll → Payroll Runs → [the open run]</strong>.</p>
+<p>Supporting menus:
+- <strong>Payroll → Tax Brackets</strong> (<code>menu_southbrook_payroll_tax_brackets</code>)
+  — CRA 2026 federal + provincial brackets, read-only.
+- <strong>Payroll → Payslips</strong> (<code>menu_southbrook_payroll_payslips</code>) — drill
+  through to individual slips.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="run-form-totals-tab-post-compute">Run form, Totals tab (post-compute)</h3>
+<ul>
+<li>Total gross</li>
+<li>Total CPP (employee + employer split)</li>
+<li>Total EI (employee + employer split)</li>
+<li>Total income tax withheld (federal + provincial combined)</li>
+<li>Total RRSP contributions</li>
+<li>Total benefits (taxable + non-taxable)</li>
+<li>Total garnishments</li>
+<li>Total net pay (sum of all payslip nets)</li>
+</ul>
+<h3 id="payslip-form-drill-through">Payslip form (drill-through)</h3>
+<ul>
+<li><em>Earnings</em> — regular, overtime, holiday, bonus</li>
+<li><em>Deductions</em> — CPP, EI, income tax, RRSP, benefits, garnishments</li>
+<li><em>YTD Snapshot</em> — year-to-date CPP / EI / income tax (drives the cap
+  math)</li>
+</ul>
+<h2 id="the-compute-in-plain-terms">The compute, in plain terms</h2>
+<p>The compute walks each payslip and applies salary rules in this
+order:</p>
+<h3 id="1-gross-calculation">1. Gross calculation</h3>
+<ul>
+<li><strong>Hourly</strong>: <code>worked_hours_total × hourly_rate</code> + overtime ×
+  multiplier</li>
+<li><strong>Salaried</strong>: <code>annual_salary / pay_periods_per_year</code> (26 for
+  bi-weekly)</li>
+<li>Plus any one-time earnings (bonus, retro, holiday pay)</li>
+</ul>
+<h3 id="2-pensionable-insurable-earnings">2. Pensionable + insurable earnings</h3>
+<ul>
+<li>Pensionable earnings = gross minus non-pensionable (some
+  benefits)</li>
+<li>Insurable earnings = gross minus non-insurable (RRSP, some
+  benefits)</li>
+</ul>
+<h3 id="3-cpp-canada-pension-plan">3. CPP (Canada Pension Plan)</h3>
+<ul>
+<li>2026 rate: 5.95% (employee + employer each)</li>
+<li>Annual maximum pensionable earnings (YMPE): $71,300 (2026)</li>
+<li>Annual basic exemption: $3,500</li>
+<li>Formula: <code>(pensionable_earnings - exemption_pro_rated) × 0.0595</code></li>
+<li>YTD cap respected: once YTD CPP = annual max, contributions stop</li>
+<li><em>Note: CPP2 enhancement on earnings above YMPE applies in 2026 —
+  the engine handles this; you don't need to do anything</em></li>
+</ul>
+<h3 id="4-ei-employment-insurance">4. EI (Employment Insurance)</h3>
+<ul>
+<li>2026 employee rate: 1.66%</li>
+<li>2026 employer rate: 2.32% (1.4× employee)</li>
+<li>Annual maximum insurable earnings: $63,200 (2026)</li>
+<li>Formula: <code>insurable_earnings × 0.0166</code></li>
+<li>YTD cap respected</li>
+</ul>
+<h3 id="5-income-tax-federal-provincial">5. Income tax (federal + provincial)</h3>
+<ul>
+<li>Federal: 5 brackets (15%, 20.5%, 26%, 29%, 33%)</li>
+<li>Provincial (Ontario typical): 5 brackets (5.05%, 9.15%, 11.16%,
+  12.16%, 13.16%)</li>
+<li>Brackets stored in <code>southbrook.payroll.tax_bracket</code> with
+  effective_year = 2026</li>
+<li>Annualised gross × bracket math, then div by pay periods</li>
+<li>TD1 credits reduce taxable income before bracket calc</li>
+</ul>
+<h3 id="6-other-deductions-in-order">6. Other deductions (in order)</h3>
+<ul>
+<li>RRSP (pre-tax contribution; reduces income tax for next slip)</li>
+<li>Benefits premiums (employee share)</li>
+<li>Garnishments (capped at 30% of net per wage protection)</li>
+<li>Manual one-time deductions</li>
+</ul>
+<h3 id="7-net-pay">7. Net pay</h3>
+<ul>
+<li><code>net_pay = gross - cpp - ei - income_tax - rrsp - benefits -
+  garnishments - other_deductions</code></li>
+</ul>
+<h2 id="your-compute-spot-check-flow">Your compute + spot-check flow</h2>
+<ol>
+<li>
+<p><strong>Click <em>Compute</em></strong> on the run. State → <code>computing</code>. Takes 30-90
+   seconds for a 50-employee run.</p>
+</li>
+<li>
+<p><strong>Wait for state → <code>pending_approval</code></strong>. The status bar advances
+   automatically.</p>
+</li>
+<li>
+<p><strong>Read the <em>Totals</em> tab</strong>:
+   - Total gross — within ±5% of last cycle?
+   - Total CPP — within ±5%?
+   - Total EI — within ±5%?
+   - Total income tax — within ±10%?
+   - Total net — within ±5%?
+   - Any big delta is a red flag.</p>
+</li>
+<li>
+<p><strong>Spot-check 3 payslips</strong>:
+   - <strong>A full-period hourly</strong>: gross = approved hours × rate?
+     Deductions in line with last cycle?
+   - <strong>A full-period salaried</strong>: gross = annual / 26? Deductions
+     match prior?
+   - <strong>One with a change</strong> (new hire, raise, deduction change):
+     verify the change reflected.</p>
+</li>
+<li>
+<p><strong>For new hires specifically</strong>: open their payslip → YTD
+   Snapshot. CPP / EI YTD should equal this slip's amounts (first
+   payslip of the year for them).</p>
+</li>
+<li>
+<p><strong>Submit for approval</strong>. <em>Cog → Submit for Approval</em>. State →
+   <code>pending_approval</code>. Plant GM gets an activity.</p>
+</li>
+</ol>
+<h2 id="what-plant-gm-is-checking">What Plant GM is checking</h2>
+<p>Plant GM has 2-3 minutes; they look at:</p>
+<ol>
+<li><strong>Totals tab</strong> — top-line numbers vs last cycle.</li>
+<li><strong>Top 3 nets</strong> — anyone unusually high?</li>
+<li><strong>Bottom 3 nets</strong> — anyone unusually low (terminated employee
+   with no vacation pay-out)?</li>
+<li><strong>Any payslip with a manual override</strong> — visible on the run's
+   <em>Audit Log</em> tab.</li>
+</ol>
+<p>If they approve, state → <code>approved</code>. If they reject, state stays
+<code>pending_approval</code> with a chatter post — you fix + re-submit.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Total gross is 20% higher than last cycle but I didn't see
+  any raises."</strong> Likely cause: bonus paid this cycle, retro pay,
+  vacation pay-out for a termination. Drill <em>Payslips</em> sorted by
+  gross descending; the outliers should explain.</p>
+</li>
+<li>
+<p><strong>"Total income tax is 30% higher; gross only up 10%."</strong> Could
+  be: a bonus that pushed someone into a higher bracket; YTD CPP
+  cap reached for several employees (CPP stops, so more income is
+  taxable); a TD1 update reducing credits. Drill the affected
+  slips.</p>
+</li>
+<li>
+<p><strong>"Net pay shows negative."</strong> Deductions exceeded gross.
+  Garnishment cap may have been bypassed; check the slip's
+  garnishment line, verify ≤ 30% of net. May indicate a
+  configuration error on the salary rule.</p>
+</li>
+<li>
+<p><strong>"CPP / EI YTD looks wrong on a new hire."</strong> They likely worked
+  elsewhere this year. They should provide a record of CPP / EI
+  contributions from prior employer (T4 box 26 / 24). Enter in
+  <em>Employee → Private Info → Prior Year YTD</em> before the next
+  compute.</p>
+</li>
+<li>
+<p><strong>"Plant GM rejected with <code>please re-check Sam's gross</code>."</strong>
+  Open Sam's payslip; compare to last cycle; verify the variance
+  cause is documented. Reply on the rejection chatter; resubmit.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Salary rule chain</strong> is the workhorse. Rules are stored in
+  <code>hr.salary.rule</code> with sequence ordering; the engine iterates
+  in sequence applying each.</li>
+<li><strong>Bracket lookup</strong> queries <code>southbrook.payroll.tax_bracket</code> for
+  the current effective year. Stored centrally so a year-change
+  is just a data update.</li>
+<li><strong>YTD math</strong> queries prior payslips for the same employee in the
+  calendar year; sums CPP, EI, income tax, gross. YTD becomes
+  input for cap logic.</li>
+<li><strong>No reverse</strong> — once computed, you can recompute (click
+  <em>Compute</em> again) but individual slip edits made between are
+  preserved if marked <code>manual_override = True</code>.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Compute finished. Totals tab shows gross 8% higher than
+last cycle. You don't see why. Where do you look first?</p>
+<blockquote>
+<p>Payslips sorted by <code>gross delta vs prior</code> descending. The top 3
+show who moved most. Then drill: bonus? retro? vacation payout?
+wage change?</p>
+</blockquote>
+<p><strong>Q2.</strong> A new hire's first payslip. CPP YTD shows the slip's own
+amount; EI YTD also shows the slip's own amount. Is this right?</p>
+<blockquote>
+<p>Right IF the new hire had no prior employment in the calendar
+year. If they did, enter their prior YTD via <em>Employee →
+Private Info → Prior Year YTD</em> and recompute. Otherwise CPP /
+EI cap math will be wrong all year.</p>
+</blockquote>
+<p><strong>Q3.</strong> Mid-2026, a long-tenured employee's payslip shows CPP =
+$0. Why?</p>
+<blockquote>
+<p>They hit the annual CPP cap (YMPE × rate). The 2026 cap is
+($71,300 - $3,500) × 5.95% = $4,034.10. Once YTD CPP = $4,034.10,
+contributions stop for the rest of the year. CPP2 may still apply
+for earnings above YMPE.</p>
+</blockquote>
+<p><strong>Q4.</strong> Plant GM asks "why is X's net $0 this cycle?" You look —
+indeed $0. What happened?</p>
+<blockquote>
+<p>Likely: gross was low (partial period), AND a fixed-amount
+deduction (benefit premium, RRSP contribution) consumed it.
+Adjust the deduction to skip this period, recompute. Or accept
+the $0 net if the employee was unpaid leave.</p>
+</blockquote>
+<p><strong>Q5.</strong> The tax brackets effective_year row for 2026 is missing
+from <code>southbrook.payroll.tax_brackets</code>. Compute fails. What's the
+fix?</p>
+<blockquote>
+<p>Plant GM or sysadmin needs to seed the 2026 brackets. The
+bracket table is data, not config; the values come from CRA's
+annual indexing. v1.1 ships a script to auto-import from CRA;
+until then, manual data XML.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>EFT generation + bank upload — lesson 19.4.</li>
+<li>Mid-cycle adjustments + garnishments — lesson 19.5.</li>
+<li>T4 year-end — Course 17 lesson 17.40.</li>
+<li>Native Odoo Payroll module concepts (we layer on top of it; the
+  Southbrook engine is the source of truth for CRA math).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_19_payroll_eft_bank" model="slide.slide">
+            <field name="name">Payroll Admin — EFT Generation and Bank Upload</field>
+            <field name="channel_id" ref="course_payroll_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Payroll administrator on Friday morning, post-approval.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-admin-eft-generation-and-bank-upload">Payroll Admin — EFT Generation and Bank Upload</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the payroll admin on Friday morning. The Plant GM approved the
+run yesterday. Today you turn it into money in employees' accounts.
+This lesson covers the EFT (Electronic Funds Transfer) file
+generation + bank upload mechanics + recovery when things break.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Payroll → Payroll Runs → [the approved run]</strong> — the <em>Generate EFT
+File</em> button.</p>
+<p>Supporting:
+- <strong>Settings → Companies → Banking</strong> — your business banking info
+  (transit, account, ICR).
+- <strong>Employees → Employees → [employee] → Private Info → Banking</strong> —
+  each employee's deposit account.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="run-header-state-approved">Run header (state = approved)</h3>
+<ul>
+<li><em>Generate EFT File</em> button (primary)</li>
+<li><em>Mark Posted</em> button (visible after EFT generated)</li>
+</ul>
+<h3 id="generated-eft">Generated EFT</h3>
+<ul>
+<li>Lands as <code>ir.attachment</code> on the run</li>
+<li>File name: <code>southbrook_payroll_&lt;pay_date&gt;_&lt;bank&gt;.aba</code></li>
+<li>Plus a human-readable summary CSV for your records</li>
+</ul>
+<h2 id="the-bank-file-formats">The bank file formats</h2>
+<p>Canadian banks support several EFT formats. The platform supports the
+common ones:</p>
+<table>
+<thead>
+<tr>
+<th>Bank</th>
+<th>Format</th>
+<th>File extension</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RBC</td>
+<td>RBC ACH 80</td>
+<td><code>.aba</code></td>
+</tr>
+<tr>
+<td>TD</td>
+<td>TD EFT</td>
+<td><code>.efx</code></td>
+</tr>
+<tr>
+<td>BMO</td>
+<td>BMO Direct Deposit</td>
+<td><code>.txt</code></td>
+</tr>
+<tr>
+<td>Scotiabank</td>
+<td>Scotia eDeposit</td>
+<td><code>.csv</code></td>
+</tr>
+<tr>
+<td>CIBC</td>
+<td>CIBC ACH</td>
+<td><code>.dat</code></td>
+</tr>
+<tr>
+<td>National</td>
+<td>NBC EFT</td>
+<td><code>.txt</code></td>
+</tr>
+</tbody>
+</table>
+<p>Configure your bank in <em>Settings → Companies → Banking → EFT Format</em>.
+Once set, the <em>Generate EFT File</em> button produces the right format.</p>
+<h2 id="the-3-step-generate-upload">The 3-step generate + upload</h2>
+<h3 id="1-generate">1. Generate</h3>
+<ul>
+<li>Open the approved run</li>
+<li>Click <em>Generate EFT File</em></li>
+<li>File downloads + attaches to the run</li>
+<li>Open the run's <em>Attachments</em> sidebar to confirm</li>
+</ul>
+<h3 id="2-upload-to-bank">2. Upload to bank</h3>
+<ul>
+<li>Log in to your business banking portal</li>
+<li>Navigate to <em>Payroll → Upload EFT File</em> (varies by bank)</li>
+<li>Select the downloaded file</li>
+<li>Enter:</li>
+<li><strong>Posting date</strong> — must match the pay date on the file</li>
+<li><strong>Total amount</strong> — must match the file's header total</li>
+<li><strong>Recipient count</strong> — must match the file's recipient count</li>
+<li>Submit + confirm</li>
+</ul>
+<h3 id="3-mark-posted-in-odoo">3. Mark posted in Odoo</h3>
+<ul>
+<li>Once the bank accepts the upload, return to Odoo</li>
+<li>Click <em>Mark Posted</em> on the run</li>
+<li>State → <code>done</code></li>
+<li>Payslips become visible to employees on <code>/my/payroll</code></li>
+<li>A confirmation email goes to each employee</li>
+</ul>
+<h2 id="whats-in-the-eft-file">What's in the EFT file</h2>
+<p>The file is a fixed-width record per employee with:
+- Recipient name
+- Bank transit + account
+- Amount (net pay)
+- Posting date
+- Originator reference</p>
+<p>The header has the total + count for verification.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Bank rejected the file: invalid format."</strong> Wrong format
+  configured. Open <em>Settings → Companies → Banking → EFT Format</em>,
+  pick the right bank, regenerate.</p>
+</li>
+<li>
+<p><strong>"Bank rejected: posting date in the past."</strong> Pay date on the
+  run is in the past (e.g. you tried to backdate). Change pay date,
+  recompute, regenerate.</p>
+</li>
+<li>
+<p><strong>"Bank rejected: recipient #15 invalid account."</strong> That
+  employee's bank info is missing or formatted wrong. Open their
+  <em>Private Info → Banking</em>, verify transit (5 digits), account
+  (7-12 digits), institution (3 digits, e.g. 003 for RBC).
+  Regenerate.</p>
+</li>
+<li>
+<p><strong>"One employee got paid twice."</strong> Bank uploaded the file twice
+  (operator error). Reach out to the bank to reverse the
+  duplicate; don't try to do this in Odoo. The bank's NSF /
+  reverse-charge tools fix it.</p>
+</li>
+<li>
+<p><strong>"One employee didn't get paid."</strong> Their bank info was invalid
+  AND the bank skipped that record silently (some banks do).
+  Issue a manual cheque or wire; mark on their payslip's chatter.</p>
+</li>
+<li>
+<p><strong>"I clicked <em>Mark Posted</em> but the bank later failed the file."</strong>
+  Reverse: open the run, <em>Cog → Reset to Approved</em>. Fix the bank
+  upload issue. Regenerate file. Re-upload.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Generate</strong> iterates <code>hr.payslip</code> rows where <code>state = done</code> for
+  the run. For each, reads employee banking + net pay; writes the
+  bank-specific format.</li>
+<li><strong>Mark Posted</strong> updates the run state + each payslip state. Posts
+  an email to each employee via a configurable template
+  (<code>southbrook_payroll_ca.payslip_published_email</code>).</li>
+<li><strong>Portal visibility</strong> — payslips become visible on
+  <code>/my/payroll</code> once <code>state = done</code>. The portal route is gated on
+  <code>mail.alias</code> ownership of the slip.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> EFT file generated. You upload to RBC's portal; portal
+says "file uploaded successfully" but bank account didn't debit.
+What do you check?</p>
+<blockquote>
+<p>The bank's posting status screen (separate from upload status).
+Some banks queue uploads for nightly batch; others reject silently
+after upload. Look for a separate confirmation or batch status
+view in the bank portal.</p>
+</blockquote>
+<p><strong>Q2.</strong> Bank's portal asks for a "control total." The file should
+contain it. Where is it?</p>
+<blockquote>
+<p>The file's header line includes the count + total. Open the file
+in a text editor (it's plain text), header row has the values.
+Or read off the run's <em>Totals</em> tab — total net pay matches.</p>
+</blockquote>
+<p><strong>Q3.</strong> Friday afternoon, EFT uploaded successfully. Employee
+emails: "I didn't get paid." What do you do first?</p>
+<blockquote>
+<p>Open their payslip; verify <code>net_pay &gt; 0</code> and banking info is
+filled. If both are fine, the bank may have rejected that
+specific recipient. Pull the bank's payment status; if rejected,
+issue a manual cheque + escalate to bank for the rejected record.</p>
+</blockquote>
+<p><strong>Q4.</strong> You generated EFT before the Plant GM approved. The run is
+still <code>pending_approval</code>. Now Plant GM approves with edits. What
+do you do?</p>
+<blockquote>
+<p>Discard the original EFT (it's stale). Regenerate after edits to
+ensure the file matches the approved totals. Bank will reject a
+file whose totals don't match the run anyway, so this is forced.</p>
+</blockquote>
+<p><strong>Q5.</strong> Half the employees use direct deposit, half want
+cheques. How do you handle the cheque half?</p>
+<blockquote>
+<p><em>Generate EFT File</em> skips employees with no banking info — they
+appear in a separate <em>Cheque List</em> attached to the run. Print
+the cheque list, run them through your physical cheque-printing
+process. Mark the run posted only after BOTH the EFT lands and
+cheques are issued.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Mid-cycle adjustments — lesson 19.5.</li>
+<li>Bank-specific portal navigation (varies; bank training).</li>
+<li>T4 year-end EFT to CRA (entirely separate mechanism, lesson 17.40).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_19_payroll_mid_cycle_adjustments" model="slide.slide">
+            <field name="name">Payroll Admin — Mid-Cycle Adjustments (Garnishments, RRSP, Advances)</field>
+            <field name="channel_id" ref="course_payroll_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Payroll administrator handling unexpected payroll changes mid-period.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-admin-mid-cycle-adjustments-garnishments-rrsp-advances">Payroll Admin — Mid-Cycle Adjustments (Garnishments, RRSP, Advances)</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the payroll admin and something has to happen <em>this pay period</em>
+that you didn't plan for: a court garnishment order arrived, an
+employee asked to start RRSP contributions, an advance was issued
+against a future paycheck, or a benefit premium changed. This lesson
+walks each scenario with the right path.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Two adjustment paths:</p>
+<ul>
+<li><strong>Persistent change</strong> — edit on <code>hr.contract</code> (Employees → Contracts)</li>
+<li><strong>One-time change</strong> — edit on the <code>hr.payslip</code> directly while the
+  run is still <code>draft</code> or <code>computing</code></li>
+</ul>
+<h2 id="garnishments">Garnishments</h2>
+<h3 id="when-you-receive-a-garnishment-order">When you receive a garnishment order</h3>
+<ul>
+<li>Court order arrives (usually mail or fax)</li>
+<li>File the order in the employee's HR documents</li>
+<li>Open the employee's contract → <em>Deductions</em> tab → <em>New</em></li>
+<li>Pick salary rule <code>garnishment_court_order</code> (seeded)</li>
+<li>Set:</li>
+<li><code>amount_type</code> — fixed (most orders) or percentage</li>
+<li><code>amount</code> — the value from the order</li>
+<li><code>start_date</code>, <code>end_date</code> — order's effective window</li>
+<li>Save</li>
+</ul>
+<h3 id="wage-protection-cap">Wage protection cap</h3>
+<ul>
+<li>Garnishments capped at <strong>30% of net pay</strong> per provincial wage
+  protection acts (Ontario Wages Act, Family Responsibility &amp;
+  Support Arrears Enforcement Act, etc.)</li>
+<li>The salary rule enforces this automatically — if the order is
+  for 35%, the platform pays 30% and queues the rest</li>
+<li>A <code>garnishment_remaining</code> field tracks the carry-forward</li>
+</ul>
+<h3 id="priority-of-multiple-garnishments">Priority of multiple garnishments</h3>
+<ul>
+<li>Family support orders take precedence over commercial debt</li>
+<li>Government tax orders (CRA, IRS) take precedence over both</li>
+<li>Order matters — set <code>sequence</code> field on the deduction lines</li>
+<li>If priorities conflict, escalate to legal counsel (not the
+  platform)</li>
+</ul>
+<h2 id="rrsp-contributions-start-stop-change">RRSP contributions (start, stop, change)</h2>
+<h3 id="starting">Starting</h3>
+<ul>
+<li>Employee submits a written request to HR</li>
+<li>Open contract → <em>Deductions</em> tab → <em>New</em></li>
+<li>Pick salary rule <code>rrsp_employee</code> (pre-tax)</li>
+<li>Set <code>amount_type</code> + <code>amount</code></li>
+<li>Set <code>pay_to</code> to the RRSP custodian (Sun Life, Manulife, etc.)</li>
+<li>Save</li>
+</ul>
+<h3 id="pre-tax-mechanics">Pre-tax mechanics</h3>
+<ul>
+<li>RRSP <code>amount_type = pretax_percentage</code> reduces taxable income</li>
+<li>The employee gets the tax savings on every pay (vs filing season)</li>
+<li>Annual maximum: 18% of prior-year earned income, capped at CRA's
+  annual limit ($31,560 for 2026)</li>
+<li>Platform tracks YTD RRSP; warns when approaching cap</li>
+</ul>
+<h3 id="changing">Changing</h3>
+<ul>
+<li>Edit the existing deduction line; change date stamps the chatter</li>
+<li>Effective on the NEXT compute (current open run may need a
+  <em>Refresh Payslips</em>)</li>
+</ul>
+<h3 id="stopping">Stopping</h3>
+<ul>
+<li>Set <code>end_date</code> on the deduction line</li>
+<li>Or set <code>state = inactive</code></li>
+</ul>
+<h2 id="advances-paid-before-the-regular-cycle">Advances (paid before the regular cycle)</h2>
+<h3 id="issuing">Issuing</h3>
+<ul>
+<li>Employee requests; manager approves</li>
+<li><em>Employees → Advances → New</em> (if your tenant has the advances
+  module enabled) OR via a manual payroll run with a single
+  payslip</li>
+<li>Pay via direct deposit OR cheque</li>
+<li>Mark in HR for recovery</li>
+</ul>
+<h3 id="recovering">Recovering</h3>
+<ul>
+<li>Next regular run: add a deduction line on that employee's
+  payslip — salary rule <code>advance_recovery</code>, negative amount</li>
+<li>Net pay reflects the deduction</li>
+<li>Repeat across cycles if the advance &gt; one cycle's net pay</li>
+</ul>
+<h3 id="what-to-avoid">What to avoid</h3>
+<ul>
+<li><strong>Don't</strong> book the advance as a regular bonus — bonus is
+  taxable income; advance is not (until recovered).</li>
+<li><strong>Don't</strong> forget to recover — employees forget; payroll's job
+  to remember.</li>
+</ul>
+<h2 id="benefit-premium-changes">Benefit premium changes</h2>
+<h3 id="annual-renewal-most-common">Annual renewal (most common)</h3>
+<ul>
+<li>Benefits broker provides new rates Q4</li>
+<li>HR enters the new rates on the benefit master record</li>
+<li>Effective date applies; current payslips re-compute on next <em>Refresh</em></li>
+<li>Verify by spot-checking one payslip after the change</li>
+</ul>
+<h3 id="mid-cycle-changes-rare">Mid-cycle changes (rare)</h3>
+<ul>
+<li>New employee mid-period: prorate the premium</li>
+<li>Employee promoted to a tier with different benefits: change
+  effective the promotion date</li>
+</ul>
+<h2 id="one-time-payslip-adjustments">One-time payslip adjustments</h2>
+<p>When the persistent flow doesn't fit:</p>
+<h3 id="manual-earning">Manual earning</h3>
+<ul>
+<li>Open the payslip in <code>draft</code> state</li>
+<li><em>Earnings</em> tab → <em>New</em></li>
+<li>Salary rule <code>manual_earning</code> (seeded)</li>
+<li>Amount + description</li>
+<li>Save — recompute applies</li>
+</ul>
+<h3 id="manual-deduction">Manual deduction</h3>
+<ul>
+<li>Same flow, <em>Deductions</em> tab → <em>New</em></li>
+<li>Salary rule <code>manual_deduction</code></li>
+<li>Negative if it's reducing (most cases)</li>
+<li>Description mandatory</li>
+</ul>
+<h3 id="override-of-a-computed-value">Override of a computed value</h3>
+<ul>
+<li>Open the line you want to override (e.g. <code>cpp_employee</code>)</li>
+<li>Tick <code>manual_override = True</code></li>
+<li>Edit the value</li>
+<li>Recompute respects the override</li>
+<li>The chatter logs that a manual override occurred — auditors notice</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"I added an RRSP deduction but it didn't apply to the run that's
+  already computed."</strong> Click <em>Refresh Payslips</em> on the run. Then
+  recompute. (The deduction added to the contract doesn't
+  automatically flow back to in-flight payslips.)</p>
+</li>
+<li>
+<p><strong>"Garnishment was over the 30% cap."</strong> Platform paid 30%, queued
+  the remainder. Next cycle, the queued amount adds to the next
+  cycle's garnishment. Court may need to be notified that full order
+  amount can't be met from one pay; usually OK because next-cycle
+  pickup is standard.</p>
+</li>
+<li>
+<p><strong>"Forgot to recover an advance from 3 paychecks ago."</strong> Add a
+  recovery deduction now for the original advance amount. Employee
+  may need to be informed before the cheque; conversation matters
+  here. Don't try to take the recovery on a future cycle without
+  telling them.</p>
+</li>
+<li>
+<p><strong>"Manual override changed CPP but bank rejected the EFT."</strong>
+  Bank doesn't care about CPP override — it only sees net pay.
+  Check the recipient's account info instead.</p>
+</li>
+<li>
+<p><strong>"RRSP YTD exceeded the cap."</strong> Platform should have warned;
+  if it didn't (configuration), the over-contribution stays on
+  the slip but employee will face a CRA tax penalty. Talk to them;
+  if recoverable, reduce next slip's contribution.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Salary rules</strong> are sequenced; persistent contract deductions
+  resolve into a <code>hr.payslip.line</code> per rule per run.</li>
+<li><strong>Manual override</strong> sets <code>quantity</code> or <code>amount</code> directly on the
+  computed <code>hr.payslip.line</code>, bypassing the salary rule's formula
+  for that one slip.</li>
+<li><strong>Wage protection cap</strong> is enforced in the <code>garnishment_court_order</code>
+  salary rule's Python code; the carry-forward field
+  <code>garnishment_remaining</code> is stored on <code>hr.contract</code>.</li>
+<li><strong>Refresh Payslips</strong> triggers re-pull of contract deductions
+  without recomputing the existing payslip lines. Then <em>Compute</em>
+  re-runs the rules with the new deductions.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Court order arrives Wednesday for $400/period. Employee's
+typical net pay is $1,000. What does the slip show?</p>
+<blockquote>
+<p>Garnishment of $300 (= 30% × $1,000 net). $100 carries forward
+to next cycle as <code>garnishment_remaining</code>. Employee's net pay
+$700 this cycle.</p>
+</blockquote>
+<p><strong>Q2.</strong> Employee asks to start RRSP at 5% of gross, effective
+immediately. Run is already computed but not approved. What's the
+fastest path?</p>
+<blockquote>
+<p>Open contract → add RRSP deduction at 5% pretax. Effective today.
+<em>Refresh Payslips</em> on the open run. <em>Compute</em> again. Plant GM
+approval covers the updated values.</p>
+</blockquote>
+<p><strong>Q3.</strong> $500 advance was issued 4 weeks ago. Recovery was supposed
+to be 4 × $125. You forgot all four cycles. Today's the fifth.
+Approach?</p>
+<blockquote>
+<p>Talk to employee first — discuss recovery plan. Then add $500
+single-cycle deduction OR spread over future cycles, depending
+on what employee can afford. Document the conversation in the
+payslip chatter.</p>
+</blockquote>
+<p><strong>Q4.</strong> Benefit premium changed Jan 1. Today is Jan 5; Q1 run is
+in flight. Premium on payslip is still old. Why?</p>
+<blockquote>
+<p>The change wasn't propagated to the contract; it stayed on the
+benefit master record. Edit the employee's contract → benefit
+line → update amount. <em>Refresh + Compute</em>.</p>
+</blockquote>
+<p><strong>Q5.</strong> You overrode CPP on one slip to $0 because employee hit
+the cap. Subsequently saw the YTD wasn't actually capped. Recovery?</p>
+<blockquote>
+<p>Untick <code>manual_override = True</code> on that line. Recompute. Slip
+goes back to the computed value. Audit-log shows the override
+existed; reviewer can ask why; document the reason in chatter.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>T4 year-end reporting of these deductions — Course 17 lesson 17.40.</li>
+<li>Native Odoo salary rule editor (only Plant GM / sysadmin should
+  touch).</li>
+<li>New benefit plan onboarding (HR's job; payroll consumes the result).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

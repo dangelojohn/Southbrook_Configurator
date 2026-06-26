@@ -197,5 +197,49 @@
             <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
             <field name="color">2</field>
         </record>
+        <record id="course_quality_persona" model="slide.channel">
+            <field name="name">Course 18 — Quality Inspector — Persona Track</field>
+            <field name="description">Five lessons for the QC inspector / quality manager: menu orientation, NCR open + escalate, SPC sampling discipline, Cpk + capability analysis, supplier scorecards. Anchored on southbrook_quality v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">180</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">5</field>
+        </record>
+        <record id="course_payroll_persona" model="slide.channel">
+            <field name="name">Course 19 — Payroll Administrator — Persona Track</field>
+            <field name="description">Five lessons for the payroll admin running the bi-weekly cycle on CRA 2026 brackets: menu orientation, pre-run checks, compute + approve, EFT + bank upload, mid-cycle adjustments. Anchored on southbrook_payroll_ca v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">190</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">7</field>
+        </record>
+        <record id="course_finance_persona" model="slide.channel">
+            <field name="name">Course 20 — Controller — Persona Track (Monthly Close)</field>
+            <field name="description">Five lessons for the controller doing the monthly close: menu orientation, WIP reconciliation deep-dive, CCA depreciation + asset register, HST input/output filing, period lock + audit pack. Anchored on southbrook_finance_pack v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">200</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">8</field>
+        </record>
+        <record id="course_exec_persona" model="slide.channel">
+            <field name="name">Course 21 — Executive / Owner — Persona Track</field>
+            <field name="description">Four lessons for the owner / Plant GM using the daily morning briefing dashboard: 5-minute scan, tile drill-through, OEE + bottleneck reading, approving + delegating via Hermes. Anchored on southbrook_exec_dashboard v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">210</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">9</field>
+        </record>
     </data>
 </odoo>

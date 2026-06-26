@@ -208,6 +208,47 @@ COURSE_META: List[Tuple[int, str, str, str, int]] = [
         "Finance (4), Payroll (5).",
         2,
     ),
+    (
+        18,
+        "course_quality_persona",
+        "Quality Inspector — Persona Track",
+        "Five lessons for the QC inspector / quality manager: menu "
+        "orientation, NCR open + escalate, SPC sampling discipline, Cpk "
+        "+ capability analysis, supplier scorecards. Anchored on "
+        "southbrook_quality v19.0.1.0.0.",
+        5,
+    ),
+    (
+        19,
+        "course_payroll_persona",
+        "Payroll Administrator — Persona Track",
+        "Five lessons for the payroll admin running the bi-weekly cycle "
+        "on CRA 2026 brackets: menu orientation, pre-run checks, "
+        "compute + approve, EFT + bank upload, mid-cycle adjustments. "
+        "Anchored on southbrook_payroll_ca v19.0.1.0.0.",
+        7,
+    ),
+    (
+        20,
+        "course_finance_persona",
+        "Controller — Persona Track (Monthly Close)",
+        "Five lessons for the controller doing the monthly close: "
+        "menu orientation, WIP reconciliation deep-dive, CCA "
+        "depreciation + asset register, HST input/output filing, "
+        "period lock + audit pack. Anchored on southbrook_finance_pack "
+        "v19.0.1.0.0.",
+        8,
+    ),
+    (
+        21,
+        "course_exec_persona",
+        "Executive / Owner — Persona Track",
+        "Four lessons for the owner / Plant GM using the daily "
+        "morning briefing dashboard: 5-minute scan, tile drill-through, "
+        "OEE + bottleneck reading, approving + delegating via Hermes. "
+        "Anchored on southbrook_exec_dashboard v19.0.1.0.0.",
+        9,
+    ),
 ]
 
 

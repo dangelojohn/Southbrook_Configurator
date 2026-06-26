@@ -1,0 +1,1181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_20_finance_menu_close" model="slide.slide">
+            <field name="name">Controller — Your Finance Menu and the 7-Step Monthly Close</field>
+            <field name="channel_id" ref="course_finance_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Controller doing the monthly close for the Southbrook books.</field>
+            <field name="html_content"><![CDATA[<h1 id="controller-your-finance-menu-and-the-7-step-monthly-close">Controller — Your Finance Menu and the 7-Step Monthly Close</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the controller doing the monthly close. Native Odoo Accounting
+handles the standard journals + reconciliation; the Southbrook Finance
+Pack adds the layers specific to a manufacturing shop (WIP, CCA
+depreciation, HST). This lesson is the map.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Finance</strong> (root menu, <code>menu_finance_pack_root</code>).</p>
+<p>Submenus:</p>
+<table>
+<thead>
+<tr>
+<th>Submenu</th>
+<th>XML id</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Asset Register</td>
+<td><code>menu_finance_asset</code></td>
+<td>Capital assets with CCA tracking</td>
+</tr>
+<tr>
+<td>CCA Class</td>
+<td><code>menu_finance_cca_class</code></td>
+<td>Master of CCA classes + rates</td>
+</tr>
+<tr>
+<td>Budget</td>
+<td><code>menu_finance_budget</code></td>
+<td>Departmental budget vs actuals</td>
+</tr>
+<tr>
+<td>Budget Pivot</td>
+<td><code>menu_finance_budget_pivot</code></td>
+<td>Pivot view of budget data</td>
+</tr>
+<tr>
+<td>HST Return</td>
+<td><code>menu_finance_hst_return</code></td>
+<td>Quarterly / monthly HST filing</td>
+</tr>
+<tr>
+<td>WIP Report</td>
+<td><code>menu_finance_wip_report</code></td>
+<td>Work-in-progress reconciliation</td>
+</tr>
+<tr>
+<td>MI Tiles</td>
+<td><code>menu_finance_mi_tiles</code></td>
+<td>Finance views of the MI dashboard</td>
+</tr>
+</tbody>
+</table>
+<p>Plus standard native menus you'll use heavily:
+- <strong>Accounting</strong> (native) — journals, COA, reconciliation
+- <strong>Inventory → Operations → Inventory Adjustments</strong> (native) —
+  posts COGS variance
+- <strong>Inventory → Reporting → Stock Valuation</strong> (native) — WIP roll-up
+  source data</p>
+<h2 id="the-7-step-southbrook-monthly-close">The 7-step Southbrook monthly close</h2>
+<p>Steps 1-4 are native Odoo + GAAP standard. Steps 5-7 are the
+Southbrook layer.</p>
+<h3 id="step-1-bank-reconciliation">Step 1: Bank reconciliation</h3>
+<ul>
+<li><em>Accounting → Bank → Reconciliation</em></li>
+<li>Every line cleared — no unmatched debits / credits</li>
+<li>Cross-check the EFT debit for the most recent payroll (matches the
+  approved run total)</li>
+<li>Multiple bank accounts: reconcile each</li>
+</ul>
+<h3 id="step-2-ar-ap-reconciliation">Step 2: AR + AP reconciliation</h3>
+<ul>
+<li><em>Accounting → Customers → Reconciliation</em> + <em>Vendors → Reconciliation</em></li>
+<li>Match received payments to invoices</li>
+<li>Match paid bills to vendor bills</li>
+<li>Open invoices &gt; 60 days flagged for follow-up</li>
+</ul>
+<h3 id="step-3-inventory-variance-close">Step 3: Inventory variance close</h3>
+<ul>
+<li><em>Inventory → Operations → Inventory Adjustments</em></li>
+<li>Any open adjustment ledger posted</li>
+<li>COGS journal entries triggered automatically by the validation</li>
+<li>Cross-check standard cost variances on Inventory Valuation</li>
+</ul>
+<h3 id="step-4-depreciation-native-cca">Step 4: Depreciation (native + CCA)</h3>
+<ul>
+<li>Native: <em>Accounting → Operations → Depreciation</em> (for assets
+  using the native asset model)</li>
+<li>CCA: <em>Finance → Asset Register</em> (lesson 20.3 deep-dive)</li>
+<li>Both should post for the month being closed</li>
+</ul>
+<h3 id="step-5-wip-reconciliation-southbrook-layer">Step 5: WIP reconciliation (Southbrook layer)</h3>
+<ul>
+<li><em>Finance → WIP Report</em> (lesson 20.2)</li>
+<li>Roll-up of open MOs by <code>cost_so_far</code></li>
+<li>Reconcile to GL WIP account; variance &lt; $1 by close</li>
+</ul>
+<h3 id="step-6-hst-filing-prep-southbrook-layer">Step 6: HST filing prep (Southbrook layer)</h3>
+<ul>
+<li><em>Finance → HST Return</em> (lesson 20.4)</li>
+<li>Pull the period; review input + output breakdown</li>
+<li>File to CRA via the business portal</li>
+</ul>
+<h3 id="step-7-period-lock-audit-pack">Step 7: Period lock + audit pack</h3>
+<ul>
+<li><em>Accounting → Configuration → Fiscal Years</em></li>
+<li>Close the period (locks edits to that month)</li>
+<li>Generate the audit pack: financial statements + supporting
+  schedules (lesson 20.5)</li>
+</ul>
+<h2 id="your-monthly-cadence">Your monthly cadence</h2>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1st of month</td>
+<td>Verify all prior-month journals posted (no drafts)</td>
+</tr>
+<tr>
+<td>2nd</td>
+<td>Bank reconciliation done</td>
+</tr>
+<tr>
+<td>3rd</td>
+<td>AR + AP reconciled</td>
+</tr>
+<tr>
+<td>4th</td>
+<td>Inventory variance + depreciation posted</td>
+</tr>
+<tr>
+<td>5th</td>
+<td>WIP reconciliation</td>
+</tr>
+<tr>
+<td>6th</td>
+<td>HST return prepared (if quarterly month)</td>
+</tr>
+<tr>
+<td>7th</td>
+<td>Period lock + audit pack delivered to ownership</td>
+</tr>
+</tbody>
+</table>
+<p>Typical close lands in 5-7 business days. Earlier is possible with
+clean upstream data; longer if reconciliation discovers anomalies.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="asset-register-list">Asset Register list</h3>
+<ul>
+<li>Decoration-warning: assets with <code>next_compute_date &lt; today</code></li>
+<li>Decoration-muted: assets with <code>disposal_date IS NOT NULL</code></li>
+</ul>
+<h3 id="wip-report-list">WIP Report list</h3>
+<ul>
+<li>Grouped by <code>responsible_team</code> by default</li>
+<li>Shows <code>wip_value</code> (= cost_so_far) per open MO</li>
+<li>Footer: total WIP value</li>
+</ul>
+<h3 id="hst-return-form">HST Return form</h3>
+<ul>
+<li><code>period_start</code>, <code>period_end</code>, <code>state</code> (draft / submitted / filed)</li>
+<li>Three computed sections:</li>
+<li>Output HST collected</li>
+<li>Input HST paid (recoverable)</li>
+<li>Net (output - input = remittance)</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Bank rec shows $0 outstanding but month-end balance doesn't
+  match bank statement."</strong> Statement may show pending items not yet
+  cleared (cheques in transit, deposit floats). Reconcile to
+  cleared bank balance, not statement balance.</p>
+</li>
+<li>
+<p><strong>"Closing the period rejected with 'unposted journal entry'."</strong>
+  <em>Accounting → Journal Entries</em> filter <code>state = draft AND date IN
+  period</code>. Find + post; retry close. (Drafts exist because someone
+  saved without posting; common with manual entries.)</p>
+</li>
+<li>
+<p><strong>"WIP variance is $0.50."</strong> Probably a rounding issue from
+  standard cost recalculation. Acceptable; document the rounding
+  cause in the close audit log.</p>
+</li>
+<li>
+<p><strong>"HST input higher than expected."</strong> Check for capital asset
+  purchases that should have been split between current and capital
+  input tax credits. Capital ITCs go to the capital tax account, not
+  current.</p>
+</li>
+<li>
+<p><strong>"Depreciation didn't post for a CCA asset."</strong> Compute didn't run
+  this month. Open the asset → <em>Compute CCA</em> manually. (v1.1 will
+  auto-cron this.)</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>The Finance Pack adds models</strong>: <code>southbrook.finance.asset</code> (CCA),
+  <code>southbrook.finance.cca_class</code>, <code>southbrook.finance.budget</code>,
+  <code>southbrook.finance.hst_return</code>, plus the WIP report view (no
+  model — read-only query).</li>
+<li><strong>Period lock</strong> is the native <code>account.move</code> line-level enforcement;
+  Southbrook doesn't override.</li>
+<li><strong>WIP report</strong> queries <code>mrp.production</code> with state IN
+  <code>(confirmed, progress)</code> and joins to <code>stock.valuation</code> for the
+  cost-so-far.</li>
+<li><strong>HST return</strong> queries <code>account.move.line</code> filtered to the HST
+  tax accounts (configurable per company).</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> It's the 6th. Step 5 (WIP) is your task today. Where do you
+start?</p>
+<blockquote>
+<p><em>Finance → WIP Report</em>. Read the total. Cross-check to GL WIP
+account balance (<em>Accounting → Reporting → Trial Balance</em> →
+filter to the WIP account, period-end balance). Variance &lt; $1 =
+done; &gt; $1 = drill (lesson 20.2 walks this).</p>
+</blockquote>
+<p><strong>Q2.</strong> Closing rejected: "1 unposted journal entry." Where do you
+find it?</p>
+<blockquote>
+<p><em>Accounting → Journal Entries → All Entries</em> filter <code>state =
+draft AND date IN this period</code>. Should land you on 1-3 candidate
+entries. Post the legitimate ones, delete the others (rare
+orphans).</p>
+</blockquote>
+<p><strong>Q3.</strong> Plant GM asks "what was our gross margin last month?" 5
+days into close. What's the most reliable answer?</p>
+<blockquote>
+<p>"Close isn't complete; preliminary view from <em>Accounting →
+Reporting → Profit &amp; Loss</em> with caveat that inventory + WIP +
+depreciation aren't final until close lands on day 7." Don't
+give a number that'll change.</p>
+</blockquote>
+<p><strong>Q4.</strong> HST quarterly month: input HST is $5k, output HST is
+$15k. You file for $10k remittance. Approver asks where it goes.</p>
+<blockquote>
+<p>CRA Business Portal — <em>My Business Account → File a Return → HST
+(GST/HST) Return</em>. The Southbrook return prep is the data;
+filing is manual.</p>
+</blockquote>
+<p><strong>Q5.</strong> Auditor asks for last quarter's adjustment journal entries
++ supporting docs. Where do you pull this?</p>
+<blockquote>
+<p><em>Accounting → Journal Entries</em> filter the period; export as CSV.
+Cross-reference each to its chatter (which has docs attached as
+<code>ir.attachment</code>). The audit pack lesson (20.5) covers structured
+delivery.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>WIP reconciliation deep-dive — lesson 20.2.</li>
+<li>CCA depreciation specifics — lesson 20.3.</li>
+<li>HST input/output details — lesson 20.4.</li>
+<li>Period lock + audit pack — lesson 20.5.</li>
+<li>Native Odoo Accounting basics (separate Odoo training).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_20_finance_wip_reconciliation" model="slide.slide">
+            <field name="name">Controller — WIP Reconciliation Deep-Dive</field>
+            <field name="channel_id" ref="course_finance_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Controller in the WIP reconciliation step of the monthly close.</field>
+            <field name="html_content"><![CDATA[<h1 id="controller-wip-reconciliation-deep-dive">Controller — WIP Reconciliation Deep-Dive</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're at step 5 of the monthly close (lesson 20.1). The WIP Report
+gives you a number; the GL gives you another number. They must
+reconcile — within $1 by close, ideally to the penny.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Finance → WIP Report</strong> (<code>menu_finance_wip_report</code>).</p>
+<p>Supporting:
+- <strong>Inventory → Reporting → Stock Valuation</strong> (native) — raw
+  material side
+- <strong>Accounting → Reporting → Trial Balance</strong> (native) — the GL WIP
+  account balance
+- <strong>Manufacturing → Orders → Manufacturing Orders</strong> (native) — drill
+  into individual MOs</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="wip-report-view-a-list-view-not-a-stored-model">WIP Report view (a list view, not a stored model)</h3>
+<ul>
+<li>One row per open MO (<code>state IN (confirmed, progress)</code>)</li>
+<li>Columns:</li>
+<li><code>mo_ref</code> (<code>mrp.production.name</code>)</li>
+<li><code>product</code> (<code>product_id.display_name</code>)</li>
+<li><code>responsible_team</code></li>
+<li><code>cost_so_far</code> — sum of consumed materials + applied labour +
+    overhead so far</li>
+<li><code>cost_to_complete</code> — estimated remaining</li>
+<li><code>wip_value</code> — = cost_so_far for accounting purposes</li>
+<li>Group by <code>responsible_team</code> by default</li>
+<li>Footer: total <code>wip_value</code></li>
+</ul>
+<h2 id="the-reconciliation">The reconciliation</h2>
+<p>The math you're verifying:</p>
+<pre><code>WIP Report Total = Σ (open MO cost_so_far)
+GL WIP Balance  = ledger balance of 211000-WIP (or equivalent)
+Variance        = Report - GL
+</code></pre>
+<p>Target: |Variance| &lt; $1.</p>
+<h3 id="when-variance-1-the-5-causes">When variance &gt; $1, the 5 causes</h3>
+<p>In order of frequency:</p>
+<h4 id="cause-1-mo-closed-without-consumption-posted">Cause 1: MO closed without consumption posted</h4>
+<ul>
+<li>MO state moved to <code>done</code> but a consumption stock move stayed
+  draft</li>
+<li>GL says lower than report (the cost moved out of WIP) OR higher
+  (the cost stayed in WIP because the move didn't post)</li>
+<li>Find: open <em>Manufacturing → Orders → Done MOs in period</em>; look
+  for ones with <code>expected_qty != qty_done</code></li>
+<li>Fix: post the missing consumption; redo recompute</li>
+</ul>
+<h4 id="cause-2-mo-with-backdated-consumption">Cause 2: MO with backdated consumption</h4>
+<ul>
+<li>A consumption was posted with <code>date &lt; period_start</code></li>
+<li>It pushed cost INTO WIP retroactively — GL captured it, but the
+  report (live) may not show the same MO</li>
+<li>Find: <em>Stock → Moves</em> filter <code>date &lt; period_start AND
+  state = done AND raw_material_production_id IS NOT NULL</code></li>
+<li>Fix: ideally reverse + re-do with correct date; in close-pressure
+  mode, document + accept</li>
+</ul>
+<h4 id="cause-3-scrap-not-journalled">Cause 3: Scrap not journalled</h4>
+<ul>
+<li>A <code>stock.scrap</code> posted the stock-side but not the journal-side</li>
+<li>Causes the WIP report to be high (scrap hasn't been
+  cost-removed) but GL to be correct (scrap account didn't get
+  charged)</li>
+<li>Find: <em>Inventory → Operations → Scrap</em> in period</li>
+<li>Fix: post the missing journal entry via <em>Action → Post Journal</em></li>
+</ul>
+<h4 id="cause-4-standard-cost-change-mid-period">Cause 4: Standard cost change mid-period</h4>
+<ul>
+<li>A product's <code>standard_price</code> was revalued mid-period</li>
+<li>Existing WIP at old cost; new consumption at new cost</li>
+<li>Variance = revaluation amount</li>
+<li>Find: <em>Inventory → Operations → Revaluation</em></li>
+<li>Fix: post a revaluation journal entry for the period start</li>
+</ul>
+<h4 id="cause-5-closed-mo-in-last-month-with-carry-over">Cause 5: Closed MO in last month with carry-over</h4>
+<ul>
+<li>An MO completed in prior period but had a stock move dated
+  this period</li>
+<li>Causes WIP to spike for one period</li>
+<li>Find: <em>Stock → Moves</em> filter <code>production_id IN (last_period
+  closed MOs) AND date IN this_period</code></li>
+<li>Fix: usually doesn't need fixing — it'll reverse itself when
+  the move's other side posts</li>
+</ul>
+<h2 id="drilling-into-a-variance">Drilling into a variance</h2>
+<p>When the WIP report total doesn't match GL:</p>
+<ol>
+<li><strong>Compare totals by team.</strong> Group by responsible_team; the team
+   with the variance localises the search.</li>
+<li><strong>Spot-check 5 large MOs.</strong> Open them; verify <code>cost_so_far</code> math.
+   Material consumed × standard cost + labour applied + overhead.</li>
+<li><strong>Run an MO-level CSV export.</strong> Export the WIP report; cross-tab
+   against a query on <code>account.move.line WHERE
+   account_id = WIP_account</code>.</li>
+<li><strong>Find the missing MO.</strong> GL has lines the report doesn't, or
+   vice versa.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Total report = $50k, total GL = $52k. Where's the $2k?"</strong> Open
+  the report grouped by responsible_team; find the team whose
+  subtotal differs from their MO list summed. That's where the
+  discrepancy lives.</p>
+</li>
+<li>
+<p><strong>"Variance reconciles by team but not in total."</strong> Rounding;
+  document the cause + accept.</p>
+</li>
+<li>
+<p><strong>"Report shows MO 1234 with <code>wip_value</code> = $1,200 but the MO is
+  marked <code>done</code>."</strong> State race condition: the report query is
+  cached. Refresh; if still showing, the MO has a draft consumption
+  move. Open <em>Stock → Moves</em> on the MO.</p>
+</li>
+<li>
+<p><strong>"GL balance is $0 but WIP report says $20k."</strong> Likely cause:
+  COGS was posted to a different account (mis-configured product
+  category). Audit the <code>product.category.property_stock_account_*</code>
+  fields for affected products.</p>
+</li>
+<li>
+<p><strong>"WIP report won't open — timeout."</strong> Heavy query in a
+  high-MO-count tenant. v1.1 ships a stored snapshot model;
+  meantime, filter to a single responsible_team first.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>WIP Report query</strong>: roughly
+  <code>sql
+  SELECT mp.name, mp.product_id, mp.responsible_team,
+         SUM(sv.value) AS cost_so_far
+  FROM mrp_production mp
+  LEFT JOIN stock_move sm ON sm.raw_material_production_id = mp.id
+       AND sm.state = 'done'
+  LEFT JOIN stock_valuation_layer sv ON sv.stock_move_id = sm.id
+  WHERE mp.state IN ('confirmed', 'progress')
+  GROUP BY mp.id;</code></li>
+<li>The query is wrapped in an Odoo view (not stored) and surfaced
+  through <code>southbrook_finance_pack.wip_report_view</code>.</li>
+<li>No automatic GL reconciliation — that's why this lesson exists.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> WIP Report says $73,500. GL WIP account says $73,250.
+Variance = $250. First action?</p>
+<blockquote>
+<p>Group the report by <code>responsible_team</code>. Sum subtotals. Compare
+each team's subtotal against MO-level sums. Find the team with
+the variance; drill into that team's MOs.</p>
+</blockquote>
+<p><strong>Q2.</strong> You find one MO showing <code>cost_so_far = $4,200</code> but the GL
+journal entries for that MO sum to $3,950. Cause?</p>
+<blockquote>
+<p>Likely scrap that didn't journal (cause #3) OR a labour cost
+applied to the MO via productivity but not yet rolled into the
+GL via the labour journal. Check both.</p>
+</blockquote>
+<p><strong>Q3.</strong> Variance is $0.07. Acceptable?</p>
+<blockquote>
+<p>Yes — within rounding. Document the cause as "standard cost
+rounding" in the close audit log. Move on.</p>
+</blockquote>
+<p><strong>Q4.</strong> Variance is $4,500. Day 7 of close. Pressure to lock.
+Action?</p>
+<blockquote>
+<p>Don't lock with that big a variance. Investigate first. Spread
+the time over two days if needed; the wrong close is worse than
+a late close.</p>
+</blockquote>
+<p><strong>Q5.</strong> WIP report is fine but the GL P&amp;L shows COGS $10k higher
+than expected. Where do you check?</p>
+<blockquote>
+<p>Standard cost change mid-period (cause #4). Look at recent
+<code>product.template.standard_price</code> history; large changes can
+drive COGS variance even when WIP balances.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Specific GL account configuration (different setups across
+  industries; consult Accounting basics).</li>
+<li>Native Odoo inventory valuation methods (FIFO vs standard cost) —
+  Odoo Accounting training.</li>
+<li>HST input on capital purchases — lesson 20.4.</li>
+<li>Period lock mechanics — lesson 20.5.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_20_finance_cca_assets" model="slide.slide">
+            <field name="name">Controller — CCA Depreciation and Asset Register</field>
+            <field name="channel_id" ref="course_finance_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Controller doing CCA depreciation at year-end (or month-end if monthly basis).</field>
+            <field name="html_content"><![CDATA[<h1 id="controller-cca-depreciation-and-asset-register">Controller — CCA Depreciation and Asset Register</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the controller doing CCA depreciation for the T2 (corporate)
+tax return. CCA — Capital Cost Allowance — is the Canadian tax-side
+depreciation. This is distinct from accounting depreciation (which
+hits financial statements) — for now we'll focus on the CCA side
+since that's what the Finance Pack adds.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Finance → Asset Register</strong> (<code>menu_finance_asset</code>).
+<strong>Finance → CCA Class</strong> (<code>menu_finance_cca_class</code>) — master.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="asset-register-list-view">Asset Register list view</h3>
+<ul>
+<li>Columns: <code>name</code>, <code>purchase_date</code>, <code>cca_class_id</code>,
+  <code>original_cost</code>, <code>current_ucc</code> (undepreciated capital cost),
+  <code>last_cca_year</code></li>
+<li>Decoration-warning: assets where <code>last_cca_year &lt; current_year - 1</code>
+  (missed an annual compute)</li>
+<li>Decoration-muted: assets with <code>disposal_date IS NOT NULL</code></li>
+</ul>
+<h3 id="asset-form-view">Asset form view</h3>
+<ul>
+<li>Identification: <code>name</code>, <code>description</code>, <code>purchase_date</code></li>
+<li>Cost: <code>original_cost</code>, <code>linked_journal_id</code></li>
+<li>Classification: <code>cca_class_id</code>, <code>cca_rate</code> (auto from class)</li>
+<li>Depreciation state:</li>
+<li><code>current_ucc</code> — read-only, computed from history</li>
+<li><code>last_cca_year</code> — last year computed</li>
+<li><code>accumulated_cca</code> — total taken</li>
+<li><em>History</em> tab: <code>southbrook.finance.cca_entry</code> rows showing
+  year-by-year compute</li>
+<li><em>Action buttons</em>: <em>Compute CCA</em> (current year), <em>Dispose</em></li>
+</ul>
+<h3 id="cca-class-form-view-mostly-read-only">CCA Class form view (mostly read-only)</h3>
+<ul>
+<li><code>code</code> (e.g. "Class 8")</li>
+<li><code>name</code> (e.g. "General office equipment")</li>
+<li><code>rate</code> (e.g. 20%)</li>
+<li><code>half_year_rule</code> boolean</li>
+<li><code>description</code> (CRA examples)</li>
+</ul>
+<h2 id="cca-in-plain-terms">CCA in plain terms</h2>
+<ul>
+<li>CCA is a <strong>declining-balance</strong> method (for most classes)</li>
+<li>Each year you claim a percentage of the remaining <code>current_ucc</code></li>
+<li>The percentage = <code>cca_class_id.rate</code></li>
+<li>Year-of-acquisition: <strong>half-year rule</strong> applies — you can only
+  claim 50% of the normal CCA in the first year</li>
+<li>The math reduces <code>current_ucc</code> each year until you dispose of
+  the asset</li>
+</ul>
+<h3 id="common-cca-classes-for-a-cabinet-shop">Common CCA classes for a cabinet shop</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Rate</th>
+<th>What it covers</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Class 8</td>
+<td>20%</td>
+<td>General equipment</td>
+<td>Office furniture, dust collectors</td>
+</tr>
+<tr>
+<td>Class 10</td>
+<td>30%</td>
+<td>Motor vehicles, computers</td>
+<td>Delivery van</td>
+</tr>
+<tr>
+<td>Class 12</td>
+<td>100%</td>
+<td>Small tools &lt; $500</td>
+<td>Drill bits, jigs</td>
+</tr>
+<tr>
+<td>Class 50</td>
+<td>55%</td>
+<td>Computers + software</td>
+<td>Servers, laptops</td>
+</tr>
+<tr>
+<td>Class 53</td>
+<td>50%</td>
+<td>Manufacturing &amp; processing equipment</td>
+<td>CNC routers, edge banders</td>
+</tr>
+</tbody>
+</table>
+<p>(2026 rates per CRA T2 Schedule 8; verify with your accountant.)</p>
+<h2 id="the-annual-compute">The annual compute</h2>
+<h3 id="when-to-compute">When to compute</h3>
+<ul>
+<li>Year-end is the canonical time (immediately after closing
+  December)</li>
+<li>Some controllers compute monthly to recognise the tax expense
+  evenly — that works too</li>
+<li>The CCA <code>compute_cca</code> action is <strong>idempotent within a year</strong> —
+  running twice for the same year doesn't double-count</li>
+</ul>
+<h3 id="the-flow">The flow</h3>
+<ol>
+<li>
+<p><strong>Verify the year</strong>: which fiscal year are you computing for?
+   Year-end month + your company's year-end define this.</p>
+</li>
+<li>
+<p><strong>Open the Asset Register</strong>, sort by <code>last_cca_year</code>.</p>
+</li>
+<li>
+<p><strong>For each asset where <code>last_cca_year &lt; current_year</code></strong>:
+   - Click <em>Compute CCA</em>
+   - Wizard shows: <code>ucc_start</code>, <code>cca_claimed</code>, <code>ucc_end</code>
+   - Confirm</p>
+</li>
+<li>
+<p><strong>Bulk compute</strong>: select multiple → Action → <em>Compute CCA for
+   Year</em></p>
+</li>
+<li>
+<p><strong>Post the journal entries</strong>: each compute creates a CCA entry
+   record; the totals roll up to a single journal entry per CCA
+   class per period. Posting is automatic but can be deferred if
+   you want to review first.</p>
+</li>
+</ol>
+<h3 id="the-math-step-by-step">The math, step by step</h3>
+<p>Example: Class 50 (55% rate), $4,000 original cost, year of
+acquisition.</p>
+<ul>
+<li><code>ucc_start = $4,000</code> (= original_cost in year 1)</li>
+<li>Half-year rule: claimable = $4,000 × 50% = $2,000</li>
+<li>CCA: $2,000 × 55% = <strong>$1,100</strong></li>
+<li><code>ucc_end = $4,000 - $1,100 = $2,900</code></li>
+</ul>
+<p>Year 2 (full year):
+- <code>ucc_start = $2,900</code>
+- CCA: $2,900 × 55% = <strong>$1,595</strong>
+- <code>ucc_end = $2,900 - $1,595 = $1,305</code></p>
+<p>And so on. The asset eventually depreciates to near zero (the
+remainder is written off at disposal).</p>
+<h2 id="disposal">Disposal</h2>
+<p>When you sell, scrap, or trade in an asset:</p>
+<ol>
+<li><strong>Open the asset → <em>Dispose</em></strong></li>
+<li><strong>Wizard asks</strong>:
+   - <code>disposal_date</code>
+   - <code>proceeds</code> — sale price (zero if scrapped)
+   - <code>disposal_journal_id</code> — where to book the gain/loss</li>
+<li><strong>Math fires</strong>:
+   - If <code>proceeds &gt; current_ucc</code> → recapture (taxable)
+   - If <code>proceeds &lt; current_ucc</code> AND no remaining assets in class →
+     terminal loss (deductible)
+   - If <code>proceeds &lt; current_ucc</code> AND class still has other assets
+     → recapture rules pool the remaining UCC</li>
+<li><strong>Journal entry</strong> posts to <em>Gain on Disposal</em> or <em>Loss on
+   Disposal</em>; asset marked <code>disposed = True</code>.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Original cost includes HST."</strong> Wrong. CCA base is pre-tax
+  cost. HST is a separately recoverable input tax credit; if it
+  ended up in original_cost, you're under-claiming the input
+  credit AND over-claiming CCA. Fix: edit the asset's
+  <code>original_cost</code>; recompute.</p>
+</li>
+<li>
+<p><strong>"Wrong CCA class."</strong> Common with cabinet-shop equipment. CNC
+  routers are Class 53 (50%, M&amp;P), not Class 8 (20%, general).
+  Wrong class = wrong CCA for years. Fix: edit the class; if
+  prior years already filed under wrong class, leave the prior
+  filings — adjust going forward.</p>
+</li>
+<li>
+<p><strong>"Forgot to compute last year."</strong> Open the asset; <em>Compute
+  CCA</em> picks up where it left off. If you missed multiple years,
+  compute each in sequence (or use the bulk compute).</p>
+</li>
+<li>
+<p><strong>"Asset disposed but journal didn't post."</strong> The dispose
+  wizard generates the journal entry as <code>draft</code> if your company's
+  journal configuration requires manual posting. Post manually
+  from the disposal record.</p>
+</li>
+<li>
+<p><strong>"CCA rate changed mid-year (federal accelerated investment
+  incentive)."</strong> The Finance Pack tracks current-year rates;
+  accelerated incentive rules need to be configured per
+  application. v1.1 will auto-detect AccII eligibility.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong><code>southbrook.finance.asset</code></strong> holds the master + state</li>
+<li><strong><code>southbrook.finance.cca_entry</code></strong> holds one row per year per
+  asset; the source of truth for <code>current_ucc</code></li>
+<li><strong><code>southbrook.finance.cca_class</code></strong> is seeded master data</li>
+<li><strong>Compute</strong> uses the class rate + the half-year rule flag</li>
+<li><strong>Disposal</strong> posts a <code>account.move</code> to the configured gain/loss
+  account; the asset is flagged but NOT deleted (audit retention)</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Bought a CNC router for $50,000 + $6,500 HST. Original
+cost field?</p>
+<blockquote>
+<p>$50,000. HST is a separately recoverable input credit, not part
+of the CCA base.</p>
+</blockquote>
+<p><strong>Q2.</strong> Class 53 (50% rate), $20,000 original cost, year 1 (year
+of acquisition). CCA amount?</p>
+<blockquote>
+<p>Half-year rule: claimable = $20,000 × 50% = $10,000.
+CCA = $10,000 × 50% = <strong>$5,000</strong>.
+<code>current_ucc</code> after = $20,000 - $5,000 = $15,000.</p>
+</blockquote>
+<p><strong>Q3.</strong> Same asset, year 5. <code>current_ucc = $1,200</code>. CCA?</p>
+<blockquote>
+<p>$1,200 × 50% = $600. <code>current_ucc</code> after = $600.</p>
+</blockquote>
+<p><strong>Q4.</strong> Year 6: asset is sold for $300. What posts?</p>
+<blockquote>
+<p>Asset's <code>current_ucc</code> going in = $600. Proceeds = $300.
+$600 &gt; $300 → no recapture; if Class 53 has no other assets,
+$300 terminal loss is deductible; if other assets remain, the
+$300 reduces the pool's UCC.</p>
+</blockquote>
+<p><strong>Q5.</strong> Did year-end CCA compute. Edited an asset's
+<code>cca_class_id</code> after. Now the prior compute looks wrong. Recovery?</p>
+<blockquote>
+<p>Open the asset → <em>History</em> tab → the entry for that year shows
+the wrong-class compute. Manually adjust the entry (manager
+only) OR delete it + recompute. Document the change in the
+asset's chatter.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Accounting depreciation (vs CCA tax depreciation) — separate
+  Odoo Accounting topic.</li>
+<li>Asset impairment write-downs (rare).</li>
+<li>Specifics of accelerated investment incentive — CRA T2 Schedule 8.</li>
+<li>T2 corporate tax filing — accountant's job, not platform's.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_20_finance_hst_filing" model="slide.slide">
+            <field name="name">Controller — HST Input/Output Reconciliation and Filing</field>
+            <field name="channel_id" ref="course_finance_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Controller filing HST returns (monthly or quarterly basis).</field>
+            <field name="html_content"><![CDATA[<h1 id="controller-hst-inputoutput-reconciliation-and-filing">Controller — HST Input/Output Reconciliation and Filing</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the controller filing HST for Southbrook (or GST for non-HST
+provinces). The filing is quarterly for most businesses; monthly if
+your annual taxable supplies exceed $6M; annually if under $1.5M.
+This lesson covers the period reconciliation + the filing prep.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Finance → HST Return</strong> (<code>menu_finance_hst_return</code>).</p>
+<p>Supporting:
+- <strong>Accounting → Reporting → Tax Report</strong> (native) — Odoo's view of
+  the same data
+- <strong>Accounting → Customers → Invoices</strong> — output HST source
+- <strong>Accounting → Vendors → Bills</strong> — input HST source</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="hst-return-list-view">HST Return list view</h3>
+<ul>
+<li>Columns: <code>name</code>, <code>period_start</code>, <code>period_end</code>, <code>state</code>,
+  <code>output_hst</code>, <code>input_hst</code>, <code>net_remittance</code></li>
+<li>Decoration-info: state <code>draft</code></li>
+<li>Decoration-warning: state <code>pending_filing</code></li>
+<li>Decoration-success: state <code>filed</code></li>
+<li>Decoration-danger: state <code>overdue</code> (passed CRA deadline)</li>
+</ul>
+<h3 id="hst-return-form-view">HST Return form view</h3>
+<ul>
+<li>Header: <code>period_start</code>, <code>period_end</code>, <code>state</code></li>
+<li>Three sections after <em>Pull</em>:</li>
+<li><strong>Output HST</strong> — collected from customers<ul>
+<li>Line items: invoice list with HST per line</li>
+<li>Subtotal</li>
+</ul>
+</li>
+<li><strong>Input HST</strong> — paid to suppliers, recoverable<ul>
+<li>Line items: bill list with HST per line</li>
+<li>Subtotal</li>
+</ul>
+</li>
+<li><strong>Net</strong> — output minus input = remittance to CRA</li>
+<li>Notebook tab <em>Audit Trail</em> — link each amount to source
+  <code>account.move.line</code> rows</li>
+<li>Action buttons: <em>Pull</em>, <em>Submit for Review</em>, <em>Mark Filed</em></li>
+</ul>
+<h2 id="the-standard-flow">The standard flow</h2>
+<h3 id="1-open-a-new-return">1. Open a new return</h3>
+<ul>
+<li><em>Finance → HST Return → New</em></li>
+<li>Set <code>period_start</code> + <code>period_end</code> to match your filing frequency</li>
+<li><em>Save</em></li>
+</ul>
+<h3 id="2-pull-the-data">2. Pull the data</h3>
+<ul>
+<li>Click <em>Pull</em></li>
+<li>Iterates <code>account.move.line</code> filtered to the HST tax accounts
+  for the period</li>
+<li>Populates Output + Input sections</li>
+<li>May take 10-30 seconds in a busy month</li>
+</ul>
+<h3 id="3-review-your-part-of-the-work">3. Review (your part of the work)</h3>
+<p>This is the substance. Walk three lists:</p>
+<h4 id="output-hst-review">Output HST review</h4>
+<ul>
+<li>Read top 10 invoices by HST amount; spot-check that each was a
+  taxable supply</li>
+<li>Look for anomalies: zero-rated sales charged HST (should be
+  zero), exempt sales charged HST (should be exempt), big-box
+  reverse-charge scenarios</li>
+<li>Check the customer's tax flag — sometimes invoices to
+  HST-registered customers don't need HST charged</li>
+</ul>
+<h4 id="input-hst-review">Input HST review</h4>
+<ul>
+<li>Read top 10 bills by HST amount</li>
+<li>Spot-check eligibility — was it a business expense? Was the
+  vendor HST-registered?</li>
+<li>Watch for personal expenses charged to corporate (common
+  mistake) — those should be excluded</li>
+<li>Verify the vendor's HST registration number is captured</li>
+</ul>
+<h4 id="capital-asset-purchases">Capital asset purchases</h4>
+<ul>
+<li>These split between "current input tax credit" and "capital
+  input tax credit" categories</li>
+<li>Capital ITCs use the same input box but have separate accounting
+  consequences; Southbrook tracks them via
+  <code>account.account.capital_itc</code> flag</li>
+<li>Make sure they're correctly classified</li>
+</ul>
+<h3 id="4-file-with-cra">4. File with CRA</h3>
+<ul>
+<li>Submit the return online via CRA's <em>My Business Account → File
+  a Return</em></li>
+<li>The platform doesn't auto-file — security/control reasons</li>
+<li>Type in the values from the Southbrook return</li>
+<li>Save the CRA confirmation number</li>
+</ul>
+<h3 id="5-mark-filed-in-odoo">5. Mark filed in Odoo</h3>
+<ul>
+<li>Open the HST return; click <em>Mark Filed</em></li>
+<li>Enter the CRA confirmation number</li>
+<li>State → <code>filed</code></li>
+<li>The remittance journal entry posts to <em>HST Payable</em></li>
+</ul>
+<h3 id="6-pay-if-remitting">6. Pay (if remitting)</h3>
+<ul>
+<li><em>Accounting → Bank → Make Payment</em> against the HST Payable
+  balance</li>
+<li>Pay date = on or before CRA's due date</li>
+</ul>
+<h2 id="period-schedule">Period schedule</h2>
+<p>Quarterly filers (most common at Southbrook scale):</p>
+<table>
+<thead>
+<tr>
+<th>Period</th>
+<th>Due date</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q1 (Jan-Mar)</td>
+<td>April 30</td>
+</tr>
+<tr>
+<td>Q2 (Apr-Jun)</td>
+<td>July 31</td>
+</tr>
+<tr>
+<td>Q3 (Jul-Sep)</td>
+<td>October 31</td>
+</tr>
+<tr>
+<td>Q4 (Oct-Dec)</td>
+<td>January 31</td>
+</tr>
+</tbody>
+</table>
+<p>Monthly filers: end of the following month.</p>
+<p>Late filing penalty: 1% of net tax + 0.25% per month, max 12
+months. CRA also charges interest on overdue amounts.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Pulled the return; output HST is $5k lower than what we
+  invoiced."</strong> Some invoices may be in draft state or in a
+  different tax account. Open <em>Accounting → Invoices</em> filter
+  <code>state = draft</code> in period; verify or post. Also check that the
+  HST tax account is correctly configured on each invoice line.</p>
+</li>
+<li>
+<p><strong>"Input HST higher than expected."</strong> Capital asset purchases.
+  These show in input but should be tracked separately as capital
+  ITCs. Audit the high-value bills + verify the account.</p>
+</li>
+<li>
+<p><strong>"Personal expense leaked into input HST."</strong> Edit the vendor
+  bill; change the tax account to <em>Non-business</em> or exclude the
+  line. Re-pull the return.</p>
+</li>
+<li>
+<p><strong>"CRA filing rejected: amounts don't match."</strong> Compare
+  Southbrook's return values to what you typed in CRA's portal.
+  Typos. Re-file with correct values.</p>
+</li>
+<li>
+<p><strong>"Period covers a rate change."</strong> Ontario HST is 13% as of
+  early 2026; if a rate change applies mid-period, the platform
+  pulls correctly per invoice date but you may need to verify
+  invoices around the change date.</p>
+</li>
+<li>
+<p><strong>"I filed but forgot to mark the return as filed in Odoo."</strong>
+  Open the return; <em>Mark Filed</em>; type the CRA confirmation number.
+  Journal entry posts. Audit trail intact.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>HST Return model</strong>: <code>southbrook.finance.hst_return</code> plus
+  <code>southbrook.finance.hst_return_line</code> for the detail</li>
+<li><strong>Pull</strong> queries <code>account.move.line</code> where
+  <code>tax_line_id IN (sale_hst_taxes)</code> for output and
+  <code>IN (purchase_hst_taxes)</code> for input</li>
+<li><strong>Mark Filed</strong> posts a single journal entry: DR Output HST, CR
+  Input HST, CR HST Payable (or DR HST Receivable if input &gt;
+  output)</li>
+<li><strong>State machine</strong>: draft → pending_filing → filed</li>
+<li><strong>No auto-CRA submission</strong> — security boundary; manual filing
+  preserves human review</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Quarterly filer, Q1 2026 ending March 31. CRA filing
+deadline?</p>
+<blockquote>
+<p>April 30. If you miss, late penalty + interest accrue.</p>
+</blockquote>
+<p><strong>Q2.</strong> Pulled the return; output HST = $80k, input HST = $35k.
+Net = $45k. CRA portal asks for total taxable supplies. Where do
+you find that?</p>
+<blockquote>
+<p>Odoo's native <em>Accounting → Reporting → Tax Report</em> gives total
+sales (the base on which HST was charged). Southbrook's HST
+Return only shows the tax amounts; sales base is on the tax
+report. (v1.1 candidate: add total sales to the Southbrook
+return.)</p>
+</blockquote>
+<p><strong>Q3.</strong> Reviewing input HST, you find a $1,500 ITC on a personal
+laptop purchase. What do you do?</p>
+<blockquote>
+<p>Exclude from the input credit claim. Reverse the bill line's
+tax account designation to a non-recoverable account. Re-pull
+the return. The line becomes a personal expense (employee
+reimbursement, dividend, etc.) — separate decision with HR or
+ownership.</p>
+</blockquote>
+<p><strong>Q4.</strong> CRA assesses penalty for late filing. Where do you book it?</p>
+<blockquote>
+<p><em>Penalties and interest</em> expense account. The penalty is NOT
+deductible for income tax purposes; flag the account as
+non-deductible. Conversation with your accountant for the year-
+end T2.</p>
+</blockquote>
+<p><strong>Q5.</strong> Your invoice to a US customer was billed without HST.
+Pull shows it correctly with zero HST. Output HST OK?</p>
+<blockquote>
+<p>Yes — sales to non-residents for export are zero-rated
+(0% HST). The customer paid no HST; you collected none. Both
+sides clean.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Other tax filings (corporate T2, payroll source deductions) —
+  separate workflows.</li>
+<li>Provincial sales tax for non-HST provinces (BC, SK, MB) —
+  separate Odoo Accounting config.</li>
+<li>HST on import / customs — separate process.</li>
+<li>Period lock — lesson 20.5.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_20_finance_period_lock_audit" model="slide.slide">
+            <field name="name">Controller — Period Lock and Audit-Ready Close-Out</field>
+            <field name="channel_id" ref="course_finance_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Controller closing the books + producing the monthly audit pack.</field>
+            <field name="html_content"><![CDATA[<h1 id="controller-period-lock-and-audit-ready-close-out">Controller — Period Lock and Audit-Ready Close-Out</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're at step 7 of the monthly close (lesson 20.1). Everything else
+is reconciled. Time to lock the period and produce a delivery pack
+for ownership, auditor, lender, or whoever consumes your monthly
+financials.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Accounting → Configuration → Fiscal Years</strong> — the lock.
+<strong>Accounting → Reporting</strong> — financial statements.
+<strong>Finance</strong> (all submenus) — supporting schedules.</p>
+<h2 id="the-3-phases-of-the-close-out">The 3 phases of the close-out</h2>
+<h3 id="phase-1-verify-pre-lock-state">Phase 1: Verify pre-lock state</h3>
+<p>Before locking, the following MUST be true:</p>
+<ul>
+<li>[ ] Bank reconciliation complete for the month</li>
+<li>[ ] AR + AP reconciled</li>
+<li>[ ] Inventory variance posted</li>
+<li>[ ] All journal entries posted (no drafts in period)</li>
+<li>[ ] WIP variance &lt; $1</li>
+<li>[ ] CCA depreciation computed for the year (or month, if
+  monthly basis)</li>
+<li>[ ] HST return prepared (if filing month)</li>
+<li>[ ] All payroll runs posted</li>
+</ul>
+<p>If any of these aren't true, fix them BEFORE locking. Once locked,
+edits in that period require a manager unlock + an audit-log entry.</p>
+<h3 id="phase-2-lock">Phase 2: Lock</h3>
+<h4 id="how-to-lock">How to lock</h4>
+<ul>
+<li><em>Accounting → Configuration → Fiscal Years</em></li>
+<li>Find the period you're closing (e.g. "May 2026")</li>
+<li><em>Edit → State → Closed</em></li>
+<li><em>Save</em></li>
+</ul>
+<h4 id="what-the-lock-does">What the lock does</h4>
+<ul>
+<li><code>account.move.line.create()</code> rejected for dates in the locked
+  period (with <code>UserError</code>)</li>
+<li><code>account.move.write()</code> rejected for moves in the locked period</li>
+<li><code>account.move.button_draft()</code> (reopen) requires manager + creates
+  an audit log entry</li>
+</ul>
+<h4 id="what-the-lock-does-not-do">What the lock does NOT do</h4>
+<ul>
+<li>Read access — viewing the period is fine</li>
+<li>Reports — financial statements + supporting reports run fine</li>
+<li>Soft deletes — the data stays</li>
+<li>Adjustments via reversing entries in the next period — those are
+  always allowed</li>
+</ul>
+<h3 id="phase-3-deliver-the-audit-pack">Phase 3: Deliver the audit pack</h3>
+<p>This is what makes the close-out <em>audit-ready</em>.</p>
+<h4 id="standard-contents-of-the-pack">Standard contents of the pack</h4>
+<ol>
+<li>
+<p><strong>Financial statements</strong> (3 standard):
+   - Balance Sheet (<code>Accounting → Reporting → Balance Sheet</code>)
+   - Profit &amp; Loss (<code>Accounting → Reporting → Profit &amp; Loss</code>)
+   - Cash Flow Statement (<code>Accounting → Reporting → Cash Flow Statement</code>)</p>
+</li>
+<li>
+<p><strong>Supporting schedules</strong>:
+   - WIP Report (Finance → WIP Report)
+   - Asset Register summary (Finance → Asset Register)
+   - HST Return (if filed this month)
+   - Aged AR (Accounting → Reporting → Aged Receivable)
+   - Aged AP (Accounting → Reporting → Aged Payable)
+   - Trial Balance (Accounting → Reporting → Trial Balance)</p>
+</li>
+<li>
+<p><strong>Reconciliations</strong>:
+   - Bank reconciliation summary
+   - WIP reconciliation memo (explain any variance &gt; $1)
+   - Inventory valuation snapshot</p>
+</li>
+<li>
+<p><strong>Adjustments log</strong>:
+   - List of manual journal entries posted during close
+   - Reason for each
+   - Approver</p>
+</li>
+<li>
+<p><strong>Memo from controller</strong>:
+   - 1-page summary of the month
+   - Notable items (large adjustments, anomalies, planned
+     follow-up)
+   - Sign-off date + signature</p>
+</li>
+</ol>
+<h4 id="delivery">Delivery</h4>
+<ul>
+<li>PDF the pack (Odoo's <em>Print</em> on each report; merge externally
+  if needed)</li>
+<li>Save to your audit-pack folder (e.g.
+  <code>/share/CACHEDEV3_DATA/Audit-Packs/2026-05/</code>)</li>
+<li>Email or share-link to the recipients (ownership, accountant,
+  lender)</li>
+</ul>
+<h2 id="when-auditors-arrive-quarterly-or-annually">When auditors arrive (quarterly or annually)</h2>
+<p>The monthly packs become the audit-trail input. Auditors will ask:
+- Show me the adjustments log from May 2026
+- Walk me through the WIP variance reconciliation in March
+- Where's the supporting doc for the $50k journal entry on
+  2026-04-15?</p>
+<p>With the monthly packs in place, the answer is fast.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Locked May; need to add an adjustment dated May 28."</strong> Unlock
+  via <em>Fiscal Years → State → Open</em>. Make the edit. Re-lock. Log
+  the reason in the period's audit log via a chatter post on the
+  fiscal year record.</p>
+</li>
+<li>
+<p><strong>"Auditor asks for a journal that doesn't show on my report."</strong>
+  The report's filter may exclude it. Re-run with broader filter
+  (date range, journal type, account). If still missing, the
+  journal may have been deleted (rare) — check <code>audit.log</code> for
+  delete events.</p>
+</li>
+<li>
+<p><strong>"WIP variance was $5 at lock; auditor flagged it."</strong> Document
+  the cause in the next month's chatter. Acceptable if explained;
+  unacceptable if hidden.</p>
+</li>
+<li>
+<p><strong>"Asset disposal was missed in the May pack."</strong> Was disposed
+  June 1; the asset register summary for May correctly shows it
+  active. Not an error.</p>
+</li>
+<li>
+<p><strong>"Pack delivered but recipient says they didn't get an
+  attachment."</strong> Check email; some firms reject PDF attachments</p>
+<blockquote>
+<p>10MB. Share via secure link instead.</p>
+</blockquote>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Fiscal Year close</strong> is native Odoo; sets a constraint on
+  account.move date insertion + edits</li>
+<li><strong>Audit log</strong> is the chatter on the fiscal year + the
+  <code>account.move.line</code> row's <code>create_date / write_date</code></li>
+<li><strong>Reports</strong> read from <code>account.move.line</code> aggregated; respect
+  closed-period rules</li>
+<li><strong>No Southbrook addon writes to the close mechanism</strong> — we use
+  the native gate</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> It's day 7 of close; you've completed steps 1-6; about to
+lock. WIP variance is $0.15. Action?</p>
+<blockquote>
+<p>Document the rounding in the close audit memo. Lock. Move on.</p>
+</blockquote>
+<p><strong>Q2.</strong> Locked May. Found a missed invoice from May 22 that posted
+to June. Action?</p>
+<blockquote>
+<p>Two options. (a) Reverse the June entry, post the entry correctly
+in May — requires unlock + relock with audit log. (b) Leave both
+entries; the financial statements close as-is, but P&amp;L will be
+$X higher in May next year-over-year and $X lower in June. (a) is
+cleaner for the year-end; (b) is faster and OK if the amount is
+immaterial.</p>
+</blockquote>
+<p><strong>Q3.</strong> Auditor asks for the supporting doc for journal entry</p>
+<h1 id="1234-from-march-where-do-you-find-it">1234 from March. Where do you find it?</h1>
+<blockquote>
+<p>Open the journal entry → chatter → attachments. If not attached,
+trace via <code>create_uid</code> and ask the creator. Documents should
+attach at creation time — establish this as policy if not
+already.</p>
+</blockquote>
+<p><strong>Q4.</strong> Lender wants the May P&amp;L by the 10th of June. Your close
+typically lands the 8th. Pressure to publish early. Action?</p>
+<blockquote>
+<p>Don't publish a non-closed P&amp;L. If the 8th is your target, hit
+it. If you slip to the 10th, communicate; reset expectations.
+A wrong P&amp;L is worse than a late one — especially to a lender.</p>
+</blockquote>
+<p><strong>Q5.</strong> Year-end is December. December close + year-end audit pack
+overlap. Order of operations?</p>
+<blockquote>
+<p>Close December as a normal month FIRST (steps 1-7). THEN add
+the year-end specifics: CCA computes for the year, T2 prep, T4
+distribution. Year-end is a SUPERSET of month-end, not a
+replacement.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Specific report customisation (separate Odoo Accounting
+  training).</li>
+<li>Year-end T2 corporate tax prep — accountant's job; you supply
+  the data.</li>
+<li>Audit firm engagement letter logistics — finance ops topic.</li>
+<li>Legal entity consolidation if Southbrook has multiple companies
+  — separate workflow.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

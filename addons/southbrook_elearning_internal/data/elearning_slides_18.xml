@@ -1,0 +1,1037 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_18_quality_menu_orientation" model="slide.slide">
+            <field name="name">Quality Inspector — Your Menu and Your Role</field>
+            <field name="channel_id" ref="course_quality_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">New quality inspector or quality manager onboarding to the Southbrook Quality module.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-inspector-your-menu-and-your-role">Quality Inspector — Your Menu and Your Role</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a quality inspector at Southbrook — or you're stepping into the
+quality manager role. Either way this lesson hands you the map: what
+menus you'll live in every day, what each submenu's job is, and where
+the boundaries are between your work and the work of production, design,
+and purchasing.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Quality</strong> (root menu, <code>menu_southbrook_quality_root</code>, declared in
+<code>southbrook_quality.views.southbrook_quality_menus</code>).</p>
+<p>Submenus, in display order:</p>
+<table>
+<thead>
+<tr>
+<th>Submenu</th>
+<th>XML id</th>
+<th>What it's for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NCRs</td>
+<td><code>menu_southbrook_quality_ncr</code></td>
+<td>Open non-conformance records. Your main inbox.</td>
+</tr>
+<tr>
+<td>SPC</td>
+<td><code>menu_southbrook_quality_spc</code></td>
+<td>Statistical Process Control sample entry + charts.</td>
+</tr>
+<tr>
+<td>Cpk</td>
+<td><code>menu_southbrook_quality_cpk</code></td>
+<td>Process capability reports rolled up from SPC.</td>
+</tr>
+<tr>
+<td>Dimensions</td>
+<td><code>menu_southbrook_quality_dimensions</code></td>
+<td>Master spec of every measured feature (USL/LSL/nominal).</td>
+</tr>
+<tr>
+<td>Supplier Defects</td>
+<td><code>menu_southbrook_quality_supplier_defects</code></td>
+<td>Defects traced to incoming materials.</td>
+</tr>
+<tr>
+<td>MI Tiles</td>
+<td><code>menu_southbrook_quality_mi_tiles</code></td>
+<td>Quality views of the MI dashboard.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Each submenu lands you on a list view with consistent visual cues:</p>
+<ul>
+<li><strong>NCRs list</strong> — decoration-warning rows = open NCRs &gt; 7 days. Decoration-
+  danger = severity <code>critical</code>. Decoration-info = state <code>quarantine</code>.</li>
+<li><strong>SPC list</strong> — last 20 samples per dimension; chart preview on the form.</li>
+<li><strong>Cpk list</strong> — each row is a computed report; columns include <code>cpk</code>,
+  <code>cp</code>, <code>mean</code>, <code>stdev</code>, <code>period_days</code>.</li>
+<li><strong>Dimensions</strong> — read-only for inspectors; the quality manager + ENG can
+  edit. Shows <code>name</code>, <code>nominal</code>, <code>usl</code>, <code>lsl</code>, <code>unit_of_measure</code>,
+  <code>applicable_workcenter_ids</code> (m2m).</li>
+<li><strong>Supplier Defects</strong> — list grouped by <code>supplier_id</code> by default; can
+  toggle to group by <code>product_id</code>.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>A typical inspector's day, in 6 phases:</p>
+<h3 id="1-morning-scan-15-min">1. Morning scan (15 min)</h3>
+<ul>
+<li>Open <em>Quality → NCRs</em>, filter <code>state = open</code> + <code>severity in (major, critical)</code>.</li>
+<li>Read each one's chatter to know what's evolved overnight.</li>
+<li>Open <em>Quality → MI Tiles</em> — the <em>Quality Health</em> tile shows
+  yesterday's NCR count + open age + critical count. If the trend is
+  bad, that becomes the first thing to brief the Plant GM about.</li>
+</ul>
+<h3 id="2-sampling-rounds-every-2-hours">2. Sampling rounds (every 2 hours)</h3>
+<ul>
+<li>Walk the floor; pull samples per the SPC plan
+  (<code>quality.dimension.sample_frequency</code>).</li>
+<li>Enter samples into <em>Quality → SPC</em> immediately (don't accumulate on
+  paper — the chart's trend signal degrades).</li>
+</ul>
+<h3 id="3-ncr-response-as-alerts-fire">3. NCR response (as alerts fire)</h3>
+<ul>
+<li>Inline NCRs created from the floor (see Course 1 lesson 1.6 and
+  Course 17 lesson 17.23 / 17.28) drop into your queue with a
+  notification.</li>
+<li>Triage: <code>severity = critical</code> blocks the line; you get pulled to it.
+  <code>major</code> blocks the cabinet but not the line; <code>minor</code> is informational.</li>
+<li>Decide: rework / scrap / accept (see lesson 18.2).</li>
+</ul>
+<h3 id="4-supplier-defects-as-incoming-receipts-hit-you">4. Supplier defects (as incoming receipts hit you)</h3>
+<ul>
+<li>When receiving creates damaged materials, the team logs a
+  <code>southbrook.quality.supplier_defect</code> linked to the PO. You verify the
+  link is accurate + severity is honest.</li>
+<li>Score recompute is nightly (see lesson 18.5).</li>
+</ul>
+<h3 id="5-cpk-capability-work-weekly">5. Cpk / capability work (weekly)</h3>
+<ul>
+<li>Each Friday, run Cpk on the top 5 dimensions by sample volume (lesson
+  18.4). Trend the numbers; pre-empt the dimensions drifting toward
+  out-of-spec.</li>
+</ul>
+<h3 id="6-end-of-day-handoff">6. End-of-day handoff</h3>
+<ul>
+<li>Post a brief chatter on any NCR still open at shift end.</li>
+<li>Open <em>Quality → MI Tiles</em> once more — confirm today's count vs your
+  morning baseline. Yesterday + today's deltas are how the Plant GM
+  reads quality at the morning briefing.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"I keep getting paged for NCRs I already triaged."</strong> Activity
+  assignment was left blank or routed to the queue-default. Open the
+  NCR → assign the activity to a specific user (yourself or the rework
+  team) to take it out of the <em>general</em> queue.</li>
+<li><strong>"I marked an NCR <code>accept</code> but the cabinet still has a quarantine
+  badge."</strong> The <code>mrp.workorder</code> block doesn't auto-clear on the
+  cabinet's downstream WOs; open the NCR's <em>Affected MOs</em> tab → <em>Unblock
+  Downstream</em>.</li>
+<li><strong>"My SPC chart hasn't updated after I entered a sample."</strong> A 60-second
+  cache delay on the chart render. Refresh; if still stale, the
+  dimension master may have changed during the period — see lesson 18.3.</li>
+<li><strong>"Supplier scorecards look static."</strong> Recompute is nightly, not
+  immediate. Today's defects don't show until tomorrow's MI run.</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li>Every NCR write fires a <code>mail.activity</code> to the assigned user via
+  <code>mail.thread</code>.</li>
+<li>SPC entry triggers a <code>southbrook.quality.spc_sample.create</code> which the
+  MI engine subscribes to — if the sample breaches control limits, MI
+  posts a recommendation to the Plant GM's Hermes queue.</li>
+<li>Cpk reports cache results on the report record for the period, so
+  re-opening doesn't recompute. To force fresh math, click <em>Compute</em>.</li>
+<li>The Supplier Defect → scorecard rollup is a cron in
+  <code>southbrook_quality.mi_engine_ext</code> that runs at 03:30 nightly (see
+  Course 7 lesson 7.1 for the orchestration cron list).</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> You arrive Monday morning and the NCR queue shows 14 open
+records, 3 critical. What's the first action?</p>
+<blockquote>
+<p>Open <em>Quality → MI Tiles</em> and check the Quality Health tile to see the
+weekend's trend, THEN dive into the 3 critical NCRs by severity +
+reported_at desc. Sorting by date first risks missing a critical that
+came in earlier.</p>
+</blockquote>
+<p><strong>Q2.</strong> A floor operator pings you: their kanban shows a cabinet with a
+red border and they can't tap <em>Done</em>. Which menu do you check?</p>
+<blockquote>
+<p><em>Quality → NCRs</em> with filter <code>production_id = &lt;their MO&gt;</code>. The red
+border = quarantine state from an open inline NCR. Triage that NCR
+before the cabinet can move.</p>
+</blockquote>
+<p><strong>Q3.</strong> Quality manager says supplier Marathon's defect rate "looks
+fine" today. The supplier scorecard backs it up. You logged 3 defects
+yesterday. What's the most likely explanation?</p>
+<blockquote>
+<p>Scorecard recompute is nightly via the MI engine cron. Yesterday's
+defects don't show until after the 03:30 run today — visible in
+<em>Quality → MI Tiles</em> once the cron lands.</p>
+</blockquote>
+<p><strong>Q4.</strong> SPC chart for <em>panel thickness on SB-CNC-BORE</em> shows a point
+breaching UCL. You enter a new sample 30 minutes later that's back in
+range. Do you still file an NCR?</p>
+<blockquote>
+<p>Yes if any cabinets passed during the breach window. The breach point
+represents real out-of-control output; even if the next sample
+recovers, what came off during the breach is suspect. File an NCR on
+the affected MO range.</p>
+</blockquote>
+<p><strong>Q5.</strong> You see a Cpk report card showing <code>cpk = 0.85</code>. The process has
+been running clean (no scrap) for a month. What's going on?</p>
+<blockquote>
+<p>Cpk &lt; 1.0 means the process spec is wider than what the math says
+you're producing — but you're not catching scrap because the
+engineering spec (USL/LSL) is generous. Either tighten the spec to
+match reality, or accept the math says "could fail" but observed
+behavior says "doesn't."</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The specifics of opening an NCR — see lesson 18.2.</li>
+<li>The specifics of SPC sample frequency + when to halt — see lesson 18.3.</li>
+<li>The math behind Cpk + what to do with it — see lesson 18.4.</li>
+<li>Supplier scoring math + monthly review meeting — see lesson 18.5.</li>
+<li>Native Odoo Quality module (we're not running it; the Southbrook quality
+  layer is the source of truth).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_18_quality_ncr_lifecycle" model="slide.slide">
+            <field name="name">Quality Inspector — The NCR Lifecycle from Open to Close</field>
+            <field name="channel_id" ref="course_quality_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Quality inspector or manager processing non-conformance records.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-inspector-the-ncr-lifecycle-from-open-to-close">Quality Inspector — The NCR Lifecycle from Open to Close</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the person who decides whether a flagged cabinet gets reworked,
+scrapped, or accepted. This lesson walks the full state machine of
+<code>southbrook.ncr</code> with the decisions you make at each state, the
+financial + production downstream effects, and the recovery paths when
+the floor's expectations don't match yours.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Quality → NCRs</strong> (<code>menu_southbrook_quality_ncr</code>).</p>
+<p>The form view is the workhorse — list view gets you to the form, but
+all the decisions happen on the form.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The NCR form has 5 distinct regions:</p>
+<h3 id="header">Header</h3>
+<ul>
+<li><code>state</code> widget (statusbar): <code>draft → quarantine → rework / scrap / accept</code></li>
+<li>Action buttons gated on state — <em>Quarantine</em>, <em>Rework</em>, <em>Scrap</em>, <em>Accept</em></li>
+<li><code>name</code> — auto-numbered, <code>NCR/YYYY/000xx</code> format (sequence in
+  <code>southbrook_quality.data.sequence_data.xml</code>)</li>
+</ul>
+<h3 id="identification-panel">Identification panel</h3>
+<ul>
+<li><code>production_id</code> — the MO this NCR points at (required, indexed)</li>
+<li><code>product_id</code> — auto-fills from the MO usually</li>
+<li><code>workorder_id</code> — optional; pin to the specific work order step</li>
+<li><code>reported_at</code>, <code>reported_by</code> (compute from create_date / create_uid)</li>
+</ul>
+<h3 id="defect-classification">Defect classification</h3>
+<ul>
+<li><code>defect_type</code> — selection: dimension / finish / hardware / material /
+  handling (5 values; if your defect doesn't fit, file as <code>handling</code>
+  and use the description field to detail)</li>
+<li><code>severity</code> — selection: minor / major / critical</li>
+<li><code>description</code> — free text, mandatory for major + critical</li>
+</ul>
+<h3 id="resolution">Resolution</h3>
+<ul>
+<li><code>resolution_path</code> (computed) — shows the path taken: rework date,
+  scrap date, accept date</li>
+<li><code>rework_workcenter_id</code> — when rework, which station re-does the work</li>
+<li><code>scrap_quantity</code> — when scrap, the qty written off</li>
+<li><code>accept_reason</code> — when accept, the documented why</li>
+</ul>
+<h3 id="notebook">Notebook</h3>
+<ul>
+<li><strong>Affected MOs</strong> — m2m to <code>mrp.production</code>, populated by the
+  <em>Block Downstream WOs</em> action</li>
+<li><strong>Photos</strong> — <code>ir.attachment</code> rows linked to the NCR</li>
+<li><strong>Chatter</strong> — full mail.thread audit</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<h3 id="opening-an-ncr">Opening an NCR</h3>
+<p>Two paths:</p>
+<p><strong>Path A: From the floor (inline NCR — already filed by operator)</strong>
+- It lands in your queue at state <code>quarantine</code>
+- You triage and decide the resolution path</p>
+<p><strong>Path B: You file it yourself (post-build inspection, customer
+return, internal audit)</strong>
+- <em>Quality → NCRs → New</em>
+- Pick the MO via <code>production_id</code> search (toggle "Show Done MOs" filter
+  to see completed runs)
+- Fill <code>defect_type</code> + <code>severity</code>
+- <em>Save</em> — state goes to <code>draft</code>
+- Click <em>Quarantine</em> to enter the lifecycle</p>
+<h3 id="state-transitions">State transitions</h3>
+<p>State machine, with what each transition does to downstream state:</p>
+<pre><code>draft ──[Quarantine]──&gt; quarantine ──[Rework]──&gt; rework ─┐
+                            │                            │
+                            ├──[Scrap]──&gt; scrap          │
+                            │                            │
+                            └──[Accept]──&gt; accept        │
+                                                          │
+                            &lt;── [Auto-close on MO done] ──┘
+</code></pre>
+<p><strong><code>quarantine</code></strong> — entering this state:
+- Blocks the cabinet's downstream WOs (<code>mrp.workorder.state</code> → <code>pending</code>
+  with <code>block_reason = ncr.&lt;id&gt;</code>)
+- Notifies the quality manager via activity
+- Posts to the MO's chatter</p>
+<p><strong><code>rework</code></strong> — entering this state:
+- Creates a <code>mrp.workorder.duration</code> adjustment record on the
+  <code>rework_workcenter_id</code>
+- The cabinet is unblocked downstream BUT routed back to that workcenter
+  first
+- NCR stays open until the rework signs off (the workcenter operator
+  marks it complete + you confirm)</p>
+<p><strong><code>scrap</code></strong> — entering this state:
+- Posts a <code>stock.scrap</code> record for <code>scrap_quantity</code> (default 1) on the
+  product
+- Re-MOs the affected demand via the SO link (procurement rerun)
+- Logs the loss to the <em>Scrap</em> GL account via stock valuation
+- NCR auto-closes after the scrap journal posts</p>
+<p><strong><code>accept</code></strong> — entering this state:
+- Unblocks all downstream WOs
+- Requires Quality Manager (<code>group_southbrook_quality_manager</code>)
+- Documents the <code>accept_reason</code> (mandatory)
+- NCR auto-closes</p>
+<h3 id="closing-the-ncr">Closing the NCR</h3>
+<p>NCRs in <code>rework</code> close when the rework signs off — operator marks WO
+complete, you click <em>Confirm Rework Done</em> in the NCR header. NCRs in
+<code>scrap</code> or <code>accept</code> close automatically. NCRs in <code>quarantine</code> stay open
+until you pick a resolution.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"I clicked Scrap by mistake. Now the cabinet is gone."</strong> The
+  <code>stock.scrap</code> move is reversible only via a manual reverse stock
+  move. Open the cabinet's product → <em>Stock → Stock Moves</em> → find the
+  scrap → <em>Reverse</em>. This is a <em>quality manager</em> action; you'll need
+  approval.</p>
+</li>
+<li>
+<p><strong>"NCR says state = accept but the cabinet is still red on the
+  kanban."</strong> The kanban reads <code>mrp.workorder.block_reason</code>; the NCR
+  accept didn't clear that field. Open the NCR → <em>Cog → Force Unblock
+  Downstream</em>. (Bug; the auto-clear should happen.)</p>
+</li>
+<li>
+<p><strong>"I see two NCRs on the same MO. Which is canonical?"</strong> Both are. NCRs
+  are additive; one cabinet can have multiple defects. State of EACH NCR
+  must resolve. Don't close one as a duplicate without resolving its
+  finding.</p>
+</li>
+<li>
+<p><strong>"Reworking sends the cabinet to SB-ASSY but it should go to
+  SAND."</strong> <code>rework_workcenter_id</code> is the target. Edit the NCR before
+  clicking <em>Rework</em>; once submitted, the routing's stuck.</p>
+</li>
+<li>
+<p><strong>"I want to file an NCR after the MO closed."</strong> Allowed — toggle the
+  <em>Show Done MOs</em> filter when searching <code>production_id</code>. The NCR will
+  post but state machine is shallower (no downstream WOs to block).</p>
+</li>
+<li>
+<p><strong>"Customer returned a cabinet 6 weeks after delivery."</strong> File the
+  NCR linked to the original MO. Severity = critical regardless of
+  defect. Triggers ECO consideration (lesson 17.10) and a supplier
+  defect entry if material-driven (lesson 18.5).</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The NCR is mostly a state machine plus a few side effects:</p>
+<ul>
+<li>
+<p><strong>Block / unblock</strong> is a write to <code>mrp.workorder.block_reason</code>. The
+  field is a Char that the Southbrook MES kanban reads + decorates with
+  the red border.</p>
+</li>
+<li>
+<p><strong>Stock scrap</strong> uses the native <code>stock.scrap</code> model — no Southbrook
+  wrapper. So scrap journal valuation comes from native COGS / scrap
+  account configuration.</p>
+</li>
+<li>
+<p><strong>Re-MO via SO link</strong> uses <code>procurement.group.run()</code> on the originating
+  SO line's qty. If the SO had multiple cabinets, only the scrapped one
+  re-MOs.</p>
+</li>
+<li>
+<p><strong>Supplier defect auto-link</strong> — if <code>defect_type = material</code> and the
+  product has a recent PO, the NCR auto-creates a
+  <code>southbrook.quality.supplier_defect</code> linked to the supplier (lesson
+  18.5 for the scoring side).</p>
+</li>
+<li>
+<p><strong>MI engine subscription</strong> — <code>southbrook_quality.mi_engine_ext</code>
+  watches NCR creates with <code>severity = critical</code> and posts a Hermes
+  recommendation to the Plant GM persona.</p>
+</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> You file an NCR with <code>defect_type = dimension</code> and
+<code>severity = major</code> against MO 1234. The floor reports the cabinet
+"shipped to assembly anyway." What did you forget?</p>
+<blockquote>
+<p>Click <em>Quarantine</em> on the NCR header. Save alone doesn't block
+downstream — state must move from <code>draft</code> to <code>quarantine</code> for the
+<code>mrp.workorder.block_reason</code> write to fire.</p>
+</blockquote>
+<p><strong>Q2.</strong> You decided rework was the right call. You click <em>Rework</em>,
+pick SAND as the target. Later you realise the right station was
+SB-EDGE. What's the recovery?</p>
+<blockquote>
+<p>NCR is now in <code>rework</code>. Click <em>Cog → Reset to Quarantine</em> (manager
+only). Edit <code>rework_workcenter_id</code>. Click <em>Rework</em> again. Logs both
+attempts in the chatter.</p>
+</blockquote>
+<p><strong>Q3.</strong> A <code>scrap</code> NCR posted a <code>stock.scrap</code> for qty 1. The customer's
+SO had a qty of 2 of that product. What happens to fulfilment?</p>
+<blockquote>
+<p>Procurement reruns for qty 1 (the scrapped one). The other unit, if
+already produced, continues. If not yet produced, the live MO covers
+both demands; no re-MO needed.</p>
+</blockquote>
+<p><strong>Q4.</strong> You accept an NCR for "cosmetic blemish, customer accepted."
+The <code>accept_reason</code> field is mandatory. What do you write?</p>
+<blockquote>
+<p>"Customer approved cosmetic blemish on RHS gable; documented in SO
+chatter at <link>. No discount applied." Be specific — <code>accept</code> is
+the only path where Finance / Quality audit might come back later.</p>
+</blockquote>
+<p><strong>Q5.</strong> You log a <code>defect_type = material</code> NCR. No supplier defect
+appears. Why?</p>
+<blockquote>
+<p>The product wasn't traceable back to a recent PO — purchased &gt; 90
+days ago, or sourced as drop-ship without a Southbrook receipt. The
+auto-link only fires when a PO line is within the lookback window.
+File the supplier defect manually (lesson 18.5).</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The math behind SPC sampling that often surfaces NCRs — lesson 18.3.</li>
+<li>Cpk capability — lesson 18.4.</li>
+<li>The supplier scoring side of supplier defects — lesson 18.5.</li>
+<li>Native Odoo Quality alerts — we don't use them; Southbrook quality
+  layer is the source of truth.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_18_quality_spc_sampling" model="slide.slide">
+            <field name="name">Quality Inspector — SPC Sampling Discipline</field>
+            <field name="channel_id" ref="course_quality_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Quality inspector running SPC sampling, quality manager setting policy.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-inspector-spc-sampling-discipline">Quality Inspector — SPC Sampling Discipline</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're either running SPC sampling at a workcenter today, or you're the
+quality manager deciding what features to sample, how often, and what to
+do when the chart goes out of control. This lesson covers both seats.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Quality → SPC</strong> (<code>menu_southbrook_quality_spc</code>) — sample entry.
+<strong>Quality → Dimensions</strong> (<code>menu_southbrook_quality_dimensions</code>) —
+master spec the inspector is sampling against.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="spc-list-view">SPC list view</h3>
+<ul>
+<li>Decoration-success: last sample inside control limits</li>
+<li>Decoration-warning: trending toward limit (Western Electric rule 1)</li>
+<li>Decoration-danger: latest sample outside control limit OR rule 1-4
+  breach</li>
+</ul>
+<h3 id="spc-form-view">SPC form view</h3>
+<ul>
+<li><code>dimension_id</code> — what's being measured (FK to <code>quality.dimension</code>)</li>
+<li><code>workcenter_id</code> — where measured (FK to <code>mrp.workcenter</code>)</li>
+<li><code>measured_value</code> — your reading</li>
+<li><code>sample_size</code> — usually 5 or 10</li>
+<li><code>taken_at</code> — datetime (auto from create_date)</li>
+<li><code>operator_id</code> — who took it (defaults to current user)</li>
+<li><strong>Chart preview</strong> — last 20 samples with UCL/LCL/centre line</li>
+</ul>
+<h3 id="dimension-form-view">Dimension form view</h3>
+<ul>
+<li><code>name</code> — descriptive ("panel thickness on SB-CNC-BORE 18mm board")</li>
+<li><code>nominal</code> — target value</li>
+<li><code>usl</code>, <code>lsl</code> — engineering spec limits (mandatory)</li>
+<li><code>unit_of_measure</code> — mm, inches, etc.</li>
+<li><code>applicable_workcenter_ids</code> (m2m) — which workcenters this applies
+  to</li>
+<li><code>sample_frequency</code> — selection: per_hour / per_50_units / per_shift /
+  per_day</li>
+<li><code>is_critical</code> — boolean; critical dimensions get tighter UCL/LCL
+  (2σ instead of 3σ)</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<h3 id="inspector-taking-samples">Inspector — taking samples</h3>
+<ol>
+<li><strong>Walk the floor</strong> at the cadence the dimension master prescribes.
+   Per_50_units means count to 50 cuts on SB-CNC-BORE, then sample.</li>
+<li><strong>Measure</strong> with the right tool (calipers, gauge block, etc.).
+   Critical dimensions need calibrated tools; check calibration date
+   on the tool.</li>
+<li><strong>Enter sample</strong>. <em>Quality → SPC → New</em>. Dimension auto-narrows
+   to the workcenter you're at if you set context. Save.</li>
+<li><strong>Read the chart</strong>. New point lands. If it's the first time you've
+   seen amber or red on this dimension today, escalate.</li>
+</ol>
+<h3 id="manager-setting-policy">Manager — setting policy</h3>
+<ol>
+<li><strong>Decide what to sample</strong>. Not every dimension; pick the ones that
+   matter to function or aesthetics. Start with 5-10 dimensions per
+   workcenter.</li>
+<li><strong>Set <code>sample_frequency</code></strong>. Tight enough to catch drift, loose
+   enough to be feasible. Per_50_units is the most common starting
+   point.</li>
+<li><strong>Define <code>usl</code> / <code>lsl</code></strong> in millimetres. These should match the
+   engineering drawing exactly. If you don't have an engineering
+   drawing, get one before sampling — Cpk against a guessed spec is
+   noise.</li>
+<li><strong>Mark <code>is_critical</code> carefully</strong>. Critical = 2σ control limits =
+   more alarms = more interruptions. Don't critical-flag everything;
+   reserve it for features that fail at the customer.</li>
+</ol>
+<h2 id="reading-the-chart">Reading the chart</h2>
+<p>The chart's the whole point. Here's how to read it:</p>
+<ul>
+<li><strong>Centre line</strong> — historical mean of all samples in the period</li>
+<li><strong>UCL / LCL</strong> — control limits (3σ for normal, 2σ for critical)</li>
+<li><strong>USL / LSL</strong> — engineering spec (wider than UCL/LCL usually)</li>
+</ul>
+<p><strong>The 4 Western Electric rules</strong> the platform watches for:</p>
+<ol>
+<li>One point outside ±3σ</li>
+<li>Two of three consecutive points outside ±2σ (same side)</li>
+<li>Four of five consecutive points outside ±1σ (same side)</li>
+<li>Nine consecutive points on one side of the centre line</li>
+</ol>
+<p>Any rule breach triggers <code>decoration-danger</code> on the SPC list view + an
+MI engine notification (the manager sees it in <em>Quality → MI Tiles</em>).</p>
+<h2 id="when-the-chart-goes-out-of-control">When the chart goes out of control</h2>
+<p><strong>Step 1: Don't panic.</strong> Out-of-control doesn't mean out-of-spec. It
+means the process has shifted from its historical norm. The cabinet
+coming off the line may still be inside USL/LSL.</p>
+<p><strong>Step 2: File an NCR if appropriate.</strong> If <code>measured_value</code> is
+outside USL or LSL (not just UCL/LCL), the affected cabinets are
+out-of-spec. NCR them (lesson 18.2).</p>
+<p><strong>Step 3: Investigate.</strong> Common drift causes:
+- Tool wear (CNC bits, edge tape spool)
+- Material lot change (different supplier batch)
+- Operator change (different technique)
+- Environmental (humidity, temp)
+- Machine calibration drift</p>
+<p><strong>Step 4: Document.</strong> Post the investigation to the SPC sample's
+chatter so the next inspector reads it before re-sampling.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"I forgot to take a sample on schedule. Should I take two now?"</strong>
+  No. Take one now, note the gap in the chatter. Backfilling samples
+  with the same timestamp distorts the chart.</p>
+</li>
+<li>
+<p><strong>"I sampled but entered the wrong dimension."</strong> Edit the
+  <code>dimension_id</code> on the sample row. The chart will refresh on the
+  correct dimension. Caveat: if you've already triggered an alert on
+  the wrong dimension, that alert's now orphaned — clear it manually.</p>
+</li>
+<li>
+<p><strong>"Sample is <code>5.001 mm</code> but I'm using a tool with 0.01 precision.
+  Enter <code>5.001</code> or <code>5.00</code>?"</strong> Use the tool's actual precision. Fake
+  precision invents data; the chart will lie to you.</p>
+</li>
+<li>
+<p><strong>"<code>usl</code> and <code>lsl</code> aren't filled on the dimension I'm trying to
+  sample."</strong> Stop sampling. The chart's math is broken without these.
+  Quality manager fills them before sampling resumes.</p>
+</li>
+<li>
+<p><strong>"Dimension master changed mid-period (new USL/LSL)."</strong> Old samples
+  are still on the old chart math; new samples will be on new math.
+  The chart will look discontinuous. This is expected; document the
+  spec change date in the dimension's chatter.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Sample create</strong> writes to <code>southbrook.quality.spc_sample</code>. A
+  computed field <code>is_in_control</code> is set at create time based on the
+  current control limits.</li>
+<li><strong>Control limits</strong> are computed from the last <code>period_samples</code>
+  (default 30) on this <code>dimension_id + workcenter_id</code> combo. Recomputed
+  on every sample create.</li>
+<li><strong>Rule breach</strong> fires <code>southbrook.quality.mi_engine_ext.check_spc()</code> —
+  posts a recommendation to the MI engine for Hermes routing.</li>
+<li><strong>Chart render</strong> is a <code>web_widget</code> OWL component reading the last 20
+  samples + control limits. Caches 60s in the browser.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> You're sampling panel thickness on SB-CNC-BORE per 50 units.
+You missed the sample at unit 50; you're now at unit 110. Do you take
+2 samples or 1?</p>
+<blockquote>
+<p>One sample now. Note the gap (units 50-100 unsampled) in the chatter.
+Two retroactive samples distort the chart's temporal pattern.</p>
+</blockquote>
+<p><strong>Q2.</strong> A sample lands at <code>4.8mm</code> on a dimension with <code>nominal=5.0mm</code>,
+<code>usl=5.2mm</code>, <code>lsl=4.9mm</code>. Chart goes red. What's wrong?</p>
+<blockquote>
+<p><code>4.8 &lt; lsl (4.9)</code>. The sample is out of spec AND out of control. File
+an NCR on the affected MO (any cabinet cut since the last good
+sample). Investigate tool wear or calibration immediately.</p>
+</blockquote>
+<p><strong>Q3.</strong> Western Electric rule 4 (nine consecutive points on one side
+of the centre line) triggered, but every point is inside spec. Action?</p>
+<blockquote>
+<p>Investigate drift cause (lesson body lists common ones). No NCR if
+nothing's out of spec. Document findings in the dimension's chatter
++ check whether the centre line should be recomputed (process has
+shifted).</p>
+</blockquote>
+<p><strong>Q4.</strong> A new dimension was added to the master last week. There are
+only 5 samples on it. Cpk asks for ≥30. What's the right action?</p>
+<blockquote>
+<p>Sample more before computing Cpk. Cpk on 5 samples is statistically
+unreliable. Wait for ≥30 (lesson 18.4 explains why) before computing.</p>
+</blockquote>
+<p><strong>Q5.</strong> Your gauge tool's last calibration was 6 months ago. The
+quality manual says recalibrate every 90 days. Latest sample looks
+fine. Do you log it?</p>
+<blockquote>
+<p>File a <em>handling</em>-type NCR on the cabinet you'd been measuring,
+severity = major. Pull the tool from service. Don't log the sample
+as authoritative; the measurement may be wrong. Note the tool
+calibration lapse in the NCR chatter.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Cpk math + when to act on it — lesson 18.4.</li>
+<li>NCR lifecycle (rework / scrap / accept) — lesson 18.2.</li>
+<li>Supplier scoring — lesson 18.5.</li>
+<li>Calibration tracking — currently outside the platform (paper log);
+  v1.1 calibration record planned.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_18_quality_cpk_capability" model="slide.slide">
+            <field name="name">Quality Inspector — Cpk and Process Capability Analysis</field>
+            <field name="channel_id" ref="course_quality_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Quality manager doing weekly capability review.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-inspector-cpk-and-process-capability-analysis">Quality Inspector — Cpk and Process Capability Analysis</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the quality manager doing the weekly capability review. You've
+got 30+ SPC samples on each of your top dimensions and you want to know
+"is this process capable of meeting spec?" One number tells you: Cpk.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Quality → Cpk</strong> (<code>menu_southbrook_quality_cpk</code>).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="cpk-list-view">Cpk list view</h3>
+<ul>
+<li>Decoration-success: <code>cpk ≥ 1.33</code> (capable)</li>
+<li>Decoration-warning: <code>1.0 ≤ cpk &lt; 1.33</code> (marginal)</li>
+<li>Decoration-danger: <code>cpk &lt; 1.0</code> (not capable)</li>
+<li>Sort by <code>cpk</code> ascending shows the trouble dimensions first.</li>
+</ul>
+<h3 id="cpk-form-view">Cpk form view</h3>
+<ul>
+<li><code>dimension_id</code> — what was analysed</li>
+<li><code>period_days</code> — lookback window (default 30)</li>
+<li><code>sample_count</code> — count of SPC samples in the period</li>
+<li><code>mean</code> — sample mean (auto)</li>
+<li><code>stdev</code> — sample standard deviation (auto)</li>
+<li><code>cp</code> — process capability <code>(USL - LSL) / 6σ</code></li>
+<li><code>cpk</code> — process capability index <code>min((USL-mean)/3σ, (mean-LSL)/3σ)</code></li>
+<li><code>cpk_lower</code>, <code>cpk_upper</code> — the two sides of the min</li>
+<li><code>computed_at</code> — when last computed</li>
+<li>Notebook tab <em>Sample List</em> — the SPC samples that went into the math</li>
+</ul>
+<h2 id="your-weekly-capability-review">Your weekly capability review</h2>
+<p>A typical Friday afternoon, 30 minutes:</p>
+<ol>
+<li><strong>Open <em>Quality → Cpk</em></strong> sorted by <code>cpk</code> ascending.</li>
+<li><strong>Review the top 5 dimensions with <code>cpk &lt; 1.33</code></strong>. These are the
+   ones to watch.</li>
+<li><strong>For each, open the report</strong>:
+   - Read <code>sample_count</code> — if &lt; 30, the math is noisy; don't act yet.
+   - Read <code>mean</code> vs <code>nominal</code> — is the process centred? If not,
+     adjust upstream (toolpath, fixture, operator method).
+   - Read <code>cpk_lower</code> vs <code>cpk_upper</code> — if one side is much worse,
+     that's the side at risk; investigate.</li>
+<li><strong>Decide actions</strong> for each — three buckets:
+   - Centre the process (engineering / operator)
+   - Reduce variation (maintenance / material)
+   - Loosen the spec (engineering decision — only with good reason)</li>
+<li><strong>Post to Plant GM</strong> via Hermes. The MI engine surfaces low-Cpk
+   dimensions automatically but the manager benefit reading them
+   weekly with context.</li>
+</ol>
+<h2 id="reading-cpk">Reading Cpk</h2>
+<pre><code>Cpk &lt; 1.0      → producing some out-of-spec parts (math says so)
+1.0 ≤ Cpk &lt; 1.33 → marginal; one shift could push to defect
+1.33 ≤ Cpk &lt; 1.67 → capable; the safe zone
+Cpk ≥ 1.67    → six-sigma capable; the gold standard
+</code></pre>
+<p>Cpk treats both sides of the spec separately. A process can be
+"capable" overall but lopsided — <code>cpk_upper = 1.5</code> and
+<code>cpk_lower = 0.9</code> means you're fine on the high side and at risk on
+the low side. The low side is what'll fail first.</p>
+<h2 id="when-cpk-says-not-capable-but-youre-not-seeing-scrap">When Cpk says "not capable" but you're not seeing scrap</h2>
+<p>This is the most common Cpk question. Three possibilities:</p>
+<ol>
+<li>
+<p><strong>Spec is wider than reality.</strong> The engineering drawing says
+   <code>±0.2mm</code> but you can hold <code>±0.1mm</code> easily. Cpk math thinks you
+   <em>could</em> produce defects given the spec, but you're not getting
+   close to the spec limits. Action: verify the spec with
+   engineering. Maybe tighten the spec to match reality — but then
+   Cpk will get worse because variation hasn't changed.</p>
+</li>
+<li>
+<p><strong>Defects are escaping detection.</strong> You're not finding the
+   out-of-spec parts because your inspection cadence misses them.
+   Action: inspect more, or improve detection methods.</p>
+</li>
+<li>
+<p><strong>Cpk math is wrong.</strong> Could be: SPC samples taken under non-
+   representative conditions (right after warm-up only); sample
+   period too short for true variation; tool calibration drifting
+   during the period. Action: investigate sampling protocol.</p>
+</li>
+</ol>
+<h2 id="when-cpk-says-capable-but-youre-getting-scrap">When Cpk says "capable" but you're getting scrap</h2>
+<p>Also possible:</p>
+<ol>
+<li><strong>Process drifted within the period.</strong> Cpk is an average over the
+   period. If the process started fine and ended bad, the average
+   looks OK. Look at the SPC chart for trend (lesson 18.3 rule 4).</li>
+<li><strong>Process is bi-modal.</strong> Two distinct populations (e.g. day shift
+   + night shift produce different) average to a centred mean but
+   each shift is offset. Look at the histogram (form notebook).</li>
+<li><strong>Scrap is from a different cause.</strong> Not all scrap is dimensional.
+   Check the NCRs — if defect_type is <code>finish</code> or <code>hardware</code>, those
+   are outside Cpk's view.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"<code>sample_count</code> is 5 and Cpk is 2.1. That's great, right?"</strong> No
+  — Cpk needs ≥30 samples for the math to be trustworthy. Five
+  samples have wide confidence intervals; you'd see 0.5 just as
+  easily next week. Wait for more samples.</p>
+</li>
+<li>
+<p><strong>"<code>cpk_lower</code> is negative."</strong> Process mean is outside the lower
+  spec entirely (mean &lt; lsl). Halt the process until investigated.
+  Filed NCRs likely.</p>
+</li>
+<li>
+<p><strong>"Cpk dropped from 1.5 to 0.8 in one week."</strong> A capable process
+  doesn't drop that fast unless something physical changed.
+  Investigate: new operator, new material lot, machine fault. Don't
+  blame the math.</p>
+</li>
+<li>
+<p><strong>"Engineering says my spec is wrong but won't update it."</strong>
+  Escalate to Plant GM. The Cpk report is your evidence. Without a
+  correct spec, capability analysis is meaningless.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Compute</strong> is on-demand (button) and idempotent — same period +
+  same samples = same result.</li>
+<li><strong>Sample selection</strong> is <code>southbrook.quality.spc_sample</code> filtered by
+  <code>dimension_id</code> + <code>taken_at within period_days</code>. The <code>applicable_
+  workcenter_ids</code> from the dimension doesn't filter; you'll see samples
+  from all workcenters that take this dimension. (To split by
+  workcenter, file a v1.1 ticket.)</li>
+<li><strong>Math</strong> is straightforward Python — <code>mean = sum/n</code>,
+  <code>stdev = sqrt(sum((x-mean)^2)/(n-1))</code>, then <code>cp</code>, <code>cpk</code> formulas.</li>
+<li><strong>No cron</strong> — Cpk is computed when you click <em>Compute</em>. No nightly
+  refresh. (v1.1: weekly auto-compute cron.)</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Cpk = 1.1 on a dimension. Sample count = 28. Action?</p>
+<blockquote>
+<p>Wait for more samples before acting. Cpk on &lt; 30 samples has wide
+confidence; the real Cpk might be 0.8 or 1.5. Sample more, recompute
+at 30+. Marginal Cpk reports below 30 samples should be treated as
+"informational only."</p>
+</blockquote>
+<p><strong>Q2.</strong> Cpk = 0.85, no scrap reported this period. Three explanations
+the lesson lists are: spec wider than reality, defects escaping
+detection, math wrong. How do you tell which?</p>
+<blockquote>
+<p>Walk the floor. Watch the process. Measure 10 samples yourself with
+a calibrated tool, compare to the SPC operator's samples. If your
+readings match theirs, spec is probably wider than reality (check
+with engineering). If yours show wider variation, detection is
+escaping. If yours show inconsistency vs SPC entries, sampling
+protocol is broken.</p>
+</blockquote>
+<p><strong>Q3.</strong> A new dimension was added 2 weeks ago. 22 samples taken so
+far. Cpk shows 1.4. Time to act?</p>
+<blockquote>
+<p>No — 22 samples is below the 30-sample threshold for trustworthy
+Cpk. The 1.4 is a directional signal but not actionable yet. Wait
+for 30+; if it stays around 1.4, then call the process capable.</p>
+</blockquote>
+<p><strong>Q4.</strong> Cpk_upper = 1.8, cpk_lower = 0.7. Cpk (the min) = 0.7. Action?</p>
+<blockquote>
+<p>Investigate the lower side specifically. The process mean is
+further from LSL than USL — likely a centering issue. Adjust
+upstream to bring mean closer to nominal. May require tool
+adjustment, fixture change, or operator method update.</p>
+</blockquote>
+<p><strong>Q5.</strong> Cpk weekly review shows 3 dimensions at Cpk &lt; 1.0. Time to
+shut down those workcenters?</p>
+<blockquote>
+<p>Not automatically. Cpk says the process <em>could</em> produce defects;
+the SPC chart says whether it <em>is</em>. Cross-check each: if the SPC
+shows actual out-of-spec samples in the period, halt + investigate.
+If SPC is clean (process is centred but variation is too wide for
+the spec), keep running while spec or variation is addressed.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>SPC sampling mechanics — lesson 18.3.</li>
+<li>NCR creation when scrap is found — lesson 18.2.</li>
+<li>Supplier scoring — lesson 18.5.</li>
+<li>Histogram / process capability index Pp (long-term) — currently
+  not computed; v1.1 candidate.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_18_quality_supplier_scorecards" model="slide.slide">
+            <field name="name">Quality Inspector — Supplier Defect Tracking and Monthly Scorecards</field>
+            <field name="channel_id" ref="course_quality_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Quality manager working with purchasing on supplier performance.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-inspector-supplier-defect-tracking-and-monthly-scorecards">Quality Inspector — Supplier Defect Tracking and Monthly Scorecards</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the quality manager who attends the monthly supplier review
+meeting with the purchasing manager. You bring data; they bring
+contracts and lead times. The decisions made together affect cost,
+quality, and customer experience. This lesson is how you build the
+defensible data.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Quality → Supplier Defects</strong> (<code>menu_southbrook_quality_supplier_defects</code>).</p>
+<p>Supporting menus:
+- <strong>Contacts → Vendors</strong> — supplier master records, scorecard lives
+  here in a notebook tab.
+- <strong>Purchase → Orders</strong> — the PO records each defect references.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="supplier-defects-list-view">Supplier Defects list view</h3>
+<ul>
+<li>Grouped by <code>supplier_id</code> by default</li>
+<li>Decoration-warning: defects in last 7 days</li>
+<li>Decoration-danger: severity = critical OR defect_count &gt; 5</li>
+</ul>
+<h3 id="supplier-defect-form-view">Supplier Defect form view</h3>
+<ul>
+<li><code>supplier_id</code> — <code>res.partner</code> flagged as vendor (mandatory)</li>
+<li><code>po_id</code> — the PO this came from (mandatory, auto-narrows products)</li>
+<li><code>product_id</code> — the SKU (mandatory)</li>
+<li><code>defect_count</code> — how many units affected</li>
+<li><code>defect_type</code> — selection</li>
+<li><code>severity</code> — selection</li>
+<li><code>description</code> — free text</li>
+<li><code>linked_ncr_ids</code> — NCRs that this defect triggered downstream</li>
+<li><code>is_warranty_claim</code> — boolean; flag if supplier should cover cost</li>
+</ul>
+<h3 id="vendor-scorecard-tab-on-respartner">Vendor scorecard tab (on res.partner)</h3>
+<ul>
+<li><code>defect_rate_pct</code> — defects per receipt over 90 days</li>
+<li><code>on_time_delivery_pct</code> — comes from PO receipt vs <code>date_planned</code></li>
+<li><code>consolidated_score</code> — weighted blend (40% defect, 40% delivery,
+  20% lead time consistency)</li>
+<li><code>score_trend</code> — last 6 months as a sparkline</li>
+</ul>
+<h2 id="logging-a-supplier-defect">Logging a supplier defect</h2>
+<p>The flow is short — but doing it well is what matters.</p>
+<h3 id="1-identify-the-source">1. Identify the source</h3>
+<ul>
+<li>Was the defect in a material lot you received from this supplier?</li>
+<li>Was the PO recent enough that the supplier is reasonably
+  accountable? (Within 90 days is the workbook standard.)</li>
+<li>Is there a Southbrook handling cause that explains it instead?
+  (Pallet drop during receiving, warehouse damage, etc.) If so, log
+  it as <code>defect_type = handling</code> with NO supplier link.</li>
+</ul>
+<h3 id="2-open-the-supplier-defect">2. Open the supplier defect</h3>
+<ul>
+<li><em>Quality → Supplier Defects → New</em></li>
+<li>Pick <code>supplier_id</code>. PO dropdown auto-narrows to their recent POs.</li>
+<li>Pick <code>po_id</code>. Product dropdown auto-narrows to that PO's lines.</li>
+<li>Pick <code>product_id</code>. Enter <code>defect_count</code> + <code>defect_type</code> +
+  <code>severity</code>.</li>
+<li>Describe what you saw + ideally attach a photo.</li>
+</ul>
+<h3 id="3-link-to-downstream-ncrs">3. Link to downstream NCRs</h3>
+<ul>
+<li>If this supplier defect surfaced through customer-side NCRs, link
+  them via <code>linked_ncr_ids</code>. The scoring weights <code>linked_ncr_count</code>.</li>
+</ul>
+<h3 id="4-mark-warranty-if-applicable">4. Mark warranty (if applicable)</h3>
+<ul>
+<li><code>is_warranty_claim = True</code> if the supplier should absorb the cost
+  (replacement material, scrap reimbursement). Sends a notification
+  to the purchasing manager who triggers the claim.</li>
+</ul>
+<h2 id="the-monthly-review-meeting">The monthly review meeting</h2>
+<p>A typical first-Monday-of-the-month, 60 minutes with the purchasing
+manager:</p>
+<ol>
+<li>
+<p><strong>Open the consolidated scorecard.</strong> <em>Contacts → Vendors</em> list,
+   sorted by <code>consolidated_score</code> ascending. Bottom 5 are the focus.</p>
+</li>
+<li>
+<p><strong>For each bottom-5 supplier</strong>, open their record + Supplier tab:
+   - Read <code>defect_rate_pct</code>, <code>on_time_delivery_pct</code>,
+     <code>consolidated_score</code>
+   - Click through to <em>Quality → Supplier Defects</em> filtered to that
+     supplier — read the defects from the last 90 days
+   - Decide actions:</p>
+<ul>
+<li><strong>Talk to them</strong> (purchasing's lead) — share the data; ask
+   for corrective action</li>
+<li><strong>Switch</strong> — start sourcing alternates if a contract pivot
+   is feasible</li>
+<li><strong>Tier down</strong> — keep them but reduce volume + change
+   inspection protocol</li>
+<li><strong>Document for renewal</strong> — file the data for the contract
+   renewal conversation</li>
+</ul>
+</li>
+<li>
+<p><strong>For your top-5 suppliers</strong>, also worth a 2-minute scan — has
+   anything degraded? Catching the slip before it's chronic.</p>
+</li>
+<li>
+<p><strong>Cross-check with quality outcomes</strong> — has a supplier issue
+   surfaced as a finished-goods NCR or customer return? Trace the
+   chain; raise it if so.</p>
+</li>
+<li>
+<p><strong>Document the meeting</strong>. Post a summary to a shared <em>Quality
+   Monthly Reviews</em> knowledge article (or chatter on the partner
+   records if no knowledge article exists).</p>
+</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"I logged a supplier defect but I'm not sure the right PO."</strong>
+  Edit the <code>po_id</code> before the monthly run. Wrong PO + right
+  supplier still affects the scorecard correctly; wrong supplier is
+  what matters.</p>
+</li>
+<li>
+<p><strong>"Scorecard hasn't moved despite 5 defects logged."</strong> Nightly
+  cron recompute. Today's logs are visible tomorrow morning. Don't
+  retry-click <em>Compute</em>; the field is <code>compute_sudo=False</code> and
+  recomputes on cron.</p>
+</li>
+<li>
+<p><strong>"Supplier protests the defect rate."</strong> Show them the underlying
+  records (use the <em>Print → Supplier Defect List</em> report). If they
+  identify a logging error, fix it — the scorecard recomputes
+  cleanly.</p>
+</li>
+<li>
+<p><strong>"Receiving handed me damaged boards. The supplier's manifest
+  marks them shipped clean. Who logs the defect?"</strong> You log it as
+  the quality team; mark <code>is_warranty_claim = True</code>. Purchasing
+  decides whether to file the warranty claim based on the freight
+  contract.</p>
+</li>
+<li>
+<p><strong>"Supplier provided a credit. Do I close the defect record?"</strong>
+  No — close means archive. The defect record stays for trend
+  analysis. Mark <code>is_warranty_claim = True</code> and post the credit
+  reference in the chatter.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>Defect create</strong> writes the record. No immediate score effect.</li>
+<li><strong>Nightly cron</strong> at 03:30 (<code>southbrook_quality.mi_engine_ext.
+  rollup_supplier_scores</code>) recomputes every active supplier:</li>
+<li><code>defect_rate_pct = sum(defect_count) over last 90d / sum(received qty) over last 90d</code></li>
+<li><code>on_time_delivery_pct = (received within ±3d of date_planned)
+    over last 90d / total receipts over last 90d</code></li>
+<li><code>consolidated_score = 0.4 * (1 - defect_rate) + 0.4 *
+    on_time_delivery + 0.2 * lead_time_consistency</code></li>
+<li><strong>Trend sparkline</strong> stores the last 6 monthly snapshots in a JSON
+  field on the partner.</li>
+<li><strong>Warranty claim</strong> posts a <code>mail.activity</code> to the purchasing
+  manager group.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Receiving identifies 3 damaged boards in a 50-board lot from
+Marathon. Lot was received 2 days ago. Severity?</p>
+<blockquote>
+<p><code>major</code>, <code>defect_count = 3</code>. The 3 damaged boards are out of spec.
+Mark <code>is_warranty_claim = True</code> since they were damaged at receipt.
+Photos attached.</p>
+</blockquote>
+<p><strong>Q2.</strong> A supplier scorecard shows <code>defect_rate_pct = 2.5%</code> but you
+remember logging more defects than that. What's the explanation?</p>
+<blockquote>
+<p>The rate is defect units / received units, not defect events /
+receipts. If the supplier ships large lots, the defect rate stays
+low even with several events. The event count is on the related
+defect list.</p>
+</blockquote>
+<p><strong>Q3.</strong> A finished cabinet NCR (<code>defect_type = hardware</code>) was traced
+to a Marathon hinge from a specific PO. Action?</p>
+<blockquote>
+<p>Open a supplier defect linked to that PO + product + the Marathon
+partner. <code>linked_ncr_ids</code> = the original NCR. Severity major (you
+shipped customer-facing). Mark <code>is_warranty_claim = True</code> if cost
+recovery is appropriate.</p>
+</blockquote>
+<p><strong>Q4.</strong> Monthly review: a supplier's <code>consolidated_score</code> is 0.75
+(your bar is 0.85). Purchasing wants to renew. Your evidence?</p>
+<blockquote>
+<p>Open the supplier's defect list (last 90 days) + the score trend
+(last 6 months). If trend is degrading, that's the argument.
+Quantify customer impact: NCRs that traced to their materials,
+warranty claims, scrap cost. Bring numbers, not feelings.</p>
+</blockquote>
+<p><strong>Q5.</strong> Same supplier — score recovered to 0.88 this month. Purchasing
+wants to celebrate. Your read?</p>
+<blockquote>
+<p>One month doesn't make a trend. Look at the underlying defect
+count — did volume drop because of a supplier improvement, or
+because Southbrook ordered less? Look at delivery — was the
+improvement luck or a fixed root cause? Cautious optimism;
+revisit next month.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>NCR lifecycle on the customer-facing side — lesson 18.2.</li>
+<li>SPC + Cpk for in-house process — lessons 18.3 + 18.4.</li>
+<li>The Purchase side of supplier management — separate course (native
+  Odoo Purchase training).</li>
+<li>Vendor PIM / contract management — currently in spreadsheets;
+  v1.2 candidate for a Southbrook addon.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>
