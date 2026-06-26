@@ -60,7 +60,7 @@
                                     <field name="target_workcenter_id"/>
                                     <field name="transform"/>
                                     <field name="json_path"
-                                           column_invisible="parent.transform != 'json_extract'"/>
+                                           readonly="transform != 'json_extract'"/>
                                     <field name="stub_value"/>
                                     <field name="last_applied_value" readonly="1"/>
                                     <field name="last_applied_at" readonly="1"/>
