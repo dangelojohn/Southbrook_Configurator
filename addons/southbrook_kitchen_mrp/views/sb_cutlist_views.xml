@@ -47,7 +47,24 @@
                             </field>
                         </page>
                         <page string="Nesting Result" name="nesting">
-                            <field name="nesting_result_json"/>
+                            <group string="Parsed Metrics">
+                                <field name="nesting_sheets_used" readonly="1"/>
+                                <field name="nesting_yield_pct" readonly="1"/>
+                                <field name="nesting_waste_pct" readonly="1"/>
+                            </group>
+                            <group string="Auto-Generated Scrap Records">
+                                <field name="nesting_scrap_ids" readonly="1" nolabel="1">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="product_id"/>
+                                        <field name="scrap_qty"/>
+                                        <field name="origin"/>
+                                    </list>
+                                </field>
+                            </group>
+                            <group string="Raw Payload (debug)">
+                                <field name="nesting_result_json" nolabel="1"/>
+                            </group>
                         </page>
                     </notebook>
                 </sheet>
