@@ -860,34 +860,138 @@ class ConfiguratorV2 extends Component {
             const v = a.values.find((vv) => vv.id === valId);
             return v ? v.name : fallback;
         };
+
+        // ── Cabinet KIND (base / wall / tall / drawer-bank) ─────────
+        // Detection prefers a real attribute if the template exposes
+        // one ("Cabinet Type" or "Construction"); falls back to a
+        // product-name regex so legacy templates still get the right
+        // drawing. Wall cabs sit on a soffit (no feet); base + tall
+        // sit on adjustable levellers (feet + toe-kick on base).
+        const productName = (this.state.product && this.state.product.name) || "";
+        const upperName = productName.toUpperCase();
+        const typeAttr = pickedNameOf("Cabinet Type",
+            pickedNameOf("Construction", null));
+        let kind = "base";
+        if (typeAttr && /wall/i.test(typeAttr)) {
+            kind = "wall";
+        } else if (typeAttr && /(tall|pantry|oven|utility)/i.test(typeAttr)) {
+            kind = "tall";
+        } else if (/\b(W\d|WALL|UPPER)\b/.test(upperName)) {
+            kind = "wall";
+        } else if (/\b(TALL|PANTRY|OVEN|UTILITY|T\d{2})\b/.test(upperName)) {
+            kind = "tall";
+        }
+
+        // Drawer-bank detection: explicit "Drawer Count" attr OR
+        // product name says drawer/bank/DB-prefix. Drawer banks
+        // render N horizontal fronts instead of vertical doors.
+        const drawerCountName = pickedNameOf("Drawer Count", null);
+        const drawerCount = drawerCountName ? parseInt(drawerCountName, 10) : 0;
+        const isDrawerBank = drawerCount > 0
+            || /\b(DRAWER|BANK|DB\d)\b/.test(upperName);
+
+        // ── Width → body width in px (existing scale preserved) ─────
         const widthName = pickedNameOf("Width", "15 in");
         const wIdx = ["9 in", "12 in", "15 in", "18 in", "21 in", "24 in",
                       "27 in", "30 in", "33 in", "36 in"].indexOf(widthName);
         const wpx = 70 + Math.max(0, wIdx) * 16;
+
+        // ── Body height varies by kind ──────────────────────────────
+        // Wall cabs are short (mounted up high), tall cabs are tall.
+        const bodyHeight = kind === "tall" ? 220
+            : (kind === "wall" ? 100 : 150);
+
+        // ── Finish color (existing) ─────────────────────────────────
         const finishName = pickedNameOf("Finish",
             pickedNameOf("Box Material", "White"));
         const color = FINISH_COLORS[finishName] || "#dcd3c4";
+
+        // ── Frame style: framed shows a thicker border on door faces.
+        const frameStyle = pickedNameOf("Frame Style",
+            pickedNameOf("Construction", "Frameless"));
+        const isFramed = /framed/i.test(frameStyle);
+        const doorBorder = isFramed
+            ? "2px solid rgba(0,0,0,.22)"
+            : "1px solid rgba(0,0,0,.12)";
+
+        // ── Overlay: inset doors sit deeper inside the carcass ──────
+        const overlay = pickedNameOf("Overlay",
+            pickedNameOf("Door Overlay", "Full Overlay"));
+        const insetGap = /inset/i.test(overlay) ? 8 : 6;
+
+        // ── Hinge + handle ──────────────────────────────────────────
         const doorCountName = pickedNameOf("Door Count", "1");
         const doors = doorCountName === "2" ? 2 : 1;
         const hinge = pickedNameOf("Hinge Side", "LH (Left Hand)");
         const isLH = hinge.startsWith("LH");
         const handle = pickedNameOf("Handle", "Bar Pull");
-        const handleHtml = (handle === "None") ? "" :
-            (handle === "Knob"
-                ? `<div style="position:absolute;top:50%;${isLH ? "right:8px" : "left:8px"};width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`
-                : `<div style="position:absolute;top:50%;${isLH ? "right:7px" : "left:7px"};width:4px;height:26px;border-radius:3px;background:#2f3b52"></div>`);
-        const doorHtml = (doors === 2)
-            ? `<div style="position:absolute;inset:6px;display:flex;gap:4px">
-                  <div style="flex:1;position:relative;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.12)">
-                    <div style="position:absolute;top:50%;right:5px;width:3px;height:20px;border-radius:3px;background:#2f3b52"></div>
-                  </div>
-                  <div style="flex:1;position:relative;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.12)">
-                    <div style="position:absolute;top:50%;left:5px;width:3px;height:20px;border-radius:3px;background:#2f3b52"></div>
-                  </div>
-                </div>`
-            : `<div style="position:absolute;inset:6px;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.1)">${handleHtml}</div>`;
+        const sideHandle = (side) => {
+            if (handle === "None") return "";
+            if (handle === "Knob") {
+                return `<div style="position:absolute;top:50%;${side}:8px;width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`;
+            }
+            return `<div style="position:absolute;top:50%;${side}:7px;width:4px;height:26px;border-radius:3px;background:#2f3b52"></div>`;
+        };
+        const centerHandle = () => {
+            if (handle === "None") return "";
+            if (handle === "Knob") {
+                return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`;
+            }
+            return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:28px;height:4px;border-radius:3px;background:#2f3b52"></div>`;
+        };
+
+        // ── Front face — drawer bank, two-door, or single door ──────
+        let frontHtml;
+        if (isDrawerBank) {
+            // 1–5 horizontal drawer fronts. Use the explicit count if
+            // present; otherwise the carcass kind dictates: tall=4,
+            // base=3 (1 false drawer + 2 deeper) by industry default.
+            const fallbackN = (kind === "tall" ? 4 : 3);
+            const drawerN = Math.max(1, Math.min(5,
+                drawerCount || fallbackN));
+            const rows = [];
+            for (let i = 0; i < drawerN; i++) {
+                rows.push(
+                    `<div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${centerHandle()}</div>`
+                );
+            }
+            frontHtml = `<div style="position:absolute;inset:${insetGap}px;display:flex;flex-direction:column;gap:3px">${rows.join("")}</div>`;
+        } else if (doors === 2) {
+            frontHtml = `<div style="position:absolute;inset:${insetGap}px;display:flex;gap:4px">
+                <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("right")}</div>
+                <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("left")}</div>
+            </div>`;
+        } else {
+            frontHtml = `<div style="position:absolute;inset:${insetGap}px;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.1)">${sideHandle(isLH ? "right" : "left")}</div>`;
+        }
+
+        // ── Toe-kick band (base cabs only) ──────────────────────────
+        const toeKickHtml = (kind === "base")
+            ? `<div style="position:absolute;bottom:0;left:0;right:0;height:14px;background:rgba(0,0,0,.18);border-radius:0 0 4px 4px"></div>`
+            : "";
+
+        // ── Adjustable levelling feet (base + tall) ─────────────────
+        const feetHtml = (kind === "base" || kind === "tall")
+            ? `<div aria-label="Adjustable levelling feet" style="display:flex;justify-content:space-between;width:${wpx}px;padding:0 12px;box-sizing:border-box;height:8px;margin-top:2px">
+                  <span style="width:5px;height:8px;background:#222;border-radius:0 0 2px 2px"></span>
+                  <span style="width:5px;height:8px;background:#222;border-radius:0 0 2px 2px"></span>
+              </div>`
+            : "";
+
+        // ── Accessibility: spoken description matches drawing ───────
+        const kindLabel = isDrawerBank
+            ? `${drawerCount || (kind === "tall" ? 4 : 3)}-drawer ${kind === "tall" ? "tall" : "base"} bank`
+            : `${doors === 2 ? "Two-door " : ""}${kind === "wall" ? "wall" : (kind === "tall" ? "tall" : "base")} cabinet`;
+        const aria = `${kindLabel}${isFramed ? ", framed" : ", frameless"}${(kind === "base" || kind === "tall") ? ", on adjustable levelling feet" : ""}`;
+
         return markup(
-            `<div style="width:${wpx}px;height:150px;background:${color};position:relative;border-top:3px solid rgba(0,0,0,.08);border-radius:4px;box-shadow:0 18px 30px -12px rgba(40,55,80,.4)">${doorHtml}</div>`
+            `<div role="img" aria-label="${aria}" style="display:flex;flex-direction:column;align-items:center">
+                <div style="width:${wpx}px;height:${bodyHeight}px;background:${color};position:relative;border-top:3px solid rgba(0,0,0,.08);border-radius:4px;box-shadow:0 18px 30px -12px rgba(40,55,80,.4)">
+                    ${frontHtml}
+                    ${toeKickHtml}
+                </div>
+                ${feetHtml}
+            </div>`
         );
     }
 
