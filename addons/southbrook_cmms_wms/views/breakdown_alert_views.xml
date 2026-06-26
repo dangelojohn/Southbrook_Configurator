@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_southbrook_cmms_breakdown_alert_list" model="ir.ui.view">
+        <field name="name">southbrook.cmms.breakdown_alert.list</field>
+        <field name="model">southbrook.cmms.breakdown_alert</field>
+        <field name="arch" type="xml">
+            <list string="Breakdown Alerts"
+                  decoration-danger="severity in ('high','critical')"
+                  decoration-warning="severity == 'medium'">
+                <field name="name"/>
+                <field name="equipment_id"/>
+                <field name="workcenter_id"/>
+                <field name="severity"/>
+                <field name="reported_at"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_breakdown_alert_form" model="ir.ui.view">
+        <field name="name">southbrook.cmms.breakdown_alert.form</field>
+        <field name="model">southbrook.cmms.breakdown_alert</field>
+        <field name="arch" type="xml">
+            <form string="Breakdown Alert">
+                <header>
+                    <button name="action_dispatch"
+                            string="Dispatch Maintenance"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'open'"/>
+                    <button name="action_block_affected_mos"
+                            string="Block Affected MOs"
+                            type="object"
+                            class="btn-secondary"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="open,dispatched,fixed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="equipment_id"/>
+                            <field name="workcenter_id"/>
+                            <field name="severity"/>
+                        </group>
+                        <group>
+                            <field name="reported_at"/>
+                            <field name="reported_by"/>
+                            <field name="maintenance_request_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Affected MOs" name="affected_mos">
+                            <field name="affected_production_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="product_id"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_breakdown_alert_kanban" model="ir.ui.view">
+        <field name="name">southbrook.cmms.breakdown_alert.kanban</field>
+        <field name="model">southbrook.cmms.breakdown_alert</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state">
+                <field name="name"/>
+                <field name="equipment_id"/>
+                <field name="severity"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card oe_kanban_global_click">
+                            <strong><field name="name"/></strong>
+                            <div><field name="equipment_id"/></div>
+                            <div>Severity: <field name="severity"/></div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- search view dropped at install time due to v19 validation quirk -->
+
+    <record id="action_southbrook_cmms_breakdown_alert" model="ir.actions.act_window">
+        <field name="name">Breakdown Alerts</field>
+        <field name="res_model">southbrook.cmms.breakdown_alert</field>
+        <field name="view_mode">list,kanban,form</field>
+    </record>
+
+</odoo>

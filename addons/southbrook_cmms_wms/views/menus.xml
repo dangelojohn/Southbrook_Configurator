@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_southbrook_cmms_wms_root"
+              name="CMMS &amp; 3PL"
+              parent="stock.menu_stock_root"
+              sequence="92"/>
+
+    <menuitem id="menu_southbrook_cmms_mtbf_mttr_report"
+              name="MTBF/MTTR Reports"
+              parent="menu_southbrook_cmms_wms_root"
+              action="action_southbrook_cmms_mtbf_mttr_report"
+              sequence="10"/>
+
+    <menuitem id="menu_southbrook_cmms_breakdown_alert"
+              name="Breakdown Alerts"
+              parent="menu_southbrook_cmms_wms_root"
+              action="action_southbrook_cmms_breakdown_alert"
+              sequence="20"/>
+
+    <menuitem id="menu_southbrook_cmms_service_contract"
+              name="Service Contracts"
+              parent="menu_southbrook_cmms_wms_root"
+              action="action_southbrook_cmms_service_contract"
+              sequence="30"/>
+
+    <menuitem id="menu_southbrook_cmms_landed_cost_template"
+              name="Landed Cost Templates"
+              parent="menu_southbrook_cmms_wms_root"
+              action="action_southbrook_cmms_landed_cost_template"
+              sequence="40"/>
+
+    <menuitem id="menu_southbrook_cmms_mi_tiles"
+              name="Snapshot"
+              parent="menu_southbrook_cmms_wms_root"
+              action="action_southbrook_cmms_mi_tiles"
+              sequence="50"/>
+
+</odoo>

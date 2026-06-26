@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_southbrook_cmms_landed_cost_template_list" model="ir.ui.view">
+        <field name="name">southbrook.cmms.landed_cost_template.list</field>
+        <field name="model">southbrook.cmms.landed_cost_template</field>
+        <field name="arch" type="xml">
+            <list string="Landed Cost Templates">
+                <field name="name"/>
+                <field name="freight_pct"/>
+                <field name="customs_pct"/>
+                <field name="duty_pct"/>
+                <field name="handling_pct"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_landed_cost_template_form" model="ir.ui.view">
+        <field name="name">southbrook.cmms.landed_cost_template.form</field>
+        <field name="model">southbrook.cmms.landed_cost_template</field>
+        <field name="arch" type="xml">
+            <form string="Landed Cost Template">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Percentages">
+                            <field name="freight_pct"/>
+                            <field name="customs_pct"/>
+                            <field name="duty_pct"/>
+                            <field name="handling_pct"/>
+                        </group>
+                        <group string="Defaults">
+                            <field name="default_for_vendor_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <div class="text-muted" colspan="2">
+                        Apply this template programmatically via
+                        <code>template.apply_to_picking(picking)</code>.
+                        Invoke from a picking server action or workflow hook.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_cmms_landed_cost_template" model="ir.actions.act_window">
+        <field name="name">Landed Cost Templates</field>
+        <field name="res_model">southbrook.cmms.landed_cost_template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>
