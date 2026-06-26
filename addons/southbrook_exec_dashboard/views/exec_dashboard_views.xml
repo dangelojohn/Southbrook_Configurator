@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Form view (fallback / drill-through view) -->
+    <record id="view_exec_snapshot_form" model="ir.ui.view">
+        <field name="name">southbrook.exec_dashboard.snapshot.form</field>
+        <field name="model">southbrook.exec_dashboard.snapshot</field>
+        <field name="arch" type="xml">
+            <form string="Executive Snapshot">
+                <header>
+                    <button name="action_refresh"
+                            type="object"
+                            string="Refresh"
+                            class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="label" readonly="1"/>
+                        </h1>
+                        <div>
+                            As of <field name="as_of" readonly="1"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group string="Production">
+                            <field name="yesterday_units_produced"/>
+                            <field name="yesterday_units_target"/>
+                            <field name="yesterday_takt_adherence_pct" widget="percentage"/>
+                            <field name="units_planned_today"/>
+                        </group>
+                        <group string="Quality">
+                            <field name="fpy_pct_7d" widget="percentage"/>
+                            <field name="quality_open_critical_ncr_count"/>
+                        </group>
+                        <group string="Logistics">
+                            <field name="otd_pct_30d" widget="percentage"/>
+                        </group>
+                        <group string="Finance">
+                            <field name="wip_value_current"/>
+                            <field name="revenue_last_30d"/>
+                            <field name="cash_position"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Bottleneck (MES)">
+                            <field name="top_bottleneck_workcenter"/>
+                            <field name="top_bottleneck_load_pct" widget="percentage"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action — opens the OWL client_action -->
+    <record id="action_exec_dashboard_morning" model="ir.actions.client">
+        <field name="name">Morning Briefing</field>
+        <field name="tag">southbrook_exec_dashboard.morning_briefing</field>
+    </record>
+
+    <!-- Window action — drill-through to recent snapshots -->
+    <record id="action_exec_snapshot_list" model="ir.actions.act_window">
+        <field name="name">Snapshots</field>
+        <field name="res_model">southbrook.exec_dashboard.snapshot</field>
+        <field name="view_mode">form</field>
+    </record>
+</odoo>
