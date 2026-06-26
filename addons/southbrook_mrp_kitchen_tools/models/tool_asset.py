@@ -52,9 +52,10 @@ CONDITION_REQUIRES_SHARPENING = {"dull"}
 class SouthbrookToolAsset(models.Model):
     _name = "southbrook.tool.asset"
     _description = "Southbrook Tool Asset"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "southbrook.qr.mixin"]
     _order = "create_date desc, id desc"
     _rec_name = "display_name"
+    _qr_kind = "tool"
 
     # ─── Identity ───────────────────────────────────────────────────
     name = fields.Char(

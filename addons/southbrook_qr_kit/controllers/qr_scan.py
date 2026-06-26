@@ -244,6 +244,14 @@ class QrScanController(http.Controller):
                 return {"ok": False, "result": "expired",
                         "error": f"QR expired ({age}s old, max {ttl}s)"}
 
+        # Expose parsed ident on the request — stateless kinds
+        # (e.g. 'defect') read it from there since their handler has
+        # no record-id to draw from.
+        try:
+            request.qr_parsed_ident = parsed["ident"]
+        except Exception:  # noqa: BLE001
+            pass
+
         # Resolve record
         try:
             record = handler.get_record(parsed["ident"])

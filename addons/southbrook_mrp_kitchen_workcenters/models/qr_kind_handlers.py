@@ -146,34 +146,54 @@ class ShiftQrKind(models.AbstractModel):
 class DefectQrKind(models.AbstractModel):
     _name = "southbrook.qr.kind.defect"
     _inherit = "southbrook.qr.kind"
-    _description = "QR Kind — Pre-Defined Defect Type"
+    _description = "QR Kind — Pre-Defined Defect Type (stateless)"
     _kind_name = "defect"
     _target_model = "southbrook.mi.check"
 
     @api.model
     def get_record(self, ident):
-        """For defect QRs, `ident` is the defect_type selection key
-        (e.g. 'scratch'). Returns an EMPTY mi.check recordset; the
-        handler creates a new one on action."""
+        """For defect QRs, `ident` IS the defect_type selection key
+        (e.g. 'scratch', 'edge_defect'). No record to fetch — return
+        an empty recordset; handler creates one on action.
+
+        The defect-type-as-ident pattern means a printed defect QR
+        sheet works standalone: each cell on the sheet carries
+        sb://defect/<defect_type>?... — scan it + the operator's
+        cabinet/WO QR and an NCR drafts itself.
+        """
         return self.env[self._target_model]
 
     @api.model
     def handle_action(self, record, action, params):
-        """Creates a new NCR pre-filled with the defect type encoded
-        in the QR. `params` may carry workorder_id to attach."""
-        defect_type = params.get("defect_type") if params else None
+        """Creates a new NCR pre-filled. The defect_type comes from
+        the *ident* (encoded in the QR itself). `params` may carry
+        workorder_id for context attachment."""
+        from odoo.http import request
+        # Resolve defect_type from URL via request — the controller
+        # passes it through after parsing. Fallback to params if a
+        # caller invokes handle_action directly.
+        defect_type = None
+        if params and params.get("defect_type"):
+            defect_type = params["defect_type"]
+        # The controller sets request.qr_parsed_ident on dispatch
+        # so downstream handlers see the defect_type carried in ident.
+        elif request and hasattr(request, "qr_parsed_ident"):
+            defect_type = request.qr_parsed_ident
         if not defect_type:
             raise UserError(_(
-                "Defect-type QR scan needs the defect_type in params "
-                "(or wrap in a kiosk UI that passes it)."))
-        wo_id = params.get("workorder_id") if params else None
+                "Defect-type QR is missing the defect_type encoded "
+                "in the QR ident."))
+        wo_id = (params or {}).get("workorder_id")
         vals = {
             "name": _("NCR from defect scan: %s") % defect_type,
-            "x_sbk_defect_type": defect_type,
+            "x_sbk_defect_type": str(defect_type),
             "x_sbk_result": "fail",
         }
         if wo_id:
-            vals["x_sbk_workorder_id"] = int(wo_id)
+            try:
+                vals["x_sbk_workorder_id"] = int(wo_id)
+            except (TypeError, ValueError):
+                pass
         new_ncr = self.env["southbrook.mi.check"].sudo().create(vals)
         return {
             "record_name": new_ncr.display_name,
