@@ -187,13 +187,45 @@ class SbCutlist(models.Model):
     def to_nesting_envelope(self) -> dict:
         """Return a deterministic JSON envelope the cutting/nesting
         division can consume. Versioned so future schema changes don't
-        silently break consumers."""
+        silently break consumers.
+
+        2026-06-25 — schema bumped to v2 (additive over v1). v2 adds:
+          - reference_origin: declares the (0,0,0) corner convention so
+            downstream nesters don't have to guess. Standard cabinet-
+            industry convention: bottom-front-left, with X=width,
+            Y=height, Z=depth (positive into the cabinet).
+          - mo (object) instead of mo_id (int) — name + product so
+            partners can categorize without an Odoo round-trip.
+          - units (string) at top level — explicit "mm" so partners
+            who do per-batch unit-toggling parse correctly.
+
+        Pre-existing v1 fields kept verbatim for back-compat.
+        """
         self.ensure_one()
+        mo_block = None
+        if self.mo_id:
+            mo_block = {
+                "id": self.mo_id.id,
+                "name": self.mo_id.name,
+                "product": (self.mo_id.product_id.name
+                            if self.mo_id.product_id else None),
+                "product_default_code": (self.mo_id.product_id.default_code
+                                         if self.mo_id.product_id else None),
+            }
         return {
-            "schema": "southbrook.nesting.v1",
+            "schema": "southbrook.nesting.v2",
+            "units": "mm",
+            "reference_origin": {
+                "anchor": "bottom_front_left",
+                "x_axis": "width",
+                "y_axis": "height",
+                "z_axis": "depth_into_cabinet",
+            },
             "cutlist_id": self.id,
             "cutlist_name": self.name,
+            # v1 compatibility: keep both mo_id (int) and mo (object).
             "mo_id": self.mo_id.id if self.mo_id else None,
+            "mo": mo_block,
             "panels": [
                 {
                     "panel_name": ln.panel_name,
@@ -204,6 +236,12 @@ class SbCutlist(models.Model):
                     "substrate": ln.substrate,
                     "grain_dir": ln.grain_dir,
                     "edge_banding": json.loads(ln.edge_banding_config or "{}"),
+                    # Reserved for v3 (per HOMAG_NESTING_EXPORT_AUDIT):
+                    # "bore_positions": [...],
+                    # "edge_banding_tape_skus": {...}.
+                    # Emitted as null so partners can negotiate ahead.
+                    "bore_positions": None,
+                    "edge_banding_tape_skus": None,
                 }
                 for ln in self.line_ids
             ],

@@ -102,28 +102,35 @@ I cannot validate end-to-end without:
 ## Source-verify against the JSON envelope today
 
 What I CAN do without partner access — verify the JSON envelope is
-**information-complete** for downstream consumption. Checklist:
+**information-complete** for downstream consumption. Re-audited 2026-06-25
+after writing the v2 envelope bump (correcting my initial scan):
 
-- [x] Panel dimensions (length × width × thickness) — present
-- [x] Edge-banding per edge (top/bottom/left/right) — present, boolean
-- [x] Quantity per panel — present
-- [ ] **Material identification** (which sheet stock / which panel
-      from the cutlist row) — `panel_name` is descriptive ("side_L")
-      but the underlying material/board ref is NOT in the envelope.
-      Likely needed for nesting.
-- [ ] **Grain direction** — not in envelope; required for grain-matched
-      cabinets
-- [ ] **Banding tape SKU** (not just boolean) — needed for the right
-      tape to feed in
-- [ ] **Bore positions** (drawer slide holes, hinge cups) — fully absent;
-      Homag CNC needs these as a separate file or embedded
-- [ ] **Reference origin** (which corner is 0,0) — not declared in
-      envelope; consumer has to assume
+- [x] Panel dimensions (length × width × thickness) — present (v1)
+- [x] Edge-banding per edge (top/bottom/left/right) — present, boolean (v1)
+- [x] Quantity per panel — present (v1)
+- [x] **Material identification** — present in v1 as `substrate`
+      (selection: melamine_white_5_8, etc.). My initial audit pass
+      missed this; corrected here.
+- [x] **Grain direction** — present in v1 as `grain_dir`
+      (with_grain / cross_grain / no_grain). Also missed initially.
+- [x] **Reference origin** — added in v2 as `reference_origin`
+      (`bottom_front_left`, x_axis=width, y_axis=height, z_axis=depth).
+- [x] **Units declaration** — added in v2 as top-level `units: "mm"`.
+- [x] **MO metadata** (name + product code) — added in v2 as `mo: {...}`
+      object alongside the legacy `mo_id` integer (v1 backcompat).
+- [ ] **Banding tape SKU** (not just boolean) — reserved field
+      `edge_banding_tape_skus: null` in v2; needs banding-product
+      taxonomy first.
+- [ ] **Bore positions** (drawer slide holes, hinge cups) — reserved
+      field `bore_positions: null` in v2; needs a `sb.cutlist.bore`
+      sub-model or per-line bore-spec JSON. Phase 3.5.
 
-**Recommendation:** before any partner conversation, extend
-`to_nesting_envelope` to add material identification, grain direction,
-banding tape SKU, and a `bore_positions` array. These are universal to
-ANY nesting downstream, regardless of which path we go.
+**Schema bump:** `southbrook.nesting.v1` → `southbrook.nesting.v2`
+landed in `addons/southbrook_kitchen_mrp/models/sb_cutlist.py` 2026-06-25.
+v2 is additive over v1 — all v1 fields preserved. v1 consumers reading
+the v2 envelope by schema name will see the bump and either upgrade or
+ignore unknown fields. Test in `test_nesting_io.py:test_envelope_is_deterministic_and_versioned`
+asserts the v2 shape end-to-end.
 
 ## Tracking
 
