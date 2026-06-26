@@ -1,0 +1,1969 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_17_design_issue_eco" model="slide.slide">
+            <field name="name">Design — Issue an Engineering Change Order</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Designer / ECO engineer reacting to a design or scope change.</field>
+            <field name="html_content"><![CDATA[<h1 id="design-issue-an-engineering-change-order">Design — Issue an Engineering Change Order</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A confirmed SO needs a change: customer-driven (lesson 17.6), supplier-
+driven (a hardware vendor discontinued a slide), or quality-driven (NCR
+escalation, lesson 17.30). All three flows land here.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Engineering → PLM → ECOs</strong></p>
+<h2 id="the-5-state-flow">The 5-state flow</h2>
+<p><code>draft → review → approved → released → closed</code></p>
+<ol>
+<li><strong>Draft.</strong> <em>New</em>. Pick <code>eco_type</code> (customer / supplier / quality /
+   internal). Pick <code>origin</code> — usually a <code>sale.order</code> or <code>mrp.production</code>
+   reference. Describe the change in plain text.</li>
+<li><strong>Review.</strong> Submit. ECO routes to your designated reviewer chain (per
+   <code>eco_stage</code> config in <em>Engineering → PLM → ECO Stage</em>).</li>
+<li><strong>Approved.</strong> Reviewer + Plant GM both click Approve. State auto-
+   advances.</li>
+<li><strong>Released.</strong> Effective date stamped. From here, downstream models pick
+   up the change — cut specs re-author, BoMs update, MOs flag affected
+   lines.</li>
+<li><strong>Closed.</strong> Once the affected MO completes (or scraps), the ECO closes.</li>
+</ol>
+<h2 id="what-gets-touched-downstream">What gets touched downstream</h2>
+<ul>
+<li><code>southbrook.cut.spec</code> — new active spec; old spec archived</li>
+<li><code>mrp.bom</code> — version bump if BoM components change</li>
+<li><code>mrp.production</code> — affected MOs flagged with <code>eco_id</code>; floor sees the
+  banner</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Reviewer chain wrong</strong> — <code>eco_type</code> drives the chain via <code>eco_stage</code>.
+  Internal-type ECOs go to ENG01 alone; customer-type ECOs need Sales
+  Manager approval too.</li>
+<li><strong>ECO closes before MO completes</strong> — bug; file a ticket. Should not
+  happen.</li>
+<li><strong>Multiple ECOs against same MO</strong> — allowed, but they apply in commit
+  order. Latest released ECO wins.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 4 lesson 4.1 <em>Engineering Change Orders</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_create_kitchen_quote" model="slide.slide">
+            <field name="name">Sales — Create a Kitchen Quote</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Sales rep with a customer on the phone or in the showroom.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-create-a-kitchen-quote">Sales — Create a Kitchen Quote</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A customer says "what would this kitchen cost?" — start here. Works for both
+walk-in retail and channel-priced orders (dealer, contractor, KD, big-box,
+refacing). The same Order Builder serves all six channels — pricing flips
+automatically when the customer changes.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Sales → Order Builder → New</strong></p>
+<p>The Order Builder menu (<code>menu_southbrook_order_builder</code>) is the canonical
+entry point. Native Sales → Quotations also works but skips the multi-zone
+grid + channel auto-resolution.</p>
+<h2 id="the-5-step-flow">The 5-step flow</h2>
+<ol>
+<li><strong>New record.</strong> Top-right <em>New</em>.</li>
+<li><strong>Customer.</strong> Search the partner field. If a walk-in, use <code>Retail Walk-In</code>
+   (seeded as a partner with <code>channel=retail</code>).</li>
+<li><strong>Add a zone.</strong> Default zone is BASE_RUN. Switch to WALL / TALL / ISLAND /
+   ACCESSORY / OTHER as appropriate. (For OTHER, fill in <code>zone_label</code>.)</li>
+<li><strong>+ Add Cabinet.</strong> Opens the inline config drawer with all 11 attributes —
+   family, width, series, box_material, door_style, finish, hinge_side,
+   finished_sides, gables, handle, accessories.</li>
+<li><strong>Save.</strong> Spec sheet PDF generates and attaches to the SO; price reflects
+   the customer's resolved pricelist.</li>
+</ol>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Customer not found</strong> → use the <em>Quick-create</em> dropdown at the end of the
+  partner list. Set their <code>channel</code> immediately after creating, or they'll
+  default to <code>retail</code>.</li>
+<li><strong>Wrong price</strong> → check <code>res.partner.channel</code> on the header; it drives the
+  pricelist. Switching the customer mid-build re-prices every line in place.</li>
+<li><strong>Maple box adds +10%</strong> silently — that's the config rule from
+  <code>Southbrook_Excel_to_Odoo_Mapping.md §3.4</code>, not a bug.</li>
+<li><strong>9-21″ cabinet shows as 1-door only</strong> — also a config rule (width → door
+  count). Door style options 2-door are correctly hidden.</li>
+</ul>
+<h2 id="want-the-deep-dive">Want the deep dive?</h2>
+<p>→ Course 5 lesson 5.2 <em>Building a Quote from a Kitchen Design</em>
+→ Course 8 lesson 8.4 <em>Order Builder Walkthrough</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_floor_assembly_daily" model="slide.slide">
+            <field name="name">Floor — Assembly Daily Flow</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Assembler on SB-ASSY (parallel-jobs enabled).</field>
+            <field name="html_content"><![CDATA[<h1 id="floor-assembly-daily-flow">Floor — Assembly Daily Flow</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You're at the assembly bench. Cut + banded panels + hardware kits should be
+landing at your station. You assemble the carcass.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Floor Workspace → Workcenter Kanban → SB-ASSY</strong></p>
+<p>(SB-ASSY has <code>parallel_jobs &gt; 1</code> per <code>southbrook_mrp_pm</code> — you can have
+multiple cabinets open simultaneously.)</p>
+<h2 id="your-5-step-loop">Your 5-step loop</h2>
+<ol>
+<li><strong>Pick a kit.</strong> The kanban groups by <em>kit_id</em> — all panels + hardware
+   for one cabinet. Scan the kit barcode.</li>
+<li><strong>Build.</strong> Follow the cabinet code's standard procedure (cards link to
+   the cut spec + door spec).</li>
+<li><strong>Test fit.</strong> Confirm doors fit, drawers slide.</li>
+<li><strong>Tap <em>Done</em>.</strong> Posts duration; cabinet moves to SB-DOOR if it has a
+   separate door-mount step, otherwise direct to finishing.</li>
+<li><strong>Next kit.</strong></li>
+</ol>
+<h2 id="hardware-lookup">Hardware lookup</h2>
+<p>If the kit is missing a part, the hardware spec is in the cut spec PDF.
+SKU + brand + quantity. Most kits use Marathon-brand hardware.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Kit incomplete</strong> — <em>Hold → Kit short</em>. Warehouse gets notified to
+  re-pick. Note exactly which SKU is missing.</li>
+<li><strong>Hinge predrilled holes don't match the door's specified hinge</strong> — the
+  cabinet's <code>hinge_side</code> attribute may have changed via ECO after the
+  panels were cut. Check the active cut spec; if it differs from your
+  panel, <em>Hold → ECO drift</em>.</li>
+<li><strong>Drawer slide hits the gable</strong> — installation note in the cut spec
+  often missed; brief the next batch on the standard offset.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 1 lesson 1.4 <em>Assembler — Your Daily Flow</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_configure_custom_cabinet" model="slide.slide">
+            <field name="name">Sales — Configure a Custom Cabinet</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Sales rep building a non-standard cabinet for a customer.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-configure-a-custom-cabinet">Sales — Configure a Custom Cabinet</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You hit <em>+ Add Cabinet</em> in the Order Builder and the inline drawer opens.
+This is the 30-second tutorial on the 11-attribute wizard.</p>
+<h2 id="the-11-attributes-in-order">The 11 attributes, in order</h2>
+<ol>
+<li><strong>family</strong> — Wall, Base, Drawer Bank, Sink Base, Tall Pantry, Tall Oven,
+   Corner, Vanity, Accessory, Worktop. Drives every downstream filter.</li>
+<li><strong>width</strong> — snap-list 200-1000 mm (default 600). Slider visible in
+   sales-rep mode only; customer-mode shows the snap list.</li>
+<li><strong>series</strong> — Signature, Contemporary, Elegance, Contractor.</li>
+<li><strong>box_material</strong> — White Melamine (default), Maple (+10%, +2 weeks lead).</li>
+<li><strong>door_style</strong> — gated by series. Contractor → white thermofoil slab only.
+   Elegance → five-piece woodgrain only.</li>
+<li><strong>finish</strong> — colour applied to the door style.</li>
+<li><strong>hinge_side</strong> — L, R, or N/A for centre-opening.</li>
+<li><strong>finished_sides</strong> — neither / left / right / both.</li>
+<li><strong>gables</strong> — none / matching / custom.</li>
+<li><strong>handle</strong> — pull, knob, integrated, none.</li>
+<li><strong>accessories</strong> — optional add-ons (soft-close upgrade, lazy susan, etc.).</li>
+</ol>
+<h2 id="rule-blocked-options">Rule-blocked options</h2>
+<p>If you can't click an option, the rule blocking it shows in the disabled-state
+tooltip — example <em>"Contractor series only ships white thermofoil slab"</em>. The
+customer-facing flow hides blocked options entirely; the sales-rep view shows
+them with the rule reason.</p>
+<h2 id="save-behaviour">Save behaviour</h2>
+<p>Clicking <em>Save</em> in the drawer adds the cabinet as a <code>sale.order.line</code> with
+the resolved <code>product.product</code> variant (auto-created by OCA if it's a new
+combination per Q6) and a <code>product.config.session</code> link for traceability.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Family change wipes everything below it</strong> — that's expected. Start the
+  family decision first.</li>
+<li><strong>Saved variant won't open the drawer again</strong> — that's also expected. To
+  edit a saved cabinet, delete the line and re-add. (v1.1: in-line edit.)</li>
+<li><strong>Maple silently bumps lead time</strong> — see lesson 17.1 gotcha #3.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 5 lesson 5.1 <em>Configurator Basics</em>
+→ Course 10 lesson 10.3 <em>Session State Machine</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_quality_score_supplier" model="slide.slide">
+            <field name="name">Quality — Score a Supplier After a Defect</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Quality manager.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-score-a-supplier-after-a-defect">Quality — Score a Supplier After a Defect</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A defect traced to incoming materials (warped boards, scratched hardware,
+wrong colour finish) — you want to log it against the supplier so
+purchasing has the data for the next contract negotiation.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Quality → Supplier Defects</strong> (<code>menu_southbrook_quality_supplier_defects</code>).</p>
+<h2 id="the-4-field-minimum">The 4-field minimum</h2>
+<ol>
+<li><strong><code>supplier_id</code></strong> — <code>res.partner</code> flagged as vendor</li>
+<li><strong><code>po_id</code></strong> — the purchase order the defect came from (auto-narrows
+   product list)</li>
+<li><strong><code>product_id</code></strong> — the SKU</li>
+<li><strong><code>defect_count</code></strong> + <strong><code>defect_type</code></strong> + <strong><code>severity</code></strong></li>
+</ol>
+<h2 id="how-scoring-rolls-up">How scoring rolls up</h2>
+<p>The supplier scorecard (<code>res.partner</code> form, <em>Supplier</em> tab) auto-derives:
+- <code>defect_rate_pct</code> — defects per receipt over 90 days
+- <code>on_time_delivery_pct</code> — comes from PO receipt timestamps
+- <code>consolidated_score</code> — weighted blend; visible to purchasing</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Supplier doesn't have a Supplier tab</strong> — they're not flagged as
+  vendor. Tick <em>Is a Vendor</em> on their partner record.</li>
+<li><strong>PO not in dropdown</strong> — check that PO state is <code>purchase</code> or <code>done</code>;
+  drafts don't show.</li>
+<li><strong>Defect logged but score doesn't move</strong> — there's a nightly recompute
+  cron; same-day saves don't reflect until tomorrow.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 18 (Quality Module — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_generate_3d_spec_pdf" model="slide.slide">
+            <field name="name">Sales — Generate a 3D Render and Spec Sheet PDF</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Sales rep about to send a quote PDF to a customer.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-generate-a-3d-render-and-spec-sheet-pdf">Sales — Generate a 3D Render and Spec Sheet PDF</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Customer wants to see the kitchen, not read line items. The platform
+auto-renders a 3D shot + Signature-Series styled PDF on every Save. This
+lesson is the recovery procedure for the times it doesn't.</p>
+<h2 id="how-rendering-normally-happens">How rendering normally happens</h2>
+<p>On <em>Save</em> of the Order Builder, the platform fires three async jobs:</p>
+<ol>
+<li><strong>3D scene snapshot</strong> — <code>southbrook_estimating_website</code> generates a
+   Three.js scene + bakes a runtime thumbnail per cabinet line (Tier-2 image
+   cascade, see Prodboard manifest §11).</li>
+<li><strong>FreeCAD render</strong> — <code>southbrook_freecad_bridge</code> calls headless FreeCAD
+   to produce a PDF + STEP + screenshots per Manufacturing Order, attached
+   to the MO once it's confirmed.</li>
+<li><strong>Signature Series PDF</strong> — QWeb report
+   <code>southbrook_estimating.signature_spec_sheet</code> renders from the SO; lives
+   on the SO chatter immediately, also emailable via the <em>Print → Spec
+   Sheet</em> dropdown.</li>
+</ol>
+<h2 id="when-the-3d-image-is-missing-on-the-pdf">When the 3D image is missing on the PDF</h2>
+<ul>
+<li>Check the SO chatter for a <code>_spec_for_bridge</code> error. The FreeCAD bridge
+  reads its spec from product-template defaults in Phase 1; a brand-new
+  template without defaults will show "rendering pending" instead of an
+  image (see lesson 4.3 audit note #10).</li>
+<li>Manually re-trigger: open the MO once it exists, <em>Cog → Re-render via
+  FreeCAD</em>. Round-trip is ~8 seconds at current settings.</li>
+</ul>
+<h2 id="when-the-spec-sheet-pdf-is-wrong">When the spec sheet PDF is wrong</h2>
+<ul>
+<li>The PDF is regenerated on every print. Edit the SO header (customer,
+  channel, zone) and re-print — never edit the PDF.</li>
+<li>For pricing mismatches, check the resolved pricelist on the header. If
+  it shows the customer's channel correctly, the issue is upstream of the
+  PDF.</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>3D never loads on mobile</strong> — by design. Customer-side mobile shows the
+  2D card stack, not the WebGL planner. Brief.</li>
+<li><strong>PDF takes 5+ seconds</strong> — first-render hits the FreeCAD bridge, which
+  is slow. Subsequent prints are &lt;1s (cached).</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 4 lesson 4.3 <em>FreeCAD Bridge</em>
+→ Course 5 lesson 5.4 <em>Configurator UX Tweaks</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_payroll_year_end_t4" model="slide.slide">
+            <field name="name">Payroll — Run Year-End T4 Generation</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Payroll administrator doing T4 season (January-February).</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-run-year-end-t4-generation">Payroll — Run Year-End T4 Generation</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>January each year. Every Canadian employee needs a T4 slip by the last
+day of February covering the prior calendar year's earnings.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Payroll → T4 Slips</strong> (<code>menu_southbrook_payroll_t4</code>).</p>
+<h2 id="the-5-step-flow">The 5-step flow</h2>
+<ol>
+<li><strong>Verify all of last year is closed.</strong> No payroll runs in <code>draft</code>
+   state for the year you're filing.</li>
+<li><strong>Generate T4s.</strong> <em>Generate T4s for Year</em> action. Pick the year.
+   Platform creates one <code>southbrook.payroll.t4</code> per employee active in
+   that year.</li>
+<li><strong>Spot-check 3 slips.</strong> Pick one full-year hourly, one salaried, one
+   partial-year (hire or termination during the year). Verify:
+   - Box 14 (employment income) = sum of all gross pay
+   - Box 16 (CPP contributions)
+   - Box 18 (EI premiums)
+   - Box 22 (income tax)
+   - Box 24 (EI insurable earnings)
+   - Box 26 (CPP/QPP pensionable earnings)</li>
+<li><strong>Generate the T4 Summary.</strong> Roll-up of all employees; matches the
+   total amounts remitted to CRA across the year.</li>
+<li><strong>File with CRA.</strong> Two paths:
+   - <strong>XML upload</strong> to CRA via the <em>T4 Internet File Transfer</em> portal —
+     platform's <em>Export XML</em> gives you the envelope
+   - <strong>Paper</strong> — print the T4 Summary + T4 slips; mail</li>
+</ol>
+<h2 id="distribute-to-employees">Distribute to employees</h2>
+<ul>
+<li>Portal: employees see their T4 on <code>/my/payroll</code>. Email notification on
+  generation.</li>
+<li>Paper: print + mail by Feb 28 (Mar 1 if Feb 28 is a weekend).</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Box 14 doesn't match the General Ledger wages account</strong> — the GL
+  may include benefits not in T4 Box 14; reconcile via the T4 Summary
+  audit pack.</li>
+<li><strong>Box 24 / 26 maxed out for high earners</strong> — that's correct; CPP +
+  EI have annual maximums. Don't manually edit.</li>
+<li><strong>T4 doesn't include the December bonus</strong> — only payroll runs with
+  <code>pay_date</code> in the year count. A December-period bonus paid in January
+  goes on next year's T4.</li>
+<li><strong>Amended T4 needed</strong> — use <em>T4A</em> (amended) — don't edit the original.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 20 (Payroll CA — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_convert_quote_to_so" model="slide.slide">
+            <field name="name">Sales — Convert a Quote to a Sales Order</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Sales rep with a signed quote ready to confirm.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-convert-a-quote-to-a-sales-order">Sales — Convert a Quote to a Sales Order</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>The customer has signed (or verbally approved). You want to release the
+order to production.</p>
+<h2 id="stock-vs-southbrook-states">Stock vs Southbrook states</h2>
+<p>Native Odoo SO states: <code>draft → sent → sale → done</code>.
+Southbrook also tracks: <em>Estimating → Approval → Confirmed → In Production</em>
+via the <code>southbrook_submitted_date</code> milestone field overlay (see audit
+note #8 in <code>docs/elearning/README.md</code>).</p>
+<p>You work with the <strong>native button</strong> at the top: <em>Confirm</em>. The Southbrook
+overlay updates automatically.</p>
+<h2 id="the-3-step-flow">The 3-step flow</h2>
+<ol>
+<li><strong>Verify channel + pricelist</strong> still match the customer. If they renegotiated
+   tier, change <code>res.partner.channel</code> first.</li>
+<li><strong>Verify zones add up.</strong> Multi-zone orders (BASE_RUN + WALL + TALL) should
+   total what the customer signed.</li>
+<li><strong>Click <em>Confirm</em>.</strong> SO state → <code>sale</code>. The MI engine + kitchen-project
+   release gate (Course 2 lesson 2.2) take over from here.</li>
+</ol>
+<h2 id="what-fires-automatically-on-confirm">What fires automatically on confirm</h2>
+<ul>
+<li>Kitchen Project (<code>sb.kitchen.project</code>) created or linked</li>
+<li>Manufacturing Order(s) drafted via <code>product_configurator_mrp</code> BoM rollup</li>
+<li>Spec sheet PDF + 3D scene shipped to the production package</li>
+<li>Hermes channel notification (if the customer is a partner with a Hermes
+  surface)</li>
+</ul>
+<h2 id="if-the-approval-gate-blocks-you">If the Approval gate blocks you</h2>
+<p>Above-threshold orders need a Sales Manager approval click. The threshold
+is a configurable system parameter; the form will surface a warning banner
+telling you who can release it.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Order disappears from your queue after confirm</strong> — that's correct; it
+  moves to the Production Planning queue (Course 2).</li>
+<li><strong>MO didn't appear</strong> — check <code>Kitchen Ops → Release Queue</code>. The release
+  gate may be waiting on ECO clearance or cut-spec authoring.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 8 lesson 8.5 <em>Quote-to-MO Handoff</em>
+→ Course 2 lesson 2.2 <em>Release Gate</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_apply_discount" model="slide.slide">
+            <field name="name">Sales — Apply a Discount Above Your Threshold</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Sales rep being asked for a discount past their auto-approval limit.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-apply-a-discount-above-your-threshold">Sales — Apply a Discount Above Your Threshold</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Customer asks for 10% off; your tier auto-allows 5%. This is the manager-
+approval workflow.</p>
+<h2 id="where-the-threshold-lives">Where the threshold lives</h2>
+<p>The threshold is the difference between the resolved pricelist line and the
+manual discount you enter. Sales reps have a personal threshold on their
+<code>hr.employee</code> record; sales managers have a higher one; some big-box channel
+discounts have no cap because they're locked to a fixed wholesale price.</p>
+<h2 id="the-3-step-flow">The 3-step flow</h2>
+<ol>
+<li><strong>Apply the discount.</strong> Open the SO line, edit <code>discount</code> field. The header
+   highlights in amber when you cross your threshold — <em>Pending Manager
+   Approval</em>.</li>
+<li><strong>Click <em>Request Approval</em></strong> in the header. This stamps
+   <code>southbrook_submitted_date</code> + posts an activity to your designated
+   approval chain (a sales manager partner).</li>
+<li><strong>Approver clicks Approve.</strong> Header turns green. You can confirm the SO.</li>
+</ol>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Approval activity goes to the wrong manager</strong> — chain is determined by
+  <code>hr.employee.parent_id</code> (your reporting manager). Update HR if wrong.</li>
+<li><strong>Approver edits the discount</strong> — that's allowed; the approval covers the
+  edited value, not the originally requested one.</li>
+<li><strong>Auto-confirm bypass</strong> — if you confirm before approval, the state machine
+  rejects with a UserError. Don't try to work around it.</li>
+</ul>
+<h2 id="channel-specific-notes">Channel-specific notes</h2>
+<table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Discount cap behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Retail</td>
+<td>Standard threshold table</td>
+</tr>
+<tr>
+<td>Dealer</td>
+<td>Capped at signed-agreement floor — can't be exceeded</td>
+</tr>
+<tr>
+<td>Contractor</td>
+<td>Tier 1/2/3 (25/30/35%) auto-applied; rep can stack 5% extra without approval</td>
+</tr>
+<tr>
+<td>KD</td>
+<td>Component pricing only, ~46% of retail; no further discount allowed</td>
+</tr>
+<tr>
+<td>Big-box</td>
+<td>Fixed wholesale — discount field disabled</td>
+</tr>
+<tr>
+<td>Refacing</td>
+<td>Margin-target rule recomputes; manual override needs manager OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 8 lesson 8.3 <em>Pricing Zones and Channels</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_handle_change_request" model="slide.slide">
+            <field name="name">Sales — Handle a Mid-Quote Change Request</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Sales rep whose customer wants to swap a cabinet after quoting.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-handle-a-mid-quote-change-request">Sales — Handle a Mid-Quote Change Request</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Customer signs off, you confirm the SO, then they call back: <em>"actually make
+that cabinet a 36-inch instead of 30-inch."</em> This is the workflow.</p>
+<h2 id="pre-confirmation-so-state-draftsent">Pre-confirmation (SO state = draft/sent)</h2>
+<p>No drama — open the SO, edit the line, save. Spec sheet re-prints with the
+change. No ECO needed.</p>
+<h2 id="post-confirmation-so-state-sale">Post-confirmation (SO state = sale)</h2>
+<p>This requires an Engineering Change Order (ECO) because the MO may already
+be in production. The flow:</p>
+<ol>
+<li><strong>Open the SO.</strong> It now has a <em>Change Order</em> button in the header.</li>
+<li><strong>Click it.</strong> Opens a draft <code>southbrook_plm.eco</code> record pre-populated with
+   the originating SO + the lines you want to change.</li>
+<li><strong>Mark the lines.</strong> Tick the cabinets affected. The ECO will show before
+   / after for each.</li>
+<li><strong>Submit.</strong> Routes to the Designer who authors the new cut spec.</li>
+<li><strong>Designer + Plant GM approve.</strong> ECO transitions to <em>Released</em>.</li>
+<li><strong>Production picks up.</strong> Affected MOs auto-update or are scrapped + re-MO'd
+   depending on workcenter state.</li>
+</ol>
+<h2 id="time-sensitivity-rules">Time-sensitivity rules</h2>
+<ul>
+<li><strong>Cut spec not yet authored</strong> (MO state = draft) → swap is free, no scrap</li>
+<li><strong>Cut spec authored, cutting not started</strong> → swap is free; cut spec is
+  re-authored</li>
+<li><strong>Cutting in progress</strong> → scrap the partially-cut panels (logged as scrap
+  on the original MO) + re-MO the changed cabinet</li>
+<li><strong>Past cutting</strong> → escalation to Plant GM required; the change may be
+  cheaper to do as a return + re-order than mid-stream</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Customer wants the change but won't pay the upcharge</strong> — that's a
+  negotiation, not a system step. Leave the ECO in Draft until you have a
+  signed addendum.</li>
+<li><strong>ECO doesn't show on the SO chatter</strong> — check that the linked SO is on
+  the ECO <code>origin_sale_order_id</code> field. Bug if missing; file a ticket.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 4 lesson 4.1 <em>ECOs</em>
+→ Course 8 lesson 8.6 <em>Revising and Versioning</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_lookup_customer" model="slide.slide">
+            <field name="name">Sales — Look Up an Existing Customer and Reuse Their Last Quote</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Sales rep with a returning customer.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-look-up-an-existing-customer-and-reuse-their-last-quote">Sales — Look Up an Existing Customer and Reuse Their Last Quote</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Customer calls back, says <em>"just like last time, but add a pantry."</em> — don't
+re-key the whole kitchen.</p>
+<h2 id="the-3-step-flow">The 3-step flow</h2>
+<ol>
+<li><strong>Find the customer.</strong> <em>Contacts → Customers</em> or just type their name in
+   the Order Builder partner field. The search hits both
+   <code>res.partner.name</code> and <code>email</code>.</li>
+<li><strong>Open their record → Sales tab.</strong> All historical SOs are listed. Pick
+   the most recent.</li>
+<li><strong>Action menu → <em>Duplicate</em></strong>. This copies the SO + every line + every
+   <code>product.config.session</code> link. State resets to <code>draft</code>.</li>
+</ol>
+<h2 id="adding-to-the-duplicate">Adding to the duplicate</h2>
+<p>Edit lines as needed, <em>+ Add Cabinet</em> for new ones, <em>Save</em>. Pricing
+re-resolves automatically against the current pricelist (which may have
+changed since their last order).</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Customer record exists twice</strong> — typo or email-vs-phone mismatch. Use
+  <em>Contacts → Tools → Merge Contacts</em> before duplicating; otherwise the
+  duplicate inherits the wrong channel.</li>
+<li><strong>Channel changed since their last order</strong> — pricing on the duplicate will
+  differ. Surface this to the customer up front.</li>
+<li><strong>Some cabinets are now end-of-life</strong> — the duplicate will keep the
+  original <code>product.template</code>. Test-confirm to see if the EOL warning fires;
+  swap to current SKUs as needed.</li>
+</ul>
+<h2 id="portal-side-equivalent">Portal-side equivalent</h2>
+<p>Customers can self-serve from <code>/my/kitchen-projects</code> — <em>Duplicate this
+quote</em>. The action is the same; just runs as the portal user.</p>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 6 lesson 6.1 <em>Customer Portal</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_sales_send_hermes_summary" model="slide.slide">
+            <field name="name">Sales — Send a Hermes Trade-Partner Summary</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">80</field>
+            <field name="description">Sales rep working a dealer or contractor channel order.</field>
+            <field name="html_content"><![CDATA[<h1 id="sales-send-a-hermes-trade-partner-summary">Sales — Send a Hermes Trade-Partner Summary</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A dealer or contractor sales partner just confirmed a substantial order and
+you want to notify them with a Hermes-styled summary they can drop into
+their CRM or share with their client.</p>
+<h2 id="what-hermes-can-do-for-you">What Hermes can do for you</h2>
+<p>Trade partners get persona-bound access (<code>trade_partner</code> persona, tiers
+T0/T1/T2). For a <em>send summary</em> job, T0 is enough — read-only assembly of
+SO state + spec sheet URL + delivery window.</p>
+<h2 id="the-3-step-flow">The 3-step flow</h2>
+<ol>
+<li><strong>Open the SO.</strong> Header shows a <em>Hermes</em> button if the customer is a
+   trade partner with Hermes enabled.</li>
+<li><strong>Click <em>Compose Summary</em>.</strong> Opens the OWL chat panel mounted below the
+   header (the <code>[data-hermes-chat-mount]</code> injection point).</li>
+<li><strong>Pick <em>Send to partner</em></strong> in the action chips. Hermes assembles the
+   summary using the <code>list_my_orders</code> + <code>get_order_status</code> + <code>get_quote_pdf_url</code>
+   tools, formats it per the partner's preferred style, and posts it to
+   their inbox (email + portal notification).</li>
+</ol>
+<h2 id="what-the-partner-sees">What the partner sees</h2>
+<p>A Hermes-styled markdown card with order ID, line items, channel pricing,
+spec sheet PDF link, and a <em>Reply via Hermes</em> button that opens their own
+authenticated chat panel scoped to that single order.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>No Hermes button on header</strong> — the customer's <code>res.partner.share</code> is
+  False or they're missing the Hermes group. Check both.</li>
+<li><strong>Summary missing the spec sheet URL</strong> — <code>get_quote_pdf_url</code> returns
+  empty if the QWeb report hasn't rendered yet. Print the spec sheet once,
+  then re-compose.</li>
+<li><strong>Partner says they got an empty message</strong> — the v1 sidecar JSON stub
+  fires if <code>southbrook_hermes.sidecar_enabled</code> is False. Flip it on, then
+  redeploy the summary.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 13 (Fabio Module) lessons 13.1 - 13.7
+→ Course 6 lesson 6.3 <em>Hermes CS View</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_design_open_cut_spec" model="slide.slide">
+            <field name="name">Design — Open a Cut Spec for a Confirmed Order</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">90</field>
+            <field name="description">Designer / ECO engineer responding to a confirmed kitchen order.</field>
+            <field name="html_content"><![CDATA[<h1 id="design-open-a-cut-spec-for-a-confirmed-order">Design — Open a Cut Spec for a Confirmed Order</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A Sales rep confirmed an SO; the release gate is now waiting on you to
+author the cut spec. This is the 60-second tutorial on getting unstuck.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Engineering → PLM → Cut Specs</strong>, or open the MO from the Release Queue
+and use the <em>Cut Spec</em> notebook tab.</p>
+<h2 id="the-3-step-flow">The 3-step flow</h2>
+<ol>
+<li><strong>From the Release Queue.</strong> <em>Kitchen Ops → Release Queue</em> → click the
+   blocked MO. Right-side panel lists what's blocking. If it says <em>Cut spec
+   missing</em>, click <em>Author Cut Spec</em>.</li>
+<li><strong>Fill the required fields.</strong> Panel dimensions, edge profiles, grain
+   orientation, drilling pattern. Most fields auto-fill from the cabinet's
+   configurator selections; you only edit what differs from default.</li>
+<li><strong>Save + Activate.</strong> Constraint <code>_check_single_active</code> (audit note #11)
+   enforces one active cut spec per cabinet. The release gate clears
+   automatically.</li>
+</ol>
+<h2 id="fields-you-cant-change">Fields you can't change</h2>
+<ul>
+<li><strong>Cabinet width / height / depth</strong> — locked from the SO configurator.</li>
+<li><strong>Door style</strong> — locked. To change, raise an ECO from the SO.</li>
+<li><strong>Box material</strong> — locked.</li>
+</ul>
+<p>You can override these via a Cut Spec Override (Kitchen Ops → Cut Spec
+Overrides), which is logged separately and triggers a manager approval.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Cut spec authored but release gate didn't clear</strong> — check that
+  <code>is_active=True</code>. Saving as Draft doesn't satisfy the gate.</li>
+<li><strong>Two cut specs for the same cabinet</strong> — constraint will reject save.
+  Archive the old one first.</li>
+<li><strong>FreeCAD bridge renders the wrong panel</strong> — bridge reads
+  <code>_spec_for_bridge</code> from product-template defaults in Phase 1, not from
+  the cut spec yet (audit note #10). Manual re-render after cut-spec save.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 4 lesson 4.2 <em>Authoring a Cut Spec Sheet</em>
+→ Course 1 lesson 1.7 <em>Reading a Cut Spec</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_design_update_freecad_master" model="slide.slide">
+            <field name="name">Design — Update the FreeCAD Master Template</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">110</field>
+            <field name="description">Designer / ECO engineer updating the parametric carcass template.</field>
+            <field name="html_content"><![CDATA[<h1 id="design-update-the-freecad-master-template">Design — Update the FreeCAD Master Template</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A new construction rule, a hardware brand switch, or a corner-detail change
+that affects every future render. The master FCStd is the source of every
+3D image the platform ever shows.</p>
+<h2 id="where-the-master-lives">Where the master lives</h2>
+<p><code>/share/CACHEDEV3_DATA/Container/southbrook/freecad-data/master.FCStd</code> on the
+QNAP. Bridge container has it read-only mounted at
+<code>/data/master.FCStd</code> (RO mount fix from
+<code>southbrook_freecad_bridge_deploy_recipe.md</code> — never edit live).</p>
+<h2 id="the-safe-edit-flow">The safe edit flow</h2>
+<ol>
+<li><strong>Open the master in desktop FreeCAD.</strong> v0.21+. Save As → working copy
+   on your laptop first; never edit the live file.</li>
+<li><strong>Edit parametrically.</strong> Use Spreadsheet workbench — every dimension /
+   feature MUST link to a named cell. If you hard-code a number, the
+   bridge can't parameterise it for downstream cabinets.</li>
+<li><strong>Test locally.</strong> Open a sample config in FreeCAD with override
+   values; verify the geometry updates as expected.</li>
+<li><strong>Save.</strong> Validate that the file size hasn't ballooned (delete unused
+   bodies; FreeCAD keeps them otherwise).</li>
+<li><strong>Promote.</strong> Coordinate with sysadmin (lesson 17.40 / deploy recipe) to
+   rsync the new master into the QNAP path. The bridge image needs no
+   rebuild — it reads the file at render time.</li>
+</ol>
+<h2 id="what-you-cant-rename">What you CAN'T rename</h2>
+<p>Parameter names referenced by the bridge:
+- <code>width_mm</code>, <code>height_mm</code>, <code>depth_mm</code>
+- <code>door_count</code>, <code>hinge_side</code>
+- <code>box_material_code</code>, <code>door_style_code</code>, <code>finish_code</code>
+- <code>gable_left</code>, <code>gable_right</code>, <code>finished_side_left</code>, <code>finished_side_right</code></p>
+<p>These are wired into the bridge code; renaming them breaks every render.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Render comes out blank</strong> — the master file is loadable but the bridge
+  can't find the parameter map. Check <code>services/freecad_bridge/</code> logs.</li>
+<li><strong>Render dimensions are off by 25.4</strong> — the master is set to inches; the
+  bridge expects mm. Switch the file's unit settings under <em>Edit →
+  Preferences → Units</em>.</li>
+<li><strong>Render takes 30s instead of 8s</strong> — the master has stale geometry
+  that's being recomputed. Open in desktop FreeCAD, <em>Tools → Edit
+  parameters</em> + recompute all, save clean.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 4 lesson 4.3 <em>FreeCAD Bridge</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_design_rerender_freecad" model="slide.slide">
+            <field name="name">Design — Manually Re-render a Cabinet via FreeCAD</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">120</field>
+            <field name="description">Designer / ECO engineer who needs to refresh a specific MO render.</field>
+            <field name="html_content"><![CDATA[<h1 id="design-manually-re-render-a-cabinet-via-freecad">Design — Manually Re-render a Cabinet via FreeCAD</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You updated the master template, a customer ECO changed dimensions, or the
+auto-render failed and shipped a stale image to the spec sheet. Use this to
+force a fresh render.</p>
+<h2 id="where-to-fire-it">Where to fire it</h2>
+<p>The MO form (<code>mrp.production</code>) — <em>Cog menu → Re-render via FreeCAD</em>.</p>
+<p>You can also fire from the SO chatter once the MO exists; the button is on
+the SO header dropdown under <em>Actions → Re-render Spec Visuals</em>.</p>
+<h2 id="what-happens">What happens</h2>
+<ol>
+<li>The MO posts a job to <code>services/freecad_bridge/</code> via the API key from
+   the bridge-svc credential.</li>
+<li>The bridge container spins up a headless FreeCAD process, loads the
+   master FCStd, applies the parameter map for THIS cabinet's
+   configurator selections, and renders.</li>
+<li>PDF + STEP + screenshots come back; old <code>ir.attachment</code> records are
+   archived (not deleted) and new ones attach to the MO.</li>
+<li>The MO chatter logs the round-trip time.</li>
+</ol>
+<h2 id="round-trip-time">Round-trip time</h2>
+<p>Normal: <strong>~8 seconds</strong> end-to-end (see
+<code>southbrook_freecad_bridge_deploy_recipe.md</code>). If it's &gt;30 seconds,
+investigate:</p>
+<ul>
+<li>Master file bloat (lesson 17.11 gotcha #3)</li>
+<li>Bridge container under load (<code>docker stats southbrook-freecad-bridge</code>)</li>
+<li>Network round-trip to the bridge over the internal docker net</li>
+</ul>
+<h2 id="if-it-404s">If it 404s</h2>
+<ul>
+<li>API key rotation: bridge-svc credential may have changed; check
+  <code>southbrook_freecad_bridge.config_parameter</code> for the current key</li>
+<li>Bridge container down: <code>docker ps</code> should show it healthy</li>
+<li>RO mount missing: the master file binding broke; recipe step 1</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Re-render makes the OLD image still shows on the PDF</strong> — Odoo caches
+  attachments aggressively. Clear the QWeb cache: <code>docker exec
+  southbrook-odoo bash -c "rm -rf /var/lib/odoo/.local/share/Odoo/sessions/*"</code>
+  or just hard-refresh the print preview.</li>
+<li><strong>Re-rendered image has a "rendering pending" placeholder</strong> — the v1
+  fallback. Bridge job took too long; retry.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 4 lesson 4.3 <em>FreeCAD Bridge</em>
+→ Memory <code>southbrook_freecad_bridge_deploy_recipe.md</code></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_design_add_sku_catalog" model="slide.slide">
+            <field name="name">Design — Add a New SKU to the Catalog</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">130</field>
+            <field name="description">Designer / product manager adding a new cabinet template or accessory.</field>
+            <field name="html_content"><![CDATA[<h1 id="design-add-a-new-sku-to-the-catalog">Design — Add a New SKU to the Catalog</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A new cabinet template (e.g. an island variant) or a hardware accessory
+that doesn't exist in the current catalog. The Order Builder relies on
+these <code>product.template</code> records; nothing else needs editing for the new
+SKU to appear.</p>
+<h2 id="the-5-step-flow">The 5-step flow</h2>
+<ol>
+<li><strong>Decide: cabinet or accessory.</strong> Cabinets get a <code>product.template</code>
+   with the 11 attributes wired in. Accessories use
+   <code>southbrook_hardware_catalog</code> (Marathon catalog).</li>
+<li><strong>For cabinets:</strong> <em>Inventory → Products → New</em>. Use the <em>Southbrook
+   Series</em> tab (added by <code>southbrook_estimating</code>). Fill family, default
+   dimensions, default series, declare which of the 11 attributes
+   apply.</li>
+<li><strong>For accessories:</strong> <em>Inventory → Products → Hardware Catalog → New</em>.
+   Fill brand (Marathon, Blum, etc.), SKU code, MSRP, your cost.</li>
+<li><strong>Pricelist seeding.</strong> Auto-creates pricelist items at retail; channel
+   pricelists derive from retail via formula. Verify by opening <em>Sales →
+   Configuration → Pricelists</em>.</li>
+<li><strong>Demo the new SKU.</strong> Open the Order Builder, try to configure it. If
+   exclusions fire incorrectly, edit <code>data/config_rules.xml</code> (see
+   declarative rules audit).</li>
+</ol>
+<h2 id="what-you-should-not-do">What you should NOT do</h2>
+<ul>
+<li>Don't write Python overrides for the new SKU. Rules go in
+  <code>product.config.line</code> records, declaratively.</li>
+<li>Don't add the new SKU to a pricelist by editing pricelist XML — use
+  the pricelist UI so it picks up the audit chatter.</li>
+<li>Don't skip the 11-attribute declaration — the Order Builder hides
+  cabinets without it.</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>New cabinet doesn't appear in Order Builder</strong> — check that
+  <code>is_published=True</code> on <code>product.template</code> and that the family is in the
+  Order Builder's family filter.</li>
+<li><strong>New cabinet appears but configurator wizard skips half the
+  attributes</strong> — the missing attributes weren't enabled on the template.</li>
+<li><strong>Hardware item shows wrong vendor price</strong> — Marathon CSV import may
+  have lagged; <em>Inventory → Configuration → Hardware Catalog → Re-import</em>.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 11 <em>Creating a New Product End-to-End</em> — all 8 lessons
+→ Course 5 lesson 5.3 <em>Hardware Catalog</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_planning_generate_mps" model="slide.slide">
+            <field name="name">Planning — Generate the Rolling 13-Week MPS</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">140</field>
+            <field name="description">Production planner doing the weekly MPS cycle.</field>
+            <field name="html_content"><![CDATA[<h1 id="planning-generate-the-rolling-13-week-mps">Planning — Generate the Rolling 13-Week MPS</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>The Monday-morning planning cycle. The MPS Workbench rolls forward by one
+week each time; this lesson is the 3-minute "I just need to run it"
+tutorial.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>MES → MPS Workbench</strong></p>
+<p>(Menu <code>menu_mps_workbench</code> from <code>southbrook_mes_mps</code>.)</p>
+<h2 id="the-flow">The flow</h2>
+<ol>
+<li><strong>Open the workbench.</strong> Default view is the pivot — product × week_start,
+   measures forecast_qty + to_supply_qty.</li>
+<li><strong>Filter to your products.</strong> The default groups by product; switch to a
+   subset if you're planning one family.</li>
+<li><strong>Select products → Action menu → <em>Generate Rolling 13 Weeks</em>.</strong> This is
+   the server action <code>action_mps_generate_13</code> bound to
+   <code>product.model_product_product</code>. It creates / refreshes 13 weeks of
+   <code>southbrook.mes_mps.mps_period</code> rows per selected product.</li>
+<li><strong>Review.</strong> The pivot now shows updated <code>forecast_qty</code>,
+   <code>actual_demand_qty</code> (from confirmed SOs), <code>planned_supply_qty</code> (from
+   confirmed MOs), and the computed <code>to_supply_qty</code> gap.</li>
+</ol>
+<h2 id="reading-the-workbench">Reading the workbench</h2>
+<ul>
+<li><strong>Green row, <code>to_supply_qty = 0</code></strong> — supply meets demand, no action
+  needed.</li>
+<li><strong>Amber row, <code>to_supply_qty &gt; 0</code></strong> — need to push MOs / POs to cover the
+  gap. Click the row to see the period detail.</li>
+<li><strong><code>state = executed</code></strong> (green decoration on list view) — this period has
+  shipped; data is historical, don't edit.</li>
+</ul>
+<h2 id="approve-flow">Approve flow</h2>
+<p>For each draft <code>mps.period</code>, the <em>Approve</em> button changes state to
+<code>approved</code> and feeds the next MRP run. Bulk-approve via list view, multi-
+select + Action → Approve.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Generate ran but nothing appeared</strong> — you probably ran it from the
+  template view; the server action is bound to <code>product.product</code> (variant)
+  not <code>product.template</code>. Try from the variant list.</li>
+<li><strong><code>forecast_qty</code> is 0 across the board</strong> — no forecast model is seeded.
+  Manual entry until forecast-from-history lands as a v1.1 feature.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 2 lesson 2.5 <em>Reading the MI Report</em>
+→ Course 7 <em>MES + MPS Workbench</em> (module deep-dive when authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_planning_approve_mps_to_mrp" model="slide.slide">
+            <field name="name">Planning — Approve the MPS and Push to MRP</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">150</field>
+            <field name="description">Production planner closing the weekly MPS cycle.</field>
+            <field name="html_content"><![CDATA[<h1 id="planning-approve-the-mps-and-push-to-mrp">Planning — Approve the MPS and Push to MRP</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You ran the 13-week generator (lesson 17.14), reviewed the gaps, and now
+want to commit the plan and have native MRP create the replenishment MOs.</p>
+<h2 id="the-flow">The flow</h2>
+<ol>
+<li><strong>MES → MPS Workbench</strong>, switch to list view.</li>
+<li><strong>Filter <code>state = draft</code>.</strong> Hide the executed historical rows.</li>
+<li><strong>Multi-select</strong> the rows you want to approve.</li>
+<li><strong>Action → Approve.</strong> State → <code>approved</code>. Each approved row's
+   <code>to_supply_qty</code> gets registered as a demand record on the product's
+   <code>procurement.group</code>.</li>
+<li><strong>Run MRP.</strong> <em>Inventory → Operations → Run Scheduler</em> (native). MRP
+   consumes the demands and drafts the corresponding MOs / POs.</li>
+</ol>
+<h2 id="what-approval-changes">What approval changes</h2>
+<ul>
+<li><code>state</code> → <code>approved</code> (locked for further edit by planner role)</li>
+<li>A procurement record is dispatched per row, qty = <code>to_supply_qty</code></li>
+<li>Audit log entry on the chatter</li>
+</ul>
+<h2 id="what-approval-does-not-do">What approval does NOT do</h2>
+<ul>
+<li>Does NOT confirm MOs (still draft after MRP creates them)</li>
+<li>Does NOT release work orders to the floor</li>
+<li>Does NOT update forecast (next week's generator pass re-reads forecast)</li>
+</ul>
+<h2 id="bulk-approve-safety">Bulk approve safety</h2>
+<p>If you select 200 rows and 3 are wrong, <em>Reject</em> on those 3 before
+clicking Approve. Once <code>executed</code>, only sysadmin can roll back.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>MOs appear but qty looks wrong</strong> — MRP rounded by <code>uom.rounding</code>;
+  if the MPS asked for 7 and rounding=2, MRP makes 8.</li>
+<li><strong>PO didn't appear for purchased components</strong> — supplier wasn't on the
+  product. Add at <em>Inventory → Products → Purchase tab</em>.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 2 lessons 2.3 <em>Bottleneck Scheduling</em> + 2.4 <em>Premium Orchestration Crons</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_planning_reschedule_breakdown" model="slide.slide">
+            <field name="name">Planning — Reschedule a Work Order After a Breakdown</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">160</field>
+            <field name="description">Production planner reacting to a workcenter breakdown.</field>
+            <field name="html_content"><![CDATA[<h1 id="planning-reschedule-a-work-order-after-a-breakdown">Planning — Reschedule a Work Order After a Breakdown</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A workcenter (SB-CNC-BORE, SB-EDGE, SB-ASSY, etc.) breaks down. The
+maintenance lead has filed a breakdown alert. Now you need to move
+in-progress + queued work to another workcenter or push the dates.</p>
+<h2 id="what-auto-happened">What auto-happened</h2>
+<ul>
+<li>Maintenance opened a <code>southbrook.cmms.breakdown_alert</code> (lesson 17.24)</li>
+<li>If they clicked <em>Block Affected MOs</em>, the alert created
+  <code>mrp.production</code> blocks on every MO whose work order targets the broken
+  workcenter</li>
+<li>The MI engine surfaced an <em>install-risk</em> tile (lesson 17.17 to read it)</li>
+</ul>
+<h2 id="your-3-step-response">Your 3-step response</h2>
+<ol>
+<li><strong>Find the affected MOs.</strong> <em>Kitchen Ops → Workcenter Bottleneck</em> shows
+   the queue by workcenter; the broken one will spike.</li>
+<li><strong>Decide: reroute or defer.</strong> Some cabinets can run on the backup
+   workcenter (SB-CNC-BORE → CNC02 backup; SB-DOOR → SB-ASSY in a pinch).
+   Some can't (SAND / PAINT / CURE are unique).</li>
+<li><strong>Reroute on the MO.</strong> Open the affected MO → <em>Work Orders</em> tab →
+   edit the <code>workcenter_id</code> on the affected work order. The MRP scheduler
+   re-runs and the new dates flow downstream.</li>
+</ol>
+<h2 id="defer-flow">Defer flow</h2>
+<p>If you can't reroute, push dates:</p>
+<ul>
+<li>Open the MO header → <em>Scheduled Start</em>. Bump by the maintenance ETA
+  (visible on the breakdown alert).</li>
+<li>Hermes / Fabio will surface this as a <em>recommendation</em> (lesson 3.2) for
+  the Plant GM to acknowledge.</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Reroute disabled</strong> — the new workcenter doesn't have the required
+  <code>workcenter.capability</code> for that operation. The MO's bom_routing
+  expects an edge_bander; only SB-EDGE has it.</li>
+<li><strong>Bulk reroute</strong> — Action menu on the work order list view. Be careful;
+  this doesn't validate capability for each row individually.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 3 lesson 3.2 <em>Approving Hermes Recommendations</em>
+→ Course 2 lesson 2.3 <em>Bottleneck Scheduling</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_planning_read_bottleneck" model="slide.slide">
+            <field name="name">Planning — Read the Bottleneck Report and Act</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">170</field>
+            <field name="description">Production planner doing the morning floor-load check.</field>
+            <field name="html_content"><![CDATA[<h1 id="planning-read-the-bottleneck-report-and-act">Planning — Read the Bottleneck Report and Act</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Daily, around 7:30 AM. The bottleneck report tells you which workcenter
+will hit capacity first this week so you can pre-empt the queue rather
+than react to it.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p>Two views worth knowing:</p>
+<ul>
+<li><strong>MES → Bottleneck Report</strong> — pure-MPS view, runs over the rolling 13
+  weeks, lists workcenters by <code>utilisation_pct = demand_hours /
+  capacity_hours</code></li>
+<li><strong>Kitchen Ops → Workcenter Bottleneck</strong> — operational view, runs over
+  THIS week and the next, uses live MO state + downtime logs</li>
+</ul>
+<h2 id="reading-the-report">Reading the report</h2>
+<ul>
+<li><strong>Green:</strong> <code>utilisation_pct &lt; 80%</code>. Healthy.</li>
+<li><strong>Amber:</strong> <code>80% ≤ utilisation_pct &lt; 100%</code>. Plan to add overtime,
+  reroute, or push dates.</li>
+<li><strong>Red:</strong> <code>utilisation_pct ≥ 100%</code>. You're overcommitted. Choose: ship
+  late, decline orders, reroute, or run a second shift.</li>
+</ul>
+<h2 id="the-3-actions">The 3 actions</h2>
+<ol>
+<li><strong>Reroute.</strong> If the MO has a parallel-capable workcenter
+   (SB-CNC-BORE ↔ CNC02 backup), open the work order and switch
+   workcenter_id. Lesson 17.16 explains the constraint.</li>
+<li><strong>Extend shift.</strong> <em>Kitchen Ops → Workcenter Bottleneck</em> → row action →
+   <em>Add Overtime Block</em>. Adds an <code>mrp.workcenter.productivity</code> allowance
+   for the period.</li>
+<li><strong>Defer SO promise.</strong> If neither works, push the customer's promise
+   date and post a Hermes-driven notification (CS will catch it on their
+   queue).</li>
+</ol>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Utilisation looks fine but you're missing dates</strong> — utilisation is
+  weekly avg; spikes within the week can still miss. Open the daily
+  breakdown.</li>
+<li><strong><code>capacity_hours</code> is wrong</strong> — workcenter's <code>time_efficiency</code> and
+  <code>oee_target</code> drive it. Stale values give bogus utilisation.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 3 lesson 3.3 <em>OEE per Workcenter</em>
+→ Course 12 lesson 12.5 <em>Floor Load Dashboards</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_floor_cutting_daily" model="slide.slide">
+            <field name="name">Floor — Cutting (CNC) Daily Flow</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">180</field>
+            <field name="description">CNC operator on SB-CNC-BORE or CNC02 backup.</field>
+            <field name="html_content"><![CDATA[<h1 id="floor-cutting-cnc-daily-flow">Floor — Cutting (CNC) Daily Flow</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You arrive at the CNC workstation, badge in, and need to know what to cut
+today.</p>
+<h2 id="where-this-lives-on-the-touchscreen">Where this lives on the touchscreen</h2>
+<p><strong>Floor Workspace → Workcenter Kanban → SB-CNC-BORE</strong> (or CNC02 backup).</p>
+<h2 id="your-5-step-loop">Your 5-step loop</h2>
+<ol>
+<li><strong>See the queue.</strong> Today's cut list shows top-first. Each card = one
+   cabinet's panels.</li>
+<li><strong>Open the top card.</strong> Cut spec PDF preview opens (rendered from
+   <code>southbrook_plm.cut_spec</code> active record).</li>
+<li><strong>Cut.</strong> Run the program. The nest file is on <code>\\fileserver\nests\</code>
+   under the cabinet code (Accucutt hand-off; lesson 1.3 deep dive).</li>
+<li><strong>Tap <em>Done</em>.</strong> Logs <code>mrp.workorder.duration_done</code> and posts a
+   chatter entry on the MO.</li>
+<li><strong>Next card.</strong> Loop.</li>
+</ol>
+<h2 id="when-something-is-wrong">When something is wrong</h2>
+<ul>
+<li><strong>Cut spec doesn't match the panels you have</strong> — DON'T cut. Tap
+  <em>Hold → Cut spec mismatch</em>. The card moves to the Plant GM queue;
+  designer gets pinged for an ECO (lesson 17.10).</li>
+<li><strong>Tool is broken / worn</strong> — <em>Hold → Tool issue</em>. Posts to maintenance
+  queue. Lesson 17.24 explains the maintenance side.</li>
+<li><strong>Machine alarms</strong> — <em>Hold → Equipment alarm</em>. Creates a breakdown
+  alert automatically; you can also raise one yourself via <em>Maintenance →
+  Breakdown Alerts → New</em>.</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Done button greyed out</strong> — work order not in <code>progress</code> state. Tap
+  <em>Start</em> first.</li>
+<li><strong>Two CNC cards open</strong> — <code>southbrook_mrp_pm</code> allows parallel jobs on
+  the workcenter if <code>parallel_jobs &gt; 1</code>. SB-CNC-BORE is sequential
+  (parallel_jobs=1); only one card should be open. If two are open,
+  close the lower-priority one.</li>
+<li><strong>Backup machine (CNC02) shows different programs</strong> — that's expected;
+  CNC02 doesn't have the boring head; cabinets needing 35mm hinge bores
+  must run on SB-CNC-BORE.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 1 lesson 1.3 <em>CNC Router Operator</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_floor_edgebanding_daily" model="slide.slide">
+            <field name="name">Floor — Edge Banding Daily Flow</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">190</field>
+            <field name="description">Edge banding operator on SB-EDGE (HOMAG).</field>
+            <field name="html_content"><![CDATA[<h1 id="floor-edge-banding-daily-flow">Floor — Edge Banding Daily Flow</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You're standing in front of the HOMAG edge bander. Cut panels are arriving
+from CNC. You need to know which panels need which tape.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Floor Workspace → Workcenter Kanban → SB-EDGE</strong></p>
+<h2 id="your-4-step-loop">Your 4-step loop</h2>
+<ol>
+<li><strong>Read the edge map.</strong> Each card shows a small graphic — the cabinet's
+   panel with arrows indicating which edges need tape and what tape SKU.</li>
+<li><strong>Load the correct tape spool.</strong> Tape SKU shows on the card (e.g. <em>PVC
+   White 22×1mm</em>); confirm against the spool barcode.</li>
+<li><strong>Run the panels.</strong> Feed them through with the tape edge aligned.</li>
+<li><strong>Tap <em>Done</em>.</strong> Same flow as cutting (lesson 17.18); duration logged.</li>
+</ol>
+<h2 id="what-the-edge-map-fields-mean">What the edge map fields mean</h2>
+<ul>
+<li><strong>Top / Bottom / Left / Right</strong> — which edges get tape</li>
+<li><strong>Tape SKU</strong> — exact code; mismatches show on the kanban as warnings</li>
+<li><strong>Profile</strong> — straight, radius, bevel</li>
+<li><strong>Glue temp</strong> — set on the HOMAG; outside the system but called out on
+  the card for double-check</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Edge map says "Top + Left" but panel needs "Top + Right"</strong> — DON'T
+  band; tap <em>Hold → Edge map error</em>. Designer gets pinged. The edge map
+  is derived from the cut spec + cabinet's <code>hinge_side</code> attribute.</li>
+<li><strong>Tape SKU not available</strong> — <em>Hold → Material missing</em>. Posts to
+  warehouse + auto-creates a PO request if stock is below reorder.</li>
+<li><strong>Glue line visible after banding</strong> — quality issue. Open an inline NCR
+  (lesson 17.23) so you don't ship it downstream.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 1 lesson 1.2 <em>Edge Banding Operator — Your Daily Flow</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_floor_hardware_daily" model="slide.slide">
+            <field name="name">Floor — Hardware Lookup and Install</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">210</field>
+            <field name="description">Assembler or hardware-station operator.</field>
+            <field name="html_content"><![CDATA[<h1 id="floor-hardware-lookup-and-install">Floor — Hardware Lookup and Install</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You're mid-assembly and you need to verify the right hinge / handle /
+slide for the cabinet you're working on, or you don't recognise a SKU on
+the kit list.</p>
+<h2 id="where-the-catalog-lives">Where the catalog lives</h2>
+<p><strong>Inventory → Hardware Catalog</strong> (menu in <code>southbrook_hardware_catalog</code>).</p>
+<p>Read-only for floor users; search by:</p>
+<ul>
+<li>SKU (e.g. <em>MRTHN-H120-NS-SC</em>)</li>
+<li>Brand (Marathon, Blum, Hettich)</li>
+<li>Type (hinge, handle, slide, slide, leg, accessory)</li>
+</ul>
+<h2 id="reading-a-catalog-entry">Reading a catalog entry</h2>
+<ul>
+<li><strong>SKU code</strong> — exact part number</li>
+<li><strong>Brand + product line</strong> — Marathon Concealed 120° Soft-Close Negro</li>
+<li><strong>Spec PDF</strong> — vendor's installation sheet (PDF attachment)</li>
+<li><strong>Default install pattern</strong> — text + image showing the standard mount</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>SKU on kit list doesn't exist in catalog</strong> — the kit was assembled
+  before catalog import caught up. <em>Hold → Material mismatch</em>; CS gets
+  pinged.</li>
+<li><strong>Old vs new hinge generation</strong> — Marathon SKUs change subtly across
+  generations. If the kit lists <em>…-NS-SC</em> but you've got <em>…-NSS-SC</em>,
+  ask before installing.</li>
+<li><strong>No spec PDF attached</strong> — fall back to vendor website. Catalog v1.1
+  will re-import all PDFs.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 5 lesson 5.3 <em>Hardware Catalog</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_floor_finishing_daily" model="slide.slide">
+            <field name="name">Floor — Sanding and Finishing Daily Flow</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">220</field>
+            <field name="description">Sander or finisher on SAND, PAINT, or CURE stations.</field>
+            <field name="html_content"><![CDATA[<h1 id="floor-sanding-and-finishing-daily-flow">Floor — Sanding and Finishing Daily Flow</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You're at the finishing line. Cabinets are arriving for sand → paint →
+cure (three separate stations, not one) per <code>southbrook_mrp_pm</code>.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Floor Workspace → Workcenter Kanban</strong> then pick:</p>
+<ul>
+<li><strong>SAND</strong> — manual sanding station</li>
+<li><strong>PAINT</strong> — spray booth</li>
+<li><strong>CURE</strong> — drying / curing rack with thermal cycle</li>
+</ul>
+<p>Each station has its own kanban; you only see the one you're rostered to.</p>
+<h2 id="your-loop-varies-by-station">Your loop (varies by station)</h2>
+<h3 id="sand">SAND</h3>
+<ol>
+<li>Pick the top cabinet card</li>
+<li>Verify the finish spec — grit progression, prep notes</li>
+<li>Sand to spec</li>
+<li>Tap <em>Done</em> → moves to PAINT queue</li>
+</ol>
+<h3 id="paint">PAINT</h3>
+<ol>
+<li>Verify the finish code on the card (must match the
+   <code>southbrook_estimating</code> configurator selection)</li>
+<li>Mix / load the right colour</li>
+<li>Spray per the standard</li>
+<li>Tap <em>Done</em> → moves to CURE queue</li>
+</ol>
+<h3 id="cure">CURE</h3>
+<ol>
+<li>Load into the rack with the cabinet's <code>cure_cycle_min</code> from the card</li>
+<li>Run the timer</li>
+<li>Tap <em>Done</em> when timer + spec match</li>
+</ol>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Finish code on card doesn't match the colour can you have</strong> — the
+  cabinet may be using a custom finish. Verify against the Spec Sheet
+  PDF on the MO. If still mismatched, <em>Hold → Finish discrepancy</em>.</li>
+<li><strong>Cabinet bypasses SAND</strong> — some white-thermofoil-slab cabinets
+  (Contractor series) skip sanding. Card will not appear in SAND queue.</li>
+<li><strong>CURE timer interrupted</strong> — restart the cycle; do NOT tap Done early.
+  The MI engine watches for short cycles and will flag.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 1 lesson 1.5 <em>Sander / Finisher — Your Daily Flow</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_floor_qc_inline_flag_defect" model="slide.slide">
+            <field name="name">Floor — Flag an Inline Defect and Open an NCR</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">230</field>
+            <field name="description">Any floor operator catching a defect mid-build.</field>
+            <field name="html_content"><![CDATA[<h1 id="floor-flag-an-inline-defect-and-open-an-ncr">Floor — Flag an Inline Defect and Open an NCR</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You catch a defect (chipped panel, wrong colour, mis-cut, scratch) DURING
+your station's work. You need to stop the cabinet from progressing AND
+get the quality team a record.</p>
+<h2 id="the-3-tap-flow">The 3-tap flow</h2>
+<ol>
+<li><strong>On the work order card → <em>Hold → Inline NCR</em>.</strong> This is the
+   workcenter-side button (faster than navigating to the Quality menu).</li>
+<li><strong>Fill the wizard:</strong>
+   - Defect type (<code>defect_type</code>): dimension, finish, hardware, material,
+     handling
+   - Severity (<code>severity</code>): minor, major, critical
+   - One-sentence description + photo if you can grab one</li>
+<li><strong>Submit.</strong> Creates a <code>southbrook.ncr</code> record auto-linked to the
+   <code>mrp.production</code> + <code>product.product</code>. Cabinet status → quarantine on
+   the kanban (red border).</li>
+</ol>
+<h2 id="what-happens-next">What happens next</h2>
+<ul>
+<li>The cabinet stops moving down the line until quality clears it</li>
+<li>Quality manager gets a notification (Course 3 deep dive)</li>
+<li>If severity = critical, the MI engine pages the Plant GM</li>
+<li>An ECO may follow if the defect points at a design issue</li>
+</ul>
+<h2 id="why-stop-the-line-is-the-right-move">Why "stop the line" is the right move</h2>
+<p>A defect that escapes the floor costs ~10x to fix at install. The
+platform is intentionally biased toward catching it now — the kanban
+turning red is by design, not a "you broke something" signal.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Inline NCR button greyed out</strong> — your role's group doesn't include
+  <em>Southbrook Quality / User</em>. Ask your supervisor.</li>
+<li><strong>NCR submitted but cabinet keeps moving</strong> — the kanban relies on the
+  <code>mrp.workorder.state</code>; if you tapped <em>Done</em> before <em>Hold → Inline
+  NCR</em>, the cabinet already moved. Manual recovery from the NCR
+  form's <em>Block downstream WOs</em> button.</li>
+<li><strong>Photo upload fails</strong> — attach later from the NCR record. Don't let
+  it block the submit.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 1 lesson 1.6 <em>Logging Downtime</em> (companion flow)
+→ Course 6 <em>Customer Touchpoints</em> (when NCRs escalate to customer)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_maintenance_ack_breakdown" model="slide.slide">
+            <field name="name">Maintenance — Acknowledge a Breakdown Alert</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">240</field>
+            <field name="description">Maintenance technician on call.</field>
+            <field name="html_content"><![CDATA[<h1 id="maintenance-acknowledge-a-breakdown-alert">Maintenance — Acknowledge a Breakdown Alert</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A floor operator (lesson 17.18 etc.) tagged an equipment alarm. An entry
+landed in your queue. This is the 2-minute first-response flow.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>CMMS → Breakdown Alerts</strong> (<code>menu_southbrook_cmms_breakdown_alert</code>).</p>
+<p>Default view is kanban grouped by state: <code>open → dispatched → fixed</code>.</p>
+<h2 id="the-3-step-ack">The 3-step ack</h2>
+<ol>
+<li><strong>Open the top alert.</strong> Read <code>equipment_id</code>, <code>workcenter_id</code>,
+   <code>severity</code>, <code>description</code>, who reported it (<code>reported_by</code>,
+   <code>reported_at</code>).</li>
+<li><strong>Click <em>Dispatch Maintenance</em>.</strong> State → <code>dispatched</code>. Auto-creates a
+   linked <code>maintenance.request</code> so native Odoo Maintenance can track the
+   work order time.</li>
+<li><strong>Walk to the machine.</strong> The native maintenance request is now your
+   work order — log parts used + duration there. The breakdown alert
+   stays in <code>dispatched</code> until you close it (lesson 17.26).</li>
+</ol>
+<h2 id="what-block-affected-mos-does">What <em>Block Affected MOs</em> does</h2>
+<p>Optional second button. Click it if you don't want production to keep
+sending cabinets to the broken workcenter while you fix it. It auto-
+blocks every active MO with a work order targeting <code>workcenter_id</code>.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Two alerts open for the same equipment</strong> — that's allowed but messy.
+  Close the duplicate; reference it in the chatter of the live one.</li>
+<li><strong>Equipment not in the dropdown</strong> — <code>maintenance.equipment</code> master is
+  missing this asset. Ask sysadmin to add it before continuing; for now,
+  pick <em>Other</em> and describe in the text field.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 12 lesson 12.4 <em>Production Release Queue</em> (downstream impact)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_maintenance_dispatch_request" model="slide.slide">
+            <field name="name">Maintenance — Dispatch a Preventive Maintenance Request</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">250</field>
+            <field name="description">Maintenance lead doing weekly PM planning.</field>
+            <field name="html_content"><![CDATA[<h1 id="maintenance-dispatch-a-preventive-maintenance-request">Maintenance — Dispatch a Preventive Maintenance Request</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Weekly: you decide which preventive maintenance (PM) jobs to dispatch in
+the coming week. Distinct from breakdown response — this is planned work,
+not reactive.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Maintenance → Maintenance Requests</strong> (native Odoo) AND <strong>CMMS → Service
+Contracts</strong> (Southbrook layer for vendor-managed equipment).</p>
+<h2 id="the-4-step-flow">The 4-step flow</h2>
+<ol>
+<li><strong>List view, filter by <code>request_date</code> next 7 days + <code>maintenance_type =
+   preventive</code>.</strong></li>
+<li><strong>Review each request.</strong> Verify the part inventory you'll need is on
+   hand (linked through <code>maintenance.equipment.spare_part_ids</code>).</li>
+<li><strong>Assign + schedule.</strong> Pick a technician (<code>user_id</code>) and set the
+   <code>schedule_date</code>. The MI engine will flag conflicts with active MOs on
+   that equipment.</li>
+<li><strong>Dispatch.</strong> Action → <em>Dispatch</em>. State → <code>in_progress</code>; technician
+   gets a notification.</li>
+</ol>
+<h2 id="coordinating-with-production">Coordinating with production</h2>
+<p>A PM that takes a workcenter offline for 4 hours should be visible to the
+production planner. After dispatch, <em>Kitchen Ops → Workcenter Bottleneck</em>
+will show the planned downtime as a darker band — planner sees this and
+schedules around it.</p>
+<h2 id="service-contract-vs-in-house">Service contract vs in-house</h2>
+<p>If the equipment has an active <code>southbrook.cmms.service_contract</code>, the
+vendor's tech handles it. Your job is to coordinate the visit. Otherwise,
+in-house tech does the work.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Schedule conflicts with a customer's promise date</strong> — escalate to
+  Plant GM before dispatching. The PM can usually slip a day or two.</li>
+<li><strong>Spare part inventory short</strong> — <em>Hold → Parts</em>. Auto-creates a PO
+  request to the vendor on the equipment master.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 12 lesson 12.6 <em>MI Engine Observability</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_maintenance_close_breakdown" model="slide.slide">
+            <field name="name">Maintenance — Close a Breakdown and Capture Downtime</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">260</field>
+            <field name="description">Maintenance technician returning from a fix.</field>
+            <field name="html_content"><![CDATA[<h1 id="maintenance-close-a-breakdown-and-capture-downtime">Maintenance — Close a Breakdown and Capture Downtime</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You've fixed the machine. You need to close the breakdown alert + log the
+downtime so MTBF / MTTR (lesson 17.27) compute correctly.</p>
+<h2 id="the-4-step-close">The 4-step close</h2>
+<ol>
+<li><strong>CMMS → Breakdown Alerts</strong>, find your dispatched alert.</li>
+<li><strong>Click <em>Mark Fixed</em></strong> at the top. Wizard asks for:
+   - <code>total_downtime_min</code> — when the equipment came back online
+   - <code>root_cause</code> — free text (or pick from common list)
+   - <code>parts_used</code> — m2m to inventory</li>
+<li><strong>Submit.</strong> State → <code>fixed</code>. The auto-linked
+   <code>maintenance.request</code> also closes with the same data.</li>
+<li><strong>Unblock affected MOs</strong> (if you used <em>Block Affected MOs</em> earlier).
+   The MO unblock is on the alert form's secondary action menu.</li>
+</ol>
+<h2 id="why-downtime-accuracy-matters">Why downtime accuracy matters</h2>
+<ul>
+<li>MTBF (lesson 17.27) = (period_runtime - total_downtime) / breakdown_count</li>
+<li>MTTR = sum(total_downtime) / breakdown_count</li>
+<li>Under-reporting downtime makes the equipment look better than it is;
+  over-reporting makes you look slow to fix</li>
+<li>These numbers drive PM schedule decisions and capex justifications</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Downtime field blank</strong> — close is rejected. Estimate honestly; you
+  can edit later if the audit pass catches an issue.</li>
+<li><strong>Forgot to log parts</strong> — open the linked <code>maintenance.request</code> and
+  edit. Parts-used drives the spare-stock auto-reorder.</li>
+<li><strong>Same equipment broke again 2 hours later</strong> — open a NEW alert; don't
+  reopen the closed one. MTBF math depends on distinct events.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 12 lesson 12.6 <em>MI Engine Observability</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_maintenance_view_mtbf_mttr" model="slide.slide">
+            <field name="name">Maintenance — View MTBF/MTTR for an Asset</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">270</field>
+            <field name="description">Maintenance lead or Plant GM checking equipment health.</field>
+            <field name="html_content"><![CDATA[<h1 id="maintenance-view-mtbfmttr-for-an-asset">Maintenance — View MTBF/MTTR for an Asset</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Monthly or before a capex review. You want to know which assets are
+costing you in unplanned downtime.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>CMMS → MTBF/MTTR Reports</strong> (<code>menu_southbrook_cmms_mtbf_mttr_report</code>).</p>
+<h2 id="reading-the-list">Reading the list</h2>
+<p>Decorations on the list view (per
+<code>addons/southbrook_cmms_wms/views/mtbf_mttr_report_views.xml</code>):
+- <strong>Green</strong> — <code>availability_pct ≥ 95%</code> — healthy
+- <strong>Amber</strong> — <code>80% ≤ availability_pct &lt; 95%</code> — watch
+- <strong>Red</strong> — <code>availability_pct &lt; 80%</code> — investigate</p>
+<p>Key columns:
+- <code>mtbf_hours</code> — mean time between failures (higher = better)
+- <code>mttr_hours</code> — mean time to repair (lower = better)
+- <code>period_days</code> — over what window the math runs (default 90)</p>
+<h2 id="generate-a-fresh-report">Generate a fresh report</h2>
+<p>Form view → <em>Recompute</em> button. Runs the calc over the period for the
+selected equipment. Bulk: list view multi-select + Action → Recompute.</p>
+<h2 id="graph-view">Graph view</h2>
+<p>Bar chart of MTBF by equipment. Quickly spots the worst offender.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>MTBF shows 0</strong> — no closed breakdowns in the period, OR breakdowns
+  weren't logged with downtime (lesson 17.26 gotcha). Spot-check the
+  count column.</li>
+<li><strong>Availability ≥ 100%</strong> — a fluke in the math when downtime was over-
+  reported. Audit the recent close-outs.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 12 lesson 12.6 <em>MI Engine Observability</em></p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_quality_open_ncr" model="slide.slide">
+            <field name="name">Quality — Open an NCR Linked to a Specific MO</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">280</field>
+            <field name="description">QC inspector or quality manager.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-open-an-ncr-linked-to-a-specific-mo">Quality — Open an NCR Linked to a Specific MO</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Inline NCRs (lesson 17.23) come from the floor. Sometimes you need to
+open one yourself — from a post-build inspection, a returned cabinet, or a
+customer complaint.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Quality → NCRs</strong> (<code>menu_southbrook_quality_ncr</code>).</p>
+<h2 id="the-4-field-minimum">The 4-field minimum</h2>
+<ol>
+<li><strong><code>production_id</code></strong> — the MO this NCR points at. Search by MO ref.</li>
+<li><strong><code>product_id</code></strong> — auto-fills from the MO usually; verify it points at
+   the cabinet, not a component.</li>
+<li><strong><code>defect_type</code></strong> — dimension / finish / hardware / material / handling</li>
+<li><strong><code>severity</code></strong> — minor / major / critical</li>
+</ol>
+<p>Description + photos go in the body. Activity assignment routes to the
+quality manager (<code>group_southbrook_quality_manager</code>).</p>
+<h2 id="state-flow">State flow</h2>
+<p><code>draft → quarantine → rework / scrap / accept</code></p>
+<ul>
+<li><strong>quarantine</strong> — cabinet is held, downstream WOs blocked</li>
+<li><strong>rework</strong> — back to a relevant station to fix; original NCR stays
+  open until the rework signs off</li>
+<li><strong>scrap</strong> — log the loss; cabinet re-MO'd; cost rolls to scrap account</li>
+<li><strong>accept</strong> — Quality manager decision; downstream WOs resume</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Can't find the MO</strong> — it may have been moved to history. Toggle the
+  <em>Show Done MOs</em> filter in the search bar.</li>
+<li><strong>NCR linked to wrong product variant</strong> — easy mistake on cabinets with
+  variant attributes. Use <em>Open Variant Picker</em> on the form to swap.</li>
+<li><strong>NCR doesn't show on the SO chatter</strong> — there's no auto-link
+  from NCR to SO; trace via MO → SO origin manually.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Memory <code>southbrook_quality</code> module deep-dive (to be authored as Course
+18 in the next wave)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_quality_update_spc" model="slide.slide">
+            <field name="name">Quality — Update an SPC Chart with a New Sample</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">290</field>
+            <field name="description">QC inspector running SPC sampling.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-update-an-spc-chart-with-a-new-sample">Quality — Update an SPC Chart with a New Sample</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You're running Statistical Process Control sampling on a workcenter (e.g.
+panel thickness on SB-CNC-BORE every 50 cuts). This is the
+sample-entry tutorial.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Quality → SPC</strong> (<code>menu_southbrook_quality_spc</code>).</p>
+<h2 id="the-3-step-entry">The 3-step entry</h2>
+<ol>
+<li><strong>Pick the dimension being measured.</strong> <code>quality.dimension</code> master record
+   carries the spec (nominal, USL, LSL). New dimensions are seeded by the
+   quality manager.</li>
+<li><strong>New sample.</strong> <em>New</em> on the SPC view. Fields:
+   - <code>dimension_id</code> — the spec
+   - <code>workcenter_id</code> — where measured
+   - <code>measured_value</code> — your reading
+   - <code>sample_size</code> — usually 5 or 10
+   - <code>taken_at</code> — auto-stamps; only override if backfilling</li>
+<li><strong>Save.</strong> The chart auto-updates. If the new point breaches a control
+   limit, the cabinet's work order kanban surfaces an alert.</li>
+</ol>
+<h2 id="reading-the-chart">Reading the chart</h2>
+<ul>
+<li><strong>Centre line</strong> — historical mean</li>
+<li><strong>UCL / LCL</strong> — upper / lower control limits (3σ)</li>
+<li><strong>USL / LSL</strong> — engineering spec (much wider)</li>
+</ul>
+<p>When a point goes outside UCL/LCL but inside USL/LSL, the process is
+drifting — investigate causes BEFORE the spec is breached.</p>
+<h2 id="when-the-process-is-out-of-control">When the process is out of control</h2>
+<ul>
+<li>File an NCR linked to the affected MO(s) (lesson 17.28)</li>
+<li>Notify maintenance if the cause looks mechanical</li>
+<li>Quality manager decides whether to halt the workcenter</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Sample saved but chart didn't update</strong> — there's a server-side delay
+  of up to 60 seconds; refresh.</li>
+<li><strong>No dimension master for what I'm measuring</strong> — coordinate with the
+  quality manager to add it; don't fudge to a similar dimension.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 18 (Quality Module — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_quality_run_cpk" model="slide.slide">
+            <field name="name">Quality — Run a Cpk Calculation on a Feature</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">310</field>
+            <field name="description">Quality manager doing capability analysis.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-run-a-cpk-calculation-on-a-feature">Quality — Run a Cpk Calculation on a Feature</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You have enough SPC samples (lesson 17.29) on a specific dimension to ask
+"is this process capable?" Cpk tells you yes / no with one number.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Quality → Cpk</strong> (<code>menu_southbrook_quality_cpk</code>).</p>
+<h2 id="the-2-step-flow">The 2-step flow</h2>
+<ol>
+<li><strong>New Cpk Report.</strong> Pick the <code>dimension_id</code>. The report pulls all
+   <code>southbrook.quality.spc_sample</code> rows for that dimension over the past
+   <code>period_days</code> (default 30).</li>
+<li><strong>Click <em>Compute</em>.</strong> Returns:
+   - <code>mean</code> — sample mean
+   - <code>stdev</code> — sample standard deviation
+   - <code>cp</code> — process capability (USL - LSL) / 6σ
+   - <code>cpk</code> — process capability index, min((USL-mean)/3σ, (mean-LSL)/3σ)</li>
+</ol>
+<h2 id="reading-cpk">Reading Cpk</h2>
+<ul>
+<li><strong>Cpk &lt; 1.0</strong> — process is producing some out-of-spec parts; not
+  capable</li>
+<li><strong>1.0 ≤ Cpk &lt; 1.33</strong> — marginal; consider tightening</li>
+<li><strong>1.33 ≤ Cpk &lt; 1.67</strong> — capable</li>
+<li><strong>Cpk ≥ 1.67</strong> — six-sigma capable; the gold standard</li>
+</ul>
+<p>If Cpk says "not capable" but you're not seeing scrap, your spec might be
+wider than reality. Verify USL/LSL with engineering before declaring a
+process problem.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Cpk is negative</strong> — process mean is outside the spec entirely.
+  Re-check the dimension master before assuming the worst.</li>
+<li><strong>Cpk says capable but you're getting scrap</strong> — drift may be occurring
+  within the period. Look at SPC chart for shifts.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 18 (Quality Module — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_finance_monthly_close" model="slide.slide">
+            <field name="name">Finance — Run the Monthly Close</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">320</field>
+            <field name="description">Controller doing the month-end close.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-run-the-monthly-close">Finance — Run the Monthly Close</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>The 1st-of-the-month ritual. Closes the books for the prior month so
+financial statements can be generated.</p>
+<h2 id="the-7-step-southbrook-close">The 7-step Southbrook close</h2>
+<p>Native Odoo handles steps 1-4; Southbrook layers add 5-7.</p>
+<ol>
+<li><strong>Reconcile bank statements.</strong> <em>Accounting → Bank → Reconcile</em>. Every
+   unreconciled line cleared.</li>
+<li><strong>Reconcile AR + AP.</strong> <em>Accounting → Customers / Vendors → Reconciliation</em>.</li>
+<li><strong>Close inventory variances.</strong> <em>Inventory → Operations → Inventory
+   Adjustments → Validate</em>. Posts COGS journal entries.</li>
+<li><strong>Run depreciation.</strong> <em>Accounting → Operations → Depreciation</em> (native
+   asset model) and <strong>Finance → Asset Register</strong> for the
+   Southbrook CCA pack (lesson 17.34).</li>
+<li><strong>Reconcile WIP.</strong> <em>Finance → WIP Report</em>. The
+   <code>southbrook_finance_pack</code> view rolls open MOs by cost; reconcile the
+   total against GL WIP account.</li>
+<li><strong>HST filing prep.</strong> <em>Finance → HST Return</em> (lesson 17.33).</li>
+<li><strong>Lock the period.</strong> <em>Accounting → Configuration → Fiscal Years</em> →
+   close the month.</li>
+</ol>
+<h2 id="what-to-check-before-locking">What to check before locking</h2>
+<ul>
+<li>All journals posted (no drafts)</li>
+<li>WIP balance matches Finance Pack report ± $1</li>
+<li>HST input + output reconcile to the period's tax journal</li>
+<li>No NCRs in <code>scrap</code> state without a scrap journal entry</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>WIP off by more than $1</strong> — usually an open MO with a backdated
+  consumption. Open <em>Finance → WIP Report</em> and drill to the offending
+  MO.</li>
+<li><strong>Depreciation doubled</strong> — Native + Finance Pack both ran. The pack
+  is supposed to skip native-tracked assets; cross-check by asset_id.</li>
+<li><strong>Tax journal mismatch</strong> — usually a credit note posted to the wrong
+  period. Re-open period, fix, re-close.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 19 (Finance Pack — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_finance_reconcile_hst" model="slide.slide">
+            <field name="name">Finance — Reconcile HST Input and Output</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">330</field>
+            <field name="description">Controller filing HST.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-reconcile-hst-input-and-output">Finance — Reconcile HST Input and Output</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Quarterly (or monthly if your filing frequency is monthly). Canada CRA
+filing — you owe HST collected minus HST paid.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Finance → HST Return</strong> (<code>menu_finance_hst_return</code>).</p>
+<h2 id="the-4-step-flow">The 4-step flow</h2>
+<ol>
+<li><strong>New HST Return.</strong> Pick <code>period_start</code> + <code>period_end</code>. Click <em>Pull</em>.
+   The <code>southbrook.hst.return</code> record auto-fills from <code>account.move.line</code>
+   filtered to the HST tax accounts.</li>
+<li><strong>Review the breakdown.</strong> Three sections:
+   - Output HST (collected from customers)
+   - Input HST (paid to suppliers, recoverable)
+   - Net (output - input = remit to CRA)</li>
+<li><strong>Spot-check the top 5 input + 5 output lines.</strong> Common errors:
+   personal expense charged to corporate, supplier missing HST registration
+   number.</li>
+<li><strong>Submit.</strong> Locks the return + posts the remittance journal entry to
+   <em>HST Payable</em>.</li>
+</ol>
+<h2 id="what-gets-filed-where">What gets filed where</h2>
+<p>The platform does NOT auto-file to CRA — you submit through CRA's
+business portal manually. The Southbrook return gives you:</p>
+<ul>
+<li>The exact dollar amounts to type in</li>
+<li>The breakdown for the supporting documentation</li>
+<li>Audit-trail link from each amount to source journal lines</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Input HST higher than expected</strong> — check for capital asset purchases
+  that should have been split between current and capital input tax
+  credits.</li>
+<li><strong>Output HST doesn't match POS</strong> — Big-box channel sometimes
+  reverse-charges; verify those invoices separately.</li>
+<li><strong>Period covers a rate change</strong> — January 2027 ON rate change applied
+  prospectively; mid-period invoices may use both rates.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 19 (Finance Pack — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_finance_add_asset_cca" model="slide.slide">
+            <field name="name">Finance — Add an Asset and Compute CCA</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">340</field>
+            <field name="description">Controller registering a new capital asset.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-add-an-asset-and-compute-cca">Finance — Add an Asset and Compute CCA</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>You bought a piece of equipment, software, or vehicle. CCA (Capital Cost
+Allowance) is the Canadian tax depreciation method; the asset register
+tracks it for the T2 return.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Finance → Asset Register</strong> (<code>menu_finance_asset</code>).</p>
+<h2 id="the-5-field-minimum">The 5-field minimum</h2>
+<ol>
+<li><strong><code>name</code></strong> — descriptive (e.g. "HOMAG Edge Bander, replaced 2026")</li>
+<li><strong><code>purchase_date</code></strong> — when the asset was acquired</li>
+<li><strong><code>original_cost</code></strong> — pre-tax cost</li>
+<li><strong><code>cca_class_id</code></strong> — pick from <code>southbrook.finance.cca_class</code>. Common:
+   Class 8 (general equipment, 20%), Class 10 (motor vehicles, 30%),
+   Class 12 (small tools, 100%), Class 50 (computers, 55%).</li>
+<li><strong><code>linked_journal_id</code></strong> — the GL journal where the purchase was booked</li>
+</ol>
+<h2 id="the-half-year-rule">The half-year rule</h2>
+<p>CRA applies the <em>half-year rule</em> to year-of-acquisition depreciation.
+The Southbrook compute logic respects this automatically; you don't need
+to halve the rate manually.</p>
+<h2 id="annual-compute">Annual compute</h2>
+<p>At year-end (or whenever), open the asset → <em>Compute CCA</em> button. Adds a
+<code>southbrook.finance.cca_entry</code> for the year:
+- <code>undepreciated_balance</code> (UCC) at start
+- <code>cca_claimed</code> this year
+- <code>closing_ucc</code></p>
+<p>These roll forward to next year's compute automatically.</p>
+<h2 id="disposal">Disposal</h2>
+<p>When you sell or scrap an asset, open the asset → <em>Dispose</em>. Wizard asks
+for proceeds + disposal date. Recapture / terminal loss math runs
+automatically; journal entry posts to <em>Gain on Disposal</em> or <em>Loss on
+Disposal</em>.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Original cost includes HST</strong> — wrong. CCA base is pre-tax cost; HST
+  is recovered separately as input tax credit.</li>
+<li><strong>Wrong CCA class</strong> — common with cabinet-shop equipment. CNC routers
+  are Class 53 (manufacturing &amp; processing, 50%) NOT Class 8. Verify with
+  your accountant before computing.</li>
+<li><strong>Compute ran but UCC didn't update</strong> — recompute is idempotent within
+  a year; running twice for the same year doesn't double-count.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 19 (Finance Pack — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_finance_review_wip" model="slide.slide">
+            <field name="name">Finance — Review WIP Before Close</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">350</field>
+            <field name="description">Controller doing month-end WIP reconciliation.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-review-wip-before-close">Finance — Review WIP Before Close</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Step 5 of the monthly close (lesson 17.32). Your GL has a WIP balance;
+the operational reality is "these MOs are in progress." This lesson
+reconciles them.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Finance → WIP Report</strong> (<code>menu_finance_wip_report</code>).</p>
+<h2 id="what-the-report-shows">What the report shows</h2>
+<p>Rolls every MO with state <code>progress</code> or <code>confirmed</code> by:
+- <code>mo_ref</code>, <code>product</code>, <code>cost_so_far</code>
+- <code>cost_to_complete</code>
+- <code>wip_value = cost_so_far</code></p>
+<p>Group by <code>responsible_team</code> to see where the WIP lives (Cutting, Edge,
+Assembly, Finishing).</p>
+<h2 id="the-reconciliation">The reconciliation</h2>
+<ul>
+<li><strong>WIP report total</strong> = sum of all open MO costs</li>
+<li><strong>GL WIP account balance</strong> = closing balance of <code>211000-WIP</code> (or your
+  chart's equivalent)</li>
+<li><strong>Variance</strong> = report - GL</li>
+</ul>
+<p>If variance &gt; $1, investigate:</p>
+<ul>
+<li>An MO marked <code>done</code> but consumption not posted → GL says lower than
+  report</li>
+<li>An MO with backdated consumption → GL says higher than report</li>
+<li>A scrapped cabinet not journalled → either direction depending on which
+  side did the cleanup</li>
+</ul>
+<h2 id="drilling-into-a-variance">Drilling into a variance</h2>
+<p>Click into the suspect MO from the report. The cost breakdown shows:
+- Material consumed (from <code>stock.move</code>)
+- Labour applied (from <code>mrp.workorder.duration_done</code>)
+- Overhead (from <code>mrp.workcenter.cost_per_hour</code> × duration)</p>
+<p>Cross-check each against the GL journal entries on the MO.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Variance equals exactly one MO's cost</strong> — that MO either completed
+  on the last day of the period and didn't get journalled, or vice versa.</li>
+<li><strong>WIP report is empty but MOs are open</strong> — the <code>state</code> filter excludes
+  drafts. Drafts shouldn't have WIP value either, so that's correct.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 19 (Finance Pack — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_payroll_run_biweekly" model="slide.slide">
+            <field name="name">Payroll — Run the Bi-Weekly Payroll</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">360</field>
+            <field name="description">Payroll administrator.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-run-the-bi-weekly-payroll">Payroll — Run the Bi-Weekly Payroll</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Every other Friday. The bi-weekly cycle is the spine of Canadian payroll.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Payroll → Payroll Runs</strong> (<code>menu_southbrook_payroll_runs</code>).</p>
+<h2 id="the-6-step-cycle">The 6-step cycle</h2>
+<ol>
+<li><strong>Verify timesheets.</strong> <em>Timesheets → Approve</em> — supervisors should
+   have signed off by Thursday EOD. Reject any draft sheets back to
+   employees with a note.</li>
+<li><strong>New Payroll Run.</strong> Pick <code>period_start</code> + <code>period_end</code> (Sunday to
+   Saturday usually). Pick <code>pay_date</code> (the following Friday).</li>
+<li><strong>Pull employees.</strong> <em>Pull</em> button auto-populates with all active
+   employees on a bi-weekly contract.</li>
+<li><strong>Generate payslips.</strong> <em>Compute</em>. For each employee:
+   - Gross from timesheet hours × <code>hourly_rate</code>
+   - CPP, EI, Income Tax deductions per CRA 2026 brackets
+     (<code>southbrook.payroll.tax_bracket</code>)
+   - Benefits + RRSP if set on <code>hr.contract</code>
+   - Net pay</li>
+<li><strong>Spot-check 3 slips.</strong> Pick a hourly employee, a salaried employee,
+   and someone with a recent change (raise, deduction). Verify numbers.</li>
+<li><strong>Lock + post.</strong> <em>Approve</em> on the run. Slips go to employees via the
+   portal; the GL journal entry posts to expense + payable.</li>
+</ol>
+<h2 id="direct-deposit">Direct deposit</h2>
+<p>After approval, <em>Generate EFT File</em>. Downloads an <code>.aba</code> file (RBC,
+TD, BMO bank format) for upload to your business banking portal. The
+platform doesn't push to the bank directly.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>CPP or EI cap reached mid-period</strong> — payslip will show partial
+  deductions. The <code>southbrook_payroll_ca</code> engine handles this; don't
+  override manually.</li>
+<li><strong>New hire on first pay</strong> — verify <code>hr.employee.tax_credit_amount</code> is
+  set (TD1 form data); otherwise income tax over-withholds.</li>
+<li><strong>Holiday in the period</strong> — <em>Compute</em> won't auto-add stat holiday pay
+  for hourly employees. Enter via <em>Earnings → Other → Holiday Pay</em>.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 20 (Payroll CA — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_payroll_add_employee" model="slide.slide">
+            <field name="name">Payroll — Add a New Employee with Canadian Tax Setup</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">370</field>
+            <field name="description">Payroll administrator onboarding a new hire.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-add-a-new-employee-with-canadian-tax-setup">Payroll — Add a New Employee with Canadian Tax Setup</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>New hire's first day. Get them into payroll before the cutoff so they
+appear on the next bi-weekly run.</p>
+<h2 id="the-3-record-setup">The 3-record setup</h2>
+<ol>
+<li><strong><code>hr.employee</code></strong> — name, SIN (encrypted), address, hire date,
+   department, manager. <em>Employees → New</em>.</li>
+<li><strong><code>hr.contract</code></strong> — wage, pay frequency (bi-weekly), benefits,
+   start_date. From the employee form: <em>Contracts → New</em>.</li>
+<li><strong>TD1 federal + provincial</strong> — the new hire fills these out on
+   paper / portal; you enter the totals on the contract's <em>Tax</em> tab:
+   - <code>td1_federal_amount</code>
+   - <code>td1_provincial_amount</code></li>
+</ol>
+<h2 id="bank-info">Bank info</h2>
+<p>For direct deposit, <em>Employee → Private Information → Banking</em>. Bank,
+transit, account. Pre-validated by the payroll run before EFT file
+generation.</p>
+<h2 id="activate">Activate</h2>
+<p>On the contract: <em>Run</em> → state <code>running</code>. Employee now appears in the
+next payroll run pull.</p>
+<h2 id="probationary-period">Probationary period</h2>
+<p>If you set <code>is_probation = True</code>, the platform tracks the 90-day window
+and auto-pings the manager before it ends.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>SIN starts with 9</strong> — that's a temporary SIN (work permit). Set
+  <code>tax_residency = 'non_resident'</code> if applicable; CRA withholdings
+  differ.</li>
+<li><strong>Tax credit amount left at default</strong> — they'll over-withhold income
+  tax all year; refund comes at filing time. Always enter from TD1.</li>
+<li><strong>Employee added but missing from payroll run</strong> — contract state was
+  left at <code>draft</code>. Activate.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 20 (Payroll CA — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_payroll_issue_roe" model="slide.slide">
+            <field name="name">Payroll — Issue a Record of Employment</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">380</field>
+            <field name="description">Payroll administrator processing a termination or leave.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-issue-a-record-of-employment">Payroll — Issue a Record of Employment</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>Employee leaves (quit, fired, laid off) or starts an unpaid leave of
+absence. Service Canada requires the ROE within 5 calendar days. CRA fines
+for late filing.</p>
+<h2 id="where-this-lives">Where this lives</h2>
+<p><strong>Payroll → ROEs</strong> (<code>menu_southbrook_payroll_roe</code>).</p>
+<h2 id="the-4-field-minimum">The 4-field minimum</h2>
+<ol>
+<li><strong><code>employee_id</code></strong> — pick from active or recently terminated employees</li>
+<li><strong><code>reason_code</code></strong> — A (shortage of work), D (illness), E (quit), K
+   (other), M (dismissal), N (leave), and ~15 more</li>
+<li><strong><code>last_day_worked</code></strong> — last paid working day</li>
+<li><strong><code>expected_return_date</code></strong> — for leaves, blank for terminations</li>
+</ol>
+<h2 id="auto-derived-fields">Auto-derived fields</h2>
+<p>The platform pulls these from the past 52 weeks of payroll data:
+- Total insurable earnings (last 53 weeks of payslips)
+- Total insurable hours
+- Pay periods breakdown</p>
+<h2 id="filing">Filing</h2>
+<p>Two paths:
+- <strong>ROE Web</strong> (Service Canada portal) — generate the XML envelope via the
+  ROE form's <em>Export</em> button; upload manually. Faster.
+- <strong>Paper</strong> — print the form; mail it. Slower but works if ROE Web is down.</p>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Reason code wrong</strong> — common error: "K - Other" gets used when the
+  real reason is "A - Shortage" (layoff). Wrong code affects employee's
+  EI eligibility. Verify before submitting.</li>
+<li><strong>Insurable hours look low</strong> — vacation pay paid out at termination
+  may have been booked to the wrong period. Verify the payslip pull
+  matches your manual count ± 1 hour.</li>
+<li><strong>Returning employee never filed</strong> — they'll be denied EI mid-claim.
+  Apologise + file ASAP; Service Canada is usually understanding for
+  first-time errors.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 20 (Payroll CA — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_17_payroll_adjust_deduction" model="slide.slide">
+            <field name="name">Payroll — Adjust a Deduction Mid-Cycle</field>
+            <field name="channel_id" ref="course_jtbd_micros"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">390</field>
+            <field name="description">Payroll administrator handling a manual deduction change.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-adjust-a-deduction-mid-cycle">Payroll — Adjust a Deduction Mid-Cycle</h1>
+<h2 id="when-you-use-this">When you use this</h2>
+<p>A garnishment order arrives, an employee asks to start an RRSP
+contribution, or a benefit premium changes. You don't want to wait for
+the next pay cycle to apply it; you also don't want to forget it for the
+upcoming run.</p>
+<h2 id="two-adjustment-paths">Two adjustment paths</h2>
+<ul>
+<li><strong>Persistent change</strong> (RRSP, benefits) — edit on <code>hr.contract</code></li>
+<li><strong>One-time change</strong> (garnishment for this pay period, advance
+  recovery) — add a <em>Manual Earning / Deduction</em> line on the payslip
+  directly</li>
+</ul>
+<h2 id="the-persistent-flow">The persistent flow</h2>
+<ol>
+<li><strong>Open employee → Contract.</strong> <em>Deductions</em> tab.</li>
+<li><strong>Add line.</strong> Pick <code>salary_rule</code> (RRSP, benefit, etc.). Set
+   <code>amount_type</code> (fixed / percentage) + value.</li>
+<li><strong>Save.</strong> Effective on the next payroll run.</li>
+</ol>
+<h2 id="the-one-time-flow">The one-time flow</h2>
+<ol>
+<li><strong>Open the payslip</strong> (must be in <code>draft</code> state — before <em>Approve</em>).</li>
+<li><strong>Lines tab → New.</strong> Pick a <em>Manual</em> salary rule.</li>
+<li><strong>Enter amount + sign</strong> (deduction = negative).</li>
+<li><strong>Save the payslip.</strong> Recompute the run.</li>
+</ol>
+<h2 id="garnishment-specifics">Garnishment specifics</h2>
+<ul>
+<li>Garnishments are protected by the wage protection act — usually capped
+  at 30% of net. The salary rule enforces this; if the order asks for
+  more, the platform pays the cap and queues the rest for the next pay.</li>
+<li>File the original garnishment order in the employee's HR documents.</li>
+</ul>
+<h2 id="common-gotchas">Common gotchas</h2>
+<ul>
+<li><strong>Persistent change applies retroactively to this run</strong> — it doesn't.
+  If the run is already drafted, edit the slip directly OR re-compute
+  the run after the contract edit.</li>
+<li><strong>Forgot which payslip you adjusted</strong> — chatter on the payslip logs
+  all changes; search by employee for an audit trail.</li>
+<li><strong>GL journal mismatch after manual line</strong> — manual lines need a
+  destination account; verify on save.</li>
+</ul>
+<h2 id="deep-dive">Deep dive</h2>
+<p>→ Course 20 (Payroll CA — to be authored)</p>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

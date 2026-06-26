@@ -196,6 +196,18 @@ COURSE_META: List[Tuple[int, str, str, str, int]] = [
         "annual refresher.",
         9,
     ),
+    (
+        17,
+        "course_jtbd_micros",
+        "JTBD Micro Library — In-the-Moment Help",
+        "Forty short, verb-phrase task tutorials — each one answers a "
+        "specific 'how do I...?' question users hit during their day. "
+        "Designed for the in-app Help systray, not for sit-down "
+        "learning. Indexed by department: Sales (8), Design (5), "
+        "Planning (4), Floor (6), Maintenance (4), Quality (4), "
+        "Finance (4), Payroll (5).",
+        2,
+    ),
 ]
 
 

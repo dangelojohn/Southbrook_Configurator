@@ -186,5 +186,16 @@
             <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
             <field name="color">9</field>
         </record>
+        <record id="course_jtbd_micros" model="slide.channel">
+            <field name="name">Course 17 — JTBD Micro Library — In-the-Moment Help</field>
+            <field name="description">Forty short, verb-phrase task tutorials — each one answers a specific &#x27;how do I...?&#x27; question users hit during their day. Designed for the in-app Help systray, not for sit-down learning. Indexed by department: Sales (8), Design (5), Planning (4), Floor (6), Maintenance (4), Quality (4), Finance (4), Payroll (5).</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">170</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">2</field>
+        </record>
     </data>
 </odoo>
