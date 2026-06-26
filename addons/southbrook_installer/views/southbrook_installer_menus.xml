@@ -45,6 +45,12 @@
               action="action_installer_closeout"
               sequence="50"/>
 
+    <menuitem id="menu_installer_punchlists"
+              name="Punchlists"
+              parent="menu_installer_root"
+              action="action_installer_punchlist"
+              sequence="55"/>
+
     <menuitem id="menu_installer_config"
               name="Configuration"
               parent="menu_installer_root"
@@ -62,5 +68,11 @@
               parent="menu_installer_config"
               action="action_installer_phase"
               sequence="20"/>
+
+    <menuitem id="menu_installer_config_punchlist_template"
+              name="Punchlist Template"
+              parent="menu_installer_config"
+              action="action_installer_punchlist_template"
+              sequence="30"/>
 
 </odoo>

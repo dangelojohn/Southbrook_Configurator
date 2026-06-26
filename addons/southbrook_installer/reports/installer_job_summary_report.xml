@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="action_report_installer_job_summary" model="ir.actions.report">
+        <field name="name">Installation Job Summary</field>
+        <field name="model">southbrook.installer.job</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">southbrook_installer.report_installer_job_summary</field>
+        <field name="report_file">southbrook_installer.report_installer_job_summary</field>
+        <field name="binding_model_id" ref="model_southbrook_installer_job"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Installation %s' % (object.name)</field>
+    </record>
+
+    <template id="report_installer_job_summary">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="job">
+                <t t-call="web.external_layout">
+                    <div class="page">
+
+                        <h2>Installation Job Summary</h2>
+                        <h3 t-out="job.name"/>
+                        <table class="table table-sm" style="margin-top:1rem">
+                            <tr>
+                                <th>Project</th>
+                                <td t-out="job.project_id.name"/>
+                                <th>Unit</th>
+                                <td t-out="job.unit_number"/>
+                            </tr>
+                            <tr>
+                                <th>Site Address</th>
+                                <td colspan="3" t-out="job.site_address"/>
+                            </tr>
+                            <tr>
+                                <th>Scheduled</th>
+                                <td>
+                                    <t t-out="job.scheduled_date"/>
+                                </td>
+                                <th>Lead Installer</th>
+                                <td t-out="job.lead_installer_id.name"/>
+                            </tr>
+                            <tr>
+                                <th>Crew</th>
+                                <td colspan="3">
+                                    <span t-foreach="job.assigned_crew_ids" t-as="m" t-key="m.id">
+                                        <t t-out="m.name"/><t t-if="not m_last">,</t>
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>On-Site Duration</th>
+                                <td>
+                                    <span t-out="job.on_site_duration_hrs"
+                                          t-options='{"widget": "float", "precision": 2}'/> hr
+                                </td>
+                                <th>Stage</th>
+                                <td t-out="job.stage_id.name"/>
+                            </tr>
+                        </table>
+
+                        <h4 style="margin-top:1.5rem">Cabinet Manifest</h4>
+                        <table class="table table-sm table-bordered"
+                               t-if="job.manifest_id">
+                            <thead><tr>
+                                <th>Product</th>
+                                <th>Expected</th>
+                                <th>Received</th>
+                                <th>Status</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr t-foreach="job.manifest_id.line_ids" t-as="line" t-key="line.id">
+                                    <td t-out="line.product_id.display_name"/>
+                                    <td t-out="line.qty_expected"/>
+                                    <td t-out="line.qty_received_ok"/>
+                                    <td t-out="line.status"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p t-if="not job.manifest_id" class="text-muted">
+                            No manifest captured for this job.
+                        </p>
+
+                        <h4 style="margin-top:1.5rem">Installation Phases</h4>
+                        <table class="table table-sm">
+                            <thead><tr>
+                                <th>Phase</th><th>State</th>
+                                <th>Photos</th><th>Duration</th><th>Completed By</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr t-foreach="job.stage_log_ids" t-as="log" t-key="log.id">
+                                    <td>
+                                        <t t-out="log.phase_id.code"/> —
+                                        <t t-out="log.phase_id.name"/>
+                                    </td>
+                                    <td t-out="log.state"/>
+                                    <td t-out="log.photo_count"/>
+                                    <td>
+                                        <t t-if="log.duration_mins"
+                                           t-out="log.duration_mins"
+                                           t-options='{"widget": "float", "precision": 0}'/>
+                                        <t t-if="log.duration_mins"> min</t>
+                                    </td>
+                                    <td t-out="log.completed_by_id.name or ''"/>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 style="margin-top:1.5rem">Issues Log</h4>
+                        <table class="table table-sm table-bordered"
+                               t-if="job.damage_flag_ids">
+                            <thead><tr>
+                                <th>Flag</th><th>Product</th>
+                                <th>Issue</th><th>Urgency</th><th>State</th><th>Replacement PO</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr t-foreach="job.damage_flag_ids" t-as="f" t-key="f.id">
+                                    <td t-out="f.name"/>
+                                    <td t-out="f.product_id.display_name"/>
+                                    <td t-out="f.issue_type"/>
+                                    <td t-out="f.urgency"/>
+                                    <td t-out="f.state"/>
+                                    <td t-out="f.replacement_po_id.name or ''"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p t-if="not job.damage_flag_ids" class="text-success">
+                            No damage flags on this job.
+                        </p>
+
+                        <h4 style="margin-top:1.5rem">Punchlist Results</h4>
+                        <div t-if="job.punchlist_id">
+                            <p>
+                                Overall:
+                                <strong t-out="job.punchlist_id.overall_result or 'pending'"/>
+                                — <span t-out="job.punchlist_id.pass_count"/> pass /
+                                <span t-out="job.punchlist_id.minor_count"/> minor /
+                                <span t-out="job.punchlist_id.fail_count"/> fail
+                            </p>
+                            <table class="table table-sm table-bordered">
+                                <thead><tr>
+                                    <th>Section</th><th>Item</th>
+                                    <th>Result</th><th>Notes</th>
+                                </tr></thead>
+                                <tbody>
+                                    <tr t-foreach="job.punchlist_id.item_ids" t-as="i" t-key="i.id">
+                                        <td t-out="i.section"/>
+                                        <td t-out="i.description"/>
+                                        <td t-out="i.result or 'pending'"/>
+                                        <td t-out="i.notes or ''"/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p t-if="not job.punchlist_id" class="text-muted">
+                            No punchlist captured for this job.
+                        </p>
+
+                        <h4 style="margin-top:1.5rem">Acceptance &amp; Sign-Off</h4>
+                        <p>
+                            The undersigned confirms all cabinets listed above
+                            have been installed per specification, with any
+                            deficiencies noted and an agreed remediation path.
+                        </p>
+                        <table class="table"
+                               t-if="job.punchlist_id and job.punchlist_id.signature_data">
+                            <tr>
+                                <td style="width:50%">
+                                    <strong>Builder Representative:</strong><br/>
+                                    <span t-out="job.punchlist_id.signed_by_name"/><br/>
+                                    <small t-out="job.punchlist_id.signed_by_role"/><br/>
+                                    Signed
+                                    <t t-out="job.punchlist_id.signed_at"/>
+                                </td>
+                                <td>
+                                    <img t-if="job.punchlist_id.signature_data"
+                                         t-att-src="'data:image/png;base64,%s' % job.punchlist_id.signature_data.decode()"
+                                         style="max-height:80px;max-width:240px"/>
+                                </td>
+                            </tr>
+                        </table>
+                        <p t-if="not (job.punchlist_id and job.punchlist_id.signature_data)"
+                           class="text-warning">
+                            Builder sign-off pending.
+                        </p>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

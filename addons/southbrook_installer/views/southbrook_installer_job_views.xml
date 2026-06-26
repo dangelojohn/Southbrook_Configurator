@@ -160,8 +160,8 @@
                     <button name="action_advance_stage" type="object"
                             string="↪ Advance Stage" class="oe_highlight"
                             invisible="stage_is_terminal"/>
-                    <button name="action_record_signoff" type="object"
-                            string="✍ Record Sign-Off"
+                    <button name="action_open_punchlist" type="object"
+                            string="✍ Open Punchlist + Sign-Off"
                             invisible="sign_off_received or stage_is_terminal"/>
                     <button name="action_open_closeout" type="object"
                             string="📋 Open Close-Out"

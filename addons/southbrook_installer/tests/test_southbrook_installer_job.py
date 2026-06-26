@@ -158,7 +158,20 @@ class TestInstallerJobLifecycle(TransactionCase):
         with self.assertRaises(UserError) as cm:
             job.action_advance_stage()
         self.assertIn("sign-off", cm.exception.args[0].lower())
-        job.action_record_signoff()
+        # Phase 2.3 wired sign_off_received to the punchlist record's
+        # state + signature_data. Drive a punchlist to complete.
+        Punchlist = self.env["southbrook.installer.punchlist"]
+        punchlist = Punchlist.create({"job_id": job.id})
+        punchlist.action_open()
+        for item in punchlist.item_ids:
+            item.write({"result": "pass"})
+        punchlist.write({
+            "signature_data": "aGVsbG8=",  # base64 "hello"
+            "signed_by_name": "Test Builder Super",
+        })
+        punchlist.action_submit_signoff()
+        job.invalidate_recordset()
+        self.assertTrue(job.sign_off_received)
         job.action_advance_stage()
         self.assertEqual(job.stage_id.code, "CLOSED_OUT")
 

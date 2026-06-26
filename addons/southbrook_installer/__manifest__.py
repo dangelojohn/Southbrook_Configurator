@@ -51,7 +51,7 @@ SAFE DEPS ONLY:
   for kit_picking_id. ``sign`` and ``sms`` deliberately omitted;
   cold install must succeed in this stack as-is.
 """,
-    "version": "19.0.2.0.0",
+    "version": "19.0.3.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
@@ -63,6 +63,7 @@ SAFE DEPS ONLY:
         "stock",
         "purchase",
         "maintenance",
+        "account",
         "bus",
         "web",
     ],
@@ -72,6 +73,7 @@ SAFE DEPS ONLY:
         "data/southbrook_installer_sequence_data.xml",
         "data/southbrook_installer_stage_data.xml",
         "data/southbrook_installer_phase_data.xml",
+        "data/southbrook_installer_punchlist_template_data.xml",
         "views/southbrook_installer_stage_views.xml",
         "views/southbrook_installer_phase_views.xml",
         "views/southbrook_installer_stage_log_views.xml",
@@ -79,9 +81,12 @@ SAFE DEPS ONLY:
         "views/southbrook_delivery_manifest_views.xml",
         "views/southbrook_installer_tool_loan_views.xml",
         "views/southbrook_installer_closeout_views.xml",
+        "views/southbrook_installer_punchlist_views.xml",
         "views/southbrook_installer_job_views.xml",
         "views/southbrook_installer_dashboard_views.xml",
         "views/southbrook_installer_menus.xml",
+        "reports/installer_job_summary_report.xml",
+        "reports/return_manifest_report.xml",
     ],
     "assets": {
         "web.assets_backend": [

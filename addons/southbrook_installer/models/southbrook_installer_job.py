@@ -231,19 +231,33 @@ class SouthbrookInstallerJob(models.Model):
     )
 
     # ------------------------------------------------------------------
-    # Sign-off / close-out placeholders
+    # Sign-off (CE-safe: canvas signature via punchlist) + closeout
     # ------------------------------------------------------------------
     sign_request_ref = fields.Char(
-        string="Sign Request Reference",
+        string="External Sign Request Ref",
         copy=False,
-        help="Placeholder Char — Phase 2.3 replaces with Many2one to "
-             "sign.request when the sign module is added to the stack.",
+        help="Optional external signing-service reference (DocuSign / "
+             "HelloSign / Adobe Sign). Not used by the in-platform "
+             "sign-off path — see punchlist_id.signature_data.",
+    )
+    punchlist_ids = fields.One2many(
+        "southbrook.installer.punchlist",
+        "job_id",
+        string="Punchlist (1:1)",
+    )
+    punchlist_id = fields.Many2one(
+        "southbrook.installer.punchlist",
+        compute="_compute_punchlist_id",
+        store=True,
+        readonly=True,
+        ondelete="set null",
     )
     sign_off_received = fields.Boolean(
-        default=False,
-        copy=False,
+        compute="_compute_sign_off_received",
+        store=True,
         tracking=True,
-        help="Set True when the builder has signed off. Used by the "
+        help="True when the punchlist record carries a signature blob "
+             "AND printed name AND is in state 'complete'. Used by the "
              "FINAL_SIGN_OFF exit gate.",
     )
     closeout_id = fields.Many2one(
@@ -400,6 +414,26 @@ class SouthbrookInstallerJob(models.Model):
     def _compute_closeout_done(self):
         for rec in self:
             rec.closeout_done = rec.closeout_id.state == "complete"
+
+    @api.depends("punchlist_ids")
+    def _compute_punchlist_id(self):
+        for rec in self:
+            rec.punchlist_id = (
+                rec.punchlist_ids[:1].id if rec.punchlist_ids else False
+            )
+
+    @api.depends(
+        "punchlist_id.state",
+        "punchlist_id.signature_data",
+        "punchlist_id.signed_by_name",
+    )
+    def _compute_sign_off_received(self):
+        for rec in self:
+            rec.sign_off_received = (
+                rec.punchlist_id.state == "complete"
+                and bool(rec.punchlist_id.signature_data)
+                and bool((rec.punchlist_id.signed_by_name or "").strip())
+            )
 
     @api.depends("tool_loan_ids", "tool_loan_ids.returned")
     def _compute_tool_loan_count(self):
@@ -632,17 +666,25 @@ class SouthbrookInstallerJob(models.Model):
             "context": {"default_job_id": self.id},
         }
 
-    def action_record_signoff(self):
-        """Placeholder for Phase 2.3 — flips the manual flag so the
-        FINAL_SIGN_OFF → CLOSED_OUT gate can be exercised today."""
-        for job in self:
-            if job.sign_off_received:
-                continue
-            job.write({"sign_off_received": True})
-            job.message_post(body=_(
-                "✍ Builder sign-off recorded (placeholder — Phase 2.3 "
-                "wires sign.request)."
-            ))
+    def action_open_punchlist(self):
+        """Open or create the punchlist for this job. Lazy-creates and
+        moves to in_progress (which auto-spawns items from the
+        configured templates)."""
+        self.ensure_one()
+        Punchlist = self.env["southbrook.installer.punchlist"]
+        punchlist = self.punchlist_id or Punchlist.create({
+            "job_id": self.id,
+        })
+        if punchlist.state == "draft":
+            punchlist.action_open()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Punchlist"),
+            "res_model": "southbrook.installer.punchlist",
+            "res_id": punchlist.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
     def action_open_closeout(self):
         """Open or create the close-out record for this job. Lazy-

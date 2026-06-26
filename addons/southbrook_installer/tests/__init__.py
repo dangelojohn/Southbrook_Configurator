@@ -2,3 +2,4 @@
 from . import test_southbrook_installer_job
 from . import test_southbrook_delivery_manifest
 from . import test_southbrook_installer_closeout
+from . import test_southbrook_installer_punchlist
