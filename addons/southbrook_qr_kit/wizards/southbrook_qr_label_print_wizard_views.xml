@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+    <record id="view_qr_label_print_wizard_form" model="ir.ui.view">
+        <field name="name">southbrook.qr.label.print.wizard.form</field>
+        <field name="model">southbrook.qr.label.print.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Print QR Labels">
+                <group>
+                    <field name="target_model" readonly="1"/>
+                    <field name="record_count" readonly="1"/>
+                    <field name="label_size"/>
+                    <field name="include_label_text"/>
+                </group>
+                <footer>
+                    <button name="action_print" type="object"
+                            string="Open Print Preview" class="btn-primary"/>
+                    <button special="cancel" string="Cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

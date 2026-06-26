@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo noupdate="1">
+    <!-- Placeholder for any qr_kit-wide system parameters.
+         The hmac_secret is auto-generated on first use; no seed
+         needed. This file exists so future config_param seeds have
+         a natural home. -->
+</odoo>

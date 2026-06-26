@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_qr_scan_log_user,qr.scan.log user,model_southbrook_qr_scan_log,base.group_user,1,0,0,0
+access_qr_scan_log_admin,qr.scan.log admin,model_southbrook_qr_scan_log,base.group_system,1,1,1,1
+access_qr_label_print_wizard_user,qr.label.print.wizard user,model_southbrook_qr_label_print_wizard,base.group_user,1,1,1,1
