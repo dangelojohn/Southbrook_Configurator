@@ -154,8 +154,12 @@ class MrpWorkcenter(models.Model):
              "`southbrook.bottleneck.alert_threshold` (default 5).",
     )
 
-    @api.depends("workorder_ids.state")
+    @api.depends("order_ids.state")
     def _compute_x_sbk_pending_load(self):
+        # Native mrp.workcenter inverse one2many to mrp.workorder is
+        # 'order_ids', not 'workorder_ids' (caught 2026-06-26 when the
+        # broken @api.depends silently corrupted the registry and
+        # blocked all subsequent module upgrades on this DB).
         Param = self.env["ir.config_parameter"].sudo()
         try:
             warn_t = int(Param.get_param(
@@ -168,7 +172,7 @@ class MrpWorkcenter(models.Model):
         except (TypeError, ValueError):
             alert_t = 5
         for wc in self:
-            pending = wc.workorder_ids.filtered(
+            pending = wc.order_ids.filtered(
                 lambda w: w.state in ("ready", "waiting", "pending"))
             count = len(pending)
             wc.x_sbk_pending_wo_count = count
