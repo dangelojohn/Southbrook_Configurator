@@ -1,0 +1,9 @@
+<odoo><record id="t" model="ir.ui.view">
+  <field name="arch" type="xml">
+    <form><field name="line_ids">
+      <list>
+        <field name="x" column_invisible="parent.bogus_field != 'y'"/>
+      </list>
+    </field></form>
+  </field>
+</record></odoo>

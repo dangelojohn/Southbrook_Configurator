@@ -54,4 +54,32 @@ if [ -x "$ROOT/scripts/lint-owl-expr.py" ]; then
     fi
 fi
 
+# Check 3: View traps (column_invisible="parent.<field>" — see memory
+# note odoo19-column-invisible-parent-trap). Pass `parent` resolves
+# to the parent FORM's model, NOT the line — silent registry break
+# at -u time with a truncated ParseError the deploy script hides.
+if [ -x "$ROOT/scripts/lint-xml-view-traps.py" ]; then
+    FAILED=0
+    for f in $STAGED_XML; do
+        case "$f" in
+            scripts/_test_fixtures/lint-view-traps/*) continue ;;
+        esac
+        if [ -f "$ROOT/$f" ]; then
+            if ! python3 "$ROOT/scripts/lint-xml-view-traps.py" "$ROOT/$f"; then
+                FAILED=1
+            fi
+        fi
+    done
+    if [ "$FAILED" -ne 0 ]; then
+        echo
+        echo "(blocked: column_invisible=\"parent.X\" reference. Reading"
+        echo " parent.<field> inside an embedded list resolves <field> on"
+        echo " the PARENT FORM's model, not the line — registry validation"
+        echo " fails at module upgrade time. Use per-row \`invisible=\` or"
+        echo " \`readonly=\` instead, see [[odoo19_column_invisible_parent_trap]].)"
+        echo "Bypass (last resort): git commit --no-verify"
+        exit 1
+    fi
+fi
+
 exit 0
