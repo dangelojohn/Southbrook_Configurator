@@ -65,6 +65,13 @@
                 <field name="x_sbk_station_type" optional="show"/>
                 <field name="x_sbk_is_bottleneck" optional="show"/>
                 <field name="x_sbk_active_for_kitchen" optional="hide"/>
+                <field name="x_sbk_pending_wo_count" optional="show"/>
+                <field name="x_sbk_congestion_level"
+                       optional="show"
+                       widget="badge"
+                       decoration-success="x_sbk_congestion_level == 'clear'"
+                       decoration-warning="x_sbk_congestion_level == 'warn'"
+                       decoration-danger="x_sbk_congestion_level == 'alert'"/>
             </field>
         </field>
     </record>
@@ -80,6 +87,10 @@
                         domain="[('x_sbk_active_for_kitchen', '=', True)]"/>
                 <filter name="filter_sbk_bottleneck" string="Bottlenecks"
                         domain="[('x_sbk_is_bottleneck', '=', True)]"/>
+                <filter name="filter_sbk_live_alert" string="Live Bottlenecks (alert)"
+                        domain="[('x_sbk_congestion_level', '=', 'alert')]"/>
+                <filter name="filter_sbk_live_warn" string="Backing Up (warn+alert)"
+                        domain="[('x_sbk_congestion_level', 'in', ['warn', 'alert'])]"/>
                 <separator/>
                 <filter name="groupby_sbk_station_type" string="Station Type"
                         context="{'group_by': 'x_sbk_station_type'}"/>
