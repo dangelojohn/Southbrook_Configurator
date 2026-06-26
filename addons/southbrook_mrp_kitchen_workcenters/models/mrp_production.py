@@ -177,3 +177,27 @@ class MrpProduction(models.Model):
         for mo in self:
             mo.workorder_ids.action_sbk_recalc_kitchen_duration()
         return True
+
+    # SAMI PRD W-08 (2026-06-26) — auto-create as-built on MO done.
+    def button_mark_done(self):
+        result = super().button_mark_done()
+        # Only spawn an as-built when the MO actually transitions to
+        # 'done' AND no as-built exists for it yet (idempotent).
+        Asbuilt = self.env["southbrook.asbuilt"]
+        for mo in self:
+            if mo.state != "done":
+                continue
+            try:
+                existing = Asbuilt.search(
+                    [("production_id", "=", mo.id)], limit=1)
+                if existing:
+                    continue
+                Asbuilt.sudo().create({
+                    "production_id": mo.id,
+                    "built_at": fields.Datetime.now(),
+                    "built_by": self.env.user.id,
+                })
+            except Exception:  # noqa: BLE001
+                # Never block an MO mark_done on an as-built failure.
+                pass
+        return result

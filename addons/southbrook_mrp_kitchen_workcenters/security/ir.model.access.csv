@@ -7,3 +7,5 @@ access_sbk_op_template_mrp_user,southbrook.kitchen.operation.template mrp user,m
 access_sbk_op_template_mrp_manager,southbrook.kitchen.operation.template mrp manager,model_southbrook_kitchen_operation_template,mrp.group_mrp_manager,1,1,1,1
 access_sbk_downtime_mrp_user,southbrook.kitchen.workcenter.downtime mrp user,model_southbrook_kitchen_workcenter_downtime,mrp.group_mrp_user,1,1,1,0
 access_sbk_downtime_mrp_manager,southbrook.kitchen.workcenter.downtime mrp manager,model_southbrook_kitchen_workcenter_downtime,mrp.group_mrp_manager,1,1,1,1
+access_sbk_asbuilt_mrp_user,southbrook.asbuilt mrp user,model_southbrook_asbuilt,mrp.group_mrp_user,1,1,1,0
+access_sbk_asbuilt_mrp_manager,southbrook.asbuilt mrp manager,model_southbrook_asbuilt,mrp.group_mrp_manager,1,1,1,1

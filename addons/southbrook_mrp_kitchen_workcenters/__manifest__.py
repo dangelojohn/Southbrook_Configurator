@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.9.0",
+    "version": "19.0.4.10.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -61,6 +61,9 @@ southbrook_kitchen_workspace) without duplicating their models.
         # Quarantine location seed (SAMI PRD INV-06). Loaded early so
         # the NCR auto-quarantine flow can resolve it by xml_id.
         "data/southbrook_quarantine_location.xml",
+        # As-built ID sequence (SAMI PRD W-08). Loaded before the views
+        # that reference the model.
+        "data/southbrook_asbuilt_sequence.xml",
         # Master data — materials + finishes the work-center fields
         # reference. Must load BEFORE the workcenter seed.
         "data/southbrook_kitchen_materials.xml",
@@ -84,6 +87,9 @@ southbrook_kitchen_workspace) without duplicating their models.
         # Loads AFTER menus.xml because it adds an entry under
         # menu_sbk_ops_root.
         "views/southbrook_ncr_views.xml",
+        # As-built records surface (SAMI PRD W-08, 2026-06-26). Also
+        # hangs off menu_sbk_ops_root.
+        "views/southbrook_asbuilt_views.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only
+
+     As-built record views (SAMI PRD W-08). Surfaces under the Kitchen
+     Ops menu next to the NCR queue.
+-->
+<odoo>
+
+    <!-- List view -->
+    <record id="view_southbrook_asbuilt_list" model="ir.ui.view">
+        <field name="name">southbrook.asbuilt.list</field>
+        <field name="model">southbrook.asbuilt</field>
+        <field name="arch" type="xml">
+            <list string="As-Built Records"
+                  decoration-success="state == 'sealed'"
+                  decoration-muted="state == 'deprecated'">
+                <field name="name"/>
+                <field name="production_id"/>
+                <field name="product_id"/>
+                <field name="bom_version_snapshot"/>
+                <field name="lot_id" optional="show"/>
+                <field name="serial_number" optional="show"/>
+                <field name="qc_overall_result" widget="badge"
+                       decoration-success="qc_overall_result == 'pass'"
+                       decoration-warning="qc_overall_result == 'conditional'"
+                       decoration-danger="qc_overall_result == 'fail'"/>
+                <field name="built_at"/>
+                <field name="built_by" optional="hide"/>
+                <field name="partner_id" optional="show"/>
+                <field name="install_due_date" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'sealed'"
+                       decoration-muted="state == 'deprecated'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form view -->
+    <record id="view_southbrook_asbuilt_form" model="ir.ui.view">
+        <field name="name">southbrook.asbuilt.form</field>
+        <field name="model">southbrook.asbuilt</field>
+        <field name="arch" type="xml">
+            <form string="As-Built Record">
+                <header>
+                    <button name="action_seal" type="object"
+                            string="Seal Record" class="oe_highlight"
+                            invisible="state != 'draft'"
+                            groups="mrp.group_mrp_manager"/>
+                    <button name="action_deprecate" type="object"
+                            string="Deprecate"
+                            invisible="state == 'deprecated'"
+                            groups="mrp.group_mrp_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,sealed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_attachments" type="object"
+                                class="oe_stat_button" icon="fa-files-o"
+                                invisible="not attachment_count">
+                            <field name="attachment_count" widget="statinfo" string="Attachments"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Sealed" bg_color="text-bg-success"
+                            invisible="state != 'sealed'"/>
+                    <widget name="web_ribbon" title="Deprecated" bg_color="text-bg-secondary"
+                            invisible="state != 'deprecated'"/>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Source MO">
+                            <field name="production_id" readonly="state in ('sealed','deprecated')"/>
+                            <field name="production_package_id"
+                                   readonly="state in ('sealed','deprecated')"/>
+                            <field name="product_id" readonly="1"/>
+                            <field name="bom_id" readonly="1"/>
+                            <field name="bom_version_snapshot" readonly="1"/>
+                        </group>
+                        <group string="Identification">
+                            <field name="lot_id" readonly="state in ('sealed','deprecated')"/>
+                            <field name="serial_number" readonly="state in ('sealed','deprecated')"/>
+                            <field name="cabinet_code" readonly="1"/>
+                            <field name="qc_overall_result" widget="badge"
+                                   decoration-success="qc_overall_result == 'pass'"
+                                   decoration-warning="qc_overall_result == 'conditional'"
+                                   decoration-danger="qc_overall_result == 'fail'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Provenance">
+                            <field name="built_at"
+                                   readonly="state in ('sealed','deprecated')"/>
+                            <field name="built_by"
+                                   readonly="state in ('sealed','deprecated')"/>
+                            <field name="sealed_at" readonly="1"
+                                   invisible="not sealed_at"/>
+                            <field name="sealed_by" readonly="1"
+                                   invisible="not sealed_by"/>
+                        </group>
+                        <group string="Customer">
+                            <field name="sale_order_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="install_due_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="QC Checks" name="qc">
+                            <field name="qc_check_ids"
+                                   readonly="state in ('sealed','deprecated')">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="x_sbk_check_stage"/>
+                                    <field name="x_sbk_defect_type"/>
+                                    <field name="x_sbk_defect_severity"/>
+                                    <field name="x_sbk_result" widget="badge"
+                                           decoration-success="x_sbk_result == 'pass'"
+                                           decoration-warning="x_sbk_result == 'rework'"
+                                           decoration-danger="x_sbk_result == 'fail'"/>
+                                    <field name="x_sbk_inspector_id"/>
+                                    <field name="x_sbk_date_checked"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Drawings &amp; Photos" name="drawings">
+                            <field name="attachment_ids" widget="many2many_binary"
+                                   readonly="state in ('sealed','deprecated')"/>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"
+                                   readonly="state in ('sealed','deprecated')"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search view -->
+    <record id="view_southbrook_asbuilt_search" model="ir.ui.view">
+        <field name="name">southbrook.asbuilt.search</field>
+        <field name="model">southbrook.asbuilt</field>
+        <field name="arch" type="xml">
+            <search string="As-Built Records">
+                <field name="name"/>
+                <field name="production_id"/>
+                <field name="product_id"/>
+                <field name="lot_id"/>
+                <field name="serial_number"/>
+                <field name="partner_id"/>
+                <field name="cabinet_code"/>
+                <filter name="state_draft" string="Draft"
+                        domain="[('state','=','draft')]"/>
+                <filter name="state_sealed" string="Sealed"
+                        domain="[('state','=','sealed')]"/>
+                <filter name="state_deprecated" string="Deprecated"
+                        domain="[('state','=','deprecated')]"/>
+                <separator/>
+                <filter name="qc_pass" string="QC Pass"
+                        domain="[('qc_overall_result','=','pass')]"/>
+                <filter name="qc_conditional" string="QC Conditional"
+                        domain="[('qc_overall_result','=','conditional')]"/>
+                <filter name="qc_fail" string="QC Fail"
+                        domain="[('qc_overall_result','=','fail')]"/>
+                <group>
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_partner" string="Customer"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_product" string="Product"
+                            context="{'group_by': 'product_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_southbrook_asbuilt" model="ir.actions.act_window">
+        <field name="name">As-Built Records</field>
+        <field name="res_model">southbrook.asbuilt</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_state_draft': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No as-built records yet.
+            </p>
+            <p>
+                As-builts auto-create when an MO is marked done. Each
+                one captures the BoM version that was actually built,
+                lot/serial, every QC inspection, and all drawings +
+                photos attached to the MO. Used for CSA A277
+                compliance, warranty traceability, and the Phase 4
+                Communities GC modules.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu under Kitchen Ops -->
+    <menuitem id="menu_sbk_ops_asbuilt"
+              name="As-Built Records"
+              parent="menu_sbk_ops_root"
+              action="action_southbrook_asbuilt"
+              sequence="50"/>
+
+</odoo>
