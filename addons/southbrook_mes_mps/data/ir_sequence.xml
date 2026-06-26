@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+
+    <record id="seq_mps_period" model="ir.sequence">
+      <field name="name">MPS Period</field>
+      <field name="code">southbrook.mes_mps.mps_period</field>
+      <field name="prefix">MPS/%(year)s-</field>
+      <field name="padding">4</field>
+      <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_oee_snapshot" model="ir.sequence">
+      <field name="name">OEE Snapshot</field>
+      <field name="code">southbrook.mes_mps.oee_snapshot</field>
+      <field name="prefix">OEE_SNAP/%(year)s%(month)s%(day)s/</field>
+      <field name="padding">4</field>
+      <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_bottleneck_report" model="ir.sequence">
+      <field name="name">Bottleneck Report</field>
+      <field name="code">southbrook.mes_mps.bottleneck_report</field>
+      <field name="prefix">BTLNCK/%(year)s%(month)s%(day)s/</field>
+      <field name="padding">4</field>
+      <field name="company_id" eval="False"/>
+    </record>
+
+  </data>
+</odoo>

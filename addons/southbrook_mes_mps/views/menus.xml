@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!-- Parent under Manufacturing root menu (provided by `mrp`). -->
+  <menuitem id="menu_mes_mps_root"
+            name="MES &amp; MPS"
+            parent="mrp.menu_mrp_root"
+            sequence="60"/>
+
+  <menuitem id="menu_mps_workbench"
+            name="MPS Workbench"
+            parent="menu_mes_mps_root"
+            action="action_mps_period"
+            sequence="10"/>
+
+  <menuitem id="menu_workcenter_capacity"
+            name="Workcenter Capacity"
+            parent="menu_mes_mps_root"
+            action="action_wc_capacity"
+            sequence="20"/>
+
+  <menuitem id="menu_oee_snapshot"
+            name="OEE Snapshots"
+            parent="menu_mes_mps_root"
+            action="action_oee_snapshot"
+            sequence="30"/>
+
+  <menuitem id="menu_bottleneck_report"
+            name="Bottleneck Report"
+            parent="menu_mes_mps_root"
+            action="action_bottleneck_report"
+            sequence="40"/>
+
+  <menuitem id="menu_mi_tiles"
+            name="MES Snapshot"
+            parent="menu_mes_mps_root"
+            action="action_mi_tiles"
+            sequence="50"/>
+
+</odoo>
