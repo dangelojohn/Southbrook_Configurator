@@ -2605,3 +2605,160 @@
     }
     .o_owl_history_version { min-width: 0; }
 }
+
+// ======================================================================
+// 2026-06-22 UX bugfix pass — toasts, cart-count chip, desktop reflow.
+// ======================================================================
+
+// ----- Toast stack ---------------------------------------------------
+// Fixed top-right, stacks newest-on-top. Lives outside the order-builder
+// content flow so it stays put when the user scrolls the order. The
+// stack itself is a thin column with a small gap; each toast is a
+// 280-320px pill with the message + a × dismissal.
+.o_owl_toast_stack {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.o_owl_toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 240px;
+    max-width: 360px;
+    padding: 10px 14px;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-left: 4px solid var(--sb-ok, #2f7d32);
+    border-radius: 3px;
+    box-shadow: 0 4px 14px rgba(15, 15, 15, 0.12);
+    color: var(--sb-ink);
+    font-family: var(--sb-font-sans);
+    font-size: 13px;
+    line-height: 1.4;
+    animation: o_owl_toast_in 180ms ease-out;
+}
+
+.o_owl_toast_success { border-left-color: var(--sb-ok, #2f7d32); }
+.o_owl_toast_error   { border-left-color: var(--sb-alert, #a83a2b); }
+
+.o_owl_toast_text {
+    flex: 1 1 auto;
+    word-break: break-word;
+}
+
+.o_owl_toast_close {
+    flex: 0 0 auto;
+    background: transparent;
+    border: 0;
+    color: var(--sb-ink-dim);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 4px;
+
+    &:hover { color: var(--sb-ink); }
+}
+
+@keyframes o_owl_toast_in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+// ----- Modal header cart-count chip ----------------------------------
+// Sits between the modal title and the × close button so the user
+// can see at a glance how many cabinets are on the order. Mono font
+// to match the channel-price badge treatment.
+.o_owl_modal_cart_count {
+    font-family: var(--sb-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sb-ink-dim);
+    margin-right: 12px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--sb-component-tint, rgba(43, 79, 107, 0.06));
+
+    strong {
+        color: var(--sb-ink);
+        font-weight: 600;
+        margin-right: 4px;
+    }
+}
+
+// Modal header is a flex row — make sure the title takes the leftmost
+// space and the chip + × sit on the right. Existing rule at
+// .o_southbrook_owl_root .o_owl_modal_header already flexes; this is a
+// scoped defensive duplicate for the catalog panel specifically.
+.o_owl_catalog_panel .o_owl_modal_header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.o_owl_catalog_panel .o_owl_modal_header .o_owl_modal_title {
+    flex: 1 1 auto;
+}
+
+// Make the × big enough to hit reliably. P2 bugfix 2026-06-22: previous
+// styling let the click target shrink under flex pressure on narrow
+// modals (and was occasionally covered by the title's flexbox overflow
+// on long modal titles). Scoped to .o_owl_catalog_panel so other modal
+// close buttons (drawer, send-to-prod confirm) keep their existing
+// look — their close affordance wasn't reported as unreliable.
+.o_owl_catalog_panel .o_owl_modal_close {
+    flex: 0 0 auto;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    position: relative;
+    z-index: 1;
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky, #2b4f6b);
+        outline-offset: 2px;
+    }
+}
+
+// ----- Desktop reflow (P3) -------------------------------------------
+// On wide viewports the portal_layout's sidebar squeezes the OWL
+// mount to ~690px — too narrow for the multi-zone line grid + the
+// 3-region card layout to breathe. From `lg` up, override the portal
+// row to drop the sidebar gutter and let the OrderBuilder take all
+// available width.
+@media (min-width: 992px) {
+    // Stretch the mount + every nested layout cap (added defensively
+    // because some sub-components carry their own 640/520 caps).
+    .o_southbrook_owl_mount,
+    .o_southbrook_owl_root,
+    .o_owl_loaded {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    // The portal layout's main column. The sidebar squeeze on this page
+    // is what was capping our app to ~469-690px at 1280px viewports.
+    // The .o_southbrook_order_builder_page wrapper we set in
+    // views/portal_template.xml is a *descendant* of those columns, so
+    // we use :has() to target ancestors that contain it and stretch
+    // them edge-to-edge. Falls back to the existing portal layout for
+    // any browser without :has() (Safari <15.4 / FF <121) — those users
+    // see the original constrained layout, which still works.
+    .col-lg-9:has(.o_southbrook_order_builder_page),
+    .col-lg-8:has(.o_southbrook_order_builder_page),
+    .col-md-9:has(.o_southbrook_order_builder_page),
+    .col-md-8:has(.o_southbrook_order_builder_page),
+    .o_portal_my_doc:has(.o_southbrook_order_builder_page),
+    .o_portal_my_main:has(.o_southbrook_order_builder_page) {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
