@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Four seed MCP tools that cover the four operational pillars the Qwen
+  agent needs visibility into: MRP, Quality, Payroll, Finance. All
+  read-only; all scoped by domain; only the listed fields come back.
+
+  Models live in sibling addons that are dependencies of this addon (via
+  southbrook_kitchen_mrp + southbrook_manufacturing_intelligence) or
+  pre-installed in the prod environment (southbrook.ncr, payroll.run,
+  finance.asset). XML refs use 'noupdate=1' so a manager who disables
+  one of these tools doesn't have it re-enabled on the next -u.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="mcp_tool_list_open_mos" model="southbrook.integrations.mcp_tool">
+            <field name="name">list_open_mos</field>
+            <field name="description">List manufacturing orders not yet done/cancel.</field>
+            <field name="category">read</field>
+            <field name="model_id" ref="mrp.model_mrp_production"/>
+            <field name="domain_json">[["state", "not in", ["done", "cancel"]]]</field>
+            <field name="read_fields_json">["name", "product_id", "date_start", "state", "qty_producing", "product_qty"]</field>
+            <field name="rate_limit_per_min">60</field>
+        </record>
+
+        <record id="mcp_tool_list_open_ncrs" model="southbrook.integrations.mcp_tool">
+            <field name="name">list_open_ncrs</field>
+            <field name="description">List Non-Conformance Reports still being worked.</field>
+            <field name="category">read</field>
+            <field name="model_id" ref="southbrook_quality.model_southbrook_ncr"/>
+            <field name="domain_json">[["state", "in", ["draft", "quarantine", "rework"]]]</field>
+            <field name="read_fields_json">["name", "severity", "defect_type", "description"]</field>
+            <field name="rate_limit_per_min">60</field>
+        </record>
+
+        <record id="mcp_tool_list_payroll_runs" model="southbrook.integrations.mcp_tool">
+            <field name="name">list_payroll_runs</field>
+            <field name="description">List recent payroll runs.</field>
+            <field name="category">read</field>
+            <field name="model_id" ref="southbrook_payroll_ca.model_southbrook_payroll_run"/>
+            <field name="domain_json">[]</field>
+            <field name="read_fields_json">["name", "period_from", "period_to", "total_gross", "total_net", "state"]</field>
+            <field name="rate_limit_per_min">30</field>
+        </record>
+
+        <record id="mcp_tool_list_wip_assets" model="southbrook.integrations.mcp_tool">
+            <field name="name">list_wip_assets</field>
+            <field name="description">List finance assets currently in_service.</field>
+            <field name="category">read</field>
+            <field name="model_id" ref="southbrook_finance_pack.model_southbrook_finance_asset"/>
+            <field name="domain_json">[["state", "=", "in_service"]]</field>
+            <field name="read_fields_json">["code", "name", "net_book_value"]</field>
+            <field name="rate_limit_per_min">30</field>
+        </record>
+    </data>
+</odoo>

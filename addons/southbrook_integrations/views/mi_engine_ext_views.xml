@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_integrations_mi_tiles_form" model="ir.ui.view">
+        <field name="name">southbrook.integrations.mi_tiles.form</field>
+        <field name="model">southbrook.integrations.mi_tiles</field>
+        <field name="arch" type="xml">
+            <form string="Integrations Snapshot">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="label"/></h1>
+                    </div>
+                    <group>
+                        <group string="Homag (CAM)">
+                            <field name="homag_sessions_30d"/>
+                            <field name="homag_avg_discrepancy_pct"/>
+                        </group>
+                        <group string="Logistics">
+                            <field name="asn_pending_count"/>
+                        </group>
+                        <group string="MCP / Qwen">
+                            <field name="mcp_calls_24h"/>
+                        </group>
+                        <group string="Labels">
+                            <field name="label_prints_24h"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_integrations_mi_tiles" model="ir.actions.act_window">
+        <field name="name">Integration Snapshot</field>
+        <field name="res_model">southbrook.integrations.mi_tiles</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+</odoo>
