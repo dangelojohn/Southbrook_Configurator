@@ -163,8 +163,8 @@
                     <button name="action_record_signoff" type="object"
                             string="✍ Record Sign-Off"
                             invisible="sign_off_received or stage_is_terminal"/>
-                    <button name="action_mark_closeout_done" type="object"
-                            string="📋 Mark Close-Out Done"
+                    <button name="action_open_closeout" type="object"
+                            string="📋 Open Close-Out"
                             invisible="closeout_done or stage_is_terminal"/>
                     <button name="action_mark_departed" type="object"
                             string="🚚 Mark Departed"
@@ -192,6 +192,20 @@
                                 class="oe_stat_button" icon="fa-flag">
                             <field name="open_damage_count"
                                    string="Open Flags" widget="statinfo"/>
+                        </button>
+                        <button name="action_view_tool_loans" type="object"
+                                class="oe_stat_button" icon="fa-wrench">
+                            <field name="tool_loan_open_count"
+                                   string="Tools Out" widget="statinfo"/>
+                        </button>
+                        <button name="action_open_closeout" type="object"
+                                class="oe_stat_button" icon="fa-check-square-o">
+                            <div>
+                                <field name="closeout_done"
+                                       widget="boolean_toggle" readonly="1"
+                                       nolabel="1"/>
+                                <span>Close-Out</span>
+                            </div>
                         </button>
                     </div>
                     <widget name="web_ribbon" title="Blocked"
@@ -240,7 +254,7 @@
                                    invisible="blocking_damage_count == 0"/>
                             <field name="sign_off_received"
                                    widget="boolean_toggle"/>
-                            <field name="closeout_done" widget="boolean_toggle"/>
+                            <field name="closeout_done" readonly="1"/>
                         </group>
                         <group>
                             <field name="gps_arrival_time" readonly="1"/>
@@ -266,6 +280,37 @@
                                     <field name="lines_missing"/>
                                     <field name="confirmation_pct"
                                            widget="progressbar"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Tools" name="tools">
+                            <field name="tool_loan_ids">
+                                <list editable="bottom"
+                                      decoration-success="returned and return_condition == 'good'"
+                                      decoration-warning="returned and return_condition == 'maintenance'"
+                                      decoration-danger="returned and return_condition in ('damaged','lost')"
+                                      decoration-info="not returned">
+                                    <field name="equipment_id"/>
+                                    <field name="tool_type"/>
+                                    <field name="signed_out_by_id"/>
+                                    <field name="signed_out_time"/>
+                                    <field name="returned" widget="boolean_toggle"/>
+                                    <field name="return_condition"/>
+                                    <field name="days_on_loan"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Close-Out" name="closeout"
+                              invisible="not closeout_id">
+                            <field name="closeout_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="builder_approves_cleanup"/>
+                                    <field name="all_tools_returned"/>
+                                    <field name="all_flags_resolved_or_eta"/>
+                                    <field name="installer_confirmed"/>
+                                    <field name="return_picking_id"/>
                                 </list>
                             </field>
                         </page>

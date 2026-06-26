@@ -246,12 +246,39 @@ class SouthbrookInstallerJob(models.Model):
         help="Set True when the builder has signed off. Used by the "
              "FINAL_SIGN_OFF exit gate.",
     )
+    closeout_id = fields.Many2one(
+        "southbrook.installer.closeout",
+        compute="_compute_closeout_id",
+        store=True,
+        readonly=True,
+        ondelete="set null",
+        help="The (unique) close-out record for this job. Computed "
+             "from the inverse southbrook.installer.closeout.job_id.",
+    )
+    closeout_ids = fields.One2many(
+        "southbrook.installer.closeout",
+        "job_id",
+        string="Close-Out (1:1)",
+    )
     closeout_done = fields.Boolean(
-        default=False,
-        copy=False,
+        compute="_compute_closeout_done",
+        store=True,
         tracking=True,
-        help="Placeholder — flipped manually here. Phase 1.3 wires this "
-             "to a southbrook.installer.closeout record.",
+        help="True when the unique close-out record is in state "
+             "'complete'. Wired in 1.3.",
+    )
+    tool_loan_ids = fields.One2many(
+        "southbrook.installer.tool.loan",
+        "job_id",
+        string="Tool Loans",
+    )
+    tool_loan_count = fields.Integer(
+        compute="_compute_tool_loan_count",
+        store=False,
+    )
+    tool_loan_open_count = fields.Integer(
+        compute="_compute_tool_loan_count",
+        store=False,
     )
 
     # ------------------------------------------------------------------
@@ -362,6 +389,25 @@ class SouthbrookInstallerJob(models.Model):
             rec.blocking_damage_count = len(open_flags.filtered(
                 lambda f: f.urgency == "blocking"
             ))
+
+    @api.depends("closeout_ids")
+    def _compute_closeout_id(self):
+        for rec in self:
+            # Unique constraint enforces ≤ 1; just take first.
+            rec.closeout_id = rec.closeout_ids[:1].id if rec.closeout_ids else False
+
+    @api.depends("closeout_id.state")
+    def _compute_closeout_done(self):
+        for rec in self:
+            rec.closeout_done = rec.closeout_id.state == "complete"
+
+    @api.depends("tool_loan_ids", "tool_loan_ids.returned")
+    def _compute_tool_loan_count(self):
+        for rec in self:
+            rec.tool_loan_count = len(rec.tool_loan_ids)
+            rec.tool_loan_open_count = len(
+                rec.tool_loan_ids.filtered(lambda l: not l.returned)
+            )
 
     @api.depends("gps_arrival_time", "gps_departure_time")
     def _compute_on_site_duration(self):
@@ -598,13 +644,33 @@ class SouthbrookInstallerJob(models.Model):
                 "wires sign.request)."
             ))
 
-    def action_mark_closeout_done(self):
-        """Placeholder for Phase 1.3 — same pattern."""
-        for job in self:
-            if job.closeout_done:
-                continue
-            job.write({"closeout_done": True})
-            job.message_post(body=_(
-                "📋 Close-out checklist submitted (placeholder — Phase "
-                "1.3 wires southbrook.installer.closeout)."
-            ))
+    def action_open_closeout(self):
+        """Open or create the close-out record for this job. Lazy-
+        creates and moves to in_progress (which auto-populates the
+        tool return lines from job.tool_loan_ids)."""
+        self.ensure_one()
+        Closeout = self.env["southbrook.installer.closeout"]
+        closeout = self.closeout_id or Closeout.create({
+            "job_id": self.id,
+        })
+        if closeout.state == "draft":
+            closeout.action_open()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Close-Out Checklist"),
+            "res_model": "southbrook.installer.closeout",
+            "res_id": closeout.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_view_tool_loans(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Tool Loans"),
+            "res_model": "southbrook.installer.tool.loan",
+            "view_mode": "list,form",
+            "domain": [("job_id", "=", self.id)],
+            "context": {"default_job_id": self.id},
+        }

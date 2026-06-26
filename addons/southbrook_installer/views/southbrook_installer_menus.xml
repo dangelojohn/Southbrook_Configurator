@@ -26,6 +26,18 @@
               action="action_damage_flag"
               sequence="30"/>
 
+    <menuitem id="menu_installer_tool_loans"
+              name="Tool Loans"
+              parent="menu_installer_root"
+              action="action_installer_tool_loan"
+              sequence="40"/>
+
+    <menuitem id="menu_installer_closeouts"
+              name="Close-Outs"
+              parent="menu_installer_root"
+              action="action_installer_closeout"
+              sequence="50"/>
+
     <menuitem id="menu_installer_config"
               name="Configuration"
               parent="menu_installer_root"

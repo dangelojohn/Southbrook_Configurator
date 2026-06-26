@@ -166,7 +166,28 @@ class TestInstallerJobLifecycle(TransactionCase):
         with self.assertRaises(UserError) as cm:
             job.action_advance_stage()
         self.assertIn("close-out", cm.exception.args[0].lower())
-        job.action_mark_closeout_done()
+        # Phase 1.3 wired closeout_done to the closeout record's state.
+        # Drive a closeout through its workflow to flip it.
+        Closeout = self.env["southbrook.installer.closeout"]
+        closeout = Closeout.create({"job_id": job.id})
+        closeout.action_open()
+        closeout.write({
+            "packaging_removed": True,
+            "offcuts_collected": True,
+            "cabinets_wiped": True,
+            "sawdust_cleared": True,
+            "adhesive_removed": True,
+            "floor_protection_removed": True,
+            "tape_removed": True,
+            "builder_approves_cleanup": True,
+            "installer_confirmed": True,
+        })
+        # phase_photo_ids is already non-empty because the photo-gated
+        # log writes earlier put attachments on stage_log_ids.photo_ids;
+        # closeout._collect_closeout_failures accepts either.
+        closeout.action_submit_closeout()
+        job.invalidate_recordset()
+        self.assertTrue(job.closeout_done)
         job.action_advance_stage()
         self.assertEqual(job.stage_id.code, "COMPLETE")
 
