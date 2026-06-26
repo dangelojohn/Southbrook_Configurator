@@ -170,11 +170,26 @@ class SouthbrookInstallerJob(models.Model):
         string="Kit Delivery Order",
         ondelete="set null",
     )
+    manifest_ids = fields.One2many(
+        "southbrook.delivery.manifest",
+        "job_id",
+        string="Delivery Manifests",
+    )
+    manifest_id = fields.Many2one(
+        "southbrook.delivery.manifest",
+        string="Active Delivery Manifest",
+        compute="_compute_active_manifest",
+        store=True,
+        ondelete="set null",
+        help="Most-recent manifest on this job. Drives "
+             "delivery_confirmed.",
+    )
     delivery_confirmed = fields.Boolean(
-        default=False,
+        compute="_compute_delivery_confirmed",
+        store=True,
         tracking=True,
-        help="Placeholder field — manually flipped in Phase 1.1. Will "
-             "be computed from southbrook.delivery.manifest in Phase 1.2.",
+        help="True when the active delivery manifest is signed off "
+             "(state in 'confirmed' or 'discrepancy'). Wired in 1.2.",
     )
     gps_arrival_time = fields.Datetime(readonly=True, copy=False)
     gps_arrival_lat = fields.Float(digits=(10, 7), readonly=True, copy=False)
@@ -191,12 +206,28 @@ class SouthbrookInstallerJob(models.Model):
     # ------------------------------------------------------------------
     # Blocking + safety
     # ------------------------------------------------------------------
+    damage_flag_ids = fields.One2many(
+        "southbrook.damage.flag",
+        "job_id",
+        string="Damage Flags",
+    )
     is_blocked = fields.Boolean(
-        default=False,
+        compute="_compute_is_blocked",
+        store=True,
         tracking=True,
         index=True,
-        help="Placeholder — manually flipped here. Phase 1.2 wires this "
-             "to live damage flags on the job.",
+        help="True when any non-resolved damage flag on this job has "
+             "urgency='blocking'. Wired in 1.2.",
+    )
+    open_damage_count = fields.Integer(
+        compute="_compute_open_damage_count",
+        store=True,
+        help="Count of damage flags not in terminal state "
+             "(resolved/cancelled).",
+    )
+    blocking_damage_count = fields.Integer(
+        compute="_compute_open_damage_count",
+        store=True,
     )
 
     # ------------------------------------------------------------------
@@ -293,6 +324,45 @@ class SouthbrookInstallerJob(models.Model):
             total = len(considered)
             rec.completion_pct = (100.0 * len(done) / total) if total else 0.0
 
+    @api.depends("manifest_ids", "manifest_ids.create_date")
+    def _compute_active_manifest(self):
+        """The 'active' manifest is the most-recently-created one. v1
+        spec assumes one manifest per job in the common case; we
+        support multiple (re-delivery scenarios) by always picking the
+        newest."""
+        for rec in self:
+            rec.manifest_id = rec.manifest_ids.sorted(
+                key=lambda m: m.create_date or fields.Datetime.now(),
+                reverse=True,
+            )[:1].id if rec.manifest_ids else False
+
+    @api.depends("manifest_id.state")
+    def _compute_delivery_confirmed(self):
+        for rec in self:
+            rec.delivery_confirmed = rec.manifest_id.state in (
+                "confirmed", "discrepancy",
+            )
+
+    @api.depends("damage_flag_ids.state", "damage_flag_ids.urgency")
+    def _compute_is_blocked(self):
+        for rec in self:
+            rec.is_blocked = any(
+                f.urgency == "blocking"
+                and f.state not in ("resolved", "cancelled")
+                for f in rec.damage_flag_ids
+            )
+
+    @api.depends("damage_flag_ids.state", "damage_flag_ids.urgency")
+    def _compute_open_damage_count(self):
+        for rec in self:
+            open_flags = rec.damage_flag_ids.filtered(
+                lambda f: f.state not in ("resolved", "cancelled")
+            )
+            rec.open_damage_count = len(open_flags)
+            rec.blocking_damage_count = len(open_flags.filtered(
+                lambda f: f.urgency == "blocking"
+            ))
+
     @api.depends("gps_arrival_time", "gps_departure_time")
     def _compute_on_site_duration(self):
         for rec in self:
@@ -319,6 +389,39 @@ class SouthbrookInstallerJob(models.Model):
             rec.stage_log_done_count = len(
                 rec.stage_log_ids.filtered(lambda l: l.state == "done")
             )
+
+    def action_open_manifest(self):
+        """Open or create the delivery manifest for this job. Lazy-
+        creates a manifest record if none exists; auto-loads lines
+        from kit_picking_id when present."""
+        self.ensure_one()
+        Manifest = self.env["southbrook.delivery.manifest"]
+        manifest = self.manifest_id or Manifest.create({
+            "job_id": self.id,
+            "picking_id": self.kit_picking_id.id if self.kit_picking_id else False,
+        })
+        if (not manifest.line_ids
+                and (self.kit_picking_id or manifest.picking_id)):
+            manifest.action_load_from_picking()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Delivery Manifest"),
+            "res_model": "southbrook.delivery.manifest",
+            "res_id": manifest.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_view_damage_flags(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Damage Flags"),
+            "res_model": "southbrook.damage.flag",
+            "view_mode": "list,form",
+            "domain": [("job_id", "=", self.id)],
+            "context": {"default_job_id": self.id},
+        }
 
     # ==================================================================
     # CRUD

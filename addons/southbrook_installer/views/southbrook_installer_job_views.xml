@@ -22,10 +22,12 @@
                 <field name="lead_installer_id"/>
                 <field name="stage_id" widget="badge"/>
                 <field name="completion_pct" widget="progressbar"/>
-                <field name="is_blocked" widget="boolean_toggle"
-                       optional="show"/>
                 <field name="delivery_confirmed" widget="boolean_toggle"
-                       optional="show"/>
+                       optional="show" readonly="1"/>
+                <field name="open_damage_count" optional="show"
+                       decoration-danger="open_damage_count &gt; 0"/>
+                <field name="is_blocked" widget="boolean_toggle"
+                       optional="show" readonly="1"/>
                 <field name="active" invisible="1"/>
                 <field name="stage_is_terminal" invisible="1"/>
             </list>
@@ -151,6 +153,10 @@
                     <button name="action_mark_arrived" type="object"
                             string="📍 Mark Arrived" class="oe_highlight"
                             invisible="gps_arrival_time or stage_is_terminal"/>
+                    <button name="action_open_manifest" type="object"
+                            string="📦 Open Delivery Manifest"
+                            class="oe_highlight"
+                            invisible="delivery_confirmed or stage_is_terminal"/>
                     <button name="action_advance_stage" type="object"
                             string="↪ Advance Stage" class="oe_highlight"
                             invisible="stage_is_terminal"/>
@@ -172,6 +178,20 @@
                                 class="oe_stat_button" icon="fa-tasks">
                             <field name="stage_log_done_count"
                                    string="Phases Done" widget="statinfo"/>
+                        </button>
+                        <button name="action_open_manifest" type="object"
+                                class="oe_stat_button" icon="fa-truck">
+                            <div>
+                                <field name="delivery_confirmed"
+                                       widget="boolean_toggle" readonly="1"
+                                       nolabel="1"/>
+                                <span>Manifest</span>
+                            </div>
+                        </button>
+                        <button name="action_view_damage_flags" type="object"
+                                class="oe_stat_button" icon="fa-flag">
+                            <field name="open_damage_count"
+                                   string="Open Flags" widget="statinfo"/>
                         </button>
                     </div>
                     <widget name="web_ribbon" title="Blocked"
@@ -213,9 +233,11 @@
                     <group string="Progress &amp; Telemetry">
                         <group>
                             <field name="completion_pct" widget="progressbar"/>
-                            <field name="delivery_confirmed"
-                                   widget="boolean_toggle"/>
-                            <field name="is_blocked" widget="boolean_toggle"/>
+                            <field name="delivery_confirmed" readonly="1"/>
+                            <field name="is_blocked" readonly="1"/>
+                            <field name="open_damage_count" readonly="1"/>
+                            <field name="blocking_damage_count" readonly="1"
+                                   invisible="blocking_damage_count == 0"/>
                             <field name="sign_off_received"
                                    widget="boolean_toggle"/>
                             <field name="closeout_done" widget="boolean_toggle"/>
@@ -228,6 +250,44 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Delivery" name="delivery">
+                            <group>
+                                <field name="kit_picking_id"
+                                       options="{'no_create': True}"/>
+                                <field name="manifest_id" readonly="1"/>
+                            </group>
+                            <field name="manifest_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="total_lines"/>
+                                    <field name="lines_ok"/>
+                                    <field name="lines_damaged"/>
+                                    <field name="lines_missing"/>
+                                    <field name="confirmation_pct"
+                                           widget="progressbar"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Issues" name="issues">
+                            <widget name="web_ribbon" title="BLOCKED"
+                                    bg_color="bg-danger"
+                                    invisible="not is_blocked"/>
+                            <field name="damage_flag_ids" readonly="1">
+                                <list decoration-danger="urgency == 'blocking' and state not in ('resolved','cancelled')"
+                                      decoration-warning="urgency == 'non_blocking' and state not in ('resolved','cancelled')"
+                                      decoration-muted="state in ('resolved','cancelled')">
+                                    <field name="name"/>
+                                    <field name="reported_time"/>
+                                    <field name="product_id"/>
+                                    <field name="issue_type"/>
+                                    <field name="urgency" widget="badge"/>
+                                    <field name="qty_affected"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="replacement_po_id"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Installation Phases" name="phases">
                             <field name="stage_log_ids">
                                 <list editable="bottom"

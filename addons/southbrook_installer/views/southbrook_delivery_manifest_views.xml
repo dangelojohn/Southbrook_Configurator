@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_delivery_manifest_list" model="ir.ui.view">
+        <field name="name">southbrook.delivery.manifest.list</field>
+        <field name="model">southbrook.delivery.manifest</field>
+        <field name="arch" type="xml">
+            <list string="Delivery Manifests"
+                  decoration-info="state == 'open'"
+                  decoration-warning="state == 'partial'"
+                  decoration-success="state == 'confirmed'"
+                  decoration-danger="state == 'discrepancy'">
+                <field name="name"/>
+                <field name="job_id"/>
+                <field name="picking_id" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="total_lines"/>
+                <field name="lines_ok"/>
+                <field name="lines_damaged"/>
+                <field name="lines_missing"/>
+                <field name="confirmation_pct" widget="progressbar"/>
+                <field name="confirm_date" optional="show"/>
+                <field name="confirmed_by_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_delivery_manifest_form" model="ir.ui.view">
+        <field name="name">southbrook.delivery.manifest.form</field>
+        <field name="model">southbrook.delivery.manifest</field>
+        <field name="arch" type="xml">
+            <form string="Delivery Manifest">
+                <header>
+                    <button name="action_load_from_picking" type="object"
+                            string="🔄 Load from Picking"
+                            invisible="not picking_id or state not in ('draft','open')"/>
+                    <button name="action_confirm_all_ok" type="object"
+                            string="✓ Confirm All OK"
+                            class="oe_highlight"
+                            invisible="state in ('confirmed','discrepancy') or lines_pending == 0"/>
+                    <button name="action_sign_off" type="object"
+                            string="✍ Sign Off Manifest"
+                            class="oe_highlight"
+                            invisible="state in ('confirmed','discrepancy') or lines_pending &gt; 0"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,open,partial,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_damage_flags" type="object"
+                                class="oe_stat_button" icon="fa-flag"
+                                invisible="lines_damaged == 0 and lines_missing == 0">
+                            <field name="lines_damaged" widget="statinfo"
+                                   string="Damaged"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="job_id"/>
+                            <field name="picking_id"/>
+                            <field name="confirm_date" readonly="1"/>
+                            <field name="confirmed_by_id" readonly="1"/>
+                        </group>
+                        <group string="Driver Info">
+                            <field name="driver_name"/>
+                            <field name="truck_plate"/>
+                        </group>
+                    </group>
+                    <group string="Progress">
+                        <group>
+                            <field name="total_lines" readonly="1"/>
+                            <field name="lines_ok" readonly="1"/>
+                            <field name="lines_damaged" readonly="1"/>
+                            <field name="lines_missing" readonly="1"/>
+                            <field name="lines_pending" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="confirmation_pct"
+                                   widget="progressbar" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Manifest Lines" name="lines">
+                            <field name="line_ids">
+                                <list editable="bottom"
+                                      decoration-success="status == 'ok'"
+                                      decoration-warning="status == 'damaged'"
+                                      decoration-danger="status == 'missing'">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="product_id" readonly="1"/>
+                                    <field name="barcode" optional="show"/>
+                                    <field name="lot_id"/>
+                                    <field name="qty_expected"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="damage_type"
+                                           readonly="status != 'damaged'"
+                                           required="status == 'damaged'"/>
+                                    <field name="qty_received_ok"
+                                           readonly="status not in ('ok','damaged')"/>
+                                    <field name="qty_damaged"
+                                           readonly="status != 'damaged'"/>
+                                    <field name="qty_missing" readonly="1"
+                                           optional="show"/>
+                                    <field name="scanned_by_barcode"
+                                           widget="boolean_toggle"
+                                           optional="hide"/>
+                                    <field name="photo_count" optional="show"/>
+                                    <button name="action_set_ok" type="object"
+                                            string="OK" icon="fa-check"
+                                            class="btn-success"
+                                            invisible="status == 'ok'"/>
+                                    <button name="action_set_damaged" type="object"
+                                            string="DMG" icon="fa-warning"
+                                            class="btn-warning"
+                                            invisible="status == 'damaged'"/>
+                                    <button name="action_set_missing" type="object"
+                                            string="MISS" icon="fa-times"
+                                            class="btn-danger"
+                                            invisible="status == 'missing'"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="product_id"/>
+                                        <field name="lot_id"/>
+                                        <field name="qty_expected"/>
+                                        <field name="status"/>
+                                        <field name="damage_type"
+                                               invisible="status != 'damaged'"/>
+                                        <field name="damage_description"
+                                               invisible="status != 'damaged'"/>
+                                        <field name="photo_ids"
+                                               widget="many2many_binary"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Delivery Photos" name="photos">
+                            <field name="delivery_photo_ids"
+                                   widget="many2many_binary"/>
+                        </page>
+                        <page string="Driver Signature" name="sig">
+                            <field name="signature_data" widget="image"/>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_delivery_manifest" model="ir.actions.act_window">
+        <field name="name">Delivery Manifests</field>
+        <field name="res_model">southbrook.delivery.manifest</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

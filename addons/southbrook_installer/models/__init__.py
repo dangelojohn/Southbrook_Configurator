@@ -3,3 +3,5 @@ from . import southbrook_installer_stage
 from . import southbrook_installer_phase
 from . import southbrook_installer_stage_log
 from . import southbrook_installer_job
+from . import southbrook_damage_flag
+from . import southbrook_delivery_manifest

@@ -14,6 +14,18 @@
               action="action_installer_job"
               sequence="10"/>
 
+    <menuitem id="menu_installer_manifests"
+              name="Delivery Manifests"
+              parent="menu_installer_root"
+              action="action_delivery_manifest"
+              sequence="20"/>
+
+    <menuitem id="menu_installer_damage_flags"
+              name="Damage Flags"
+              parent="menu_installer_root"
+              action="action_damage_flag"
+              sequence="30"/>
+
     <menuitem id="menu_installer_config"
               name="Configuration"
               parent="menu_installer_root"

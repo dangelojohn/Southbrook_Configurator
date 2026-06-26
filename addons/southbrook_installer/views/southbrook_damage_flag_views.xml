@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_damage_flag_list" model="ir.ui.view">
+        <field name="name">southbrook.damage.flag.list</field>
+        <field name="model">southbrook.damage.flag</field>
+        <field name="arch" type="xml">
+            <list string="Damage Flags"
+                  decoration-danger="urgency == 'blocking' and state not in ('resolved','cancelled')"
+                  decoration-warning="urgency == 'non_blocking' and state not in ('resolved','cancelled')"
+                  decoration-muted="state in ('resolved','cancelled')">
+                <field name="name"/>
+                <field name="reported_time"/>
+                <field name="job_id"/>
+                <field name="product_id"/>
+                <field name="issue_type"/>
+                <field name="urgency" widget="badge"/>
+                <field name="qty_affected"/>
+                <field name="state" widget="badge"/>
+                <field name="replacement_po_id" optional="show"/>
+                <field name="photo_count" optional="show"/>
+                <field name="reported_by_id" optional="show"/>
+                <field name="resolution_duration_hrs" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_damage_flag_form" model="ir.ui.view">
+        <field name="name">southbrook.damage.flag.form</field>
+        <field name="model">southbrook.damage.flag</field>
+        <field name="arch" type="xml">
+            <form string="Damage Flag">
+                <header>
+                    <button name="action_create_replacement_po" type="object"
+                            string="🛒 Order Replacement"
+                            class="oe_highlight"
+                            invisible="replacement_po_id or state in ('reorder_pending','reorder_confirmed','delivered','resolved','cancelled')"/>
+                    <button name="action_confirm_vendor" type="object"
+                            string="✅ Vendor Confirmed"
+                            class="oe_highlight"
+                            invisible="state != 'reorder_pending'"/>
+                    <button name="action_confirm_replacement_delivery" type="object"
+                            string="📦 Replacement Received"
+                            class="oe_highlight"
+                            invisible="state not in ('reorder_pending','reorder_confirmed')"/>
+                    <button name="action_resolve" type="object"
+                            string="✅ Resolve"
+                            class="oe_highlight"
+                            invisible="state in ('resolved','cancelled')"/>
+                    <button name="action_cancel" type="object"
+                            string="Cancel Flag"
+                            invisible="state in ('resolved','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="open,reorder_pending,reorder_confirmed,delivered,resolved"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_po" type="object"
+                                class="oe_stat_button" icon="fa-shopping-cart"
+                                invisible="not replacement_po_id">
+                            <field name="replacement_po_id" widget="statinfo"
+                                   string="Replacement PO"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="BLOCKING"
+                            bg_color="bg-danger"
+                            invisible="urgency != 'blocking' or state in ('resolved','cancelled')"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="What">
+                            <field name="job_id" readonly="state != 'open'"/>
+                            <field name="product_id"/>
+                            <field name="lot_id"/>
+                            <field name="issue_type"/>
+                            <field name="urgency" widget="radio"/>
+                            <field name="qty_affected"/>
+                        </group>
+                        <group string="When + Who">
+                            <field name="reported_time" readonly="1"/>
+                            <field name="reported_by_id" readonly="1"/>
+                            <field name="manifest_line_id" readonly="1"/>
+                            <field name="photo_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"
+                               placeholder="Describe what was wrong, what is needed."/>
+                    </group>
+                    <notebook>
+                        <page string="Photos" name="photos">
+                            <field name="photo_ids" widget="many2many_binary"/>
+                        </page>
+                        <page string="Replacement" name="replacement">
+                            <group>
+                                <group>
+                                    <field name="replacement_product_id"/>
+                                    <field name="replacement_qty"/>
+                                    <field name="replacement_eta"/>
+                                </group>
+                                <group>
+                                    <field name="replacement_po_id" readonly="1"/>
+                                    <field name="replacement_confirmed_by_id" readonly="1"/>
+                                    <field name="resolution_time" readonly="1"/>
+                                    <field name="resolution_duration_hrs"
+                                           widget="float_time" readonly="1"/>
+                                </group>
+                            </group>
+                            <separator string="Dispatcher Notes"/>
+                            <field name="dispatcher_notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_damage_flag_search" model="ir.ui.view">
+        <field name="name">southbrook.damage.flag.search</field>
+        <field name="model">southbrook.damage.flag</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="job_id"/>
+                <field name="product_id"/>
+                <field name="reported_by_id"/>
+                <filter name="open" string="Open"
+                        domain="[('state', 'not in', ['resolved','cancelled'])]"/>
+                <filter name="blocking" string="Blocking"
+                        domain="[('urgency', '=', 'blocking'),
+                                 ('state', 'not in', ['resolved','cancelled'])]"/>
+                <filter name="reorder_pending" string="Replacement Pending"
+                        domain="[('state', '=', 'reorder_pending')]"/>
+                <filter name="my_flags" string="Reported by Me"
+                        domain="[('reported_by_id.user_id', '=', uid)]"/>
+                <separator/>
+                <filter name="today" string="Reported Today"
+                        domain="[('reported_time', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00'))]"/>
+                <group>
+                    <filter name="g_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="g_job" string="Job"
+                            context="{'group_by': 'job_id'}"/>
+                    <filter name="g_urgency" string="Urgency"
+                            context="{'group_by': 'urgency'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_damage_flag" model="ir.actions.act_window">
+        <field name="name">Damage Flags</field>
+        <field name="res_model">southbrook.damage.flag</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{"search_default_open": 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No active damage flags
+            </p>
+            <p>
+                Damage flags are raised by installers when a delivered
+                item is damaged, wrong, or missing. Blocking-urgency
+                flags auto-trigger a replacement purchase order against
+                the product's configured vendor.
+            </p>
+        </field>
+    </record>
+
+</odoo>

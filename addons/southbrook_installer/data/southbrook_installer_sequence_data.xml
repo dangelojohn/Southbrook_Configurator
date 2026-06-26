@@ -10,4 +10,14 @@
         <field name="number_increment">1</field>
         <field name="company_id" eval="False"/>
     </record>
+
+    <record id="seq_damage_flag" model="ir.sequence">
+        <field name="name">Southbrook Installer Damage Flag</field>
+        <field name="code">southbrook.damage.flag</field>
+        <field name="prefix">FLAG-%(year)s-</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>

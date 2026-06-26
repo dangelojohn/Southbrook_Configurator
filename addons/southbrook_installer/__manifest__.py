@@ -51,7 +51,7 @@ SAFE DEPS ONLY:
   for kit_picking_id. ``sign`` and ``sms`` deliberately omitted;
   cold install must succeed in this stack as-is.
 """,
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
@@ -61,6 +61,7 @@ SAFE DEPS ONLY:
         "project",
         "hr",
         "stock",
+        "purchase",
     ],
     "data": [
         "security/southbrook_installer_groups.xml",
@@ -71,6 +72,8 @@ SAFE DEPS ONLY:
         "views/southbrook_installer_stage_views.xml",
         "views/southbrook_installer_phase_views.xml",
         "views/southbrook_installer_stage_log_views.xml",
+        "views/southbrook_damage_flag_views.xml",
+        "views/southbrook_delivery_manifest_views.xml",
         "views/southbrook_installer_job_views.xml",
         "views/southbrook_installer_menus.xml",
     ],
