@@ -5,3 +5,4 @@ from . import qr_scan_log
 from . import qr_mixin
 from . import stock_extensions
 from . import shipping_unit
+from . import truck_load

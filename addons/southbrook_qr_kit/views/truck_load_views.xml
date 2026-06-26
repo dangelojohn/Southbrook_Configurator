@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+    <record id="view_truck_load_list" model="ir.ui.view">
+        <field name="name">southbrook.truck.load.list</field>
+        <field name="model">southbrook.truck.load</field>
+        <field name="arch" type="xml">
+            <list string="Truck Loads"
+                  decoration-info="state == 'draft'"
+                  decoration-warning="state == 'loading' or roll_out_blocked"
+                  decoration-success="state == 'rolled_out'"
+                  decoration-muted="state == 'returned'">
+                <field name="name"/>
+                <field name="truck_ref"/>
+                <field name="scheduled_at"/>
+                <field name="driver_id" optional="show"/>
+                <field name="driver_name" optional="show"/>
+                <field name="manifest_count"/>
+                <field name="loaded_count"/>
+                <field name="missing_count"
+                       decoration-danger="missing_count > 0"/>
+                <field name="extra_count"
+                       decoration-danger="extra_count > 0"/>
+                <field name="oversize_count" optional="show"/>
+                <field name="total_weight_kg" optional="show"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_truck_load_form" model="ir.ui.view">
+        <field name="name">southbrook.truck.load.form</field>
+        <field name="model">southbrook.truck.load</field>
+        <field name="arch" type="xml">
+            <form string="Truck Load">
+                <header>
+                    <button name="action_start_loading" type="object"
+                            string="Start Loading" class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_roll_out" type="object"
+                            string="Roll Out" class="oe_highlight"
+                            invisible="state != 'loading'"
+                            disabled="roll_out_blocked"/>
+                    <button name="action_return" type="object"
+                            string="Returned"
+                            invisible="state != 'rolled_out'"/>
+                    <button name="action_print_qr_label" type="object"
+                            string="Print Truck QR"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,loading,rolled_out"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <div class="alert alert-danger"
+                         invisible="not roll_out_blocked"
+                         role="alert">
+                        <strong>Manifest mismatch.</strong>
+                        <span invisible="missing_count == 0">
+                            Missing: <field name="missing_count" readonly="1"
+                                            class="oe_inline"/> unit(s).
+                        </span>
+                        <span invisible="extra_count == 0">
+                            Extra (not on BOL):
+                            <field name="extra_count" readonly="1"
+                                   class="oe_inline"/> unit(s).
+                        </span>
+                    </div>
+                    <group>
+                        <group string="Truck">
+                            <field name="truck_ref"/>
+                            <field name="driver_id"/>
+                            <field name="driver_name"
+                                   invisible="driver_id"/>
+                            <field name="scheduled_at"/>
+                        </group>
+                        <group string="Totals">
+                            <field name="manifest_count"/>
+                            <field name="loaded_count"/>
+                            <field name="total_weight_kg"/>
+                            <field name="oversize_count"
+                                   decoration-danger="oversize_count > 0"/>
+                            <field name="roll_out_blocked" readonly="1"
+                                   invisible="not roll_out_blocked"/>
+                            <field name="rolled_out_at" readonly="1"
+                                   invisible="not rolled_out_at"/>
+                            <field name="rolled_out_by" readonly="1"
+                                   invisible="not rolled_out_by"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Manifested Units" name="manifested">
+                            <field name="manifest_unit_ids" widget="many2many"
+                                   readonly="state == 'rolled_out'">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="kind"/>
+                                    <field name="partner_id"/>
+                                    <field name="builder_unit_ref"/>
+                                    <field name="weight_kg"/>
+                                    <field name="oversize" widget="boolean_toggle"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Loaded Units (scanned)" name="loaded">
+                            <field name="loaded_unit_ids" widget="many2many"
+                                   readonly="state == 'rolled_out'">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="kind"/>
+                                    <field name="partner_id"/>
+                                    <field name="weight_kg"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="QR" name="qr">
+                            <field name="qr_payload" readonly="1"/>
+                            <field name="qr_image_base64" readonly="1"
+                                   widget="image"/>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_truck_load_search" model="ir.ui.view">
+        <field name="name">southbrook.truck.load.search</field>
+        <field name="model">southbrook.truck.load</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="truck_ref"/>
+                <field name="driver_id"/>
+                <field name="driver_name"/>
+                <filter name="draft" string="Draft"
+                        domain="[('state','=','draft')]"/>
+                <filter name="loading" string="Loading"
+                        domain="[('state','=','loading')]"/>
+                <filter name="blocked" string="Blocked (mismatch)"
+                        domain="[('roll_out_blocked','=',True)]"/>
+                <filter name="rolled_out" string="Rolled Out"
+                        domain="[('state','=','rolled_out')]"/>
+                <group>
+                    <filter name="g_state" string="State"
+                            context="{'group_by':'state'}"/>
+                    <filter name="g_truck" string="Truck"
+                            context="{'group_by':'truck_ref'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_truck_load" model="ir.actions.act_window">
+        <field name="name">Truck Loads</field>
+        <field name="res_model">southbrook.truck.load</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_qr_truck_loads" name="Truck Loads"
+              parent="menu_qr_scan_log_root"
+              action="action_truck_load" sequence="25"/>
+</odoo>

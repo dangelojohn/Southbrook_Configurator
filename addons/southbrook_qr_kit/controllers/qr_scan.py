@@ -63,6 +63,46 @@ class QrScanController(http.Controller):
         return request.make_response(body, headers=[
             ("Content-Type", "text/html; charset=utf-8")])
 
+    @http.route("/sb/qr/shipping/load-unit", type="json", auth="user",
+                methods=["POST"])
+    def load_unit(self, truck=None, unit=None, **kw):
+        """Scan-to-load at the loading bay.
+
+        Body:
+          {
+            "truck": "sb://truck/<truck_load_id>?...",
+            "unit":  "sb://ship/<shipping_unit_id>?..."
+          }
+
+        Resolves both signed payloads, calls action_load_unit on the
+        truck. Returns {ok, unit_name, is_extra, missing_count,
+        extra_count, alert} so the loading-bay UI can flash green/red.
+        """
+        env = request.env
+        Payload = env["southbrook.qr.payload"].sudo()
+        if not truck or not unit:
+            return {"ok": False, "error": "truck + unit required"}
+        try:
+            tp = Payload.parse(truck)
+            up = Payload.parse(unit)
+            if not tp["valid_signature"] or not up["valid_signature"]:
+                return {"ok": False, "error": "Invalid signature"}
+            if tp["kind"] != "truck" or up["kind"] != "ship":
+                return {"ok": False,
+                        "error": "truck must be 'truck' kind, unit 'ship' kind"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"parse: {exc}"}
+        Truck = env["southbrook.truck.load"]
+        rec = Truck.browse(int(tp["ident"])).exists()
+        if not rec:
+            return {"ok": False, "error": "Truck load not found"}
+        try:
+            result = rec.action_load_unit(int(up["ident"]))
+            result.setdefault("ok", True)
+            return result
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+
     @http.route("/sb/qr/inventory/bin-scan", type="json", auth="user",
                 methods=["POST"])
     def bin_scan(self, src=None, dst=None, product=None, qty=1.0, **kw):
