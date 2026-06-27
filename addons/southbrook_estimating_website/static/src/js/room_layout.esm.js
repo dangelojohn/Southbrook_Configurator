@@ -3,20 +3,28 @@
  * SPDX-License-Identifier: LGPL-3.0-only
  *
  * Phase 3.B — Room Layout tab (2026-06-27).
+ * Phase 3.C.2a — tap interactivity layer (2026-06-27).
  *
- * Two OWL components:
+ * Components:
  *
- *   RoomLayoutTab  — parent. Hosts the floor-plan SVG + a per-wall
- *                    metrics panel + the Unplaced Cabinets sidebar.
- *                    Handles the empty states (no room / no walls /
- *                    no lines).
+ *   RoomLayoutTab     — parent. Hosts the floor-plan SVG + a per-wall
+ *                       metrics panel + the Unplaced Cabinets sidebar.
+ *                       Handles the empty states (no room / no walls /
+ *                       no lines). 3.C.2a adds three click affordances:
+ *                       cabinet poly → highlight line, gap rect → catalog
+ *                       w/ auto-place, unplaced "Assign..." → modal.
  *
- *   FloorPlanSVG   — pure render. Takes room + lines, emits one big
- *                    inline <svg> with: room outline (per-wall lines),
- *                    constraints, cabinets (zone-coloured polygons),
- *                    gap markers, and wall name labels.
+ *   FloorPlanSVG      — pure render. Takes room + lines, emits one big
+ *                       inline <svg> with: room outline (per-wall lines),
+ *                       constraints, cabinets (zone-coloured polygons),
+ *                       gap markers, and wall name labels. 3.C.2a wires
+ *                       click handlers on cabinet polygons + gap rects.
  *
- * READ-ONLY in 3.B. Click/drag/elevation toggle is Phase 3.C.
+ *   AssignToWallModal — overlay opened when the user clicks "Assign..."
+ *                       on an unplaced cabinet. Wall dropdown + position
+ *                       input + Cancel/Assign. Parent owns the RPC.
+ *
+ * 3.C.2b (drag) and 3.C.2c (elevation view) remain deferred.
  *
  * Geometry sourced from the shared room_geometry.esm.js helper so the
  * wizard preview (Phase 2.C RoomOutlinePreview) and this floor plan
@@ -29,7 +37,7 @@
  *   - `<` encoded as &lt; in attribute expressions where needed.
  *   - SVG sub-trees are plain XML — OWL handles the namespace.
  */
-import { Component } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { wallSegmentsForShape } from "@southbrook_estimating_website/js/room_geometry.esm";
 
 // ----------------------------------------------------------------------
@@ -137,7 +145,22 @@ class FloorPlanSVG extends Component {
     static props = {
         room: { type: Object, optional: true },
         lines: { type: Array, optional: true },
+        // Phase 3.C.2a — click affordances. Both optional so the
+        // component still renders read-only when used without
+        // interactivity (e.g. inside the wizard preview pane).
+        onCabinetClick: { type: Function, optional: true },
+        onGapClick: { type: Function, optional: true },
     };
+
+    // Phase 3.C.2a — click handlers. Both no-op when the parent didn't
+    // wire a callback so the SVG falls back to read-only.
+    _onCabinetClick(lineId) {
+        if (this.props.onCabinetClick) this.props.onCabinetClick(lineId);
+    }
+
+    _onGapClick(wallId, gapMm, positionMm) {
+        if (this.props.onGapClick) this.props.onGapClick(wallId, gapMm, positionMm);
+    }
 
     get _viewBox() {
         return "0 0 " + SVG_W + " " + SVG_H;
@@ -396,6 +419,10 @@ class FloorPlanSVG extends Component {
                 const widthPx = width * this._transform.scale;
                 out.push({
                     key: "cab-" + line.id,
+                    // Phase 3.C.2a — surface the line id explicitly so
+                    // the template's t-on-click can call back into the
+                    // parent without re-parsing the key string.
+                    lineId: line.id,
                     points: pts,
                     zoneClass: ZONE_CLASS(line.zone),
                     conflict: !!wall.has_conflicts,
@@ -458,6 +485,15 @@ class FloorPlanSVG extends Component {
                     cx,
                     cy,
                     showLabel: widthPx >= 40,
+                    // Phase 3.C.2a — surface the click target context so
+                    // the gap-click handler can stash a placement intent
+                    // before the catalog modal opens. position = gap-left
+                    // edge in mm (where the cabinet will start). The
+                    // parent's _onPlanGapClick adjusts as needed (e.g.
+                    // centering inside the gap is a Phase-3.D nicety).
+                    wallId: wallId,
+                    gapMm: gap,
+                    positionMm: lo,
                 });
             }
         }
@@ -543,7 +579,25 @@ export class RoomLayoutTab extends Component {
     static props = {
         room: { type: [Object, { value: null }], optional: true },
         lines: { type: Array, optional: true },
+        // Phase 3.C.2a — tap interactivity callbacks. All optional so
+        // the tab stays read-only when wired without these. The parent
+        // OrderBuilder threads three handlers through:
+        //   onCabinetClick(lineId)              — clicked a placed cabinet
+        //   onGapClick(wallId, gapMm, posMm)    — clicked an empty gap
+        //   onAssignFromSidebar(lineId)         — clicked sidebar "Assign..."
+        onCabinetClick: { type: Function, optional: true },
+        onGapClick: { type: Function, optional: true },
+        onAssignFromSidebar: { type: Function, optional: true },
     };
+
+    // Phase 3.C.2a — sidebar Assign... button handler. No-op when the
+    // parent didn't wire a callback (defensive — every production
+    // mount wires this).
+    _onAssignClick(lineId) {
+        if (this.props.onAssignFromSidebar) {
+            this.props.onAssignFromSidebar(lineId);
+        }
+    }
 
     // ------------------------------------------------------------------
     // Empty-state predicates — drive the t-if/t-elif cascade in the
@@ -608,5 +662,109 @@ export class RoomLayoutTab extends Component {
         const used_mm = metrics.reduce((a, m) => a + m.used_mm, 0);
         const remaining_mm = length_mm - used_mm;
         return { length_mm, used_mm, remaining_mm };
+    }
+}
+
+// ----------------------------------------------------------------------
+// AssignToWallModal — Phase 3.C.2a.
+//
+// Fullscreen overlay launched from the Room Layout sidebar's
+// "Assign..." button on each unplaced cabinet. Wall dropdown + position
+// input; on Assign click the parent OrderBuilder owns the RPC via the
+// onAssign(wallId, positionMm) callback.
+//
+// Position seeded from the picked wall's used_mm (i.e. the cabinet
+// starts where the last placed cabinet ends — sensible default). The
+// user can override before submitting.
+//
+// Visual chrome mirrors the RoomSetupWizard backdrop so the two
+// overlays read as the same UI vocabulary. Sub-prefix `sb-room-plan-
+// modal-*` keeps the new selectors isolated from the wizard's.
+// ----------------------------------------------------------------------
+
+export class AssignToWallModal extends Component {
+    static template = "southbrook_estimating_website.AssignToWallModal";
+    static props = {
+        line: Object,
+        room: Object,
+        onAssign: Function,
+        onCancel: Function,
+    };
+
+    setup() {
+        const walls = (this.props.room && this.props.room.walls) || [];
+        const firstWall = walls[0] || null;
+        this.state = useState({
+            // Stored as strings so the <select> + <input> bind cleanly;
+            // coerced to int on submit.
+            wallId: firstWall ? String(firstWall.id) : "",
+            // Seed position to the wall's used_mm so the cabinet appends
+            // to the end of the existing run. Falls back to 0 when the
+            // wall is empty.
+            positionMm: firstWall ? String(firstWall.used_mm || 0) : "0",
+            submitting: false,
+            error: null,
+        });
+    }
+
+    // Sorted-by-name wall list so the dropdown stays predictable.
+    get _wallOptions() {
+        const walls = (this.props.room && this.props.room.walls) || [];
+        return walls.map((w) => ({
+            id: w.id,
+            name: w.name || "Wall",
+            length_mm: w.length_mm || 0,
+            remaining_mm: typeof w.remaining_mm === "number" ? w.remaining_mm : 0,
+            used_mm: w.used_mm || 0,
+        }));
+    }
+
+    // Re-seed position when the user switches walls — start at the
+    // newly-picked wall's used_mm (append-to-end default).
+    _onWallChange = (ev) => {
+        const newId = ev.target.value;
+        this.state.wallId = newId;
+        const w = this._wallOptions.find((o) => String(o.id) === String(newId));
+        if (w) {
+            this.state.positionMm = String(w.used_mm || 0);
+        }
+    };
+
+    _onPositionInput = (ev) => {
+        this.state.positionMm = ev.target.value;
+    };
+
+    _onCancelClick = () => {
+        if (this.state.submitting) return;
+        this.props.onCancel();
+    };
+
+    _onAssignClick = async () => {
+        if (this.state.submitting) return;
+        const wallIdNum = parseInt(this.state.wallId, 10);
+        const posNum = parseFloat(this.state.positionMm);
+        if (!Number.isFinite(wallIdNum) || wallIdNum <= 0) {
+            this.state.error = "Pick a wall.";
+            return;
+        }
+        if (!Number.isFinite(posNum) || posNum < 0) {
+            this.state.error = "Position must be 0 or greater.";
+            return;
+        }
+        this.state.submitting = true;
+        this.state.error = null;
+        try {
+            await this.props.onAssign(wallIdNum, posNum);
+        } catch (e) {
+            this.state.error = e && e.message ? e.message : String(e);
+        } finally {
+            this.state.submitting = false;
+        }
+    };
+
+    // Cabinet width used in the body summary so the user can sanity-
+    // check the placement (e.g. "600mm cabinet → wall has 1200mm left").
+    get _cabinetWidthMm() {
+        return (this.props.line && this.props.line.sb_width_mm) || 0;
     }
 }

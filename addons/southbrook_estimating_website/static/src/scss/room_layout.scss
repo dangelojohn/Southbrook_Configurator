@@ -1368,3 +1368,243 @@
     font-size: 0.85rem;
     font-style: italic;
 }
+
+// ---------------------------------------------------------------------
+// Phase 3.C.2a — tap interactivity.
+//
+// Three surfaces, all sub-prefixed so they cannot collide with the
+// Phase 3.B `.sb-room-plan-*` selectors above:
+//   .sb-room-plan-cab--clickable      → pointer cursor on placed cabinets
+//   .sb-room-plan-gap--clickable      → pointer cursor on gap rects
+//   .sb-room-plan-unplaced-assign     → Assign... button in sidebar row
+//   .sb-room-plan-modal-*             → AssignToWallModal overlay
+//
+// Tokens (--sb-*) inherited from _southbrook_design_tokens.scss.
+// ---------------------------------------------------------------------
+
+.sb-room-plan-cab--clickable {
+    cursor: pointer;
+    transition: filter 120ms ease, stroke-width 120ms ease;
+
+    &:hover {
+        filter: brightness(1.08);
+        stroke-width: 2.5;
+    }
+}
+
+.sb-room-plan-gap--clickable {
+    cursor: pointer;
+    transition: stroke 120ms ease, opacity 120ms ease;
+
+    &:hover {
+        stroke: var(--sb-sky);
+        opacity: 1;
+    }
+}
+
+.sb-room-plan-unplaced-assign {
+    margin-left: 0.4rem;
+    padding: 0.15rem 0.55rem;
+    background: var(--sb-walnut);
+    color: var(--sb-paper);
+    border: 1px solid var(--sb-walnut-d);
+    border-radius: var(--sb-radius-sm);
+    font-family: var(--sb-font-display);
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+
+    &:hover {
+        background: var(--sb-walnut-d);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+}
+
+// ---------------------------------------------------------------------
+// AssignToWallModal — backdrop + dialog box.
+// ---------------------------------------------------------------------
+
+.sb-room-plan-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1055;
+    background: rgba(20, 18, 16, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.sb-room-plan-modal {
+    width: 100%;
+    max-width: 460px;
+    background: var(--sb-paper);
+    border-radius: var(--sb-radius);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: var(--sb-font-sans);
+    color: var(--sb-ink);
+}
+
+.sb-room-plan-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 0.95rem 1.2rem 0.7rem 1.2rem;
+    border-bottom: 1px solid var(--sb-rule);
+    background: var(--sb-linen);
+}
+
+.sb-room-plan-modal-title {
+    margin: 0;
+    font-family: var(--sb-font-display);
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--sb-walnut-d);
+}
+
+.sb-room-plan-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--sb-ink-dim);
+    cursor: pointer;
+    padding: 0 0.4rem;
+    line-height: 1;
+
+    &:hover { color: var(--sb-walnut-d); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+}
+
+.sb-room-plan-modal-body {
+    padding: 1rem 1.2rem 0.4rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.sb-room-plan-modal-cabinet {
+    margin: 0 0 0.4rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.92rem;
+
+    strong {
+        color: var(--sb-walnut-d);
+    }
+}
+
+.sb-room-plan-modal-width {
+    color: var(--sb-ink-dim);
+    font-size: 0.82rem;
+}
+
+.sb-room-plan-modal-label {
+    display: block;
+    margin: 0.3rem 0 0.15rem 0;
+    font-size: 0.78rem;
+    color: var(--sb-ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+
+.sb-room-plan-modal-select,
+.sb-room-plan-modal-input {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    background: var(--sb-paper);
+    color: var(--sb-ink);
+    border: 1px solid var(--sb-rule-d);
+    border-radius: var(--sb-radius-sm);
+    font-family: var(--sb-font-sans);
+    font-size: 0.92rem;
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 0;
+        border-color: var(--sb-sky);
+    }
+
+    &:disabled {
+        background: var(--sb-linen);
+        cursor: not-allowed;
+    }
+}
+
+.sb-room-plan-modal-input {
+    font-family: var(--sb-font-mono);
+    text-align: right;
+}
+
+.sb-room-plan-modal-error {
+    margin: 0.4rem 0 0 0;
+    padding: 0.4rem 0.55rem;
+    color: var(--sb-alert);
+    background: rgba(220, 80, 80, 0.08);
+    border: 1px solid var(--sb-alert);
+    border-radius: var(--sb-radius-sm);
+    font-size: 0.85rem;
+}
+
+.sb-room-plan-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.85rem 1.2rem;
+    border-top: 1px solid var(--sb-rule);
+    background: var(--sb-paper);
+}
+
+.sb-room-plan-modal-btn {
+    padding: 0.5rem 1.1rem;
+    border-radius: var(--sb-radius-sm);
+    font-family: var(--sb-font-display);
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color 120ms ease, border-color 120ms ease;
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+
+    &--primary {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+        border-color: var(--sb-walnut-d);
+
+        &:hover:not(:disabled) {
+            background: var(--sb-walnut-d);
+        }
+    }
+
+    &--secondary {
+        background: var(--sb-paper);
+        color: var(--sb-walnut-d);
+        border-color: var(--sb-rule-d);
+
+        &:hover:not(:disabled) {
+            background: var(--sb-linen);
+        }
+    }
+}

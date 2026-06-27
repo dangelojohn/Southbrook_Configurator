@@ -1,16 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     Phase 3.B — Room Layout tab templates (2026-06-27).
+    Phase 3.C.2a — tap interactivity layer (2026-06-27).
 
-    Two components mounted into web.assets_frontend via the addon
-    manifest. OWL tokenizer rules followed throughout:
+    Components mounted into web.assets_frontend via the addon manifest.
+    OWL tokenizer rules followed throughout:
 
       * t-if / t-att-* expressions use ||, &&, ! (never Python or/and/not)
       * `<` encoded as &lt; inside attribute expressions where needed
       * SVG sub-trees are plain XML — OWL handles the namespace
 
-    Read-only in 3.B — click handlers, drag, and the elevation toggle
-    are Phase 3.C.
+    Three click affordances in 3.C.2a:
+      - cabinet polygon click → onCabinetClick(lineId)
+      - gap rect click        → onGapClick(wallId, gapMm, positionMm)
+      - sidebar Assign... btn → onAssignFromSidebar(lineId)
+
+    Drag (3.C.2b) and the elevation toggle (3.C.2c) remain deferred.
 -->
 <templates xml:space="preserve">
 
@@ -60,7 +65,10 @@
                  class="sb-room-plan-layout">
 
                 <div class="sb-room-plan-canvas">
-                    <FloorPlanSVG room="props.room" lines="props.lines"/>
+                    <FloorPlanSVG room="props.room"
+                                  lines="props.lines"
+                                  onCabinetClick="props.onCabinetClick"
+                                  onGapClick="props.onGapClick"/>
                 </div>
 
                 <aside class="sb-room-plan-sidebar">
@@ -142,6 +150,19 @@
                                 <span class="sb-room-plan-unplaced-width mono">
                                     <t t-esc="line.sb_width_mm || 0"/> mm
                                 </span>
+                                <!-- Phase 3.C.2a — Assign... opens the
+                                     AssignToWallModal at the parent
+                                     OrderBuilder level. Button hidden
+                                     when no callback was wired so the
+                                     read-only mount (e.g. preview pane)
+                                     stays clean. -->
+                                <button t-if="props.onAssignFromSidebar"
+                                        type="button"
+                                        class="sb-room-plan-unplaced-assign"
+                                        t-on-click="() => this._onAssignClick(line.id)"
+                                        t-att-aria-label="'Assign ' + line.name + ' to a wall'">
+                                    Assign…
+                                </button>
                             </li>
                         </ul>
                         <p t-if="!_hasLines &amp;&amp; _hasWalls"
@@ -214,13 +235,20 @@
                 </t>
             </g>
 
-            <!-- Gap markers — dashed rect, no fill. -->
+            <!-- Gap markers — dashed rect, no fill. Phase 3.C.2a wires
+                 the click handler so a tap opens the catalog modal with
+                 a stashed pendingGapPlacement. Cursor flips to pointer
+                 only when a click handler is wired (props.onGapClick on
+                 the FloorPlanSVG, threaded down by RoomLayoutTab from
+                 the OrderBuilder). -->
             <g class="sb-room-plan-gaps-g">
                 <t t-foreach="_gapMarkers"
                    t-as="g"
                    t-key="g.key">
                     <polygon class="sb-room-plan-gap"
-                             t-att-points="g.points"/>
+                             t-att-class="props.onGapClick ? 'sb-room-plan-gap sb-room-plan-gap--clickable' : 'sb-room-plan-gap'"
+                             t-att-points="g.points"
+                             t-on-click="() => this._onGapClick(g.wallId, g.gapMm, g.positionMm)"/>
                     <text t-if="g.showLabel"
                           class="sb-room-plan-gap-label"
                           t-att-x="g.cx"
@@ -232,15 +260,19 @@
                 </t>
             </g>
 
-            <!-- Cabinet polygons + (conditional) labels. -->
+            <!-- Cabinet polygons + (conditional) labels. Phase 3.C.2a
+                 wires the click handler so tapping a cabinet jumps to
+                 the Order Lines tab + selects the row (parent owns the
+                 state mutation via onCabinetClick). -->
             <g class="sb-room-plan-cabs-g">
                 <t t-foreach="_cabinetPolys"
                    t-as="cab"
                    t-key="cab.key">
                     <polygon t-att-class="cab.conflict
-                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
-                                           : cab.zoneClass"
-                             t-att-points="cab.points"/>
+                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict' + (props.onCabinetClick ? ' sb-room-plan-cab--clickable' : ''))
+                                           : (cab.zoneClass + (props.onCabinetClick ? ' sb-room-plan-cab--clickable' : ''))"
+                             t-att-points="cab.points"
+                             t-on-click="() => this._onCabinetClick(cab.lineId)"/>
                     <text t-if="cab.showLabel"
                           class="sb-room-plan-cab-label"
                           t-att-x="cab.cx"
@@ -267,6 +299,104 @@
             </g>
 
         </svg>
+    </t>
+
+    <!-- ============================================================
+         AssignToWallModal — Phase 3.C.2a.
+
+         Fullscreen overlay launched when the user clicks "Assign..."
+         next to an unplaced cabinet in the Room Layout sidebar. Wall
+         dropdown (length + remaining) + position input + Cancel /
+         Assign. Parent OrderBuilder owns the RPC; this template just
+         drives the form.
+
+         Backdrop click does NOT close (a misclick mid-pick would lose
+         the form state). Use the × button or Cancel.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.AssignToWallModal">
+        <div class="sb-room-plan-modal-backdrop">
+            <div class="sb-room-plan-modal"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="sb-room-plan-modal-title">
+                <header class="sb-room-plan-modal-head">
+                    <h2 id="sb-room-plan-modal-title"
+                        class="sb-room-plan-modal-title">
+                        Assign cabinet to a wall
+                    </h2>
+                    <button type="button"
+                            class="sb-room-plan-modal-close"
+                            aria-label="Cancel"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.submitting">×</button>
+                </header>
+
+                <div class="sb-room-plan-modal-body">
+                    <p class="sb-room-plan-modal-cabinet">
+                        <strong t-esc="props.line.name || 'Cabinet'"/>
+                        <span t-if="_cabinetWidthMm"
+                              class="sb-room-plan-modal-width mono">
+                            <t t-esc="_cabinetWidthMm"/> mm wide
+                        </span>
+                    </p>
+
+                    <label class="sb-room-plan-modal-label"
+                           for="sb-room-plan-modal-wall">
+                        Wall
+                    </label>
+                    <select id="sb-room-plan-modal-wall"
+                            class="sb-room-plan-modal-select"
+                            t-att-value="state.wallId"
+                            t-on-change="_onWallChange"
+                            t-att-disabled="state.submitting">
+                        <option t-foreach="_wallOptions"
+                                t-as="opt"
+                                t-key="opt.id"
+                                t-att-value="opt.id"
+                                t-att-selected="String(opt.id) === String(state.wallId) ? 'selected' : null">
+                            <t t-esc="opt.name"/>
+                            ·
+                            <t t-esc="opt.length_mm"/> mm
+                            ·
+                            <t t-esc="opt.remaining_mm"/> mm left
+                        </option>
+                    </select>
+
+                    <label class="sb-room-plan-modal-label"
+                           for="sb-room-plan-modal-pos">
+                        Position from left (mm)
+                    </label>
+                    <input id="sb-room-plan-modal-pos"
+                           type="number"
+                           min="0"
+                           step="10"
+                           class="sb-room-plan-modal-input mono"
+                           t-att-value="state.positionMm"
+                           t-on-input="_onPositionInput"
+                           t-att-disabled="state.submitting"/>
+
+                    <p t-if="state.error"
+                       class="sb-room-plan-modal-error"
+                       t-esc="state.error"/>
+                </div>
+
+                <footer class="sb-room-plan-modal-foot">
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--secondary"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.submitting">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--primary"
+                            t-on-click="_onAssignClick"
+                            t-att-disabled="state.submitting">
+                        <t t-if="state.submitting">Assigning…</t>
+                        <t t-else="">Assign</t>
+                    </button>
+                </footer>
+            </div>
+        </div>
     </t>
 
 </templates>

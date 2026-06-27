@@ -35,7 +35,7 @@
 import { Component, mount, markup, onMounted, onWillUnmount, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
-import { RoomLayoutTab } from "@southbrook_estimating_website/js/room_layout.esm";
+import { RoomLayoutTab, AssignToWallModal } from "@southbrook_estimating_website/js/room_layout.esm";
 
 // ----------------------------------------------------------------------
 // USD currency formatter — shared between OrderBuilder (probe) + the
@@ -2408,15 +2408,19 @@ const TEMPLATE = xml`
                     </div>
                 </t>
             </div>
-            <!-- Phase 3.B — Room Layout tab. Top-down floor plan
-                 (read-only in 3.B; interactivity is 3.C). Mounts
-                 RoomLayoutTab which renders the SVG + per-wall
-                 metrics + unplaced cabinets sidebar. -->
+            <!-- Phase 3.B — Room Layout tab. Top-down floor plan.
+                 Phase 3.C.2a adds three click affordances via the
+                 callbacks below; drag (3.C.2b) + elevation (3.C.2c)
+                 remain deferred. -->
             <div t-elif="state.ui.current_tab === 'room_layout'"
                  class="o_owl_tab_panel sb-room-plan-panel"
                  role="tabpanel" aria-labelledby="o_owl_tab_room_layout"
                  tabindex="0">
-                <RoomLayoutTab room="state.room" lines="state.lines"/>
+                <RoomLayoutTab room="state.room"
+                               lines="state.lines"
+                               onCabinetClick="_onPlanCabinetClick"
+                               onGapClick="_onPlanGapClick"
+                               onAssignFromSidebar="_onPlanAssignClick"/>
             </div>
             <div t-elif="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines"
@@ -2606,6 +2610,17 @@ const TEMPLATE = xml`
                              orderId="props.orderId"
                              onClose="_closeRoomSetupWizard"
                              onSubmitted="_onRoomSubmitted"/>
+
+            <!-- Phase 3.C.2a — AssignToWallModal. Opened from the
+                 Room Layout sidebar Assign... button. The line lookup
+                 returns null when the line is gone (race after a
+                 concurrent delete) — the t-if guard then hides the
+                 modal cleanly. -->
+            <AssignToWallModal t-if="state.ui.assigning &amp;&amp; _lineById(state.ui.assigning) &amp;&amp; state.room"
+                               line="_lineById(state.ui.assigning)"
+                               room="state.room"
+                               onAssign="(wallId, posMm) => this._onAssignSubmit(state.ui.assigning, wallId, posMm)"
+                               onCancel="_onAssignCancel"/>
         </div>
     </div>
 `;
@@ -2626,6 +2641,11 @@ class OrderBuilder extends Component {
         CatalogPicker,
         RoomSetupWizard,
         RoomLayoutTab,
+        // Phase 3.C.2a — fullscreen overlay opened by the Room Layout
+        // sidebar's Assign... button. Mounted at OrderBuilder level so
+        // it floats above the tab chrome (and survives a tab switch
+        // mid-pick).
+        AssignToWallModal,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -2723,7 +2743,22 @@ class OrderBuilder extends Component {
                 // ("⚠ N issues found") is always visible; bullet
                 // list appears only when expanded.
                 warnings_expanded: false,
+                // Phase 3.C.2a — line id of the cabinet currently
+                // being assigned to a wall via the AssignToWallModal.
+                // null when the modal is closed. The render block
+                // mounts <AssignToWallModal/> when this is non-null.
+                assigning: null,
             },
+            // Phase 3.C.2a — gap-click stash. When the user taps a gap
+            // rect on the Room Layout, we record the wall+position here
+            // and open the catalog modal; after the picker creates a
+            // new line, _onPickCabinet checks this flag and fires the
+            // /place-on-wall RPC to auto-place the new cabinet at the
+            // gap. Cleared after the place call (success OR failure)
+            // so a subsequent normal Add doesn't accidentally inherit
+            // the placement. Kept at the top level (NOT under .ui)
+            // because it's a data-flow flag, not a UI visibility flag.
+            pendingGapPlacement: null,
         });
         // Pre-bind handler methods to this. OWL's template compiler
         // doesn't preserve 'this' when methods are referenced as
@@ -2883,6 +2918,13 @@ class OrderBuilder extends Component {
     _closeCatalog() {
         if (!this.state.catalog_busy) {
             this.state.ui.catalog_open = false;
+            // Phase 3.C.2a — drop any stashed gap-placement intent so
+            // the NEXT "+ Add Another Cabinet" click doesn't
+            // accidentally inherit a placement from a cancelled gap
+            // flow. _onPickCabinet success path already clears it on
+            // the happy path; this covers the "user closed the modal
+            // without picking" case.
+            this.state.pendingGapPlacement = null;
         }
     }
 
@@ -2942,6 +2984,55 @@ class OrderBuilder extends Component {
                 // when done. The error path still surfaces via
                 // state.error and skips the success-state pulse.
                 await this._loadOrder();
+                // Phase 3.C.2a — gap-click auto-place. When the catalog
+                // modal was opened by a tap on an empty wall gap (vs the
+                // top-level "+ Add Another Cabinet" button), we POST a
+                // /place-on-wall RPC against the freshly-created line so
+                // it lands at the gap's position. The flag is cleared
+                // unconditionally — a placement failure leaves the
+                // cabinet on the order but unplaced, which the sidebar
+                // surfaces so the user can resolve via Assign...
+                const stash = this.state.pendingGapPlacement;
+                const newLineId = result.line_id;
+                if (stash && newLineId) {
+                    try {
+                        const placeRes = await rpcJsonCall(
+                            "/southbrook/api/order/"
+                            + encodeURIComponent(this.state.order.id)
+                            + "/line/" + encodeURIComponent(newLineId)
+                            + "/place-on-wall",
+                            {
+                                wall_id: stash.wallId,
+                                position_from_left_mm: stash.position,
+                            },
+                        );
+                        if (placeRes && placeRes.ok) {
+                            await this._refreshRoomState();
+                            this.state.payload_hash = "";
+                            await this._loadOrder();
+                            this._pushToast("Cabinet placed on wall", "success");
+                        } else {
+                            // Don't block the catalog flow — the line
+                            // was added, just not placed. Surface a
+                            // soft warning so the user knows to assign
+                            // it via the sidebar.
+                            this._pushToast(
+                                "Cabinet added but could not auto-place — assign it from the Room Layout sidebar.",
+                                "error",
+                                5000,
+                            );
+                        }
+                    } catch (placeErr) {
+                        this._pushToast(
+                            "Cabinet added but auto-place failed: "
+                            + (placeErr && placeErr.message ? placeErr.message : String(placeErr)),
+                            "error",
+                            5000,
+                        );
+                    } finally {
+                        this.state.pendingGapPlacement = null;
+                    }
+                }
                 // P1 bugfix 2026-06-22: visible confirmation toast.
                 // Quantity prefix only when qty>1 to keep the common
                 // case short. `label` comes from the catalog card so
@@ -3502,6 +3593,99 @@ class OrderBuilder extends Component {
     _onKitchen3dLineSelected = (lineId) => {
         this.state.ui.current_tab = "lines";
         this.state.ui.selected_line_id = lineId;
+    };
+
+    // ------------------------------------------------------------------
+    // Phase 3.C.2a — Room Layout tap interactivity.
+    //
+    // Three callbacks threaded into <RoomLayoutTab/>:
+    //   _onPlanCabinetClick(lineId)         — placed-cabinet tap
+    //   _onPlanGapClick(wallId, gap, posMm) — empty-gap tap (opens
+    //                                          catalog + stashes intent)
+    //   _onPlanAssignClick(lineId)          — sidebar Assign... button
+    //
+    // Plus two modal-driven handlers:
+    //   _onAssignSubmit(lineId, wallId, posMm) — modal Assign click
+    //   _onAssignCancel()                       — modal × / Cancel
+    //
+    // And one helper for the modal mount:
+    //   _lineById(id) — lookup by id, returns null if not found
+    //
+    // The line-creation auto-place path lives inside _onPickCabinet
+    // (search for "pendingGapPlacement" in this file).
+    // ------------------------------------------------------------------
+
+    _onPlanCabinetClick = (lineId) => {
+        // Mirror _onKitchen3dLineSelected — same UX (jump to Lines tab,
+        // select the row). The Order Lines tab honours selected_line_id
+        // to scroll + highlight via the existing ConfigDrawer expansion.
+        this.state.ui.current_tab = "lines";
+        this.state.ui.selected_line_id = lineId;
+    };
+
+    _onPlanGapClick = (wallId, gapMm, position) => {
+        // Stash the placement intent on the top-level state flag, then
+        // reuse the existing catalog modal. When the user picks a
+        // template + _onPickCabinet fires the /add-line RPC and gets a
+        // line_id back, the auto-place block at the tail of that method
+        // POSTs /place-on-wall against the stashed wall+position and
+        // clears the flag. Failure to place is non-fatal — the cabinet
+        // still exists on the order, just unplaced (which the user can
+        // resolve from the sidebar Assign... button).
+        this.state.pendingGapPlacement = {
+            wallId: wallId,
+            position: position,
+            gapMm: gapMm,
+        };
+        this._openCatalog();
+    };
+
+    _onPlanAssignClick = (lineId) => {
+        this.state.ui.assigning = lineId;
+    };
+
+    _onAssignSubmit = async (lineId, wallId, positionMm) => {
+        // Parent owns the RPC so the modal stays presentation-only.
+        // On success we refresh state.room (used_mm + remaining_mm on
+        // the picked wall) AND _loadOrder so the line's wall_id flows
+        // into state.lines (the sidebar's "unplaced" filter reads it).
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/" + encodeURIComponent(this.props.orderId)
+                + "/line/" + encodeURIComponent(lineId) + "/place-on-wall",
+                {
+                    wall_id: wallId,
+                    position_from_left_mm: positionMm,
+                },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                // Force the next _loadOrder to take (the hash-skip path
+                // would otherwise no-op on an unchanged-looking poll).
+                this.state.payload_hash = "";
+                await this._loadOrder();
+                this.state.ui.assigning = null;
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                // Surface to the user — same channel the other action
+                // failures use (alert is intentionally coarse here; the
+                // modal's own state.error captures it from the throw).
+                throw new Error("Could not assign cabinet: " + detail);
+            }
+        } catch (e) {
+            // Re-throw so the modal's own try/catch picks it up and
+            // shows the inline error band (parent doesn't double-toast).
+            throw e;
+        }
+    };
+
+    _onAssignCancel = () => {
+        this.state.ui.assigning = null;
+    };
+
+    _lineById = (id) => {
+        if (id === null || id === undefined) return null;
+        return (this.state.lines || []).find((l) => l.id === id) || null;
     };
 
     // T2C11 — total BoM items used as the BoM tab badge count.
