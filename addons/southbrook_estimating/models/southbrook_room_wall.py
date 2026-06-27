@@ -24,4 +24,53 @@ class SouthbrookRoomWall(models.Model):
 
     constraint_ids = fields.One2many(
         "southbrook.room.constraint", "wall_id", string="Constraints")
-    # Reverse O2m + capacity computes are populated by Task 1.2.
+
+    # ------------------------------------------------------------------
+    # Room-First UX Phase 1.2 — reverse O2m + capacity / conflict computes.
+    # ------------------------------------------------------------------
+    cabinet_line_ids = fields.One2many(
+        "sale.order.line", "wall_id", string="Cabinet Lines")
+    used_mm = fields.Integer(
+        compute="_compute_capacity", store=False, string="Used (mm)")
+    remaining_mm = fields.Integer(
+        compute="_compute_capacity", store=False, string="Remaining (mm)")
+    has_conflicts = fields.Boolean(
+        compute="_compute_conflicts", store=False)
+
+    @api.depends("cabinet_line_ids.sb_width_mm", "cabinet_line_ids.product_uom_qty", "length_mm")
+    def _compute_capacity(self):
+        for rec in self:
+            used = 0.0
+            for line in rec.cabinet_line_ids:
+                qty = line.product_uom_qty or 0.0
+                used += (line.sb_width_mm or 0.0) * qty
+            rec.used_mm = int(round(used))
+            rec.remaining_mm = (rec.length_mm or 0) - rec.used_mm
+
+    @api.depends(
+        "cabinet_line_ids.wall_id",
+        "cabinet_line_ids.position_from_left_mm",
+        "cabinet_line_ids.sb_width_mm",
+        "constraint_ids.distance_from_left_mm",
+        "constraint_ids.width_mm",
+    )
+    def _compute_conflicts(self):
+        for rec in self:
+            ranges = []
+            for c in rec.constraint_ids:
+                if c.width_mm and c.constraint_type not in ("power_outlet", "structural_post"):
+                    ranges.append((c.distance_from_left_mm or 0,
+                                   (c.distance_from_left_mm or 0) + (c.width_mm or 0)))
+            conflict = False
+            for line in rec.cabinet_line_ids:
+                if line.position_from_left_mm is False or not line.sb_width_mm:
+                    continue
+                lo = line.position_from_left_mm or 0
+                hi = lo + int(line.sb_width_mm)
+                for clo, chi in ranges:
+                    if lo < chi and hi > clo:
+                        conflict = True
+                        break
+                if conflict:
+                    break
+            rec.has_conflicts = conflict
