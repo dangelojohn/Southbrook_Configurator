@@ -1194,11 +1194,45 @@ When user clicks a gap on the Room Layout floor plan, replace the direct-to-cata
   - Append `.sb-room-plan-recommend-*` modal styles (mirror AssignToWallModal pattern).
 - Modify: `addons/southbrook_estimating_website/__manifest__.py` — bump `version` `19.0.12.0.0` → `19.0.13.0.0`.
 
-### Phase 6.2 — Room templates library (DRAFT — not in this batch)
+### Phase 6.2 — Room templates library (detailed)
 
-Pre-configured room layouts the wizard can clone. New `southbrook.room.template` model + 4 seed records (Small Straight, Standard L, Galley, Standard Laundry) + "Start from a template" button in the wizard Step 1.
+Pre-configured room layouts the wizard can clone in one click. 4 seed templates ship: Small Straight Kitchen, Standard L-Shape Kitchen, Galley Kitchen, Standard Laundry. User picks one in the wizard's Step 1 → state.walls + state.constraints get pre-populated → user tweaks from Step 2 onward.
 
-Re-plan when activated.
+**Server side — `southbrook_estimating`:**
+- New file: `addons/southbrook_estimating/models/southbrook_room_template.py` — `southbrook.room.template` model with fields:
+  - `name` (Char, required) — display name e.g. "Standard L-Shape Kitchen"
+  - `sequence` (Integer, default 10) — sort order for the picker
+  - `room_type` (Selection — same set as `southbrook.room`)
+  - `layout_shape` (Selection — same)
+  - `ceiling_height_mm` (Integer, default 2400)
+  - `walls_json` (Text) — JSON-serialized `[{name, length_mm, wall_order}, ...]`
+  - `constraints_json` (Text) — JSON-serialized `[{wall_index, constraint_type, distance_from_left_mm, width_mm, height_mm}, ...]`
+  - `description` (Text) — short blurb for the picker tile
+- Modify: `addons/southbrook_estimating/models/__init__.py` — append import
+- Modify: `addons/southbrook_estimating/security/ir.model.access.csv` — add 3 ACL rows (read for `base.group_user`; full for `sales_team.group_sale_salesman` + `_sale_manager`)
+- New: `addons/southbrook_estimating/data/room_templates.xml` — 4 seed records with `noupdate="0"` so future edits to the seeds propagate
+- Modify: `addons/southbrook_estimating/__manifest__.py` — register `data/room_templates.xml`, bump `version` `19.0.6.0.0` → `19.0.7.0.0`
+- Modify: `addons/southbrook_estimating/tests/test_southbrook_room.py` — add 1 test: `test_room_templates_seed_present` (count >= 4, all parsable JSON)
+
+**Server side — `southbrook_estimating_website`:**
+- Modify: `addons/southbrook_estimating_website/controllers/room_api.py` — new endpoint `POST /southbrook/api/room-templates/list` (no order_id — templates are global). Body `{}`. Returns `{ok, templates: [{id, name, description, room_type, layout_shape, ceiling_height_mm, walls: [...], constraints: [...]}, ...]}`. Auth `user`.
+- Modify: `addons/southbrook_estimating_website/tests/test_room_api.py` — 1 test that the endpoint returns the 4 seed templates.
+- Modify: `__manifest__.py` — bump `19.0.13.0.0` → `19.0.14.0.0`.
+
+**Client side — wizard integration:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js`:
+  - On `setup()` of `RoomSetupWizard`, fire a one-shot fetch to `/room-templates/list` → store in `state.templates = []`.
+  - New section at the TOP of Step 1: **"Start from a template"** with 4 tiles + "or start from scratch" divider above the existing room-type picker.
+  - Each tile is clickable → on click: pre-populate wizard `state.room.layout_shape`, `state.room.room_type`, `state.room.ceiling_height_mm`, `state.walls`, `state.constraints` from the template's walls/constraints arrays, then advance `state.step = 2`.
+  - Show a small "Applied template: NAME — edit anything below" notice in Step 2 when a template was used.
+- Modify: `addons/southbrook_estimating_website/static/src/xml/room_setup_wizard.xml` — add template-picker section markup.
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss` — append `.sb-room-wizard-template-*` tile styles.
+
+**Seed template data:**
+- **Small Straight Kitchen**: room_type=kitchen, layout_shape=straight, ceiling=2400, walls=[{name:"Wall A", length_mm:2400}], constraints=[].
+- **Standard L-Shape Kitchen**: room_type=kitchen, layout_shape=l_shape, ceiling=2400, walls=[{name:"Wall A", length_mm:3600}, {name:"Wall B", length_mm:2400}], constraints=[{wall_index:0, constraint_type:"sink", distance_from_left_mm:1500, width_mm:900}, {wall_index:0, constraint_type:"window", distance_from_left_mm:1200, width_mm:1500, height_mm:1200}].
+- **Galley Kitchen**: room_type=kitchen, layout_shape=galley, ceiling=2400, walls=[{name:"Wall A — Sink Side", length_mm:3000}, {name:"Wall B — Cook Side", length_mm:3000}], constraints=[{wall_index:0, constraint_type:"sink", distance_from_left_mm:1200, width_mm:900}, {wall_index:1, constraint_type:"cooktop", distance_from_left_mm:1200, width_mm:900}].
+- **Standard Laundry**: room_type=laundry, layout_shape=straight, ceiling=2400, walls=[{name:"Wall A", length_mm:1800}], constraints=[{wall_index:0, constraint_type:"sink", distance_from_left_mm:1200, width_mm:600}].
 
 ---
 
