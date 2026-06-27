@@ -1,0 +1,874 @@
+# Room-First Order Builder Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Add a first-class `southbrook.room` model + 3-step setup wizard + interactive Room Layout tab to the Order Builder, anchoring every order to a physical room and giving the designer live conflict/capacity feedback.
+
+**Architecture:** New ORM trio (`southbrook.room` + `southbrook.room.wall` + `southbrook.room.constraint`) lives in `southbrook_estimating` and is **One2many from `sale.order`**; cabinet placement is two optional fields (`wall_id`, `position_from_left_mm`) on `sale.order.line`. UI ships as **two new OWL tabs** appended to the existing `portal_boot.esm.js` tablist (not Bootstrap), plus a backend smart button + form pages. The Room Layout tab uses **inline SVG** (no new vendored libs); wkhtmltopdf renders the same SVG natively in the PDF extension. All new fields are non-required with sensible defaults so every existing order continues to work unchanged.
+
+**Tech Stack:** Odoo 19 CE · OCA `product_configurator` · OWL · plain SVG · QWeb (PDF) · Python 3 (PIL only for PDF rasterization fallback) · existing asset bundles `web.assets_backend` + `web.assets_frontend` (no new deps).
+
+## Global Constraints
+
+- **Odoo 19 CE only.** The brief said "Odoo 17" — wrong. Use `models.Constraint('UNIQUE(...)', 'msg')` not legacy `_sql_constraints`; v19 silently ignores the latter (`odoo19_sql_constraints_deprecated`). `res.groups.category_id` is gone; group declarations must omit it (`odoo19_res_users_group_ids_rename`). View-validation in `-u` is strict — no manual-field refs in `decoration-*` attrs of XML living in an addon whose downstream sibling owns the field (`odoo19_view_dep_chain_manual_fields`).
+- **Branch:** `feature/prodboard-tier-2-mi-quality` (clean, HEAD @ `82b6436`). All work commits here unless a separate `feature/room-first` branch is requested.
+- **License:** LGPL-3 (matches `southbrook_estimating`). Top of every new file: `# SPDX-License-Identifier: LGPL-3.0-only`.
+- **Order entity = `sale.order`**, line entity = `sale.order.line`. There is **no** `southbrook.order` model. The room model belongs to `sale.order` via a One2many.
+- **Tab insertion is via OWL state, not QWeb.** New tabs go in the `_tabs` getter at `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js:2885-2929` plus a sibling conditional render block at `:2238-2379`. Do **not** modify `portal_template.xml` to add tabs — the OWL tablist owns rendering.
+- **Existing `zone` Selection field already encodes the "Base Run / Upper Run" grouping** (`sale_order_line.py:55-71`). Do not introduce a parallel run-name field; reuse `zone`.
+- **OCA configurator integration:** `sale.order.line` already carries `config_session_id` (optional). New fields `wall_id` + `position_from_left_mm` must be **non-required + `copy=False`** so duplication (NF6 version chain) does not propagate stale placements.
+- **No new external Python deps.** PIL is already in `external_dependencies`; qrcode is in `southbrook_kitchen_mrp`. The Room Layout tab uses inline SVG strings only.
+- **Non-destructive contract:** every new field on existing models is optional with a default. Pricing engine + BoM generation must continue to work identically for orders with no room data.
+- **Portal route precedent:** existing portal handlers live in `addons/southbrook_estimating_website/controllers/main.py`. New JSON-RPC endpoints follow the auth/ownership pattern of `_southbrook_resolve_order()` (`main.py:844-873`).
+- **CSS scoping:** all new classes prefixed `sb-room-`. SCSS lives under `southbrook_estimating_website/static/src/scss/room_layout.scss`.
+- **Locked-decisions adherence:** consult `PUNCHLIST.md` § "2026-05-29 · Locked decisions" before deviating on attributes, zones, or pricelist behavior. Q21 (zone) and NF6 (version chain) are directly load-bearing on this work.
+
+---
+
+## Phase 1 — Data Model (Tasks 1.1, 1.2, 1.3)
+
+### Task 1.1 — Create `southbrook.room` + `southbrook.room.wall` + `southbrook.room.constraint`
+
+**Files:**
+- Create: `addons/southbrook_estimating/models/southbrook_room.py`
+- Create: `addons/southbrook_estimating/models/southbrook_room_wall.py`
+- Create: `addons/southbrook_estimating/models/southbrook_room_constraint.py`
+- Modify: `addons/southbrook_estimating/models/__init__.py:1-N` (append three imports near the existing block; insertion BEFORE `sale_order` so the relations resolve)
+- Modify: `addons/southbrook_estimating/security/ir.model.access.csv` (append 9 rows: 3 per model × {user, sales, manager})
+- Modify: `addons/southbrook_estimating/__manifest__.py` (bump `version` to `19.0.5.0.0`)
+- Test: `addons/southbrook_estimating/tests/test_southbrook_room.py`
+
+**Interfaces:**
+- Produces:
+  - `southbrook.room` model with fields: `name (Char, required)`, `order_id (M2o sale.order, required, ondelete='cascade')`, `room_type (Selection)`, `layout_shape (Selection)`, `ceiling_height_mm (Integer, default=2400)`, `unit_preference (Selection, default='mm')`, `wall_ids (O2m southbrook.room.wall)`, `constraint_ids (O2m southbrook.room.constraint)`, `total_linear_mm (Integer, computed, store=True)`, `wall_count (Integer, computed, store=True)`, `constraint_count (Integer, computed, store=True)`, `layout_complete (Boolean, computed, store=True)`, `has_plumbing (Boolean, computed, store=True)`.
+  - `southbrook.room.wall` model: `name (Char, required)`, `room_id (M2o, required, ondelete='cascade')`, `length_mm (Integer, default=0)`, `has_upper_cabinets (Boolean, default=True)`, `has_base_cabinets (Boolean, default=True)`, `has_tall_cabinets (Boolean, default=False)`, `wall_order (Integer, default=10, _order field)`. Reverse o2m + capacity computes added in Task 1.2.
+  - `southbrook.room.constraint` model: `constraint_type (Selection: window, door, sink, cooktop, oven, dishwasher, rangehood, fridge_space, power_outlet, structural_post, other)`, `wall_id (M2o southbrook.room.wall, required, ondelete='cascade')`, `room_id (M2o, related='wall_id.room_id', store=True)`, `distance_from_left_mm (Integer)`, `width_mm (Integer)`, `height_mm (Integer)`, `height_from_floor_mm (Integer)`, `notes (Text)`.
+
+- [ ] **Step 1: Write failing tests** — `tests/test_southbrook_room.py`
+
+```python
+# SPDX-License-Identifier: LGPL-3.0-only
+from odoo.tests.common import TransactionCase, tagged
+
+
+@tagged("post_install", "-at_install", "southbrook", "southbrook_room")
+class TestSouthbrookRoom(TransactionCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.partner = cls.env["res.partner"].create({"name": "Test Customer"})
+        cls.order = cls.env["sale.order"].create({"partner_id": cls.partner.id})
+
+    def test_create_minimal_room(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Main Kitchen",
+            "order_id": self.order.id,
+        })
+        self.assertEqual(room.order_id, self.order)
+        self.assertEqual(room.unit_preference, "mm")
+        self.assertEqual(room.ceiling_height_mm, 2400)
+        self.assertFalse(room.layout_complete)
+
+    def test_layout_complete_requires_shape_plus_two_walls(self):
+        room = self.env["southbrook.room"].create({
+            "name": "L-Kitchen",
+            "order_id": self.order.id,
+            "layout_shape": "l_shape",
+            "wall_ids": [
+                (0, 0, {"name": "Wall A", "length_mm": 3600}),
+                (0, 0, {"name": "Wall B", "length_mm": 2400}),
+            ],
+        })
+        self.assertTrue(room.layout_complete)
+        self.assertEqual(room.total_linear_mm, 6000)
+        self.assertEqual(room.wall_count, 2)
+
+    def test_layout_incomplete_when_wall_has_zero_length(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Half-set",
+            "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "Wall A", "length_mm": 0})],
+        })
+        self.assertFalse(room.layout_complete)
+
+    def test_has_plumbing_when_sink_constraint_present(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Plumb",
+            "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "A", "length_mm": 3000})],
+        })
+        wall = room.wall_ids[0]
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": wall.id,
+            "constraint_type": "sink",
+            "distance_from_left_mm": 1200,
+            "width_mm": 900,
+        })
+        room.invalidate_recordset(["has_plumbing", "constraint_count"])
+        self.assertTrue(room.has_plumbing)
+        self.assertEqual(room.constraint_count, 1)
+
+    def test_room_cascade_deletes_walls_and_constraints(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Doomed",
+            "order_id": self.order.id,
+            "wall_ids": [(0, 0, {"name": "A", "length_mm": 3000})],
+        })
+        wall = room.wall_ids[0]
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": wall.id,
+            "constraint_type": "window",
+            "distance_from_left_mm": 500,
+            "width_mm": 600,
+        })
+        wall_id, room_id = wall.id, room.id
+        room.unlink()
+        self.assertFalse(self.env["southbrook.room.wall"].browse(wall_id).exists())
+        self.assertFalse(self.env["southbrook.room"].browse(room_id).exists())
+
+    def test_unit_preference_round_trip(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Imp", "order_id": self.order.id, "unit_preference": "imperial",
+        })
+        self.assertEqual(room.unit_preference, "imperial")
+```
+
+- [ ] **Step 2: Run tests — expect failure (models do not exist)**
+
+```bash
+# If sami-odoo container is up:
+cd ~/southbrook-v19cr && make test 2>&1 | tail -40
+# Or, focused (faster):
+docker exec sami-odoo odoo -d southbrook -u southbrook_estimating \
+  --test-enable --test-tags=southbrook_room \
+  --stop-after-init --no-http --workers=0 --max-cron-threads=0 2>&1 | tail -20
+```
+Expected: `KeyError: 'southbrook.room'` or `Model not found` (test fails because model not yet defined).
+
+- [ ] **Step 3: Implement `southbrook_room.py`**
+
+```python
+# SPDX-License-Identifier: LGPL-3.0-only
+"""southbrook.room — first-class room anchoring an order to a physical space.
+
+Per the Room-First UX initiative (2026-06-27): every order can optionally
+declare one room (multi-room support planned via the O2m from sale.order
+keeping the migration cost low). Wall + constraint child models live in
+sibling files.
+"""
+from odoo import api, fields, models
+
+
+_ROOM_TYPES = [
+    ("kitchen", "Kitchen"),
+    ("laundry", "Laundry"),
+    ("butler", "Butler's Pantry"),
+    ("bar", "Bar"),
+    ("bathroom", "Bathroom"),
+    ("office", "Office"),
+    ("other", "Other"),
+]
+
+_LAYOUT_SHAPES = [
+    ("straight", "Straight"),
+    ("l_shape", "L-Shape"),
+    ("u_shape", "U-Shape"),
+    ("galley", "Galley"),
+    ("g_shape", "G-Shape"),
+    ("island", "Island"),
+    ("peninsula", "Peninsula"),
+    ("custom", "Custom"),
+]
+
+_UNIT_PREF = [("mm", "Millimetres"), ("imperial", "Feet & Inches")]
+
+
+class SouthbrookRoom(models.Model):
+    _name = "southbrook.room"
+    _description = "Southbrook Room"
+    _order = "id desc"
+    _rec_name = "name"
+
+    name = fields.Char(required=True, default="Main Kitchen")
+    order_id = fields.Many2one(
+        "sale.order", required=True, ondelete="cascade", index=True,
+        help="The Sale Order this room belongs to.")
+
+    room_type = fields.Selection(_ROOM_TYPES, default="kitchen")
+    layout_shape = fields.Selection(_LAYOUT_SHAPES)
+    ceiling_height_mm = fields.Integer(default=2400, string="Ceiling Height (mm)")
+    unit_preference = fields.Selection(
+        _UNIT_PREF, default="mm", required=True,
+        help="Drives display across the whole order. Storage is always mm.")
+
+    wall_ids = fields.One2many(
+        "southbrook.room.wall", "room_id", string="Walls")
+    constraint_ids = fields.One2many(
+        "southbrook.room.constraint", "room_id", string="Constraints")
+
+    total_linear_mm = fields.Integer(
+        compute="_compute_summary", store=True, string="Total Linear (mm)")
+    wall_count = fields.Integer(compute="_compute_summary", store=True)
+    constraint_count = fields.Integer(compute="_compute_summary", store=True)
+    layout_complete = fields.Boolean(compute="_compute_summary", store=True)
+    has_plumbing = fields.Boolean(compute="_compute_summary", store=True)
+
+    @api.depends(
+        "layout_shape", "wall_ids", "wall_ids.length_mm",
+        "constraint_ids", "constraint_ids.constraint_type",
+    )
+    def _compute_summary(self):
+        plumbing = {"sink", "dishwasher"}
+        for rec in self:
+            walls = rec.wall_ids
+            rec.wall_count = len(walls)
+            rec.total_linear_mm = sum(w.length_mm or 0 for w in walls)
+            rec.constraint_count = len(rec.constraint_ids)
+            positive = [w for w in walls if (w.length_mm or 0) > 0]
+            single_wall_shapes = {"straight", "island"}
+            min_walls = 1 if rec.layout_shape in single_wall_shapes else 2
+            rec.layout_complete = bool(
+                rec.layout_shape and len(positive) >= min_walls)
+            rec.has_plumbing = any(
+                c.constraint_type in plumbing for c in rec.constraint_ids)
+```
+
+- [ ] **Step 4: Implement `southbrook_room_wall.py`** (capacity computes added in Task 1.2)
+
+```python
+# SPDX-License-Identifier: LGPL-3.0-only
+"""southbrook.room.wall — one wall of a room with its own cabinet zones."""
+from odoo import api, fields, models
+
+
+class SouthbrookRoomWall(models.Model):
+    _name = "southbrook.room.wall"
+    _description = "Southbrook Room Wall"
+    _order = "room_id, wall_order, id"
+    _rec_name = "name"
+
+    name = fields.Char(required=True, default="Wall A")
+    room_id = fields.Many2one(
+        "southbrook.room", required=True, ondelete="cascade", index=True)
+    order_id = fields.Many2one(
+        "sale.order", related="room_id.order_id", store=True, index=True)
+
+    length_mm = fields.Integer(string="Length (mm)", default=0)
+    wall_order = fields.Integer(default=10)
+
+    has_upper_cabinets = fields.Boolean(default=True)
+    has_base_cabinets = fields.Boolean(default=True)
+    has_tall_cabinets = fields.Boolean(default=False)
+
+    constraint_ids = fields.One2many(
+        "southbrook.room.constraint", "wall_id", string="Constraints")
+    # Reverse O2m + capacity computes are populated by Task 1.2.
+```
+
+- [ ] **Step 5: Implement `southbrook_room_constraint.py`**
+
+```python
+# SPDX-License-Identifier: LGPL-3.0-only
+"""southbrook.room.constraint — a fixed obstacle/feature pinned to a wall."""
+from odoo import fields, models
+
+
+_CONSTRAINT_TYPES = [
+    ("window", "Window"),
+    ("door", "Door"),
+    ("sink", "Sink"),
+    ("cooktop", "Cooktop"),
+    ("oven", "Oven"),
+    ("dishwasher", "Dishwasher"),
+    ("rangehood", "Rangehood"),
+    ("fridge_space", "Fridge Space"),
+    ("power_outlet", "Power Outlet"),
+    ("structural_post", "Structural Post"),
+    ("other", "Other"),
+]
+
+
+class SouthbrookRoomConstraint(models.Model):
+    _name = "southbrook.room.constraint"
+    _description = "Southbrook Room Constraint"
+    _order = "wall_id, distance_from_left_mm, id"
+
+    constraint_type = fields.Selection(_CONSTRAINT_TYPES, required=True, default="window")
+    wall_id = fields.Many2one(
+        "southbrook.room.wall", required=True, ondelete="cascade", index=True)
+    room_id = fields.Many2one(
+        "southbrook.room", related="wall_id.room_id", store=True, index=True)
+
+    distance_from_left_mm = fields.Integer(default=0)
+    width_mm = fields.Integer(default=0)
+    height_mm = fields.Integer(default=0)
+    height_from_floor_mm = fields.Integer(default=0)
+    notes = fields.Text()
+```
+
+- [ ] **Step 6: Register imports — `models/__init__.py`**
+
+Add these three lines BEFORE the existing `from . import sale_order` line:
+```python
+from . import southbrook_room
+from . import southbrook_room_wall
+from . import southbrook_room_constraint
+```
+
+- [ ] **Step 7: Add ACL rows — `security/ir.model.access.csv`**
+
+Append (preserving the trailing newline already in the file):
+```
+access_southbrook_room_user,southbrook.room user,model_southbrook_room,base.group_user,1,0,0,0
+access_southbrook_room_sales,southbrook.room sales,model_southbrook_room,sales_team.group_sale_salesman,1,1,1,0
+access_southbrook_room_manager,southbrook.room manager,model_southbrook_room,sales_team.group_sale_manager,1,1,1,1
+access_southbrook_room_wall_user,southbrook.room.wall user,model_southbrook_room_wall,base.group_user,1,0,0,0
+access_southbrook_room_wall_sales,southbrook.room.wall sales,model_southbrook_room_wall,sales_team.group_sale_salesman,1,1,1,1
+access_southbrook_room_wall_manager,southbrook.room.wall manager,model_southbrook_room_wall,sales_team.group_sale_manager,1,1,1,1
+access_southbrook_room_constraint_user,southbrook.room.constraint user,model_southbrook_room_constraint,base.group_user,1,0,0,0
+access_southbrook_room_constraint_sales,southbrook.room.constraint sales,model_southbrook_room_constraint,sales_team.group_sale_salesman,1,1,1,1
+access_southbrook_room_constraint_manager,southbrook.room.constraint manager,model_southbrook_room_constraint,sales_team.group_sale_manager,1,1,1,1
+```
+
+- [ ] **Step 8: Bump manifest version**
+
+Edit `__manifest__.py:59` `"version": "19.0.4.29.0",` → `"version": "19.0.5.0.0",`.
+
+- [ ] **Step 9: Run tests — expect PASS**
+
+```bash
+# Re-run the same focused test command — should now pass:
+docker exec sami-odoo odoo -d southbrook -u southbrook_estimating \
+  --test-enable --test-tags=southbrook_room \
+  --stop-after-init --no-http --workers=0 --max-cron-threads=0 2>&1 | tail -30
+```
+Expected: 6 passed. If `sami-odoo` is not running, fall back to `python3 -m py_compile` per Phase 1.1 precedent and defer live tests to the next QNAP `-u` smoke run.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add addons/southbrook_estimating/models/southbrook_room.py \
+        addons/southbrook_estimating/models/southbrook_room_wall.py \
+        addons/southbrook_estimating/models/southbrook_room_constraint.py \
+        addons/southbrook_estimating/models/__init__.py \
+        addons/southbrook_estimating/security/ir.model.access.csv \
+        addons/southbrook_estimating/__manifest__.py \
+        addons/southbrook_estimating/tests/test_southbrook_room.py
+git commit -m "feat(estimating): southbrook.room + wall + constraint model trio (19.0.5.0.0)
+
+Room-First UX Phase 1.1. First-class room model anchoring an order to a
+physical space. One2many from sale.order (multi-room ready). Optional —
+existing orders unaffected. No new external deps. ACL: read for any
+internal user; write for sales team."
+```
+
+---
+
+### Task 1.2 — Link `sale.order.line` → `southbrook.room.wall` + capacity computes
+
+**Files:**
+- Modify: `addons/southbrook_estimating/models/sale_order_line.py:52-79` (add 3 fields, 1 compute)
+- Modify: `addons/southbrook_estimating/models/southbrook_room_wall.py` (add reverse O2m + 3 computes)
+- Test: `addons/southbrook_estimating/tests/test_room_wall_assignment.py`
+
+**Interfaces:**
+- Consumes from 1.1: `southbrook.room.wall` model.
+- Produces:
+  - `sale.order.line.wall_id (M2o → southbrook.room.wall, optional, copy=False)`
+  - `sale.order.line.position_from_left_mm (Integer, optional, copy=False)`
+  - `sale.order.line.is_positioned (Boolean computed)`
+  - `southbrook.room.wall.cabinet_line_ids (O2m sale.order.line)`
+  - `southbrook.room.wall.used_mm (Integer computed, sum of widths)`
+  - `southbrook.room.wall.remaining_mm (Integer computed)`
+  - `southbrook.room.wall.has_conflicts (Boolean computed)`
+
+- [ ] **Step 1: Write failing tests** — `tests/test_room_wall_assignment.py`
+
+```python
+# SPDX-License-Identifier: LGPL-3.0-only
+from odoo.tests.common import TransactionCase, tagged
+
+
+@tagged("post_install", "-at_install", "southbrook", "southbrook_room_wall")
+class TestRoomWallAssignment(TransactionCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.partner = cls.env["res.partner"].create({"name": "Cust"})
+        cls.order = cls.env["sale.order"].create({"partner_id": cls.partner.id})
+        cls.room = cls.env["southbrook.room"].create({
+            "name": "K", "order_id": cls.order.id,
+            "layout_shape": "l_shape",
+            "wall_ids": [
+                (0, 0, {"name": "A", "length_mm": 3600}),
+                (0, 0, {"name": "B", "length_mm": 2400}),
+            ],
+        })
+        cls.wall_a, cls.wall_b = cls.room.wall_ids
+        cls.product = cls.env.ref("southbrook_estimating.product_base_2dr").product_variant_id
+
+    def test_unpositioned_line_does_not_break_existing_behavior(self):
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+        })
+        self.assertFalse(line.wall_id)
+        self.assertFalse(line.is_positioned)
+
+    def test_position_a_cabinet_against_wall_a(self):
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id, "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+            "wall_id": self.wall_a.id, "position_from_left_mm": 0,
+        })
+        self.assertTrue(line.is_positioned)
+        self.wall_a.invalidate_recordset(["used_mm", "remaining_mm"])
+        # sb_width_mm default 600 for base cabinet without PTAV resolution
+        self.assertGreater(self.wall_a.used_mm, 0)
+        self.assertEqual(
+            self.wall_a.remaining_mm, self.wall_a.length_mm - self.wall_a.used_mm)
+
+    def test_overlap_detection_with_constraint(self):
+        # Window 600mm wide, starting at 1000mm from wall A's left corner
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": self.wall_a.id, "constraint_type": "window",
+            "distance_from_left_mm": 1000, "width_mm": 600,
+        })
+        # Cabinet starting at 900mm, 600mm wide → overlaps window (900-1500 vs 1000-1600)
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id, "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+            "wall_id": self.wall_a.id, "position_from_left_mm": 900,
+        })
+        self.wall_a.invalidate_recordset(["has_conflicts"])
+        self.assertTrue(self.wall_a.has_conflicts)
+        # The line itself also reports conflict via order-line compute
+        # (we expose this via wall.has_conflicts only — line-level conflict
+        # is derived in the UI from wall conflicts intersecting position)
+
+    def test_copy_false_on_duplicate(self):
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id, "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+            "wall_id": self.wall_a.id, "position_from_left_mm": 100,
+        })
+        new_order = self.order.copy()
+        new_line = new_order.order_line[0]
+        self.assertFalse(new_line.wall_id, "wall_id must not propagate on copy (NF6)")
+        self.assertFalse(new_line.position_from_left_mm)
+```
+
+- [ ] **Step 2: Run tests — expect AttributeError on `wall_id`**
+
+```bash
+docker exec sami-odoo odoo -d southbrook -u southbrook_estimating \
+  --test-enable --test-tags=southbrook_room_wall \
+  --stop-after-init --no-http --workers=0 --max-cron-threads=0 2>&1 | tail -20
+# (or py_compile fallback if sami-odoo is not up)
+```
+
+- [ ] **Step 3: Add fields to `sale_order_line.py`** — append after the existing `zone_label` field (around line 79):
+
+```python
+    wall_id = fields.Many2one(
+        "southbrook.room.wall", string="Wall",
+        copy=False, ondelete="set null", index=True,
+        help="The wall this cabinet sits against. Optional.")
+    position_from_left_mm = fields.Integer(
+        string="Position From Left (mm)", copy=False,
+        help="Cabinet's left edge distance from the wall's left corner.")
+    is_positioned = fields.Boolean(
+        compute="_compute_is_positioned", store=True)
+
+    @api.depends("wall_id", "position_from_left_mm")
+    def _compute_is_positioned(self):
+        for rec in self:
+            rec.is_positioned = bool(
+                rec.wall_id and rec.position_from_left_mm is not False)
+```
+
+- [ ] **Step 4: Add wall capacity computes to `southbrook_room_wall.py`**
+
+Append these fields + a compute to the class:
+
+```python
+    cabinet_line_ids = fields.One2many(
+        "sale.order.line", "wall_id", string="Cabinet Lines")
+    used_mm = fields.Integer(
+        compute="_compute_capacity", store=False, string="Used (mm)")
+    remaining_mm = fields.Integer(
+        compute="_compute_capacity", store=False, string="Remaining (mm)")
+    has_conflicts = fields.Boolean(
+        compute="_compute_conflicts", store=False)
+
+    @api.depends("cabinet_line_ids.sb_width_mm", "cabinet_line_ids.product_uom_qty", "length_mm")
+    def _compute_capacity(self):
+        for rec in self:
+            used = 0.0
+            for line in rec.cabinet_line_ids:
+                qty = line.product_uom_qty or 0.0
+                used += (line.sb_width_mm or 0.0) * qty
+            rec.used_mm = int(round(used))
+            rec.remaining_mm = (rec.length_mm or 0) - rec.used_mm
+
+    @api.depends(
+        "cabinet_line_ids.wall_id",
+        "cabinet_line_ids.position_from_left_mm",
+        "cabinet_line_ids.sb_width_mm",
+        "constraint_ids.distance_from_left_mm",
+        "constraint_ids.width_mm",
+    )
+    def _compute_conflicts(self):
+        for rec in self:
+            ranges = []
+            for c in rec.constraint_ids:
+                if c.width_mm and c.constraint_type not in ("power_outlet", "structural_post"):
+                    ranges.append((c.distance_from_left_mm or 0,
+                                   (c.distance_from_left_mm or 0) + (c.width_mm or 0)))
+            conflict = False
+            for line in rec.cabinet_line_ids:
+                if line.position_from_left_mm is False or not line.sb_width_mm:
+                    continue
+                lo = line.position_from_left_mm or 0
+                hi = lo + int(line.sb_width_mm)
+                for clo, chi in ranges:
+                    if lo < chi and hi > clo:
+                        conflict = True
+                        break
+                if conflict:
+                    break
+            rec.has_conflicts = conflict
+```
+
+- [ ] **Step 5: Run tests — expect PASS**
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add addons/southbrook_estimating/models/sale_order_line.py \
+        addons/southbrook_estimating/models/southbrook_room_wall.py \
+        addons/southbrook_estimating/tests/test_room_wall_assignment.py
+git commit -m "feat(estimating): link sale.order.line to room wall + capacity computes
+
+Optional wall_id + position_from_left_mm on sale.order.line (copy=False
+preserves NF6 version-chain semantics). Wall gains used_mm, remaining_mm,
+and has_conflicts (overlap of a positioned cabinet with a sized
+constraint on the same wall). Non-destructive: lines without wall_id
+behave identically to today."
+```
+
+---
+
+### Task 1.3 — Backend admin views + smart button
+
+**Files:**
+- Create: `addons/southbrook_estimating/views/southbrook_room_views.xml`
+- Modify: `addons/southbrook_estimating/views/sale_order_views.xml` (insert smart button + wall column on line tree)
+- Modify: `addons/southbrook_estimating/__manifest__.py` `data` list (register the new XML right after `views/sale_order_views.xml`)
+
+**Interfaces:**
+- Consumes: models from 1.1 + 1.2.
+- Produces: `southbrook_estimating.action_southbrook_room` action ref; menu under "Southbrook Estimating / Rooms".
+
+- [ ] **Step 1: Write the new views file** — `views/southbrook_room_views.xml`
+
+(Standard Odoo form/tree/search for `southbrook.room`, with embedded `wall_ids` tree showing capacity bar via `widget="progressbar"` on `used_mm` with `length_mm` denominator, and `constraint_ids` tree on each wall page. Avoids `<group string=>` inside search views — v19 view-validation traps. Avoids `column_invisible="parent.X"` — v19 column_invisible parent trap.)
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_southbrook_room_tree" model="ir.ui.view">
+        <field name="name">southbrook.room.tree</field>
+        <field name="model">southbrook.room</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="order_id"/>
+                <field name="room_type"/>
+                <field name="layout_shape"/>
+                <field name="total_linear_mm"/>
+                <field name="wall_count"/>
+                <field name="layout_complete" widget="boolean_toggle" readonly="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_room_form" model="ir.ui.view">
+        <field name="name">southbrook.room.form</field>
+        <field name="model">southbrook.room</field>
+        <field name="arch" type="xml">
+            <form string="Room">
+                <header/>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Main Kitchen"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="order_id"/>
+                            <field name="room_type"/>
+                            <field name="layout_shape"/>
+                        </group>
+                        <group>
+                            <field name="ceiling_height_mm"/>
+                            <field name="unit_preference"/>
+                            <field name="total_linear_mm" readonly="1"/>
+                            <field name="layout_complete" readonly="1"/>
+                            <field name="has_plumbing" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Walls" name="walls">
+                            <field name="wall_ids">
+                                <list editable="bottom">
+                                    <field name="wall_order" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="length_mm"/>
+                                    <field name="used_mm" readonly="1"/>
+                                    <field name="remaining_mm" readonly="1"/>
+                                    <field name="has_upper_cabinets"/>
+                                    <field name="has_base_cabinets"/>
+                                    <field name="has_tall_cabinets"/>
+                                    <field name="has_conflicts" readonly="1" widget="boolean_toggle"/>
+                                </list>
+                                <form>
+                                    <sheet>
+                                        <group>
+                                            <field name="name"/>
+                                            <field name="length_mm"/>
+                                            <field name="wall_order"/>
+                                        </group>
+                                        <notebook>
+                                            <page string="Constraints">
+                                                <field name="constraint_ids">
+                                                    <list editable="bottom">
+                                                        <field name="constraint_type"/>
+                                                        <field name="distance_from_left_mm"/>
+                                                        <field name="width_mm"/>
+                                                        <field name="height_mm"/>
+                                                        <field name="height_from_floor_mm"/>
+                                                        <field name="notes"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                            <page string="Cabinets">
+                                                <field name="cabinet_line_ids" readonly="1">
+                                                    <list>
+                                                        <field name="name"/>
+                                                        <field name="position_from_left_mm"/>
+                                                        <field name="sb_width_mm"/>
+                                                        <field name="product_uom_qty"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                        </notebook>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Constraints (All)" name="all_constraints">
+                            <field name="constraint_ids" readonly="1">
+                                <list>
+                                    <field name="wall_id"/>
+                                    <field name="constraint_type"/>
+                                    <field name="distance_from_left_mm"/>
+                                    <field name="width_mm"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_room_search" model="ir.ui.view">
+        <field name="name">southbrook.room.search</field>
+        <field name="model">southbrook.room</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="order_id"/>
+                <filter name="filter_complete" string="Layout Complete"
+                        domain="[('layout_complete', '=', True)]"/>
+                <filter name="filter_with_plumbing" string="Has Plumbing"
+                        domain="[('has_plumbing', '=', True)]"/>
+                <group>
+                    <filter name="group_by_shape" string="Shape"
+                            context="{'group_by': 'layout_shape'}"/>
+                    <filter name="group_by_type" string="Room Type"
+                            context="{'group_by': 'room_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_southbrook_room" model="ir.actions.act_window">
+        <field name="name">Rooms</field>
+        <field name="res_model">southbrook.room</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_southbrook_room_search"/>
+    </record>
+
+    <menuitem id="menu_southbrook_rooms" name="Rooms"
+              parent="southbrook_estimating.menu_southbrook_root"
+              action="action_southbrook_room" sequence="20"/>
+
+    <!-- Sale order form: smart button + wall column on line tree -->
+    <record id="view_sale_order_form_southbrook_room" model="ir.ui.view">
+        <field name="name">sale.order.form.southbrook.room</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_southbrook_room"
+                        type="object" class="oe_stat_button" icon="fa-home"
+                        invisible="not room_count">
+                    <field name="room_count" widget="statinfo" string="Room"/>
+                </button>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list//field[@name='product_uom_qty']" position="before">
+                <field name="wall_id" optional="hide"/>
+                <field name="position_from_left_mm" optional="hide"/>
+                <field name="is_positioned" optional="hide" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
+```
+
+- [ ] **Step 2: Add `room_ids` + `room_count` + `action_open_southbrook_room` on `sale.order`**
+
+Modify `addons/southbrook_estimating/models/sale_order.py` — add fields + method to the existing `SaleOrder` class:
+
+```python
+    room_ids = fields.One2many("southbrook.room", "order_id", string="Rooms")
+    room_count = fields.Integer(compute="_compute_room_count", store=False)
+
+    @api.depends("room_ids")
+    def _compute_room_count(self):
+        for rec in self:
+            rec.room_count = len(rec.room_ids)
+
+    def action_open_southbrook_room(self):
+        self.ensure_one()
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "southbrook_estimating.action_southbrook_room")
+        if len(self.room_ids) == 1:
+            action.update({
+                "views": [(False, "form")],
+                "res_id": self.room_ids.id,
+            })
+        else:
+            action["domain"] = [("order_id", "=", self.id)]
+        return action
+```
+
+- [ ] **Step 3: Register the new XML in `__manifest__.py`**
+
+Add `"views/southbrook_room_views.xml",` immediately after `"views/sale_order_views.xml",` in the `data` list.
+
+- [ ] **Step 4: Smoke-test in dev container**
+
+```bash
+# Cold-install validation (matches scripts/cold-install-test.sh pattern):
+cd ~/southbrook-v19cr && make install 2>&1 | tail -30
+# Or fresh-DB:
+make install-fresh 2>&1 | tail -30
+```
+Expected: install completes cleanly, no ParseError, no missing-field warnings. Fallback: `python3 -m py_compile` + `xmllint --noout` if no local container is up.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add addons/southbrook_estimating/views/southbrook_room_views.xml \
+        addons/southbrook_estimating/models/sale_order.py \
+        addons/southbrook_estimating/__manifest__.py
+git commit -m "feat(estimating): backend views for southbrook.room + SO smart button
+
+Room form with embedded wall/constraint trees, capacity bars, search
+view (no <group string=> per v19 view-validation trap). Sale Order form
+gets a Room smart button + optional wall_id columns on the line tree."
+```
+
+---
+
+## Phase 2 — Portal: Room Setup Wizard (DRAFT — finalize after Phase 1 lands)
+
+Phase 2 must be re-planned with fresh context once Phase 1 is reviewed and merged, because it depends on (a) Phase 1's final ACL/field shapes and (b) inspection of the actual `portal_boot.esm.js` OWL component tree at modification time.
+
+**High-level scope** (Tasks 2.1 + 2.2 in the brief):
+
+- Inline OWL state machine in `portal_boot.esm.js` (NOT a Bootstrap modal — the portal is 100% OWL). Three steps: Room Type + Shape, Wall Dimensions, Fixed Constraints. Skip-able from Step 3 onward.
+- Live SVG room-outline preview reacts to dimension typing (debounce 100ms via `requestIdleCallback` or `setTimeout`).
+- New portal endpoints in `southbrook_estimating_website/controllers/main.py`:
+  - `POST /southbrook/api/order/<id>/room/create` — wizard completion
+  - `POST /southbrook/api/order/<id>/room/update` — inline edits
+  - `POST /southbrook/api/order/<id>/room/constraint/add` — add constraint
+- Auth/ownership reuses `_southbrook_resolve_order()` (`main.py:844-873`).
+- Room Setup tab added to OWL `_tabs` getter as the **first** tab (sequence index 0). The 6 existing tabs shift right.
+- Order-header summary line: rendered in the OrderBuilder OWL component above the tablist.
+
+**Acceptance**: brief §2.1 + §2.2 acceptance criteria carry forward verbatim.
+
+---
+
+## Phase 3 — Room Layout Tab (DRAFT)
+
+**High-level scope** (Tasks 3.1 + 3.2 in the brief):
+
+- New OWL component `RoomLayoutTab` in `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js`.
+- Inline-SVG floor plan. No third-party library. Rendering primitives: room outline (`<polyline>`), walls (`<line>` per wall), constraints (`<rect>` + per-type icon `<g>` from a small icon sprite), cabinets (`<rect>` per assigned line, fill by zone), gaps (`<rect>` with `stroke-dasharray`), conflict highlights (`<rect>` with red stroke).
+- Sidebar "Unplaced Cabinets" list pulled from `state.order.order_line.filter(l => !l.wall_id)`.
+- Click cabinet → highlights line in Order Lines tab via shared OWL state.
+- Click gap → modal "Add cabinet here?" with recommended widths from `southbrook.room.recommend_for_gap(wall_id, gap_mm)` RPC (Phase 6.1).
+- Drag-to-reorder: optional, gated on viewport width ≥ 768px; mobile falls back to ← → arrow buttons.
+- Elevation toggle: redraws as side-view of the selected wall (cabinets stacked at known Y heights from `zone`).
+- Inline warning banner in Order Lines tab: scrolls collapsible list of conflicts/gaps; each entry deep-links to the Room Layout tab focused on the issue.
+- New SCSS file `room_layout.scss` (all `sb-room-*` prefixed classes).
+
+---
+
+## Phase 4 — Portal Polish: Progress + Units (DRAFT)
+
+- Persistent 5-step room-setup progress checklist on Room Setup tab.
+- Unit toggle (mm ↔ ft/in) stored on `southbrook.room.unit_preference`; all dimension renders respect it. mm → ft/in helper in `static/src/js/units.esm.js`. Storage stays mm always.
+
+---
+
+## Phase 5 — PDF Extension (DRAFT)
+
+- Extend `addons/southbrook_estimating/reports/signature_spec_sheet.xml` with two new pages:
+  - Page 2: Room setup summary (shape, walls table, constraints table).
+  - Page 3: Server-side SVG floor plan (Python helper in `models/southbrook_room.py:to_svg(width_px=720)` rendered inline in QWeb).
+- Conditional render: pages 2/3 omitted when no room is configured.
+- wkhtmltopdf renders inline SVG natively → no PNG transcode needed (cabinet-label WebP trap does not apply here because logos still use the existing PNG path).
+
+---
+
+## Phase 6 — Stretch (DRAFT)
+
+- 6.1 Cabinet recommendation engine. New `southbrook.room.wall.recommend_for_gap(gap_mm) → list[(template_id, width_mm, score)]` RPC. Filters templates by max width ≤ gap; prefers standard widths (300/400/450/500/600/900) via scoring function.
+- 6.2 Room templates. New `southbrook.room.template` model with seed records. "Apply Template" action on `southbrook.room` clones walls + constraints from a template.
+
+---
+
+## Self-Review (post-draft)
+
+**Spec coverage** — Phase 1 covers brief Tasks 1.1, 1.2, 1.3 in full. Phase 2-6 are scoped at outline level (re-plan after Phase 1 merges).
+
+**Placeholder scan** — Phase 1 has zero placeholders. Phases 2-6 are explicitly marked DRAFT; "high-level scope" language is appropriate at this stage.
+
+**Type consistency** — `wall_id` is `M2o → southbrook.room.wall` everywhere; `position_from_left_mm` is Integer everywhere; `_compute_summary` field set matches across model + tests + views.
+
+**v19 traps avoided** — no `_sql_constraints`, no `res.groups.category_id`, no `column_invisible="parent.X"`, no `<group string=>` in search views, no `decoration-*` on cross-addon fields.
+
+**Branch hygiene** — work commits on `feature/prodboard-tier-2-mi-quality` per current HEAD.

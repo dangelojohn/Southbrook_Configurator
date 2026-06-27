@@ -2,7 +2,7 @@
 from odoo.tests.common import TransactionCase, tagged
 
 
-@tagged("post_install", "-at_install", "southbrook_room")
+@tagged("post_install", "-at_install", "southbrook", "southbrook_room")
 class TestSouthbrookRoom(TransactionCase):
 
     @classmethod
