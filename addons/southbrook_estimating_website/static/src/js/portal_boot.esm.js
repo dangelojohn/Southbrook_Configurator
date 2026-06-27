@@ -149,6 +149,16 @@ class OrderTitlebar extends Component {
                 <t t-if="props.order.state">
                     · <t t-esc="_stateLabel(props.order.state)"/>
                 </t>
+                <!-- 2026-06-27 — last-saved stamp (FE P3#13). Renders
+                     relative ("2 min ago"); the order's write_date
+                     advances on every line edit, attribute change, or
+                     header field write, so this is the canonical
+                     "your edits landed" signal. -->
+                <div t-if="props.order.write_date"
+                     class="o_owl_titlebar_saved mono"
+                     t-att-title="props.order.write_date">
+                    saved <t t-esc="_relativeTime(props.order.write_date)"/>
+                </div>
             </div>
         </div>
     `;
@@ -166,6 +176,23 @@ class OrderTitlebar extends Component {
             cancel: "Cancelled",
         };
         return labels[state] || state;
+    }
+
+    // 2026-06-27 — compact relative-time formatter for the
+    // saved-stamp. Server returns ISO 8601 (UTC) so Date.parse handles
+    // it consistently. "just now" / "Ns ago" / "Nm ago" / "Nh ago" /
+    // date string. Bounded at 1d so a long-idle order doesn't show
+    // "saved 47 days ago" which reads as a stale-data warning.
+    _relativeTime(iso) {
+        const t = Date.parse(iso);
+        if (!t || Number.isNaN(t)) return "";
+        const delta = Math.max(0, (Date.now() - t) / 1000);
+        if (delta < 5)    return "just now";
+        if (delta < 60)   return `${Math.floor(delta)}s ago`;
+        if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
+        if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+        const d = new Date(t);
+        return d.toLocaleDateString();
     }
 }
 
@@ -346,7 +373,7 @@ class FooterActions extends Component {
                      manufacturing-ish has happened yet). -->
                 <button class="o_owl_btn o_owl_btn_primary"
                         t-on-click="_onConfirmClick"
-                        t-att-disabled="props.busy or !_canConfirm()">
+                        t-att-disabled="props.busy || !_canConfirm()">
                     <t t-if="!_canConfirm()">
                         <t t-if="props.mode === 'customer'">
                             Submitted (<t t-esc="props.order.state"/>)
@@ -1213,6 +1240,16 @@ class OrderLine extends Component {
                       t-att-title="'Lead time: ' + props.line.lead_time_days + ' days'">
                     +<t t-esc="props.line.lead_time_days - 14"/>d
                 </span>
+                <!-- 2026-06-27 — ECO/PLM revision drift chip (MFG #1.5).
+                     Visible on confirmed lines when the live cut spec
+                     or BoM version has moved past the snapshot taken
+                     at confirm. Tells the user "what you quoted is no
+                     longer what we'd build today — re-quote?" -->
+                <span t-if="props.line.revision_drift"
+                      class="o_owl_badge o_owl_badge_drift"
+                      t-att-title="_driftTitle(props.line)">
+                    ⚠ rev drift
+                </span>
             </div>
             <!-- 2026-06-27 — inline qty stepper. Edits autosave on blur
                  or Enter via the parent's onQtyChange handler; no need
@@ -1328,6 +1365,26 @@ class OrderLine extends Component {
             this.state.qtyDirty = false;
             ev.target.blur();
         }
+    }
+
+    // 2026-06-27 — assemble the drift-chip tooltip from the per-line
+    // snapshot vs current fields. Either cut_spec or bom can drift
+    // independently; show both when both apply.
+    _driftTitle(line) {
+        const bits = [];
+        if (line.cut_spec_drift) {
+            bits.push(
+                "Cut spec: " + (line.cut_spec_snap_name || "snapshot")
+                + " → live " + (line.cut_spec_current_name || "")
+            );
+        }
+        if (line.bom_drift) {
+            bits.push(
+                "BoM: v" + line.bom_snap_ver
+                + " → live v" + line.bom_current_ver
+            );
+        }
+        return bits.join("\n");
     }
 
     async _commitQty() {
@@ -1846,6 +1903,20 @@ class HeaderStrip extends Component {
                 <div class="o_owl_hs_value mono"
                      t-esc="fmtUsd(props.order.savings)"/>
             </div>
+            <!-- 2026-06-27 — channel margin chip (MFG JTBD: don't
+                 ship under cost). Hidden when cost_subtotal is 0
+                 (no standard_price set — refacing pricelist case)
+                 to avoid showing a misleading 100% margin. -->
+            <div t-if="props.order.cost_subtotal > 0"
+                 class="o_owl_hs_cell o_owl_hs_margin"
+                 t-att-class="_marginClass()">
+                <div class="o_owl_hs_label">Margin</div>
+                <div class="o_owl_hs_value mono">
+                    <t t-esc="props.order.margin_pct"/>%
+                </div>
+                <div class="o_owl_hs_sub mono"
+                     t-esc="fmtUsd(props.order.margin_total)"/>
+            </div>
             <div class="o_owl_hs_cell">
                 <div class="o_owl_hs_label">Lead Time</div>
                 <div class="o_owl_hs_value">
@@ -1868,6 +1939,18 @@ class HeaderStrip extends Component {
     // resolve identifiers against `this`, so a named arrow assignment
     // works without import shenanigans.
     fmtUsd = fmtUsd;
+
+    // 2026-06-27 — channel margin colour gate. Red below 10%, amber
+    // 10-15%, green ≥ 15%. Thresholds match the 35% target margin
+    // mentioned in CLAUDE.md §6 — anything below 10% is well below
+    // any channel's target and should pull the eye hard.
+    _marginClass() {
+        const m = this.props.order.margin_pct;
+        if (m === undefined || m === null) return "";
+        if (m < 10) return "o_owl_hs_margin_red";
+        if (m < 15) return "o_owl_hs_margin_amber";
+        return "o_owl_hs_margin_green";
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -2226,7 +2309,7 @@ class CatalogPicker extends Component {
                                              aria-label="Quantity">
                                             <button type="button"
                                                     class="o_owl_catalog_qty_btn"
-                                                    t-att-disabled="props.busy or getQty(item.sku) &lt;= 1"
+                                                    t-att-disabled="props.busy || getQty(item.sku) &lt;= 1"
                                                     t-on-click="() => this._decQty(item.sku)"
                                                     aria-label="Decrease quantity">−</button>
                                             <input type="number" min="1"
@@ -3690,6 +3773,12 @@ class OrderBuilder extends Component {
                     // Endpoint accepts and validates; defaults to 1
                     // when omitted, so old callers stay correct.
                     qty: qtyArg,
+                    // 2026-06-27 — when the user opened the catalog via
+                    // "+ Add to <zone>", forward the zone so the new
+                    // line lands there instead of the family-derived
+                    // default. Backend resolver also accepts no value
+                    // and derives from the SKU's family.
+                    zone: this.state.ui.catalog_zone_filter || undefined,
                 },
             );
             if (result && result.ok) {

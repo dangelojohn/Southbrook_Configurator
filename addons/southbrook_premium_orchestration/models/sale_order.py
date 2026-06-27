@@ -287,12 +287,20 @@ class SaleOrder(models.Model):
             style, species, self.name or "Draft")
 
     def _infer_kitchen_specs(self):
-        """Heuristic specs from the order's product line names.
+        """Specs from the order's lines.
 
-        Cheap keyword scan over product_id.display_name + product_template
-        name — good enough for the 8 orphan orders and for the typical
-        Southbrook quote which carries the door style and species directly
-        in the product name (e.g. 'Base Cabinet, Shaker Maple, 30W')."""
+        2026-06-27 — PRIMARY: read product_template_attribute_value_ids
+        (PTAVs) on the configured variants. Manufacturing-truth: PTAVs
+        are the canonical store of door style / species / finish picks,
+        set by the configurator.
+
+        FALLBACK: keyword scan over product_id.display_name +
+        product_template name. Catches:
+          • orphan orders (the original 8 the heuristic was written for)
+          • lines on the default variant with no PTAVs set yet
+          • non-configured Southbrook product lines whose name carries
+            the spec inline ("Base Cabinet, Shaker Maple, 30W")
+        """
         self.ensure_one()
         out = {
             "door_style": None,
@@ -300,27 +308,64 @@ class SaleOrder(models.Model):
             "finish": None,
             "install_due_date": False,
         }
-        haystack_parts = []
-        for line in self.order_line:
-            if line.display_type:  # skip section/note lines
-                continue
-            if line.product_id:
-                haystack_parts.append(line.product_id.display_name or "")
-                tmpl = line.product_id.product_tmpl_id
-                if tmpl:
-                    haystack_parts.append(tmpl.name or "")
-            if line.name:
-                haystack_parts.append(line.name)
-        haystack = " ".join(haystack_parts).lower()
 
-        for needle, label in _DOOR_STYLE_KEYWORDS:
-            if needle in haystack:
-                out["door_style"] = label
-                break
-        for needle, label in _WOOD_SPECIES_KEYWORDS:
-            if needle in haystack:
-                out["wood_species"] = label
-                break
+        # ---- PTAV pass (canonical) ----
+        # Attribute names we look at — lower-case match because Southbrook
+        # attribute records use various capitalisations across imports.
+        DOOR_ATTR_NAMES = {"door style", "door_style", "style"}
+        SPECIES_ATTR_NAMES = {
+            "box material", "box_material", "wood species",
+            "wood_species", "species", "material",
+        }
+        FINISH_ATTR_NAMES = {"finish", "color", "colour"}
+        for line in self.order_line:
+            if line.display_type or not line.product_id:
+                continue
+            ptavs = getattr(
+                line.product_id, "product_template_attribute_value_ids", False,
+            )
+            if not ptavs:
+                continue
+            for ptav in ptavs:
+                attr_name = (ptav.attribute_id.name or "").strip().lower()
+                value_name = (ptav.name or "").strip()
+                if not value_name:
+                    continue
+                if not out["door_style"] and attr_name in DOOR_ATTR_NAMES:
+                    out["door_style"] = value_name
+                elif not out["wood_species"] and attr_name in SPECIES_ATTR_NAMES:
+                    out["wood_species"] = value_name
+                elif not out["finish"] and attr_name in FINISH_ATTR_NAMES:
+                    out["finish"] = value_name
+            if out["door_style"] and out["wood_species"]:
+                break  # found both — no need to keep walking
+
+        # ---- Regex fallback for any field PTAVs didn't cover ----
+        if not (out["door_style"] and out["wood_species"]):
+            haystack_parts = []
+            for line in self.order_line:
+                if line.display_type:
+                    continue
+                if line.product_id:
+                    haystack_parts.append(
+                        line.product_id.display_name or "",
+                    )
+                    tmpl = line.product_id.product_tmpl_id
+                    if tmpl:
+                        haystack_parts.append(tmpl.name or "")
+                if line.name:
+                    haystack_parts.append(line.name)
+            haystack = " ".join(haystack_parts).lower()
+            if not out["door_style"]:
+                for needle, label in _DOOR_STYLE_KEYWORDS:
+                    if needle in haystack:
+                        out["door_style"] = label
+                        break
+            if not out["wood_species"]:
+                for needle, label in _WOOD_SPECIES_KEYWORDS:
+                    if needle in haystack:
+                        out["wood_species"] = label
+                        break
 
         # Install due-date heuristic: prefer the order's commitment_date if
         # populated, else fall back to its expected delivery date.

@@ -1254,6 +1254,40 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
     # later. The default variant carries the template's list_price;
     # the channel pricelist + attribute price_extras apply when the
     # user steps into the configurator.
+    # 2026-06-27 — family → zone mapping for auto-zoning per BE
+    # reviewer P1#6. Falls back to base_run when the family doesn't
+    # match (the legacy default-everything-to-base_run behaviour, just
+    # narrowed). Explicit `zone` arg from the frontend always wins
+    # (the per-zone "+ Add to <zone>" path already knows the target).
+    _FAMILY_TO_ZONE = {
+        "base":      "base_run",
+        "sink":      "base_run",
+        "corner":    "base_run",
+        "drawer":    "base_run",
+        "wall":      "wall",
+        "tall":      "tall",
+        "pantry":    "tall",
+        "oven":      "tall",
+        "island":    "island",
+        "vanity":    "base_run",
+        "worktop":   "accessory",
+        "accessory": "accessory",
+    }
+
+    def _southbrook_resolve_zone(self, family, explicit_zone=None):
+        """Pick the zone for a newly-added line. Explicit > family map
+        > base_run fallback."""
+        if explicit_zone:
+            valid = {"base_run", "wall", "tall", "island",
+                     "accessory", "other"}
+            if explicit_zone in valid:
+                return explicit_zone
+        fam = (family or "").lower()
+        for prefix, zone in self._FAMILY_TO_ZONE.items():
+            if fam.startswith(prefix):
+                return zone
+        return "base_run"
+
     @http.route(
         "/southbrook/api/order/<int:order_id>/add-line",
         type="json",
@@ -1261,7 +1295,7 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         methods=["POST"],
     )
     def southbrook_api_order_add_line(
-        self, order_id, product_tmpl_id=None, qty=None, **kw,
+        self, order_id, product_tmpl_id=None, qty=None, zone=None, **kw,
     ):
         try:
             order = self._southbrook_resolve_order(order_id)
@@ -1341,6 +1375,16 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "qty": existing.product_uom_qty,
             }
 
+        # 2026-06-27 — derive zone from the product's family (looked up
+        # via SKU defaults). Frontend can pass an explicit `zone` arg
+        # which wins. Without this, every newly-added line landed in
+        # `base_run` regardless of family, forcing the dealer to
+        # re-zone wall/tall/island cabinets one at a time.
+        sku = tmpl.default_code or ""
+        sku_row = request.env["product.config.session"]._SKU_DEFAULTS.get(sku)
+        family = sku_row[0] if sku_row else ""
+        resolved_zone = self._southbrook_resolve_zone(family, zone)
+
         line = (
             request.env["sale.order.line"]
             .sudo()
@@ -1348,13 +1392,208 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "order_id": order.id,
                 "product_id": variant.id,
                 "product_uom_qty": qty_int,
+                "zone": resolved_zone,
             })
         )
         # Trigger Odoo's onchange-equivalent so price_unit /
         # product_uom / name get populated from the variant.
         line.product_id_change() if hasattr(line, "product_id_change") else None
 
-        return {"ok": True, "line_id": line.id}
+        # 2026-06-27 — smart attribute defaults (FE reviewer P1#7).
+        # Inherit the prior in-zone line's attribute choices (door
+        # style, finish, species…) so a kitchen-wide build of base
+        # cabinets in matching Shaker White Maple takes 1 click per
+        # cabinet instead of 6. Skipped silently when:
+        #   • no prior line in this zone, OR
+        #   • prior line has no PTAVs (default-variant fast path), OR
+        #   • the new template doesn't expose any of the prior's
+        #     attributes (e.g. wall-cabinet template with no door
+        #     style attribute when copying from a tall pantry).
+        inherited_attr_count = self._southbrook_inherit_prior_line_attrs(
+            order, line, tmpl, resolved_zone,
+        )
+
+        return {
+            "ok": True,
+            "line_id": line.id,
+            "zone": resolved_zone,
+            "inherited_attrs": inherited_attr_count,
+        }
+
+    def _southbrook_inherit_prior_line_attrs(
+        self, order, new_line, new_tmpl, zone,
+    ):
+        """Apply the prior in-zone line's PTAVs to the new line.
+
+        Returns the number of attributes inherited (0 when no prior
+        line / no PTAVs / no overlapping attributes — caller logs the
+        count back to the frontend so the OWL UI could surface 'inherited
+        N picks from line K' if it wanted).
+        """
+        prior = (
+            request.env["sale.order.line"]
+            .sudo()
+            .search(
+                [
+                    ("order_id", "=", order.id),
+                    ("zone", "=", zone),
+                    ("id", "!=", new_line.id),
+                ],
+                order="sequence desc, id desc",
+                limit=1,
+            )
+        )
+        if not prior or not prior.product_id:
+            return 0
+        prior_ptavs = (
+            prior.product_id.product_template_attribute_value_ids
+        )
+        if not prior_ptavs:
+            return 0
+        # Filter to PTAVs whose attribute_line is defined on the new
+        # template. Two different templates can share attributes (e.g.
+        # door_style is on both base and wall cabinets); we only carry
+        # over the overlap. For each inherited attribute, pick the PTAV
+        # on the NEW template that has the same attribute_id + value_id.
+        new_template_attr_lines = new_tmpl.attribute_line_ids
+        inherited = request.env["product.template.attribute.value"].sudo()
+        for prior_ptav in prior_ptavs:
+            attr_id = prior_ptav.attribute_id.id
+            value_id = prior_ptav.product_attribute_value_id.id
+            target_line = new_template_attr_lines.filtered(
+                lambda al: al.attribute_id.id == attr_id
+            )
+            if not target_line:
+                continue
+            target_ptav = target_line.product_template_value_ids.filtered(
+                lambda v: v.product_attribute_value_id.id == value_id
+            )
+            if target_ptav:
+                inherited |= target_ptav[:1]
+        if not inherited:
+            return 0
+        # Resolve / create the variant for this combination — same
+        # pattern as southbrook_api_line_set_attribute uses.
+        variant = new_tmpl._get_variant_for_combination(inherited)
+        if not variant:
+            variant = (
+                request.env["product.product"]
+                .sudo()
+                .create({
+                    "product_tmpl_id": new_tmpl.id,
+                    "product_template_attribute_value_ids": [
+                        (6, 0, inherited.ids)
+                    ],
+                })
+            )
+        if not variant:
+            return 0
+        new_line.sudo().write({"product_id": variant.id})
+        if hasattr(new_line, "product_id_change"):
+            new_line.product_id_change()
+        return len(inherited)
+
+    # 2026-06-27 — bulk-add endpoint (BE reviewer P2#8). Accepts
+    # `items: [{product_tmpl_id, qty, zone?}]` and creates / merges
+    # all lines in one round-trip + one ORM transaction. Reuses the
+    # same dedupe-merge + zone-resolution logic as the single-add path.
+    #
+    # Use cases: "starter kit" pre-fill (5 typical wall cabinets +
+    # 3 base sized to the room), spreadsheet paste, "duplicate as
+    # draft" with overrides. Replaces N×/add-line calls.
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/lines/bulk-add",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_bulk_add(self, order_id, items=None, **kw):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        if order.state not in ("draft", "sent"):
+            return {"error": "order_locked", "state": order.state}
+
+        if not items or not isinstance(items, list):
+            return {"error": "missing_items"}
+
+        # Hard cap per call to keep the loop bounded and reduce blast
+        # radius of a scripted abuse. 200 cabinets is well above any
+        # legitimate kitchen.
+        if len(items) > 200:
+            return {"error": "too_many_items", "max": 200}
+
+        Template = request.env["product.template"].sudo()
+        Sol = request.env["sale.order.line"].sudo()
+        Variant = request.env["product.product"].sudo()
+        sku_defaults = request.env["product.config.session"]._SKU_DEFAULTS
+
+        created_ids, merged_ids, skipped = [], [], []
+        for idx, raw in enumerate(items):
+            if not isinstance(raw, dict):
+                skipped.append({"index": idx, "error": "bad_item"})
+                continue
+            tmpl_id = raw.get("product_tmpl_id")
+            if not tmpl_id:
+                skipped.append({"index": idx, "error": "missing_tmpl"})
+                continue
+            try:
+                qty_int = max(1, int(raw.get("qty") or 1))
+            except (TypeError, ValueError):
+                qty_int = 1
+            if qty_int > 999:
+                qty_int = 999
+
+            tmpl = Template.browse(int(tmpl_id)).exists()
+            if not tmpl:
+                skipped.append({"index": idx, "error": "tmpl_not_found"})
+                continue
+
+            variant = tmpl.product_variant_ids[:1]
+            if not variant:
+                variant = Variant.create({"product_tmpl_id": tmpl.id})
+
+            # Dedupe-merge — same contract as single-add.
+            existing = Sol.search(
+                [
+                    ("order_id", "=", order.id),
+                    ("product_id", "=", variant.id),
+                ],
+                limit=1,
+            )
+            if existing:
+                existing.product_uom_qty = existing.product_uom_qty + qty_int
+                merged_ids.append(existing.id)
+                continue
+
+            sku = tmpl.default_code or ""
+            sku_row = sku_defaults.get(sku)
+            family = sku_row[0] if sku_row else ""
+            resolved_zone = self._southbrook_resolve_zone(
+                family, raw.get("zone"),
+            )
+            line = Sol.create({
+                "order_id": order.id,
+                "product_id": variant.id,
+                "product_uom_qty": qty_int,
+                "zone": resolved_zone,
+            })
+            if hasattr(line, "product_id_change"):
+                line.product_id_change()
+            created_ids.append(line.id)
+
+        return {
+            "ok": True,
+            "created": created_ids,
+            "merged": merged_ids,
+            "skipped": skipped,
+            "total_created": len(created_ids),
+            "total_merged": len(merged_ids),
+        }
 
     # T2C12 — FooterActions dispatcher.
     #
@@ -2039,6 +2278,25 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         channel_total = retail_subtotal * (1 - discount_pct / 100.0)
         savings = retail_subtotal - channel_total
 
+        # 2026-06-27 — cost rollup for the channel-margin chip
+        # (MFG reviewer P1#8). standard_price × qty per line; total
+        # margin = channel_total - cost. Hidden when zero (e.g. empty
+        # order, or templates without a cost — refacing SKUs).
+        cost_subtotal = 0.0
+        for line in order.order_line:
+            if line.product_id:
+                cost_subtotal += (
+                    (line.product_id.standard_price or 0.0)
+                    * (line.product_uom_qty or 0.0)
+                )
+        margin_total = channel_total - cost_subtotal
+        # Guard against div-by-zero when channel_total is 0 (empty order
+        # or all-zero pricing). Negative margin is real and shown red.
+        margin_pct = (
+            (margin_total / channel_total * 100.0)
+            if channel_total > 0 else 0.0
+        )
+
         # Per-line shape.
         lines = []
         zone_buckets = {}
@@ -2078,6 +2336,43 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 round((width_mm / 25.4) * 4) / 4 if width_mm else 0
             )
 
+            # 2026-06-27 — ECO/PLM revision drift detection (MFG #1.5).
+            # When a line was snapshotted at confirm against revision N
+            # but the active revision has since moved to N+M, surface
+            # the drift inline so the user knows the quoted spec is
+            # stale relative to what manufacturing will build. Only
+            # relevant for confirmed lines (snapshots fire at confirm).
+            cut_spec_drift = False
+            cut_spec_snap_name = ""
+            cut_spec_current_name = ""
+            bom_drift = False
+            bom_snap_ver = 0
+            bom_current_ver = 0
+            snap_spec = getattr(line, "southbrook_cut_spec_version_id", False)
+            if snap_spec:
+                cut_spec_snap_name = snap_spec.display_name or ""
+                active_spec = (
+                    request.env["southbrook.cut.spec"]
+                    .sudo()._get_active()
+                    if "southbrook.cut.spec" in request.env else False
+                )
+                if active_spec:
+                    cut_spec_current_name = active_spec.display_name or ""
+                    cut_spec_drift = active_spec.id != snap_spec.id
+            snap_bom_ver = getattr(line, "southbrook_bom_version", 0) or 0
+            if snap_bom_ver and tmpl:
+                BomLookup = request.env["mrp.bom"].sudo()
+                current_bom = BomLookup.search(
+                    [("product_tmpl_id", "=", tmpl.id), ("active", "=", True)],
+                    limit=1,
+                )
+                if current_bom and getattr(
+                    current_bom, "southbrook_version", 0,
+                ):
+                    bom_snap_ver = snap_bom_ver
+                    bom_current_ver = current_bom.southbrook_version
+                    bom_drift = bom_current_ver > snap_bom_ver
+
             line_payload = {
                 "id": line.id,
                 "sequence": idx,
@@ -2094,6 +2389,15 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "channel_price": line_channel,
                 "width_mm": width_mm,
                 "width_inches": width_inches,
+                # 2026-06-27 — ECO drift surfaces. Frontend gates the
+                # orange chip on `revision_drift` being true.
+                "revision_drift": cut_spec_drift or bom_drift,
+                "cut_spec_drift": cut_spec_drift,
+                "cut_spec_snap_name": cut_spec_snap_name,
+                "cut_spec_current_name": cut_spec_current_name,
+                "bom_drift": bom_drift,
+                "bom_snap_ver": bom_snap_ver,
+                "bom_current_ver": bom_current_ver,
                 "config_session_id": (
                     line.config_session_id.id
                     if hasattr(line, "config_session_id")
@@ -2333,6 +2637,13 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "retail_subtotal": retail_subtotal,
                 "channel_total":  channel_total,
                 "savings":        savings,
+                # 2026-06-27 — channel margin surfaces (MFG #1.8).
+                # cost_subtotal == sum(standard_price × qty); margin_pct
+                # is (channel - cost)/channel × 100. Frontend renders a
+                # margin chip red below 10%, amber 10-15%, green ≥ 15%.
+                "cost_subtotal":  cost_subtotal,
+                "margin_total":   margin_total,
+                "margin_pct":     round(margin_pct, 1),
                 "lead_time_days": lead_time_days,
                 "line_count":     len(lines),
                 # G14 + G17 (2026-06-01) — timeline timestamps for the
@@ -2358,6 +2669,15 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "history_chain": (
                     order._southbrook_history_chain()
                     if hasattr(order, "_southbrook_history_chain") else []
+                ),
+                # 2026-06-27 — server write_date for the "last saved
+                # X min ago" stamp at order level (FE reviewer P3#13).
+                # ISO string so the OWL formatter can produce a
+                # localised relative-time label without parsing
+                # ambiguity.
+                "write_date": (
+                    order.write_date.isoformat()
+                    if order.write_date else None
                 ),
                 # 2026-06-27 — production-approval surfaces. Optional
                 # (defaults to None) so the page renders cleanly even

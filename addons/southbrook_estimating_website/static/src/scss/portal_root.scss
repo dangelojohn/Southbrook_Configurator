@@ -1327,6 +1327,17 @@
     font-variant-numeric: tabular-nums;
 }
 
+// 2026-06-27 — ECO/PLM revision drift chip. Orange-red because the
+// stakes are higher than the lead-time chip — if the user confirmed
+// a quote against revision N but the shop now builds revision N+M,
+// the customer paid for the old spec and gets the new one.
+.o_owl_badge_drift {
+    background: #fed7aa;
+    color: #9a3412;
+    border: 1px solid #fdba74;
+    cursor: help;
+}
+
 // 2026-06-27 — production-approval strip. Lives between StagePipeline
 // and HeaderStrip; surfaces approval state + MO preview + Request
 // Approval button so the dealer doesn't have to bounce into backend.
@@ -1741,6 +1752,26 @@
 // "you saved $X" affordance.
 .o_owl_hs_savings .o_owl_hs_value {
     color: var(--sb-ok);
+}
+
+// 2026-06-27 — last-saved stamp under the titlebar ref block.
+// Muted text so it informs without competing with the SO ref.
+.o_owl_titlebar_saved {
+    font-size: 11px;
+    color: var(--sb-ink-dim, #6b6b6b);
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+}
+
+// 2026-06-27 — channel margin chip (MFG #1.8). Colour-graded so the
+// manufacturing user can spot under-margin orders without reading
+// the percentage. Red below 10% pulls hard; amber 10-15% is a soft
+// warning; green ≥ 15% is the "OK" zone.
+.o_owl_hs_margin {
+    .o_owl_hs_value { font-weight: 600; }
+    &.o_owl_hs_margin_red   .o_owl_hs_value { color: #dc2626; }
+    &.o_owl_hs_margin_amber .o_owl_hs_value { color: #b45309; }
+    &.o_owl_hs_margin_green .o_owl_hs_value { color: var(--sb-ok, #16a34a); }
 }
 
 // ----- OWL OrderBuilder root (T2C2 commit's component) ------------
