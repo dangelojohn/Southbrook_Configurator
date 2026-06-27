@@ -165,11 +165,15 @@ class DefectQrKind(models.AbstractModel):
 
     # SAMI PRD (2026-06-26) — how long after a wo/mo/asbuilt/pkg scan
     # does the next defect scan still inherit that record as context?
-    # Default 5 minutes covers realistic floor delays (operator
-    # spots defect, fetches sheet, beeps the relevant defect type).
+    # W018 (2026-06-27, R5.3): widened from 300s -> 900s. The 5-min
+    # default was too tight for the realistic floor walk: operator
+    # scans WO at the station, walks to the defect-QR sheet at the
+    # quality station 30-90s away, hunts down the right cell, scans
+    # it. Doubling-plus to 15 min covers operators who scan-then-
+    # walk-to-station without losing context.
     # Tunable per-site via ir.config_parameter
     # `southbrook.qr_kit.defect_context_window_seconds`.
-    _DEFAULT_DEFECT_CONTEXT_SEC = 300
+    _DEFAULT_DEFECT_CONTEXT_SEC = 900
 
     @api.model
     def _resolve_workorder_from_context(self):
@@ -264,14 +268,45 @@ class DefectQrKind(models.AbstractModel):
             try:
                 new_ncr.message_post(body=_(
                     "Auto-linked to WO from your previous scan within "
-                    "the defect-context window (5 min default)."))
+                    "the defect-context window (15 min default)."))
             except Exception:  # noqa: BLE001
                 pass
+        # W018 (R5.3) — echo the resolved WO in the toast so the
+        # operator can confirm at a glance that the NCR linked to the
+        # right work order. "Drafted defect" alone left them guessing.
+        # Shape: "Drafted defect 'scratch' -> WO00123 (Edgebanding)"
+        resolved_wo = False
+        if wo_id:
+            try:
+                resolved_wo = self.env["mrp.workorder"].sudo().browse(
+                    int(wo_id)).exists()
+            except (TypeError, ValueError):
+                resolved_wo = False
+        if resolved_wo:
+            wo_label = resolved_wo.display_name or (
+                "WO%05d" % resolved_wo.id)
+            op_label = ""
+            if resolved_wo.workcenter_id:
+                op_label = " (%s)" % resolved_wo.workcenter_id.name
+            elif resolved_wo.operation_id:
+                op_label = " (%s)" % resolved_wo.operation_id.name
+            message = _(
+                "Drafted defect '%(defect)s' -> %(wo)s%(op)s"
+            ) % {"defect": defect_type, "wo": wo_label, "op": op_label}
+        else:
+            message = _("NCR drafted for defect '%s' "
+                        "(no recent WO scan -- link manually)") % defect_type
         return {
             "record_name": new_ncr.display_name,
             "record_id": new_ncr.id,
             "model": self._target_model,
-            "message": _("NCR drafted for defect '%s'") % defect_type,
+            "message": message,
+            "wo_id": resolved_wo.id if resolved_wo else False,
+            "wo_name": (resolved_wo.display_name if resolved_wo else ""),
+            "workcenter_name": (
+                resolved_wo.workcenter_id.name
+                if resolved_wo and resolved_wo.workcenter_id else ""),
+            "context_resolved": context_resolved,
             "act_window": {
                 "type": "ir.actions.act_window",
                 "res_model": self._target_model,
