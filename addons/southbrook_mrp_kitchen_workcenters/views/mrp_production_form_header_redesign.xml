@@ -129,6 +129,18 @@
                             <field name="name"/>
                             <field name="message"/>
                             <field name="recommendation"/>
+                            <!-- W024 — inline auto-fix button per row.
+                                 column_invisible on the bool keeps the
+                                 field fetched (so the button's invisible
+                                 expression can read it) without burning
+                                 a visible column. -->
+                            <field name="auto_fixable" column_invisible="1"/>
+                            <button name="action_auto_fix" type="object"
+                                    string="Fix" class="btn-link"
+                                    icon="fa-magic"
+                                    invisible="not auto_fixable"
+                                    help="Run the deterministic auto-fix for this
+                                          check (W024). Idempotent."/>
                         </list>
                     </field>
                 </page>

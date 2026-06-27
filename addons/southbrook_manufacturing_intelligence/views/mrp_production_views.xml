@@ -58,6 +58,17 @@
                             <!-- W001 — inline thumbnail. Tap the row to open
                                  the standalone form (chatter + full image). -->
                             <field name="image" widget="image" options="{'size': [32, 32]}"/>
+                            <!-- W024 — auto_fixable drives Fix-button
+                                 visibility. Field is fetched (not optional)
+                                 so the `invisible` clause has access. -->
+                            <field name="auto_fixable" column_invisible="1"/>
+                            <button name="action_auto_fix" type="object"
+                                    string="Fix" class="btn-link"
+                                    icon="fa-magic"
+                                    invisible="not auto_fixable"
+                                    help="Run the deterministic auto-fix for this
+                                          check (W024). Idempotent: safe to click
+                                          twice; MI recomputes after."/>
                         </list>
                     </field>
                 </page>

@@ -1,9 +1,26 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+import logging
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
+_logger = logging.getLogger(__name__)
+
 SEVERITY_RANK = {"blocker": 0, "warning": 1, "info": 2}
+
+# W024 — Auto-fix mapping. Keys are MI check categories that have a
+# known, deterministic remediation; values are the method name on this
+# model that runs the fix. Categories absent from this mapping are not
+# auto-fixable and the inline button hides.
+#
+# All handlers MUST be idempotent — re-firing on an already-fixed check
+# is a no-op (and the MI recompute that runs at the end will erase
+# the check entirely if the underlying condition cleared).
+AUTO_FIX_DISPATCH = {
+    "cut": "_action_auto_fix_cut",
+    "cad": "_action_auto_fix_cad",
+}
 
 
 # W012 — base-level lifecycle state on mi.check.
@@ -99,6 +116,254 @@ class SouthbrookMiCheck(models.Model):
     def _compute_severity_rank(self):
         for rec in self:
             rec.severity_rank = SEVERITY_RANK.get(rec.severity, 99)
+
+    # ------------------------------------------------------------------
+    # W024 — Inline auto-fix on MI check rows
+    # ------------------------------------------------------------------
+    # Per R1.W5 (docs/MFG-REVIEW-R1-mo-lifecycle.md:190): the planner
+    # today reads a recommendation sentence and hunts through 3 menus
+    # to remediate. We expose an "Auto-Fix" button per row when the
+    # check's category maps to a known deterministic remediation
+    # (see AUTO_FIX_DISPATCH at module top).
+    #
+    # `auto_fixable` is a computed boolean (unstored) — the dispatch
+    # table is static, the severity check is per-row, no need to burn
+    # storage on it. The view uses `invisible="not auto_fixable"` to
+    # hide the button where it can't help.
+    auto_fixable = fields.Boolean(
+        compute="_compute_auto_fixable", store=False,
+        help="True iff this check's category maps to a known auto-fix "
+             "and the check is currently raising a non-OK severity. "
+             "Drives visibility of the inline Auto-Fix button.",
+    )
+
+    @api.depends("category", "severity")
+    def _compute_auto_fixable(self):
+        for rec in self:
+            rec.auto_fixable = (
+                rec.severity in ("blocker", "warning")
+                and rec.category in AUTO_FIX_DISPATCH
+            )
+
+    def action_auto_fix(self):
+        """Run the auto-fix for this check's category.
+
+        Idempotent: re-firing on a check whose underlying condition has
+        already been resolved by a prior call is a no-op (the dispatch
+        handlers themselves check the current state, and the MI recompute
+        at the end will erase the check entirely if it now passes).
+
+        Bulk-safe: walks self, skips checks where auto_fixable is False
+        (defensive — view layer already hides the button) or whose MO
+        was unlinked between view-fetch and click.
+        """
+        engine = self.env["southbrook.mi.engine"]
+        touched_productions = self.env["mrp.production"]
+
+        for check in self:
+            if not check.auto_fixable:
+                _logger.debug(
+                    "W024 auto-fix: skip check %s — not auto_fixable",
+                    check.id,
+                )
+                continue
+            production = check.production_id
+            if not production or not production.exists():
+                _logger.debug(
+                    "W024 auto-fix: skip check %s — no production_id",
+                    check.id,
+                )
+                continue
+            handler_name = AUTO_FIX_DISPATCH.get(check.category)
+            if not handler_name:
+                continue
+            try:
+                getattr(check, handler_name)()
+                touched_productions |= production
+            except UserError:
+                # Bubble UserError up — it's intentional operator-
+                # facing messaging (e.g. FreeCAD bridge disabled).
+                raise
+            except Exception:  # noqa: BLE001
+                _logger.warning(
+                    "W024 auto-fix: handler %s raised for check %s "
+                    "(MO %s) — recording failure on chatter and "
+                    "leaving the check in place.",
+                    handler_name, check.id, production.id,
+                    exc_info=True,
+                )
+                production.message_post(body=_(
+                    "Auto-fix failed for MI check '%(name)s' "
+                    "(category=%(category)s). See server log for "
+                    "details; the check remains active.",
+                    name=check.name,
+                    category=check.category,
+                ))
+
+        # Recompute MI status across affected MOs so any blocker that
+        # the handler cleared drops out of the check list.
+        for production in touched_productions:
+            try:
+                engine._recompute_production(production)
+            except Exception:  # noqa: BLE001
+                _logger.warning(
+                    "W024 auto-fix: post-fix MI recompute failed for "
+                    "MO %s — UI may show stale check until next sweep.",
+                    production.id, exc_info=True,
+                )
+        return True
+
+    # ------------------------------------------------------------------
+    # Per-category handlers. Each MUST be idempotent.
+    # ------------------------------------------------------------------
+    def _action_auto_fix_cut(self):
+        """Attempt to generate the missing cutlist via the P3 builder.
+
+        Idempotent: if a cutlist already exists on the production
+        package, returns early. The recompute that follows in
+        action_auto_fix will then erase the Missing-cutlist check.
+
+        Falls through to a chatter note when:
+          - the production has no source order line
+          - the configurator config is incomplete (Door Style=Custom,
+            missing Width attribute)
+          - the build itself raises (logged via the engine's existing
+            try/except)
+        """
+        self.ensure_one()
+        engine = self.env["southbrook.mi.engine"]
+        production = self.production_id
+        if not production:
+            return False
+
+        # Idempotency check — cutlist already present.
+        existing_cutlist = engine._production_cutlist(production)
+        if existing_cutlist:
+            production.message_post(body=_(
+                "Auto-fix (W024): cutlist already exists for this MO "
+                "— no action taken."
+            ))
+            return True
+
+        order_line = engine._p3_source_order_line(production)
+        if not order_line:
+            production.message_post(body=_(
+                "Auto-fix (W024): cannot auto-generate cutlist — no "
+                "source sale.order.line resolvable for this MO."
+            ))
+            return False
+
+        if not engine._p3_config_is_complete(order_line):
+            production.message_post(body=_(
+                "Auto-fix (W024): configurator config is incomplete "
+                "(Door Style=Custom, or missing Width) — operator "
+                "must complete the configuration before the cutlist "
+                "can be generated deterministically."
+            ))
+            return False
+
+        package = engine._p3_try_emit_package(order_line, production)
+        if package:
+            production.message_post(body=_(
+                "Auto-fix (W024): cutlist generated for MO %(name)s "
+                "via P3 builder.",
+                name=production.name,
+            ))
+            return True
+        # The engine logged the failure detail; surface a planner-
+        # readable note on chatter.
+        production.message_post(body=_(
+            "Auto-fix (W024): P3 builder did not return a package. "
+            "See server log for the failure detail."
+        ))
+        return False
+
+    def _action_auto_fix_cad(self):
+        """Re-fire the FreeCAD bridge render job for the parent MO.
+
+        Idempotent: when x_cad_status is already 'done', returns early
+        with a chatter note. When 'rendering', returns early (a job is
+        already in flight). Otherwise re-POSTs the render job via the
+        bridge's existing action_regenerate_cad.
+
+        Falls through to a chatter note when the FreeCAD bridge addon
+        isn't installed (no action_regenerate_cad method on the model)
+        or when the bridge gate is disabled (UserError bubbles up).
+        """
+        self.ensure_one()
+        production = self.production_id
+        if not production:
+            return False
+
+        if not hasattr(production, "action_regenerate_cad"):
+            production.message_post(body=_(
+                "Auto-fix (W024): FreeCAD bridge addon is not "
+                "installed; cannot regenerate CAD. Resolve the CAD "
+                "artifact manually."
+            ))
+            return False
+
+        cad_status = getattr(production, "x_cad_status", False)
+        if cad_status == "done":
+            production.message_post(body=_(
+                "Auto-fix (W024): CAD is already 'done' for this MO "
+                "— no action taken."
+            ))
+            return True
+        if cad_status == "rendering":
+            production.message_post(body=_(
+                "Auto-fix (W024): CAD render is already in flight "
+                "for this MO — no action taken (wait for callback)."
+            ))
+            return True
+
+        production.action_regenerate_cad()
+        production.message_post(body=_(
+            "Auto-fix (W024): CAD render job re-posted to the FreeCAD "
+            "bridge for MO %(name)s.",
+            name=production.name,
+        ))
+        return True
+
+    @api.model
+    def action_auto_fix_all_selected(self):
+        """Server-action entry point — runs auto_fix across every
+        selected row that is auto_fixable. Skips the rest silently
+        (per W024 spec: bulk-fix targets only the fixable subset).
+
+        Resolves selection from context active_ids when called from
+        a list-view server action; falls back to self when called
+        from an arbitrary recordset.
+        """
+        rows = self
+        active_ids = self.env.context.get("active_ids")
+        if active_ids:
+            rows = self.browse(active_ids)
+        fixable = rows.filtered(lambda r: r.auto_fixable)
+        if not fixable:
+            return {
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "title": _("Auto-Fix"),
+                    "message": _("No auto-fixable checks in the "
+                                 "current selection."),
+                    "type": "warning",
+                    "sticky": False,
+                },
+            }
+        fixable.action_auto_fix()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Auto-Fix"),
+                "message": _("Ran auto-fix on %d check(s). "
+                             "MI status recomputed."),
+                "type": "success",
+                "sticky": False,
+            },
+        }
 
     # ------------------------------------------------------------------
     # W012 — engineering deviation approval flow

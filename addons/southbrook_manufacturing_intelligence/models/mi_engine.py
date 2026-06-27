@@ -314,9 +314,20 @@ class SouthbrookMiEngine(models.AbstractModel):
     # P3 — Auto-remediation flag. When ON, the engine attempts to
     # generate the missing cutlist via the P1 builder before deciding
     # the blocker is unavoidable.
+    #
+    # W024 (2026-06-27): default flipped from "False" to "True". The
+    # safety net (Door Style = "Custom (Signature)" disqualifier at
+    # _p3_config_is_complete) is already in place, and the P3 builder
+    # has been stable in prod since R1 Win 5 shipped. Auto-remediate
+    # now self-heals the ~4-6 cutlist-missing blockers per cron sweep
+    # instead of leaving them for the planner to chase. Admins who
+    # explicitly set this to "False" via Settings / Technical / System
+    # Parameters retain their override — noupdate=1 on the data record
+    # keeps existing values untouched on module upgrade.
     _AUTO_REMEDIATE_FLAG = (
         "southbrook_manufacturing_intelligence.auto_remediate_cutlist"
     )
+    _AUTO_REMEDIATE_DEFAULT = "True"
 
     @api.model
     def _recompute_production(self, production):
@@ -493,7 +504,8 @@ class SouthbrookMiEngine(models.AbstractModel):
     @api.model
     def _p3_auto_remediate_enabled(self):
         flag = self.env["ir.config_parameter"].sudo().get_param(
-            self._AUTO_REMEDIATE_FLAG, default="False")
+            self._AUTO_REMEDIATE_FLAG,
+            default=self._AUTO_REMEDIATE_DEFAULT)
         return str(flag).strip().lower() in ("1", "true", "yes", "on")
 
     @api.model

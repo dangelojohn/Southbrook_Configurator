@@ -8,3 +8,4 @@ from . import test_t1_open_side
 from . import test_ready_queue_split
 from . import test_deviation_waiver
 from . import test_w053_mi_cron_idempotent
+from . import test_w024_inline_auto_fix
