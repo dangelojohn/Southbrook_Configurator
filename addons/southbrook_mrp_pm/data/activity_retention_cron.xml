@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only
+
+     W057 (MFG-REVIEW-R7.6) — Activity feed retention cron.
+
+     mail.activity rows accumulate fast on a manufacturing floor
+     (every WO check, every NCR, every breakdown spawns activities)
+     and per R7 the growth pattern accelerates mid-year. Without
+     trimming, the table balloons past 10M rows and the activity
+     widget queries (which scan by user + date_deadline) tank.
+
+     Scope of safe deletion:
+       * Only rows with date_done IS NOT NULL — incomplete activities
+         are someones live to-do; never touch them.
+       * Older than 90 days from now.
+
+     This is pure garbage collection. No audit trail kept — completed
+     activities older than a quarter are not interesting; chatter
+     messages (mail.message) carry the durable record of what was
+     done. The activity row itself is ephemeral signal.
+-->
+<odoo noupdate="1">
+
+    <record id="ir_cron_activity_retention" model="ir.cron">
+        <field name="name">Southbrook: trim done mail.activity older than 90 days</field>
+        <field name="model_id" ref="mail.model_mail_activity"/>
+        <field name="state">code</field>
+        <field name="code">model._sbk_purge_done_activities(days=90)</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+</odoo>
