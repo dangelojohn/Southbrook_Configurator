@@ -272,7 +272,11 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                     request.env["southbrook.room.constraint"].sudo().create(
                         cons_cmds
                     )
-        except ValidationError as e:
+        except (ValidationError, ValueError) as e:
+            # Selection field bad-enum (e.g. unit_preference="bogus")
+            # raises ValueError, not ValidationError — surface both
+            # cleanly so a hand-crafted curl doesn't get a JSON-RPC
+            # 500 (review #6).
             return {"error": "invalid", "detail": str(e)}
 
         return {"ok": True, "room": _serialize_room(room)}
@@ -355,7 +359,11 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                     request.env["southbrook.room.wall"].sudo().create(wall_vals)
         except AccessError:
             return {"error": "forbidden"}
-        except ValidationError as e:
+        except (ValidationError, ValueError) as e:
+            # Selection field bad-enum (e.g. unit_preference="bogus")
+            # raises ValueError, not ValidationError — surface both
+            # cleanly so a hand-crafted curl doesn't get a JSON-RPC
+            # 500 (review #6).
             return {"error": "invalid", "detail": str(e)}
 
         # Refresh ORM cache so computes reflect the writes.
@@ -428,7 +436,11 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
 
         try:
             c = request.env["southbrook.room.constraint"].sudo().create(vals)
-        except ValidationError as e:
+        except (ValidationError, ValueError) as e:
+            # Selection field bad-enum (e.g. unit_preference="bogus")
+            # raises ValueError, not ValidationError — surface both
+            # cleanly so a hand-crafted curl doesn't get a JSON-RPC
+            # 500 (review #6).
             return {"error": "invalid", "detail": str(e)}
 
         return {"ok": True, "constraint": _serialize_constraint(c)}

@@ -427,10 +427,22 @@ export class RoomSetupWizard extends Component {
         this.state.room.layout_shape = code;
         // Pre-populate walls with the default count for this shape so
         // Step 2 has scaffolding to edit. Don't clobber existing walls
-        // if the user is re-picking the same shape.
+        // if the user is re-picking the same shape. When the count
+        // changes, preserve overlap — keep already-entered length_mm
+        // and name for the first min(old, want) walls (review #7).
         const want = wallsForShape(code);
         if (this.state.walls.length !== want) {
-            this.state.walls = defaultWalls(want);
+            const fresh = defaultWalls(want);
+            const keep = Math.min(this.state.walls.length, want);
+            for (let i = 0; i < keep; i++) {
+                if (this.state.walls[i].length_mm) {
+                    fresh[i].length_mm = this.state.walls[i].length_mm;
+                }
+                if (this.state.walls[i].name) {
+                    fresh[i].name = this.state.walls[i].name;
+                }
+            }
+            this.state.walls = fresh;
             // Drop constraints that pointed at walls that no longer exist.
             this.state.constraints = this.state.constraints.filter(
                 (c) => c.wall_index < want,
@@ -495,6 +507,8 @@ export class RoomSetupWizard extends Component {
     }
 
     _next = () => {
+        // In-flight guard — prevents double-click double-submit (review #1).
+        if (this.state.step === "submitting") return;
         if (!this._canAdvance()) return;
         if (this.state.step === 3) {
             this._submit();
@@ -525,6 +539,9 @@ export class RoomSetupWizard extends Component {
     // ------------------------------------------------------------------
 
     async _submit() {
+        // In-flight guard — _next() also gates but a direct caller path
+        // (e.g. the error-screen "Retry" button) needs its own guard (review #1).
+        if (this.state.step === "submitting") return;
         this.state.step = "submitting";
         this.state.errorMessage = null;
         try {
@@ -543,6 +560,14 @@ export class RoomSetupWizard extends Component {
                 + "/room/create",
                 body,
             );
+            // Idempotency: server returns room_already_exists when the
+            // order has a prior room — treat as success and hand the
+            // existing room back, not as failure (review #2).
+            if (r && r.error === "room_already_exists" && r.room) {
+                this.state.step = "done";
+                this.props.onSubmitted(r.room);
+                return;
+            }
             if (!r || r.error) {
                 this.state.errorMessage = (r && (r.detail || r.error))
                     || "The room could not be saved.";

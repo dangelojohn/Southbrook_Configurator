@@ -3074,8 +3074,9 @@ class OrderBuilder extends Component {
     // capacity bar; clamped so an over-used wall renders at 100% with
     // the negative `remaining_mm` surfacing via the `--over` modifier.
     //
-    // _openRoomSetupWizard is a Phase 2.C stub. Phase 2.B ships the
-    // tab + empty-state; the wizard arrives next.
+    // _openRoomSetupWizard mounts the 3-step wizard component (Phase
+    // 2.C) by flipping state.ui.wizard. _closeRoomSetupWizard +
+    // _onRoomSubmitted are the lifecycle callbacks the wizard invokes.
     //
     // _refreshRoomState wraps the /room/get endpoint from Phase 2.A.
     // Reuses the module-level rpcJsonCall helper (line 58) — must NOT

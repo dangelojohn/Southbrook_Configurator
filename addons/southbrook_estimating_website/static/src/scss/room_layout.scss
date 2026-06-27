@@ -904,3 +904,52 @@
     white-space: pre-wrap;
 }
 
+// ---------------------------------------------------------------------------
+// Mobile breakpoint (review #3) — brief mandates graceful degradation
+// on mobile for the customer persona. Below 768px:
+//   - wizard body collapses from 2-col grid to single column
+//   - preview pane drops underneath (or hides on very small screens)
+//   - wall input grid stacks; constraint forms full-width
+//   - tile grids reflow to 2-col so they stay readable
+// ---------------------------------------------------------------------------
+@media (max-width: 768px) {
+    .sb-room-wizard-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, auto) minmax(0, auto);
+    }
+    .sb-room-wizard-step-pane {
+        border-right: none;
+        border-bottom: 1px solid var(--sb-rule);
+        padding: 0.9rem 1rem;
+    }
+    .sb-room-wizard-preview-pane {
+        padding: 0.6rem 1rem 1rem 1rem;
+        max-height: 38vh;
+    }
+    .sb-room-wizard-steps {
+        font-size: 0.85rem;
+    }
+    .sb-room-wizard-walls-table {
+        // Existing layout assumed flex/grid — switch to vertical stack.
+        display: block;
+        & > * {
+            display: block;
+            width: 100%;
+            margin-bottom: 0.6rem;
+        }
+    }
+    // Tile grids (room-type + shape pickers in Step 1) — 2-col on mobile.
+    .sb-room-wizard-step-opt {
+        flex: 1 1 calc(50% - 0.4rem);
+        min-width: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .sb-room-wizard-preview-pane {
+        // Tight phones: hide the SVG preview entirely — wall inputs are
+        // what the user is actually working in, the preview is a luxury.
+        display: none;
+    }
+}
+
