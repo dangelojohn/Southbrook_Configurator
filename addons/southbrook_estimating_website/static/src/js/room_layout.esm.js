@@ -41,6 +41,36 @@ import { Component, useState } from "@odoo/owl";
 import { wallSegmentsForShape } from "@southbrook_estimating_website/js/room_geometry.esm";
 
 // ----------------------------------------------------------------------
+// Phase 4 — mm ↔ ft/in conversion helpers (module-local).
+//
+// Mirrors OrderBuilder._imperialFromMm / _humanLen so the room_layout
+// surface can render length labels in the unit the user picked on the
+// Room Setup tab's segmented toggle — without reaching back into the
+// parent reactive store. Module-local (not class-bound) so all three
+// components (RoomLayoutTab, FloorPlanSVG, AssignToWallModal) share one
+// canonical implementation.
+//
+// Helpers are intentionally tiny + pure: extraction into a shared util
+// module would just move the dependency around — keeping them next to
+// their callers keeps the diff readable.
+// ----------------------------------------------------------------------
+
+function _imperialFromMm(mm) {
+    const inches = Math.round((Number(mm) || 0) / 25.4);
+    const feet = Math.floor(inches / 12);
+    const remIn = inches - feet * 12;
+    if (feet === 0) return `${remIn}"`;
+    if (remIn === 0) return `${feet}'`;
+    return `${feet}' ${remIn}"`;
+}
+
+function _humanLenWithPref(mm, pref) {
+    if (!mm && mm !== 0) return "—";
+    if (pref === "imperial") return _imperialFromMm(mm);
+    return `${Math.round(Number(mm) || 0)} mm`;
+}
+
+// ----------------------------------------------------------------------
 // Zone-based cabinet depth defaults — mirror sale_order_line.py's
 // _SB_DEFAULT_*_DEPTH_MM constants. Wall cabinets float higher and
 // shallower; tall cabinets project deepest. The floor plan is a top-
@@ -150,6 +180,9 @@ class FloorPlanSVG extends Component {
         // interactivity (e.g. inside the wizard preview pane).
         onCabinetClick: { type: Function, optional: true },
         onGapClick: { type: Function, optional: true },
+        // Phase 4 — unit preference (mm | imperial) for any length
+        // labels rendered inside the SVG (today: gap markers).
+        unitPreference: { type: String, optional: true },
     };
 
     // Phase 3.C.2a — click handlers. Both no-op when the parent didn't
@@ -160,6 +193,13 @@ class FloorPlanSVG extends Component {
 
     _onGapClick(wallId, gapMm, positionMm) {
         if (this.props.onGapClick) this.props.onGapClick(wallId, gapMm, positionMm);
+    }
+
+    // Phase 4 — length formatter honouring props.unitPreference. Pure
+    // wrapper around the module-local helper so the template can read
+    // `_humanLen(mm)` without spelling out the pref every time.
+    _humanLen(mm) {
+        return _humanLenWithPref(mm, this.props.unitPreference || "mm");
     }
 
     get _viewBox() {
@@ -481,7 +521,8 @@ class FloorPlanSVG extends Component {
                 out.push({
                     key: "g-" + wallId + "-" + lo,
                     points: pts,
-                    label: gap + " mm gap",
+                    // Phase 4 — gap label honours the unit preference.
+                    label: this._humanLen(gap) + " gap",
                     cx,
                     cy,
                     showLabel: widthPx >= 40,
@@ -588,6 +629,10 @@ export class RoomLayoutTab extends Component {
         onCabinetClick: { type: Function, optional: true },
         onGapClick: { type: Function, optional: true },
         onAssignFromSidebar: { type: Function, optional: true },
+        // Phase 4 — unit preference (mm | imperial) for every length
+        // label rendered by this tab. Flipped from the Room Setup tab's
+        // segmented toggle; FloorPlanSVG receives it via passthrough.
+        unitPreference: { type: String, optional: true },
     };
 
     // Phase 3.C.2a — sidebar Assign... button handler. No-op when the
@@ -597,6 +642,12 @@ export class RoomLayoutTab extends Component {
         if (this.props.onAssignFromSidebar) {
             this.props.onAssignFromSidebar(lineId);
         }
+    }
+
+    // Phase 4 — template-facing length formatter. Honours the
+    // unit-preference passed in from the parent OrderBuilder.
+    _humanLen(mm) {
+        return _humanLenWithPref(mm, this.props.unitPreference || "mm");
     }
 
     // ------------------------------------------------------------------
@@ -689,6 +740,11 @@ export class AssignToWallModal extends Component {
         room: Object,
         onAssign: Function,
         onCancel: Function,
+        // Phase 4 — unit preference. The position input stays in raw
+        // mm always (numeric input — mm is simpler than parsing
+        // `3' 6"` strings), but the dropdown options + cabinet width
+        // summary flip to ft/in when the room is on imperial.
+        unitPreference: { type: String, optional: true },
     };
 
     setup() {
@@ -766,5 +822,11 @@ export class AssignToWallModal extends Component {
     // check the placement (e.g. "600mm cabinet → wall has 1200mm left").
     get _cabinetWidthMm() {
         return (this.props.line && this.props.line.sb_width_mm) || 0;
+    }
+
+    // Phase 4 — template-facing length formatter. Honours the
+    // unit-preference passed in from the parent OrderBuilder.
+    _humanLen(mm) {
+        return _humanLenWithPref(mm, this.props.unitPreference || "mm");
     }
 }

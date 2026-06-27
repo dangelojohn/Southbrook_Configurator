@@ -1608,3 +1608,268 @@
         }
     }
 }
+
+// ---------------------------------------------------------------------
+// Phase 4 — Room Setup panel header (unit toggle) + 5-step progress
+// checklist + "Room Complete" celebratory card.
+//
+// All three live ABOVE the sb-room-summary card on the Room Setup tab.
+// The unit toggle persists; the progress strip is replaced by the
+// completion card once every step is done.
+// ---------------------------------------------------------------------
+
+.sb-room-panel-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.sb-room-unit-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--sb-font-sans);
+    font-size: 0.85rem;
+    color: var(--sb-ink-dim);
+}
+
+.sb-room-unit-toggle-label {
+    margin-right: 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.sb-room-unit-toggle-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--sb-rule-d);
+    background: var(--sb-paper);
+    color: var(--sb-walnut-d);
+    padding: 0.28rem 0.7rem;
+    font-family: var(--sb-font-mono);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease,
+                border-color 120ms ease;
+
+    &:first-of-type {
+        border-top-left-radius: var(--sb-radius-sm);
+        border-bottom-left-radius: var(--sb-radius-sm);
+        border-right-width: 0;
+    }
+    &:last-of-type {
+        border-top-right-radius: var(--sb-radius-sm);
+        border-bottom-right-radius: var(--sb-radius-sm);
+    }
+
+    &:hover:not(:disabled):not(.sb-room-unit-toggle-btn--active) {
+        background: var(--sb-linen);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+        position: relative;
+        z-index: 1;
+    }
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    &--active {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+        border-color: var(--sb-walnut-d);
+    }
+}
+
+// ---------------------------------------------------------------------
+// 5-step progress checklist — horizontal strip at the TOP of the
+// Room Setup panel.
+// ---------------------------------------------------------------------
+
+.sb-room-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    list-style: none;
+    margin: 0 0 1.1rem 0;
+    padding: 0.7rem 0.85rem;
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius-sm);
+}
+
+.sb-room-progress-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    font-family: var(--sb-font-sans);
+    font-size: 0.82rem;
+    color: var(--sb-ink);
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius-sm);
+    flex: 0 1 auto;
+
+    &--done {
+        color: var(--sb-walnut-d);
+        border-color: var(--sb-ok, #2f7d4f);
+
+        .sb-room-progress-bubble {
+            background: var(--sb-ok, #2f7d4f);
+            color: var(--sb-paper);
+            border-color: var(--sb-ok, #2f7d4f);
+        }
+    }
+
+    &--optional:not(.sb-room-progress-step--done) {
+        color: var(--sb-ink-dim);
+        border-style: dashed;
+
+        .sb-room-progress-bubble {
+            background: var(--sb-paper);
+            color: var(--sb-ink-dim);
+            border-color: var(--sb-rule-d);
+        }
+    }
+
+    &--todo {
+        color: var(--sb-ink);
+    }
+}
+
+.sb-room-progress-bubble {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--sb-rule-d);
+    background: var(--sb-paper);
+    font-family: var(--sb-font-mono);
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.sb-room-progress-label {
+    white-space: nowrap;
+}
+
+.sb-room-progress-cta {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--sb-sky);
+    font-family: var(--sb-font-mono);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.15rem;
+    cursor: pointer;
+    border-radius: var(--sb-radius-sm);
+
+    &:hover {
+        color: var(--sb-walnut-d);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+}
+
+// ---------------------------------------------------------------------
+// Celebratory completion card — replaces the checklist when all 5
+// steps complete.
+// ---------------------------------------------------------------------
+
+.sb-room-complete-card {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin: 0 0 1.1rem 0;
+    padding: 0.85rem 1rem;
+    background: var(--sb-hl, #f6f1e6);
+    border: 1px solid var(--sb-ok, #2f7d4f);
+    border-radius: var(--sb-radius-sm);
+}
+
+.sb-room-complete-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--sb-ok, #2f7d4f);
+    color: var(--sb-paper);
+    font-family: var(--sb-font-mono);
+    font-weight: 600;
+    font-size: 1rem;
+    flex: 0 0 auto;
+}
+
+.sb-room-complete-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sb-room-complete-title {
+    margin: 0 0 0.15rem 0;
+    font-family: var(--sb-font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--sb-walnut-d);
+}
+
+.sb-room-complete-text {
+    margin: 0;
+    font-family: var(--sb-font-sans);
+    font-size: 0.85rem;
+    color: var(--sb-ink-dim);
+}
+
+.sb-room-complete-cta {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--sb-walnut-d);
+    background: var(--sb-walnut);
+    color: var(--sb-paper);
+    font-family: var(--sb-font-display);
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 0.5rem 1.1rem;
+    border-radius: var(--sb-radius-sm);
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: background-color 120ms ease;
+
+    &:hover {
+        background: var(--sb-walnut-d);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+}
+
+// Modal hint shown when the unit pref is imperial — small text under
+// the "Position from left (mm)" label clarifying that the input stays
+// in mm regardless of the display unit.
+.sb-room-plan-modal-hint {
+    display: block;
+    margin-top: 0.15rem;
+    font-family: var(--sb-font-sans);
+    font-size: 0.72rem;
+    color: var(--sb-ink-dim);
+    font-weight: 400;
+}

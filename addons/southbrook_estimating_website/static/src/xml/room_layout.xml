@@ -67,6 +67,7 @@
                 <div class="sb-room-plan-canvas">
                     <FloorPlanSVG room="props.room"
                                   lines="props.lines"
+                                  unitPreference="props.unitPreference || 'mm'"
                                   onCabinetClick="props.onCabinetClick"
                                   onGapClick="props.onGapClick"/>
                 </div>
@@ -98,16 +99,16 @@
                                     }">
                                     <td t-esc="m.name"/>
                                     <td class="sb-room-plan-num mono">
-                                        <t t-esc="m.length_mm"/>
+                                        <t t-esc="_humanLen(m.length_mm)"/>
                                     </td>
                                     <td class="sb-room-plan-num mono">
-                                        <t t-esc="m.used_mm"/>
+                                        <t t-esc="_humanLen(m.used_mm)"/>
                                     </td>
                                     <td class="sb-room-plan-num mono"
                                         t-att-class="{
                                             'sb-room-plan-over': m.remaining_mm &lt; 0,
                                         }">
-                                        <t t-esc="m.remaining_mm"/>
+                                        <t t-esc="_humanLen(m.remaining_mm)"/>
                                     </td>
                                     <td class="sb-room-plan-num mono">
                                         <t t-esc="m.conflict_count"/>
@@ -116,13 +117,13 @@
                                 <tr class="sb-room-plan-wall-total">
                                     <td><strong>Total</strong></td>
                                     <td class="sb-room-plan-num mono">
-                                        <t t-esc="_wallTotals.length_mm"/>
+                                        <t t-esc="_humanLen(_wallTotals.length_mm)"/>
                                     </td>
                                     <td class="sb-room-plan-num mono">
-                                        <t t-esc="_wallTotals.used_mm"/>
+                                        <t t-esc="_humanLen(_wallTotals.used_mm)"/>
                                     </td>
                                     <td class="sb-room-plan-num mono">
-                                        <t t-esc="_wallTotals.remaining_mm"/>
+                                        <t t-esc="_humanLen(_wallTotals.remaining_mm)"/>
                                     </td>
                                     <td class="sb-room-plan-num mono">—</td>
                                 </tr>
@@ -148,7 +149,7 @@
                                 <span class="sb-room-plan-unplaced-name"
                                       t-esc="line.name"/>
                                 <span class="sb-room-plan-unplaced-width mono">
-                                    <t t-esc="line.sb_width_mm || 0"/> mm
+                                    <t t-esc="_humanLen(line.sb_width_mm || 0)"/>
                                 </span>
                                 <!-- Phase 3.C.2a — Assign... opens the
                                      AssignToWallModal at the parent
@@ -336,7 +337,7 @@
                         <strong t-esc="props.line.name || 'Cabinet'"/>
                         <span t-if="_cabinetWidthMm"
                               class="sb-room-plan-modal-width mono">
-                            <t t-esc="_cabinetWidthMm"/> mm wide
+                            <t t-esc="_humanLen(_cabinetWidthMm)"/> wide
                         </span>
                     </p>
 
@@ -356,15 +357,19 @@
                                 t-att-selected="String(opt.id) === String(state.wallId) ? 'selected' : null">
                             <t t-esc="opt.name"/>
                             ·
-                            <t t-esc="opt.length_mm"/> mm
+                            <t t-esc="_humanLen(opt.length_mm)"/>
                             ·
-                            <t t-esc="opt.remaining_mm"/> mm left
+                            <t t-esc="_humanLen(opt.remaining_mm)"/> left
                         </option>
                     </select>
 
                     <label class="sb-room-plan-modal-label"
                            for="sb-room-plan-modal-pos">
                         Position from left (mm)
+                        <small t-if="(props.unitPreference || 'mm') === 'imperial'"
+                               class="sb-room-plan-modal-hint">
+                            — input stays in mm; toggle is display-only
+                        </small>
                     </label>
                     <input id="sb-room-plan-modal-pos"
                            type="number"

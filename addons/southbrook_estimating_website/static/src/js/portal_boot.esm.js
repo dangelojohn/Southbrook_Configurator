@@ -1206,7 +1206,9 @@ class ZoneGroup extends Component {
                 <!-- Phase 3.D — per-zone wall-summary footer. Only
                      renders when every line in the zone points at the
                      same wall (single-wall zone); otherwise stays
-                     silent so multi-wall zones aren't misrepresented. -->
+                     silent so multi-wall zones aren't misrepresented.
+                     Phase 4 — length labels flip through _humanLen so
+                     they honour the room's unit_preference toggle. -->
                 <t t-set="wallSummary" t-value="_singleWallSummary()"/>
                 <div t-if="wallSummary"
                      class="sb-room-zone-wall-summary">
@@ -1214,11 +1216,11 @@ class ZoneGroup extends Component {
                         Wall: <t t-esc="wallSummary.name"/>
                     </span>
                     <span class="sb-room-zone-wall-cap mono">
-                        <t t-esc="wallSummary.used_mm"/>/<t t-esc="wallSummary.length_mm"/>mm used
+                        <t t-esc="_humanLen(wallSummary.used_mm)"/> / <t t-esc="_humanLen(wallSummary.length_mm)"/> used
                     </span>
                     <span class="sb-room-zone-wall-rem mono"
                           t-att-class="wallSummary.remaining_mm &lt; 0 ? 'sb-room-zone-wall-rem--over' : ''">
-                        <t t-esc="wallSummary.remaining_mm"/>mm left
+                        <t t-esc="_humanLen(wallSummary.remaining_mm)"/> left
                     </span>
                 </div>
             </div>
@@ -1240,6 +1242,12 @@ class ZoneGroup extends Component {
         // in that case _lineStatus returns null and chips don't render
         // and the wall-summary footer stays silent.
         room: { type: [Object, { value: null }], optional: true },
+        // Phase 4 — unit preference forwarded from OrderBuilder so the
+        // wall-summary footer renders mm or ft/in consistently with the
+        // rest of the Room Setup surface. Mirrored locally on the
+        // ZoneGroup so _humanLen here doesn't have to reach back into a
+        // parent reference. Defaults to "mm".
+        unitPreference: { type: String, optional: true },
     };
 
     setup() {
@@ -1249,6 +1257,26 @@ class ZoneGroup extends Component {
     _toggle = () => {
         this.state.collapsed = !this.state.collapsed;
     };
+
+    // Phase 4 — mm → ft/in conversion mirror of OrderBuilder._imperialFromMm.
+    // Kept identical (small + pure) so the wall-summary footer can call it
+    // without a prop-method round-trip. Reads unitPreference from props so
+    // the parent can flip the toggle and OWL re-renders this group.
+    _imperialFromMm(mm) {
+        const inches = Math.round((Number(mm) || 0) / 25.4);
+        const feet = Math.floor(inches / 12);
+        const remIn = inches - feet * 12;
+        if (feet === 0) return `${remIn}"`;
+        if (remIn === 0) return `${feet}'`;
+        return `${feet}' ${remIn}"`;
+    }
+
+    _humanLen(mm) {
+        if (!mm && mm !== 0) return "—";
+        const pref = this.props.unitPreference || "mm";
+        if (pref === "imperial") return this._imperialFromMm(mm);
+        return `${Math.round(Number(mm) || 0)} mm`;
+    }
 
     // Phase 3.D — derive the chip status for one line. Pure function
     // of (line, props.room); no new state, recomputes per render so
@@ -2334,6 +2362,81 @@ const TEMPLATE = xml`
                  role="tabpanel" aria-labelledby="o_owl_tab_room_setup"
                  tabindex="0">
                 <t t-if="state.room">
+                    <!-- Phase 4 — Room Setup panel header bar. Hosts the
+                         persistent unit toggle (mm | ft/in). The toggle
+                         POSTs /room/<rid>/update and on success refreshes
+                         state.room so every length label re-renders in
+                         the new unit. -->
+                    <div class="sb-room-panel-header">
+                        <div class="sb-room-unit-toggle"
+                             role="group"
+                             aria-label="Length units">
+                            <span class="sb-room-unit-toggle-label">Units:</span>
+                            <button type="button"
+                                    class="sb-room-unit-toggle-btn"
+                                    t-att-class="(state.room.unit_preference || 'mm') === 'mm' ? 'sb-room-unit-toggle-btn--active' : ''"
+                                    t-att-aria-pressed="(state.room.unit_preference || 'mm') === 'mm' ? 'true' : 'false'"
+                                    t-att-disabled="state.unit_saving"
+                                    t-on-click="() => this._onUnitToggle('mm')">
+                                mm
+                            </button>
+                            <button type="button"
+                                    class="sb-room-unit-toggle-btn"
+                                    t-att-class="(state.room.unit_preference || 'mm') === 'imperial' ? 'sb-room-unit-toggle-btn--active' : ''"
+                                    t-att-aria-pressed="(state.room.unit_preference || 'mm') === 'imperial' ? 'true' : 'false'"
+                                    t-att-disabled="state.unit_saving"
+                                    t-on-click="() => this._onUnitToggle('imperial')">
+                                ft/in
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Phase 4 — celebratory state when all 5 steps
+                         complete. Replaces the checklist so the user has
+                         a clear "you can move on" signal. -->
+                    <t t-if="_allStepsComplete()">
+                        <div class="sb-room-complete-card">
+                            <div class="sb-room-complete-icon" aria-hidden="true">✓</div>
+                            <div class="sb-room-complete-body">
+                                <h3 class="sb-room-complete-title">Room Complete</h3>
+                                <p class="sb-room-complete-text">
+                                    Your room is fully set up — all
+                                    cabinets placed, no conflicts.
+                                </p>
+                            </div>
+                            <button type="button"
+                                    class="sb-room-complete-cta"
+                                    t-on-click="() => this._setActiveTab('lines')">
+                                Continue to Order Lines →
+                            </button>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <!-- Phase 4 — 5-step progress checklist. Each
+                             step shows ✓ when complete, an empty bubble
+                             otherwise, plus a → CTA link on incomplete
+                             steps that dispatches via
+                             _onProgressStepClick(step.key). -->
+                        <ol class="sb-room-progress" aria-label="Room setup progress">
+                            <li t-foreach="_progressSteps()"
+                                t-as="step"
+                                t-key="step.key"
+                                class="sb-room-progress-step"
+                                t-att-class="step.complete ? 'sb-room-progress-step--done' : (step.optional ? 'sb-room-progress-step--optional' : 'sb-room-progress-step--todo')">
+                                <span class="sb-room-progress-bubble" aria-hidden="true">
+                                    <t t-if="step.complete">✓</t>
+                                    <t t-else=""></t>
+                                </span>
+                                <span class="sb-room-progress-label" t-esc="step.label"/>
+                                <button t-if="!step.complete"
+                                        type="button"
+                                        class="sb-room-progress-cta"
+                                        t-att-aria-label="step.hint"
+                                        t-on-click="() => this._onProgressStepClick(step.key)">→</button>
+                            </li>
+                        </ol>
+                    </t>
+
                     <!-- Summary card + per-wall cards -->
                     <div class="sb-room-summary">
                         <h2 class="sb-room-title">
@@ -2344,7 +2447,7 @@ const TEMPLATE = xml`
                                 <t t-esc="_humanShape(state.room.layout_shape)"/>
                             </span>
                             <span class="sb-room-linear">
-                                <t t-esc="state.room.total_linear_mm"/> mm linear
+                                <t t-esc="_humanLen(state.room.total_linear_mm)"/> linear
                             </span>
                             <span class="sb-room-walls">
                                 <t t-esc="state.room.walls.length"/> wall(s)
@@ -2360,19 +2463,19 @@ const TEMPLATE = xml`
                                 <header>
                                     <strong t-esc="wall.name"/>
                                     <span class="sb-room-wall-len">
-                                        <t t-esc="wall.length_mm"/> mm
+                                        <t t-esc="_humanLen(wall.length_mm)"/>
                                     </span>
                                 </header>
                                 <div class="sb-room-wall-bar"
-                                     t-att-title="wall.used_mm + ' / ' + wall.length_mm + ' mm used'">
+                                     t-att-title="_humanLen(wall.used_mm) + ' / ' + _humanLen(wall.length_mm) + ' used'">
                                     <div class="sb-room-wall-bar-fill"
                                          t-att-style="'width:' + _capPct(wall) + '%'"></div>
                                 </div>
                                 <footer class="sb-room-wall-cap">
-                                    <span><t t-esc="wall.used_mm"/> mm used</span>
+                                    <span><t t-esc="_humanLen(wall.used_mm)"/> used</span>
                                     <span class="sb-room-wall-rem"
                                           t-att-class="wall.remaining_mm &lt; 0 ? 'sb-room-wall-rem--over' : ''">
-                                        <t t-esc="wall.remaining_mm"/> mm left
+                                        <t t-esc="_humanLen(wall.remaining_mm)"/> left
                                     </span>
                                 </footer>
                                 <ul t-if="wall.constraints.length" class="sb-room-constraint-chips">
@@ -2380,7 +2483,7 @@ const TEMPLATE = xml`
                                         class="sb-room-chip"
                                         t-att-data-type="c.constraint_type">
                                         <t t-esc="_humanConstraint(c.constraint_type)"/>
-                                        <small>@ <t t-esc="c.distance_from_left_mm"/>mm</small>
+                                        <small>@ <t t-esc="_humanLen(c.distance_from_left_mm)"/></small>
                                     </li>
                                 </ul>
                             </div>
@@ -2418,6 +2521,7 @@ const TEMPLATE = xml`
                  tabindex="0">
                 <RoomLayoutTab room="state.room"
                                lines="state.lines"
+                               unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"
                                onCabinetClick="_onPlanCabinetClick"
                                onGapClick="_onPlanGapClick"
                                onAssignFromSidebar="_onPlanAssignClick"/>
@@ -2502,7 +2606,8 @@ const TEMPLATE = xml`
                                onLineSaved="_onLineSaved"
                                onAddToZone="_onAddToZone"
                                issuesForLine="_issuesForLine"
-                               room="state.room"/>
+                               room="state.room"
+                               unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
@@ -2619,6 +2724,7 @@ const TEMPLATE = xml`
             <AssignToWallModal t-if="state.ui.assigning &amp;&amp; _lineById(state.ui.assigning) &amp;&amp; state.room"
                                line="_lineById(state.ui.assigning)"
                                room="state.room"
+                               unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"
                                onAssign="(wallId, posMm) => this._onAssignSubmit(state.ui.assigning, wallId, posMm)"
                                onCancel="_onAssignCancel"/>
         </div>
@@ -2698,6 +2804,10 @@ class OrderBuilder extends Component {
             // shows a brief inline message while an RPC is in flight.
             action_busy: false,
             action_message: null,
+            // Phase 4 — in-flight flag for the Room Setup unit toggle.
+            // Disables both segmented buttons while the POST is pending
+            // so a rapid double-click doesn't queue two flips.
+            unit_saving: false,
             // P25C4 — monotonically increasing counter bumped on every
             // successful _loadOrder. KitchenViewport watches this to
             // refetch its 3D payload when the order changes underneath
@@ -3345,6 +3455,151 @@ class OrderBuilder extends Component {
         const len = wall.length_mm || 1;
         const used = Math.max(0, wall.used_mm);
         return Math.min(100, Math.round((used / len) * 100));
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 4 — mm ↔ ft/in conversion helpers.
+    //
+    // Storage layer is always mm; the toggle on the Room Setup header
+    // flips state.room.unit_preference between "mm" and "imperial". Every
+    // length label that reads off the room payload calls _humanLen so the
+    // re-render flips cleanly without round-tripping to the server.
+    //
+    // ZoneGroup, RoomLayoutTab, FloorPlanSVG and AssignToWallModal each
+    // carry mirror copies of these helpers (they're 5 lines of pure
+    // arithmetic) — extracting to a module would just move the import
+    // weight without simplifying anything.
+    // ------------------------------------------------------------------
+
+    _imperialFromMm(mm) {
+        const inches = Math.round((Number(mm) || 0) / 25.4);
+        const feet = Math.floor(inches / 12);
+        const remIn = inches - feet * 12;
+        if (feet === 0) return `${remIn}"`;
+        if (remIn === 0) return `${feet}'`;
+        return `${feet}' ${remIn}"`;
+    }
+
+    _humanLen(mm) {
+        if (!mm && mm !== 0) return "—";
+        const pref = (this.state.room && this.state.room.unit_preference) || "mm";
+        if (pref === "imperial") return this._imperialFromMm(mm);
+        return `${Math.round(Number(mm) || 0)} mm`;
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 4 — Unit toggle handler. POSTs the new preference to the
+    // /room/<rid>/update endpoint (Phase 2.A — already supports a
+    // partial-update body with unit_preference); on success refreshes
+    // state.room so every length label re-renders in the new unit.
+    // Failure is non-fatal: we restore the previous preference visually
+    // and log to console.
+    // ------------------------------------------------------------------
+
+    _onUnitToggle = async (unit) => {
+        if (!this.state.room) return;
+        const current = this.state.room.unit_preference || "mm";
+        if (current === unit) return;
+        if (this.state.unit_saving) return;
+        this.state.unit_saving = true;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/"
+                + encodeURIComponent(this.state.room.id)
+                + "/update",
+                { unit_preference: unit },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+            } else {
+                console.warn("[OrderBuilder] unit toggle rejected:", r);
+            }
+        } catch (e) {
+            console.warn("[OrderBuilder] unit toggle failed:", e);
+        } finally {
+            this.state.unit_saving = false;
+        }
+    };
+
+    // ------------------------------------------------------------------
+    // Phase 4 — 5-step progress checklist for the Room Setup panel.
+    //
+    // _progressSteps() returns an array of {key, label, complete, hint,
+    // optional} entries. _allStepsComplete() reads the same list and
+    // returns true when every step's complete === true; the panel
+    // template swaps to the celebratory card in that case.
+    //
+    // _onProgressStepClick(key) dispatches the per-step CTA: steps
+    // 1-3 reopen the wizard (where the user authored the data),
+    // steps 4-5 jump to the Room Layout tab (where placement and
+    // conflicts are visualised).
+    // ------------------------------------------------------------------
+
+    _progressSteps() {
+        const room = this.state.room;
+        if (!room) return [];
+        const walls = room.walls || [];
+        const constraints = room.constraints || [];
+        const allWallsHaveLen = walls.length > 0
+            && walls.every((w) => (w.length_mm || 0) > 0);
+        const lines = this.state.lines || [];
+        const allLinesPlaced = lines.length === 0
+            || lines.every((l) => !!l.wall_id);
+        const noConflicts = walls.every((w) => !w.has_conflicts);
+        return [
+            {
+                key: "room_shape",
+                label: "Room type & shape selected",
+                complete: !!room.layout_shape,
+                hint: "Open Room Setup wizard",
+            },
+            {
+                key: "wall_dimensions",
+                label: "Wall dimensions entered",
+                complete: allWallsHaveLen,
+                hint: "Open Room Setup wizard",
+            },
+            {
+                key: "constraints",
+                label: "Fixed constraints mapped (optional)",
+                complete: constraints.length > 0,
+                hint: "Open Room Setup wizard",
+                optional: true,
+            },
+            {
+                key: "cabinets_assigned",
+                label: "All cabinets assigned to walls",
+                complete: allLinesPlaced,
+                hint: "Open Room Layout tab",
+            },
+            {
+                key: "no_conflicts",
+                label: "No conflicts detected",
+                complete: noConflicts,
+                hint: "Open Room Layout tab",
+            },
+        ];
+    }
+
+    _allStepsComplete() {
+        const steps = this._progressSteps();
+        if (steps.length === 0) return false;
+        return steps.every((s) => s.complete === true);
+    }
+
+    _onProgressStepClick(stepKey) {
+        if (stepKey === "room_shape"
+            || stepKey === "wall_dimensions"
+            || stepKey === "constraints") {
+            this._openRoomSetupWizard();
+            return;
+        }
+        if (stepKey === "cabinets_assigned" || stepKey === "no_conflicts") {
+            this._setActiveTab("room_layout");
+            return;
+        }
     }
 
     // Phase 2.C — wired. Mounts the RoomSetupWizard overlay; the
