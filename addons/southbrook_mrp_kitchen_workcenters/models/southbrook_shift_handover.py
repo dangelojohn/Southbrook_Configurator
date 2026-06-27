@@ -99,10 +99,49 @@ class SouthbrookShiftHandover(models.Model):
         help="The cells the outgoing lead was responsible for during "
              "this shift.",
     )
+    # W087 (R2.7) — Structured shift-handover prompts.
+    #
+    # JTBD: zero handovers exist in production today; the free-text
+    # `summary` field is the friction. Replacing freeform Text with
+    # three yes/no triage questions + an optional notes field lowers
+    # the cognitive load to "tap three Yes/No" so the outgoing lead
+    # actually creates the record.
+    #
+    # The legacy `summary` field is kept (renamed to a Description
+    # role) so existing handovers + searches keep working — the new
+    # structured fields augment, not replace.
+    q_anything_broken = fields.Boolean(
+        string="Anything Broken?",
+        tracking=True,
+        help="Any equipment, fixture, jig, or tool that's currently "
+             "out of service or running in a degraded state the "
+             "incoming lead must know about.",
+    )
+    q_material_low = fields.Boolean(
+        string="Material Running Low?",
+        tracking=True,
+        help="Any raw material, hardware, or consumable that is at "
+             "or near reorder point and could starve the line during "
+             "the incoming shift.",
+    )
+    q_safety_concern = fields.Boolean(
+        string="Safety Concern?",
+        tracking=True,
+        help="Any near-miss, hazard, spill, blocked exit, or PPE "
+             "issue from this shift the incoming lead must know "
+             "about before sign-on.",
+    )
+    q_extra_notes = fields.Text(
+        string="Extra Notes (Optional)",
+        help="Free-text augment to the three triage questions. Use "
+             "for anything that doesn't fit the Yes/No prompts.",
+    )
     summary = fields.Text(
-        string="Summary",
-        help="What's open, what's stuck, what the incoming lead needs "
-             "to know first.",
+        string="Summary (Legacy / Description)",
+        help="Pre-W087 free-text summary. New handovers should use "
+             "the three structured triage questions + optional "
+             "Extra Notes. Kept here for backward compatibility "
+             "with historical records and search filters.",
         tracking=True,
     )
     attachment_ids = fields.Many2many(

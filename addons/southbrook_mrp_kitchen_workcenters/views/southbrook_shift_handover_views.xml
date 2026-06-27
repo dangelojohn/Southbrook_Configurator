@@ -16,6 +16,17 @@
                 <field name="shift"/>
                 <field name="from_user_id"/>
                 <field name="to_user_id"/>
+                <!-- W087 — triage at-a-glance badges -->
+                <field name="q_anything_broken"
+                       optional="show"
+                       string="Broken?"/>
+                <field name="q_material_low"
+                       optional="show"
+                       string="Material Low?"/>
+                <field name="q_safety_concern"
+                       optional="show"
+                       string="Safety?"
+                       decoration-danger="q_safety_concern == True"/>
                 <field name="state" widget="badge"/>
             </list>
         </field>
@@ -68,10 +79,30 @@
                                widget="many2many_tags"
                                readonly="state != 'draft'"/>
                     </group>
+                    <!-- W087 — three structured triage questions
+                         BEFORE the legacy free-text page. Default
+                         placement is the form sheet body (not a
+                         notebook tab) so the outgoing lead cannot
+                         skip them on the way to Submit. -->
+                    <group string="Shift Triage (Required)">
+                        <group>
+                            <field name="q_anything_broken"
+                                   readonly="state not in ('draft','submitted')"/>
+                            <field name="q_material_low"
+                                   readonly="state not in ('draft','submitted')"/>
+                            <field name="q_safety_concern"
+                                   readonly="state not in ('draft','submitted')"/>
+                        </group>
+                        <group>
+                            <field name="q_extra_notes" nolabel="1"
+                                   placeholder="Extra notes (optional)..."
+                                   readonly="state not in ('draft','submitted')"/>
+                        </group>
+                    </group>
                     <notebook>
-                        <page string="Summary" name="summary">
+                        <page string="Description (Legacy)" name="summary">
                             <field name="summary" nolabel="1"
-                                   placeholder="What's open, what's stuck, what the incoming lead needs to know..."
+                                   placeholder="Pre-W087 free-text summary. Use the triage questions above for new handovers."
                                    readonly="state not in ('draft','submitted')"/>
                         </page>
                         <page string="Attachments" name="attachments">
