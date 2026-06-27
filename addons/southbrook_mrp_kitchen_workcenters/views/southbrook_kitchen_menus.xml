@@ -43,5 +43,39 @@
               action="action_sbk_downtime"
               sequence="40"/>
 
+    <!-- W045 (MFG-REVIEW-R5.9) — one-click Quarantine inventory view.
+         Filters stock.quant to the seeded Southbrook Quarantine
+         location so a supervisor can see everything in quarantine
+         right now without drilling 4-5 menus deep into Inventory. -->
+    <record id="action_sbk_quarantine_inventory" model="ir.actions.act_window">
+        <field name="name">Quarantine Inventory</field>
+        <field name="res_model">stock.quant</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain" eval="[
+            ('location_id', '=',
+             ref('southbrook_mrp_kitchen_workcenters.stock_location_southbrook_quarantine')),
+        ]"/>
+        <field name="context">{
+            "search_default_internal_loc": 0,
+            "search_default_productgroup": 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nothing in quarantine right now.
+            </p>
+            <p>
+                Stock that has been moved into the Southbrook Quarantine
+                location appears here. Items land here automatically when
+                a critical NCR fails inspection (SAMI PRD INV-06).
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_sbk_ops_quarantine"
+              name="Quarantine Inventory"
+              parent="menu_sbk_ops_root"
+              action="action_sbk_quarantine_inventory"
+              sequence="50"/>
+
     <!-- Existing mrp.workcenter menu already covers Work Centers -->
 </odoo>
