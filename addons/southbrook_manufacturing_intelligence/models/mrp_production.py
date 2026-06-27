@@ -72,3 +72,50 @@ class MrpProduction(models.Model):
         for production in self:
             engine._recompute_production(production)
         return True
+
+    # ------------------------------------------------------------------
+    # W053 / R7.6 — 5-min sweep cron over in-flight MOs
+    # ------------------------------------------------------------------
+    # MI status fields (x_mi_status, x_mi_blocker_count) are stamped on
+    # event-driven hooks today. Those events miss MOs whose blocking
+    # input changes outside the MO record itself (a freshly-attached
+    # FreeCAD render, a CAD-status flip on the cabinet, a stock-move
+    # availability change). A 5-min sweep closes that staleness gap.
+    #
+    # IDEMPOTENT: _recompute_production only WRITES when any of
+    # (x_mi_status, x_mi_blocker_count, x_mi_warning_count,
+    # x_mi_next_action) actually CHANGES. See _mi_idempotent_write
+    # below. A no-change recompute is a search + compare + zero
+    # writes, so the cron is safe at any frequency.
+    @api.model
+    def _cron_mi_recompute_sweep(self):
+        """Re-fire MI recompute across every in-flight MO.
+
+        In-flight = state in ('confirmed', 'progress', 'to_close').
+        Cancelled and done MOs are skipped — their MI status is
+        historical.
+
+        Calls _recompute_production per row inside a try/except so a
+        single bad MO doesn't poison the whole sweep.
+        """
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        engine = self.env["southbrook.mi.engine"]
+        domain = [("state", "in", ("confirmed", "progress", "to_close"))]
+        productions = self.sudo().search(domain)
+        touched = 0
+        for prod in productions:
+            try:
+                engine._recompute_production(prod)
+                touched += 1
+            except Exception as e:  # noqa: BLE001
+                _logger.warning(
+                    "W053 MI sweep: MO %s recompute failed: %s",
+                    prod.display_name, e,
+                )
+        _logger.info(
+            "W053 MI sweep: %d in-flight MOs scanned, recompute completed",
+            touched,
+        )
+        return True

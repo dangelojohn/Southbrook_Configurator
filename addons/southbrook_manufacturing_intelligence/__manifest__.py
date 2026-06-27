@@ -5,7 +5,7 @@
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.3.3.0",
+    "version": "19.0.3.4.0",
     "depends": [
         "mrp",
         "southbrook_estimating",
@@ -19,6 +19,8 @@
         # W012 — sequence MUST load before any view that defaults a
         # waiver name (the wizard creates records on submit).
         "data/deviation_waiver_sequence.xml",
+        # W053 / R7.6 — 5-min MI recompute sweep cron.
+        "data/mi_recompute_cron.xml",
         "views/mrp_production_views.xml",
         "views/production_package_views.xml",
         "views/manager_dashboard_views.xml",

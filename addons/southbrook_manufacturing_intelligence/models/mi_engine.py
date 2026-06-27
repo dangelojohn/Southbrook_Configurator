@@ -403,14 +403,20 @@ class SouthbrookMiEngine(models.AbstractModel):
             [("production_id", "=", production.id)]
         )
         severities = checks.mapped("severity")
-        production.write(
-            {
-                "x_mi_status": self._status_from_severities(severities),
-                "x_mi_blocker_count": len(checks.filtered(lambda c: c.severity == "blocker")),
-                "x_mi_warning_count": len(checks.filtered(lambda c: c.severity == "warning")),
-                "x_mi_next_action": self._next_action_from_checks(checks),
-            }
-        )
+        # W053 — idempotent write. Cron sweep calls this every 5 min;
+        # only persist when one of the four MI fields actually changed.
+        new_vals = {
+            "x_mi_status": self._status_from_severities(severities),
+            "x_mi_blocker_count": len(checks.filtered(lambda c: c.severity == "blocker")),
+            "x_mi_warning_count": len(checks.filtered(lambda c: c.severity == "warning")),
+            "x_mi_next_action": self._next_action_from_checks(checks),
+        }
+        delta = {
+            k: v for k, v in new_vals.items()
+            if production[k] != v
+        }
+        if delta:
+            production.write(delta)
         return True
 
     # ------------------------------------------------------------------
