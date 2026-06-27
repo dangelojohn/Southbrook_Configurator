@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.26.0",
+    "version": "19.0.4.27.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -118,6 +118,14 @@ southbrook_kitchen_workspace) without duplicating their models.
     "demo": [
         "demo/southbrook_kitchen_workcenters_demo.xml",
     ],
+    # W014 (2026-06-27) — tablet kanban SCSS for mrp.workorder.
+    # Loads into the backend bundle; scoped to .o_kanban_sb_tablet so
+    # it never touches the native workcenter_line_kanban.
+    "assets": {
+        "web.assets_backend": [
+            "southbrook_mrp_kitchen_workcenters/static/src/scss/tablet_kanban.scss",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,

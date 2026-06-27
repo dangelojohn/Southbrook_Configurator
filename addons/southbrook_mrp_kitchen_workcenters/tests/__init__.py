@@ -9,3 +9,4 @@ from . import test_w011_form_open_scan_log
 from . import test_w018_defect_context_echo
 from . import test_w042_asbuilt_lot_snapshot
 from . import test_w055_mo_qr_resolve
+from . import test_w014_tablet_kanban

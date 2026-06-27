@@ -71,6 +71,40 @@ class MrpWorkorder(models.Model):
     _qr_kind = "wo"
 
     # ------------------------------------------------------------------
+    # W014 — Tablet kanban surface (MFG-REVIEW R2.1 / R8.13)
+    #
+    # The kitchen "cabinet code" + "room" identifiers live on
+    # mrp.production (the MO). The tablet kanban needs them rendered
+    # inline on each WO card; expose them here as stored related fields
+    # so the kanban template can read them and the search filter can
+    # group by room without joining at query time.
+    #
+    # Stored so kanban grouping / list filters are cheap; the MO sets
+    # these at MO-create time and they rarely change after, so the cost
+    # of the related cache is negligible vs the read amplification a
+    # non-stored related would inflict on every kanban refresh.
+    # ------------------------------------------------------------------
+    x_sbk_cabinet_code = fields.Char(
+        string="Cabinet Code",
+        related="production_id.x_sbk_cabinet_code",
+        store=True,
+        readonly=True,
+        help="The cabinet identifier this WO produces. Surfaced from "
+             "mrp.production for the tablet kanban (W014) so the "
+             "operator sees what they're building without opening the "
+             "WO form.",
+    )
+    x_sbk_kitchen_room = fields.Char(
+        string="Kitchen Room",
+        related="production_id.x_sbk_kitchen_room",
+        store=True,
+        readonly=True,
+        help="The kitchen room (e.g. 'Main Kitchen', 'Pantry') this WO "
+             "ships to. Surfaced from mrp.production for the tablet "
+             "kanban (W014).",
+    )
+
+    # ------------------------------------------------------------------
     # Duration variance (M2 formula vs native expected)
     # ------------------------------------------------------------------
     x_sbk_kitchen_expected_min = fields.Float(

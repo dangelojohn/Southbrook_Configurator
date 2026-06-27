@@ -12,6 +12,19 @@
         <field name="model">mrp.workcenter</field>
         <field name="inherit_id" ref="mrp.mrp_workcenter_view"/>
         <field name="arch" type="xml">
+            <!-- W014 — header button to open the tablet WO queue. The
+                 action reads `active_id` from the context to filter by
+                 this workcenter. -->
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="%(action_sbk_tablet_wo_queue)d"
+                            type="action"
+                            string="Open Tablet Queue"
+                            class="btn-primary"
+                            context="{'active_id': id}"
+                            help="Open the big-touch tablet kanban for this work center (W014)."/>
+                </header>
+            </xpath>
             <xpath expr="//sheet" position="inside">
                 <notebook>
                     <page string="Kitchen Configuration" name="sbk_kitchen">

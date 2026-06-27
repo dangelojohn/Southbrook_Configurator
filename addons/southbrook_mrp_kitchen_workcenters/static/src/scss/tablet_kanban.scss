@@ -1,0 +1,96 @@
+// W014 — Tablet kanban big-touch styling for mrp.workorder.
+//
+// Targets a 10" tablet at the workcenter cell — gloves, sawdust, and
+// the operator one-handed. Hit targets follow R8.13 / B-1 (≥56px on
+// secondary actions, ≥80px on primary START/DONE).
+//
+// Scoped to `.o_kanban_sb_tablet` so we never bleed into the native
+// `workcenter_line_kanban` (which we deliberately did NOT replace —
+// planners + supervisors still want the dense desktop kanban).
+
+.o_kanban_sb_tablet {
+    // Make sure cards never look starved on a roomy tablet.
+    .o_kanban_record,
+    .oe_kanban_card.sb-tablet-card {
+        padding: 24px;
+        min-height: 240px;
+        font-size: 1.4rem;
+        line-height: 1.35;
+        // A soft border + lift so cards read as distinct tap targets
+        // (matters when the kanban is grouped by state and rows are
+        // colour-banded by the state column).
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .sb-tablet-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .sb-tablet-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .sb-cabinet-code {
+        font-weight: 700;
+        font-size: 1.8rem;
+        line-height: 1.15;
+        // When the cabinet code is missing, this span collapses; the
+        // MO name on the right still anchors the card.
+    }
+
+    .sb-mo-name {
+        font-size: 1rem;
+        color: var(--text-muted, #6b7280);
+        font-weight: 500;
+    }
+
+    .sb-tablet-body {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .sb-product {
+        font-weight: 600;
+        font-size: 1.25rem;
+    }
+
+    .sb-op-name {
+        font-size: 1rem;
+        color: var(--text-muted, #6b7280);
+    }
+
+    .sb-meta {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        font-size: 1rem;
+        color: var(--text-muted, #4b5563);
+    }
+
+    .sb-tablet-actions {
+        display: flex;
+        gap: 16px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+    }
+
+    .sb-tablet-btn {
+        flex: 1 1 30%;
+        min-height: 80px;
+        font-size: 1.3rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        // Keep buttons from collapsing below thumb-width on portrait
+        // 7" tablets.
+        min-width: 140px;
+        border-radius: 8px;
+    }
+}

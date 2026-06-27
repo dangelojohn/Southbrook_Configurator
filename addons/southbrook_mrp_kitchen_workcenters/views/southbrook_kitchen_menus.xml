@@ -37,6 +37,47 @@
               parent="mrp.menu_mrp_manufacturing"
               sequence="50"/>
 
+    <!--
+        W014 — Floor menu.
+
+        Top-level operator entry point. The "Tablet Queues" sub-menu
+        lands on the workcenter list (Kitchen Active filter pre-applied
+        via context); operators tap their workcenter row to open its
+        big-touch WO kanban via the form header button added in
+        mrp_workcenter_views.xml. No per-workcenter sub-menus (rigid,
+        breaks when a workcenter is added without an addon bump);
+        the workcenter list + per-form button covers it.
+    -->
+    <menuitem id="menu_sbk_floor_root"
+              name="Floor"
+              parent="mrp.menu_mrp_root"
+              sequence="5"
+              web_icon="mrp,static/description/icon.png"/>
+
+    <record id="action_sbk_floor_workcenter_picker" model="ir.actions.act_window">
+        <field name="name">Tablet Queues</field>
+        <field name="res_model">mrp.workcenter</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{
+            'search_default_filter_sbk_active_for_kitchen': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Pick your workcenter to open its tablet queue.
+            </p>
+            <p>
+                Tap a workcenter, then tap "Open Tablet Queue" in the
+                header to land on the big-touch WO kanban (W014).
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_sbk_floor_tablet_queues"
+              name="Tablet Queues"
+              parent="menu_sbk_floor_root"
+              action="action_sbk_floor_workcenter_picker"
+              sequence="10"/>
+
     <menuitem id="menu_sbk_ops_downtime"
               name="Work Center Downtime"
               parent="menu_sbk_ops_root"

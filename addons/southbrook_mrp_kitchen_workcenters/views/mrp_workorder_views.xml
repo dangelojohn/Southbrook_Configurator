@@ -6,6 +6,147 @@
         Recalc button.
     -->
 
+    <!--
+        W014 — Tablet kanban for the operator (MFG-REVIEW R2.1 / R8.13).
+
+        A big-touch sibling kanban for `mrp.workorder`, kept separate
+        from the native `workcenter_line_kanban` (which is a 28px-control
+        desktop view). Targets the `action_sbk_tablet_wo_queue` action
+        below; the native action keeps the native kanban so we don't
+        break planners' existing flows.
+
+        Card layout — one card per WO, glove-grade hit targets:
+          * Cabinet code + room (top-line, 1.8rem bold) when present;
+            falls back to MO name when the kitchen fields are empty
+          * Product + Qty + Start time (1.4rem body)
+          * Three primary buttons (Start / Pause / Done) at >=80px
+            height; visibility gated on `state`
+
+        All buttons call EXISTING `mrp.workorder` methods
+        (`button_start`, `button_pending`, `button_finish`). No new
+        Python actions.
+    -->
+    <record id="view_mrp_workorder_kanban_sbk_tablet" model="ir.ui.view">
+        <field name="name">mrp.workorder.kanban.sbk.tablet</field>
+        <field name="model">mrp.workorder</field>
+        <!-- Higher priority than native (which has no priority set,
+             defaulting to 16). We sit BELOW the native kanban for the
+             native action by leaving priority default, but the tablet
+             action references this view explicitly so priority is moot
+             there. Setting priority=100 keeps us out of the way for
+             any action that does NOT pin a view_id. -->
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_sb_tablet o_kanban_mobile"
+                    records_draggable="0"
+                    create="0"
+                    sample="1">
+                <field name="state"/>
+                <field name="workcenter_id"/>
+                <field name="production_id"/>
+                <field name="product_id"/>
+                <field name="qty_production"/>
+                <field name="qty_producing"/>
+                <field name="date_start"/>
+                <field name="name"/>
+                <field name="x_sbk_cabinet_code"/>
+                <field name="x_sbk_kitchen_room"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card sb-tablet-card">
+                            <div class="sb-tablet-header">
+                                <span class="sb-cabinet-code">
+                                    <field name="x_sbk_cabinet_code"/>
+                                    <t t-if="record.x_sbk_kitchen_room.raw_value">
+                                        — <field name="x_sbk_kitchen_room"/>
+                                    </t>
+                                </span>
+                                <span class="sb-mo-name">
+                                    <field name="production_id"/>
+                                </span>
+                            </div>
+                            <div class="sb-tablet-body">
+                                <div class="sb-product"><field name="product_id"/></div>
+                                <div class="sb-op-name"><field name="name"/></div>
+                                <div class="sb-meta">
+                                    <span>Qty: <field name="qty_production"/></span>
+                                    <span t-if="record.date_start.raw_value">
+                                        Start: <field name="date_start" widget="datetime"/>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="sb-tablet-actions">
+                                <button name="button_start"
+                                        type="object"
+                                        class="btn btn-primary btn-lg sb-tablet-btn"
+                                        invisible="state != 'ready'">START</button>
+                                <button name="button_pending"
+                                        type="object"
+                                        class="btn btn-secondary btn-lg sb-tablet-btn"
+                                        invisible="state != 'progress'">PAUSE</button>
+                                <button name="button_finish"
+                                        type="object"
+                                        class="btn btn-success btn-lg sb-tablet-btn"
+                                        invisible="state != 'progress'">DONE</button>
+                                <button name="button_unblock"
+                                        type="object"
+                                        class="btn btn-warning btn-lg sb-tablet-btn"
+                                        invisible="state != 'blocked'">UNBLOCK</button>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!--
+        W014 — Hidden surfaces for the tablet kanban needs.
+
+        The kanban references `x_sbk_cabinet_code` + `x_sbk_kitchen_room`
+        as fields on `mrp.workorder` so they render inline. Those fields
+        live on `mrp.production` (the MO); we surface them on the WO via
+        related fields in the model layer (see
+        `models/mrp_workorder.py`). The two fields are declared there
+        so view validation can see them at install time.
+    -->
+
+    <!--
+        W014 — Tablet WO queue action.
+
+        Domain: workcenter == active_id, state in ready / progress / blocked.
+        The `active_id` comes from the menu / button that launches the
+        action — set by the workcenter form button or by the per-workcenter
+        sub-menu. Defaults the kanban view; list + form remain available
+        as a fallback for the supervisor.
+    -->
+    <record id="action_sbk_tablet_wo_queue" model="ir.actions.act_window">
+        <field name="name">Tablet Queue</field>
+        <field name="res_model">mrp.workorder</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="view_mrp_workorder_kanban_sbk_tablet"/>
+        <field name="domain">
+            [('state', 'in', ('ready', 'progress', 'blocked')),
+             ('workcenter_id', '=', active_id)]
+        </field>
+        <field name="context">{
+            'default_workcenter_id': active_id,
+            'search_default_groupby_state': 0,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nothing in your queue right now.
+            </p>
+            <p>
+                This is your tablet view — ready / in-progress / blocked
+                work orders for this workcenter, with big-touch
+                Start / Pause / Done buttons. Tap a card's action button
+                to drive the WO without opening the dense desktop form.
+            </p>
+        </field>
+    </record>
+
     <record id="view_mrp_workorder_form_sbk_kitchen" model="ir.ui.view">
         <field name="name">mrp.production.workorder.form.sbk.kitchen</field>
         <field name="model">mrp.workorder</field>
