@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.15.1",
+    "version": "19.0.4.16.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -84,6 +84,12 @@ southbrook_kitchen_workspace) without duplicating their models.
         "views/southbrook_kitchen_workcenter_downtime_views.xml",
         "views/mrp_workcenter_views.xml",
         "views/mrp_production_views.xml",
+        # Path B MO form redesign (19.0.4.16.0): header context bar +
+        # MI tab. Lives here (top of the kitchen MRP dep chain) so the
+        # x_sbk_* + x_mi_* fields are loaded into the model class by
+        # view-validation time. Companion Cabinet Label tab ships from
+        # southbrook_kitchen_mrp.
+        "views/mrp_production_form_header_redesign.xml",
         "views/mrp_workorder_views.xml",
         "views/mrp_bom_views.xml",
         "views/southbrook_kitchen_menus.xml",
