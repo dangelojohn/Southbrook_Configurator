@@ -38,6 +38,9 @@ from datetime import datetime, time
 from odoo import _, api, fields, models
 
 
+_ALERT_CONDITIONS = ("fair", "watch", "critical", "offline")
+
+
 # Same gate states the floor portal uses. Keeping the constant local
 # here avoids cross-module imports for what's effectively a literal.
 _IN_FLIGHT_WO_STATES = ("pending", "waiting", "ready", "progress")
@@ -114,6 +117,94 @@ class MrpWorkcenter(models.Model):
             ])
             wc.southbrook_pm_equipment_alerts = Eq.search_count([
                 ("workcenter_id", "=", wc.id),
-                ("southbrook_condition", "in",
-                 ["fair", "watch", "critical", "offline"]),
+                ("southbrook_condition", "in", list(_ALERT_CONDITIONS)),
             ])
+
+    # ==================================================================
+    # W051 (R7.6) — equipment-alerts tile clickable + cross-link to MOs
+    # ==================================================================
+    #
+    # Before this commit the equipment-alerts count on the PM dashboard
+    # was a decorative integer — the PM saw "3 alerts" but had to
+    # navigate manually to Maintenance, filter by workcenter, then
+    # cross to MO impact. Three actions wire that path:
+    #
+    #   action_view_equipment_alerts     opens the alerted equipment
+    #                                    list (Fair / Watch / Critical
+    #                                    / Offline) for this workcenter.
+    #                                    From there the existing smart
+    #                                    button (M14) cross-links to
+    #                                    impacted MOs.
+    #   action_view_impacted_productions roll-up: opens every in-flight
+    #                                    MO whose workorders use this
+    #                                    workcenter (one extra click
+    #                                    saved).
+    #   action_view_inflight_workorders  opens the WO list for this
+    #                                    workcenter — consistent with
+    #                                    the In-Queue tile already
+    #                                    treated as a counter.
+
+    def action_view_equipment_alerts(self):
+        """Open the list of alerted equipment (condition != good) at
+        this workcenter. Drives the W051 click-through from the PM
+        dashboard tile to the maintenance backlog."""
+        self.ensure_one()
+        Eq = self.env["maintenance.equipment"]
+        domain = [
+            ("workcenter_id", "=", self.id),
+            ("southbrook_condition", "in", list(_ALERT_CONDITIONS)),
+        ]
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Equipment Alerts — %s") % self.name,
+            "res_model": "maintenance.equipment",
+            "view_mode": "list,form,kanban",
+            "domain": domain,
+            "context": {
+                "search_default_group_by_southbrook_condition": 1,
+                "default_workcenter_id": self.id,
+            },
+            "help": _(
+                "<p>No equipment alerts on %s.</p>"
+                "<p>This list shows machines whose southbrook_condition "
+                "is anything other than 'good'. From here the Impacted "
+                "MOs smart button on each equipment opens the in-flight "
+                "manufacturing orders the alert is putting at risk.</p>"
+            ) % self.name,
+        }
+
+    def action_view_impacted_productions(self):
+        """Open in-flight MOs whose workorders use this workcenter.
+        W051 (R7.6) cross-link — saves the PM going Equipment -> smart
+        button -> Impacted MOs path when they just want the MO roll-up."""
+        self.ensure_one()
+        MO_STATES = ("draft", "confirmed", "progress", "to_close")
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("MOs at %s") % self.name,
+            "res_model": "mrp.production",
+            "view_mode": "list,form,kanban",
+            "domain": [
+                ("state", "in", list(MO_STATES)),
+                ("workorder_ids.workcenter_id", "=", self.id),
+            ],
+            "context": {
+                "search_default_group_by_state": 1,
+            },
+        }
+
+    def action_view_inflight_workorders(self):
+        """Open the in-flight WO list for this workcenter. Companion to
+        the In Queue tile — keeps the dashboard's interaction model
+        consistent across all four tiles."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("In-Flight WOs — %s") % self.name,
+            "res_model": "mrp.workorder",
+            "view_mode": "list,form,kanban",
+            "domain": [
+                ("workcenter_id", "=", self.id),
+                ("state", "in", list(_IN_FLIGHT_WO_STATES)),
+            ],
+        }
