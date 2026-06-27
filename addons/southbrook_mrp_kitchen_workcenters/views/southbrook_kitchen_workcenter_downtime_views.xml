@@ -92,9 +92,36 @@
         </field>
     </record>
 
+    <!-- W047 / R7.4 — pivot + graph for downtime trend analysis.
+         "Downtime by reason this month vs last" without Excel export. -->
+    <record id="view_sbk_downtime_pivot" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.workcenter.downtime.pivot</field>
+        <field name="model">southbrook.kitchen.workcenter.downtime</field>
+        <field name="arch" type="xml">
+            <pivot string="Downtime Analysis" sample="1">
+                <field name="reason" type="row"/>
+                <field name="date_start" interval="month" type="col"/>
+                <field name="duration_min" type="measure"/>
+                <field name="downtime_cost" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_sbk_downtime_graph" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.workcenter.downtime.graph</field>
+        <field name="model">southbrook.kitchen.workcenter.downtime</field>
+        <field name="arch" type="xml">
+            <graph string="Downtime Trend" type="bar" sample="1">
+                <field name="reason"/>
+                <field name="date_start" interval="month"/>
+                <field name="duration_min" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
     <record id="action_sbk_downtime" model="ir.actions.act_window">
         <field name="name">Work Center Downtime</field>
         <field name="res_model">southbrook.kitchen.workcenter.downtime</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,pivot,graph</field>
     </record>
 </odoo>
