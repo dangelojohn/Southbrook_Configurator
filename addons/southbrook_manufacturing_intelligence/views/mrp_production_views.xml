@@ -5,6 +5,22 @@
         <field name="model">mrp.production</field>
         <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
         <field name="arch" type="xml">
+            <!-- W012 — deviation-waiver smart button. Surfaced on the MO
+                 form so a warranty tech 18 months out can answer
+                 "did this cabinet ship with a known defect?" in 1 click.
+                 div[@name='button_box'] is the standard Odoo MO header
+                 smart-button container. -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_deviation_waivers"
+                        type="object" class="oe_stat_button"
+                        icon="fa-file-text-o"
+                        invisible="deviation_waiver_count == 0"
+                        groups="mrp.group_mrp_user">
+                    <field name="deviation_waiver_count"
+                           widget="statinfo"
+                           string="Waivers"/>
+                </button>
+            </xpath>
             <xpath expr="//notebook" position="inside">
                 <page name="manufacturing_intelligence" string="Intelligence">
                     <button name="action_recompute_manufacturing_intelligence"

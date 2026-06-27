@@ -6,3 +6,4 @@ from . import test_mi_workcenter
 from . import test_p3_auto_remediate
 from . import test_t1_open_side
 from . import test_ready_queue_split
+from . import test_deviation_waiver

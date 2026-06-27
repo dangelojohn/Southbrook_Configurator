@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- W012 — views for southbrook.deviation.waiver. Form + list + kanban
+     + action + menu (under Manufacturing → Quality). -->
+<odoo>
+    <!-- List -->
+    <record id="view_southbrook_deviation_waiver_list" model="ir.ui.view">
+        <field name="name">southbrook.deviation.waiver.list</field>
+        <field name="model">southbrook.deviation.waiver</field>
+        <field name="arch" type="xml">
+            <list string="Deviation Waivers"
+                   decoration-info="state == 'draft'"
+                   decoration-warning="state == 'eng_review'"
+                   decoration-success="state == 'approved'"
+                   decoration-danger="state == 'rejected'">
+                <field name="name"/>
+                <field name="create_date"/>
+                <field name="production_id"/>
+                <field name="cabinet_serial"/>
+                <field name="customer_id"/>
+                <field name="defect_summary" optional="show"/>
+                <field name="customer_acknowledged" widget="boolean_toggle" optional="show"/>
+                <field name="engineering_approver_id" optional="show"/>
+                <field name="engineering_approved_at" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'eng_review'"
+                       decoration-success="state == 'approved'"
+                       decoration-danger="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form -->
+    <record id="view_southbrook_deviation_waiver_form" model="ir.ui.view">
+        <field name="name">southbrook.deviation.waiver.form</field>
+        <field name="model">southbrook.deviation.waiver</field>
+        <field name="arch" type="xml">
+            <form string="Deviation Waiver">
+                <header>
+                    <button name="action_submit_for_eng_review"
+                            string="Submit for Eng Review"
+                            type="object" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_approve"
+                            string="Approve"
+                            type="object" class="btn-success"
+                            invisible="state not in ('draft', 'eng_review')"
+                            groups="mrp.group_mrp_manager"/>
+                    <button name="action_reject"
+                            string="Reject"
+                            type="object" class="btn-danger"
+                            invisible="state not in ('draft', 'eng_review')"
+                            groups="mrp.group_mrp_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,eng_review,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_mi_check"
+                                type="object" class="oe_stat_button"
+                                icon="fa-search"
+                                invisible="not mi_check_id">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">NCR</span>
+                            </div>
+                        </button>
+                        <button name="action_open_production"
+                                type="object" class="oe_stat_button"
+                                icon="fa-wrench"
+                                invisible="not production_id">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">MO</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Source">
+                            <field name="mi_check_id"
+                                   readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="production_id" readonly="1"/>
+                            <field name="cabinet_serial" readonly="1"/>
+                            <field name="customer_id"
+                                   readonly="state == 'approved'"/>
+                        </group>
+                        <group string="Engineering Approval">
+                            <field name="engineering_approver_id"
+                                   readonly="1"/>
+                            <field name="engineering_approved_at"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Defect" name="defect">
+                            <group>
+                                <field name="defect_summary"
+                                       readonly="state in ('approved', 'rejected')"/>
+                                <field name="engineering_rationale"
+                                       readonly="state == 'approved'"/>
+                            </group>
+                        </page>
+                        <page string="Customer Acknowledgement"
+                              name="customer_ack">
+                            <group>
+                                <field name="customer_acknowledged"
+                                       readonly="state == 'approved'"/>
+                                <field name="customer_acknowledgment_method"
+                                       readonly="state == 'approved'"/>
+                                <field name="customer_acknowledgment_ref"
+                                       readonly="state == 'approved'"/>
+                            </group>
+                            <p class="text-muted">
+                                Attach the customer's acknowledgement
+                                (email PDF, photo of signed PO amendment,
+                                call-log screenshot) via the chatter
+                                below. The chatter is the file-of-record
+                                — please attach everything, even paper.
+                            </p>
+                        </page>
+                        <page string="Engineering Notes" name="eng_notes">
+                            <field name="engineering_notes"
+                                   readonly="state == 'approved'"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Kanban -->
+    <record id="view_southbrook_deviation_waiver_kanban" model="ir.ui.view">
+        <field name="name">southbrook.deviation.waiver.kanban</field>
+        <field name="model">southbrook.deviation.waiver</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="production_id"/>
+                <field name="cabinet_serial"/>
+                <field name="customer_id"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card">
+                            <div class="o_kanban_record_top">
+                                <strong><field name="name"/></strong>
+                            </div>
+                            <div>
+                                MO: <field name="production_id"/>
+                            </div>
+                            <div t-if="record.cabinet_serial.raw_value">
+                                Serial: <field name="cabinet_serial"/>
+                            </div>
+                            <div t-if="record.customer_id.raw_value">
+                                <field name="customer_id"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Search -->
+    <record id="view_southbrook_deviation_waiver_search" model="ir.ui.view">
+        <field name="name">southbrook.deviation.waiver.search</field>
+        <field name="model">southbrook.deviation.waiver</field>
+        <field name="arch" type="xml">
+            <search string="Deviation Waivers">
+                <field name="name"/>
+                <field name="production_id"/>
+                <field name="cabinet_serial"/>
+                <field name="customer_id"/>
+                <field name="defect_summary"/>
+                <filter name="filter_draft" string="Draft"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_eng_review" string="Eng Review"
+                        domain="[('state', '=', 'eng_review')]"/>
+                <filter name="filter_approved" string="Approved"
+                        domain="[('state', '=', 'approved')]"/>
+                <filter name="filter_rejected" string="Rejected"
+                        domain="[('state', '=', 'rejected')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_customer" string="Customer"
+                            context="{'group_by': 'customer_id'}"/>
+                    <filter name="group_approver" string="Approver"
+                            context="{'group_by': 'engineering_approver_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_southbrook_deviation_waiver" model="ir.actions.act_window">
+        <field name="name">Deviation Waivers</field>
+        <field name="res_model">southbrook.deviation.waiver</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_southbrook_deviation_waiver_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No deviation waivers yet.
+            </p>
+            <p>
+                A waiver records the path where a defective cabinet is
+                shipped with explicit engineering approval AND customer
+                acknowledgement. Created from the NCR form via
+                "Ship with Deviation".
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu (under MRP → Manufacturing). v19 CE mrp does not ship a
+         menu_mrp_quality_control — the native quality_* modules aren't
+         installed here (per R5 doc). Parenting to menu_mrp_manufacturing
+         keeps the deviation waiver list one click from the planner's
+         home, alongside Work Orders and Manufacturing Orders. -->
+    <menuitem id="menu_southbrook_deviation_waiver"
+              name="Deviation Waivers"
+              parent="mrp.menu_mrp_manufacturing"
+              action="action_southbrook_deviation_waiver"
+              sequence="50"
+              groups="mrp.group_mrp_user"/>
+</odoo>

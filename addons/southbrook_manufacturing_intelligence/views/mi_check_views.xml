@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- W012 — extend the existing southbrook.mi.check form (declared in
+     manager_dashboard_views.xml) with a deviation-waiver header button
+     + a smart button + the status bar. Inheritance keeps us from
+     forking the form. -->
+<odoo>
+    <record id="view_southbrook_mi_check_form_w012" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.form.deviation</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="inherit_id"
+               ref="southbrook_manufacturing_intelligence.view_southbrook_mi_check_form"/>
+        <field name="arch" type="xml">
+            <!-- Add header above the sheet for the action button +
+                 statusbar. The base form has no <header>, so we inject
+                 one immediately before <sheet>. -->
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="action_approve_deviation"
+                            string="Ship with Deviation"
+                            type="object" class="btn-warning"
+                            invisible="state == 'ship_with_deviation'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,pending_deviation_approval,ship_with_deviation"/>
+                </header>
+            </xpath>
+            <!-- Add the smart button box at the top of the sheet so it
+                 renders above the oe_title. The base form has no
+                 button_box; we create one. -->
+            <xpath expr="//sheet/div[hasclass('oe_title')]" position="before">
+                <div class="oe_button_box" name="button_box">
+                    <button name="action_open_deviation_waiver"
+                            type="object" class="oe_stat_button"
+                            icon="fa-file-text-o"
+                            invisible="deviation_waiver_count == 0">
+                        <field name="deviation_waiver_count"
+                               widget="statinfo"
+                               string="Waiver"/>
+                    </button>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
