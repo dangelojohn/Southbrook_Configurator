@@ -23,5 +23,19 @@
         <field name="key">southbrook.operator_session_timeout_min</field>
         <field name="value">30</field>
     </record>
+
+    <!-- W038 (R8.5) — night-shift dark mode auto-engage flag. When
+         "1" the dark_mode_toggle.js will auto-flip to dark in the
+         22:00-06:00 local window IF the user has NEVER set an
+         explicit preference (URL param OR localStorage). Once the
+         user manually toggles (sbDarkMode.on/off) the choice
+         persists and auto-engage is bypassed.
+         Default "0" — auto-engage OFF so day-shift users never get
+         surprised by an automatic theme swap. -->
+    <record id="ir_config_param_dark_mode_auto_engage"
+            model="ir.config_parameter">
+        <field name="key">southbrook.dark_mode.auto_engage</field>
+        <field name="value">0</field>
+    </record>
 </odoo>
 

@@ -43,7 +43,7 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.7.0",
+    "version": "19.0.0.8.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
@@ -72,16 +72,24 @@ SECURITY:
     # also bundled into BOTH backend and frontend so the operator
     # identity follows the kiosk regardless of which Odoo surface
     # the tablet happens to be on.
+    # W038 (R8.5, 2026-06-27) — Night-shift dark mode. SCSS + toggle
+    # JS bundled into BOTH backend and frontend so kanban, scan modal,
+    # POD page, and traveler-print preview all honour the same body
+    # class. Default OFF — day-shift users see zero visual change.
     "assets": {
         "web.assets_backend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
             "southbrook_qr_kit/static/src/js/operator_pin_modal.js",
             "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
+            "southbrook_qr_kit/static/src/js/dark_mode_toggle.js",
+            "southbrook_qr_kit/static/src/scss/dark_mode.scss",
         ],
         "web.assets_frontend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
             "southbrook_qr_kit/static/src/js/operator_pin_modal.js",
             "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
+            "southbrook_qr_kit/static/src/js/dark_mode_toggle.js",
+            "southbrook_qr_kit/static/src/scss/dark_mode.scss",
         ],
     },
     "installable": True,
