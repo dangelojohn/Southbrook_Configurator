@@ -12,7 +12,12 @@ The x_sbk_kitchen_project_id reuses sb.kitchen.project from
 southbrook_kitchen_workspace per the locked decision in the M0
 discovery (no parallel project model).
 """
-from odoo import api, fields, models
+import logging
+
+from odoo import _, api, fields, models
+
+
+_logger = logging.getLogger(__name__)
 
 
 PRIORITY_LEVELS = [
@@ -198,7 +203,34 @@ class MrpProduction(models.Model):
                     "built_at": fields.Datetime.now(),
                     "built_by": self.env.user.id,
                 })
-            except Exception:  # noqa: BLE001
-                # Never block an MO mark_done on an as-built failure.
-                pass
+            except Exception as exc:  # noqa: BLE001
+                # W052 (MFG-REVIEW-R1.10) — never block an MO
+                # mark_done on an as-built failure, BUT do not let
+                # the failure disappear silently either. Log the full
+                # traceback to the server log AND post a chatter line
+                # on the MO so a supervisor sees the gap and can
+                # re-run as-built creation manually.
+                _logger.exception(
+                    "Auto as-built creation failed for MO %s (id=%s)",
+                    mo.name, mo.id,
+                )
+                try:
+                    mo.message_post(
+                        body=_(
+                            "Automatic as-built record creation "
+                            "failed: %s. Please create the as-built "
+                            "manually from the As-Built menu, or "
+                            "investigate the server log for the "
+                            "full traceback."
+                        ) % exc,
+                        message_type="comment",
+                        subtype_xmlid="mail.mt_note",
+                    )
+                except Exception:  # noqa: BLE001
+                    # Chatter post itself failing would be exotic;
+                    # log it but absolutely never block mark_done.
+                    _logger.exception(
+                        "Chatter post for asbuilt failure also failed "
+                        "on MO %s (id=%s)", mo.name, mo.id,
+                    )
         return result
