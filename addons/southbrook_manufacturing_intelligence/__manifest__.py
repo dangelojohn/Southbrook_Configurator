@@ -5,7 +5,7 @@
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.3.5.0",
+    "version": "19.0.3.6.0",
     "depends": [
         "mrp",
         "southbrook_estimating",
@@ -22,6 +22,8 @@
         # W053 / R7.6 — 5-min MI recompute sweep cron.
         "data/mi_recompute_cron.xml",
         "views/mrp_production_views.xml",
+        # W025 — First Article Inspection gate metadata on mrp.bom.
+        "views/mrp_bom_views.xml",
         "views/production_package_views.xml",
         "views/manager_dashboard_views.xml",
         "views/pm_kanban_inherit.xml",

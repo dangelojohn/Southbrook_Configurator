@@ -79,6 +79,14 @@ class SouthbrookMiCheck(models.Model):
             ("install", "Install"),
             ("cad", "CAD"),
             ("hardware", "Hardware"),
+            # W025 — First Article Inspection: a category-tagged NCR
+            # auto-created when an MO is started on a brand-new (or
+            # freshly-versioned) mrp.bom whose `fai_required` flag is
+            # True. The mi.check carries the FAI pass/fail buttons and
+            # the SoD-enforced sign-off; passing the check flips the
+            # BOM.fai_required=False so subsequent MOs on the same
+            # BOM no longer get gated.
+            ("fai", "First Article Inspection"),
         ],
         required=True,
         default="production",
@@ -445,3 +453,150 @@ class SouthbrookMiCheck(models.Model):
             "view_mode": "form",
             "target": "current",
         }
+
+    # ------------------------------------------------------------------
+    # W025 — First Article Inspection pass/fail buttons
+    # ------------------------------------------------------------------
+    # These run on the FAI mi.check that was auto-created when the first
+    # MO of a `fai_required=True` BOM was created (see
+    # mrp.production._auto_create_fai_check). They are idempotent:
+    #
+    #   * action_fai_pass on an already-passed BOM is a no-op (the BOM
+    #     flag is already False; the MO fai_status is already 'passed'
+    #     via the stored compute).
+    #   * action_fai_fail on an already-failed check just refreshes the
+    #     fail metadata + chatter line.
+    #
+    # SoD: the inspector firing pass MUST NOT be the user who created
+    # the underlying BOM (or, when PG release is involved, the user who
+    # executed the release). Pattern matches deviation_waiver.action_approve.
+    def _check_fai_sod(self, bom):
+        """Raise UserError if env.user == BOM creator (or release approver).
+
+        Admin (base.group_system) bypasses — needed for test fixtures
+        and emergency overrides.
+        """
+        if self.env.user.has_group("base.group_system"):
+            return
+        bom_creator = bom.create_uid
+        if bom_creator and bom_creator == self.env.user:
+            raise UserError(_(
+                "Segregation of Duties: the engineer who created the BOM "
+                "(%(creator)s) cannot also sign off the First Article "
+                "Inspection. Have a second engineer or QC lead complete "
+                "the FAI pass.",
+                creator=bom_creator.display_name,
+            ))
+        # When PG-release is in play, also block the release approver
+        # from being the FAI signer. The field may not exist if
+        # product_graph_release isn't installed — soft check.
+        pg_release_id = getattr(bom, "pg_release_id", False)
+        if pg_release_id:
+            released_by = getattr(pg_release_id, "released_by_id", False)
+            if released_by and released_by == self.env.user:
+                raise UserError(_(
+                    "Segregation of Duties: the engineer who executed "
+                    "the ProductGraph release (%(approver)s) cannot also "
+                    "sign off the First Article Inspection.",
+                    approver=released_by.display_name,
+                ))
+
+    def action_fai_pass(self):
+        """Mark this FAI check as passed.
+
+        Idempotent: if the BOM's fai_required flag is already False AND
+        this check is already linked as the passing check, returns True
+        with no writes. Otherwise:
+          * SoD-checks the caller against the BOM creator
+          * Stamps BOM.fai_passed_at + fai_passed_by + fai_passing_mi_check_id
+          * Flips BOM.fai_required=False
+          * Recomputes MO.fai_status (stored compute triggers off bom.fai_required)
+        """
+        self.ensure_one()
+        if self.category != "fai":
+            raise UserError(_(
+                "action_fai_pass may only be called on a check with "
+                "category='fai'. This one is '%(cat)s'.",
+                cat=self.category,
+            ))
+        production = self.production_id
+        if not production:
+            raise UserError(_(
+                "FAI check '%(name)s' has no linked manufacturing order.",
+                name=self.name,
+            ))
+        bom = production.bom_id
+        if not bom:
+            raise UserError(_(
+                "MO %(name)s has no bom_id — cannot complete FAI sign-off.",
+                name=production.display_name,
+            ))
+        # Idempotency check.
+        if not bom.fai_required and bom.fai_passing_mi_check_id == self:
+            production.message_post(body=_(
+                "FAI (W025): already passed for this BOM — no action taken."
+            ))
+            return True
+        # SoD gate.
+        self._check_fai_sod(bom)
+        # Apply the pass. sudo() because the inspector may not have
+        # write rights on mrp.bom directly; the sign-off authority IS
+        # the QC role gate, which is enforced by the surrounding UI
+        # being on a southbrook.mi.check the inspector owns.
+        now = fields.Datetime.now()
+        bom.sudo().write({
+            "fai_required": False,
+            "fai_passed_at": now,
+            "fai_passed_by": self.env.user.id,
+            "fai_passing_mi_check_id": self.id,
+        })
+        # Stamp + retire this check — it served its purpose.
+        self.write({
+            "severity": "info",
+            "active": False,
+        })
+        production.message_post(body=_(
+            "<strong>First Article Inspection PASSED</strong> by "
+            "%(user)s for BOM <b>%(bom)s</b>. Subsequent MOs against "
+            "this BOM will not be FAI-gated.",
+            user=self.env.user.display_name,
+            bom=bom.display_name,
+        ))
+        # Force a recompute on the MO so fai_status flips to 'passed'.
+        production.modified(["fai_status"])
+        return True
+
+    def action_fai_fail(self):
+        """Mark this FAI check as failed — MO stays blocked.
+
+        Idempotent: re-firing just refreshes the fail chatter line +
+        ensures severity='blocker' (so the MO is unambiguously gated).
+
+        Does NOT flip BOM.fai_required — the BOM is still un-validated.
+        The path forward is:
+          * rework the cabinet via NCR + action_create_rework_workorder
+          * OR raise a deviation waiver via action_approve_deviation
+            (W012 flow) for a customer-ack ship-with-deviation
+        """
+        self.ensure_one()
+        if self.category != "fai":
+            raise UserError(_(
+                "action_fai_fail may only be called on a check with "
+                "category='fai'. This one is '%(cat)s'.",
+                cat=self.category,
+            ))
+        production = self.production_id
+        # Bump severity to blocker so the MI engine + ready-queue
+        # surfaces this prominently.
+        if self.severity != "blocker":
+            self.write({"severity": "blocker"})
+        if production:
+            production.message_post(body=_(
+                "<strong>First Article Inspection FAILED</strong> by "
+                "%(user)s. MO remains blocked until rework completes "
+                "(open a new rework WO) OR a deviation waiver is "
+                "approved (W012 flow).",
+                user=self.env.user.display_name,
+            ))
+            production.modified(["fai_status"])
+        return True

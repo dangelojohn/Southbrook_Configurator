@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- W025 — surface the First Article Inspection gate metadata on the
+     mrp.bom form. fai_required is shown read-only: the flag is set
+     automatically by the mrp.bom create() hook (PG release or PLM ECO
+     re-version) and cleared by southbrook.mi.check.action_fai_pass.
+     Hand-editing on the form would defeat the gate's purpose; admin
+     overrides go through developer mode or odoo-shell. -->
+<odoo>
+    <record id="view_mrp_bom_form_w025_fai" model="ir.ui.view">
+        <field name="name">mrp.bom.form.w025_fai</field>
+        <field name="model">mrp.bom</field>
+        <field name="inherit_id" ref="mrp.mrp_bom_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="First Article Inspection (W025)"
+                       name="w025_fai">
+                    <group>
+                        <field name="fai_required" readonly="1"/>
+                        <field name="fai_passing_mi_check_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="fai_passed_at" readonly="1"/>
+                        <field name="fai_passed_by" readonly="1"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

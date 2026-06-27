@@ -34,6 +34,17 @@
                                    decoration-success="x_mi_status == 'ok'"
                                    decoration-warning="x_mi_status == 'review'"
                                    decoration-danger="x_mi_status == 'blocked'"/>
+                            <!-- W025 — FAI status badge. Surfaces the gate
+                                 state near the rest of the MI surface.
+                                 Colored to match the action-required
+                                 severity: pending/in_progress=warning,
+                                 failed=danger, passed=success. -->
+                            <field name="fai_status"
+                                   widget="badge"
+                                   decoration-success="fai_status == 'passed'"
+                                   decoration-warning="fai_status in ('pending', 'in_progress')"
+                                   decoration-danger="fai_status == 'failed'"
+                                   invisible="fai_status == 'not_required'"/>
                             <field name="x_mi_next_action"/>
                             <!-- x_mi_bottleneck_workcenter_id is reserved
                                  for a future MI engine extension and is

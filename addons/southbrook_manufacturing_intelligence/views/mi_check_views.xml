@@ -53,9 +53,33 @@
                     <button name="action_approve_deviation"
                             string="Ship with Deviation"
                             type="object" class="btn-warning"
-                            invisible="state == 'ship_with_deviation'"/>
+                            invisible="state == 'ship_with_deviation' or category == 'fai'"/>
+                    <!-- W025 — FAI pass/fail buttons. Only visible on
+                         category='fai' checks (the auto-created sign-off
+                         row). Pass clears the BOM's fai_required flag +
+                         retires the check; Fail bumps severity to blocker
+                         so the MO stays gated until rework or waiver. -->
+                    <button name="action_fai_pass"
+                            string="FAI Pass"
+                            type="object" class="btn-success"
+                            invisible="category != 'fai' or not active"
+                            help="Sign off the First Article Inspection
+                                  (W025). Flips the BOM's fai_required
+                                  flag to False so subsequent MOs against
+                                  this BOM unlock automatically. Cannot
+                                  be the same user who created the BOM
+                                  (segregation of duties)."/>
+                    <button name="action_fai_fail"
+                            string="FAI Fail"
+                            type="object" class="btn-danger"
+                            invisible="category != 'fai' or not active"
+                            help="Mark the FAI as failed — MO stays
+                                  blocked until either rework completes
+                                  OR a deviation waiver is approved
+                                  (W012 flow)."/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,pending_deviation_approval,ship_with_deviation"/>
+                           statusbar_visible="draft,pending_deviation_approval,ship_with_deviation"
+                           invisible="category == 'fai'"/>
                 </header>
             </xpath>
             <!-- Add the smart button box at the top of the sheet so it
