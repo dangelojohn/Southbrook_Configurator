@@ -1,5 +1,32 @@
 # SPDX-License-Identifier: LGPL-3.0-only
-"""W009 — Production-approval HARD GATE, defense-in-depth at MO create.
+"""W068 (R3.12, 2026-06-27) — Plan-delta snapshot on MO.
+
+JTBD: "When the GM asks 'what slipped this week', I want a one-screen
+answer instead of Excel."
+
+Records the FIRST-OBSERVED planned dates on an MO so we can compute
+slip vs final actual completion at the end of the week.
+
+  sbk_initial_date_planned_start    snapshotted once at MO confirm
+                                    (or first-write if confirm slipped)
+  sbk_initial_date_planned_finished symmetric finish snapshot
+  sbk_slipped_days                  computed: (date_finished -
+                                    sbk_initial_date_planned_finished)
+                                    once state == done. Negative when
+                                    delivered early; zero when on time;
+                                    positive when late. False otherwise.
+
+The snapshot is intentionally one-shot: re-planning after confirm
+does NOT overwrite the initial commit (that's the whole point — we're
+measuring drift from the commit the planner made the morning of).
+Replanning the original is a separate `action_reset_plan_snapshot`
+escape hatch for the planner if the initial capture was wrong.
+
+Companion view: "Plan Delta" — list of MOs whose sbk_slipped_days is
+set, default-grouped by week (date_finished:week). Lives under the
+Southbrook PM menu next to Shop Daily.
+
+W009 — Production-approval HARD GATE, defense-in-depth at MO create.
 
 The primary gate fires at sale.order.action_confirm() (see
 models/sale_order.py). This module catches the other path: MOs created
@@ -200,6 +227,97 @@ class MrpProduction(models.Model):
                 mo.today_plan_section = "ready_now"
             else:
                 mo.today_plan_section = "at_risk"
+
+    # ------------------------------------------------------------------
+    # W068 (R3.12, 2026-06-27) — Plan-delta snapshot fields + hooks
+    # ------------------------------------------------------------------
+    sbk_initial_date_planned_start = fields.Datetime(
+        string="Initial Planned Start",
+        readonly=True, copy=False, index=True,
+        help="Snapshotted ONCE at the first observed confirm — never "
+             "overwritten on replans. The reference point used by the "
+             "W068 Plan Delta report.",
+    )
+    sbk_initial_date_planned_finished = fields.Datetime(
+        string="Initial Planned Finish",
+        readonly=True, copy=False,
+        help="Symmetric finish snapshot — never overwritten on replans.",
+    )
+    sbk_slipped_days = fields.Float(
+        string="Slipped (days)",
+        compute="_compute_sbk_slipped_days",
+        store=True,
+        help="date_finished − sbk_initial_date_planned_finished in days "
+             "(positive = late, negative = early, 0 = on time). False "
+             "until both anchors are set + state=done.",
+    )
+    sbk_plan_week = fields.Date(
+        string="Plan Week",
+        compute="_compute_sbk_plan_week",
+        store=True,
+        help="Monday of the week of sbk_initial_date_planned_finished — "
+             "used by the Plan Delta view to group MOs by the week they "
+             "were originally committed to deliver.",
+    )
+
+    @api.depends("date_finished", "sbk_initial_date_planned_finished",
+                 "state")
+    def _compute_sbk_slipped_days(self):
+        for mo in self:
+            if mo.state != "done":
+                mo.sbk_slipped_days = 0.0
+                continue
+            if not (mo.date_finished and
+                    mo.sbk_initial_date_planned_finished):
+                mo.sbk_slipped_days = 0.0
+                continue
+            delta = mo.date_finished - mo.sbk_initial_date_planned_finished
+            mo.sbk_slipped_days = delta.total_seconds() / 86400.0
+
+    @api.depends("sbk_initial_date_planned_finished")
+    def _compute_sbk_plan_week(self):
+        for mo in self:
+            anchor = mo.sbk_initial_date_planned_finished
+            if not anchor:
+                mo.sbk_plan_week = False
+                continue
+            d = fields.Date.to_date(anchor)
+            # Monday of the week (weekday() = 0 for Monday).
+            mo.sbk_plan_week = d - timedelta(days=d.weekday())
+
+    def _sbk_snapshot_initial_plan(self):
+        """One-shot snapshot. Re-running on an MO that already has the
+        snapshot is a no-op."""
+        for mo in self:
+            if mo.sbk_initial_date_planned_start:
+                continue
+            vals = {}
+            if mo.date_start:
+                vals["sbk_initial_date_planned_start"] = mo.date_start
+            if mo.date_finished:
+                vals["sbk_initial_date_planned_finished"] = mo.date_finished
+            if vals:
+                # super().write to bypass any custom write logic that
+                # might gate planning fields.
+                super(MrpProduction, mo).write(vals)
+
+    def action_confirm(self):
+        res = super().action_confirm()
+        # Snapshot AFTER super so date_start / date_finished have settled
+        # to the planning calendar values the engine produces on confirm.
+        self._sbk_snapshot_initial_plan()
+        return res
+
+    def action_reset_plan_snapshot(self):
+        """Planner escape hatch — clear the initial snapshot so the next
+        confirm re-anchors. Use when the initial capture was wrong (rare;
+        usually a bug in the planning calendar rather than an operator
+        mistake)."""
+        self.write({
+            "sbk_initial_date_planned_start": False,
+            "sbk_initial_date_planned_finished": False,
+        })
+        return True
 
     @api.model_create_multi
     def create(self, vals_list):

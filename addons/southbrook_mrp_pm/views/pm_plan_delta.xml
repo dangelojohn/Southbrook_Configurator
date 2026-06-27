@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W068 (R3.12, 2026-06-27) — Plan Delta views on mrp.production.
+
+  JTBD: "When the GM asks 'what slipped this week', I want a one-screen
+  answer instead of Excel."
+
+  These are pure inherit-views over mrp.production — no new model. We
+  filter to MOs that have the W068 snapshot anchor set + state=done,
+  and group by sbk_plan_week (Monday of the originally-committed week)
+  so the GM can scan slip distribution week over week.
+-->
+<odoo>
+    <data>
+
+        <!-- Pivot view: slip distribution by week × WC family. -->
+        <record id="view_mo_plan_delta_pivot" model="ir.ui.view">
+            <field name="name">mrp.production.plan.delta.pivot</field>
+            <field name="model">mrp.production</field>
+            <field name="arch" type="xml">
+                <pivot string="Plan Delta (slip distribution)" sample="1">
+                    <field name="sbk_plan_week" type="row" interval="week"/>
+                    <field name="sbk_slipped_days" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- Graph: weekly slip trend, bar chart. -->
+        <record id="view_mo_plan_delta_graph" model="ir.ui.view">
+            <field name="name">mrp.production.plan.delta.graph</field>
+            <field name="model">mrp.production</field>
+            <field name="arch" type="xml">
+                <graph string="Slip trend by week" type="bar" sample="1">
+                    <field name="sbk_plan_week" interval="week"/>
+                    <field name="sbk_slipped_days" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <!-- List: the punch-list answer to "what slipped this week". -->
+        <record id="view_mo_plan_delta_list" model="ir.ui.view">
+            <field name="name">mrp.production.plan.delta.list</field>
+            <field name="model">mrp.production</field>
+            <field name="arch" type="xml">
+                <list string="Plan Delta"
+                      create="false" edit="false"
+                      decoration-danger="sbk_slipped_days &gt; 2"
+                      decoration-warning="sbk_slipped_days &gt; 0"
+                      decoration-success="sbk_slipped_days &lt; 0">
+                    <field name="sbk_plan_week"/>
+                    <field name="name"/>
+                    <field name="product_id"/>
+                    <field name="sbk_initial_date_planned_finished"
+                           string="Initial Planned Finish"/>
+                    <field name="date_finished" string="Actual Finish"/>
+                    <field name="sbk_slipped_days"
+                           string="Slipped (days)"
+                           sum="Net slip"/>
+                    <field name="state"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Search: filters for "this week", "last week", late only. -->
+        <record id="view_mo_plan_delta_search" model="ir.ui.view">
+            <field name="name">mrp.production.plan.delta.search</field>
+            <field name="model">mrp.production</field>
+            <field name="arch" type="xml">
+                <search string="Plan Delta">
+                    <field name="name"/>
+                    <field name="product_id"/>
+                    <field name="sbk_plan_week"/>
+                    <filter name="late_only"
+                            string="Late Only"
+                            domain="[('sbk_slipped_days','&gt;',0)]"/>
+                    <filter name="early_only"
+                            string="Early Only"
+                            domain="[('sbk_slipped_days','&lt;',0)]"/>
+                    <filter name="this_week"
+                            string="This Week"
+                            domain="[
+                                ('sbk_plan_week','&gt;=',
+                                 (context_today() - relativedelta(days=context_today().weekday())).strftime('%Y-%m-%d')),
+                                ('sbk_plan_week','&lt;=', context_today().strftime('%Y-%m-%d'))
+                            ]"/>
+                    <filter name="last_4_weeks"
+                            string="Last 4 Weeks"
+                            domain="[
+                                ('sbk_plan_week','&gt;=',
+                                 (context_today() - relativedelta(days=28)).strftime('%Y-%m-%d'))
+                            ]"/>
+                    <group string="Group By">
+                        <filter name="group_by_plan_week"
+                                string="Plan Week"
+                                context="{'group_by': 'sbk_plan_week:week'}"/>
+                        <filter name="group_by_product"
+                                string="Product"
+                                context="{'group_by': 'product_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Window action — default scoped to MOs with anchor + done. -->
+        <record id="action_mo_plan_delta" model="ir.actions.act_window">
+            <field name="name">Plan Delta</field>
+            <field name="res_model">mrp.production</field>
+            <field name="view_mode">list,pivot,graph</field>
+            <field name="domain">[
+                ('state','=','done'),
+                ('sbk_initial_date_planned_finished','!=',False),
+            ]</field>
+            <field name="context">{
+                'search_default_last_4_weeks': 1,
+                'search_default_group_by_plan_week': 1,
+            }</field>
+            <field name="view_ids" eval="[
+                (5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_mo_plan_delta_list')}),
+                (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_mo_plan_delta_pivot')}),
+                (0, 0, {'view_mode': 'graph', 'view_id': ref('view_mo_plan_delta_graph')}),
+            ]"/>
+            <field name="search_view_id" ref="view_mo_plan_delta_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No slipped MOs yet — go close some manufacturing
+                    orders first.
+                </p>
+                <p>
+                    Each row is a completed MO that carried a Plan
+                    Delta snapshot (captured at MO confirm). The
+                    "Slipped (days)" column is actual finish minus
+                    initial committed finish: positive = late, negative
+                    = early. Group by Plan Week to see the GM's
+                    end-of-week reconcile in one screen.
+                </p>
+            </field>
+        </record>
+
+        <!-- Menu entry next to Shop Daily, sequence 10. -->
+        <menuitem
+            id="menu_mo_plan_delta"
+            parent="menu_southbrook_pm_root"
+            name="Plan Delta"
+            action="action_mo_plan_delta"
+            sequence="10"/>
+
+    </data>
+</odoo>

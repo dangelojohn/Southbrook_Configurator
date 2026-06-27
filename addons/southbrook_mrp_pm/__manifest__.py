@@ -40,7 +40,7 @@ analysis. Layered build:
       M17 Floor Manager access group
       M20 ECO → in-flight MO notification rule
 """,
-    "version": "19.0.1.11.0",
+    "version": "19.0.1.12.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -119,6 +119,10 @@ analysis. Layered build:
         # the pivot/graph/list views + menu under PM root load next.
         "data/shop_daily_cron.xml",
         "views/shop_daily_views.xml",
+        # W068 (R3.12, 2026-06-27) — Plan Delta inherit-views over
+        # mrp.production. Loads AFTER pm_menus.xml so it can hang its
+        # menuitem under menu_southbrook_pm_root.
+        "views/pm_plan_delta.xml",
     ],
     "assets": {
         "web.assets_frontend": [

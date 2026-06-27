@@ -112,6 +112,24 @@ class SouthbrookShopDaily(models.Model):
              "day at this WC.",
     )
 
+    # W068 (R3.12, 2026-06-27) — plan-delta aggregate per (WC × day)
+    # so the GM's end-of-week reconcile can roll up "MOs slipped on
+    # Mon vs Tue vs ..." in the same pivot the daily snapshot uses.
+    # Counts and slip-day totals are computed from mrp.production rows
+    # whose date_finished landed in the day AND which carry the
+    # sbk_initial_date_planned_finished anchor (W068 hook on confirm).
+    slipped_mo_count = fields.Integer(
+        string="MOs Slipped",
+        help="Count of mrp.production rows whose date_finished landed "
+             "on this day at this WC, where sbk_slipped_days > 0 "
+             "(delivered AFTER the initial plan commit).",
+    )
+    slipped_days_total = fields.Float(
+        string="Slip-Days Total",
+        help="Sum of sbk_slipped_days for MOs that completed on this "
+             "day at this WC. Positive = late, negative = early.",
+    )
+
     refreshed_at = fields.Datetime(
         string="Refreshed",
         default=fields.Datetime.now,
@@ -219,6 +237,10 @@ class SouthbrookShopDaily(models.Model):
             scrap_map = self._pull_scrap(workcenters, day_start, day_end)
             defect_map = self._pull_defects(workcenters, day_start, day_end)
             downtime_map = self._pull_downtime(workcenters, day_start, day_end)
+            # W068 plan-delta — count + slip-day totals for MOs that
+            # closed in the day with the W068 anchor set.
+            slip_count_map, slip_days_map = self._pull_plan_delta(
+                workcenters, day_start, day_end)
 
             for wc in workcenters:
                 creates.append({
@@ -230,6 +252,8 @@ class SouthbrookShopDaily(models.Model):
                     "scrap_qty_total": scrap_map.get(wc.id, 0.0),
                     "defect_count": defect_map.get(wc.id, 0),
                     "downtime_minutes": downtime_map.get(wc.id, 0.0),
+                    "slipped_mo_count": slip_count_map.get(wc.id, 0),
+                    "slipped_days_total": slip_days_map.get(wc.id, 0.0),
                 })
         rows = self.create(creates) if creates else self.browse()
         _logger.info(
@@ -342,6 +366,41 @@ class SouthbrookShopDaily(models.Model):
                 continue
             out[wc_id] = out.get(wc_id, 0) + 1
         return out
+
+    def _pull_plan_delta(self, workcenters, day_start, day_end):
+        """W068 — return ({wc_id: slipped_count}, {wc_id: slip_days_sum}).
+
+        An MO is attributed to every distinct WC its WOs touched (same
+        per-station double-count convention as _pull_mo_completed). An
+        MO without sbk_initial_date_planned_finished anchor contributes
+        nothing (the snapshot is one-shot at confirm — pre-W068 MOs
+        won't have it and we simply skip them).
+        """
+        Production = self.env["mrp.production"]
+        # Feature-detect the W068 field so the snapshot doesn't break if
+        # the field hasn't been added yet (e.g. running against an older
+        # DB before -u landed).
+        if "sbk_initial_date_planned_finished" not in Production._fields:
+            return {}, {}
+        mos = Production.search([
+            ("state", "=", "done"),
+            ("date_finished", ">=", day_start),
+            ("date_finished", "<", day_end),
+            ("sbk_initial_date_planned_finished", "!=", False),
+        ])
+        count_out, days_out = {}, {}
+        for mo in mos:
+            slip = mo.sbk_slipped_days or 0.0
+            # Only count POSITIVE slip toward count; days_total carries
+            # signed sum so the report can show "net days early/late".
+            for wc_id in {wo.workcenter_id.id for wo in mo.workorder_ids
+                          if wo.workcenter_id}:
+                if wc_id not in workcenters.ids:
+                    continue
+                days_out[wc_id] = days_out.get(wc_id, 0.0) + slip
+                if slip > 0:
+                    count_out[wc_id] = count_out.get(wc_id, 0) + 1
+        return count_out, days_out
 
     def _pull_downtime(self, workcenters, day_start, day_end):
         """Sum of downtime duration_min for rows whose date_start
