@@ -474,3 +474,113 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
 
         constraint.sudo().unlink()
         return {"ok": True}
+
+    # ------------------------------------------------------------------
+    # POST /southbrook/api/order/<order_id>/line/<line_id>/place-on-wall
+    # ------------------------------------------------------------------
+    #
+    # Phase 3.A — wall placement for cabinet lines. Backs the Room
+    # Layout tab drag-and-drop interactivity coming in Phase 3.C. The
+    # response returns BOTH the updated line dict AND the after-mutation
+    # wall metrics (used_mm / remaining_mm / has_conflicts) so the
+    # caller can refresh the line list AND the floor-plan SVG in one
+    # round-trip without a follow-up /room/get fetch.
+    #
+    # wall_id=null is the unplace path (line.wall_id cleared + position
+    # zeroed); the `wall` key in the response is null in that case.
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/line/<int:line_id>"
+        "/place-on-wall",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_line_place_on_wall(
+        self,
+        order_id,
+        line_id,
+        wall_id=None,
+        position_from_left_mm=0,
+        **kw,
+    ):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        # Position bounds — accept 0, reject negatives. Coerce to int so
+        # a JSON string from a hand-crafted curl doesn't 500 the worker.
+        try:
+            pos_mm = int(position_from_left_mm or 0)
+        except (TypeError, ValueError):
+            return {
+                "error": "invalid",
+                "detail": "position_from_left_mm must be an integer",
+            }
+        if pos_mm < 0:
+            return {
+                "error": "invalid",
+                "detail": "position_from_left_mm must be >= 0",
+            }
+
+        # Line ownership — must belong to the resolved order. Mismatch
+        # surfaces as forbidden (NOT not_found) to match the Phase 2.A
+        # no-existence-oracle convention.
+        line = request.env["sale.order.line"].sudo().browse(line_id).exists()
+        if not line or line.order_id.id != order.id:
+            return {"error": "forbidden"}
+
+        # Resolve target wall (None → unplace). The wall must live on a
+        # room that lives on `order`; verify by walking room→wall via
+        # the scope helpers so the existing AccessError → forbidden path
+        # applies uniformly.
+        wall = None
+        if wall_id is not None:
+            wall_rs = request.env["southbrook.room.wall"].sudo().browse(
+                wall_id
+            ).exists()
+            if not wall_rs or not wall_rs.room_id:
+                return {"error": "forbidden"}
+            try:
+                room = self._get_room_scoped(order, wall_rs.room_id.id)
+                wall = self._get_wall_scoped(room, wall_rs.id)
+            except AccessError:
+                return {"error": "forbidden"}
+
+        try:
+            if wall is None:
+                line.sudo().write({
+                    "wall_id": False,
+                    "position_from_left_mm": 0,
+                })
+            else:
+                line.sudo().write({
+                    "wall_id": wall.id,
+                    "position_from_left_mm": pos_mm,
+                })
+        except (ValidationError, ValueError) as e:
+            return {"error": "invalid", "detail": str(e)}
+
+        # Refresh ORM cache so wall.used_mm / remaining_mm / has_conflicts
+        # reflect the just-written placement.
+        line.invalidate_recordset()
+        if wall is not None:
+            wall.invalidate_recordset()
+
+        line_dict = {
+            "id": line.id,
+            "wall_id": line.wall_id.id if line.wall_id else False,
+            "position_from_left_mm": line.position_from_left_mm,
+            "is_positioned": line.is_positioned,
+        }
+        wall_dict = None
+        if wall is not None:
+            wall_dict = {
+                "id": wall.id,
+                "used_mm": wall.used_mm,
+                "remaining_mm": wall.remaining_mm,
+                "has_conflicts": wall.has_conflicts,
+            }
+        return {"ok": True, "line": line_dict, "wall": wall_dict}

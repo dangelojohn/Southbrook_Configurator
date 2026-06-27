@@ -307,6 +307,108 @@ class TestRoomApi(TransactionCase):
         self.assertEqual(result.get("error"), "forbidden")
 
     # ------------------------------------------------------------------
+    # /line/<lid>/place-on-wall  (Phase 3.A)
+    # ------------------------------------------------------------------
+    def test_place_on_wall_happy_path(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Place Room",
+            "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "Wall A", "length_mm": 3000})],
+        })
+        wall = room.wall_ids[0]
+        # A line on the order — bare-bones, no product needed for the
+        # placement smoke (wall_id + position_from_left_mm are scalars).
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "name": "Place me",
+        })
+        controller = ctrl_room.SouthbrookRoomApi()
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_line_place_on_wall(
+                self.order.id,
+                line.id,
+                wall_id=wall.id,
+                position_from_left_mm=450,
+            )
+        self.assertTrue(result.get("ok"), msg=f"unexpected: {result}")
+        # Line dict reflects the write.
+        self.assertEqual(result["line"]["id"], line.id)
+        self.assertEqual(result["line"]["wall_id"], wall.id)
+        self.assertEqual(result["line"]["position_from_left_mm"], 450)
+        self.assertTrue(result["line"]["is_positioned"])
+        # Wall dict carries the live-recomputed metrics.
+        self.assertIsNotNone(result["wall"])
+        self.assertEqual(result["wall"]["id"], wall.id)
+        self.assertIn("used_mm", result["wall"])
+        self.assertIn("remaining_mm", result["wall"])
+        self.assertIn("has_conflicts", result["wall"])
+        # ORM-side confirmation.
+        line.invalidate_recordset()
+        self.assertEqual(line.wall_id.id, wall.id)
+        self.assertEqual(line.position_from_left_mm, 450)
+
+    def test_place_on_wall_unplace_via_null(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Unplace Room",
+            "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "Wall A", "length_mm": 3000})],
+        })
+        wall = room.wall_ids[0]
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "name": "Already placed",
+            "wall_id": wall.id,
+            "position_from_left_mm": 600,
+        })
+        controller = ctrl_room.SouthbrookRoomApi()
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_line_place_on_wall(
+                self.order.id,
+                line.id,
+                wall_id=None,
+            )
+        self.assertTrue(result.get("ok"), msg=f"unexpected: {result}")
+        self.assertFalse(result["line"]["wall_id"])
+        self.assertEqual(result["line"]["position_from_left_mm"], 0)
+        self.assertFalse(result["line"]["is_positioned"])
+        # Unplace → wall dict is null (no metrics to return).
+        self.assertIsNone(result["wall"])
+        line.invalidate_recordset()
+        self.assertFalse(line.wall_id)
+
+    def test_place_on_wall_cross_order_forbidden(self):
+        # Line lives on order A; wall lives on order B's room. Caller
+        # asks "place A's line on B's wall via order_a's path" — scope
+        # guard must surface `forbidden` (no existence-oracle leak).
+        order_b = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+        })
+        room_b = self.env["southbrook.room"].create({
+            "name": "B", "order_id": order_b.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "WB", "length_mm": 3000})],
+        })
+        wall_b = room_b.wall_ids[0]
+        line_a = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "name": "Line A",
+        })
+        controller = ctrl_room.SouthbrookRoomApi()
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_line_place_on_wall(
+                self.order.id,
+                line_a.id,
+                wall_id=wall_b.id,
+                position_from_left_mm=100,
+            )
+        self.assertEqual(result.get("error"), "forbidden")
+        # And the line was NOT mutated.
+        line_a.invalidate_recordset()
+        self.assertFalse(line_a.wall_id)
+
+    # ------------------------------------------------------------------
     # /constraint/<cid>/delete
     # ------------------------------------------------------------------
     def test_constraint_delete(self):
