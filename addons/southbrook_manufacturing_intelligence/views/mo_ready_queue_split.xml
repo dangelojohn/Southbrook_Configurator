@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W010 — Split the unified Ready Queue into "Ready to Release"
+  (kanban) and "Blocked" (list with next-action column).
+
+  From docs/MFG-REVIEW-R1-mo-lifecycle.md Win 4 + R9 master roadmap:
+  the existing action_pm_ready_queue (southbrook_mrp_pm) lists state
+  in (confirmed, progress) without filtering blockers — 75% of "Ready"
+  MOs in prod are actually blocked on material / MI / approval. The
+  unified queue is misleading the planner.
+
+  Why this file lives in southbrook_manufacturing_intelligence (not
+  southbrook_mrp_pm): the domain + list-column field references include
+  x_mi_status and x_mi_blocker_count, which are defined in this addon.
+  Putting these views in mrp_pm would fail view validation when MI
+  isn't installed; here they're safe by transitive dep.
+
+  Selection field grounding (v19 CE):
+    - state: draft / confirmed / progress / to_close / done / cancel
+    - components_availability_state: available / assigned / expected /
+      late / unavailable (Selection on modern v19)
+    - reservation_state: confirmed / assigned / waiting (Char, fallback)
+    - x_mi_status: ok / review / blocked
+    - production_approval_state (W009): none / pending / approved /
+      rejected
+-->
+<odoo>
+  <data>
+
+    <!-- ===========================================================
+         BLOCKED LIST VIEW — surfaces next_action_hint as headline.
+         Standalone (not inherited) so it doesn't bleed columns into
+         every other mrp.production list. Defined BEFORE the action
+         that references it via ref().
+         =========================================================== -->
+    <record id="view_mo_blocked_list" model="ir.ui.view">
+      <field name="name">mrp.production.list.blocked</field>
+      <field name="model">mrp.production</field>
+      <field name="arch" type="xml">
+        <list string="Blocked MOs"
+              decoration-danger="state == 'progress'"
+              decoration-warning="state == 'confirmed'"
+              decoration-muted="state == 'draft'">
+          <field name="priority" widget="priority"/>
+          <field name="name"/>
+          <field name="product_id"/>
+          <field name="next_action_hint" string="Next Action"/>
+          <field name="components_availability_state"
+                 string="Material" widget="badge"
+                 decoration-success="components_availability_state in ['available','assigned']"
+                 decoration-warning="components_availability_state == 'expected'"
+                 decoration-danger="components_availability_state in ['late','unavailable']"/>
+          <field name="x_mi_status" widget="badge"
+                 decoration-success="x_mi_status == 'ok'"
+                 decoration-warning="x_mi_status == 'review'"
+                 decoration-danger="x_mi_status == 'blocked'"
+                 optional="show"/>
+          <field name="x_mi_blocker_count" optional="hide"/>
+          <field name="production_approval_state" widget="badge"
+                 decoration-success="production_approval_state == 'approved'"
+                 decoration-warning="production_approval_state == 'pending'"
+                 decoration-danger="production_approval_state in ['none','rejected']"
+                 optional="show"/>
+          <field name="date_start" widget="remaining_days"/>
+          <field name="state" widget="badge"/>
+        </list>
+      </field>
+    </record>
+
+    <!-- ===========================================================
+         READY-TO-RELEASE KANBAN VIEW — dense card for the planner's
+         release-decision moment. Surfaces product, due date, partner,
+         and assignee. Defined BEFORE the action that binds it.
+
+         Standalone (not inherited) so the column-by-state pipeline
+         kanban at southbrook_mrp_pm/views/mrp_production_kanban.xml
+         remains the default canonical kanban; this view is bound
+         explicitly to action_mo_ready_to_release only.
+         =========================================================== -->
+    <record id="view_mo_ready_to_release_kanban" model="ir.ui.view">
+      <field name="name">mrp.production.kanban.ready_to_release</field>
+      <field name="model">mrp.production</field>
+      <field name="arch" type="xml">
+        <kanban class="o_sb_mo_ready_kanban" sample="1"
+                default_order="date_start asc, priority desc">
+          <field name="state"/>
+          <field name="product_id"/>
+          <field name="product_qty"/>
+          <field name="product_uom_id"/>
+          <field name="date_start"/>
+          <field name="date_deadline"/>
+          <field name="priority"/>
+          <field name="partner_id"/>
+          <field name="origin"/>
+          <field name="components_availability_state"/>
+          <field name="reservation_state"/>
+          <field name="user_id"/>
+          <templates>
+            <t t-name="card">
+              <div class="oe_kanban_global_click o_sb_mo_ready_card">
+                <header class="o_sb_mo_ready_head">
+                  <span class="o_sb_mo_ready_priority">
+                    <field name="priority" widget="priority"/>
+                  </span>
+                  <strong class="o_sb_mo_ready_name">
+                    <field name="name"/>
+                  </strong>
+                  <span class="o_sb_mo_ready_state">
+                    <field name="state" widget="badge"/>
+                  </span>
+                </header>
+                <div class="o_sb_mo_ready_body">
+                  <div class="o_sb_mo_ready_product">
+                    <field name="product_id"/>
+                    <span class="o_sb_mo_ready_qty">
+                      x <field name="product_qty"/>
+                      <field name="product_uom_id"/>
+                    </span>
+                  </div>
+                  <div class="o_sb_mo_ready_partner"
+                       t-if="record.partner_id.raw_value">
+                    <field name="partner_id"/>
+                  </div>
+                  <div class="o_sb_mo_ready_origin"
+                       t-if="record.origin.raw_value">
+                    <small>
+                      Origin: <field name="origin"/>
+                    </small>
+                  </div>
+                </div>
+                <footer class="o_sb_mo_ready_foot">
+                  <span class="o_sb_mo_ready_date">
+                    <field name="date_start" widget="remaining_days"/>
+                  </span>
+                  <span class="o_sb_mo_ready_assignee">
+                    <field name="user_id" widget="many2one_avatar_user"/>
+                  </span>
+                </footer>
+              </div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+
+    <!-- ===========================================================
+         READY TO RELEASE — kanban, only actually-actionable MOs.
+         Domain conjuncts (default polish-AND):
+           1. state in (confirmed, progress) — already past draft
+           2. components available (modern field, with reservation
+              fallback when components_availability_state is null)
+           3. MI status absent or ok (engineering signed off)
+           4. MI blocker count absent or zero (defensive)
+           5. Production approval absent or approved (W009)
+         =========================================================== -->
+    <record id="action_mo_ready_to_release"
+            model="ir.actions.act_window">
+      <field name="name">Ready to Release</field>
+      <field name="res_model">mrp.production</field>
+      <field name="view_mode">kanban,list,form</field>
+      <field name="domain">
+        [
+          ('state', 'in', ['confirmed', 'progress']),
+          '|',
+            ('components_availability_state', 'in',
+             ['available', 'assigned']),
+            '&amp;',
+              ('components_availability_state', '=', False),
+              ('reservation_state', 'in', ['assigned']),
+          '|',
+            ('x_mi_status', '=', False),
+            ('x_mi_status', '=', 'ok'),
+          '|',
+            ('x_mi_blocker_count', '=', False),
+            ('x_mi_blocker_count', '=', 0),
+          '|',
+            ('production_approval_state', '=', False),
+            ('production_approval_state', '=', 'approved')
+        ]
+      </field>
+      <field name="context">{}</field>
+      <!-- Bind to the W010 standalone kanban view explicitly. Without
+           this Odoo auto-picks the highest-priority kanban view on
+           the model — that's mrp.production.kanban.southbrook (state
+           pipeline columns), wrong primitive for a queue that's
+           already filtered by state. -->
+      <field name="view_ids" eval="[
+          (5, 0, 0),
+          (0, 0, {
+              'view_mode': 'kanban',
+              'view_id': ref('view_mo_ready_to_release_kanban'),
+          }),
+          (0, 0, {'view_mode': 'list'}),
+          (0, 0, {'view_mode': 'form'}),
+      ]"/>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+          Nothing to release right now.
+        </p>
+        <p>
+          This queue shows only MOs that are fully actionable:
+          components available, MI status OK, and Production
+          approval granted. If you expected an MO here but it's
+          missing, check the Blocked queue for the reason.
+        </p>
+      </field>
+    </record>
+    <menuitem
+        id="menu_pm_ready_to_release"
+        parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+        name="Ready to Release"
+        action="action_mo_ready_to_release"
+        sequence="11"/>
+
+    <!-- ===========================================================
+         BLOCKED — list with next_action_hint surfaced.
+         Domain disjunctions (any-one trips):
+           a. components NOT available (material gap)
+           b. MI status in (blocked, review)
+           c. MI blocker count > 0 (defensive, picks up zero-status
+              edge case where cron hasn't normalised yet)
+           d. Production approval not approved (W009 gate failure)
+           e. reservation_state == 'waiting' (legacy fallback for
+              MOs created before components_availability_state was
+              populated)
+         =========================================================== -->
+    <record id="action_mo_blocked"
+            model="ir.actions.act_window">
+      <field name="name">Blocked</field>
+      <field name="res_model">mrp.production</field>
+      <field name="view_mode">list,form</field>
+      <field name="view_id" ref="view_mo_blocked_list"/>
+      <field name="domain">
+        [
+          ('state', 'in', ['draft', 'confirmed', 'progress']),
+          '|', '|', '|', '|',
+            ('components_availability_state', 'not in',
+             ['available', 'assigned']),
+            ('x_mi_status', 'in', ['blocked', 'review']),
+            ('x_mi_blocker_count', '>', 0),
+            ('production_approval_state', 'in',
+             ['none', 'pending', 'rejected']),
+            ('reservation_state', '=', 'waiting')
+        ]
+      </field>
+      <field name="context">{}</field>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+          Nothing is blocked. Good shop day.
+        </p>
+        <p>
+          MOs in this queue are gated on something — material,
+          engineering (MI), or production approval. The Next Action
+          column surfaces the dominant blocker so you can chase the
+          right person without opening the form.
+        </p>
+      </field>
+    </record>
+    <menuitem
+        id="menu_pm_blocked"
+        parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+        name="Blocked"
+        action="action_mo_blocked"
+        sequence="12"/>
+
+  </data>
+</odoo>

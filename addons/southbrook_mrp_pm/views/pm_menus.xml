@@ -57,9 +57,23 @@
     <menuitem
         id="menu_pm_ready_queue"
         parent="menu_southbrook_pm_root"
-        name="Ready Queue"
+        name="Ready Queue (All)"
         action="action_pm_ready_queue"
-        sequence="10"/>
+        sequence="15"/>
+
+    <!-- ============================================================
+         W010 — Split the unified Ready Queue.
+         R1 Win 4: today's "Ready Queue" lists state in (confirmed,
+         progress) without filtering blockers — 75% of "Ready" MOs
+         are actually waiting on material / MI / approval. The actual
+         split (Ready to Release + Blocked) lives in
+         southbrook_manufacturing_intelligence/views/mo_ready_queue_split.xml
+         because the domain + view both reference x_mi_* fields owned
+         by that addon. The existing action_pm_ready_queue is preserved
+         (other shortcuts / portal links may reference it); the menu
+         label is demoted to "Ready Queue (All)" so the planner
+         gravitates to the new split queues.
+         ============================================================ -->
 
     <!-- ============================================================
          In Production — MOs currently running
