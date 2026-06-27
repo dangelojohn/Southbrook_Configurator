@@ -2,8 +2,8 @@
 """
 scripts/lint-owl-expr.py — fail on OWL tokenizer violations in t-* attrs.
 
-Catches two bug classes that pass server-side XML lint and Odoo module install
-but throw OwlError at browser-side template-compile time:
+Catches three bug classes that pass server-side XML lint and Odoo module
+install but throw OwlError at browser-side template-compile time:
 
 1. Bare-word logical operators (or / and / not) inside t-* attribute
    expressions. Python and legacy server-side QWeb accept these; OWL's
@@ -11,10 +11,17 @@ but throw OwlError at browser-side template-compile time:
 2. JavaScript regex literals (/pattern/flags) inside t-* attribute
    expressions (non-attf only). OWL's tokenizer doesn't understand `/`
    in expression context.
+3. JS-style backslash-escaped quotes inside t-* attribute values
+   (e.g. t-esc="x + '\\"'" thinking `\\"` escapes). In a JS backtick
+   template literal `\\"` resolves to a literal `"`, which then closes
+   the XML attribute prematurely. Use &quot; / &apos; XML entities
+   instead. Added 2026-06-27 after the OdooIQ-supplied kitchen-3d
+   addon hit it on its first mount (commit 85f8fa9 → fix 34e32fb).
 
-Both bug classes hit Southbrook three times in <12 hours on 2026-06-22
-(see memory note owl-tokenizer-constraints): configurator-ux f05b99d,
-mrp_pm kanban f3d13dd / ab45954.
+These bug classes hit Southbrook four times in 5 days (see memory note
+owl-tokenizer-constraints): configurator-ux f05b99d, mrp_pm kanban
+f3d13dd / ab45954, planner_boot.esm.js (2 latent caught by JS-block
+extension 2026-06-27), kitchen-3d t-esc escaped-quote 2026-06-27.
 
 Scope:
 - OWL-compiled contexts only:
@@ -140,6 +147,17 @@ def owl_line_ranges(lines):
 
 def violations_for_attr(name, value):
     """Yield (kind, fix) tuples for a single t-* attribute value."""
+    # Bug class 3: any `\` in a t-* attr value is almost certainly a
+    # JS-style escape attempt that breaks XML attribute parsing. The
+    # ATTR_RE regex stops at the first `"` (or `'`), so if the captured
+    # value ends in `\`, the user wrote `\"` (or `\'`) thinking it would
+    # escape — but JS template-literal evaluation strips the `\` and the
+    # resulting bare `"` closes the XML attribute prematurely. Apply
+    # check before the per-class branch so it catches t-attf-* too.
+    if "\\" in value:
+        yield ("JS-style backslash escape (probably \\\" or \\')",
+               "use &quot; / &apos; XML entities instead of \\\" / \\'")
+
     if name.startswith("t-attf"):
         # String template: only {{...}} / #{...} interpolations are expressions.
         # Regex-literal check skipped (URL paths contain /).
