@@ -112,6 +112,12 @@ class MrpProduction(models.Model):
         """
         try:
             from PIL import Image  # noqa: WPS433 — lazy import is fine
+            # PIL's auto-plugin discovery doesn't load WebP on the
+            # Debian-bookworm Pillow build; res.company.logo_web in
+            # Odoo 19 is WebP, so we register the plugin explicitly.
+            # Without this, Image.open() raises UnidentifiedImageError
+            # even though features.check("webp") returns True.
+            from PIL import WebPImagePlugin  # noqa: F401, WPS433
         except ImportError:
             for rec in self:
                 rec.sbk_company_logo_b64 = ""
