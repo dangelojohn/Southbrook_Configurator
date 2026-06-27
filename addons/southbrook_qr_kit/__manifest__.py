@@ -43,7 +43,7 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.4.0",
+    "version": "19.0.0.5.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
@@ -60,6 +60,19 @@ SECURITY:
     ],
     "external_dependencies": {
         "python": ["qrcode"],
+    },
+    # W036 (R8.7, 2026-06-27) — scan-success/fail audio cues for the
+    # tablet/handheld scan flow. Loads into web.assets_backend AND
+    # web.assets_frontend so both backend OWL clients and any public
+    # PWA scan UI emit the same beep. Self-installs by patching the
+    # global fetch + XMLHttpRequest layers; default = unmuted.
+    "assets": {
+        "web.assets_backend": [
+            "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
+        ],
+        "web.assets_frontend": [
+            "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
+        ],
     },
     "installable": True,
     "application": False,

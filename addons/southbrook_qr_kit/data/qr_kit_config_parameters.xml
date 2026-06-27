@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: LGPL-3.0-only -->
 <odoo noupdate="1">
-    <!-- Placeholder for any qr_kit-wide system parameters.
-         The hmac_secret is auto-generated on first use; no seed
-         needed. This file exists so future config_param seeds have
-         a natural home. -->
+    <!-- The hmac_secret is auto-generated on first use; no seed
+         needed. -->
+
+    <!-- W036 (R8.7) — global mute for scan-success/fail audio cues.
+         Default "0" = audio on. Flip to "1" to silence every tablet
+         site-wide; each tablet can also locally mute via
+         `localStorage["southbrook.qr_kit.audio_muted"] = "1"`. -->
+    <record id="ir_config_param_qr_audio_muted" model="ir.config_parameter">
+        <field name="key">southbrook.qr_kit.audio_muted</field>
+        <field name="value">0</field>
+    </record>
 </odoo>
