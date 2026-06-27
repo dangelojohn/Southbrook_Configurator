@@ -2204,3 +2204,73 @@
     justify-content: flex-end;
     gap: 0.4rem;
 }
+
+// ---------------------------------------------------------------------
+// Phase 6.2 — Room Templates library tiles (Step 1 of the wizard) +
+// "applied template" breadcrumb (Step 2). The grid auto-fills to
+// minmax(180px, 1fr) so 4-6 templates fit comfortably without media
+// queries.
+// ---------------------------------------------------------------------
+
+.sb-room-wizard-templates {
+    margin-bottom: 1.2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--sb-rule);
+}
+.sb-room-wizard-templates-title {
+    margin: 0 0 0.6rem 0;
+    font-family: var(--sb-font-display);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--sb-walnut-d);
+}
+.sb-room-wizard-templates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.6rem;
+}
+.sb-room-wizard-template-tile {
+    text-align: left;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius);
+    padding: 0.7rem 0.8rem;
+    cursor: pointer;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+    &:hover {
+        border-color: var(--sb-sky);
+        box-shadow: 0 0 0 1px var(--sb-sky) inset;
+    }
+}
+.sb-room-wizard-template-tile-name {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--sb-walnut-d);
+    margin-bottom: 0.25rem;
+}
+.sb-room-wizard-template-tile-desc {
+    font-size: 0.78rem;
+    color: var(--sb-ink-dim);
+    margin-bottom: 0.4rem;
+    line-height: 1.3;
+}
+.sb-room-wizard-template-tile-meta {
+    font-size: 0.72rem;
+    font-family: var(--sb-font-mono);
+    color: var(--sb-ink-dim);
+}
+.sb-room-wizard-templates-or {
+    margin: 0.8rem 0 0 0;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--sb-ink-dim);
+    font-style: italic;
+}
+.sb-room-wizard-applied-template {
+    margin-bottom: 0.8rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--sb-hl);
+    border-left: 3px solid var(--sb-sky);
+    border-radius: var(--sb-radius-sm);
+    color: var(--sb-ink);
+}

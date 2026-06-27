@@ -626,6 +626,42 @@ class TestRoomApi(TransactionCase):
         self.assertEqual(result.get("recommendations"), [])
         self.assertEqual(result.get("note"), "gap_too_small")
 
+    # ------------------------------------------------------------------
+    # /room-templates/list — Phase 6.2 Room Templates library.
+    # ------------------------------------------------------------------
+    def test_room_templates_list_returns_seeds(self):
+        """Endpoint returns the 4 seed templates as parsed dicts."""
+        controller = ctrl_room.SouthbrookRoomApi()
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_room_templates_list()
+        self.assertTrue(
+            result.get("ok"), msg=f"unexpected response: {result}",
+        )
+        templates = result.get("templates") or []
+        self.assertGreaterEqual(
+            len(templates), 4,
+            msg=(
+                "expected at least 4 seed templates from "
+                "southbrook_estimating/data/room_templates.xml"
+            ),
+        )
+        for t in templates:
+            self.assertIn("name", t)
+            self.assertIn("walls", t)
+            self.assertIn("constraints", t)
+            self.assertIsInstance(t["walls"], list)
+            self.assertIsInstance(t["constraints"], list)
+            self.assertIn("sequence", t)
+            self.assertIn("room_type", t)
+            self.assertIn("layout_shape", t)
+            self.assertIn("ceiling_height_mm", t)
+        # Sorted by (sequence, id) — sequences must be monotonic.
+        sequences = [t["sequence"] for t in templates]
+        self.assertEqual(
+            sequences, sorted(sequences),
+            "templates must be returned sorted by sequence",
+        )
+
     def test_recommend_rejects_invalid_gap_mm(self):
         """gap_mm in {0, -5, None} → error=invalid.
 

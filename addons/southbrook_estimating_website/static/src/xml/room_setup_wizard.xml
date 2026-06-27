@@ -66,7 +66,9 @@
                                            room="state.room"
                                            onRoomTypePicked="_onRoomTypePicked"
                                            onShapePicked="_onShapePicked"
-                                           onNameChanged="_onNameChanged"/>
+                                           onNameChanged="_onNameChanged"
+                                           templates="state.templates"
+                                           onApplyTemplate.bind="_onApplyTemplate"/>
 
                         <WallDimensionsStep t-if="_isStep(2)"
                                             room="state.room"
@@ -74,7 +76,8 @@
                                             onWallLengthChanged="_onWallLengthChanged"
                                             onWallNameChanged="_onWallNameChanged"
                                             onCeilingChanged="_onCeilingChanged"
-                                            onUnitChanged="_onUnitChanged"/>
+                                            onUnitChanged="_onUnitChanged"
+                                            appliedTemplateName="state.appliedTemplateName"/>
 
                         <ConstraintsStep t-if="_isStep(3)"
                                          walls="state.walls"
@@ -145,6 +148,29 @@
          ============================================================ -->
     <t t-name="southbrook_estimating_website.RoomTypeShapeStep">
         <div class="sb-room-wizard-step-1">
+            <!-- Phase 6.2 — Room Templates library. One-click clone of a
+                 pre-configured room into the wizard state. Hidden when
+                 the templates fetch returned an empty list (silent-fail
+                 UX — the custom-shape picker below still works). -->
+            <div class="sb-room-wizard-templates"
+                 t-if="props.templates &amp;&amp; props.templates.length">
+                <h4 class="sb-room-wizard-templates-title">Start from a template</h4>
+                <div class="sb-room-wizard-templates-grid">
+                    <button type="button"
+                            t-foreach="props.templates" t-as="t" t-key="t.id"
+                            class="sb-room-wizard-template-tile"
+                            t-on-click="() => props.onApplyTemplate(t)">
+                        <div class="sb-room-wizard-template-tile-name" t-esc="t.name"/>
+                        <div class="sb-room-wizard-template-tile-desc" t-esc="t.description || ''"/>
+                        <div class="sb-room-wizard-template-tile-meta">
+                            <t t-esc="t.walls.length"/> wall(s),
+                            <t t-esc="t.constraints.length"/> constraint(s)
+                        </div>
+                    </button>
+                </div>
+                <div class="sb-room-wizard-templates-or">&#8212; or pick a custom shape below &#8212;</div>
+            </div>
+
             <label class="sb-room-wizard-label">
                 Room Name
                 <input type="text"
@@ -196,6 +222,13 @@
          ============================================================ -->
     <t t-name="southbrook_estimating_website.WallDimensionsStep">
         <div class="sb-room-wizard-step-2">
+            <!-- Phase 6.2 — applied-template breadcrumb. Surfaces only
+                 when Step 1 applied a Room Template; tells the user the
+                 form was pre-populated and what was cloned. -->
+            <div class="sb-room-wizard-applied-template"
+                 t-if="props.appliedTemplateName">
+                <small>Applied template: <strong t-esc="props.appliedTemplateName"/> &#8212; edit anything below.</small>
+            </div>
             <div class="sb-room-wizard-row">
                 <h3 class="sb-room-wizard-heading">Wall Dimensions</h3>
                 <div class="sb-room-wizard-unit-toggle"

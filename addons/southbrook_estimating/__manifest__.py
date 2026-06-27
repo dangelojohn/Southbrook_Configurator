@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.6.0.0",
+    "version": "19.0.7.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -155,6 +155,11 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # which is augmented there, and registers the menu under
         # menu_southbrook_root (defined in sale_order_views.xml).
         "views/southbrook_room_views.xml",
+        # Phase 6.2 (2026-06-27) — Room Templates library seed.
+        # MUST load AFTER security (ACL must exist) and AFTER the room
+        # views block (model registration order, conventional).
+        # noupdate="0" so seed updates propagate on -u.
+        "data/room_templates.xml",
         "views/res_users_views.xml",
         # Commit 10 — QWeb reports (routine #6 partial)
         # Styles MUST load before the report templates that reference them

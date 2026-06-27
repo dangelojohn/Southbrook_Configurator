@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 6.2 (2026-06-27) — Room Templates library.
+
+  4 pre-configured room layouts the Room Setup wizard can clone in one
+  click from Step 1. JSON-encoded walls + constraints keep the schema
+  flat — see models/southbrook_room_template.py.
+
+  noupdate="0" so future seed updates (added templates, tweaked
+  defaults) propagate on -u southbrook_estimating. The trade-off: a
+  user-edited template is overwritten on upgrade; v1 callers don't
+  edit these, the wizard clones state OUT of the template into a
+  fresh southbrook.room record.
+-->
+<odoo noupdate="0">
+
+    <record id="room_template_small_straight_kitchen" model="southbrook.room.template">
+        <field name="name">Small Straight Kitchen</field>
+        <field name="sequence">10</field>
+        <field name="description">Compact one-wall kitchen — 2.4m linear, no constraints.</field>
+        <field name="room_type">kitchen</field>
+        <field name="layout_shape">straight</field>
+        <field name="ceiling_height_mm">2400</field>
+        <field name="walls_json">[{"name": "Wall A", "length_mm": 2400, "wall_order": 10}]</field>
+        <field name="constraints_json">[]</field>
+    </record>
+
+    <record id="room_template_standard_l_kitchen" model="southbrook.room.template">
+        <field name="name">Standard L-Shape Kitchen</field>
+        <field name="sequence">20</field>
+        <field name="description">L-shape kitchen — 3.6m + 2.4m walls, sink and window seeded on Wall A.</field>
+        <field name="room_type">kitchen</field>
+        <field name="layout_shape">l_shape</field>
+        <field name="ceiling_height_mm">2400</field>
+        <field name="walls_json">[{"name": "Wall A", "length_mm": 3600, "wall_order": 10}, {"name": "Wall B", "length_mm": 2400, "wall_order": 20}]</field>
+        <field name="constraints_json">[{"wall_index": 0, "constraint_type": "sink", "distance_from_left_mm": 1500, "width_mm": 900}, {"wall_index": 0, "constraint_type": "window", "distance_from_left_mm": 1200, "width_mm": 1500, "height_mm": 1200}]</field>
+    </record>
+
+    <record id="room_template_galley_kitchen" model="southbrook.room.template">
+        <field name="name">Galley Kitchen</field>
+        <field name="sequence">30</field>
+        <field name="description">Galley kitchen — twin 3.0m walls, sink + cooktop on opposing sides.</field>
+        <field name="room_type">kitchen</field>
+        <field name="layout_shape">galley</field>
+        <field name="ceiling_height_mm">2400</field>
+        <field name="walls_json">[{"name": "Wall A &#8212; Sink Side", "length_mm": 3000, "wall_order": 10}, {"name": "Wall B &#8212; Cook Side", "length_mm": 3000, "wall_order": 20}]</field>
+        <field name="constraints_json">[{"wall_index": 0, "constraint_type": "sink", "distance_from_left_mm": 1200, "width_mm": 900}, {"wall_index": 1, "constraint_type": "cooktop", "distance_from_left_mm": 1200, "width_mm": 900}]</field>
+    </record>
+
+    <record id="room_template_standard_laundry" model="southbrook.room.template">
+        <field name="name">Standard Laundry</field>
+        <field name="sequence">40</field>
+        <field name="description">Single-wall laundry — 1.8m linear, sink seeded.</field>
+        <field name="room_type">laundry</field>
+        <field name="layout_shape">straight</field>
+        <field name="ceiling_height_mm">2400</field>
+        <field name="walls_json">[{"name": "Wall A", "length_mm": 1800, "wall_order": 10}]</field>
+        <field name="constraints_json">[{"wall_index": 0, "constraint_type": "sink", "distance_from_left_mm": 1200, "width_mm": 600}]</field>
+    </record>
+
+</odoo>

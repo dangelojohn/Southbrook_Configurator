@@ -184,3 +184,22 @@ class TestSouthbrookRoom(TransactionCase):
         self.assertEqual(len(summary["constraints"]), 1)
         self.assertEqual(summary["constraints"][0]["type_label"], "Sink")
         self.assertEqual(summary["shape_label"], "L-Shape")
+
+    # ------------------------------------------------------------------
+    # Phase 6.2 — Room Templates library seed.
+    # ------------------------------------------------------------------
+
+    def test_room_templates_seed_present(self):
+        """4 seed room templates should be loaded with parsable JSON."""
+        import json
+        templates = self.env["southbrook.room.template"].search([])
+        self.assertGreaterEqual(len(templates), 4,
+                                "expected at least 4 seed templates")
+        for t in templates:
+            walls = json.loads(t.walls_json or "[]")
+            constraints = json.loads(t.constraints_json or "[]")
+            self.assertIsInstance(walls, list)
+            self.assertIsInstance(constraints, list)
+            if t.layout_shape:
+                # Walls list non-empty for templates with a shape
+                self.assertGreater(len(walls), 0, f"{t.name}: empty walls_json")

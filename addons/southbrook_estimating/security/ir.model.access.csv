@@ -18,3 +18,6 @@ access_southbrook_room_wall_manager,southbrook.room.wall manager,model_southbroo
 access_southbrook_room_constraint_user,southbrook.room.constraint user,model_southbrook_room_constraint,base.group_user,1,0,0,0
 access_southbrook_room_constraint_sales,southbrook.room.constraint sales,model_southbrook_room_constraint,sales_team.group_sale_salesman,1,1,1,1
 access_southbrook_room_constraint_manager,southbrook.room.constraint manager,model_southbrook_room_constraint,sales_team.group_sale_manager,1,1,1,1
+access_southbrook_room_template_user,southbrook.room.template user,model_southbrook_room_template,base.group_user,1,0,0,0
+access_southbrook_room_template_sales,southbrook.room.template sales,model_southbrook_room_template,sales_team.group_sale_salesman,1,1,1,1
+access_southbrook_room_template_manager,southbrook.room.template manager,model_southbrook_room_template,sales_team.group_sale_manager,1,1,1,1

@@ -13,6 +13,7 @@ from . import product_pricelist
 from . import southbrook_room
 from . import southbrook_room_wall
 from . import southbrook_room_constraint
+from . import southbrook_room_template
 from . import sale_order
 from . import sale_order_line
 from . import product_config_line

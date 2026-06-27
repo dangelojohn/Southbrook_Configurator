@@ -35,6 +35,7 @@
  */
 import {
     Component,
+    onMounted,
     useState,
     xml,
 } from "@odoo/owl";
@@ -243,6 +244,11 @@ class RoomTypeShapeStep extends Component {
         onRoomTypePicked: Function,
         onShapePicked: Function,
         onNameChanged: Function,
+        // Phase 6.2 — Room Templates library. Both optional so the step
+        // still renders cleanly if the parent hasn't wired the templates
+        // fetch (e.g. older tests that instantiate the step directly).
+        templates: { type: Array, optional: true },
+        onApplyTemplate: { type: Function, optional: true },
     };
 
     get _roomTypes() { return ROOM_TYPES; }
@@ -271,6 +277,11 @@ class WallDimensionsStep extends Component {
         onWallNameChanged: Function,
         onCeilingChanged: Function,
         onUnitChanged: Function,
+        // Phase 6.2 — when a Room Template seeded Step 2, surface a
+        // gentle "Applied template: X — edit anything below" notice so
+        // the user knows the form isn't blank by accident. Optional —
+        // null when the user picked a custom shape on Step 1.
+        appliedTemplateName: { type: [String, { value: null }], optional: true },
     };
 
     // Conversion helpers. Imperial unit shows inches (decimal) for v1;
@@ -414,9 +425,52 @@ export class RoomSetupWizard extends Component {
             },
             walls: [],
             constraints: [],
+            // Phase 6.2 — Room Templates library. Populated by a single
+            // fetch on mount; an empty list means the wizard renders the
+            // Step 1 templates section invisibly (existing custom-shape
+            // picker still works either way, fail-silent UX).
+            templates: [],
+            appliedTemplateName: null,
             errorMessage: null,
         });
+        onMounted(() => {
+            rpcJsonCall("/southbrook/api/room-templates/list", {})
+                .then((r) => {
+                    if (r && r.ok && Array.isArray(r.templates)) {
+                        this.state.templates = r.templates;
+                    }
+                })
+                .catch(() => {
+                    // Silent fail — wizard still works without templates.
+                });
+        });
     }
+
+    // ------------------------------------------------------------------
+    // Phase 6.2 — apply a Room Template. Clones the template's walls +
+    // constraints into the wizard state and jumps to Step 2 so the user
+    // tweaks lengths rather than starting from a blank slate.
+    // ------------------------------------------------------------------
+    _onApplyTemplate = (template) => {
+        if (!template) return;
+        this.state.room.layout_shape = template.layout_shape;
+        this.state.room.room_type = template.room_type;
+        this.state.room.ceiling_height_mm = template.ceiling_height_mm;
+        this.state.walls = (template.walls || []).map((w) => ({
+            name: w.name,
+            length_mm: w.length_mm,
+            wall_order: w.wall_order,
+        }));
+        this.state.constraints = (template.constraints || []).map((c) => ({
+            wall_index: c.wall_index,
+            constraint_type: c.constraint_type,
+            distance_from_left_mm: c.distance_from_left_mm,
+            width_mm: c.width_mm,
+            height_mm: c.height_mm || 0,
+        }));
+        this.state.appliedTemplateName = template.name;
+        this.state.step = 2;
+    };
 
     // ------------------------------------------------------------------
     // Step 1 callbacks

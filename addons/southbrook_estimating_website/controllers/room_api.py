@@ -790,3 +790,66 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                 "note": "gap_too_small",
             }
         return {"ok": True, "gap_mm": gap, "recommendations": top3}
+
+    # ------------------------------------------------------------------
+    # POST /southbrook/api/room-templates/list
+    # ------------------------------------------------------------------
+    #
+    # Phase 6.2 — Room Templates library. Returns the 4 (or more) seed
+    # southbrook.room.template records as parsed dicts for one-click
+    # cloning in the Room Setup wizard's Step 1.
+    #
+    # Auth: user. No body params — every authenticated user sees the
+    # same library (templates are platform seed data, not per-tenant).
+    #
+    # Robustness: a single template with a malformed walls_json /
+    # constraints_json does NOT crash the whole list. We log a warning
+    # and substitute empty arrays so the wizard still has the other
+    # templates to show.
+    @http.route(
+        "/southbrook/api/room-templates/list",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_room_templates_list(self, **kw):
+        import json
+        templates = request.env["southbrook.room.template"].sudo().search(
+            [], order="sequence, id",
+        )
+        out = []
+        for t in templates:
+            try:
+                walls = json.loads(t.walls_json or "[]")
+                if not isinstance(walls, list):
+                    walls = []
+            except (ValueError, TypeError):
+                _logger.warning(
+                    "room template %s (id=%s): walls_json parse failed; "
+                    "substituting empty list",
+                    t.name, t.id,
+                )
+                walls = []
+            try:
+                constraints = json.loads(t.constraints_json or "[]")
+                if not isinstance(constraints, list):
+                    constraints = []
+            except (ValueError, TypeError):
+                _logger.warning(
+                    "room template %s (id=%s): constraints_json parse "
+                    "failed; substituting empty list",
+                    t.name, t.id,
+                )
+                constraints = []
+            out.append({
+                "id": t.id,
+                "name": t.name,
+                "description": t.description or "",
+                "sequence": t.sequence,
+                "room_type": t.room_type,
+                "layout_shape": t.layout_shape,
+                "ceiling_height_mm": t.ceiling_height_mm,
+                "walls": walls,
+                "constraints": constraints,
+            })
+        return {"ok": True, "templates": out}
