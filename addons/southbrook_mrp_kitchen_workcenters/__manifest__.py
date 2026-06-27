@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.18.0",
+    "version": "19.0.4.19.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -57,6 +57,11 @@ southbrook_kitchen_workspace) without duplicating their models.
         "southbrook_kitchen_workspace",
         # QR foundation — provides qr.mixin + scan controller.
         "southbrook_qr_kit",
+        # W008 — asbuilt back-references pg.release / pg.ebom / pg.item
+        # via stored related fields walking production_id.pg_*. The
+        # release addon adds those fields to mrp.production (PG-112)
+        # and owns the pg.release / pg.ebom / pg.item models.
+        "product_graph_release",
     ],
     "data": [
         "security/ir.model.access.csv",

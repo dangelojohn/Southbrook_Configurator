@@ -197,6 +197,42 @@ class SouthbrookAsbuilt(models.Model):
         store=True, readonly=True,
     )
 
+    # --- Engineering trace (W008, MFG-REVIEW-R4 W4) ---
+    # Stored related fields that close the warranty-trace loop:
+    # cabinet serial -> MO -> engineering revision in 1 hop instead
+    # of the historical 3 hops + 2 archived-record lookups. All four
+    # walk production_id.pg_* (added by product_graph_release on
+    # mrp.production via PG-112 traceability).
+    pg_release_id = fields.Many2one(
+        "pg.release",
+        string="Engineering Release",
+        related="production_id.pg_release_id",
+        store=True, readonly=True, index=True,
+        help="ProductGraph release that produced this as-built record "
+             "(via the MO that consumed the released mrp.bom).",
+    )
+    pg_revision_code = fields.Char(
+        string="Eng Revision",
+        related="production_id.pg_revision_code",
+        store=True, readonly=True, index=True,
+        help="ProductGraph revision code at time of MO release. "
+             "One-hop warranty trace from serial -> engineering rev.",
+    )
+    pg_ebom_id = fields.Many2one(
+        "pg.ebom",
+        string="Engineering BOM",
+        related="production_id.pg_ebom_id",
+        store=True, readonly=True, index=True,
+        help="ProductGraph EBOM that drove the MRP BOM for this asbuilt.",
+    )
+    pg_root_item_id = fields.Many2one(
+        "pg.item",
+        string="Engineering Item",
+        related="production_id.pg_root_item_id",
+        store=True, readonly=True, index=True,
+        help="ProductGraph root item (assembly) for this asbuilt.",
+    )
+
     # --- Free-form ---
     notes = fields.Text(string="Build Notes")
 
