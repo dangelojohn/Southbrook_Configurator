@@ -2249,8 +2249,89 @@ const TEMPLATE = xml`
                     activeTab="state.ui.current_tab"
                     onTabChange.bind="_setActiveTab"/>
 
-            <!-- Tab panels. T2C9 fills Lines. T2C10-11 fill the rest. -->
-            <div t-if="state.ui.current_tab === 'lines'"
+            <!-- Tab panels. T2C9 fills Lines. T2C10-11 fill the rest.
+                 Phase 2.B prepends the Room Setup panel as the chain
+                 head; lines/3D/etc are downstream t-elif siblings. -->
+            <div t-if="state.ui.current_tab === 'room_setup'"
+                 class="o_owl_tab_panel sb-room-setup-panel"
+                 role="tabpanel" aria-labelledby="o_owl_tab_room_setup"
+                 tabindex="0">
+                <t t-if="state.room">
+                    <!-- Summary card + per-wall cards -->
+                    <div class="sb-room-summary">
+                        <h2 class="sb-room-title">
+                            <t t-esc="state.room.name"/>
+                        </h2>
+                        <div class="sb-room-meta">
+                            <span class="sb-room-shape">
+                                <t t-esc="_humanShape(state.room.layout_shape)"/>
+                            </span>
+                            <span class="sb-room-linear">
+                                <t t-esc="state.room.total_linear_mm"/> mm linear
+                            </span>
+                            <span class="sb-room-walls">
+                                <t t-esc="state.room.walls.length"/> wall(s)
+                            </span>
+                            <span t-if="state.room.has_plumbing"
+                                  class="sb-room-plumbing-flag">Plumbing</span>
+                        </div>
+                    </div>
+                    <div class="sb-room-walls-grid">
+                        <t t-foreach="state.room.walls" t-as="wall" t-key="wall.id">
+                            <div class="sb-room-wall-card"
+                                 t-att-class="wall.has_conflicts ? 'sb-room-wall-card--conflict' : ''">
+                                <header>
+                                    <strong t-esc="wall.name"/>
+                                    <span class="sb-room-wall-len">
+                                        <t t-esc="wall.length_mm"/> mm
+                                    </span>
+                                </header>
+                                <div class="sb-room-wall-bar"
+                                     t-att-title="wall.used_mm + ' / ' + wall.length_mm + ' mm used'">
+                                    <div class="sb-room-wall-bar-fill"
+                                         t-att-style="'width:' + _capPct(wall) + '%'"></div>
+                                </div>
+                                <footer class="sb-room-wall-cap">
+                                    <span><t t-esc="wall.used_mm"/> mm used</span>
+                                    <span class="sb-room-wall-rem"
+                                          t-att-class="wall.remaining_mm &lt; 0 ? 'sb-room-wall-rem--over' : ''">
+                                        <t t-esc="wall.remaining_mm"/> mm left
+                                    </span>
+                                </footer>
+                                <ul t-if="wall.constraints.length" class="sb-room-constraint-chips">
+                                    <li t-foreach="wall.constraints" t-as="c" t-key="c.id"
+                                        class="sb-room-chip"
+                                        t-att-data-type="c.constraint_type">
+                                        <t t-esc="_humanConstraint(c.constraint_type)"/>
+                                        <small>@ <t t-esc="c.distance_from_left_mm"/>mm</small>
+                                    </li>
+                                </ul>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="sb-room-empty">
+                        <h2>No room configured yet</h2>
+                        <p>
+                            Add room dimensions, walls, and constraints to anchor
+                            this order to a physical space. Cabinets you add can
+                            then be placed against walls with live conflict
+                            detection.
+                        </p>
+                        <button class="o_owl_add_cabinet_btn sb-room-setup-cta"
+                                t-on-click="_openRoomSetupWizard">
+                            Set Up Room
+                        </button>
+                        <p class="sb-room-empty-note">
+                            <small>You can still add cabinets and design without
+                                   setting up a room — it just unlocks the Room
+                                   Layout tab in Phase 3.</small>
+                        </p>
+                    </div>
+                </t>
+            </div>
+            <div t-elif="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines"
                  role="tabpanel" aria-labelledby="o_owl_tab_lines"
                  tabindex="0">
@@ -2482,6 +2563,13 @@ class OrderBuilder extends Component {
             // ("Dealer (-50%)", "Contractor Tier 3 (-35%)", etc.).
             // Drives the channel badge on each catalog card.
             channel_label: "",
+            // Phase 2.B — Room Setup tab payload. Mirrors the shape
+            // returned by /southbrook/api/order/<id>/room/get
+            // (Phase 2.A controller). Null until the background fetch
+            // resolves; the room_setup tab renders the empty-state CTA
+            // while it's null. Non-blocking: initial render does NOT
+            // wait on this.
+            room: null,
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
@@ -2522,6 +2610,11 @@ class OrderBuilder extends Component {
         onMounted(() => {
             this._loadOrder();
             this._loadCatalog();
+            // Phase 2.B — fire-and-forget room fetch. The Room Setup tab
+            // pre-renders with state.room=null (empty-state CTA) so we
+            // do NOT await this; if the fetch fails the tab just shows
+            // the empty state, which is the correct fallback.
+            this._refreshRoomState();
             this._startRealtimeSync();
         });
         onWillUnmount(() => this._stopRealtimeSync());
@@ -2885,6 +2978,19 @@ class OrderBuilder extends Component {
     get _tabs() {
         const order = this.state.order || {};
         const all = [
+            // Phase 2.B — Room Setup is the first tab. Badge:
+            //   ✓ when a room is configured AND layout_complete is true
+            //   ⚠ when a room exists but is not yet complete
+            //   null when no room (badge hidden)
+            // Customer mode includes this tab — room measurement is a
+            // customer concern (see customerCodes below).
+            {
+                code: "room_setup",
+                label: "Room Setup",
+                count: this.state.room
+                    ? (this.state.room.layout_complete ? "✓" : "⚠")
+                    : null,
+            },
             {
                 code: "lines",
                 label: "Order Lines",
@@ -2924,7 +3030,11 @@ class OrderBuilder extends Component {
         // commit 1 added 3D Kitchen to the customer-visible set —
         // it's a presentation surface, not a power-user tool.
         if (this.props.mode === "customer") {
-            const customerCodes = new Set(["lines", "kitchen3d", "print"]);
+            // Phase 2.B — "room_setup" is customer-visible (room
+            // measurement is a customer concern, not a power-user tool).
+            const customerCodes = new Set([
+                "room_setup", "lines", "kitchen3d", "print",
+            ]);
             return all.filter((t) => customerCodes.has(t.code));
         }
         return all;
@@ -2936,6 +3046,88 @@ class OrderBuilder extends Component {
     _setActiveTab = (code) => {
         this.state.ui.current_tab = code;
     };
+
+    // ------------------------------------------------------------------
+    // Phase 2.B — Room Setup helpers.
+    //
+    // _humanShape / _humanConstraint translate the server's enum codes
+    // (snake_case selection values from Phase 1 models) into customer-
+    // readable labels for the summary card and constraint chips.
+    //
+    // _capPct returns the wall-utilisation percentage (0-100) for the
+    // capacity bar; clamped so an over-used wall renders at 100% with
+    // the negative `remaining_mm` surfacing via the `--over` modifier.
+    //
+    // _openRoomSetupWizard is a Phase 2.C stub. Phase 2.B ships the
+    // tab + empty-state; the wizard arrives next.
+    //
+    // _refreshRoomState wraps the /room/get endpoint from Phase 2.A.
+    // Reuses the module-level rpcJsonCall helper (line 58) — must NOT
+    // introduce a parallel fetch path. Failure is swallowed so the
+    // tab degrades to the empty-state CTA rather than blocking the
+    // initial render.
+    // ------------------------------------------------------------------
+
+    _humanShape(code) {
+        return {
+            straight: "Straight",
+            l_shape: "L-Shape",
+            u_shape: "U-Shape",
+            galley: "Galley",
+            g_shape: "G-Shape",
+            island: "Island",
+            peninsula: "Peninsula",
+            custom: "Custom",
+        }[code] || code || "—";
+    }
+
+    _humanConstraint(code) {
+        return {
+            window: "Window",
+            door: "Door",
+            sink: "Sink",
+            cooktop: "Cooktop",
+            oven: "Oven",
+            dishwasher: "Dishwasher",
+            rangehood: "Rangehood",
+            fridge_space: "Fridge Space",
+            power_outlet: "Power Outlet",
+            structural_post: "Structural Post",
+            other: "Other",
+        }[code] || code;
+    }
+
+    _capPct(wall) {
+        const len = wall.length_mm || 1;
+        const used = Math.max(0, wall.used_mm);
+        return Math.min(100, Math.round((used / len) * 100));
+    }
+
+    _openRoomSetupWizard() {
+        // Wired in Phase 2.C. For now, a friendly stub.
+        alert("Room setup wizard arrives in Phase 2.C. " +
+              "For now, set up your room via the backend " +
+              "(Sales → Southbrook Estimating → Rooms).");
+    }
+
+    async _refreshRoomState() {
+        const orderId = this.props.orderId;
+        if (!orderId) {
+            return;
+        }
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/" + encodeURIComponent(orderId) + "/room/get",
+                {});
+            if (r && r.ok) {
+                this.state.room = r.room;
+            }
+        } catch (e) {
+            // Tab still works in empty state — room fetch failure is
+            // non-fatal. Log for ops visibility.
+            console.warn("[OrderBuilder] room fetch failed:", e);
+        }
+    }
 
     // ------------------------------------------------------------------
     // T2C9 — line grouping + selection

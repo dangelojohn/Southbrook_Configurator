@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.3.0.0",
+    "version": "19.0.4.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -74,6 +74,11 @@
             # "southbrook_estimating/static/lib/three/GLTFLoader.js",
             "southbrook_estimating/static/src/js/cabinet_glb_loader.esm.js",
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
+            # Phase 2.B (2026-06-27) — Room Setup tab styles. Loaded
+            # after portal_root.scss so the --sb-* tokens are bound to
+            # the active theme; sb-room-* classes only attach inside
+            # the new tab panel, no other surface is affected.
+            "southbrook_estimating_website/static/src/scss/room_layout.scss",
             # G1 + G2 (2026-06-01) — homepage hero + features SCSS.
             "southbrook_estimating_website/static/src/scss/homepage.scss",
             # Phase 2 commit 1 — kitchen-planner three-pane SCSS.

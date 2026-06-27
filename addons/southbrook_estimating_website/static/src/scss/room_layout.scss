@@ -1,0 +1,294 @@
+// ---------------------------------------------------------------------
+// Southbrook Room Setup — Phase 2.B
+//
+// Styles for the new Room Setup tab in the OrderBuilder OWL component.
+// Loaded into web.assets_frontend AFTER portal_root.scss so the
+// Southbrook design tokens (--sb-*) defined in
+// _southbrook_design_tokens.scss are available here.
+//
+// Conventions:
+//   - All classes prefixed `sb-room-` so they cannot collide with the
+//     existing `o_owl_*` portal classes.
+//   - Use CSS custom properties (--sb-*) — no SCSS variables — so the
+//     Phase 3 light/dark theme rebind in portal_root.scss reskins this
+//     panel automatically.
+//   - BEM-ish modifiers via `--<modifier>` suffix (e.g.
+//     `.sb-room-wall-card--conflict`).
+//
+// Phase 2.C will extend this with the wizard chrome; the wizard is
+// out of scope here.
+// ---------------------------------------------------------------------
+
+.sb-room-setup-panel {
+    padding: 1.25rem 1.5rem;
+    font-family: var(--sb-font-sans);
+    color: var(--sb-ink);
+    background: var(--sb-paper);
+    border-radius: var(--sb-radius);
+    min-height: 240px;
+}
+
+// ---------------------------------------------------------------------
+// Summary card — top of the panel when a room is configured.
+// ---------------------------------------------------------------------
+
+.sb-room-summary {
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--sb-rule);
+}
+
+.sb-room-title {
+    margin: 0 0 0.4rem 0;
+    font-family: var(--sb-font-display);
+    font-size: 1.45rem;
+    font-weight: 500;
+    color: var(--sb-walnut-d);
+    letter-spacing: 0.01em;
+}
+
+.sb-room-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    font-size: 0.875rem;
+    color: var(--sb-ink-dim);
+
+    > span {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.5rem;
+        background: var(--sb-linen);
+        border: 1px solid var(--sb-rule);
+        border-radius: var(--sb-radius-sm);
+        white-space: nowrap;
+    }
+}
+
+.sb-room-shape {
+    font-weight: 600;
+    color: var(--sb-sky);
+}
+
+.sb-room-linear {
+    font-family: var(--sb-font-mono);
+}
+
+.sb-room-walls {
+    color: var(--sb-ink-dim);
+}
+
+.sb-room-plumbing-flag {
+    background: var(--sb-hl) !important;
+    color: var(--sb-warn) !important;
+    border-color: var(--sb-warn) !important;
+    font-weight: 600;
+}
+
+// ---------------------------------------------------------------------
+// Wall cards grid — one card per wall in the room.
+// ---------------------------------------------------------------------
+
+.sb-room-walls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.9rem;
+}
+
+.sb-room-wall-card {
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius);
+    padding: 0.75rem 0.85rem;
+    box-shadow: var(--sb-shadow-sm);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+
+    &:hover {
+        border-color: var(--sb-rule-d);
+    }
+
+    > header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 0.5rem;
+        gap: 0.5rem;
+
+        strong {
+            font-family: var(--sb-font-display);
+            font-size: 0.95rem;
+            color: var(--sb-walnut-d);
+        }
+    }
+
+    &--conflict {
+        border-color: var(--sb-alert);
+        background: lighten(#fbf7ef, 0); // keep paper, just border + corner mark
+        box-shadow: 0 0 0 1px var(--sb-alert) inset;
+    }
+}
+
+.sb-room-wall-len {
+    font-family: var(--sb-font-mono);
+    font-size: 0.8rem;
+    color: var(--sb-ink-dim);
+}
+
+// ---------------------------------------------------------------------
+// Capacity progress bar — used_mm vs length_mm.
+// ---------------------------------------------------------------------
+
+.sb-room-wall-bar {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    background: var(--sb-linen);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+}
+
+.sb-room-wall-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg,
+                                var(--sb-sky),
+                                var(--sb-walnut));
+    border-radius: 3px;
+    transition: width 200ms ease;
+}
+
+.sb-room-wall-cap {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    font-family: var(--sb-font-mono);
+    color: var(--sb-ink-dim);
+    margin-bottom: 0.5rem;
+
+    > span {
+        white-space: nowrap;
+    }
+}
+
+.sb-room-wall-rem {
+    color: var(--sb-ok);
+
+    &--over {
+        color: var(--sb-alert);
+        font-weight: 600;
+    }
+}
+
+// ---------------------------------------------------------------------
+// Constraint chips — one chip per window/door/sink/etc on the wall.
+// ---------------------------------------------------------------------
+
+.sb-room-constraint-chips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.sb-room-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.45rem;
+    background: var(--sb-sky-l);
+    color: var(--sb-sky);
+    border: 1px solid var(--sb-sky);
+    border-radius: var(--sb-radius-sm);
+    font-size: 0.72rem;
+    font-weight: 500;
+
+    small {
+        color: var(--sb-ink-dim);
+        font-family: var(--sb-font-mono);
+        font-weight: 400;
+    }
+
+    // Per-type accents — colour cues for the most common constraints.
+    &[data-type="sink"],
+    &[data-type="dishwasher"] {
+        background: var(--sb-hl);
+        color: var(--sb-warn);
+        border-color: var(--sb-warn);
+    }
+
+    &[data-type="cooktop"],
+    &[data-type="oven"],
+    &[data-type="rangehood"] {
+        background: #fde2d4;
+        color: var(--sb-alert);
+        border-color: var(--sb-alert);
+    }
+
+    &[data-type="structural_post"] {
+        background: var(--sb-rule);
+        color: var(--sb-ink);
+        border-color: var(--sb-rule-d);
+        font-weight: 600;
+    }
+}
+
+// ---------------------------------------------------------------------
+// Empty state — shown when state.room is null (no room configured yet).
+// ---------------------------------------------------------------------
+
+.sb-room-empty {
+    max-width: 540px;
+    margin: 2rem auto;
+    padding: 2rem 1.75rem;
+    text-align: center;
+    background: var(--sb-paper);
+    border: 1px dashed var(--sb-rule-d);
+    border-radius: var(--sb-radius);
+
+    h2 {
+        margin: 0 0 0.75rem 0;
+        font-family: var(--sb-font-display);
+        font-weight: 500;
+        font-size: 1.4rem;
+        color: var(--sb-walnut-d);
+    }
+
+    p {
+        margin: 0 0 1.25rem 0;
+        color: var(--sb-ink-dim);
+        line-height: 1.5;
+    }
+}
+
+.sb-room-setup-cta {
+    margin: 0.25rem auto 1rem auto;
+    padding: 0.6rem 1.4rem;
+    background: var(--sb-walnut);
+    color: var(--sb-paper);
+    border: none;
+    border-radius: var(--sb-radius);
+    font-family: var(--sb-font-display);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+
+    &:hover {
+        background: var(--sb-walnut-d);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+}
+
+.sb-room-empty-note {
+    color: var(--sb-ink-dim);
+    font-size: 0.82rem;
+    margin: 0;
+    line-height: 1.4;
+}
