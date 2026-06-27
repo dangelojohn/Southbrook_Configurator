@@ -873,19 +873,85 @@ Wizard structure:
 
 ---
 
-## Phase 3 — Room Layout Tab (DRAFT)
+## Phase 3 — Room Layout Tab (detailed, post-Phase 2)
 
-**High-level scope** (Tasks 3.1 + 3.2 in the brief):
+Phase 2 fully shipped + live on QNAP 2026-06-27 (`19.0.5.0.0` both addons). Phase 3 decomposes into 5 sub-phases. 3.A and 3.D are independent — can be dispatched in parallel.
 
-- New OWL component `RoomLayoutTab` in `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js`.
-- Inline-SVG floor plan. No third-party library. Rendering primitives: room outline (`<polyline>`), walls (`<line>` per wall), constraints (`<rect>` + per-type icon `<g>` from a small icon sprite), cabinets (`<rect>` per assigned line, fill by zone), gaps (`<rect>` with `stroke-dasharray`), conflict highlights (`<rect>` with red stroke).
-- Sidebar "Unplaced Cabinets" list pulled from `state.order.order_line.filter(l => !l.wall_id)`.
-- Click cabinet → highlights line in Order Lines tab via shared OWL state.
-- Click gap → modal "Add cabinet here?" with recommended widths from `southbrook.room.recommend_for_gap(wall_id, gap_mm)` RPC (Phase 6.1).
-- Drag-to-reorder: optional, gated on viewport width ≥ 768px; mobile falls back to ← → arrow buttons.
-- Elevation toggle: redraws as side-view of the selected wall (cabinets stacked at known Y heights from `zone`).
-- Inline warning banner in Order Lines tab: scrolls collapsible list of conflicts/gaps; each entry deep-links to the Room Layout tab focused on the issue.
-- New SCSS file `room_layout.scss` (all `sb-room-*` prefixed classes).
+### Phase 3.A — Cabinet placement endpoint
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/controllers/room_api.py` — append one endpoint to the existing `SouthbrookRoomApi` controller.
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` — bump version `19.0.5.0.0` → `19.0.6.0.0`.
+- Modify: `addons/southbrook_estimating_website/tests/test_room_api.py` — add 3 tests for the new endpoint.
+
+**Interfaces:**
+- `POST /southbrook/api/order/<int:order_id>/line/<int:line_id>/place-on-wall` — body `{wall_id, position_from_left_mm}`. Setting `wall_id` to null unplaces. Returns `{ok, line: {id, wall_id, position_from_left_mm, is_positioned}, wall: {id, used_mm, remaining_mm, has_conflicts}}` so the client can update both line + wall state in one round-trip.
+- Auth: line ownership via `_southbrook_resolve_order(line.order_id.id)` — the existing helper pattern from main.py.
+- Wall scope: if wall_id is non-null, must belong to a room belonging to the resolved order.
+
+### Phase 3.B — Room Layout tab + read-only floor-plan SVG
+
+The biggest single chunk in Phase 3 — the interactive (initially read-only) top-down floor plan.
+
+**Files:**
+- New: `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js` — single OWL component `RoomLayoutTab` (parent) + `FloorPlanSVG` (child, pure render).
+- New: `addons/southbrook_estimating_website/static/src/xml/room_layout.xml` — OWL templates.
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss` — append floor-plan styles (sub-prefix `sb-room-plan-*`).
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js`:
+  - Insert "Room Layout" tab in `_tabs` getter at position 1 (after "Room Setup", before "Order Lines")
+  - Add render block for the new panel that mounts `<RoomLayoutTab room="state.room" lines="state.lines"/>`
+  - Add `"room_layout"` to the `customerCodes` Set
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` — register new JS + XML, bump version `19.0.6.0.0` → `19.0.7.0.0`.
+
+**Interfaces (props):**
+- `room: object | null` — the same room dict shape as Phase 2.B (id, walls, constraints, etc.).
+- `lines: array` — the order's sale.order.line dicts with `wall_id`, `position_from_left_mm`, `sb_width_mm`, `zone`, `name`.
+- `onLineSelected: (lineId) => void` — call when user clicks a cabinet rect.
+
+**Rendering primitives (inline SVG, no libraries):**
+- Room outline: `<polyline>` from layout_shape + wall lengths (same algorithm as `RoomOutlinePreview` from 2.C — extract into a shared helper).
+- Wall labels: `<text>` per wall at midpoint.
+- Constraints: `<rect>` colored by type, with `<text>` label.
+- Cabinets: `<rect>` per positioned line, fill from a zone→color map (base=walnut, wall=linen, tall=ink, etc.).
+- Gaps: `<rect>` with `stroke-dasharray="4 3"` where a wall has unused mm and the gap is ≥ 200mm.
+- Conflict highlight: red stroke (`stroke: var(--sb-alert); stroke-width: 2`) on the offending cabinet rect.
+- Per-wall metrics panel: hover/click a wall → side panel shows `<wall_name>: <length_mm> total | <used_mm> used | <remaining_mm> left | <conflict_count> conflicts`.
+- Sidebar "Unplaced Cabinets": list of `lines.filter(l => !l.wall_id)`. Read-only in 3.B; 3.C adds the drag/assign affordance.
+
+### Phase 3.C — Layout interactivity (defer-able)
+
+- Click cabinet rect → propagate `onLineSelected(line.id)` → OrderBuilder switches `current_tab` to `lines` and sets `selected_line_id`.
+- Click gap → modal "Add cabinet here?" with recommended widths (Phase 6.1 dependency — until that lands, the modal lists hardcoded standard widths 300/400/450/500/600/900).
+- Drag-to-reorder cabinets along a wall via mouse drag (viewport ≥ 768px) OR ← → arrow buttons (mobile). On drop, POST `/place-on-wall` (3.A endpoint).
+- Elevation view toggle: click a wall → side panel shows a side-on elevation SVG of that wall's cabinets at their Y heights (`base_run` at 0-900mm, `wall` at 1400-2100mm, `tall` floor-to-ceiling). New `<WallElevationSVG>` component.
+- Assign-from-sidebar: drag an unplaced cabinet to a wall (or click "Assign" → wall dropdown). POST `/place-on-wall`.
+
+3.C ships ONLY after 3.B is verified live. Re-plan post-3.B since interactivity surfaces emerge from rendering.
+
+### Phase 3.D — Smart inline warnings on Order Lines tab (independent of 3.B)
+
+Adds per-line indicator chips + collapsible warning banner + per-zone wall-summary row.
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js`:
+  - Add a small helper `_lineStatus(line)` → `"placed" | "unplaced" | "conflict" | null` (null when no room is configured — chip not rendered).
+  - Add a computed/method that surfaces a warnings list from `state.room` + `state.lines` (over-capacity walls + conflicting cabinets + unplaced cabinet count).
+  - Insert a warning banner element above the lines list when `_warnings().length > 0`.
+  - In the ZoneGroup OWL component (already exists per audit), add a `<small>` row showing wall capacity if all cabinets in the zone are placed on the same wall.
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss` — append `.sb-room-warning-*` styles.
+- No new files. No new endpoints. No version bump beyond Phase 3.B's.
+
+3.D is small + low-risk; can be appended to the Phase 3.B commit or shipped as a sibling commit.
+
+### Phase 3.E — Smoke + review
+
+- Live smoke on SO `S01264` (the brief's reference order):
+  1. Place a cabinet on a wall via the line tree backend
+  2. Open `/my/southbrook/order-builder/1264` → Room Layout tab
+  3. Verify the cabinet renders at its position; verify gap rect shows for unused wall space
+  4. Add a window constraint that overlaps the cabinet → reload → verify red conflict highlight
+- Curl `/place-on-wall` happy path + ownership-denial
+- Cumulative Phase 3 code review
 
 ---
 
