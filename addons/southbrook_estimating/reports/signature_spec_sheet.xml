@@ -170,6 +170,98 @@
             </div>
 
           </div>
+
+          <!--
+            Phase 5 — Room Summary page (conditional on doc.room_ids).
+            Renders only when the order has at least one room declared.
+            Existing single-page orders without rooms render unchanged.
+          -->
+          <div class="page" t-if="o.room_ids">
+            <t t-set="room" t-value="o.room_ids[0]"/>
+            <t t-set="summary" t-value="room.to_summary_dict()"/>
+            <h2 class="report_h2" style="margin: 0 0 12px 0;">
+              Kitchen Room — <t t-esc="summary['name']"/>
+            </h2>
+            <table class="sb-meta-table" style="width:100%; border-collapse:collapse; font-size: 9pt;">
+              <tr>
+                <th style="text-align:left;padding:4px 8px 4px 0;">Shape</th>
+                <td style="padding:4px 12px 4px 0;"><t t-esc="summary['shape_label']"/></td>
+                <th style="text-align:left;padding:4px 8px 4px 0;">Ceiling</th>
+                <td style="padding:4px 0;"><t t-esc="summary['ceiling_mm']"/> mm</td>
+              </tr>
+              <tr>
+                <th style="text-align:left;padding:4px 8px 4px 0;">Linear</th>
+                <td style="padding:4px 12px 4px 0;"><t t-esc="summary['total_linear_mm']"/> mm</td>
+                <th style="text-align:left;padding:4px 8px 4px 0;">Walls</th>
+                <td style="padding:4px 0;"><t t-esc="summary['wall_count']"/></td>
+              </tr>
+              <tr t-if="summary['plumbing']">
+                <th style="text-align:left;padding:4px 8px 4px 0;">Plumbing</th>
+                <td colspan="3" style="color:#C28840;padding:4px 0;">Sink or dishwasher present</td>
+              </tr>
+            </table>
+            <h3 class="report_h3" style="margin: 14px 0 6px 0;">Walls</h3>
+            <table style="width:100%; border-collapse:collapse; font-size:9pt;">
+              <thead>
+                <tr>
+                  <th>Wall</th><th>Length</th><th>Used</th>
+                  <th>Remaining</th><th>Constraints</th><th>Conflict</th>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-foreach="summary['walls']" t-as="w">
+                  <tr>
+                    <td t-esc="w['name']"/>
+                    <td t-esc="str(w['length_mm']) + ' mm'"/>
+                    <td t-esc="str(w['used_mm']) + ' mm'"/>
+                    <td t-esc="str(w['remaining_mm']) + ' mm'"
+                        t-att-style="'color:' + ('#A03E2D' if w['remaining_mm'] &lt; 0 else '#3D2F22') + ';'"/>
+                    <td t-esc="w['constraint_count']"/>
+                    <td t-esc="'YES' if w['conflicts'] else 'no'"/>
+                  </tr>
+                </t>
+              </tbody>
+            </table>
+            <h3 class="report_h3" t-if="summary['constraints']"
+                style="margin: 14px 0 6px 0;">Constraints</h3>
+            <table t-if="summary['constraints']"
+                   style="width:100%; border-collapse:collapse; font-size:9pt;">
+              <thead>
+                <tr>
+                  <th>Wall</th><th>Type</th><th>Position</th>
+                  <th>Width</th><th>Height</th>
+                </tr>
+              </thead>
+              <tbody>
+                <t t-foreach="summary['constraints']" t-as="c">
+                  <tr>
+                    <td t-esc="c['wall_name']"/>
+                    <td t-esc="c['type_label']"/>
+                    <td t-esc="str(c['position_mm']) + ' mm'"/>
+                    <td t-esc="str(c['width_mm']) + ' mm'"/>
+                    <td t-esc="(str(c['height_mm']) + ' mm') if c['height_mm'] else '—'"/>
+                  </tr>
+                </t>
+              </tbody>
+            </table>
+          </div>
+
+          <!--
+            Phase 5 — Floor Plan page. SVG returned by to_svg() is
+            inlined via t-raw (the markup is trusted — we generate it
+            and html-escape any user-supplied label text inside).
+          -->
+          <div class="page" t-if="o.room_ids">
+            <t t-set="room" t-value="o.room_ids[0]"/>
+            <h2 class="report_h2" style="margin: 0 0 8px 0;">Floor Plan</h2>
+            <div style="text-align:center; margin: 8px 0;">
+              <t t-raw="room.to_svg(720, 540)"/>
+            </div>
+            <p style="font-size: 8pt; color:#776B5C; text-align:center; margin-top: 6px;">
+              Top-down view. Cabinet positions are nominal — verify against
+              on-site measurements before manufacture.
+            </p>
+          </div>
         </t>
       </t>
     </t>

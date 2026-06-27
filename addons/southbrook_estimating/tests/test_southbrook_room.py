@@ -115,3 +115,72 @@ class TestSouthbrookRoom(TransactionCase):
         self.assertEqual(
             len(new_order.room_ids), 0,
             "room_ids must not propagate on copy (NF6 — v2 starts with fresh measurement)")
+
+    # ------------------------------------------------------------------
+    # Phase 5 — Customer Spec Sheet PDF helpers (to_summary_dict + to_svg).
+    # ------------------------------------------------------------------
+
+    def test_to_svg_returns_svg_for_configured_room(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Kitchen-PDF",
+            "order_id": self.order.id,
+            "layout_shape": "l_shape",
+            "wall_ids": [
+                (0, 0, {"name": "WallA", "length_mm": 3600}),
+                (0, 0, {"name": "WallB", "length_mm": 2400}),
+            ],
+        })
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": room.wall_ids[0].id,
+            "constraint_type": "window",
+            "distance_from_left_mm": 800,
+            "width_mm": 900,
+        })
+        svg = room.to_svg()
+        self.assertTrue(svg.startswith("<svg"),
+                        "to_svg must return a valid SVG root element")
+        self.assertIn("3600", svg,
+                      "wall length label must appear in the rendered SVG")
+        # Window marker colour (Sky) should appear in the SVG markup.
+        self.assertIn("#5E8FBE", svg,
+                      "window constraint colour must be rendered")
+        self.assertIn("Window", svg,
+                      "window type label must appear in the SVG")
+
+    def test_to_svg_returns_placeholder_for_no_walls(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Empty",
+            "order_id": self.order.id,
+        })
+        svg = room.to_svg()
+        self.assertTrue(svg.startswith("<svg"))
+        self.assertIn("no walls", svg.lower(),
+                      "empty-room placeholder must mention 'no walls'")
+
+    def test_to_summary_dict_shape_with_constraints(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Summary-Test",
+            "order_id": self.order.id,
+            "layout_shape": "l_shape",
+            "wall_ids": [
+                (0, 0, {"name": "A", "length_mm": 3600}),
+                (0, 0, {"name": "B", "length_mm": 2400}),
+            ],
+        })
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": room.wall_ids[0].id,
+            "constraint_type": "sink",
+            "distance_from_left_mm": 1200,
+            "width_mm": 900,
+        })
+        room.invalidate_recordset(["has_plumbing", "constraint_count"])
+        summary = room.to_summary_dict()
+        self.assertIn("name", summary)
+        self.assertIn("walls", summary)
+        self.assertIn("constraints", summary)
+        self.assertTrue(summary["plumbing"],
+                        "sink constraint must flip plumbing flag")
+        self.assertEqual(len(summary["walls"]), 2)
+        self.assertEqual(len(summary["constraints"]), 1)
+        self.assertEqual(summary["constraints"][0]["type_label"], "Sink")
+        self.assertEqual(summary["shape_label"], "L-Shape")
