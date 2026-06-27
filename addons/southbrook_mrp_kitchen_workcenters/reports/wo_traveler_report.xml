@@ -2,9 +2,18 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-only
 
      WO Traveler PDF — one page per mrp.workorder. Used by operators
-     to wallpaper the WO at the cell: scan once = open in tablet,
-     then tap Start/Pause/Finish from the form view (or use the wo
-     kind handler's REST endpoint).
+     to wallpaper the WO at the cell.
+
+     W026 (2026-06-27) — rich traveler per MFG-REVIEW R2.5 + R8.2:
+       - top-of-page CAD render thumbnail (FreeCAD bridge artifact
+         or fallback to product image) so the operator sees the spec
+         without leaving the cell
+       - bottom-of-page 3 scan-QRs (START / PAUSE / DONE) so the
+         operator can advance WO state with a single scan instead of
+         opening the form + tapping
+     The original single-QR "SCAN TO OPEN" panel is kept — it's still
+     the right entry point when an operator wants the full form
+     surface (e.g. to record scrap or attach a defect note).
 -->
 <odoo>
 
@@ -18,6 +27,31 @@
                             <span t-esc="wo.production_id.name"/> —
                             <span t-esc="wo.product_id.display_name"/>
                         </h3>
+
+                        <!--
+                            W026 — CAD render / cabinet image thumbnail.
+                            Pulled from FreeCAD bridge (x_cad_attachment_ids)
+                            with product image as fallback. Routed via
+                            /web/image/mrp.workorder/<id>/cad_thumbnail so
+                            wkhtmltopdf gets a real URL it can fetch
+                            in-process (data: URIs blow the report cache
+                            for any image > a few KB).
+                        -->
+                        <t t-if="wo.cad_thumbnail">
+                            <div class="row mt-2">
+                                <div class="col-12 text-center">
+                                    <img t-att-src="'/web/image/mrp.workorder/%d/cad_thumbnail' % wo.id"
+                                         style="max-width: 100%; max-height: 200px;
+                                                border: 1px solid #ccc; padding: 4px;
+                                                background: #fff;"
+                                         alt="Cabinet drawing / CAD render"/>
+                                    <div style="font-size: 8pt; color: #666;
+                                                margin-top: 4px;">
+                                        Build to this spec
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
 
                         <div class="row mt-4">
                             <div class="col-7">
@@ -84,11 +118,93 @@
                             </div>
                         </div>
 
+                        <!--
+                            W026 / R8.2 — 3 scan-QRs for 0-tap state advance.
+                            Each QR encodes /sb/qr/scan?p=<signed>&amp;action=...
+                            which the wo handler routes to button_start /
+                            button_pending / button_finish. Operator scans
+                            the matching tile when starting / pausing /
+                            finishing the WO — no need to open the form.
+                        -->
+                        <h4 class="mt-4">Scan to Advance</h4>
+                        <div class="row text-center mt-2">
+                            <div class="col-4">
+                                <t t-if="wo.qr_action_start_b64">
+                                    <img t-att-src="'data:image/png;base64,' + wo.qr_action_start_b64"
+                                         style="width: 130px; height: 130px;
+                                                border: 2px solid #2e7d32;
+                                                padding: 4px;"
+                                         alt="START scan QR"/>
+                                </t>
+                                <t t-else="">
+                                    <div style="width: 130px; height: 130px;
+                                                border: 1px dashed #999;
+                                                display: inline-block;
+                                                line-height: 130px;
+                                                font-size: 8pt; color: #999;">
+                                        QR unavailable
+                                    </div>
+                                </t>
+                                <div style="margin-top: 4px; font-size: 11pt;
+                                            font-weight: bold; color: #2e7d32;">
+                                    START
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <t t-if="wo.qr_action_pause_b64">
+                                    <img t-att-src="'data:image/png;base64,' + wo.qr_action_pause_b64"
+                                         style="width: 130px; height: 130px;
+                                                border: 2px solid #f57c00;
+                                                padding: 4px;"
+                                         alt="PAUSE scan QR"/>
+                                </t>
+                                <t t-else="">
+                                    <div style="width: 130px; height: 130px;
+                                                border: 1px dashed #999;
+                                                display: inline-block;
+                                                line-height: 130px;
+                                                font-size: 8pt; color: #999;">
+                                        QR unavailable
+                                    </div>
+                                </t>
+                                <div style="margin-top: 4px; font-size: 11pt;
+                                            font-weight: bold; color: #f57c00;">
+                                    PAUSE
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <t t-if="wo.qr_action_done_b64">
+                                    <img t-att-src="'data:image/png;base64,' + wo.qr_action_done_b64"
+                                         style="width: 130px; height: 130px;
+                                                border: 2px solid #1565c0;
+                                                padding: 4px;"
+                                         alt="DONE scan QR"/>
+                                </t>
+                                <t t-else="">
+                                    <div style="width: 130px; height: 130px;
+                                                border: 1px dashed #999;
+                                                display: inline-block;
+                                                line-height: 130px;
+                                                font-size: 8pt; color: #999;">
+                                        QR unavailable
+                                    </div>
+                                </t>
+                                <div style="margin-top: 4px; font-size: 11pt;
+                                            font-weight: bold; color: #1565c0;">
+                                    DONE
+                                </div>
+                            </div>
+                        </div>
+
                         <h4 class="mt-4">Operator Instructions</h4>
                         <ol style="line-height: 1.8">
-                            <li>Scan QR to open this WO on your tablet.</li>
-                            <li>Tap <strong>Start</strong> when work begins.</li>
-                            <li>Tap <strong>Finish</strong> when work completes.</li>
+                            <li>Scan the <strong>START</strong> QR when work begins
+                                (no need to open the form).</li>
+                            <li>Scan <strong>PAUSE</strong> if you stop mid-job;
+                                scan <strong>START</strong> again to resume.</li>
+                            <li>Scan <strong>DONE</strong> when work completes.</li>
+                            <li>Need the full form (record scrap, attach notes)?
+                                Scan the <strong>SCAN TO OPEN</strong> QR above.</li>
                             <li>If a defect is found:
                                 <ul>
                                     <li>Scan the matching <strong>defect-type QR</strong> from the floor board.</li>

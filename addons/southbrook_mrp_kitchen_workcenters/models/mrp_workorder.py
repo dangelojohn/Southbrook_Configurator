@@ -53,6 +53,7 @@ when the same user has form-opened the same WO within the last
 import logging
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -333,6 +334,194 @@ class MrpWorkorder(models.Model):
         if template.quantity_driver_type == "fixed":
             return 0.0
         return self.production_id.product_qty or 0.0
+
+    # ------------------------------------------------------------------
+    # W026 — Rich WO traveler (MFG-REVIEW R2.5 / R8.2)
+    #
+    # The traveler PDF embeds:
+    #   * a CAD render thumbnail (FreeCAD bridge render when present,
+    #     else the product image — so the operator never builds the
+    #     wrong spec from a missing drawing per R2.5)
+    #   * 3 separate scan-QRs (START / PAUSE / DONE) so the operator
+    #     can advance WO state with a single scan instead of opening
+    #     the form + tapping — per R8.2 the wo handler already accepts
+    #     these actions; this surface gives them a 0-tap entry point
+    #     (W017 closes the loop once the OPL scheduling-engine gating
+    #     is removed).
+    #
+    # The fields are computed-but-not-stored because:
+    #   - cad_thumbnail is a derived Binary that follows the upstream
+    #     FreeCAD attachment / product image; storing it would force
+    #     us to invalidate on every product image edit + every render
+    #     callback. Cheaper to re-derive at template-render time.
+    #   - the 3 qr_action_* fields are derived from web.base.url +
+    #     qr_payload (signed). The QR library spend is ~5ms/code on
+    #     a Pi; the traveler renders one WO per page, so the worst
+    #     case is ~15ms per page — fine for a PDF that's printed
+    #     once per shift.
+    # ------------------------------------------------------------------
+    cad_thumbnail = fields.Binary(
+        string="CAD Thumbnail",
+        compute="_compute_cad_thumbnail",
+        store=False,
+        attachment=False,
+        help="Cabinet render thumbnail for the WO traveler. Prefers "
+             "the latest FreeCAD bridge artifact attached to the MO; "
+             "falls back to the product image. Empty when neither is "
+             "available — the traveler then skips the image block.",
+    )
+    qr_action_start_url = fields.Char(
+        string="Start Scan URL",
+        compute="_compute_qr_action_urls",
+        store=False,
+    )
+    qr_action_pause_url = fields.Char(
+        string="Pause Scan URL",
+        compute="_compute_qr_action_urls",
+        store=False,
+    )
+    qr_action_done_url = fields.Char(
+        string="Done Scan URL",
+        compute="_compute_qr_action_urls",
+        store=False,
+    )
+    qr_action_start_b64 = fields.Char(
+        string="Start QR (PNG b64)",
+        compute="_compute_qr_action_images",
+        store=False,
+    )
+    qr_action_pause_b64 = fields.Char(
+        string="Pause QR (PNG b64)",
+        compute="_compute_qr_action_images",
+        store=False,
+    )
+    qr_action_done_b64 = fields.Char(
+        string="Done QR (PNG b64)",
+        compute="_compute_qr_action_images",
+        store=False,
+    )
+
+    def _sbk_cad_thumbnail_binary(self):
+        """Return the best-available image bytes for this WO's cabinet.
+
+        Order of preference:
+          1. FreeCAD bridge render — first image attachment on the MO
+             via x_cad_attachment_ids whose mimetype is image/*
+             (PNG/JPEG/SVG). The bridge writes DXF/SVG/PDF/STEP per
+             panel + a top-level cabinet render thumbnail.
+          2. product.image_1920 on the WO's finished product
+             (Odoo's native ResImageField).
+
+        Returns False when neither exists — the QWeb template renders
+        the right column blank in that case rather than a broken img.
+        """
+        self.ensure_one()
+        # Try FreeCAD bridge attachments first.
+        mo = self.production_id
+        if mo and "x_cad_attachment_ids" in mo._fields:
+            try:
+                for att in mo.x_cad_attachment_ids:
+                    mime = (att.mimetype or "").lower()
+                    if mime.startswith("image/") and att.datas:
+                        return att.datas
+            except Exception:  # noqa: BLE001
+                # Bridge may not be installed / field may be empty —
+                # fall through to the product image.
+                pass
+        # Fallback to the product image. image_1920 is the largest
+        # native field; QWeb will resize via /web/image route.
+        product = self.product_id
+        if product and product.image_1920:
+            return product.image_1920
+        return False
+
+    @api.depends("production_id", "product_id")
+    def _compute_cad_thumbnail(self):
+        for wo in self:
+            try:
+                wo.cad_thumbnail = wo._sbk_cad_thumbnail_binary()
+            except Exception:  # noqa: BLE001
+                _logger.warning(
+                    "W026 cad_thumbnail compute failed for WO %s",
+                    wo.id, exc_info=True,
+                )
+                wo.cad_thumbnail = False
+
+    def _sbk_build_action_scan_url(self, action):
+        """Build the absolute /sb/qr/scan URL for a given WO action.
+
+        The signed sb://wo/<id>?t=...&s=... payload (from qr_payload)
+        is URL-encoded into the `p=` query param; the `action=` query
+        param picks the wo handler's start/pause/finish branch.
+        Returns "" when web.base.url is unset (test sandboxes) so the
+        template falls back gracefully.
+        """
+        from urllib.parse import quote
+        self.ensure_one()
+        if action not in ("start", "pause", "done"):
+            raise UserError(_("Unknown WO scan action: %s") % action)
+        # Map UI label "done" to the handler's "finish" action so
+        # the URL is human-meaningful but still hits button_finish.
+        handler_action = "finish" if action == "done" else action
+        payload = self.qr_payload or ""
+        if not payload:
+            return ""
+        Param = self.env["ir.config_parameter"].sudo()
+        base = (Param.get_param("web.base.url") or "").rstrip("/")
+        if not base:
+            return ""
+        return f"{base}/sb/qr/scan?p={quote(payload, safe='')}&action={handler_action}"
+
+    @api.depends("qr_payload")
+    def _compute_qr_action_urls(self):
+        for wo in self:
+            try:
+                wo.qr_action_start_url = wo._sbk_build_action_scan_url("start")
+                wo.qr_action_pause_url = wo._sbk_build_action_scan_url("pause")
+                wo.qr_action_done_url = wo._sbk_build_action_scan_url("done")
+            except Exception:  # noqa: BLE001
+                _logger.warning(
+                    "W026 qr_action_urls compute failed for WO %s",
+                    wo.id, exc_info=True,
+                )
+                wo.qr_action_start_url = ""
+                wo.qr_action_pause_url = ""
+                wo.qr_action_done_url = ""
+
+    @api.depends("qr_action_start_url", "qr_action_pause_url",
+                 "qr_action_done_url")
+    def _compute_qr_action_images(self):
+        import base64
+        import io
+        for wo in self:
+            try:
+                import qrcode
+            except ImportError:
+                wo.qr_action_start_b64 = ""
+                wo.qr_action_pause_b64 = ""
+                wo.qr_action_done_b64 = ""
+                continue
+            for action, url_field, img_field in (
+                ("start", "qr_action_start_url", "qr_action_start_b64"),
+                ("pause", "qr_action_pause_url", "qr_action_pause_b64"),
+                ("done", "qr_action_done_url", "qr_action_done_b64"),
+            ):
+                url = wo[url_field] or ""
+                if not url:
+                    wo[img_field] = ""
+                    continue
+                try:
+                    img = qrcode.make(url, box_size=4, border=2)
+                    buf = io.BytesIO()
+                    img.save(buf, format="PNG")
+                    wo[img_field] = base64.b64encode(
+                        buf.getvalue()).decode("ascii")
+                except Exception:  # noqa: BLE001
+                    _logger.warning(
+                        "W026 qr image render failed for WO %s action %s",
+                        wo.id, action, exc_info=True,
+                    )
+                    wo[img_field] = ""
 
     # ------------------------------------------------------------------
     # W011 — form-open scan log (MFG-REVIEW-R2 §R2.2)
