@@ -1006,13 +1006,40 @@ Adds per-line indicator chips + collapsible warning banner + per-zone wall-summa
 
 ---
 
-## Phase 5 — PDF Extension (DRAFT)
+## Phase 5 — PDF Extension (detailed, post-3.C)
 
-- Extend `addons/southbrook_estimating/reports/signature_spec_sheet.xml` with two new pages:
-  - Page 2: Room setup summary (shape, walls table, constraints table).
-  - Page 3: Server-side SVG floor plan (Python helper in `models/southbrook_room.py:to_svg(width_px=720)` rendered inline in QWeb).
-- Conditional render: pages 2/3 omitted when no room is configured.
-- wkhtmltopdf renders inline SVG natively → no PNG transcode needed (cabinet-label WebP trap does not apply here because logos still use the existing PNG path).
+Extends `signature_spec_sheet.xml` with two new conditionally-rendered pages — room summary + server-side SVG floor plan. Single addon: `southbrook_estimating`.
+
+### Phase 5.A — Server-side SVG generator + room-summary helpers
+
+**Files:**
+- Modify: `addons/southbrook_estimating/models/southbrook_room.py` — add 3 methods to the `SouthbrookRoom` class:
+  - `to_svg(width_px=720, height_px=540)` — returns an SVG markup string (the room outline + walls + constraints + cabinets). Mirrors the geometry from `room_geometry.esm.js` (extract the layout shapes into a Python helper for consistency).
+  - `to_summary_dict()` — returns a plain dict for the QWeb summary table: `{name, shape_label, ceiling_mm, unit, total_linear_mm, wall_count, plumbing, walls: [{name, length_mm, used_mm, remaining_mm, conflicts, constraint_count}], constraints: [{wall_name, type_label, position, width, height}]}`. Decouples QWeb from raw recordset traversal so the template stays declarative.
+  - `to_imperial_str(mm)` (staticmethod) — convert mm to "3' 6"" when `unit_preference == "imperial"`. Used by the QWeb template to render lengths according to the room's preferred unit.
+- Modify: `addons/southbrook_estimating/tests/test_southbrook_room.py` — add 3 tests:
+  - `test_to_svg_returns_svg_for_configured_room` — assert returned string starts with `<svg` and contains the room's wall lengths.
+  - `test_to_svg_empty_for_unconfigured_room` — room with no walls → empty `<svg>` or minimal placeholder.
+  - `test_to_summary_dict_shape` — assert all expected keys present, walls + constraints populated.
+
+### Phase 5.B — Extend `signature_spec_sheet.xml`
+
+**Files:**
+- Modify: `addons/southbrook_estimating/reports/signature_spec_sheet.xml` — add 2 new `<div class="page">` blocks AFTER the existing page-1 content, both wrapped in `<t t-if="doc.room_ids">`:
+  - **Page 2 — Room Summary**:
+    - Header row: room name + shape label + total linear + wall count + plumbing badge
+    - Walls table: name | length | used | remaining | conflicts | constraints (#)
+    - Constraints table: wall | type | position | width | height (collapsed when no constraints)
+  - **Page 3 — Floor Plan**:
+    - Inline `<t t-raw="doc.room_ids[0].to_svg(720, 540)"/>` — wkhtmltopdf renders inline SVG natively
+    - Per-wall metrics table below the SVG (same data as the wizard's wall cards)
+- Modify: `addons/southbrook_estimating/__manifest__.py` — bump `version` `19.0.5.0.0` → `19.0.6.0.0`.
+
+### Phase 5.C — Smoke + review
+
+- Live smoke: generate the spec sheet PDF for SO `S01264` after creating a room via the wizard. Verify pages 2-3 render. Verify the SVG floor plan is legible.
+- Smoke for no-room order: verify pages 2-3 are correctly omitted (existing single-page report still works).
+- Code review on the cumulative diff.
 
 ---
 
