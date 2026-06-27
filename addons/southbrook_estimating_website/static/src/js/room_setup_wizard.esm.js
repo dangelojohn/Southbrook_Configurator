@@ -39,6 +39,10 @@ import {
     xml,
 } from "@odoo/owl";
 import { rpcJsonCall } from "@southbrook_estimating_website/js/portal_boot.esm";
+import {
+    wallSegmentsForShape,
+    polylinePointsFromSegments,
+} from "@southbrook_estimating_website/js/room_geometry.esm";
 
 // ----------------------------------------------------------------------
 // Static catalogues — the tiles + chip lists. Plain JS objects so the
@@ -167,36 +171,35 @@ class RoomOutlinePreview extends Component {
             .join(" ");
     }
 
-    // Pure mm-space geometry per shape. Returns an array of [x, y]
-    // points; the polyline is rendered in order. Unsupported shapes
-    // return null → fallback rectangle.
+    // Pure mm-space geometry per shape. Delegates to the shared
+    // wallSegmentsForShape() helper (room_geometry.esm.js) which is
+    // also consumed by Phase 3.B's FloorPlanSVG. Returns an array of
+    // [x, y] points; unsupported shapes return null → fallback
+    // rectangle path.
+    //
+    // Galley gap is computed from the wall lengths (not a fixed mm)
+    // to keep the live preview visually balanced as the user types —
+    // a 6m galley needs a wider rendered aisle than a 2m one to read
+    // correctly inside the 720x540 viewBox. The Phase 3.B Room Layout
+    // tab uses a fixed 1200 mm aisle (real-world typical) instead.
     _rawPoints(shape, walls) {
-        const fallback = 1000;
-        const wA = walls[0] || fallback;
-        const wB = walls[1] || fallback;
-        const wC = walls[2] || fallback;
-        // Coordinates use "screen" axes: +x right, +y down.
-        if (shape === "straight") {
-            return [[0, 0], [wA, 0]];
-        }
-        if (shape === "l_shape") {
-            // Wall A horizontal across the top, Wall B down the right.
-            return [[0, 0], [wA, 0], [wA, wB]];
-        }
-        if (shape === "u_shape") {
-            // Wall A left vertical, Wall B bottom horizontal, Wall C
-            // right vertical. Closed at the top by visual implication.
-            return [[0, 0], [0, wA], [wB, wA], [wB, wA - wC]];
-        }
-        if (shape === "galley") {
-            // Two parallel walls — render as two horizontal segments
-            // stacked. The polyline jumps between them which renders
-            // as a visible diagonal; we'd prefer two separate <line>s
-            // but for v1 a single polyline keeps the template simple.
-            const gap = Math.max(wA, wB) * 0.6;
-            return [[0, 0], [wA, 0], [wA, gap], [wA - wB, gap]];
-        }
-        return null;
+        const safeWalls = (walls || []).map((mm, i) => ({
+            name: "Wall " + String.fromCharCode(65 + i),
+            length_mm: mm,
+        }));
+        // Match the previous wizard galley behaviour: gap scales with
+        // wall length so the preview stays balanced for both small +
+        // large kitchens.
+        const wA = walls[0] || 1000;
+        const wB = walls[1] || 1000;
+        const galleyGap = shape === "galley"
+            ? Math.max(wA, wB) * 0.6
+            : undefined;
+        const segs = wallSegmentsForShape(shape, safeWalls, {
+            galleyGapMm: galleyGap,
+        });
+        if (!segs) return null;
+        return polylinePointsFromSegments(segs);
     }
 
     // Fallback-rectangle path used for shapes we don't render properly.

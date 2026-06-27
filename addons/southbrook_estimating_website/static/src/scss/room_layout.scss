@@ -1091,3 +1091,280 @@
         font-weight: 600;
     }
 }
+
+// ---------------------------------------------------------------------
+// Phase 3.B — Room Layout tab (sub-prefix `sb-room-plan-*`)
+//
+// Top-down floor plan. The SVG canvas is the centrepiece; right-side
+// sidebar carries the per-wall metrics table + the unplaced cabinet
+// list. CSS-tokens-only — no SCSS variables — so the portal_root.scss
+// theme rebind reskins this surface without template edits.
+// ---------------------------------------------------------------------
+
+.sb-room-plan-panel {
+    padding: 1.25rem 1.5rem;
+    font-family: var(--sb-font-sans);
+    color: var(--sb-ink);
+    background: var(--sb-paper);
+    border-radius: var(--sb-radius);
+    min-height: 240px;
+}
+
+.sb-room-plan-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sb-room-plan-empty {
+    padding: 1.5rem;
+    border: 1px dashed var(--sb-rule);
+    border-radius: var(--sb-radius);
+    background: var(--sb-linen);
+    color: var(--sb-ink-dim);
+
+    h2 {
+        margin: 0 0 0.5rem 0;
+        font-family: var(--sb-font-display);
+        font-size: 1.2rem;
+        color: var(--sb-walnut-d);
+    }
+
+    p {
+        margin: 0;
+        max-width: 60ch;
+    }
+}
+
+// Two-column grid: SVG centre + sidebar right.
+.sb-room-plan-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .sb-room-plan-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sb-room-plan-canvas {
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius);
+    padding: 0.5rem;
+    min-height: 480px;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.sb-room-plan-svg {
+    width: 100%;
+    height: 100%;
+    min-height: 460px;
+    display: block;
+}
+
+// ---------------------------------------------------------------------
+// SVG inner layers
+// ---------------------------------------------------------------------
+
+.sb-room-plan-floor {
+    fill: var(--sb-paper);
+    stroke: none;
+}
+
+.sb-room-plan-wall-line {
+    stroke: var(--sb-walnut);
+    stroke-width: 8;
+    stroke-linecap: round;
+    fill: none;
+
+    &--conflict {
+        stroke: var(--sb-alert);
+    }
+}
+
+.sb-room-plan-wall-label {
+    fill: var(--sb-ink);
+    font-family: var(--sb-font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+// Cabinet polygons by zone. Stroke = darker walnut for definition.
+.sb-room-plan-cab {
+    stroke: var(--sb-walnut-d);
+    stroke-width: 1.5;
+}
+
+.sb-room-plan-cab--base_run  { fill: var(--sb-walnut-l); }
+.sb-room-plan-cab--wall      { fill: var(--sb-paper); }
+.sb-room-plan-cab--tall      { fill: var(--sb-ink-dim); }
+.sb-room-plan-cab--island    { fill: var(--sb-sky-l, var(--sb-linen)); }
+.sb-room-plan-cab--accessory { fill: var(--sb-warn-l, var(--sb-linen)); }
+.sb-room-plan-cab--other     { fill: var(--sb-rule); }
+
+.sb-room-plan-cab--conflict {
+    stroke: var(--sb-alert);
+    stroke-width: 3;
+}
+
+.sb-room-plan-cab-label {
+    fill: var(--sb-ink);
+    font-family: var(--sb-font-mono, var(--sb-font-sans));
+    font-size: 10px;
+    pointer-events: none;
+}
+
+// Constraint polygons by type.
+.sb-room-plan-constraint {
+    fill: var(--sb-ink-dim);
+    fill-opacity: 0.6;
+    stroke: var(--sb-ink);
+    stroke-width: 1;
+}
+
+.sb-room-plan-constraint--window      { fill: var(--sb-sky, #6fb8d6); fill-opacity: 0.6; }
+.sb-room-plan-constraint--door        { fill: var(--sb-walnut); fill-opacity: 0.4; }
+.sb-room-plan-constraint--sink        { fill: var(--sb-warn, #d9a85f); fill-opacity: 0.7; }
+.sb-room-plan-constraint--cooktop     { fill: var(--sb-alert); fill-opacity: 0.5; }
+.sb-room-plan-constraint--oven        { fill: var(--sb-alert); fill-opacity: 0.6; }
+.sb-room-plan-constraint--dishwasher  { fill: var(--sb-sky, #6fb8d6); fill-opacity: 0.4; }
+.sb-room-plan-constraint--rangehood   { fill: var(--sb-ink-dim); fill-opacity: 0.5; }
+.sb-room-plan-constraint--fridge_space{ fill: var(--sb-linen); fill-opacity: 0.7; }
+
+.sb-room-plan-constraint-label {
+    fill: var(--sb-ink);
+    font-family: var(--sb-font-sans);
+    font-size: 9px;
+    font-weight: 500;
+    pointer-events: none;
+}
+
+// Gap markers — dashed rect, no fill.
+.sb-room-plan-gap {
+    fill: none;
+    stroke: var(--sb-ink-dim);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+    opacity: 0.7;
+}
+
+.sb-room-plan-gap-label {
+    fill: var(--sb-ink-dim);
+    font-family: var(--sb-font-mono, var(--sb-font-sans));
+    font-size: 10px;
+    font-style: italic;
+    pointer-events: none;
+}
+
+// ---------------------------------------------------------------------
+// Sidebar (walls metrics + unplaced list)
+// ---------------------------------------------------------------------
+
+.sb-room-plan-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius);
+    padding: 0.75rem 0.9rem;
+}
+
+.sb-room-plan-section-title {
+    margin: 0 0 0.5rem 0;
+    font-family: var(--sb-font-display);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--sb-walnut-d);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.sb-room-plan-walls-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    color: var(--sb-ink);
+
+    th, td {
+        padding: 0.3rem 0.4rem;
+        border-bottom: 1px solid var(--sb-rule);
+        text-align: left;
+    }
+
+    th {
+        font-weight: 600;
+        color: var(--sb-ink-dim);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+}
+
+.sb-room-plan-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.sb-room-plan-wall-row--conflict {
+    background: rgba(220, 80, 80, 0.06);
+    color: var(--sb-alert);
+}
+
+.sb-room-plan-wall-total {
+    background: var(--sb-paper);
+    font-weight: 600;
+}
+
+.sb-room-plan-over {
+    color: var(--sb-alert);
+    font-weight: 600;
+}
+
+.sb-room-plan-unplaced-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.sb-room-plan-unplaced-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.35rem 0.5rem;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.sb-room-plan-unplaced-name {
+    flex: 1;
+    margin-right: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sb-room-plan-unplaced-width {
+    color: var(--sb-ink-dim);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.sb-room-plan-unplaced-empty {
+    margin: 0;
+    color: var(--sb-ink-dim);
+    font-size: 0.85rem;
+    font-style: italic;
+}

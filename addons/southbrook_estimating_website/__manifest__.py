@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.6.0.0",
+    "version": "19.0.7.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -93,8 +93,19 @@
             # portal_boot.esm.js so the rpcJsonCall export resolves; the
             # XML template ships in the same bundle so OWL can find the
             # registered templates at component instantiation.
+            # Phase 3.B (2026-06-27) — room_geometry.esm.js is the shared
+            # shape→walls helper consumed by both RoomOutlinePreview
+            # (wizard) and FloorPlanSVG (Room Layout tab). Loads BEFORE
+            # both consumers.
+            "southbrook_estimating_website/static/src/js/room_geometry.esm.js",
             "southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js",
             "southbrook_estimating_website/static/src/xml/room_setup_wizard.xml",
+            # Phase 3.B (2026-06-27) — Room Layout tab. Read-only top-
+            # down floor plan SVG + per-wall metrics + unplaced cabinet
+            # sidebar. Click handlers, drag, and the elevation toggle
+            # are Phase 3.C.
+            "southbrook_estimating_website/static/src/js/room_layout.esm.js",
+            "southbrook_estimating_website/static/src/xml/room_layout.xml",
             # Phase 2 commit 2 — OWL <KitchenPlanner/> boot for
             # /kitchen-planner customer route. Independent of
             # portal_boot.esm.js (each bootstrap finds its own

@@ -35,6 +35,7 @@
 import { Component, mount, markup, onMounted, onWillUnmount, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
+import { RoomLayoutTab } from "@southbrook_estimating_website/js/room_layout.esm";
 
 // ----------------------------------------------------------------------
 // USD currency formatter — shared between OrderBuilder (probe) + the
@@ -2407,6 +2408,16 @@ const TEMPLATE = xml`
                     </div>
                 </t>
             </div>
+            <!-- Phase 3.B — Room Layout tab. Top-down floor plan
+                 (read-only in 3.B; interactivity is 3.C). Mounts
+                 RoomLayoutTab which renders the SVG + per-wall
+                 metrics + unplaced cabinets sidebar. -->
+            <div t-elif="state.ui.current_tab === 'room_layout'"
+                 class="o_owl_tab_panel sb-room-plan-panel"
+                 role="tabpanel" aria-labelledby="o_owl_tab_room_layout"
+                 tabindex="0">
+                <RoomLayoutTab room="state.room" lines="state.lines"/>
+            </div>
             <div t-elif="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines"
                  role="tabpanel" aria-labelledby="o_owl_tab_lines"
@@ -2614,6 +2625,7 @@ class OrderBuilder extends Component {
         KitchenViewport,
         CatalogPicker,
         RoomSetupWizard,
+        RoomLayoutTab,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -3121,6 +3133,16 @@ class OrderBuilder extends Component {
                     ? (this.state.room.layout_complete ? "✓" : "⚠")
                     : null,
             },
+            // Phase 3.B — Room Layout. Position 1 (after Room Setup,
+            // before Order Lines). Badge: unplaced cabinet count when
+            // a room exists, null otherwise (badge hidden).
+            {
+                code: "room_layout",
+                label: "Room Layout",
+                count: this.state.room
+                    ? (this.state.lines.filter((l) => !l.wall_id).length || null)
+                    : null,
+            },
             {
                 code: "lines",
                 label: "Order Lines",
@@ -3163,7 +3185,7 @@ class OrderBuilder extends Component {
             // Phase 2.B — "room_setup" is customer-visible (room
             // measurement is a customer concern, not a power-user tool).
             const customerCodes = new Set([
-                "room_setup", "lines", "kitchen3d", "print",
+                "room_setup", "room_layout", "lines", "kitchen3d", "print",
             ]);
             return all.filter((t) => customerCodes.has(t.code));
         }

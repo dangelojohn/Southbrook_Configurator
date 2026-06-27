@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Phase 3.B — Room Layout tab templates (2026-06-27).
+
+    Two components mounted into web.assets_frontend via the addon
+    manifest. OWL tokenizer rules followed throughout:
+
+      * t-if / t-att-* expressions use ||, &&, ! (never Python or/and/not)
+      * `<` encoded as &lt; inside attribute expressions where needed
+      * SVG sub-trees are plain XML — OWL handles the namespace
+
+    Read-only in 3.B — click handlers, drag, and the elevation toggle
+    are Phase 3.C.
+-->
+<templates xml:space="preserve">
+
+    <!-- ============================================================
+         RoomLayoutTab — parent shell.
+
+         Layout:
+             ┌────────────────────────────────┬──────────┐
+             │                                │ Walls    │
+             │     <FloorPlanSVG/>            │ table    │
+             │                                ├──────────┤
+             │                                │ Unplaced │
+             │                                │ list     │
+             └────────────────────────────────┴──────────┘
+
+         Empty states:
+             - no room      → "Set up a room…" pointer
+             - room/no walls → "Add walls…" pointer
+             - room+walls/no lines → render the room outline only
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.RoomLayoutTab">
+        <div class="sb-room-plan-tab">
+
+            <!-- Empty state #1: no room configured. -->
+            <div t-if="!_hasRoom" class="sb-room-plan-empty">
+                <h2>No room configured yet</h2>
+                <p>
+                    Go to the <strong>Room Setup</strong> tab to add a
+                    room. Once it has at least one wall, the floor
+                    plan will render here with every cabinet you
+                    place.
+                </p>
+            </div>
+
+            <!-- Empty state #2: room exists, no walls yet. -->
+            <div t-elif="!_hasWalls" class="sb-room-plan-empty">
+                <h2>Room has no walls yet</h2>
+                <p>
+                    Add walls via the <strong>Room Setup</strong>
+                    tab. The floor plan needs at least one wall to
+                    render.
+                </p>
+            </div>
+
+            <!-- Populated: render the SVG + metrics + sidebar. -->
+            <div t-else=""
+                 class="sb-room-plan-layout">
+
+                <div class="sb-room-plan-canvas">
+                    <FloorPlanSVG room="props.room" lines="props.lines"/>
+                </div>
+
+                <aside class="sb-room-plan-sidebar">
+
+                    <!-- Per-wall metrics -->
+                    <section class="sb-room-plan-walls">
+                        <h3 class="sb-room-plan-section-title">
+                            Walls
+                        </h3>
+                        <table class="sb-room-plan-walls-table">
+                            <thead>
+                                <tr>
+                                    <th>Wall</th>
+                                    <th class="sb-room-plan-num">Total</th>
+                                    <th class="sb-room-plan-num">Used</th>
+                                    <th class="sb-room-plan-num">Left</th>
+                                    <th class="sb-room-plan-num">Conflicts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="_wallMetrics"
+                                    t-as="m"
+                                    t-key="m.id"
+                                    class="sb-room-plan-wall-row"
+                                    t-att-class="{
+                                        'sb-room-plan-wall-row--conflict': m.has_conflicts,
+                                    }">
+                                    <td t-esc="m.name"/>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="m.length_mm"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="m.used_mm"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono"
+                                        t-att-class="{
+                                            'sb-room-plan-over': m.remaining_mm &lt; 0,
+                                        }">
+                                        <t t-esc="m.remaining_mm"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="m.conflict_count"/>
+                                    </td>
+                                </tr>
+                                <tr class="sb-room-plan-wall-total">
+                                    <td><strong>Total</strong></td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_wallTotals.length_mm"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_wallTotals.used_mm"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_wallTotals.remaining_mm"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <!-- Unplaced cabinets list -->
+                    <section class="sb-room-plan-unplaced">
+                        <h3 class="sb-room-plan-section-title">
+                            Unplaced (<t t-esc="_unplacedCount"/>)
+                        </h3>
+                        <p t-if="_unplacedCount === 0"
+                           class="sb-room-plan-unplaced-empty">
+                            All cabinets placed.
+                        </p>
+                        <ul t-else=""
+                            class="sb-room-plan-unplaced-list">
+                            <li t-foreach="_unplacedLines"
+                                t-as="line"
+                                t-key="line.id"
+                                class="sb-room-plan-unplaced-item">
+                                <span class="sb-room-plan-unplaced-name"
+                                      t-esc="line.name"/>
+                                <span class="sb-room-plan-unplaced-width mono">
+                                    <t t-esc="line.sb_width_mm || 0"/> mm
+                                </span>
+                            </li>
+                        </ul>
+                        <p t-if="!_hasLines &amp;&amp; _hasWalls"
+                           class="sb-room-plan-unplaced-empty">
+                            No cabinets in this order yet.
+                        </p>
+                    </section>
+                </aside>
+            </div>
+        </div>
+    </t>
+
+    <!-- ============================================================
+         FloorPlanSVG — pure-render top-down inline SVG.
+
+         Layers, painter's order (back → front):
+           1. Background floor rect (subtle linen)
+           2. Wall lines (thick walnut strokes)
+           3. Constraints (type-coloured polygons + labels)
+           4. Gap markers (dashed rect + mm label)
+           5. Cabinet polygons (zone fill, conflict border)
+           6. Cabinet labels (short SKU, centred)
+           7. Wall name labels (text on the OUTSIDE of each wall)
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.FloorPlanSVG">
+        <svg class="sb-room-plan-svg"
+             t-att-viewBox="_viewBox"
+             xmlns="http://www.w3.org/2000/svg"
+             role="img"
+             aria-label="Room floor plan">
+
+            <!-- Background floor rect — only when we have walls. -->
+            <rect t-if="_bgRect"
+                  class="sb-room-plan-floor"
+                  t-att-x="_bgRect.x"
+                  t-att-y="_bgRect.y"
+                  t-att-width="_bgRect.w"
+                  t-att-height="_bgRect.h"/>
+
+            <!-- Wall lines. Conflict walls get the alert stroke. -->
+            <g class="sb-room-plan-walls-g">
+                <line t-foreach="_wallLines"
+                      t-as="w"
+                      t-key="w.key"
+                      class="sb-room-plan-wall-line"
+                      t-att-class="{
+                          'sb-room-plan-wall-line--conflict': w.hasConflicts,
+                      }"
+                      t-att-x1="w.x1"
+                      t-att-y1="w.y1"
+                      t-att-x2="w.x2"
+                      t-att-y2="w.y2"/>
+            </g>
+
+            <!-- Constraint polygons + labels. -->
+            <g class="sb-room-plan-constraints-g">
+                <t t-foreach="_constraintPolys"
+                   t-as="c"
+                   t-key="c.key">
+                    <polygon class="sb-room-plan-constraint"
+                             t-att-class="'sb-room-plan-constraint--' + c.type"
+                             t-att-points="c.points"/>
+                    <text class="sb-room-plan-constraint-label"
+                          t-att-x="c.cx"
+                          t-att-y="c.cy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="c.label"/>
+                    </text>
+                </t>
+            </g>
+
+            <!-- Gap markers — dashed rect, no fill. -->
+            <g class="sb-room-plan-gaps-g">
+                <t t-foreach="_gapMarkers"
+                   t-as="g"
+                   t-key="g.key">
+                    <polygon class="sb-room-plan-gap"
+                             t-att-points="g.points"/>
+                    <text t-if="g.showLabel"
+                          class="sb-room-plan-gap-label"
+                          t-att-x="g.cx"
+                          t-att-y="g.cy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="g.label"/>
+                    </text>
+                </t>
+            </g>
+
+            <!-- Cabinet polygons + (conditional) labels. -->
+            <g class="sb-room-plan-cabs-g">
+                <t t-foreach="_cabinetPolys"
+                   t-as="cab"
+                   t-key="cab.key">
+                    <polygon t-att-class="cab.conflict
+                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
+                                           : cab.zoneClass"
+                             t-att-points="cab.points"/>
+                    <text t-if="cab.showLabel"
+                          class="sb-room-plan-cab-label"
+                          t-att-x="cab.cx"
+                          t-att-y="cab.cy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="cab.label"/>
+                    </text>
+                </t>
+            </g>
+
+            <!-- Wall name labels — drawn LAST so they sit on top. -->
+            <g class="sb-room-plan-wall-labels-g">
+                <text t-foreach="_wallLabels"
+                      t-as="lbl"
+                      t-key="lbl.key"
+                      class="sb-room-plan-wall-label"
+                      t-att-x="lbl.x"
+                      t-att-y="lbl.y"
+                      text-anchor="middle"
+                      dominant-baseline="central">
+                    <t t-esc="lbl.name"/>
+                </text>
+            </g>
+
+        </svg>
+    </t>
+
+</templates>
