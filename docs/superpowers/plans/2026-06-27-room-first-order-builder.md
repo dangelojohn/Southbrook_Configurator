@@ -1151,10 +1151,54 @@ Extends `signature_spec_sheet.xml` with two new conditionally-rendered pages —
 
 ---
 
-## Phase 6 — Stretch (DRAFT)
+## Phase 6 — Stretch
 
-- 6.1 Cabinet recommendation engine. New `southbrook.room.wall.recommend_for_gap(gap_mm) → list[(template_id, width_mm, score)]` RPC. Filters templates by max width ≤ gap; prefers standard widths (300/400/450/500/600/900) via scoring function.
-- 6.2 Room templates. New `southbrook.room.template` model with seed records. "Apply Template" action on `southbrook.room` clones walls + constraints from a template.
+### Phase 6.1 — Cabinet recommendation engine (detailed)
+
+When user clicks a gap on the Room Layout floor plan, replace the direct-to-catalog jump (3.C.2a) with a small **"Recommended for this gap"** modal showing the top 3 cabinet templates whose Width attribute has a value ≤ gap_mm, sorted by "best filler" (largest fitting width closest to gap). "Browse all cabinets" fallback button preserves the catalog flow.
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/controllers/room_api.py`:
+  - Add new endpoint `POST /southbrook/api/order/<int:order_id>/room/<int:room_id>/wall/<int:wall_id>/recommend` body `{gap_mm: int, position_from_left_mm: int}`. Returns `{ok, recommendations: [{template_id, name, default_code, fitting_widths_mm: [int, ...], best_width_mm: int, score: float}, ...]}`.
+  - Logic:
+    - Scope-validate order + wall via existing helpers.
+    - Query the 12 Southbrook cabinet templates (`product.template.search([('default_code', 'like', 'SB-%')])`).
+    - For each template, find its Width attribute (`attribute_line_ids` whose `attribute_id.name` matches `"Width"` case-insensitive). Skip templates without a Width attribute.
+    - For each attribute value, parse to mm:
+      - Try inches regex `(\d+)\s*(?:"|″|in)` → mm = inches × 25.4
+      - Try mm regex `(\d{2,4})\s*mm` → direct mm
+      - Skip if can't parse
+    - Filter to widths ≤ gap_mm. Skip template if no fitting widths.
+    - Score = `largest_fitting_width / gap_mm` (closer to 1.0 = better filler). Tie-break by preferred standard widths (300/400/450/500/600/900) — bonus +0.05 to score if any fitting width is exactly standard.
+    - Sort by score descending. Take top 3.
+- Modify: `addons/southbrook_estimating_website/tests/test_room_api.py`:
+  - `test_recommend_returns_top3_for_gap` — happy path. Use a known-width fixture (or use a test order with the demo seed templates).
+  - `test_recommend_empty_for_tiny_gap` — gap_mm = 100 → no cabinets fit → empty recommendations + `note: "gap_too_small"`.
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js`:
+  - New `GapRecommendModal` OWL component — `static props = {gapInfo: Object, recommendations: Array, onPick(templateId), onBrowseAll(), onCancel()}`.
+  - Renders modal: gap_mm header, list of 3 recommendation cards, "Browse all cabinets" link.
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js`:
+  - Add `state.ui.gapRecommend = null` (modal state).
+  - Add `state.gapRecommendLoading = false` (in-flight flag).
+  - Modify `_onPlanGapClick(wallId, gapMm, position)` — instead of immediately opening the catalog:
+    - Set loading flag
+    - POST `/recommend` with `{gap_mm, position_from_left_mm: position}`
+    - On success: stash `state.pendingGapPlacement = {wallId, position}` (same as today) + set `state.ui.gapRecommend = {gapMm, position, wallId, recommendations: r.recommendations}` → modal renders
+    - On error: fall back to opening catalog directly (preserves existing flow)
+  - Add `_onGapPickTemplate(templateId)` — POST `/add-line` with that template; the existing `_onPickCabinet` auto-place handles the rest.
+  - Add `_onGapBrowseAll()` — close recommend modal + open catalog (existing pendingGapPlacement preserved).
+  - Add `_onGapCancel()` — close recommend modal + clear `pendingGapPlacement`.
+- Modify: `addons/southbrook_estimating_website/static/src/xml/room_layout.xml`:
+  - Add `<t t-name="southbrook_estimating_website.GapRecommendModal">` template.
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss`:
+  - Append `.sb-room-plan-recommend-*` modal styles (mirror AssignToWallModal pattern).
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` — bump `version` `19.0.12.0.0` → `19.0.13.0.0`.
+
+### Phase 6.2 — Room templates library (DRAFT — not in this batch)
+
+Pre-configured room layouts the wizard can clone. New `southbrook.room.template` model + 4 seed records (Small Straight, Standard L, Galley, Standard Laundry) + "Start from a template" button in the wizard Step 1.
+
+Re-plan when activated.
 
 ---
 
