@@ -1319,6 +1319,232 @@
     color: var(--sb-linen);
 }
 
+// 2026-06-27 — per-line lead-time chip. Amber to telegraph
+// "this cabinet is dragging the schedule" without being alarming.
+.o_owl_badge_lead {
+    background: #f59e0b;
+    color: #1a1a1a;
+    font-variant-numeric: tabular-nums;
+}
+
+// 2026-06-27 — production-approval strip. Lives between StagePipeline
+// and HeaderStrip; surfaces approval state + MO preview + Request
+// Approval button so the dealer doesn't have to bounce into backend.
+.o_owl_approval_strip {
+    margin: 12px 0;
+    padding: 10px 14px;
+    background: var(--sb-paper, #f6f1e8);
+    border: 1px solid var(--sb-rule, #d8cebd);
+    border-radius: 4px;
+    border-left-width: 3px;
+
+    // State-specific accents.
+    &.o_owl_approval_pending  { border-left-color: #f59e0b; }
+    &.o_owl_approval_approved { border-left-color: #16a34a; }
+    &.o_owl_approval_rejected { border-left-color: #dc2626; }
+    &.o_owl_approval_none     { border-left-color: var(--sb-rule, #d8cebd); }
+}
+.o_owl_approval_main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    font-size: 13px;
+}
+.o_owl_approval_label {
+    font-weight: 600;
+    color: var(--sb-walnut, #4a3a2a);
+}
+.o_owl_approval_state {
+    font-weight: 600;
+
+    &.o_owl_approval_state_pending  { color: #b45309; }
+    &.o_owl_approval_state_approved { color: #16a34a; }
+    &.o_owl_approval_state_rejected { color: #dc2626; }
+    &.o_owl_approval_state_none     { color: var(--sb-ink-dim, #6b6b6b); }
+}
+.o_owl_approval_who {
+    color: var(--sb-ink-dim, #6b6b6b);
+    font-size: 12px;
+}
+.o_owl_approval_btn {
+    margin-left: auto;
+    background: var(--sb-walnut, #4a3a2a);
+    color: var(--sb-linen, #fdfbf6);
+    border: 1px solid var(--sb-walnut, #4a3a2a);
+    border-radius: 3px;
+    padding: 4px 12px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: opacity 0.12s ease;
+
+    &:hover:not(:disabled),
+    &:focus-visible:not(:disabled) {
+        opacity: 0.85;
+        outline: none;
+    }
+    &:disabled {
+        opacity: 0.5;
+        cursor: progress;
+    }
+}
+.o_owl_approval_preview {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--sb-rule, #d8cebd);
+    font-size: 12px;
+    color: var(--sb-ink-dim, #6b6b6b);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    align-items: baseline;
+}
+.o_owl_approval_preview_n {
+    color: var(--sb-walnut, #4a3a2a);
+    font-size: 14px;
+}
+.o_owl_approval_preview_chip {
+    color: var(--sb-walnut, #4a3a2a);
+}
+.o_owl_approval_reject_reason {
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: rgba(220, 38, 38, 0.06);
+    border-radius: 3px;
+    font-size: 12px;
+    color: #7f1d1d;
+}
+.o_owl_approval_blockers {
+    margin: 8px 0 0;
+    padding-left: 0;
+    list-style: none;
+    font-size: 12px;
+
+    li {
+        padding: 2px 0;
+        color: #b45309;
+    }
+}
+
+// 2026-06-27 — keyboard shortcut help dialog. Compact panel with
+// monospace key chips. Reuses .o_owl_modal_backdrop + _panel +
+// _header so visual style matches the catalog modal.
+.o_owl_shortcut_help_panel {
+    max-width: 380px;
+    padding-bottom: 18px;
+}
+.o_owl_shortcut_list {
+    list-style: none;
+    padding: 0 18px;
+    margin: 8px 0 0;
+
+    li {
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--sb-rule, #d8cebd);
+        font-size: 13px;
+
+        &:last-child { border-bottom: none; }
+
+        kbd {
+            display: inline-block;
+            min-width: 22px;
+            padding: 1px 6px;
+            margin: 0 2px;
+            background: var(--sb-paper, #f6f1e8);
+            border: 1px solid var(--sb-rule, #d8cebd);
+            border-bottom-width: 2px;
+            border-radius: 3px;
+            font-family: "JetBrains Mono", "Menlo", monospace;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--sb-walnut, #4a3a2a);
+            text-align: center;
+            line-height: 1.4;
+        }
+    }
+}
+
+// 2026-06-27 — inline qty stepper. Tabular-nums + walnut accent
+// so the number reads as a value, not chrome. Tight padding to
+// fit the existing `.o_owl_line_qty` cell footprint.
+.o_owl_line_qty_input {
+    width: 64px;
+    padding: 2px 6px;
+    text-align: right;
+    background: var(--sb-paper, #f6f1e8);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+    color: var(--sb-walnut, #4a3a2a);
+    transition: border-color 0.12s ease, background 0.12s ease;
+
+    &:hover,
+    &:focus {
+        border-color: var(--sb-rule, #d8cebd);
+        background: var(--sb-linen, #fdfbf6);
+        outline: none;
+    }
+    &:disabled {
+        opacity: 0.5;
+        cursor: progress;
+    }
+    /* Hide the spin buttons when the field isn't focused — keeps the
+       row clean and consistent with the read-only mono cells around it. */
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+        opacity: 0;
+        transition: opacity 0.12s ease;
+    }
+    &:focus::-webkit-inner-spin-button,
+    &:focus::-webkit-outer-spin-button {
+        opacity: 1;
+    }
+}
+
+// 2026-06-27 — Keep-open toggle in CatalogPicker header. Compact
+// inline label so it lives next to the cart-count chip without
+// crowding the title or × button.
+.o_owl_modal_keep_open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--sb-ink-dim, #6b6b6b);
+    cursor: pointer;
+    user-select: none;
+    margin-right: 10px;
+
+    input[type="checkbox"] {
+        accent-color: var(--sb-walnut, #4a3a2a);
+        margin: 0;
+    }
+}
+
+// 2026-06-27 — explicit per-line trash button (replaces the legacy
+// "⋯" placeholder when an onDelete handler is bound). Muted by
+// default to avoid pulling the eye, walnut on hover so the action
+// affordance is clear without being alarming.
+.o_owl_line_delete {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 6px;
+    cursor: pointer;
+    color: var(--sb-ink-dim, #6b6b6b);
+    font-size: 14px;
+    line-height: 1;
+    transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--sb-walnut, #4a3a2a);
+        background: var(--sb-paper, #f6f1e8);
+        border-color: var(--sb-rule, #d8cebd);
+        outline: none;
+    }
+}
+
 .o_owl_lines_empty {
     em { font-style: italic; color: var(--sb-ink-dim); }
 }
@@ -1474,6 +1700,41 @@
         margin: 6px 0 0;
         display: inline-block;
     }
+}
+
+// 2026-06-27 — discount % sub-line under the channel badge, so a
+// power user opening an order can verify "Contractor T3 −35%" at a
+// glance without expanding the badge tooltip.
+.o_owl_hs_discount {
+    margin-top: 4px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--sb-ink-dim, #6b6b6b);
+}
+
+// 2026-06-27 — Cabinet Mix cell (HeaderStrip glance check).
+// Chip layout: each family gets one inline pill with count + label.
+.o_owl_hs_mix .o_owl_hs_mix_value {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 2px;
+}
+.o_owl_hs_mix_chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 13px;
+}
+.o_owl_hs_mix_n {
+    font-weight: 600;
+    color: var(--sb-walnut, #4a3a2a);
+}
+.o_owl_hs_mix_lbl {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--sb-ink-dim, #6b6b6b);
+    text-transform: lowercase;
 }
 
 // Savings cell — value renders in success-green for the

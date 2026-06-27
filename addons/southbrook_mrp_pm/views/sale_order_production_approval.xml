@@ -47,6 +47,38 @@
             </header>
 
             <!--
+              ORDER MATTERS: Odoo applies inheritance operations in
+              DOCUMENT order. The Production Approval page must be
+              CREATED here first so the next xpath (`page[@name=
+              'production_approval'] position="after"`) can find it.
+              2026-06-27 fix — original commit ordered these the other
+              way around, which failed cold-load with "Element ...
+              cannot be located in parent view".
+            -->
+            <notebook position="inside">
+                <page name="production_approval"
+                      string="Production Approval"
+                      invisible="production_approval_state == 'none'">
+                    <group>
+                        <group string="Request">
+                            <field name="production_requested_by" readonly="1"/>
+                            <field name="production_requested_date" readonly="1"/>
+                        </group>
+                        <group string="Decision">
+                            <field name="production_approved_by" readonly="1"/>
+                            <field name="production_approved_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Rejection Reason"
+                           invisible="production_approval_state not in ('pending', 'rejected')">
+                        <field name="production_reject_reason"
+                               nolabel="1"
+                               placeholder="Required context when rejecting — shown to the requester."/>
+                    </group>
+                </page>
+            </notebook>
+
+            <!--
               W009 — Production-approval HARD GATE bypass.
               Manager-only (sales_team.group_sale_manager). Every flip
               of force_production_release is auto-tracked into chatter
@@ -75,29 +107,6 @@
                     </p>
                 </page>
             </xpath>
-
-            <notebook position="inside">
-                <page name="production_approval"
-                      string="Production Approval"
-                      invisible="production_approval_state == 'none'">
-                    <group>
-                        <group string="Request">
-                            <field name="production_requested_by" readonly="1"/>
-                            <field name="production_requested_date" readonly="1"/>
-                        </group>
-                        <group string="Decision">
-                            <field name="production_approved_by" readonly="1"/>
-                            <field name="production_approved_date" readonly="1"/>
-                        </group>
-                    </group>
-                    <group string="Rejection Reason"
-                           invisible="production_approval_state not in ('pending', 'rejected')">
-                        <field name="production_reject_reason"
-                               nolabel="1"
-                               placeholder="Required context when rejecting — shown to the requester."/>
-                    </group>
-                </page>
-            </notebook>
 
         </field>
     </record>

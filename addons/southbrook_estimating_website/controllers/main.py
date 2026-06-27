@@ -963,16 +963,50 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             return {"error": "forbidden"}
 
         # Apply qty update if present.
+        # 2026-06-27 — qty == 0 now deletes the line (was: error). This
+        # mirrors the new explicit /delete endpoint so the OWL trash-icon
+        # path and the qty-stepper-to-zero path both work without the
+        # frontend needing to branch. Hard cap at 999 prevents an
+        # accidental "1e9" paste from triggering an ORM amount overflow
+        # (per the backend review's P3 hardening item).
         if qty is not None:
             try:
                 qty_f = float(qty)
             except (TypeError, ValueError):
                 return {"error": "invalid_qty"}
-            if qty_f <= 0:
+            if qty_f < 0 or qty_f > 999:
                 return {"error": "invalid_qty"}
+            if qty_f == 0:
+                line.with_user(request.env.user).unlink()
+                return {"ok": True, "line_id": line_id, "deleted": True}
             line.with_user(request.env.user).product_uom_qty = qty_f
 
         return {"ok": True, "line_id": line.id}
+
+    # 2026-06-27 — explicit delete endpoint. Frontend can also reach
+    # delete via /update with qty=0, but a dedicated route reads better
+    # in logs + makes the trash-icon click handler unambiguous (no need
+    # for the OWL code to know about the qty=0 convention).
+    @http.route(
+        "/southbrook/api/line/<int:line_id>/delete",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_line_delete(self, line_id, **kw):
+        line = request.env["sale.order.line"].sudo().browse(line_id).exists()
+        if not line:
+            # Idempotent: already-gone is a success.
+            return {"ok": True, "line_id": line_id, "deleted": True}
+        try:
+            self._southbrook_resolve_order(line.order_id.id)
+        except (AccessError, MissingError):
+            return {"error": "forbidden"}
+        # Cannot delete from a confirmed/done order via portal.
+        if line.order_id.state not in ("draft", "sent"):
+            return {"error": "order_locked"}
+        line.with_user(request.env.user).unlink()
+        return {"ok": True, "line_id": line_id, "deleted": True}
 
     # G15 (customer-flow JTBD gap 2026-06-01) — line attribute picker
     # endpoints backing the inline drawer.
@@ -1648,21 +1682,187 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         # extension (Track 1 T1C6). Same env, same source of truth.
         return order.with_user(request.env.user).get_kitchen_3d_payload()
 
+    def _southbrook_order_signature(self, order):
+        """Cheap server-side change-detection signature for the order
+        payload. Includes everything the OWL store would notice as a
+        change:
+
+          • order.write_date + state (top-level shape)
+          • partner.write_date (channel/tier-driven price recompute)
+          • pricelist.write_date (rule edits)
+          • line count + id-sum (add/delete bumps even if line write_date
+            wouldn't move — e.g. a delete-then-readd of the same template)
+          • per-line write_date (qty / attribute / spec edits)
+
+        Returned as a "|"-joined string for human-readable log inspection.
+        Stable hashing is left to the caller (the value is short enough
+        to compare directly).
+        """
+        parts = [
+            order.write_date.isoformat() if order.write_date else "",
+            str(order.state or ""),
+            str(len(order.order_line)),
+            str(sum(line.id for line in order.order_line)),
+        ]
+        if order.partner_id and order.partner_id.write_date:
+            parts.append(order.partner_id.write_date.isoformat())
+        if order.pricelist_id and order.pricelist_id.write_date:
+            parts.append(order.pricelist_id.write_date.isoformat())
+        for line in order.order_line:
+            if line.write_date:
+                parts.append(line.write_date.isoformat())
+        return "|".join(parts)
+
     @http.route(
         "/southbrook/api/order/<int:order_id>",
         type="json",
         auth="user",
         methods=["POST"],
     )
-    def southbrook_api_order(self, order_id, **kw):
-        """Return the order shape for the OWL store."""
+    def southbrook_api_order(self, order_id, client_etag=None, **kw):
+        """Return the order shape for the OWL store.
+
+        2026-06-27 — accepts a `client_etag` from the OWL poll loop. When
+        the server-computed signature matches, return `{unchanged: True,
+        etag: <sig>}` in <5ms instead of rebuilding the ~80-SQL payload.
+        Backstops the existing client-side payload_hash (which still
+        catches false-positive ETag matches caused by clock skew or
+        derived-field drift the signature can't see).
+        """
         try:
             order = self._southbrook_resolve_order(order_id)
         except MissingError:
             return {"error": "not_found"}
         except AccessError:
             return {"error": "forbidden"}
-        return self._build_southbrook_order_payload(order)
+        sig = self._southbrook_order_signature(order)
+        if client_etag and client_etag == sig:
+            return {"unchanged": True, "etag": sig}
+        payload = self._build_southbrook_order_payload(order)
+        payload["etag"] = sig
+        return payload
+
+    # 2026-06-27 — preflight-confirm + MO preview.
+    #
+    # Pre-flight dry-run that returns the same data
+    # action_send_to_production would create, WITHOUT actually creating
+    # anything. The OWL confirm modal renders the preview so the user
+    # never clicks Confirm and gets a wall-of-text UserError popup
+    # from the gate (per the backend reviewer's P1 #7).
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/preflight-confirm",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_preflight_confirm(self, order_id, **kw):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        # MO preview — count lines with a resolvable BoM, grouped by
+        # product family for the "8 base · 3 wall · 1 tall MOs" copy.
+        mo_preview = []
+        unapproved_count = 0
+        Bom = request.env["mrp.bom"].sudo()
+        resolver = getattr(order, "_resolve_bom_for_line", None)
+        if resolver:
+            family_counts = {}
+            for line in order.order_line:
+                if not line.product_id or line.display_type:
+                    continue
+                bom = order._resolve_bom_for_line(Bom, line)
+                if not bom:
+                    continue
+                # Family lookup mirrors _build_southbrook_order_payload.
+                tmpl = line.product_id.product_tmpl_id
+                sku = tmpl.default_code if tmpl else ""
+                sku_row = request.env[
+                    "product.config.session"
+                ]._SKU_DEFAULTS.get(sku)
+                fam = (sku_row[0] if sku_row else "other").lower()
+                fam_bucket = "other"
+                for f in ("base", "wall", "tall", "island", "accessory"):
+                    if fam.startswith(f):
+                        fam_bucket = f
+                        break
+                family_counts[fam_bucket] = (
+                    family_counts.get(fam_bucket, 0) + 1
+                )
+            mo_preview = [
+                {"family": f, "count": family_counts[f]}
+                for f in ("base", "wall", "tall", "island", "accessory", "other")
+                if family_counts.get(f, 0) > 0
+            ]
+            unapproved_count = sum(family_counts.values())
+
+        # Blockers — pre-confirm validation summary.
+        blockers = []
+        approval_state = getattr(order, "production_approval_state", None)
+        if order.state == "sale" and approval_state in ("none", "rejected"):
+            blockers.append({
+                "code": "needs_production_approval",
+                "message": (
+                    "Production approval is required before Send to "
+                    "Manufacturing."
+                ),
+            })
+        if not order.order_line:
+            blockers.append({
+                "code": "empty_order",
+                "message": "Add at least one cabinet to the order.",
+            })
+        # Surface any hard-severity validation issues from the existing
+        # collector — those would also block confirmation downstream.
+        for v in self._southbrook_collect_validation(order):
+            if v.get("severity") == "hard":
+                blockers.append({
+                    "code": v.get("code", "validation"),
+                    "message": v.get("message", ""),
+                })
+
+        return {
+            "ok": True,
+            "can_confirm": not blockers,
+            "mo_preview": mo_preview,
+            "mo_total": unapproved_count,
+            "blockers": blockers,
+            "approval_state": approval_state,
+        }
+
+    # 2026-06-27 — request-production-approval. Thin portal wrapper
+    # around southbrook_mrp_pm's action_request_production so a dealer
+    # can advance the order without bouncing into the backend form.
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/request-production-approval",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_request_production_approval(
+        self, order_id, **kw,
+    ):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        if not hasattr(order, "action_request_production"):
+            return {"error": "not_supported"}
+        try:
+            order.with_user(request.env.user).action_request_production()
+        except Exception as e:
+            return {"error": "rejected", "message": str(e)[:300]}
+        return {
+            "ok": True,
+            "approval_state": getattr(
+                order, "production_approval_state", None,
+            ),
+        }
 
     def _southbrook_collect_validation(self, order):
         """Phase 3 Sprint B1 — produce ValidationStrip issue list.
@@ -1955,8 +2155,13 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         # Reading southbrook_lead_time_extra from the line's BoM if
         # one exists; orders with no BoM-resolved lines fall back to
         # the base 14.
+        # 2026-06-27 — also stamp per-line lead_time_days so the OWL
+        # OrderLine row can surface which cabinet is dragging the
+        # schedule. Manufacturing JTBD: one glance to spot the maple
+        # tall driving the whole order to 8wk.
         Bom = request.env["mrp.bom"].sudo()
-        lead_time_days = 14
+        BASE_LEAD = 14
+        lead_time_days = BASE_LEAD
         max_extra = 0
         for line in order.order_line:
             if not line.product_id:
@@ -1977,9 +2182,49 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 order="sequence, id",
                 limit=1,
             )
+            extra = 0
             if bom and hasattr(bom, "southbrook_lead_time_extra"):
-                max_extra = max(max_extra, bom.southbrook_lead_time_extra or 0)
+                extra = int(bom.southbrook_lead_time_extra or 0)
+                max_extra = max(max_extra, extra)
+            # Backfill the matching line_payload by line.id — payloads
+            # are keyed by line id in `lines`.
+            for lp in lines:
+                if lp["id"] == line.id:
+                    lp["lead_time_days"] = BASE_LEAD + extra
+                    break
+        # Lines that never matched (no BoM) fall back to the base.
+        for lp in lines:
+            lp.setdefault("lead_time_days", BASE_LEAD)
         lead_time_days += int(max_extra)
+
+        # 2026-06-27 — cabinet-class summary for the HeaderStrip glance
+        # check ("12 base · 8 wall · 3 tall"). Grouped by family (the
+        # cabinet's intrinsic class) so the count is independent of
+        # zone assignment. Order matches the standard kitchen layout
+        # convention (base → wall → tall → island → accessory).
+        family_order = ["base", "wall", "tall", "island", "accessory", "other"]
+        family_label = {
+            "base": "base",
+            "wall": "wall",
+            "tall": "tall",
+            "island": "island",
+            "accessory": "accessory",
+            "other": "other",
+        }
+        family_count_map = {f: 0 for f in family_order}
+        for lp in lines:
+            fam = (lp.get("family") or "other").lower()
+            # Normalise edge-case families ("base_2dr" → "base").
+            fam_bucket = next(
+                (f for f in family_order if fam.startswith(f)),
+                "other",
+            )
+            family_count_map[fam_bucket] += int(lp.get("qty") or 1)
+        family_counts = [
+            {"code": f, "label": family_label[f], "count": family_count_map[f]}
+            for f in family_order
+            if family_count_map[f] > 0
+        ]
 
         # T2C11 — BoM rollup across the order's SB cabinets. Computes
         # panel + hardware + edge-banding totals by calling Phase-1
@@ -2060,6 +2305,14 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         #      the OCA validator already detected.
         validation = self._southbrook_collect_validation(order)
 
+        # 2026-06-27 — gate IllustrativeBanner on the canonical config_param.
+        # Default 'canonical' so an unseeded prod DB does NOT show "ILLUSTRATIVE
+        # SEED · Demo numbers" to real customers. The seeded value remains
+        # 'illustrative' so dev databases keep the warning.
+        seed_mode = request.env["ir.config_parameter"].sudo().get_param(
+            "southbrook.seed_mode", default="canonical",
+        )
+
         return {
             "order": {
                 "id":             order.id,
@@ -2073,6 +2326,7 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 "channel_label":  channel_label,
                 "channel_css":    channel_css,
                 "tradesperson_tier": tier,
+                "seed_mode":      seed_mode,
                 "pricelist_id":   order.pricelist_id.id if order.pricelist_id else None,
                 "pricelist_name": order.pricelist_id.name if order.pricelist_id else "",
                 "discount_pct":   discount_pct,
@@ -2105,9 +2359,29 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                     order._southbrook_history_chain()
                     if hasattr(order, "_southbrook_history_chain") else []
                 ),
+                # 2026-06-27 — production-approval surfaces. Optional
+                # (defaults to None) so the page renders cleanly even
+                # when southbrook_mrp_pm isn't installed. The OWL
+                # chip + Request-Approval button are gated on
+                # production_approval_state being non-null.
+                "production_approval_state": getattr(
+                    order, "production_approval_state", None,
+                ),
+                "production_requested_by_name": (
+                    getattr(order, "production_requested_by", False)
+                    and order.production_requested_by.name
+                ) or "",
+                "production_approved_by_name": (
+                    getattr(order, "production_approved_by", False)
+                    and order.production_approved_by.name
+                ) or "",
+                "production_reject_reason": (
+                    getattr(order, "production_reject_reason", "") or ""
+                ),
             },
             "lines": lines,
             "zones": zones,
+            "family_counts": family_counts,
             "bom_rollup": bom_rollup,
             "validation": validation,
         }

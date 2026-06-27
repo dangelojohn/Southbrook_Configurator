@@ -32,7 +32,7 @@
  *     },
  *   };
  */
-import { Component, mount, markup, onMounted, onWillUnmount, useState, xml } from "@odoo/owl";
+import { Component, mount, markup, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
 import { RoomLayoutTab, AssignToWallModal, GapRecommendModal } from "@southbrook_estimating_website/js/room_layout.esm";
@@ -193,7 +193,7 @@ class OrderTitlebar extends Component {
 class StagePipeline extends Component {
     static template = xml`
         <div class="o_owl_stages">
-            <t t-foreach="_stages" t-as="stage" t-key="stage_index">
+            <t t-foreach="_stages" t-as="stage" t-key="stage.label">
                 <div class="o_owl_stage"
                      t-att-class="{
                          'o_owl_stage_done':    stage_index &lt; currentIdx,
@@ -385,6 +385,68 @@ class FooterActions extends Component {
                  variant-BoM snapshot fields, this modal will also
                  show the cut spec + BoM versions per line. For now
                  it shows what's already in the payload. -->
+            <!-- 2026-06-27 — Send-to-Manufacturing review modal.
+                 Parallel to the Send-to-Production modal below; shows
+                 MO preview + blockers fetched on click via the parent's
+                 loadPreflight. Replaces a tab-blocking window.confirm. -->
+            <div t-if="state.confirmingMfg" class="o_owl_modal_backdrop"
+                 t-on-click="_onCancelMfg">
+                <div class="o_owl_modal"
+                     t-on-click="(ev) => ev.stopPropagation()"
+                     role="dialog"
+                     aria-modal="true"
+                     aria-label="Send to Manufacturing — review">
+                    <header class="o_owl_modal_head">
+                        <h2 class="o_owl_modal_title">Send to Manufacturing?</h2>
+                        <p class="o_owl_modal_sub">
+                            This creates a Manufacturing Order for every
+                            cabinet line with a resolvable BoM. Existing
+                            MOs (from a prior send) are reused — nothing
+                            is duplicated.
+                        </p>
+                    </header>
+                    <dl class="o_owl_modal_review">
+                        <dt>Order</dt>
+                        <dd t-esc="props.order.name"/>
+                        <dt>Lines</dt>
+                        <dd><t t-esc="props.order.line_count"/> cabinets</dd>
+                        <dt t-if="state.mfgPreview">MOs to create</dt>
+                        <dd t-if="state.mfgPreview">
+                            <strong class="mono"
+                                    t-esc="state.mfgPreview.mo_total"/>
+                            <t t-if="state.mfgPreview.mo_preview &amp;&amp; state.mfgPreview.mo_preview.length">
+                                ·
+                                <t t-foreach="state.mfgPreview.mo_preview"
+                                   t-as="grp" t-key="grp.family">
+                                    <span class="o_owl_approval_preview_chip">
+                                        <strong t-esc="grp.count"/>&#160;<t t-esc="grp.family"/>
+                                    </span><t t-if="!grp_last">, </t>
+                                </t>
+                            </t>
+                        </dd>
+                    </dl>
+                    <ul t-if="state.mfgPreview &amp;&amp; state.mfgPreview.blockers &amp;&amp; state.mfgPreview.blockers.length"
+                        class="o_owl_approval_blockers">
+                        <li t-foreach="state.mfgPreview.blockers"
+                            t-as="b" t-key="b.code">
+                            ⚠ <t t-esc="b.message"/>
+                        </li>
+                    </ul>
+                    <footer class="o_owl_modal_foot">
+                        <button class="o_owl_btn o_owl_btn_secondary"
+                                t-on-click="_onCancelMfg"
+                                t-att-disabled="props.busy">
+                            Cancel
+                        </button>
+                        <button class="o_owl_btn o_owl_btn_primary"
+                                t-on-click="_onApproveMfg"
+                                t-att-disabled="props.busy">
+                            Send to Manufacturing
+                        </button>
+                    </footer>
+                </div>
+            </div>
+
             <div t-if="state.confirming" class="o_owl_modal_backdrop"
                  t-on-click="_onCancelConfirm">
                 <div class="o_owl_modal"
@@ -440,6 +502,10 @@ class FooterActions extends Component {
         onAction: Function,
         busy: { type: Boolean, optional: true },
         mode: { type: String, optional: true },
+        // 2026-06-27 — used by the Send-to-Mfg review modal to fetch
+        // MO preview + blockers before the irreversible commit. Optional
+        // for forward-compat with parents that don't wire it.
+        loadPreflight: { type: Function, optional: true },
     };
 
     setup() {
@@ -449,6 +515,12 @@ class FooterActions extends Component {
             // toggled false on Cancel, on Confirm-Send, or on
             // backdrop click. Customer mode never opens this modal.
             confirming: false,
+            // 2026-06-27 — Send-to-Manufacturing review modal (replaces
+            // the legacy window.confirm). Same UX shape as the Send-to-
+            // Production modal so users see a consistent review pattern.
+            confirmingMfg: false,
+            // Lazy-loaded preflight payload populated by _onSendToMfgClick.
+            mfgPreview: null,
         });
     }
 
@@ -488,16 +560,31 @@ class FooterActions extends Component {
         return this.props.order?.state === "sale";
     }
 
-    _onSendToMfgClick = () => {
+    // 2026-06-27 — Send-to-Mfg now uses the same inline review modal as
+    // Send-to-Production. window.confirm is a tab-blocking native prompt
+    // with zero context; the modal shows MO preview + blocker list so
+    // the user sees what they're committing to. Pre-fetches the preview
+    // before opening so the modal renders with data.
+    _onSendToMfgClick = async () => {
         if (!this._canSendToMfg()) return;
-        const msg = "Send all cabinets in this order to manufacturing? "
-                  + "This creates an MO for every cabinet line with a "
-                  + "BoM. Existing MOs (e.g. from a prior Send) are "
-                  + "reused — nothing is duplicated.";
-        if (typeof window !== "undefined" && window.confirm
-            && !window.confirm(msg)) {
-            return;
+        if (this.props.loadPreflight) {
+            this.state.mfgPreview = null;
+            this.state.confirmingMfg = true;
+            const res = await this.props.loadPreflight();
+            if (res && res.ok) this.state.mfgPreview = res;
+        } else {
+            // Forward-compat: parent didn't wire loadPreflight (older
+            // template). Open the modal anyway with no preview block.
+            this.state.confirmingMfg = true;
         }
+    };
+
+    _onCancelMfg = () => {
+        this.state.confirmingMfg = false;
+    };
+
+    _onApproveMfg = () => {
+        this.state.confirmingMfg = false;
         this.props.onAction("send_to_manufacturing");
     };
 
@@ -728,7 +815,7 @@ class ValidationStrip extends Component {
             </t>
             <t t-else="">
                 <ul class="o_owl_validation_list">
-                    <t t-foreach="props.issues" t-as="issue" t-key="issue_index">
+                    <t t-foreach="props.issues" t-as="issue" t-key="issue.severity + '::' + issue.message">
                         <li class="o_owl_validation_item"
                             t-att-class="'o_owl_validation_' + issue.severity">
                             <span class="o_owl_validation_sev mono">
@@ -921,7 +1008,7 @@ class ConfigDrawer extends Component {
                 </div>
                 <ul class="o_owl_drawer_validation_list">
                     <li t-foreach="props.lineIssues || []"
-                        t-as="iss" t-key="iss_index"
+                        t-as="iss" t-key="iss.severity + '::' + iss.message"
                         t-att-class="'o_owl_drawer_validation_item o_owl_dv_' + iss.severity">
                         <span class="o_owl_dv_sev mono"
                               t-esc="iss.severity.toUpperCase()"/>
@@ -1087,8 +1174,13 @@ class ConfigDrawer extends Component {
 class OrderLine extends Component {
     static template = xml`
         <div class="o_owl_line"
+             role="button"
+             tabindex="0"
+             t-att-aria-pressed="props.isSelected ? 'true' : 'false'"
+             t-att-aria-label="'Line ' + props.line.sequence + ': ' + props.line.product_name + (props.line.spec_summary ? ' — ' + props.line.spec_summary : '')"
              t-att-class="{ 'o_owl_line_selected': props.isSelected }"
-             t-on-click="() => props.onSelect(props.line.id)">
+             t-on-click="() => props.onSelect(props.line.id)"
+             t-on-keydown="_onKeydown">
             <div class="o_owl_lineno" t-esc="props.line.sequence"/>
             <div class="o_owl_line_tpl">
                 <t t-esc="props.line.product_name"/>
@@ -1112,21 +1204,156 @@ class OrderLine extends Component {
                       class="o_owl_badge o_owl_badge_rule">
                     RULE
                 </span>
+                <!-- 2026-06-27 — per-line lead time chip. Highlights as
+                     'long' when this line exceeds the order's base lead
+                     time (14d shop default), making the schedule-driving
+                     cabinet visible at a glance. -->
+                <span t-if="props.line.lead_time_days > 14"
+                      class="o_owl_badge o_owl_badge_lead"
+                      t-att-title="'Lead time: ' + props.line.lead_time_days + ' days'">
+                    +<t t-esc="props.line.lead_time_days - 14"/>d
+                </span>
             </div>
-            <div class="o_owl_line_qty mono" t-esc="props.line.qty"/>
+            <!-- 2026-06-27 — inline qty stepper. Edits autosave on blur
+                 or Enter via the parent's onQtyChange handler; no need
+                 to expand the ConfigDrawer for a qty bump. Click is
+                 stopped from bubbling to the row so the drawer doesn't
+                 toggle when the user means to edit qty. -->
+            <div class="o_owl_line_qty"
+                 t-on-click.stop=""
+                 t-on-keydown.stop="">
+                <input t-if="props.onQtyChange"
+                       type="number"
+                       class="o_owl_line_qty_input mono"
+                       min="0"
+                       max="999"
+                       step="1"
+                       t-att-value="state.localQty"
+                       t-on-input="_onQtyInput"
+                       t-on-blur="_commitQty"
+                       t-on-keydown="_onQtyKeydown"
+                       t-att-aria-label="'Quantity for line ' + props.line.sequence"
+                       t-att-disabled="state.qtyBusy ? 'disabled' : ''"/>
+                <span t-else="" class="mono" t-esc="props.line.qty"/>
+            </div>
             <div class="o_owl_line_price o_owl_line_retail mono"
                  t-esc="fmtUsd(props.line.retail_price)"/>
             <div class="o_owl_line_price mono"
                  t-esc="fmtUsd(props.line.channel_price)"/>
-            <div class="o_owl_line_menu">⋯</div>
+            <div class="o_owl_line_menu">
+                <!-- 2026-06-27 — explicit delete affordance. Trash icon
+                     with stopPropagation so the row-click (open drawer)
+                     doesn't fire. onDelete is optional so customer-view
+                     mounts that don't want delete-by-default can omit it. -->
+                <button t-if="props.onDelete"
+                        type="button"
+                        class="o_owl_line_delete"
+                        t-att-aria-label="'Remove line ' + props.line.sequence + ': ' + props.line.product_name"
+                        t-on-click.stop="_onDeleteClick"
+                        t-on-keydown.stop="_onDeleteKeydown">
+                    🗑
+                </button>
+                <span t-else="" aria-hidden="true">⋯</span>
+            </div>
         </div>
     `;
     static props = {
         line: Object,
         isSelected: { type: Boolean, optional: true },
         onSelect: Function,
+        onDelete: { type: Function, optional: true },
+        // 2026-06-27 — inline qty stepper. Optional so customer-view
+        // mounts that want qty-locked can omit and the cell renders
+        // read-only.
+        onQtyChange: { type: Function, optional: true },
     };
     fmtUsd = fmtUsd;
+
+    setup() {
+        // Local qty buffer so typing doesn't fight an in-flight server
+        // round-trip. Reconciled to props.line.qty on every patch when
+        // the user isn't actively editing.
+        this.state = useState({
+            localQty: String(this.props.line.qty || 0),
+            qtyBusy: false,
+            qtyDirty: false,
+        });
+        onWillUpdateProps((next) => {
+            // Only refresh the buffer when the user isn't mid-edit.
+            // Otherwise their keystrokes would race with the server.
+            if (!this.state.qtyDirty) {
+                this.state.localQty = String(next.line.qty || 0);
+            }
+        });
+    }
+
+    // 2026-06-27 a11y: keyboard-only sales reps can now Enter/Space-toggle
+    // a line (matching the click handler). Without this, keyboard users
+    // couldn't open the ConfigDrawer at all.
+    _onKeydown(ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this.props.onSelect(this.props.line.id);
+        }
+    }
+
+    _onDeleteClick(ev) {
+        ev.preventDefault();
+        if (this.props.onDelete) {
+            this.props.onDelete(this.props.line.id);
+        }
+    }
+
+    _onDeleteKeydown(ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            if (this.props.onDelete) {
+                this.props.onDelete(this.props.line.id);
+            }
+        }
+    }
+
+    _onQtyInput(ev) {
+        this.state.localQty = ev.target.value;
+        this.state.qtyDirty = true;
+    }
+
+    _onQtyKeydown(ev) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            ev.target.blur();
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this.state.localQty = String(this.props.line.qty || 0);
+            this.state.qtyDirty = false;
+            ev.target.blur();
+        }
+    }
+
+    async _commitQty() {
+        if (!this.state.qtyDirty) return;
+        const next = Number(this.state.localQty);
+        if (!Number.isFinite(next) || next < 0 || next > 999) {
+            // Revert on invalid input. Clamps + bounds-check is also done
+            // server-side (qty<0 / qty>999 → invalid_qty), but bouncing
+            // here gives instant feedback.
+            this.state.localQty = String(this.props.line.qty || 0);
+            this.state.qtyDirty = false;
+            return;
+        }
+        if (next === Number(this.props.line.qty)) {
+            // No-op (user blurred without changing). Just drop the dirty flag.
+            this.state.qtyDirty = false;
+            return;
+        }
+        this.state.qtyBusy = true;
+        try {
+            await this.props.onQtyChange(this.props.line.id, next);
+        } finally {
+            this.state.qtyBusy = false;
+            this.state.qtyDirty = false;
+        }
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -1183,7 +1410,9 @@ class ZoneGroup extends Component {
                            t-esc="_chipDot(chipStatus)"/>
                     <OrderLine line="line"
                                isSelected="line.id === props.selectedLineId"
-                               onSelect="props.onSelectLine"/>
+                               onSelect="props.onSelectLine"
+                               onDelete="props.onDeleteLine"
+                               onQtyChange="props.onLineQtyChange"/>
                     <!-- T2C10 — ConfigDrawer expands below the selected line,
                          spanning all 8 columns of the parent grid. -->
                     <ConfigDrawer t-if="line.id === props.selectedLineId"
@@ -1234,6 +1463,14 @@ class ZoneGroup extends Component {
         onSelectLine: Function,
         onLineSaved: Function,
         onAddToZone: Function,
+        // 2026-06-27 — explicit per-line delete (trash icon).
+        // Optional so customer-view mounts can omit and the line just
+        // renders the legacy "⋯" placeholder. The OrderBuilder passes
+        // a bound handler that confirms + RPCs + reloads.
+        onDeleteLine: { type: Function, optional: true },
+        // 2026-06-27 — inline qty stepper handler. Same optionality:
+        // omit and the line renders read-only qty.
+        onLineQtyChange: { type: Function, optional: true },
         // Phase 3 Sprint C2 — issuesForLine(line_id) -> Array of
         // validation issues filtered to the given line.
         issuesForLine: Function,
@@ -1404,6 +1641,148 @@ class TabBar extends Component {
 }
 
 // ----------------------------------------------------------------------
+// ProductionApprovalStrip — 2026-06-27.
+//
+// Surfaces production_approval_state inline so a dealer can advance the
+// order without bouncing into the backend form. Renders nothing when the
+// payload omits production_approval_state (forward-compat with installs
+// where southbrook_mrp_pm isn't present).
+//
+// State copy:
+//   • none       — "Approval not requested" + Request button (only when
+//                  order.state == 'sale')
+//   • pending    — "Awaiting approval (requested by X)" + MO preview
+//   • approved   — "✓ Approved by X" + link/count of MOs created
+//   • rejected   — "✗ Rejected: <reason>" + Request-again button
+//
+// MO preview is fetched lazily on mount via /preflight-confirm so we
+// don't pay the BoM-resolve loop on every poll. Refetched when the
+// state field flips.
+// ----------------------------------------------------------------------
+
+class ProductionApprovalStrip extends Component {
+    static template = xml`
+        <div t-if="props.order &amp;&amp; props.order.production_approval_state"
+             class="o_owl_approval_strip"
+             t-att-class="'o_owl_approval_' + props.order.production_approval_state">
+
+            <div class="o_owl_approval_main">
+                <span class="o_owl_approval_label">Production Approval:</span>
+                <span class="o_owl_approval_state"
+                      t-att-class="'o_owl_approval_state_' + props.order.production_approval_state">
+                    <t t-if="props.order.production_approval_state === 'none'">Not requested</t>
+                    <t t-elif="props.order.production_approval_state === 'pending'">⏳ Pending</t>
+                    <t t-elif="props.order.production_approval_state === 'approved'">✓ Approved</t>
+                    <t t-elif="props.order.production_approval_state === 'rejected'">✗ Rejected</t>
+                </span>
+                <span t-if="props.order.production_approval_state === 'pending' &amp;&amp; props.order.production_requested_by_name"
+                      class="o_owl_approval_who">
+                    by <t t-esc="props.order.production_requested_by_name"/>
+                </span>
+                <span t-if="props.order.production_approval_state === 'approved' &amp;&amp; props.order.production_approved_by_name"
+                      class="o_owl_approval_who">
+                    by <t t-esc="props.order.production_approved_by_name"/>
+                </span>
+                <button t-if="_canRequest()"
+                        type="button"
+                        class="o_owl_approval_btn"
+                        t-att-disabled="state.busy ? 'disabled' : ''"
+                        t-on-click="_onRequest">
+                    <t t-if="state.busy">Requesting…</t>
+                    <t t-elif="props.order.production_approval_state === 'rejected'">Re-request Approval</t>
+                    <t t-else="">Request Production Approval</t>
+                </button>
+            </div>
+
+            <!-- MO preview: visible while in 'none' / 'pending' / 'rejected'
+                 so the user always knows what's about to be created. Hidden
+                 when state is 'approved' (the MOs already exist). -->
+            <div t-if="state.preview &amp;&amp; props.order.production_approval_state !== 'approved'"
+                 class="o_owl_approval_preview">
+                <span class="o_owl_approval_preview_label">Would create</span>
+                <strong class="o_owl_approval_preview_n mono"
+                        t-esc="state.preview.mo_total"/>
+                <span>MO<t t-if="state.preview.mo_total !== 1">s</t></span>
+                <span t-if="state.preview.mo_preview &amp;&amp; state.preview.mo_preview.length"
+                      class="o_owl_approval_preview_breakdown">
+                    (<t t-foreach="state.preview.mo_preview" t-as="grp" t-key="grp.family">
+                        <span class="o_owl_approval_preview_chip">
+                            <strong t-esc="grp.count"/>&#160;<t t-esc="grp.family"/>
+                        </span><t t-if="!grp_last">, </t>
+                    </t>)
+                </span>
+            </div>
+
+            <!-- Rejected: surface reason inline so the user knows what to fix. -->
+            <div t-if="props.order.production_approval_state === 'rejected' &amp;&amp; props.order.production_reject_reason"
+                 class="o_owl_approval_reject_reason">
+                <strong>Reason:</strong>
+                <t t-esc="props.order.production_reject_reason"/>
+            </div>
+
+            <!-- Blockers (e.g. validation issues that would fail the gate). -->
+            <ul t-if="state.preview &amp;&amp; state.preview.blockers &amp;&amp; state.preview.blockers.length"
+                class="o_owl_approval_blockers">
+                <li t-foreach="state.preview.blockers" t-as="b" t-key="b.code">
+                    ⚠ <t t-esc="b.message"/>
+                </li>
+            </ul>
+        </div>
+    `;
+    static props = {
+        order: Object,
+        onRequestApproval: Function,
+        loadPreflight: Function,
+    };
+
+    setup() {
+        this.state = useState({ busy: false, preview: null });
+        onMounted(() => this._refreshPreview());
+        onWillUpdateProps((next) => {
+            // Refetch preview when the approval state shifts so the
+            // banner copy doesn't drift.
+            const oldState = (this.props.order || {}).production_approval_state;
+            const newState = (next.order || {}).production_approval_state;
+            if (oldState !== newState) {
+                this._refreshPreview();
+            }
+        });
+    }
+
+    async _refreshPreview() {
+        try {
+            const res = await this.props.loadPreflight();
+            if (res && res.ok) {
+                this.state.preview = res;
+            }
+        } catch (e) {
+            // Silent — the chip still renders, only the preview hides.
+        }
+    }
+
+    _canRequest() {
+        const o = this.props.order || {};
+        const st = o.production_approval_state;
+        // Only confirmed (sale state) orders can request approval per
+        // action_request_production's own guard. Drafts must be Confirmed
+        // first (Send-to-Manufacturing path).
+        return o.state === "sale" && (st === "none" || st === "rejected");
+    }
+
+    async _onRequest() {
+        this.state.busy = true;
+        try {
+            const res = await this.props.onRequestApproval();
+            if (res && res.ok) {
+                await this._refreshPreview();
+            }
+        } finally {
+            this.state.busy = false;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
 // HeaderStrip — T2C6.
 //
 // The 5-cell row at the top of the OrderBuilder (per mockup §HeaderStrip):
@@ -1429,9 +1808,28 @@ class HeaderStrip extends Component {
                     </span>
                 </div>
                 <span class="o_owl_channel_badge"
-                      t-att-class="'o_owl_channel_' + props.order.channel_css">
+                      t-att-class="'o_owl_channel_' + props.order.channel_css"
+                      t-att-title="'Pricelist: ' + (props.order.pricelist_name || '')">
                     <t t-esc="props.order.channel_label"/>
                 </span>
+                <div t-if="props.order.discount_pct > 0"
+                     class="o_owl_hs_discount mono">
+                    −<t t-esc="props.order.discount_pct"/>% applied
+                </div>
+            </div>
+            <div t-if="props.familyCounts &amp;&amp; props.familyCounts.length"
+                 class="o_owl_hs_cell o_owl_hs_mix">
+                <div class="o_owl_hs_label">Cabinet Mix</div>
+                <div class="o_owl_hs_value o_owl_hs_mix_value">
+                    <t t-foreach="props.familyCounts" t-as="fc" t-key="fc.code">
+                        <span class="o_owl_hs_mix_chip">
+                            <span class="o_owl_hs_mix_n mono"
+                                  t-esc="fc.count"/>
+                            <span class="o_owl_hs_mix_lbl"
+                                  t-esc="fc.label"/>
+                        </span>
+                    </t>
+                </div>
             </div>
             <div class="o_owl_hs_cell">
                 <div class="o_owl_hs_label">Retail Subtotal</div>
@@ -1462,6 +1860,7 @@ class HeaderStrip extends Component {
     `;
     static props = {
         order: Object,
+        familyCounts: { type: Array, optional: true },
     };
 
     // Expose the shared formatter on the component instance so the
@@ -1626,6 +2025,18 @@ class CatalogPicker extends Component {
                         <t t-else=""> cabinets</t>
                         on order
                     </span>
+                    <!-- 2026-06-27 — Keep-open toggle for bulk-add. Default
+                         (off) closes the modal ~1.5s after a successful add
+                         so SKU-known single-adds are 1 click. Power users
+                         doing 30 cabinets tick this and stay open. -->
+                    <label t-if="props.onKeepOpenChange"
+                           class="o_owl_modal_keep_open">
+                        <input type="checkbox"
+                               t-att-checked="props.keepOpen ? 'checked' : ''"
+                               t-on-change="_onKeepOpenChange"
+                               aria-label="Keep catalog open after each add"/>
+                        Keep open
+                    </label>
                     <button type="button" class="o_owl_modal_close"
                             t-on-click="_onCloseClick"
                             aria-label="Close">×</button>
@@ -1885,6 +2296,12 @@ class CatalogPicker extends Component {
         cartCount: {
             type: [Number, { value: null }], optional: true,
         },
+        // 2026-06-27 — Keep-open toggle. False = default = single Add
+        // auto-closes the modal ~1.5s after success. True = stays open
+        // for bulk-add. Owned by the parent so the preference can
+        // survive close/reopen cycles within the same tab.
+        keepOpen: { type: Boolean, optional: true },
+        onKeepOpenChange: { type: Function, optional: true },
     };
 
     // Module-level helpers exposed as instance fields so the template
@@ -2145,6 +2562,16 @@ class CatalogPicker extends Component {
         }
     }
 
+    // 2026-06-27 — Keep-open toggle change handler. Bubbles the boolean
+    // up to the parent OrderBuilder so the preference is owned at the
+    // session level (a power user who reopens the catalog gets their
+    // toggle state back).
+    _onKeepOpenChange(ev) {
+        if (this.props.onKeepOpenChange) {
+            this.props.onKeepOpenChange(!!(ev && ev.target && ev.target.checked));
+        }
+    }
+
     // P2 bugfix 2026-06-22: stable × handler. Important: stop event
     // propagation so it doesn't bubble to the backdrop and double-fire
     // (some browsers fire both with overlapping z-stacks), and prevent
@@ -2290,6 +2717,34 @@ const TEMPLATE = xml`
             </div>
         </div>
 
+        <!-- 2026-06-27 — keyboard shortcut help dialog (triggered by ?).
+             Lives at the top so it overlays all tab content. Escape
+             closes via the global keydown handler. -->
+        <div t-if="state.ui.shortcut_help_open"
+             class="o_owl_modal_backdrop"
+             t-on-click="() => state.ui.shortcut_help_open = false">
+            <div class="o_owl_modal_panel o_owl_shortcut_help_panel"
+                 t-on-click.stop=""
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Keyboard shortcuts">
+                <div class="o_owl_modal_header">
+                    <h3 class="o_owl_modal_title">Keyboard shortcuts</h3>
+                    <button type="button" class="o_owl_modal_close"
+                            t-on-click="() => state.ui.shortcut_help_open = false"
+                            aria-label="Close">×</button>
+                </div>
+                <ul class="o_owl_shortcut_list">
+                    <li><kbd>1</kbd>–<kbd>9</kbd> — switch tab</li>
+                    <li><kbd>n</kbd> — open catalog</li>
+                    <li><kbd>/</kbd> — focus catalog search (opens if needed)</li>
+                    <li><kbd>?</kbd> — show this help</li>
+                    <li><kbd>Esc</kbd> — close modals</li>
+                    <li><kbd>Enter</kbd> / <kbd>Space</kbd> — open the focused line</li>
+                </ul>
+            </div>
+        </div>
+
         <!-- Loading -->
         <div t-if="state.loading" class="o_owl_loading_card">
             <p class="o_owl_status">Loading order…</p>
@@ -2336,18 +2791,37 @@ const TEMPLATE = xml`
                            channelLabel="state.channel_label"
                            zoneFilter="state.ui.catalog_zone_filter"
                            cartCount="state.lines.length"
+                           keepOpen="state.ui.catalog_keep_open"
+                           onKeepOpenChange="_setCatalogKeepOpen"
                            onClose="_closeCatalog"
                            onPick="_onPickCabinet"/>
 
-            <!-- Chrome (T2C7) — banner + titlebar + stages. -->
-            <IllustrativeBanner show="true"/>
+            <!-- Chrome (T2C7) — banner + titlebar + stages.
+                 2026-06-27 — banner now reads server-side seed_mode (default
+                 'canonical' = hidden) so live customers don't see "ILLUSTRATIVE
+                 SEED · Demo numbers" on their real quote. Toggle via
+                 ir.config_parameter southbrook.seed_mode='illustrative' for
+                 dev/staging databases. -->
+            <IllustrativeBanner show="state.order.seed_mode === 'illustrative'"/>
             <OrderTitlebar order="state.order"
                            mode="props.mode || 'dealer'"/>
             <StagePipeline order="state.order"
                            mode="props.mode || 'dealer'"/>
 
-            <!-- HeaderStrip (T2C6) — reads order header from state. -->
-            <HeaderStrip order="state.order"/>
+            <!-- 2026-06-27 — production-approval strip. Renders nothing
+                 when mrp_pm isn't installed (payload omits the field).
+                 When present, surfaces approval state + Request button
+                 + MO preview inline so the dealer doesn't need to bounce
+                 into the backend form. -->
+            <ProductionApprovalStrip order="state.order"
+                                     onRequestApproval="_onRequestApproval"
+                                     loadPreflight="_loadPreflight"/>
+
+            <!-- HeaderStrip (T2C6) — reads order header from state.
+                 2026-06-27 — also takes family_counts for the new
+                 Cabinet Mix glance cell. -->
+            <HeaderStrip order="state.order"
+                         familyCounts="state.family_counts"/>
 
             <!-- TabBar (T2C8) — client-side panel switch. -->
             <TabBar tabs="_tabs"
@@ -2589,7 +3063,7 @@ const TEMPLATE = xml`
                         </button>
                         <ul t-if="state.ui.warnings_expanded"
                             class="sb-room-warn-list">
-                            <li t-foreach="warnings" t-as="w" t-key="w_index"
+                            <li t-foreach="warnings" t-as="w" t-key="w"
                                 class="sb-room-warn-item"
                                 t-esc="w"/>
                         </ul>
@@ -2607,6 +3081,8 @@ const TEMPLATE = xml`
                                onSelectLine="_setSelectedLine"
                                onLineSaved="_onLineSaved"
                                onAddToZone="_onAddToZone"
+                               onDeleteLine="_onDeleteLine"
+                               onLineQtyChange="_onLineQtyChange"
                                issuesForLine="_issuesForLine"
                                room="state.room"
                                unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"/>
@@ -2694,11 +3170,15 @@ const TEMPLATE = xml`
                 </p>
             </div>
 
-            <!-- T2C12 — FooterActions row -->
+            <!-- T2C12 — FooterActions row.
+                 2026-06-27 — passes loadPreflight so the Send-to-Mfg
+                 review modal can show MO preview + blockers before the
+                 irreversible commit. -->
             <FooterActions order="state.order"
                            onAction.bind="_onFooterAction"
                            busy="state.action_busy"
-                           mode="props.mode || 'dealer'"/>
+                           mode="props.mode || 'dealer'"
+                           loadPreflight="_loadPreflight"/>
 
             <div t-if="state.action_message" class="o_owl_action_msg"
                  t-esc="state.action_message"/>
@@ -2752,6 +3232,7 @@ class OrderBuilder extends Component {
         IllustrativeBanner,
         OrderTitlebar,
         StagePipeline,
+        ProductionApprovalStrip,
         HeaderStrip,
         TabBar,
         ZoneGroup,
@@ -2798,10 +3279,18 @@ class OrderBuilder extends Component {
             // OWL doesn't even reconcile (avoids any chance of resetting
             // child reactivity on a no-op).
             payload_hash: "",
+            // 2026-06-27 — server-issued ETag, sent back on each poll
+            // for sub-5ms unchanged-response short-circuit. Empty on
+            // first paint so the initial fetch always returns the
+            // full payload + the first ETag.
+            payload_etag: "",
             error: null,
             order: null,
             lines: [],
             zones: [],
+            // 2026-06-27 — cabinet-class summary for HeaderStrip glance
+            // check. Empty list hides the cell until first payload arrives.
+            family_counts: [],
             // P1 bugfix 2026-06-22: confirmation toasts. Each toast is
             // {id, text, kind: 'success'|'error'}; renders top-right and
             // auto-dismisses after ~3s via setTimeout.
@@ -2856,6 +3345,13 @@ class OrderBuilder extends Component {
                 selected_line_id: null,
                 // G11 — modal visibility.
                 catalog_open: false,
+                // 2026-06-27 — when false (default), single Add auto-closes
+                // the modal ~1.5s after success. When true (user toggled
+                // "Keep open for bulk-add"), the modal stays open and the
+                // user closes it manually. The toggle is sticky for the
+                // tab lifetime so a power user doing 30 cabinets isn't
+                // forced to re-tick it on every modal open.
+                catalog_keep_open: false,
                 // Phase 3 Sprint C1 — when the user clicks "+ Add to
                 // <zone>", we stash the zone code here so the
                 // CatalogPicker can pre-filter to the matching
@@ -2872,6 +3368,9 @@ class OrderBuilder extends Component {
                 // ("⚠ N issues found") is always visible; bullet
                 // list appears only when expanded.
                 warnings_expanded: false,
+                // 2026-06-27 — keyboard shortcut help dialog. Triggered
+                // by `?` and closed by Esc or click-on-backdrop.
+                shortcut_help_open: false,
                 // Phase 3.C.2a — line id of the cabinet currently
                 // being assigned to a wall via the AssignToWallModal.
                 // null when the modal is closed. The render block
@@ -2911,6 +3410,8 @@ class OrderBuilder extends Component {
         this._onPickCabinet = this._onPickCabinet.bind(this);
         this._setSelectedLine = this._setSelectedLine.bind(this);
         this._onLineSaved = this._onLineSaved.bind(this);
+        this._onDeleteLine = this._onDeleteLine.bind(this);
+        this._onLineQtyChange = this._onLineQtyChange.bind(this);
 
         // P1 bugfix: synchronous lock prevents double-add on rapid clicks
         // (the reactive `state.catalog_busy` flag flips inside an async
@@ -2930,8 +3431,87 @@ class OrderBuilder extends Component {
             // the empty state, which is the correct fallback.
             this._refreshRoomState();
             this._startRealtimeSync();
+            // 2026-06-27 — global keyboard shortcuts. Bound on document
+            // so they fire anywhere on the page except inside an input.
+            // Removed cleanly on unmount.
+            this._onGlobalKeydown = this._onGlobalKeydown.bind(this);
+            document.addEventListener("keydown", this._onGlobalKeydown);
         });
-        onWillUnmount(() => this._stopRealtimeSync());
+        onWillUnmount(() => {
+            this._stopRealtimeSync();
+            if (this._onGlobalKeydown) {
+                document.removeEventListener("keydown", this._onGlobalKeydown);
+            }
+        });
+    }
+
+    // 2026-06-27 — keyboard shortcuts for power users. Gated on:
+    //   • no input/textarea/select/contentEditable has focus
+    //   • no ctrl/meta/alt modifier (shift is OK for `?`)
+    //   • catalog modal isn't in a busy add (Esc still passes through
+    //     to the modal's own handler)
+    _onGlobalKeydown(ev) {
+        // Don't intercept typed input.
+        const tgt = ev.target;
+        if (tgt && (
+            tgt.tagName === "INPUT"
+            || tgt.tagName === "TEXTAREA"
+            || tgt.tagName === "SELECT"
+            || tgt.isContentEditable
+        )) {
+            return;
+        }
+        if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+
+        // ? = open shortcut help
+        if (ev.key === "?" || (ev.shiftKey && ev.key === "/")) {
+            ev.preventDefault();
+            this.state.ui.shortcut_help_open = true;
+            return;
+        }
+        // Esc = close shortcut help (the catalog modal has its own
+        // Esc listener for its own close path).
+        if (ev.key === "Escape" && this.state.ui.shortcut_help_open) {
+            ev.preventDefault();
+            this.state.ui.shortcut_help_open = false;
+            return;
+        }
+        // n = open the catalog (only when no modal is already open).
+        if (ev.key === "n" && !this.state.ui.catalog_open
+            && !this.state.ui.shortcut_help_open
+            && !this.state.ui.wizard) {
+            ev.preventDefault();
+            this._openCatalog();
+            return;
+        }
+        // / = focus the catalog search input (open the catalog first
+        //     if it's not already open).
+        if (ev.key === "/" && !ev.shiftKey) {
+            ev.preventDefault();
+            if (!this.state.ui.catalog_open) {
+                this._openCatalog();
+            }
+            // Wait one frame so the input exists in the DOM.
+            requestAnimationFrame(() => {
+                const input = document.querySelector(".o_owl_catalog_search");
+                if (input) input.focus();
+            });
+            return;
+        }
+        // 1..9 = jump to the Nth tab. Gated on no modal active so the
+        // catalog's own keyhandlers aren't shadowed.
+        if (/^[1-9]$/.test(ev.key)
+            && !this.state.ui.catalog_open
+            && !this.state.ui.shortcut_help_open
+            && !this.state.ui.wizard) {
+            const idx = Number(ev.key) - 1;
+            const tabs = this._tabs;
+            if (idx >= 0 && idx < tabs.length) {
+                ev.preventDefault();
+                this._setActiveTab(tabs[idx].code);
+            }
+            return;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -3052,6 +3632,12 @@ class OrderBuilder extends Component {
         this.state.ui.catalog_open = true;
     };
 
+    // 2026-06-27 — Keep-open preference owner. The CatalogPicker bubbles
+    // its checkbox state up here so it survives a close/reopen cycle.
+    _setCatalogKeepOpen = (next) => {
+        this.state.ui.catalog_keep_open = !!next;
+    };
+
     _closeCatalog() {
         if (!this.state.catalog_busy) {
             this.state.ui.catalog_open = false;
@@ -3109,7 +3695,7 @@ class OrderBuilder extends Component {
             if (result && result.ok) {
                 // Force the next _loadOrder to apply (the add changed
                 // server state in a way the hash MUST observe).
-                this.state.payload_hash = "";
+                this._invalidatePayloadCache();
                 // Refresh the order so the new line appears + totals
                 // re-compute. Bumps payload_version, which makes the
                 // KitchenViewport refetch its 3D payload as a bonus.
@@ -3145,7 +3731,7 @@ class OrderBuilder extends Component {
                         );
                         if (placeRes && placeRes.ok) {
                             await this._refreshRoomState();
-                            this.state.payload_hash = "";
+                            this._invalidatePayloadCache();
                             await this._loadOrder();
                             this._pushToast("Cabinet placed on wall", "success");
                         } else {
@@ -3179,6 +3765,25 @@ class OrderBuilder extends Component {
                     `Added ${qtyPrefix}${label || "cabinet"}`,
                     "success",
                 );
+                // 2026-06-27 — auto-close after a single add unless the
+                // user toggled "Keep open for bulk-add". 1.5s delay lets
+                // the toast and the per-card success pulse register before
+                // the modal dismisses. Skip when a gap-placement was in
+                // flight (the user already implicitly committed to one
+                // specific add) — that path's own toast covers it.
+                if (!this.state.ui.catalog_keep_open
+                    && !this.state.pendingGapPlacement) {
+                    setTimeout(() => {
+                        // Re-check at fire time so a fast user opening
+                        // a new modal mid-timeout doesn't get bounced.
+                        if (this.state.ui.catalog_open
+                            && !this.state.catalog_busy
+                            && !this._addInFlight
+                            && !this.state.ui.catalog_keep_open) {
+                            this._closeCatalog();
+                        }
+                    }, 1500);
+                }
             } else {
                 this.state.error = (
                     result?.error === "order_locked"
@@ -3212,6 +3817,22 @@ class OrderBuilder extends Component {
         }
     }
 
+    // 2026-06-27 — single point of invalidation for the poll-skip hash.
+    // Server-state-mutating actions must call this BEFORE the followup
+    // _loadOrder() so the hash bail-out cannot mask the change. Five
+    // call sites previously inlined `state.payload_hash = ""` with no
+    // shared name; one missed reset = stale UI bug. Keep the call
+    // adjacent to the await that mutates server state.
+    _invalidatePayloadCache() {
+        this.state.payload_hash = "";
+        // 2026-06-27 — also clear the server ETag so the next _loadOrder
+        // hits the full payload path. The server's signature would catch
+        // the change on its own (line write_date moved), but clearing
+        // here means we don't pay the round-trip-to-discover-unchanged
+        // for a poll we already know is stale.
+        this.state.payload_etag = "";
+    }
+
     async _loadOrder() {
         const orderId = this.props.orderId;
         if (!orderId) {
@@ -3231,9 +3852,27 @@ class OrderBuilder extends Component {
             this.state.error = null;
         }
         try {
+            // 2026-06-27 — send the server-issued ETag so the backend can
+            // short-circuit unchanged polls in <5ms (skips the ~80-SQL
+            // payload rebuild + BoM-search-per-line loop). Backstops the
+            // client-side payload_hash below: if the server says
+            // "unchanged", we trust it and do nothing.
             const payload = await rpcJsonCall(
                 `/southbrook/api/order/${encodeURIComponent(orderId)}`,
+                this.state.payload_etag
+                    ? { client_etag: this.state.payload_etag }
+                    : {},
             );
+            if (payload && payload.unchanged) {
+                // Server confirms nothing changed since last fetch — skip
+                // the state write entirely so OWL doesn't reconcile.
+                // Update the etag in case the server upgraded its hash
+                // shape between fetches (no-op normally).
+                if (payload.etag) {
+                    this.state.payload_etag = payload.etag;
+                }
+                return;
+            }
             if (payload && payload.error) {
                 // Only surface a structured error on the initial paint.
                 // Background polls swallow it (network blip / 401 from
@@ -3262,9 +3901,18 @@ class OrderBuilder extends Component {
                 return;
             }
             this.state.payload_hash = newHash;
+            // 2026-06-27 — stash the server-issued ETag for the next
+            // poll's If-None-Match. Forward-compat with older backends
+            // that don't return etag: fall back to empty (next poll
+            // gets a full payload, no harm done).
+            this.state.payload_etag = payload.etag || "";
             this.state.order = payload.order;
             this.state.lines = payload.lines || [];
             this.state.zones = payload.zones || [];
+            // 2026-06-27 — cabinet-class summary for the header glance.
+            // Backend may omit (forward-compat); default empty list keeps
+            // the HeaderStrip cell hidden in that case.
+            this.state.family_counts = payload.family_counts || [];
             // T2C11 — keep the default shape when the payload omits
             // the key (forward-compat with older backend versions).
             if (payload.bom_rollup) {
@@ -3786,6 +4434,133 @@ class OrderBuilder extends Component {
             this.state.ui.selected_line_id === lineId ? null : lineId;
     };
 
+    // 2026-06-27 — production-approval handlers. _loadPreflight is
+    // called by the ProductionApprovalStrip on mount + on state-change
+    // to fetch the MO preview + blockers without paying the cost on
+    // every poll. _onRequestApproval wraps the new portal endpoint
+    // (which delegates to mrp_pm's action_request_production).
+    _loadPreflight = async () => {
+        if (!this.state.order) return null;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/preflight-confirm",
+                {},
+            );
+            return res;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    _onRequestApproval = async () => {
+        if (!this.state.order) return null;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/request-production-approval",
+                {},
+            );
+            if (res && res.ok) {
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast("Production approval requested.", "success");
+            } else {
+                this._pushToast(
+                    "Could not request approval: "
+                        + ((res && (res.message || res.error)) || "unknown"),
+                    "error",
+                    5000,
+                );
+            }
+            return res;
+        } catch (err) {
+            this._pushToast(
+                "Could not request approval: " + (err && err.message || err),
+                "error",
+                5000,
+            );
+            return null;
+        }
+    };
+
+    // 2026-06-27 — inline qty change handler. The OrderLine commits on
+    // blur / Enter; this method does the RPC + reload. qty=0 triggers
+    // the delete branch server-side (the /update endpoint accepts it
+    // as a delete-equivalent), so the line vanishes naturally.
+    _onLineQtyChange = async (lineId, nextQty) => {
+        try {
+            const result = await rpcJsonCall(
+                "/southbrook/api/line/" + encodeURIComponent(lineId) + "/update",
+                { qty: nextQty },
+            );
+            if (result && result.ok) {
+                this._invalidatePayloadCache();
+                if (result.deleted
+                    && this.state.ui.selected_line_id === lineId) {
+                    this.state.ui.selected_line_id = null;
+                }
+                await this._loadOrder();
+                if (result.deleted) {
+                    this._pushToast("Line removed", "success");
+                }
+            } else {
+                this._pushToast(
+                    "Could not update qty: "
+                        + ((result && result.error) || "unknown"),
+                    "error",
+                );
+            }
+        } catch (err) {
+            this._pushToast(
+                "Could not update qty: " + (err && err.message || err),
+                "error",
+            );
+        }
+    };
+
+    // 2026-06-27 — line delete handler bound at setup() per the same
+    // pattern as _setSelectedLine / _onLineSaved. Confirms before
+    // unlinking (a single misclick on the trash icon would be costly).
+    // After success, clears the selection if the deleted line was open
+    // in the drawer, invalidates the poll-hash, and reloads the order.
+    _onDeleteLine = async (lineId) => {
+        const line = (this.state.lines || []).find((l) => l.id === lineId);
+        if (!line) return;
+        const label = line.product_name
+            + (line.spec_summary ? " — " + line.spec_summary : "");
+        if (!window.confirm("Remove this line?\n\n" + label)) {
+            return;
+        }
+        try {
+            const result = await rpcJsonCall(
+                "/southbrook/api/line/" + encodeURIComponent(lineId) + "/delete",
+                {},
+            );
+            if (result && result.ok) {
+                if (this.state.ui.selected_line_id === lineId) {
+                    this.state.ui.selected_line_id = null;
+                }
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast("Line removed", "success");
+            } else {
+                this._pushToast(
+                    "Could not remove line: "
+                        + ((result && result.error) || "unknown"),
+                    "error",
+                );
+            }
+        } catch (err) {
+            this._pushToast(
+                "Could not remove line: " + (err && err.message || err),
+                "error",
+            );
+        }
+    };
+
     // T2C10 — invoked by ConfigDrawer after a successful autosave.
     // Re-fetches the order payload so prices everywhere (line cell,
     // zone subtotal, header strip) refresh from the canonical
@@ -4049,7 +4824,7 @@ class OrderBuilder extends Component {
                 await this._refreshRoomState();
                 // Force the next _loadOrder to take (the hash-skip path
                 // would otherwise no-op on an unchanged-looking poll).
-                this.state.payload_hash = "";
+                this._invalidatePayloadCache();
                 await this._loadOrder();
                 this.state.ui.assigning = null;
             } else {
@@ -4093,7 +4868,7 @@ class OrderBuilder extends Component {
                 await this._refreshRoomState();
                 // Force the next _loadOrder to take (hash-skip path
                 // would otherwise no-op on a same-looking poll).
-                this.state.payload_hash = "";
+                this._invalidatePayloadCache();
                 await this._loadOrder();
             } else if (r && r.error === "out_of_bounds") {
                 // 25mm snap + JS-side clamp should make this
@@ -4144,7 +4919,7 @@ class OrderBuilder extends Component {
             );
             if (r && r.ok) {
                 await this._refreshRoomState();
-                this.state.payload_hash = "";
+                this._invalidatePayloadCache();
                 await this._loadOrder();
             } else {
                 const detail = (r && (r.detail || r.error)) || "unknown error";

@@ -48,16 +48,31 @@
           <field name="date_deadline"/>
           <field name="date_start"/>
           <field name="priority"/>
-          <field name="partner_id"/>
+          <!-- 2026-06-27 fix: removed `partner_id` — not a direct field
+               on mrp.production (it lives on linked sale.order via
+               sale_mrp's sale_id relation). The kanban card now relies
+               on `origin` (= SO name string) for customer context. -->
           <field name="origin"/>
-          <field name="workcenter_id"/>
+          <!-- 2026-06-27 fix: removed `workcenter_id` — not a field on
+               mrp.production (it lives on mrp.workorder). Was declared
+               but unused in templates; declaration alone trips view
+               validation on cold-load. -->
           <field name="user_id"/>
           <field name="today_plan_section"/>
           <field name="next_action_hint"/>
-          <field name="x_mi_status"/>
-          <field name="x_mi_blocker_count"/>
-          <field name="components_availability_state"/>
-          <field name="production_approval_state"/>
+          <!-- 2026-06-27 fix: removed `x_mi_status`, `x_mi_blocker_count`,
+               `components_availability_state`, `production_approval_state`
+               field declarations. These either live on a SIBLING addon that
+               loads AFTER southbrook_mrp_pm (x_mi_*: declared by
+               southbrook_manufacturing_intelligence which depends-on
+               this addon — the view validator can't see them yet —
+               per [[odoo19_view_dep_chain_manual_fields]]) OR they're
+               on sale.order, not mrp.production (production_approval_state).
+               None are referenced by the kanban templates below; declarations
+               alone fail cold-load. The compute logic for today_plan_section /
+               next_action_hint reads them safely via `getattr` in
+               models/mrp_production.py. -->
+
           <templates>
             <t t-name="card">
               <div class="oe_kanban_global_click o_sb_today_plan_card"
@@ -81,9 +96,14 @@
                       <field name="product_uom_id"/>
                     </span>
                   </div>
-                  <div class="o_sb_today_plan_partner"
-                       t-if="record.partner_id.raw_value">
-                    <field name="partner_id"/>
+                  <!-- 2026-06-27 — partner block removed (mrp.production
+                       has no direct partner_id; origin already shown
+                       above in the SO reference line). -->
+                  <div class="o_sb_today_plan_origin"
+                       t-if="record.origin.raw_value">
+                    <small class="text-muted">
+                      <field name="origin"/>
+                    </small>
                   </div>
                   <div class="o_sb_today_plan_hint"
                        t-if="record.next_action_hint.raw_value">
