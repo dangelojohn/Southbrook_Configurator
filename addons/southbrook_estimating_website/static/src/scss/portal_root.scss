@@ -1338,6 +1338,115 @@
     cursor: help;
 }
 
+// 2026-06-27 L1 — bulk-edit checkbox column on OrderLine rows.
+// Tucked at the start of the row; reserves a narrow cell so the
+// rest of the row layout doesn't shift when checkboxes appear.
+.o_owl_line_bulk_cell {
+    padding: 0 6px 0 0;
+    display: flex;
+    align-items: center;
+}
+.o_owl_line_bulk_check {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--sb-walnut, #4a3a2a);
+    cursor: pointer;
+}
+.o_owl_line_bulk_checked {
+    background: rgba(74, 58, 42, 0.04);  // faint walnut tint
+    box-shadow: inset 3px 0 0 var(--sb-walnut, #4a3a2a);
+}
+
+// 2026-06-27 L1 — sticky bulk-action toolbar. Fixed at the bottom
+// of the viewport, walnut-on-linen, visible only when ≥1 line is
+// checked. Keeps page layout stable (no push).
+.o_owl_bulk_toolbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 950;
+    background: var(--sb-walnut, #4a3a2a);
+    color: var(--sb-linen, #fdfbf6);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+}
+.o_owl_bulk_toolbar_count {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.o_owl_bulk_toolbar_actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.o_owl_bulk_btn {
+    background: var(--sb-linen, #fdfbf6);
+    color: var(--sb-walnut, #4a3a2a);
+    border: 1px solid var(--sb-linen, #fdfbf6);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.12s ease;
+
+    &:hover:not(:disabled),
+    &:focus-visible:not(:disabled) {
+        opacity: 0.85;
+        outline: none;
+    }
+    &:disabled {
+        opacity: 0.4;
+        cursor: progress;
+    }
+    &.o_owl_bulk_btn_danger {
+        background: #dc2626;
+        color: white;
+        border-color: #dc2626;
+    }
+    &.o_owl_bulk_btn_link {
+        background: transparent;
+        color: var(--sb-linen, #fdfbf6);
+        border-color: transparent;
+        text-decoration: underline;
+    }
+}
+
+// 2026-06-27 L1 — bulk modal (set-attribute / move-zone share chrome).
+.o_owl_bulk_modal {
+    max-width: 480px;
+}
+.o_owl_bulk_modal_body {
+    padding: 12px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.o_owl_bulk_modal_label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sb-ink-dim, #6b6b6b);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.o_owl_bulk_modal_select {
+    padding: 8px 10px;
+    border: 1px solid var(--sb-rule, #d8cebd);
+    border-radius: 4px;
+    background: var(--sb-linen, #fdfbf6);
+    font-size: 14px;
+
+    &:focus {
+        border-color: var(--sb-walnut, #4a3a2a);
+        outline: none;
+    }
+}
+
 // 2026-06-27 — production-approval strip. Lives between StagePipeline
 // and HeaderStrip; surfaces approval state + MO preview + Request
 // Approval button so the dealer doesn't have to bounce into backend.

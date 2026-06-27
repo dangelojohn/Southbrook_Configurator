@@ -1003,17 +1003,44 @@ class ConfigDrawer extends Component {
                         <label t-attf-for="attr_field_{{attr.attribute_id}}">
                             <t t-esc="attr.name"/>
                         </label>
+                        <!-- 2026-06-27 L2 — combobox: allowed values
+                             first, rule-blocked values grouped at the
+                             bottom with disabled state + reason tooltip.
+                             Browser-native type-ahead still works
+                             ("type s" jumps to "Shaker"). Eliminates the
+                             surprise of picking a value the server
+                             would reject — the user can see upfront
+                             that "Maple" is blocked when Contractor is
+                             selected. -->
                         <select t-attf-id="attr_field_{{attr.attribute_id}}"
                                 class="o_owl_attr_select"
                                 t-att-disabled="state.attrSaving"
                                 t-on-change="(ev) => this._onAttrChange(attr.attribute_id, ev.target.value)">
                             <option value="">— pick —</option>
-                            <option t-foreach="attr.values"
-                                    t-as="v"
-                                    t-key="v.value_id"
-                                    t-att-value="v.value_id"
-                                    t-att-selected="v.current ? 'selected' : null"
-                                    t-esc="v.name"/>
+                            <!-- Allowed values (or values w/o allowed
+                                 flag, e.g. older backend versions). -->
+                            <t t-foreach="attr.values" t-as="v" t-key="v.value_id">
+                                <option t-if="v.allowed !== false"
+                                        t-att-value="v.value_id"
+                                        t-att-selected="v.current ? 'selected' : null"
+                                        t-esc="v.name"/>
+                            </t>
+                            <!-- Blocked group. Rendered after the
+                                 allowed values so users naturally see
+                                 the legitimate picks first; the
+                                 disabled attr + title tooltip explain
+                                 why they can't pick the rest. -->
+                            <t t-if="_hasBlockedValues(attr)">
+                                <optgroup label="── Blocked by current selection ──">
+                                    <t t-foreach="attr.values" t-as="v" t-key="v.value_id">
+                                        <option t-if="v.allowed === false"
+                                                t-att-value="v.value_id"
+                                                disabled="disabled"
+                                                t-att-title="v.reason || 'Blocked by current selection'"
+                                                t-esc="v.name + ' (blocked)'"/>
+                                    </t>
+                                </optgroup>
+                            </t>
                         </select>
                     </div>
                 </div>
@@ -1082,6 +1109,16 @@ class ConfigDrawer extends Component {
     // ------------------------------------------------------------------
     // G15 — attribute picker.
     // ------------------------------------------------------------------
+
+    // 2026-06-27 L2 — helper for the blocked-values optgroup; the
+    // group only renders when the backend marked at least one value
+    // as not allowed. Old backend versions (pre-L2) don't ship the
+    // `allowed` flag at all — in that case every value is treated as
+    // allowed and the optgroup stays hidden.
+    _hasBlockedValues(attr) {
+        if (!attr || !attr.values) return false;
+        return attr.values.some((v) => v.allowed === false);
+    }
 
     async _loadAttributes() {
         this.state.attrsLoading = true;
@@ -1205,9 +1242,25 @@ class OrderLine extends Component {
              tabindex="0"
              t-att-aria-pressed="props.isSelected ? 'true' : 'false'"
              t-att-aria-label="'Line ' + props.line.sequence + ': ' + props.line.product_name + (props.line.spec_summary ? ' — ' + props.line.spec_summary : '')"
-             t-att-class="{ 'o_owl_line_selected': props.isSelected }"
+             t-att-class="{
+                 'o_owl_line_selected': props.isSelected,
+                 'o_owl_line_bulk_checked': props.isBulkChecked
+             }"
              t-on-click="() => props.onSelect(props.line.id)"
              t-on-keydown="_onKeydown">
+            <!-- 2026-06-27 L1 — bulk-edit checkbox column. Optional so
+                 customer-view mounts can omit. stopPropagation so the
+                 row click (open drawer) doesn't fire when toggling. -->
+            <div t-if="props.onBulkToggle"
+                 class="o_owl_line_bulk_cell"
+                 t-on-click.stop=""
+                 t-on-keydown.stop="">
+                <input type="checkbox"
+                       class="o_owl_line_bulk_check"
+                       t-att-checked="props.isBulkChecked ? 'checked' : ''"
+                       t-on-change="_onBulkToggle"
+                       t-att-aria-label="'Select line ' + props.line.sequence + ' for bulk edit'"/>
+            </div>
             <div class="o_owl_lineno" t-esc="props.line.sequence"/>
             <div class="o_owl_line_tpl">
                 <t t-esc="props.line.product_name"/>
@@ -1303,6 +1356,11 @@ class OrderLine extends Component {
         // mounts that want qty-locked can omit and the cell renders
         // read-only.
         onQtyChange: { type: Function, optional: true },
+        // 2026-06-27 L1 — bulk-edit checkbox. Optional; when both are
+        // present, the row renders the checkbox cell and propagates
+        // checkbox toggles up to the parent via onBulkToggle(line_id).
+        isBulkChecked: { type: Boolean, optional: true },
+        onBulkToggle: { type: Function, optional: true },
     };
     fmtUsd = fmtUsd;
 
@@ -1347,6 +1405,15 @@ class OrderLine extends Component {
             if (this.props.onDelete) {
                 this.props.onDelete(this.props.line.id);
             }
+        }
+    }
+
+    // 2026-06-27 L1 — toggle bulk-selection state for this line.
+    _onBulkToggle(ev) {
+        if (this.props.onBulkToggle) {
+            this.props.onBulkToggle(
+                this.props.line.id, !!(ev && ev.target && ev.target.checked),
+            );
         }
     }
 
@@ -1469,7 +1536,9 @@ class ZoneGroup extends Component {
                                isSelected="line.id === props.selectedLineId"
                                onSelect="props.onSelectLine"
                                onDelete="props.onDeleteLine"
-                               onQtyChange="props.onLineQtyChange"/>
+                               onQtyChange="props.onLineQtyChange"
+                               isBulkChecked="props.bulkChecked &amp;&amp; props.bulkChecked.includes(line.id)"
+                               onBulkToggle="props.onBulkToggle"/>
                     <!-- T2C10 — ConfigDrawer expands below the selected line,
                          spanning all 8 columns of the parent grid. -->
                     <ConfigDrawer t-if="line.id === props.selectedLineId"
@@ -1528,6 +1597,12 @@ class ZoneGroup extends Component {
         // 2026-06-27 — inline qty stepper handler. Same optionality:
         // omit and the line renders read-only qty.
         onLineQtyChange: { type: Function, optional: true },
+        // 2026-06-27 L1 — bulk-edit plumbing. bulkChecked is an Array
+        // of line ids currently selected for bulk action; onBulkToggle
+        // receives (line_id, checked) when a row checkbox flips. Both
+        // optional so customer-view mounts can stay simple.
+        bulkChecked: { type: Array, optional: true },
+        onBulkToggle: { type: Function, optional: true },
         // Phase 3 Sprint C2 — issuesForLine(line_id) -> Array of
         // validation issues filtered to the given line.
         issuesForLine: Function,
@@ -2800,6 +2875,151 @@ const TEMPLATE = xml`
             </div>
         </div>
 
+        <!-- 2026-06-27 L1 — sticky bulk-action toolbar. Renders only
+             when at least one line is checked. Position: fixed at the
+             bottom of the viewport so it doesn't push page layout.
+             Actions: delete, move-zone, set-attribute, clear. -->
+        <div t-if="state.ui.bulk_checked.length"
+             class="o_owl_bulk_toolbar"
+             role="toolbar"
+             aria-label="Bulk line actions">
+            <div class="o_owl_bulk_toolbar_count">
+                <strong t-esc="state.ui.bulk_checked.length"/>
+                <t t-if="state.ui.bulk_checked.length === 1"> line</t>
+                <t t-else=""> lines</t>
+                selected
+            </div>
+            <div class="o_owl_bulk_toolbar_actions">
+                <button type="button"
+                        class="o_owl_bulk_btn"
+                        t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                        t-on-click="() => _openBulkModal('set_attribute')">
+                    Apply attribute…
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn"
+                        t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                        t-on-click="() => _openBulkModal('move_zone')">
+                    Move to zone…
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn o_owl_bulk_btn_danger"
+                        t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                        t-on-click="_onBulkDelete">
+                    Delete
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn o_owl_bulk_btn_link"
+                        t-on-click="_selectAllLines">
+                    Select all
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn o_owl_bulk_btn_link"
+                        t-on-click="_clearBulkSelection">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- L1 bulk modal — kind switches between set_attribute and
+             move_zone. Shares the same modal chrome. -->
+        <div t-if="state.ui.bulk_modal"
+             class="o_owl_modal_backdrop"
+             t-on-click="_closeBulkModal">
+            <div class="o_owl_modal o_owl_bulk_modal"
+                 t-on-click="(ev) => ev.stopPropagation()"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Bulk edit">
+                <header class="o_owl_modal_head">
+                    <h2 class="o_owl_modal_title">
+                        <t t-if="state.ui.bulk_modal === 'set_attribute'">
+                            Apply attribute to <t t-esc="state.ui.bulk_checked.length"/> lines
+                        </t>
+                        <t t-elif="state.ui.bulk_modal === 'move_zone'">
+                            Move <t t-esc="state.ui.bulk_checked.length"/> lines to zone
+                        </t>
+                    </h2>
+                    <p class="o_owl_modal_sub">
+                        <t t-if="state.ui.bulk_modal === 'set_attribute'">
+                            Lines whose template doesn't expose this attribute will be skipped.
+                            Attribute catalog is taken from the first selected line.
+                        </t>
+                        <t t-elif="state.ui.bulk_modal === 'move_zone'">
+                            Re-zones every selected line. Useful when a wall
+                            cabinet was added to the base run by mistake.
+                        </t>
+                    </p>
+                </header>
+
+                <div t-if="state.ui.bulk_modal === 'set_attribute'"
+                     class="o_owl_bulk_modal_body">
+                    <label class="o_owl_bulk_modal_label">Attribute</label>
+                    <select class="o_owl_bulk_modal_select"
+                            t-on-change="_onBulkAttrSelect"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''">
+                        <option value="">— pick an attribute —</option>
+                        <t t-foreach="_bulkAttrOptions()" t-as="attr"
+                           t-key="attr.attribute_id">
+                            <option t-att-value="attr.attribute_id"
+                                    t-att-selected="state.ui.bulk_set_attr_id === attr.attribute_id ? 'selected' : ''"
+                                    t-esc="attr.name"/>
+                        </t>
+                    </select>
+
+                    <label class="o_owl_bulk_modal_label"
+                           t-if="state.ui.bulk_set_attr_id">Value</label>
+                    <select t-if="state.ui.bulk_set_attr_id"
+                            class="o_owl_bulk_modal_select"
+                            t-on-change="_onBulkValueSelect"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''">
+                        <option value="">— pick a value —</option>
+                        <t t-foreach="_bulkValueOptions()" t-as="val"
+                           t-key="val.value_id">
+                            <option t-att-value="val.value_id"
+                                    t-att-selected="state.ui.bulk_set_value_id === val.value_id ? 'selected' : ''"
+                                    t-esc="val.name"/>
+                        </t>
+                    </select>
+                </div>
+
+                <div t-if="state.ui.bulk_modal === 'move_zone'"
+                     class="o_owl_bulk_modal_body">
+                    <label class="o_owl_bulk_modal_label">Target zone</label>
+                    <select class="o_owl_bulk_modal_select"
+                            t-on-change="_onBulkZoneSelect"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''">
+                        <option value="base_run">Base Run</option>
+                        <option value="wall">Wall</option>
+                        <option value="tall">Tall</option>
+                        <option value="island">Island</option>
+                        <option value="accessory">Accessory</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <footer class="o_owl_modal_foot">
+                    <button class="o_owl_btn o_owl_btn_secondary"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                            t-on-click="_closeBulkModal">
+                        Cancel
+                    </button>
+                    <button t-if="state.ui.bulk_modal === 'set_attribute'"
+                            class="o_owl_btn o_owl_btn_primary"
+                            t-att-disabled="state.ui.bulk_busy || !state.ui.bulk_set_attr_id || !state.ui.bulk_set_value_id ? 'disabled' : ''"
+                            t-on-click="_onBulkSetAttributeConfirm">
+                        Apply to <t t-esc="state.ui.bulk_checked.length"/> lines
+                    </button>
+                    <button t-if="state.ui.bulk_modal === 'move_zone'"
+                            class="o_owl_btn o_owl_btn_primary"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                            t-on-click="_onBulkMoveZoneConfirm">
+                        Move <t t-esc="state.ui.bulk_checked.length"/> lines
+                    </button>
+                </footer>
+            </div>
+        </div>
+
         <!-- 2026-06-27 — keyboard shortcut help dialog (triggered by ?).
              Lives at the top so it overlays all tab content. Escape
              closes via the global keydown handler. -->
@@ -3166,6 +3386,8 @@ const TEMPLATE = xml`
                                onAddToZone="_onAddToZone"
                                onDeleteLine="_onDeleteLine"
                                onLineQtyChange="_onLineQtyChange"
+                               bulkChecked="state.ui.bulk_checked"
+                               onBulkToggle="_onBulkToggle"
                                issuesForLine="_issuesForLine"
                                room="state.room"
                                unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"/>
@@ -3454,6 +3676,16 @@ class OrderBuilder extends Component {
                 // 2026-06-27 — keyboard shortcut help dialog. Triggered
                 // by `?` and closed by Esc or click-on-backdrop.
                 shortcut_help_open: false,
+                // 2026-06-27 L1 — bulk-edit state. `bulk_checked` is an
+                // array of line ids currently selected for bulk action.
+                // `bulk_modal` is null / "set_attribute" / "move_zone"
+                // depending on which modal flow is active.
+                bulk_checked: [],
+                bulk_modal: null,
+                bulk_busy: false,
+                bulk_set_attr_id: null,
+                bulk_set_value_id: null,
+                bulk_move_zone: "base_run",
                 // Phase 3.C.2a — line id of the cabinet currently
                 // being assigned to a wall via the AssignToWallModal.
                 // null when the modal is closed. The render block
@@ -3495,6 +3727,7 @@ class OrderBuilder extends Component {
         this._onLineSaved = this._onLineSaved.bind(this);
         this._onDeleteLine = this._onDeleteLine.bind(this);
         this._onLineQtyChange = this._onLineQtyChange.bind(this);
+        this._onBulkToggle = this._onBulkToggle.bind(this);
 
         // P1 bugfix: synchronous lock prevents double-add on rapid clicks
         // (the reactive `state.catalog_busy` flag flips inside an async
@@ -4609,6 +4842,221 @@ class OrderBuilder extends Component {
             );
         }
     };
+
+    // ──────────────────────────────────────────────────────────────────
+    // 2026-06-27 L1 — bulk-edit handlers.
+    // ──────────────────────────────────────────────────────────────────
+    _onBulkToggle = (lineId, checked) => {
+        const cur = this.state.ui.bulk_checked;
+        const idx = cur.indexOf(lineId);
+        if (checked && idx < 0) {
+            cur.push(lineId);
+        } else if (!checked && idx >= 0) {
+            cur.splice(idx, 1);
+        }
+    };
+
+    _clearBulkSelection = () => {
+        this.state.ui.bulk_checked.splice(0);
+    };
+
+    _selectAllLines = () => {
+        const cur = this.state.ui.bulk_checked;
+        cur.splice(0);
+        for (const l of this.state.lines || []) {
+            cur.push(l.id);
+        }
+    };
+
+    _openBulkModal = (modalKind) => {
+        this.state.ui.bulk_set_attr_id = null;
+        this.state.ui.bulk_set_value_id = null;
+        this.state.ui.bulk_modal = modalKind;
+    };
+
+    _closeBulkModal = () => {
+        this.state.ui.bulk_modal = null;
+    };
+
+    _onBulkDelete = async () => {
+        const ids = [...this.state.ui.bulk_checked];
+        if (!ids.length) return;
+        const label = ids.length === 1
+            ? "1 line"
+            : ids.length + " lines";
+        if (!window.confirm("Remove " + label + " from this order?")) {
+            return;
+        }
+        this.state.ui.bulk_busy = true;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/lines/bulk-delete",
+                { line_ids: ids },
+            );
+            if (res && res.ok) {
+                this._clearBulkSelection();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast(
+                    "Removed " + (res.total_deleted || 0) + " lines",
+                    "success",
+                );
+            } else {
+                this._pushToast(
+                    "Bulk delete failed: "
+                        + ((res && res.error) || "unknown"),
+                    "error", 5000,
+                );
+            }
+        } finally {
+            this.state.ui.bulk_busy = false;
+        }
+    };
+
+    _onBulkMoveZoneConfirm = async () => {
+        const ids = [...this.state.ui.bulk_checked];
+        const zone = this.state.ui.bulk_move_zone;
+        if (!ids.length || !zone) return;
+        this.state.ui.bulk_busy = true;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/lines/bulk-move-zone",
+                { line_ids: ids, zone: zone },
+            );
+            if (res && res.ok) {
+                this._closeBulkModal();
+                this._clearBulkSelection();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast(
+                    "Moved " + (res.total_moved || 0) + " lines to "
+                        + zone, "success",
+                );
+            } else {
+                this._pushToast(
+                    "Bulk move failed: "
+                        + ((res && res.error) || "unknown"),
+                    "error", 5000,
+                );
+            }
+        } finally {
+            this.state.ui.bulk_busy = false;
+        }
+    };
+
+    _onBulkSetAttributeConfirm = async () => {
+        const ids = [...this.state.ui.bulk_checked];
+        const attrId = this.state.ui.bulk_set_attr_id;
+        const valId = this.state.ui.bulk_set_value_id;
+        if (!ids.length || !attrId || !valId) return;
+        this.state.ui.bulk_busy = true;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/lines/bulk-set-attribute",
+                {
+                    line_ids: ids,
+                    attribute_id: attrId,
+                    value_id: valId,
+                },
+            );
+            if (res && res.ok) {
+                this._closeBulkModal();
+                this._clearBulkSelection();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                const upd = res.total_updated || 0;
+                const skp = res.total_skipped || 0;
+                const msg = "Updated " + upd + " lines"
+                    + (skp ? " (" + skp + " skipped — attr not on template)" : "");
+                this._pushToast(msg, "success", 4000);
+            } else {
+                this._pushToast(
+                    "Bulk set-attribute failed: "
+                        + ((res && res.error) || "unknown"),
+                    "error", 5000,
+                );
+            }
+        } finally {
+            this.state.ui.bulk_busy = false;
+        }
+    };
+
+    // For the bulk-set-attribute modal: derive the attribute UNION
+    // across the currently-selected lines' templates. We pull from
+    // each line's already-fetched attribute lines via the existing
+    // /attributes endpoint cache; if not cached, we fetch on demand.
+    // Simple v1: just gather distinct (attribute_id, name, values)
+    // across the selection. Per-template availability is enforced
+    // server-side (skipped with reason if a target template doesn't
+    // expose the value).
+    _bulkSelectedLines() {
+        const ids = new Set(this.state.ui.bulk_checked);
+        return (this.state.lines || []).filter((l) => ids.has(l.id));
+    }
+
+    _onBulkAttrSelect = (ev) => {
+        this.state.ui.bulk_set_attr_id = ev.target.value
+            ? Number(ev.target.value) : null;
+        this.state.ui.bulk_set_value_id = null;
+        // Lazy-fetch the attribute catalog if we don't have it.
+        if (this.state.ui.bulk_set_attr_id && !this._bulkAttrCache) {
+            this._loadBulkAttrCatalog();
+        }
+    };
+
+    _onBulkValueSelect = (ev) => {
+        this.state.ui.bulk_set_value_id = ev.target.value
+            ? Number(ev.target.value) : null;
+    };
+
+    _onBulkZoneSelect = (ev) => {
+        this.state.ui.bulk_move_zone = ev.target.value;
+    };
+
+    // Lazy load the attribute catalog for the bulk modal. Uses the
+    // first selected line's template as the basis (good enough for
+    // the common "all base cabinets" case; mixed-template bulks
+    // fall through to server-side skip).
+    async _loadBulkAttrCatalog() {
+        const sel = this._bulkSelectedLines();
+        if (!sel.length) return;
+        const firstLine = sel[0];
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/line/"
+                + encodeURIComponent(firstLine.id)
+                + "/attributes",
+                {},
+            );
+            if (res && res.ok && Array.isArray(res.attributes)) {
+                this._bulkAttrCache = res.attributes;
+                // Trigger re-render by touching state.
+                this.state.ui.bulk_modal = this.state.ui.bulk_modal;
+            }
+        } catch (e) {
+            // Silent fail — modal still shows the attr <select> with
+            // empty options; user can close + try again.
+        }
+    }
+
+    _bulkAttrOptions() {
+        return this._bulkAttrCache || [];
+    }
+
+    _bulkValueOptions() {
+        const attrId = this.state.ui.bulk_set_attr_id;
+        if (!attrId || !this._bulkAttrCache) return [];
+        const a = this._bulkAttrCache.find(
+            (x) => x.attribute_id === attrId
+        );
+        return a && a.values ? a.values : [];
+    }
 
     // 2026-06-27 — line delete handler bound at setup() per the same
     // pattern as _setSelectedLine / _onLineSaved. Confirms before

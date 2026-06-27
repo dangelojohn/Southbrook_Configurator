@@ -1108,6 +1108,15 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                 v.attribute_id.id, set(),
             ).add(v.id)
 
+        # 2026-06-27 L2 — rule-block resolution per value.
+        # Calls OCA's product.config.session.values_available so the
+        # combobox can show ALL values with disabled-state for those
+        # blocked by the current selection (e.g. Contractor series →
+        # all door styles except thermofoil_slab_white). Frontend
+        # renders disabled values at the bottom with a hover tooltip.
+        Session = request.env["product.config.session"].sudo()
+        current_pav_ids = list(line_value_ids)
+
         attributes = []
         for attr_line in tmpl.attribute_line_ids:
             # Hide attributes with a single option — nothing to pick.
@@ -1131,6 +1140,30 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             all_values = all_values.sorted(
                 key=lambda v: (v.sequence or 0, v.id),
             )
+
+            # 2026-06-27 L2 — per-value allowed/blocked check.
+            # values_available() is an @api.model on product.config.session
+            # so we can call it without instantiating a real session. The
+            # current PTAV combination (current_pav_ids) becomes
+            # the "selected so far" context; for each candidate value we
+            # ask "would this value be available given the current
+            # selection?" If not, mark blocked and emit a short reason.
+            try:
+                allowed_ids = Session.values_available(
+                    check_val_ids=all_values.ids,
+                    value_ids=current_pav_ids,
+                    custom_vals={},
+                    product_tmpl_id=tmpl.id,
+                    product_template_attribute_line_id=attr_line.id,
+                )
+                allowed_set = set(allowed_ids)
+            except Exception:
+                # Defensive: if OCA's machinery errors on a malformed
+                # rule, treat all values as allowed rather than locking
+                # the user out of the picker entirely. Frontend still
+                # functions; only the rule-block badge goes missing.
+                allowed_set = set(all_values.ids)
+
             attributes.append({
                 "attribute_id": attr_id,
                 "name": attr_line.attribute_id.name,
@@ -1142,6 +1175,15 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
                         "value_id": v.id,
                         "name": v.name,
                         "current": v.id in line_value_ids,
+                        # 2026-06-27 L2 — allowed/blocked status from
+                        # values_available. The combobox renders
+                        # blocked options disabled, grouped at the
+                        # bottom, with reason as the title tooltip.
+                        "allowed": v.id in allowed_set,
+                        "reason": (
+                            "" if v.id in allowed_set
+                            else "Blocked by current selection"
+                        ),
                     }
                     for v in all_values
                 ],
@@ -1593,6 +1635,181 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             "skipped": skipped,
             "total_created": len(created_ids),
             "total_merged": len(merged_ids),
+        }
+
+    # ──────────────────────────────────────────────────────────────────
+    # 2026-06-27 — bulk-action endpoints (L1 from the deferred-L list).
+    # Mirror the single-line endpoints but accept a `line_ids` list and
+    # apply the change once per line in a single ORM transaction. The
+    # frontend bulk-toolbar (checkbox column on OrderLine + sticky
+    # toolbar) calls these so kitchen-wide edits ("change all 12 base
+    # doors to Slab") are one click instead of 12.
+    #
+    # All three: per-line access check, draft/sent state gate, skip
+    # malformed entries gracefully. Returns per-line outcome so the
+    # frontend can show "10 updated, 2 skipped".
+    # ──────────────────────────────────────────────────────────────────
+    def _southbrook_resolve_bulk_lines(self, order_id, line_ids):
+        """Resolve + gate a list of line ids against this order.
+
+        Returns (order, lines) on success or ({error}, None) on failure
+        so callers can early-return cleanly.
+        """
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}, None
+        except AccessError:
+            return {"error": "forbidden"}, None
+        if order.state not in ("draft", "sent"):
+            return ({"error": "order_locked", "state": order.state}, None)
+        if not isinstance(line_ids, list) or not line_ids:
+            return {"error": "missing_line_ids"}, None
+        # Hard cap. A bulk action is meant for kitchen-wide edits, not
+        # a scripted run over thousands of rows.
+        if len(line_ids) > 200:
+            return {"error": "too_many_lines", "max": 200}, None
+        Sol = request.env["sale.order.line"].sudo()
+        try:
+            ids_int = [int(i) for i in line_ids]
+        except (TypeError, ValueError):
+            return {"error": "bad_line_ids"}, None
+        lines = Sol.search([
+            ("id", "in", ids_int),
+            ("order_id", "=", order.id),  # also gates: must be this order
+        ])
+        if not lines:
+            return {"error": "no_lines_resolved"}, None
+        return order, lines
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/lines/bulk-delete",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_bulk_delete(
+        self, order_id, line_ids=None, **kw,
+    ):
+        result = self._southbrook_resolve_bulk_lines(order_id, line_ids)
+        if result[1] is None:
+            return result[0]
+        order, lines = result
+        deleted_ids = lines.ids
+        lines.with_user(request.env.user).unlink()
+        return {
+            "ok": True,
+            "deleted": deleted_ids,
+            "total_deleted": len(deleted_ids),
+        }
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/lines/bulk-move-zone",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_bulk_move_zone(
+        self, order_id, line_ids=None, zone=None, **kw,
+    ):
+        valid_zones = {
+            "base_run", "wall", "tall", "island", "accessory", "other",
+        }
+        if zone not in valid_zones:
+            return {"error": "bad_zone", "valid": list(valid_zones)}
+        result = self._southbrook_resolve_bulk_lines(order_id, line_ids)
+        if result[1] is None:
+            return result[0]
+        order, lines = result
+        lines.with_user(request.env.user).write({"zone": zone})
+        return {
+            "ok": True,
+            "moved": lines.ids,
+            "total_moved": len(lines),
+            "zone": zone,
+        }
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/lines/bulk-set-attribute",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_order_bulk_set_attribute(
+        self, order_id, line_ids=None, attribute_id=None,
+        value_id=None, **kw,
+    ):
+        if not attribute_id or not value_id:
+            return {"error": "missing_attribute_or_value"}
+        result = self._southbrook_resolve_bulk_lines(order_id, line_ids)
+        if result[1] is None:
+            return result[0]
+        order, lines = result
+
+        try:
+            attr_id_int = int(attribute_id)
+            val_id_int = int(value_id)
+        except (TypeError, ValueError):
+            return {"error": "bad_ids"}
+
+        updated, skipped = [], []
+        Ptav = request.env["product.template.attribute.value"].sudo()
+        Variant = request.env["product.product"].sudo()
+        for line in lines:
+            if not line.product_id:
+                skipped.append({"line_id": line.id, "reason": "no_variant"})
+                continue
+            tmpl = line.product_id.product_tmpl_id
+            if not tmpl:
+                skipped.append({"line_id": line.id, "reason": "no_template"})
+                continue
+            # Find the PTAV for this template + this attribute_value pair.
+            target_ptav = Ptav.search([
+                ("product_tmpl_id", "=", tmpl.id),
+                ("attribute_id", "=", attr_id_int),
+                ("product_attribute_value_id", "=", val_id_int),
+            ], limit=1)
+            if not target_ptav:
+                # This template doesn't expose this value — silent skip.
+                # Common when bulk-editing a mixed-template selection.
+                skipped.append({
+                    "line_id": line.id,
+                    "reason": "attribute_not_on_template",
+                })
+                continue
+            # Drop any existing PTAV for the same attribute, keep all
+            # others. Same combination math as the single-line
+            # set-attribute endpoint above.
+            current_ptav = line.product_id.product_template_attribute_value_ids
+            same_attr = current_ptav.filtered(
+                lambda v: v.attribute_id.id == attr_id_int
+            )
+            new_combination = (current_ptav - same_attr) | target_ptav
+            variant = tmpl._get_variant_for_combination(new_combination)
+            if not variant:
+                variant = Variant.create({
+                    "product_tmpl_id": tmpl.id,
+                    "product_template_attribute_value_ids": [
+                        (6, 0, new_combination.ids)
+                    ],
+                })
+            if not variant:
+                skipped.append({
+                    "line_id": line.id,
+                    "reason": "variant_resolve_failed",
+                })
+                continue
+            line.sudo().write({"product_id": variant.id})
+            if hasattr(line, "product_id_change"):
+                line.product_id_change()
+            updated.append(line.id)
+
+        return {
+            "ok": True,
+            "updated": updated,
+            "skipped": skipped,
+            "total_updated": len(updated),
+            "total_skipped": len(skipped),
         }
 
     # T2C12 — FooterActions dispatcher.
