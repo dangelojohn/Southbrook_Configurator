@@ -20,6 +20,12 @@ Scope:
 - OWL-compiled contexts only:
     * Any XML file under .../static/src/...
     * Inside <templates>...</templates> blocks of view files (kanban/etc.)
+    * 2026-06-27 — inside `xml`-tagged template literals in .esm.js /
+      .js files under .../static/src/... (Component.static template =
+      xml`...`, plus const TEMPLATE = xml`...` and similar patterns).
+      Added after two latent `and` operators inside such literals broke
+      OrderBuilder mount in production despite the rest of this linter
+      coming back clean. See commit 3af970d 2026-06-27.
 - Server-side QWeb is intentionally NOT scanned: PDF reports, mail
   templates, website portal templates with <template> (singular) — these
   use the Python QWeb sandbox where or/and/not are valid.
@@ -193,18 +199,129 @@ def scan_file(path: Path):
                 yield (lineno, name, value, kind, fix)
 
 
-def iter_xml(targets):
+# ─────────────────────────────────────────────────────────────────────
+# 2026-06-27 — JS-embedded OWL template scan.
+#
+# Adds coverage for OWL templates written inside `xml`-tagged template
+# literals in .esm.js / .js files. The XML-only scan above misses these
+# because they live inside JS source. The bug class is identical:
+# Python word ops + JS regex literals throw at OWL template-compile
+# time in the browser.
+#
+# Two latent `and` operators inside such literals in portal_boot.esm.js
+# broke OrderBuilder mount in production on 2026-06-27 (commit 3af970d)
+# despite the XML-only scan coming back clean. This block closes the gap.
+# ─────────────────────────────────────────────────────────────────────
+
+# `xml` tagged template literal start. Anchored on a preceding non-word
+# char so we don't match identifiers like `someXml\``. The opening
+# backtick is captured; the matching close-backtick is found by a
+# forward scan that respects escaped backticks (\`) and ${...} interp.
+JS_XML_TEMPLATE_RE = re.compile(r"(?<![\w$])xml\s*`")
+
+
+def _find_xml_blocks(text: str):
+    """Yield (start_offset, end_offset) for each `xml`...` block in text.
+
+    Skip escaped backticks (\\`). Respect ${...} interpolation depth so
+    a `${...}` whose body contains a backtick doesn't terminate the
+    outer template. OWL templates rarely use ${...} but we handle the
+    case for forward-compat.
+    """
+    for m in JS_XML_TEMPLATE_RE.finditer(text):
+        body_start = m.end()  # position right after the opening backtick
+        i = body_start
+        depth = 0  # ${...} nesting depth
+        while i < len(text):
+            ch = text[i]
+            if ch == "\\":
+                i += 2  # skip the escaped char (handles \` and \$)
+                continue
+            if ch == "$" and i + 1 < len(text) and text[i + 1] == "{":
+                depth += 1
+                i += 2
+                continue
+            if ch == "}" and depth > 0:
+                depth -= 1
+                i += 1
+                continue
+            if ch == "`" and depth == 0:
+                yield (body_start, i)
+                break
+            i += 1
+
+
+def _offset_to_lineno(text: str, offset: int) -> int:
+    """1-based line number of `offset` in `text`. Cheap newline count."""
+    return text.count("\n", 0, offset) + 1
+
+
+def scan_js_file(path: Path):
+    """Scan a .js/.esm.js file for OWL `t-*` violations inside
+    `xml`-tagged template literals. Yields the same shape as
+    scan_file() so the caller can pretty-print uniformly.
+    """
+    if not is_static_src(path):
+        return  # OWL components only live under static/src/
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError as exc:
+        print(f"{path}: cannot read ({exc})", file=sys.stderr)
+        return
+
+    for start, end in _find_xml_blocks(text):
+        block = text[start:end]
+        block_start_line = _offset_to_lineno(text, start)
+        # Walk attribute matches relative to block, recover absolute line.
+        for match in ATTR_RE.finditer(block):
+            name = match.group(1)
+            if not is_t_expr_attr(name):
+                continue
+            value = (
+                match.group(2)
+                if match.group(2) is not None
+                else match.group(3)
+            )
+            # Match-relative line within the block + block's starting line.
+            attr_line_in_block = block.count("\n", 0, match.start())
+            lineno = block_start_line + attr_line_in_block
+            for kind, fix in violations_for_attr(name, value):
+                yield (lineno, name, value, kind, fix)
+
+
+def iter_files(targets):
+    """Yield XML + JS files for scanning. Vendored addons skipped."""
+    js_suffixes = (".js", ".esm.js")
     for target in targets:
         if not target.exists():
             print(f"warning: {target} does not exist", file=sys.stderr)
             continue
         if target.is_file():
-            if target.suffix == ".xml" and not is_vendored(target):
+            if is_vendored(target):
+                continue
+            if target.suffix == ".xml":
+                yield target
+            elif target.name.endswith(js_suffixes):
                 yield target
         else:
             for f in sorted(target.rglob("*.xml")):
                 if not is_vendored(f):
                     yield f
+            for pattern in ("*.esm.js", "*.js"):
+                for f in sorted(target.rglob(pattern)):
+                    if is_vendored(f):
+                        continue
+                    # rglob *.js also matches *.esm.js; dedupe by name.
+                    # We rely on the (start, end) of `xml` blocks to
+                    # find OWL templates — non-OWL JS just yields no
+                    # matches and is silently skipped.
+                    yield f
+
+
+# Keep the old name as an alias so external callers (and a stale
+# pre-commit hook) keep working until they're updated.
+iter_xml = iter_files
 
 
 def main(argv):
@@ -215,11 +332,27 @@ def main(argv):
     targets = [Path(p) for p in argv[1:]] if len(argv) > 1 else [Path("addons")]
     total = 0
     files_seen = 0
+    js_files_seen = 0
     files_with_violations = 0
+    seen_paths = set()
 
-    for f in iter_xml(targets):
-        files_seen += 1
-        violations = list(scan_file(f))
+    for f in iter_files(targets):
+        # rglob("*.js") matches *.esm.js too — dedupe by resolved path.
+        rp = f.resolve()
+        if rp in seen_paths:
+            continue
+        seen_paths.add(rp)
+
+        # Pick the right scanner by suffix.
+        if f.suffix == ".xml":
+            files_seen += 1
+            violations = list(scan_file(f))
+        elif f.name.endswith((".esm.js", ".js")):
+            js_files_seen += 1
+            violations = list(scan_js_file(f))
+        else:
+            continue
+
         if violations:
             files_with_violations += 1
             for lineno, name, value, kind, fix in violations:
@@ -229,8 +362,10 @@ def main(argv):
 
     if total:
         print(
-            f"\nFAIL: {total} OWL violation(s) across {files_with_violations} "
-            f"file(s) (scanned {files_seen} XML files in OWL contexts).",
+            f"\nFAIL: {total} OWL violation(s) across "
+            f"{files_with_violations} file(s) "
+            f"(scanned {files_seen} XML + {js_files_seen} JS files in "
+            f"OWL contexts).",
             file=sys.stderr,
         )
         print("See memory note: owl-tokenizer-constraints", file=sys.stderr)
@@ -238,7 +373,8 @@ def main(argv):
 
     print(
         f"OK: no OWL tokenizer violations "
-        f"({files_seen} XML files scanned, OWL contexts only)."
+        f"({files_seen} XML + {js_files_seen} JS files scanned, "
+        f"OWL contexts only)."
     )
     return 0
 

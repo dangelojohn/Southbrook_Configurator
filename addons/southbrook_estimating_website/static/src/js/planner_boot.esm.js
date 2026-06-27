@@ -180,7 +180,7 @@ class KitchenPlanner extends Component {
                 </ul>
 
                 <footer class="o_kp_catalog_foot"
-                        t-if="!state.loading and !state.error">
+                        t-if="!state.loading &amp;&amp; !state.error">
                     <t t-esc="filteredCatalog.length"/> of
                     <t t-esc="state.payload.catalog.length"/> cabinets ·
                     Phase 2 commit 3
@@ -189,7 +189,7 @@ class KitchenPlanner extends Component {
 
             <!-- RIGHT VIEWPORT -->
             <main class="o_kp_viewport">
-                <div t-if="state.loading or state.error"
+                <div t-if="state.loading || state.error"
                      class="o_kp_placeholder">
                     <h1 class="o_kp_placeholder_title">Design Your Kitchen</h1>
                 </div>
