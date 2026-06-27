@@ -37,6 +37,8 @@
                                 <field name="name"/>
                                 <field name="message"/>
                                 <field name="recommendation"/>
+                                <!-- W001 — inline thumbnail. -->
+                                <field name="image" widget="image" options="{'size': [32, 32]}"/>
                             </list>
                         </field>
                     </page>

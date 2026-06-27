@@ -8,6 +8,11 @@ SEVERITY_RANK = {"blocker": 0, "warning": 1, "info": 2}
 class SouthbrookMiCheck(models.Model):
     _name = "southbrook.mi.check"
     _description = "Southbrook Manufacturing Intelligence Check"
+    # mail.thread + mail.activity.mixin (W001) give the NCR record
+    # chatter, follower-routing, and activity scheduling — required for
+    # the 4-tap photo-+-tag-+-route shop-floor workflow. The image
+    # widget posts attachments via the chatter pipeline.
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     # Order by severity rank then category. Selection values sort by
     # stored string, so 'blocker'/'info'/'warning' alphabetical-DESC
     # produces warning > info > blocker — semantically wrong. We
@@ -41,6 +46,19 @@ class SouthbrookMiCheck(models.Model):
     )
     message = fields.Text(required=True)
     recommendation = fields.Text()
+    # W001 — defect photo captured from the shop floor. fields.Image
+    # caps in-DB storage at max_width/max_height (resized server-side
+    # on upload) so a 4032x3024 phone capture doesn't bloat the row.
+    # 1920x1920 is enough resolution for QA review while staying under
+    # ~400 KB per record. The 1st photo lives here; additional photos
+    # go to chatter attachments (free via mail.thread inherit above).
+    image = fields.Image(
+        string="Defect Photo",
+        max_width=1920,
+        max_height=1920,
+        help="Primary defect photo. Attach additional photos via the "
+             "chatter below.",
+    )
     production_id = fields.Many2one(
         "mrp.production", string="Manufacturing Order", ondelete="cascade", index=True
     )

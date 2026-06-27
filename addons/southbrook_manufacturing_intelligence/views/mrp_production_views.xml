@@ -39,6 +39,9 @@
                             <field name="name"/>
                             <field name="message"/>
                             <field name="recommendation"/>
+                            <!-- W001 — inline thumbnail. Tap the row to open
+                                 the standalone form (chatter + full image). -->
+                            <field name="image" widget="image" options="{'size': [32, 32]}"/>
                         </list>
                     </field>
                 </page>

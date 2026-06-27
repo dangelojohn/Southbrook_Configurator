@@ -15,7 +15,57 @@
                 <field name="production_id"/>
                 <field name="message"/>
                 <field name="recommendation"/>
+                <!-- W001 — tiny thumbnail so supervisors can spot
+                     photo-backed NCRs without opening each row. -->
+                <field name="image" widget="image" options="{'size': [32, 32]}"/>
             </list>
+        </field>
+    </record>
+
+    <!-- W001 — standalone form view so the inspector can open an NCR,
+         see/capture the defect photo, and use chatter to attach more
+         photos or @mention engineering. The embedded one2many inside
+         the MO form still uses the implicit list view above; opening
+         a row in that list now pops THIS form. -->
+    <record id="view_southbrook_mi_check_form" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.form</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="arch" type="xml">
+            <form string="Manufacturing Intelligence Check">
+                <sheet>
+                    <field name="image" widget="image"
+                           class="oe_avatar"
+                           options="{'preview_image': 'image'}"/>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Short title (e.g. 'Edge chip on door L')"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="severity" widget="badge"
+                                   decoration-danger="severity == 'blocker'"
+                                   decoration-warning="severity == 'warning'"
+                                   decoration-info="severity == 'info'"/>
+                            <field name="category"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="production_id"/>
+                            <field name="production_package_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="findings" string="Findings">
+                            <group>
+                                <field name="message" placeholder="What did you see?" nolabel="1"/>
+                            </group>
+                            <group string="Recommendation">
+                                <field name="recommendation" placeholder="What should happen next?" nolabel="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
         </field>
     </record>
 
@@ -65,7 +115,7 @@
     <record id="action_southbrook_mi_checks" model="ir.actions.act_window">
         <field name="name">Manufacturing Intelligence Checks</field>
         <field name="res_model">southbrook.mi.check</field>
-        <field name="view_mode">list,search</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_southbrook_mi_check_search"/>
         <field name="context">{'search_default_blockers': 1, 'search_default_group_category': 1}</field>
     </record>
