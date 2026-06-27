@@ -88,6 +88,9 @@
                         context="{'group_by': 'workcenter_id'}"/>
                 <filter name="groupby_reason" string="Reason"
                         context="{'group_by': 'reason'}"/>
+                <!-- W049 (R7.5) — shift attribution group-by. -->
+                <filter name="groupby_shift" string="Shift"
+                        context="{'group_by': 'x_sb_shift'}"/>
             </search>
         </field>
     </record>
@@ -100,6 +103,10 @@
         <field name="arch" type="xml">
             <pivot string="Downtime Analysis" sample="1">
                 <field name="reason" type="row"/>
+                <!-- W049 (R7.5) — leading/lagging shift surfaces
+                     "morning team's edge banding down 40min more
+                     than night" without an Excel export. -->
+                <field name="x_sb_shift" type="row"/>
                 <field name="date_start" interval="month" type="col"/>
                 <field name="duration_min" type="measure"/>
                 <field name="downtime_cost" type="measure"/>

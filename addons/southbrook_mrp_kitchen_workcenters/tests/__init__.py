@@ -13,4 +13,5 @@ from . import test_w014_tablet_kanban
 from . import test_w026_traveler_richness
 from . import test_w043_reinspection_after_rework
 from . import test_w044_operator_attribution
+from . import test_w049_shift_attribution
 from . import test_w067_capacity_day

@@ -76,6 +76,15 @@ class SouthbrookKitchenWorkcenterDowntime(models.Model):
         related="workorder_id.production_id",
         store=True, readonly=True, index=True,
     )
+    # W049 (R7.5, 2026-06-27) — shift attribution on downtime pivot.
+    # Stored related so the pivot/graph can group-by "Shift" without
+    # joining at query time. Empty when there's no attached WO or the
+    # WO hasn't started — both treated as "Unassigned" in the report.
+    x_sb_shift = fields.Selection(
+        related="workorder_id.x_sb_shift",
+        store=True, readonly=True, index=True,
+        string="Shift",
+    )
 
     date_start = fields.Datetime(
         string="Start",

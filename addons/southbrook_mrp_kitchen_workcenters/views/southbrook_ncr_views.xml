@@ -55,6 +55,11 @@
                                    readonly="1"/>
                             <field name="x_sbk_date_checked"/>
                             <field name="x_sbk_check_stage"/>
+                            <!-- W049 (R7.5) — shift bucket derived
+                                 from the WO's date_start. Read-only;
+                                 supervisor uses it to pareto-by-
+                                 shift in the pivot/list. -->
+                            <field name="x_sb_shift" readonly="1"/>
                         </group>
                         <group string="Defect Detail">
                             <field name="x_sbk_defect_type"/>
@@ -208,6 +213,10 @@
                          for pareto-by-operator NCR review. -->
                     <filter name="group_operator" string="Operator"
                             context="{'group_by':'x_sbk_operator_who_caused_defect_id'}"/>
+                    <!-- W049 (R7.5) — shift attribution group-by
+                         for "leading/lagging shift" reviews. -->
+                    <filter name="group_shift" string="Shift"
+                            context="{'group_by':'x_sb_shift'}"/>
                 </group>
             </search>
         </field>

@@ -180,6 +180,45 @@ class MrpWorkorder(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # W049 (R7.5, 2026-06-27) — shift attribution on KPIs.
+    #
+    # JTBD: "When I'm reviewing this week's KPIs, I want to know which
+    # shift is leading/lagging so I can target coaching."
+    #
+    # Derive shift from date_start.hour against three configurable
+    # boundary ICPs. Defaults are sensible for North American
+    # kitchen-cabinet shops:
+    #   morning   06:00 - 13:59
+    #   afternoon 14:00 - 21:59
+    #   night     22:00 - 05:59   (wraps midnight)
+    #
+    # ICP keys (in HOURS, 0..23):
+    #   southbrook.shift_morning_start_hour       default 6
+    #   southbrook.shift_afternoon_start_hour     default 14
+    #   southbrook.shift_night_start_hour         default 22
+    #
+    # Stored so the pivot/graph group-by on downtime / throughput /
+    # NCR is cheap. Empty when date_start is unset (planned WO not
+    # yet started); reports treat empty as a separate bucket so the
+    # supervisor can see the "not yet started" cohort.
+    # ------------------------------------------------------------------
+    x_sb_shift = fields.Selection(
+        [
+            ("morning", "Morning"),
+            ("afternoon", "Afternoon"),
+            ("night", "Night"),
+        ],
+        string="Shift",
+        compute="_compute_x_sb_shift",
+        store=True,
+        index=True,
+        help="Derived shift bucket for this WO based on the start time. "
+             "Boundaries are configurable via the "
+             "southbrook.shift_*_start_hour ICPs (defaults: 06/14/22). "
+             "Empty when the WO has not started.",
+    )
+
+    # ------------------------------------------------------------------
     # Downtime aggregates
     # ------------------------------------------------------------------
     x_sbk_downtime_min = fields.Float(
@@ -246,6 +285,88 @@ class MrpWorkorder(models.Model):
             wo.x_sbk_units_per_op_hour = (
                 (wo.qty_producing or 0.0) / hours if hours > 0 else 0.0
             )
+
+    # ------------------------------------------------------------------
+    # W049 — shift attribution helpers
+    # ------------------------------------------------------------------
+    _SHIFT_DEFAULT_BOUNDARIES = (6, 14, 22)  # morning, afternoon, night
+
+    @api.model
+    def _sbk_shift_boundaries(self):
+        """Read the 3 shift-boundary ICPs and return a sorted tuple of
+        (morning_start, afternoon_start, night_start) hours, each
+        clamped to [0, 23]. Falls back to defaults on bad config.
+
+        Sortedness matters: the bucket-from-hour resolver below walks
+        the boundaries in ascending order and shifts that wrap past
+        midnight need the "night" boundary to come last."""
+        Param = self.env["ir.config_parameter"].sudo()
+        keys = (
+            ("southbrook.shift_morning_start_hour",
+             self._SHIFT_DEFAULT_BOUNDARIES[0]),
+            ("southbrook.shift_afternoon_start_hour",
+             self._SHIFT_DEFAULT_BOUNDARIES[1]),
+            ("southbrook.shift_night_start_hour",
+             self._SHIFT_DEFAULT_BOUNDARIES[2]),
+        )
+        out = []
+        for key, default in keys:
+            raw = Param.get_param(key, str(default))
+            try:
+                h = int(raw)
+            except (TypeError, ValueError):
+                h = default
+            h = max(0, min(23, h))
+            out.append(h)
+        return tuple(out)
+
+    @api.model
+    def _sbk_shift_for_hour(self, hour):
+        """Bucket an hour (0..23) into morning / afternoon / night per
+        the configured boundaries. Returns False on invalid input.
+
+        Algorithm: pair each shift label with its start hour, sort by
+        hour ascending, and walk forward — the hour belongs to the
+        last shift whose start <= hour. The night shift wraps midnight,
+        so any hour < morning_start also belongs to night."""
+        if hour is None or not isinstance(hour, int):
+            return False
+        if hour < 0 or hour > 23:
+            return False
+        morning, afternoon, night = self._sbk_shift_boundaries()
+        # Pairs sorted by start hour. Tie-break is stable (morning
+        # before afternoon before night) which matches what a
+        # supervisor expects if two boundaries collide.
+        pairs = sorted([
+            ("morning", morning),
+            ("afternoon", afternoon),
+            ("night", night),
+        ], key=lambda p: p[1])
+        label = pairs[-1][0]  # default to the wrap-around shift
+        for shift_label, start in pairs:
+            if hour >= start:
+                label = shift_label
+        # Wrap: hour < smallest_start means we're in the shift whose
+        # boundary is the LATEST in the day (night under defaults).
+        if hour < pairs[0][1]:
+            label = pairs[-1][0]
+        return label
+
+    @api.depends("date_start")
+    def _compute_x_sb_shift(self):
+        for wo in self:
+            if not wo.date_start:
+                wo.x_sb_shift = False
+                continue
+            try:
+                wo.x_sb_shift = self._sbk_shift_for_hour(
+                    wo.date_start.hour) or False
+            except Exception:  # noqa: BLE001
+                _logger.warning(
+                    "W049 shift compute failed for WO %s",
+                    wo.id, exc_info=True,
+                )
+                wo.x_sb_shift = False
 
     @api.depends("workcenter_id")
     def _compute_x_sbk_downtime(self):

@@ -123,6 +123,17 @@ class SouthbrookMiCheck(models.Model):
         related="x_sbk_workorder_id.workcenter_id",
         store=True, readonly=True, index=True,
     )
+    # W049 (R7.5, 2026-06-27) — shift attribution on NCR pareto.
+    # Stored related so the supervisor can group "this week's NCRs by
+    # shift" without an Excel export. Empty when the WO has not
+    # started or when no WO is attached — both bucketed as "Unassigned"
+    # in the report (the supervisor's signal that the originating
+    # shift is not yet known).
+    x_sb_shift = fields.Selection(
+        related="x_sbk_workorder_id.x_sb_shift",
+        store=True, readonly=True, index=True,
+        string="Shift",
+    )
     x_sbk_inspector_id = fields.Many2one(
         comodel_name="res.users",
         string="Inspector",
