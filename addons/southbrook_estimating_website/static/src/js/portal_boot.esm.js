@@ -324,7 +324,7 @@ class FooterActions extends Component {
                      (after Send-to-Manufacturing fires). The server
                      returns no_mo when no MO is tied, and the OWL
                      component shows the message inline. -->
-                <button t-if="props.mode !== 'customer' and props.order?.state === 'sale'"
+                <button t-if="props.mode !== 'customer' &amp;&amp; props.order &amp;&amp; props.order.state === 'sale'"
                         class="o_owl_btn o_owl_btn_secondary"
                         t-on-click="() => props.onAction('print_shop_copy')"
                         t-att-disabled="props.busy">
@@ -1724,7 +1724,7 @@ class TabBar extends Component {
                         t-att-id="'o_owl_tab_' + tab.code"
                         t-on-click.stop="() => props.onTabChange(tab.code)">
                     <t t-esc="tab.label"/>
-                    <span t-if="tab.count !== null and tab.count !== undefined"
+                    <span t-if="tab.count !== null &amp;&amp; tab.count !== undefined"
                           class="o_owl_tab_count"
                           t-esc="tab.count"/>
                 </button>
