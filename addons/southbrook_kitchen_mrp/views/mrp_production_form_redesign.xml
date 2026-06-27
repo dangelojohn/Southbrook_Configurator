@@ -1,93 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: LGPL-3.0-only -->
 <!--
-    MO form redesign for the expert MRP user — surfaces the high-value
-    Southbrook fields on the header and adds a consolidated Cabinet
-    Label tab alongside the existing notebook.
+    MO form redesign — SAFE subset shippable from XML.
 
-    All inherits target the BASE mrp.production form. Inheriting from
-    sibling Southbrook addons (mrp_kitchen_workcenters / mi) would
-    create a dependency loop because those addons depend transitively
-    on southbrook_kitchen_mrp. The x_sbk_* and x_mi_* fields are
-    written by their owning addons at runtime; the view validator
-    accepts them because they ARE on mrp.production at view-load
-    time.
+    Why the user's proposal can't fully land from a data XML:
+    The Cabinet Code, Room/Zone, Install Due, MI Status, etc. are
+    Studio-class MANUAL fields (state='manual' in ir.model.fields).
+    Manual fields live in the DB schema but the Odoo view validator
+    (which runs at -u time) doesn't see them on the model class —
+    only Python-declared fields. So an XML inherit that places those
+    fields fails with:
 
-    Five priority bands:
+        Field "x_sbk_cabinet_code" does not exist in model "mrp.production"
 
-      priority 17 — Header context bar
-                    Promotes Cabinet Code, Room/Zone, Install Due,
-                    Deadline, Source SO, and the MI status badge from
-                    deep-tab locations to the always-visible header.
+    Three paths forward for the manual-field changes:
 
-      priority 18 — Tab renames for clarity
+      (a) Place them via Studio's UI on the live form. Studio writes
+          the inherit to the DB directly without going through the
+          XML validator. This is the path the original proposal's
+          RPC-call route is doing.
+      (b) Promote the fields from manual to Python — define them as
+          fields.Char/Date/etc on a class _inherit="mrp.production"
+          in their owning addon (southbrook_mrp_kitchen_workcenters
+          and southbrook_manufacturing_intelligence). They'd then be
+          XML-reachable.
+      (c) Ship a post-init hook in this addon that creates the
+          inherit view rows via ORM (bypasses validation the same
+          way Studio does).
+
+    For this commit we ship (a) the always-safe changes — tab rename
+    + a new Cabinet Label tab that uses only THIS addon's Python
+    fields (sbk_label_*). The header context bar + MI tab from the
+    proposal are deferred to Studio or to a follow-up that ports the
+    manual fields to Python.
+
+    Two priority bands:
+
+      priority 18 — Tab rename for clarity
                     "Miscellaneous" → "Admin / Locations".
 
       priority 19 — Cabinet Label tab
-                    NEW notebook page consolidating all the
-                    sbk_label_* fields a floor operator needs to
-                    verify what will print on the label, with the
-                    Print button right there.
-
-      priority 20 — MI inline on Availability tab
-                    Adds an MI status section to the Availability tab
-                    (where present in the merged form) so blockers
-                    are visible alongside material availability.
-                    This is a position="inside" on the availability
-                    page; it is a no-op if that page is not present.
+                    NEW notebook page with the eight sbk_label_*
+                    fields a floor operator wants to see (door
+                    name, color, interior, code, hinge, fin, QR
+                    URL) and the Print button.
 -->
 <odoo>
 
-    <!-- ====================================================== -->
-    <!-- Priority 17 — Header context bar                       -->
-    <!-- ====================================================== -->
-    <record id="view_mrp_production_form_sbk_header_context" model="ir.ui.view">
-        <field name="name">mrp.production.form.sbk_header_context</field>
-        <field name="model">mrp.production</field>
-        <field name="priority">17</field>
-        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
-        <field name="arch" type="xml">
-
-            <!-- Cabinet Code, Room/Zone, Install Due — after Responsible -->
-            <xpath expr="//field[@name='user_id']" position="after">
-                <field name="x_sbk_cabinet_code"
-                       readonly="state not in ('draft','confirmed','progress')"
-                       placeholder="e.g. B3D24"/>
-                <field name="x_sbk_kitchen_room"
-                       readonly="state == 'done'"/>
-                <field name="x_sbk_install_due_date"
-                       widget="date"/>
-            </xpath>
-
-            <!-- Deadline + Source SO — after Start Date -->
-            <xpath expr="//field[@name='date_start']" position="after">
-                <field name="date_deadline"
-                       widget="date"
-                       decoration-danger="date_deadline and date_deadline &lt; context_today().strftime('%Y-%m-%d')"/>
-                <field name="origin"
-                       string="Source SO"
-                       readonly="1"/>
-            </xpath>
-
-            <!-- MI status badge + blocker count — after Component Status -->
-            <xpath expr="//field[@name='components_availability']" position="after">
-                <field name="x_mi_status"
-                       widget="badge"
-                       decoration-danger="x_mi_status == 'blocked'"
-                       decoration-warning="x_mi_status == 'warning'"
-                       decoration-success="x_mi_status == 'ok'"
-                       readonly="1"/>
-                <field name="x_mi_blocker_count"
-                       decoration-danger="x_mi_blocker_count &gt; 0"
-                       readonly="1"/>
-            </xpath>
-
-        </field>
-    </record>
-
-    <!-- ====================================================== -->
-    <!-- Priority 18 — Tab renames for clarity                  -->
-    <!-- ====================================================== -->
     <record id="view_mrp_production_form_sbk_tab_renames" model="ir.ui.view">
         <field name="name">mrp.production.form.sbk_tab_renames</field>
         <field name="model">mrp.production</field>
@@ -102,14 +61,6 @@
         </field>
     </record>
 
-    <!-- ====================================================== -->
-    <!-- Priority 19 — NEW Cabinet Label tab                    -->
-    <!--                                                        -->
-    <!-- One-stop view of every string that will print on the   -->
-    <!-- Avery 9421 cabinet label, with the Print button right  -->
-    <!-- there. Operator can verify the data without rendering  -->
-    <!-- the PDF.                                                -->
-    <!-- ====================================================== -->
     <record id="view_mrp_production_form_sbk_label_tab" model="ir.ui.view">
         <field name="name">mrp.production.form.sbk_label_tab</field>
         <field name="model">mrp.production</field>
@@ -135,69 +86,14 @@
                             <field name="sbk_label_qr_url" readonly="1" widget="url"/>
                         </group>
                     </group>
-                    <footer>
+                    <div class="oe_button_box" style="margin-top: 1rem">
                         <button name="action_print_cabinet_label"
                                 type="object"
                                 string="🏷 Print Cabinet Label"
-                                class="btn-primary"
+                                class="oe_highlight"
                                 groups="mrp.group_mrp_user"/>
-                    </footer>
+                    </div>
                 </page>
-            </xpath>
-
-        </field>
-    </record>
-
-    <!-- ====================================================== -->
-    <!-- Priority 20 — MI inline on Availability tab            -->
-    <!--                                                        -->
-    <!-- position="inside" the availability page IF the         -->
-    <!-- availability page exists. Where mrp_sfc_availability_  -->
-    <!-- check is not installed, this xpath silently no-ops     -->
-    <!-- because page[@name='availability'] is absent.          -->
-    <!-- ====================================================== -->
-    <record id="view_mrp_production_form_sbk_mi_inline" model="ir.ui.view">
-        <field name="name">mrp.production.form.sbk_mi_inline</field>
-        <field name="model">mrp.production</field>
-        <field name="priority">20</field>
-        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
-        <field name="arch" type="xml">
-
-            <xpath expr="//page[@name='availability']" position="inside">
-                <separator string="Manufacturing Intelligence"/>
-                <group>
-                    <group>
-                        <field name="x_mi_status" widget="badge"
-                               decoration-danger="x_mi_status == 'blocked'"
-                               decoration-warning="x_mi_status == 'warning'"
-                               decoration-success="x_mi_status == 'ok'"
-                               readonly="1"/>
-                        <field name="x_mi_next_action" readonly="1"/>
-                        <field name="x_mi_blocker_count"
-                               decoration-danger="x_mi_blocker_count &gt; 0"
-                               readonly="1"/>
-                        <field name="x_mi_warning_count"
-                               decoration-warning="x_mi_warning_count &gt; 0"
-                               readonly="1"/>
-                    </group>
-                    <group>
-                        <field name="x_mi_yield_pct" readonly="1"/>
-                        <field name="x_mi_waste_area_m2" readonly="1"/>
-                    </group>
-                </group>
-                <field name="x_mi_check_ids" readonly="1" nolabel="1">
-                    <list decoration-danger="severity == 'blocked'"
-                          decoration-warning="severity == 'warning'">
-                        <field name="severity" widget="badge"
-                               decoration-danger="severity == 'blocked'"
-                               decoration-warning="severity == 'warning'"
-                               decoration-success="severity == 'ok'"/>
-                        <field name="category"/>
-                        <field name="name"/>
-                        <field name="message"/>
-                        <field name="recommendation"/>
-                    </list>
-                </field>
             </xpath>
 
         </field>
