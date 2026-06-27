@@ -24,6 +24,31 @@
         <field name="value">30</field>
     </record>
 
+    <!-- W037 (R8.4) — Service-Worker offline-scan-queue cap. The
+         in-browser IndexedDB FIFO holds at most this many queued
+         scans during a wifi outage; beyond the cap the OLDEST entry
+         is evicted (so the operator always keeps the most recent
+         scans). Default 500 ≈ one shift of dense scanning at a
+         single station. The Service Worker reads this via a small
+         postMessage from the client glue (offline_scan_queue.js).
+         Clamped client-side to [1, 10000]. -->
+    <record id="ir_config_param_offline_queue_cap"
+            model="ir.config_parameter">
+        <field name="key">southbrook.qr_kit.offline_queue_cap</field>
+        <field name="value">500</field>
+    </record>
+
+    <!-- W037 (R8.4) — Server-side client_uuid replay-dedup TTL in
+         seconds. Replays of the same client_uuid within this window
+         return the cached response without re-running the handler.
+         Default 600s (10 min) — covers typical wifi-outage drain
+         windows while keeping the worker-local cache bounded. -->
+    <record id="ir_config_param_client_uuid_ttl_sec"
+            model="ir.config_parameter">
+        <field name="key">southbrook.qr_kit.client_uuid_ttl_sec</field>
+        <field name="value">600</field>
+    </record>
+
     <!-- W038 (R8.5) — night-shift dark mode auto-engage flag. When
          "1" the dark_mode_toggle.js will auto-flip to dark in the
          22:00-06:00 local window IF the user has NEVER set an

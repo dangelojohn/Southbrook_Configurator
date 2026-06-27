@@ -30,13 +30,84 @@ Time-bound expiry:
 """
 import json
 import logging
+import os
+import re
 import time
 
 from odoo import http
 from odoo.exceptions import AccessError
 from odoo.http import request
+from odoo.modules import get_module_path
 
 _logger = logging.getLogger(__name__)
+
+# W037 (R8.4, 2026-06-27) — client_uuid replay-dedup cache.
+# Worker-local in-memory ring: key = client_uuid, value = cached
+# response dict. TTL is bounded so the cache cannot grow forever.
+# Replays inside the TTL return the original result, NOT a re-execute
+# of the action (idempotency on the wire).
+# The cache is process-local on purpose: an Odoo deployment with N
+# workers may see N independent caches, but a replay is still a
+# replay only if it hits the same worker. The Service Worker queue
+# typically replays back-to-back within seconds, so worker affinity
+# (sticky session, or just the same TCP connection on a small box)
+# usually holds. Misses fall through and the controller's existing
+# logic handles them — at worst the same scan is logged twice; at
+# best the second one returns the cached ack.
+_CLIENT_UUID_TTL_SEC_DEFAULT = 600
+_CLIENT_UUID_CAP = 2048
+_CLIENT_UUID_CACHE = {}
+
+
+def _client_uuid_ttl_sec():
+    """Read the TTL from ir.config_parameter, falling back to default
+    and clamping to [1, 86400]. Each replay-check pulls this fresh
+    so an ops admin can tune without restarting workers."""
+    try:
+        raw = request.env["ir.config_parameter"].sudo().get_param(
+            "southbrook.qr_kit.client_uuid_ttl_sec",
+            str(_CLIENT_UUID_TTL_SEC_DEFAULT))
+        ttl = int(raw)
+    except Exception:  # noqa: BLE001
+        ttl = _CLIENT_UUID_TTL_SEC_DEFAULT
+    return max(1, min(ttl, 86400))
+_UUID4_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def _seen_client_uuid(client_uuid):
+    """Return cached response for a replay, or None if first-seen.
+    Trims expired entries opportunistically each call."""
+    if not client_uuid or not _UUID4_RE.match(str(client_uuid) or ""):
+        return None
+    now = int(time.time())
+    # Lazy GC: trim expired entries when the cap is near.
+    if len(_CLIENT_UUID_CACHE) >= _CLIENT_UUID_CAP:
+        for k in list(_CLIENT_UUID_CACHE.keys()):
+            ts, _resp = _CLIENT_UUID_CACHE[k]
+            if now - ts > _client_uuid_ttl_sec():
+                _CLIENT_UUID_CACHE.pop(k, None)
+        # Still over cap? Drop oldest half.
+        if len(_CLIENT_UUID_CACHE) >= _CLIENT_UUID_CAP:
+            items = sorted(_CLIENT_UUID_CACHE.items(), key=lambda kv: kv[1][0])
+            for k, _v in items[:_CLIENT_UUID_CAP // 2]:
+                _CLIENT_UUID_CACHE.pop(k, None)
+    entry = _CLIENT_UUID_CACHE.get(client_uuid)
+    if not entry:
+        return None
+    ts, resp = entry
+    if now - ts > _client_uuid_ttl_sec():
+        _CLIENT_UUID_CACHE.pop(client_uuid, None)
+        return None
+    return resp
+
+
+def _remember_client_uuid(client_uuid, response):
+    if not client_uuid or not _UUID4_RE.match(str(client_uuid) or ""):
+        return
+    _CLIENT_UUID_CACHE[client_uuid] = (int(time.time()), response)
 
 # W035 (R8.14) — operator identity in the session.
 # Session keys:
@@ -88,9 +159,43 @@ class QrScanController(http.Controller):
         return request.make_response(body, headers=[
             ("Content-Type", "text/html; charset=utf-8")])
 
+    @http.route("/sb/qr/sw.js", type="http", auth="public",
+                methods=["GET"], csrf=False)
+    def service_worker(self, **kw):
+        """W037 — Serve the offline-scan Service Worker from `/sb/qr/`
+        so browsers grant it scope over the entire /sb/qr/* tree.
+        Without this route, the SW file would be served from
+        `/southbrook_qr_kit/static/src/js/` and the browser would
+        scope it to that path (which no scan POST ever uses).
+
+        Sends `Service-Worker-Allowed: /sb/qr/` to make the scope
+        widening explicit per the SW spec.
+        """
+        sw_path = os.path.join(
+            get_module_path("southbrook_qr_kit"),
+            "static", "src", "js", "offline_scan_sw.js",
+        )
+        try:
+            with open(sw_path, "rb") as fh:
+                body = fh.read()
+        except OSError:
+            return request.make_response(
+                "Service Worker file missing",
+                status=404,
+                headers=[("Content-Type", "text/plain")],
+            )
+        return request.make_response(
+            body,
+            headers=[
+                ("Content-Type", "application/javascript; charset=utf-8"),
+                ("Service-Worker-Allowed", "/sb/qr/"),
+                ("Cache-Control", "no-cache"),
+            ],
+        )
+
     @http.route("/sb/qr/shipping/load-unit", type="json", auth="user",
                 methods=["POST"])
-    def load_unit(self, truck=None, unit=None, **kw):
+    def load_unit(self, truck=None, unit=None, client_uuid=None, **kw):
         """Scan-to-load at the loading bay.
 
         Body:
@@ -103,6 +208,12 @@ class QrScanController(http.Controller):
         truck. Returns {ok, unit_name, is_extra, missing_count,
         extra_count, alert} so the loading-bay UI can flash green/red.
         """
+        # W037: Service Worker replay dedup. If the same client_uuid
+        # already produced a result in the worker cache, return it
+        # without re-touching the truck/unit state.
+        cached = _seen_client_uuid(client_uuid)
+        if cached is not None:
+            return dict(cached, replayed=True)
         env = request.env
         Payload = env["southbrook.qr.payload"].sudo()
         if not truck or not unit:
@@ -124,13 +235,15 @@ class QrScanController(http.Controller):
         try:
             result = rec.action_load_unit(int(up["ident"]))
             result.setdefault("ok", True)
+            _remember_client_uuid(client_uuid, result)
             return result
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
     @http.route("/sb/qr/inventory/bin-scan", type="json", auth="user",
                 methods=["POST"])
-    def bin_scan(self, src=None, dst=None, product=None, qty=1.0, **kw):
+    def bin_scan(self, src=None, dst=None, product=None, qty=1.0,
+                 client_uuid=None, **kw):
         """Bin-scan inventory move.
 
         Body:
@@ -143,6 +256,10 @@ class QrScanController(http.Controller):
 
         Returns: {ok, move_id, message} or {ok:false, error}.
         """
+        # W037 replay dedup.
+        cached = _seen_client_uuid(client_uuid)
+        if cached is not None:
+            return dict(cached, replayed=True)
         env = request.env
         if not src or not dst:
             return {"ok": False, "error": "src + dst required"}
@@ -177,15 +294,17 @@ class QrScanController(http.Controller):
         try:
             move = env["stock.move"].sudo()._scan_quick_move(
                 src_id, dst_id, product_id, qty=float(qty))
-            return {"ok": True, "move_id": move.id,
-                    "message": f"Moved {qty} of product {product_id} from {src_id} to {dst_id}"}
+            result = {"ok": True, "move_id": move.id,
+                      "message": f"Moved {qty} of product {product_id} from {src_id} to {dst_id}"}
+            _remember_client_uuid(client_uuid, result)
+            return result
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
     @http.route("/sb/qr/pod/submit", type="json", auth="public",
                 methods=["POST"], csrf=False)
     def pod_submit(self, payload=None, signature=None, photo=None,
-                   recipient=None, **kw):
+                   recipient=None, client_uuid=None, **kw):
         """Public POD submit. HMAC signature on the payload IS the
         identity check — anyone with the QR is authorized to capture
         POD for that unit. Re-verifies signature, ensures kind='ship',
@@ -193,6 +312,12 @@ class QrScanController(http.Controller):
 
         Returns {ok, message} on success, {ok:false, error} on fail.
         """
+        # W037 replay dedup — POD submission is heavily replay-sensitive
+        # because the SW queues PODs across the wifi outage; without
+        # dedup the same delivery gets marked twice on drain.
+        cached = _seen_client_uuid(client_uuid)
+        if cached is not None:
+            return dict(cached, replayed=True)
         if not payload:
             return {"ok": False, "error": "missing payload"}
         env = request.env
@@ -234,9 +359,11 @@ class QrScanController(http.Controller):
                 })
             except Exception:  # noqa: BLE001
                 pass
-            return {"ok": True,
-                    "message": "POD captured. Thank you, %s." %
-                    (recipient or "driver")}
+            result = {"ok": True,
+                      "message": "POD captured. Thank you, %s." %
+                      (recipient or "driver")}
+            _remember_client_uuid(client_uuid, result)
+            return result
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
@@ -505,8 +632,12 @@ class QrScanController(http.Controller):
         payload = kw.get("payload")
         action = kw.get("action") or "open"
         params = kw.get("params") or {}
+        # W037: client_uuid may travel either at the JSON-RPC envelope
+        # level (the SW patches the outer body) OR inside params (when
+        # the caller explicitly added it). Try both.
+        client_uuid = kw.get("client_uuid") or params.get("client_uuid")
         return self._dispatch(payload=payload, action=action, params=params,
-                              source="json")
+                              source="json", client_uuid=client_uuid)
 
     # ------------------------------------------------------------------
     # W035 (R8.14) — operator identity via hr.employee.pin
@@ -640,7 +771,15 @@ class QrScanController(http.Controller):
     # ------------------------------------------------------------------
     # Core dispatch
     # ------------------------------------------------------------------
-    def _dispatch(self, payload, action, params, source):
+    def _dispatch(self, payload, action, params, source, client_uuid=None):
+        # W037: replay dedup. If the same uuid was already processed
+        # within the TTL window, return the cached response without
+        # re-touching the target record or creating a duplicate scan
+        # log row. Replay-tagged so downstream tooling can tell them
+        # apart in forensics.
+        cached = _seen_client_uuid(client_uuid)
+        if cached is not None:
+            return dict(cached, replayed=True)
         env = request.env
         Log = env["southbrook.qr.scan.log"].sudo()
         # W035: stamp the resolved operator (may be empty for public
@@ -731,6 +870,7 @@ class QrScanController(http.Controller):
             Log.create({**log_vals, "result": "ok"})
             result.setdefault("ok", True)
             result.setdefault("result", "ok")
+            _remember_client_uuid(client_uuid, result)
             return result
         except NotImplementedError as exc:
             Log.create({**log_vals, "result": "unknown_action",

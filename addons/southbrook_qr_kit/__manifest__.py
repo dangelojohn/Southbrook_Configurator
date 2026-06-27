@@ -43,7 +43,7 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.8.0",
+    "version": "19.0.0.9.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
@@ -76,6 +76,11 @@ SECURITY:
     # JS bundled into BOTH backend and frontend so kanban, scan modal,
     # POD page, and traveler-print preview all honour the same body
     # class. Default OFF — day-shift users see zero visual change.
+    # W037 (R8.4, 2026-06-27) — Offline scan queue: the SW glue
+    # (`offline_scan_queue.js`) lives in the bundle so it
+    # auto-registers on every page; the SW itself (`offline_scan_sw.js`)
+    # is NOT bundled — it's served by the `/sb/qr/sw.js` route at
+    # top-level scope so the browser grants it `/sb/qr/*` scope.
     "assets": {
         "web.assets_backend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
@@ -83,6 +88,7 @@ SECURITY:
             "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
             "southbrook_qr_kit/static/src/js/dark_mode_toggle.js",
             "southbrook_qr_kit/static/src/scss/dark_mode.scss",
+            "southbrook_qr_kit/static/src/js/offline_scan_queue.js",
         ],
         "web.assets_frontend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
@@ -90,6 +96,7 @@ SECURITY:
             "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
             "southbrook_qr_kit/static/src/js/dark_mode_toggle.js",
             "southbrook_qr_kit/static/src/scss/dark_mode.scss",
+            "southbrook_qr_kit/static/src/js/offline_scan_queue.js",
         ],
     },
     "installable": True,
