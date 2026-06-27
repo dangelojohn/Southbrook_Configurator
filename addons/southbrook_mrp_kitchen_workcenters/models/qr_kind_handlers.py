@@ -95,6 +95,56 @@ class MoQrKind(models.AbstractModel):
     _target_model = "mrp.production"
 
     @api.model
+    def get_record(self, ident):
+        """W055 / R1.12 — resolve by MO name (WH/MO/00023) OR int id.
+
+        The cabinet label QR now encodes the MO's *name* rather than
+        its raw id. The name is preserved across ECO-driven MO rebuilds
+        (the new MO inherits the same name with a -1 suffix at worst);
+        the bare id is not. This override:
+
+        1. tries int parse first (legacy callers still work);
+        2. on miss, searches mrp.production by name;
+        3. on a name with an ECO-rebuild suffix (e.g. WH/MO/00023-1),
+           returns the latest matching MO so a printed label always
+           opens the *current* MO for that cabinet.
+
+        Backward compat — already-printed labels with raw int ids hit
+        path #1 and resolve exactly as before.
+        """
+        # Path 1 — int parse (legacy + non-name idents)
+        try:
+            rid = int(ident)
+            rec = self.env["mrp.production"].browse(rid).exists()
+            if rec:
+                rec.check_access_rights("read")
+                rec.check_access_rule("read")
+                return rec
+        except (TypeError, ValueError):
+            pass
+        # Path 2 — name lookup
+        if isinstance(ident, str):
+            Mo = self.env["mrp.production"].sudo()
+            # Exact match first.
+            rec = Mo.search([("name", "=", ident)], limit=1)
+            if not rec:
+                # Path 3 — ECO-rebuild fan-out (name + numeric suffix).
+                # E.g. printed label says WH/MO/00023; ECO rebuilt to
+                # WH/MO/00023-1 → resolve to the most recent one.
+                rec = Mo.search(
+                    [("name", "=ilike", f"{ident}%")],
+                    order="id desc", limit=1,
+                )
+            if rec:
+                # Re-bind via env(user=self.env.user) so ACL holds.
+                rec = self.env["mrp.production"].browse(rec.id)
+                rec.check_access_rights("read")
+                rec.check_access_rule("read")
+                return rec
+        # Fall through to default int-only error path
+        return super().get_record(ident)
+
+    @api.model
     def handle_action(self, record, action, params):
         if action == "done":
             if hasattr(record, "button_mark_done"):

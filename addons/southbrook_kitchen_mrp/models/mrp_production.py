@@ -233,27 +233,61 @@ class MrpProduction(models.Model):
     # on every access anyway — no stale-cache risk.
     @api.depends("name")
     def _compute_sbk_label_qr(self):
+        """W055 / R1.12 — emit a signed sb://mo/<ident> payload routed
+        through /sb/qr/scan?p=... instead of a raw MO id URL.
+
+        Why: when an ECO triggers MO rebuild, the new MO gets a new id.
+        Previously printed labels then pointed at a dead id. The signed
+        payload encodes the MO's *name* (e.g. WH/MO/00023) when set —
+        which the ECO rebuild preserves — and falls back to the raw id
+        only for MOs that never got a name.
+
+        Backward compatibility: ALREADY-PRINTED labels carrying the old
+        raw `/odoo/action-mrp.mrp_production_action/<id>` URL still
+        resolve correctly because the scanner opens the URL directly
+        in the browser — Odoo's own MO route renders the MO form. The
+        only behavior change is for labels printed FROM NOW ON.
+        """
         Param = self.env["ir.config_parameter"].sudo()
         base = (Param.get_param("web.base.url") or "").rstrip("/")
+        Payload = (
+            self.env["southbrook.qr.payload"]
+            if "southbrook.qr.payload" in self.env else None
+        )
         for rec in self:
             if not rec.id:
                 rec.sbk_label_qr_url = ""
                 rec.sbk_label_qr_image = False
                 continue
-            # Authenticated operator scans → opens MO form. Works
-            # without the qr_kit signed-URL infrastructure being on
-            # this branch.
-            url = (
-                f"{base}/odoo/action-mrp.mrp_production_action/{rec.id}"
-                if base else f"/odoo/action-mrp.mrp_production_action/{rec.id}"
-            )
+            # Prefer the MO name (WH/MO/00023 style) — it survives ECO
+            # MO rebuild via the production_id chain. Falls back to the
+            # bare id for MOs without names (legacy/draft state).
+            ident = (rec.name or "").strip() or str(rec.id)
+            if Payload is not None:
+                signed = Payload.build("mo", ident)
+                from urllib.parse import quote
+                url = (
+                    f"{base}/sb/qr/scan?p={quote(signed, safe='')}"
+                    if base
+                    else f"/sb/qr/scan?p={quote(signed, safe='')}"
+                )
+            else:
+                # Defensive — qr_kit is a hard depend in __manifest__,
+                # but keep the legacy raw-URL path so a partial registry
+                # never produces a blank label.
+                url = (
+                    f"{base}/odoo/action-mrp.mrp_production_action/{rec.id}"
+                    if base
+                    else f"/odoo/action-mrp.mrp_production_action/{rec.id}"
+                )
             # W007 — embed engineering revision code in the QR payload
-            # when present. Backward-compatible: NULL/empty rev → no
-            # change to the URL.
+            # when present. Appended as an extra query param so the
+            # signed sb:// payload is untouched.
             rev = (getattr(rec, "pg_revision_code", "") or "").strip()
             if rev:
                 from urllib.parse import quote
-                url = f"{url}?rev={quote(rev, safe='')}"
+                sep = "&" if "?" in url else "?"
+                url = f"{url}{sep}rev={quote(rev, safe='')}"
             rec.sbk_label_qr_url = url
             try:
                 import qrcode  # noqa: WPS433 — optional at compute time
