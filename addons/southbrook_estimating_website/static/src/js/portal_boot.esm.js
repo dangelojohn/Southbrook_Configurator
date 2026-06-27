@@ -1169,6 +1169,17 @@ class ZoneGroup extends Component {
                     <div/>
                 </div>
                 <t t-foreach="props.lines" t-as="line" t-key="line.id">
+                    <!-- Phase 3.D — per-line status chip. Hidden when no
+                         room is configured (chipStatus returns null). The
+                         OrderLine row hosts its own grid; the chip sits
+                         to its left as a sibling so click targets stay
+                         clean. -->
+                    <t t-set="chipStatus" t-value="_lineStatus(line)"/>
+                    <small t-if="chipStatus"
+                           class="sb-room-chip-status"
+                           t-att-class="'sb-room-chip-status--' + chipStatus"
+                           t-att-title="_chipTitle(chipStatus)"
+                           t-esc="_chipDot(chipStatus)"/>
                     <OrderLine line="line"
                                isSelected="line.id === props.selectedLineId"
                                onSelect="props.onSelectLine"/>
@@ -1191,6 +1202,24 @@ class ZoneGroup extends Component {
                         + Add to <t t-esc="props.zone.label"/>
                     </button>
                 </div>
+                <!-- Phase 3.D — per-zone wall-summary footer. Only
+                     renders when every line in the zone points at the
+                     same wall (single-wall zone); otherwise stays
+                     silent so multi-wall zones aren't misrepresented. -->
+                <t t-set="wallSummary" t-value="_singleWallSummary()"/>
+                <div t-if="wallSummary"
+                     class="sb-room-zone-wall-summary">
+                    <span class="sb-room-zone-wall-name">
+                        Wall: <t t-esc="wallSummary.name"/>
+                    </span>
+                    <span class="sb-room-zone-wall-cap mono">
+                        <t t-esc="wallSummary.used_mm"/>/<t t-esc="wallSummary.length_mm"/>mm used
+                    </span>
+                    <span class="sb-room-zone-wall-rem mono"
+                          t-att-class="wallSummary.remaining_mm &lt; 0 ? 'sb-room-zone-wall-rem--over' : ''">
+                        <t t-esc="wallSummary.remaining_mm"/>mm left
+                    </span>
+                </div>
             </div>
         </div>
     `;
@@ -1205,6 +1234,11 @@ class ZoneGroup extends Component {
         // Phase 3 Sprint C2 — issuesForLine(line_id) -> Array of
         // validation issues filtered to the given line.
         issuesForLine: Function,
+        // Phase 3.D — the order's room payload (mirror of state.room on
+        // the parent OrderBuilder). Null when no room is configured;
+        // in that case _lineStatus returns null and chips don't render
+        // and the wall-summary footer stays silent.
+        room: { type: [Object, { value: null }], optional: true },
     };
 
     setup() {
@@ -1214,6 +1248,47 @@ class ZoneGroup extends Component {
     _toggle = () => {
         this.state.collapsed = !this.state.collapsed;
     };
+
+    // Phase 3.D — derive the chip status for one line. Pure function
+    // of (line, props.room); no new state, recomputes per render so
+    // OWL handles reactivity naturally.
+    _lineStatus(line) {
+        if (!this.props.room) return null;
+        if (!line.wall_id) return "unplaced";
+        const walls = this.props.room.walls || [];
+        const wall = walls.find((w) => w.id === line.wall_id);
+        if (wall && wall.has_conflicts) return "conflict";
+        return "placed";
+    }
+
+    _chipDot(status) {
+        // U+25CF (BLACK CIRCLE) — accessible to screen readers via the
+        // title attribute; visual colour is handled by the SCSS variant.
+        return "●";
+    }
+
+    _chipTitle(status) {
+        return {
+            placed:   "Placed on a wall",
+            unplaced: "Not yet placed on a wall",
+            conflict: "Wall has a placement conflict",
+        }[status] || "";
+    }
+
+    // Phase 3.D — collapse-to-summary when every line in the zone
+    // points at the same wall. Returns the wall dict or null.
+    _singleWallSummary() {
+        if (!this.props.room) return null;
+        const lines = this.props.lines || [];
+        if (!lines.length) return null;
+        const firstId = lines[0].wall_id;
+        if (!firstId) return null;
+        for (const l of lines) {
+            if (l.wall_id !== firstId) return null;
+        }
+        const walls = this.props.room.walls || [];
+        return walls.find((w) => w.id === firstId) || null;
+    }
 
     fmtUsd = fmtUsd;
 }
@@ -2366,6 +2441,39 @@ const TEMPLATE = xml`
                             on this order
                         </span>
                     </div>
+
+                    <!-- Phase 3.D — collapsible warning banner. Renders
+                         only when _warnings() returns at least one entry.
+                         Headline shows the count; expand/collapse toggles
+                         the bullet list. Each bullet stays static text in
+                         3.D; 3.C will wire click → zone/wall focus. -->
+                    <t t-set="warnings" t-value="_warnings()"/>
+                    <div t-if="warnings.length"
+                         class="sb-room-warn-banner"
+                         t-att-class="state.ui.warnings_expanded ? 'sb-room-warn-banner--open' : ''">
+                        <button type="button"
+                                class="sb-room-warn-banner-head"
+                                t-on-click="_toggleWarnings"
+                                t-att-aria-expanded="state.ui.warnings_expanded ? 'true' : 'false'">
+                            <span class="sb-room-warn-icon" aria-hidden="true">⚠</span>
+                            <span class="sb-room-warn-headline">
+                                <t t-esc="warnings.length"/>
+                                <t t-if="warnings.length === 1"> issue found</t>
+                                <t t-else=""> issues found</t>
+                            </span>
+                            <span class="sb-room-warn-chevron" aria-hidden="true">
+                                <t t-if="state.ui.warnings_expanded">▾</t>
+                                <t t-else="">▸</t>
+                            </span>
+                        </button>
+                        <ul t-if="state.ui.warnings_expanded"
+                            class="sb-room-warn-list">
+                            <li t-foreach="warnings" t-as="w" t-key="w_index"
+                                class="sb-room-warn-item"
+                                t-esc="w"/>
+                        </ul>
+                    </div>
+
                     <!-- onSelectLine / onLineSaved are pre-bound in
                          setup() so plain-reference props carry 'this'
                          correctly. -->
@@ -2378,7 +2486,8 @@ const TEMPLATE = xml`
                                onSelectLine="_setSelectedLine"
                                onLineSaved="_onLineSaved"
                                onAddToZone="_onAddToZone"
-                               issuesForLine="_issuesForLine"/>
+                               issuesForLine="_issuesForLine"
+                               room="state.room"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
@@ -2597,6 +2706,11 @@ class OrderBuilder extends Component {
                 // wizard is mounted. Future wizards (e.g. cabinet
                 // bulk-edit) can reuse this slot.
                 wizard: null,
+                // Phase 3.D — collapsible warning banner above the
+                // Order Lines list. Starts collapsed; the headline
+                // ("⚠ N issues found") is always visible; bullet
+                // list appears only when expanded.
+                warnings_expanded: false,
             },
         });
         // Pre-bind handler methods to this. OWL's template compiler
@@ -3186,6 +3300,88 @@ class OrderBuilder extends Component {
     _issuesForLine = (lineId) => {
         return (this.state.validation || [])
             .filter((iss) => iss && iss.line_id === lineId);
+    };
+
+    // ------------------------------------------------------------------
+    // Phase 3.D — smart inline warnings on the Order Lines tab.
+    //
+    // _lineStatus / _warnings are the data side of the same UX surface:
+    //   • _lineStatus(line)  → "placed" / "unplaced" / "conflict" / null.
+    //     Passed by ZoneGroup itself (each ZoneGroup gets state.room as
+    //     a prop) — kept on the parent ONLY so dealer-facing scripts /
+    //     future test hooks have a single canonical implementation to
+    //     reach for. The ZoneGroup template hosts its own _lineStatus
+    //     mirror for perf (avoids one prop-callback per row × render).
+    //   • _warnings()         → array of human-readable warning strings
+    //     used to populate the collapsible banner. Pulls from:
+    //       - per-wall: wall.remaining_mm < 0 → over capacity by N mm
+    //       - per-wall: wall.has_conflicts    → placement conflict
+    //       - per-order: lines with no wall_id when a room exists
+    //
+    // Returns [] (not null) when there's nothing to warn about so the
+    // template's t-if check is a simple .length read.
+    // ------------------------------------------------------------------
+
+    _lineStatus(line) {
+        const room = this.state.room;
+        if (!room) return null;
+        if (!line.wall_id) return "unplaced";
+        const walls = room.walls || [];
+        const wall = walls.find((w) => w.id === line.wall_id);
+        if (wall && wall.has_conflicts) return "conflict";
+        return "placed";
+    }
+
+    _warnings() {
+        const out = [];
+        const room = this.state.room;
+        if (!room) return out;
+        const walls = room.walls || [];
+
+        // Over-capacity walls (one bullet each).
+        for (const w of walls) {
+            if (typeof w.remaining_mm === "number" && w.remaining_mm < 0) {
+                const over = -w.remaining_mm;
+                out.push(
+                    "Wall " + (w.name || "?") + " is over capacity by "
+                    + over + "mm",
+                );
+            }
+        }
+
+        // Wall conflicts (one bullet per wall, not per line).
+        const conflictWalls = walls.filter((w) => w.has_conflicts);
+        if (conflictWalls.length === 1) {
+            const w = conflictWalls[0];
+            out.push(
+                "Wall " + (w.name || "?") + " has a placement conflict",
+            );
+        } else if (conflictWalls.length > 1) {
+            const names = conflictWalls
+                .map((w) => w.name || "?")
+                .join(", ");
+            out.push(
+                conflictWalls.length + " walls have placement conflicts ("
+                + names + ")",
+            );
+        }
+
+        // Unplaced cabinets (one rolled-up bullet).
+        const unplaced = (this.state.lines || [])
+            .filter((l) => !l.wall_id).length;
+        if (unplaced > 0) {
+            out.push(
+                unplaced + " "
+                + (unplaced === 1 ? "cabinet has" : "cabinets have")
+                + " no wall assigned",
+            );
+        }
+
+        return out;
+    }
+
+    _toggleWarnings = () => {
+        this.state.ui.warnings_expanded = !this.state.ui.warnings_expanded;
     };
 
     _setSelectedLine = (lineId) => {
