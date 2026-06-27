@@ -47,6 +47,12 @@
                             <field name="x_sbk_workorder_id"/>
                             <field name="x_sbk_workcenter_id" readonly="1"/>
                             <field name="x_sbk_inspector_id"/>
+                            <!-- W044 (R5.8) — operator-at-the-bench
+                                 attribution. Distinct from inspector.
+                                 Resolves from the most recent PIN-gated
+                                 scan_log row on the WO. -->
+                            <field name="x_sbk_operator_who_caused_defect_id"
+                                   readonly="1"/>
                             <field name="x_sbk_date_checked"/>
                             <field name="x_sbk_check_stage"/>
                         </group>
@@ -114,6 +120,13 @@
             <pivot string="NCR Analysis" sample="1">
                 <field name="x_sbk_check_stage" type="row"/>
                 <field name="x_sbk_defect_type" type="row"/>
+                <!-- W044 (R5.8) — pareto-by-operator surface.
+                     Stored compute reads the most recent PIN-gated
+                     scan_log row on the WO; rows are now stage ×
+                     defect_type × operator so the supervisor can
+                     spot the "same operator, same defect" cluster
+                     without an Excel export. -->
+                <field name="x_sbk_operator_who_caused_defect_id" type="row"/>
                 <field name="create_date" type="col" interval="week"/>
             </pivot>
         </field>
@@ -149,7 +162,7 @@
         <field name="context">{
             'search_default_pending_rework': 1,
             'pivot_measures': ['__count'],
-            'pivot_row_groupby': ['x_sbk_check_stage', 'x_sbk_defect_type'],
+            'pivot_row_groupby': ['x_sbk_check_stage', 'x_sbk_defect_type', 'x_sbk_operator_who_caused_defect_id'],
             'pivot_column_groupby': ['create_date:week'],
             'graph_measure': '__count',
             'graph_mode': 'bar',
@@ -191,6 +204,10 @@
                             context="{'group_by':'x_sbk_check_stage'}"/>
                     <filter name="group_workcenter" string="Workcenter"
                             context="{'group_by':'x_sbk_workcenter_id'}"/>
+                    <!-- W044 (R5.8) — operator-attribution groupby
+                         for pareto-by-operator NCR review. -->
+                    <filter name="group_operator" string="Operator"
+                            context="{'group_by':'x_sbk_operator_who_caused_defect_id'}"/>
                 </group>
             </search>
         </field>

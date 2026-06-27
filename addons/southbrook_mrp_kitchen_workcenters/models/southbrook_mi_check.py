@@ -133,6 +133,76 @@ class SouthbrookMiCheck(models.Model):
         default=fields.Datetime.now,
     )
 
+    # W044 (R5.8, 2026-06-27) — pareto-by-operator attribution.
+    #
+    # JTBD: "When I'm tracking defect root cause this quarter, I want
+    # to see which operator is producing the most NCRs so I can pair
+    # them with the senior on the next shift." Without an operator
+    # field on mi.check, the only attribution we have is
+    # x_sbk_inspector_id — which credits the QC person who *found*
+    # the defect, not the operator who *caused* it.
+    #
+    # Strategy (per W044 spec, stored-compute branch — NOT stored-related):
+    #   We can't use a stored related from x_sbk_workorder_id.user_id
+    #   because (a) mrp.workorder doesn't track operator-attribution
+    #   directly in v19 CE — Odoo uses mrp.workcenter.productivity
+    #   rows for per-block credit — and (b) the value we actually want
+    #   is "who was at the bench when the part went through", which
+    #   maps cleanly to the most-recent scan-log row stamped during
+    #   W035 PIN-gated scanning.
+    #
+    # The compute walks `southbrook.qr.scan.log` for the WO's most
+    # recent scan with kind='wo' and a populated employee_id, sorted
+    # by create_date desc. Bounded scope: only checks where x_sbk_
+    # workorder_id is set; otherwise the operator field stays empty
+    # (consistent with not-applicable). Stored so the Pareto pivot/
+    # graph groupby is cheap (no per-row resolver hit).
+    #
+    # Depends are conservative — the value can change post-create if
+    # a fresh scan lands; the standard recompute hooks fire when an
+    # NCR is created (scan_log already in place at that moment) and
+    # when x_sbk_workorder_id is rebound (e.g. follow-up reinspection
+    # spawn rebinds to the rework WO). We do NOT add scan_log as a
+    # depends source — that would require depends_context tracking we
+    # don't currently support, and the field is acceptable as a
+    # snapshot at NCR-create time rather than continuously re-resolving.
+    x_sbk_operator_who_caused_defect_id = fields.Many2one(
+        comodel_name="hr.employee",
+        string="Operator (Caused Defect)",
+        compute="_compute_operator_who_caused_defect",
+        store=True,
+        index=True,
+        readonly=True,
+        help="The shop-floor operator at the bench when the defect was "
+             "produced — resolved from the most recent PIN-gated QR "
+             "scan_log row tied to this WO. Distinct from "
+             "x_sbk_inspector_id (the QC person who found the "
+             "defect). Drives the pareto-by-operator NCR pivot.",
+    )
+
+    @api.depends("x_sbk_workorder_id")
+    def _compute_operator_who_caused_defect(self):
+        Log = self.env["southbrook.qr.scan.log"].sudo()
+        for check in self:
+            if not check.x_sbk_workorder_id:
+                check.x_sbk_operator_who_caused_defect_id = False
+                continue
+            # Most recent scan-log row on this WO with employee_id set.
+            # We accept any action — `wo`/`start`/`finish`/`form_open`
+            # all credit the operator who was at the bench. Restricting
+            # to start/finish would miss the form_open path that W035
+            # also stamps and would weaken the attribution for stations
+            # whose tablets read but never write WO state.
+            log = Log.search([
+                ("target_model", "=", "mrp.workorder"),
+                ("target_id", "=", check.x_sbk_workorder_id.id),
+                ("employee_id", "!=", False),
+                ("result", "=", "ok"),
+            ], order="create_date desc, id desc", limit=1)
+            check.x_sbk_operator_who_caused_defect_id = (
+                log.employee_id.id if log else False
+            )
+
     # Rework wiring.
     x_sbk_rework_required = fields.Boolean(
         string="Rework Required",
