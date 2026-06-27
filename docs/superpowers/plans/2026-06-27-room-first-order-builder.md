@@ -1001,6 +1001,28 @@ Drag a placed cabinet along its current wall to fine-tune `position_from_left_mm
 
 **Skip-in-this-batch**: drag the unplaced sidebar cabinet INTO the floor plan to assign (the brief's "drag from sidebar" option). That's drag-and-drop across a component boundary — harder. The existing "Assign…" button covers it for now.
 
+#### Phase 3.C.2d — Interactive wall resize on the floor plan (re-activated)
+
+"Stretch the room" UX — drag a wall endpoint to lengthen/shorten in real time. Mirrors the cabinet-drag pattern from 3.C.2b.
+
+**Scope:**
+- Handle at OUTER endpoints only — inner shared corners (l_shape/u_shape/galley/g_shape) stay fixed; resizing one wall does not displace the corner where two walls meet. Outer endpoint of wall A in l_shape = (0, 0). Outer endpoint of wall B in l_shape = (lenA, lenB). Etc.
+- Drag the handle → new length projects to wall's direction unit vector.
+- Snap-to-25mm on drop.
+- POST `/room/<rid>/update` with `{walls: [{id, length_mm}]}` (Phase 2.A endpoint already supports upsert).
+- Side effect: cabinets that no longer fit fire `has_conflicts` via the existing wall compute — surface via the existing Phase 3.D warning banner ("Wall A is over capacity by Nmm"). No server-side mutation; let the user resolve.
+- Mobile fallback: `+ / −` length buttons in the per-wall metrics sidebar (NOT on the SVG — small handles are fiddly on touch).
+- Visual: handle = small filled circle at the outer endpoint, exposed on hover (desktop) or always (touch); on drag, dashed preview line shows the new endpoint position; original wall stays low-opacity as ghost.
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js` — add wall-drag handlers + `_outerEndpointFor(wall)` helper + handle rendering
+- Modify: `addons/southbrook_estimating_website/static/src/xml/room_layout.xml` — render handle `<circle>` per wall + ghost line during drag
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss` — handle cursor + hover + drag styles
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js` — new `_onWallResizeEnd(wallId, newLengthMm)` callback wired into `<RoomLayoutTab>`; POSTs `/room/update` and refreshes
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` — bump `19.0.14.0.0` → `19.0.15.0.0`
+
+**Server-side**: NO endpoint changes. `/room/<rid>/update` already accepts `walls: [{id, length_mm}]`. Server computes on the wall (`used_mm`/`remaining_mm`/`has_conflicts`) recompute on demand. Lines that overshoot the new length surface as conflicts.
+
 #### Phase 3.C.2c — Elevation view toggle (re-activated)
 
 Side-on view of a single wall's cabinets at their Y heights, with floor line + ceiling line + worktop line + constraints (windows, doors at correct Y positions). Lets the user verify upper/base/tall stack visually.
