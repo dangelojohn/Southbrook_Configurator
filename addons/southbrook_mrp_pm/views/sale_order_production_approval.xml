@@ -46,6 +46,36 @@
                        decoration-danger="production_approval_state == 'rejected'"/>
             </header>
 
+            <!--
+              W009 — Production-approval HARD GATE bypass.
+              Manager-only (sales_team.group_sale_manager). Every flip
+              of force_production_release is auto-tracked into chatter
+              via tracking=True on the field. Placed inside the
+              notebook as its own page so it's reachable in every
+              order state (the existing Production Approval page is
+              hidden when state='none' which is exactly when a manager
+              might want to set the bypass pre-confirm). Only sales
+              managers see the page at all.
+            -->
+            <xpath expr="//page[@name='production_approval']"
+                   position="after">
+                <page name="production_approval_bypass"
+                      string="Approval Bypass"
+                      groups="sales_team.group_sale_manager"
+                      invisible="production_approval_state == 'approved'">
+                    <group>
+                        <field name="force_production_release"/>
+                    </group>
+                    <p class="text-muted">
+                        Manager-only override. When checked, this order can be
+                        confirmed even if production approval was not granted.
+                        Use sparingly — every flip is logged in the order
+                        chatter for audit. Prefer the normal Request → Approve
+                        flow.
+                    </p>
+                </page>
+            </xpath>
+
             <notebook position="inside">
                 <page name="production_approval"
                       string="Production Approval"

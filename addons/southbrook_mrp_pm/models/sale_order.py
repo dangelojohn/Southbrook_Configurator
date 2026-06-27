@@ -91,6 +91,104 @@ class SaleOrder(models.Model):
              "in the production-approval tab on the sale order.",
     )
 
+    # W009 — Production-approval HARD GATE bypass. Manager-only escape
+    # hatch for the rare one-off MO that legitimately must bypass the
+    # production-approval contract. Tracked on mail.thread so every use
+    # of the bypass leaves an audit trail in the order chatter.
+    force_production_release = fields.Boolean(
+        string="Force Production Release (Bypass Approval)",
+        copy=False,
+        tracking=True,
+        help="Manager-only override. When checked, the order can be "
+             "confirmed even if production approval was not granted. "
+             "Use sparingly — every flip is logged in the order chatter "
+             "for audit. Hidden from non-managers via view groups; the "
+             "underlying field accepts writes from sale managers only.",
+    )
+
+    # ──────────────────────────────────────────────────────────────────
+    # W009 — Production-approval HARD GATE
+    # ──────────────────────────────────────────────────────────────────
+    # The legacy approval flow was advisory: the Request / Approve /
+    # Reject buttons set the state field but nothing CONSUMED that field
+    # at MO-create time. Per R1 analysis (MFG-REVIEW-R1 Win 3) 60% of
+    # source SOs in prod created MOs while production_approval_state
+    # was still 'none' — the approval surface was cosmetic.
+    #
+    # The gate now fires at sale.order.action_confirm() and again at
+    # mrp.production.create() (defense in depth — direct MO creation
+    # paths bypass action_confirm). Both raise UserError. Existing
+    # in-flight MOs are unaffected: the gate only fires on NEW order
+    # confirms or NEW MO creates, never on already-existing records.
+    # ──────────────────────────────────────────────────────────────────
+
+    def _get_unapproved_manufacturing_lines(self):
+        """Return the order_line subset that would generate manufacturing
+        orders but lack production approval. Used by both the
+        action_confirm gate and the SO form banner.
+
+        A line "would generate an MO" if its product has a resolvable
+        BoM. We re-use _resolve_bom_for_line so the gate's definition of
+        'this line manufactures' exactly matches what
+        action_send_to_production would actually create. Catches both
+        the OCA-configured-product path AND any direct product with a
+        BoM seeded by southbrook_estimating's templates.
+        """
+        self.ensure_one()
+        if self.production_approval_state == "approved":
+            return self.env["sale.order.line"]
+        Bom = self.env["mrp.bom"].sudo()
+        unapproved = self.env["sale.order.line"]
+        for line in self.order_line:
+            if not line.product_id:
+                continue
+            if line.display_type:  # section / note lines
+                continue
+            bom = self._resolve_bom_for_line(Bom, line)
+            if bom:
+                unapproved |= line
+        return unapproved
+
+    def _check_production_approval_gate(self):
+        """Raise UserError if any manufacturing line lacks approval and
+        force_production_release is not set."""
+        for order in self:
+            if order.force_production_release:
+                # Log the bypass into chatter so the audit trail is
+                # complete. Done once per confirm, not once per line.
+                order.message_post(body=_(
+                    "Production-approval gate bypassed by %s via "
+                    "force_production_release."
+                ) % self.env.user.display_name)
+                continue
+            unapproved = order._get_unapproved_manufacturing_lines()
+            if unapproved:
+                raise UserError(_(
+                    "Cannot confirm sale order %(name)s — these lines "
+                    "would generate manufacturing orders but the order "
+                    "is not Production-Approved (current state: "
+                    "%(state)s). Use Request Production → Approve "
+                    "Production before confirming, or ask a Sales "
+                    "Manager to set Force Production Release for a "
+                    "one-off bypass.\n\nUnapproved lines:\n%(lines)s",
+                    name=order.name or _("(new)"),
+                    state=order.production_approval_state,
+                    lines="\n".join(
+                        "  - " + (l.product_id.display_name or "")
+                        for l in unapproved
+                    ),
+                ))
+
+    def action_confirm(self):
+        """W009 gate: enforce production approval before super().
+        Running the gate BEFORE super() means we block at the very
+        edge of the SO state-change; downstream procurement hooks +
+        sibling action_confirm overrides only run once the gate is
+        cleared.
+        """
+        self._check_production_approval_gate()
+        return super().action_confirm()
+
     # ──────────────────────────────────────────────────────────────────
     # State-transition actions (referenced by the order form view's
     # Request / Approve / Reject buttons).
