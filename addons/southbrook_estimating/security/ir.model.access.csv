@@ -10,7 +10,7 @@ access_southbrook_builder_po_intake_manager,southbrook.builder.po.intake manager
 access_southbrook_builder_po_intake_line_sales,southbrook.builder.po.intake.line sales,model_southbrook_builder_po_intake_line,sales_team.group_sale_salesman,1,1,1,1
 access_southbrook_builder_po_intake_line_manager,southbrook.builder.po.intake.line manager,model_southbrook_builder_po_intake_line,sales_team.group_sale_manager,1,1,1,1
 access_southbrook_room_user,southbrook.room user,model_southbrook_room,base.group_user,1,0,0,0
-access_southbrook_room_sales,southbrook.room sales,model_southbrook_room,sales_team.group_sale_salesman,1,1,1,0
+access_southbrook_room_sales,southbrook.room sales,model_southbrook_room,sales_team.group_sale_salesman,1,1,1,1
 access_southbrook_room_manager,southbrook.room manager,model_southbrook_room,sales_team.group_sale_manager,1,1,1,1
 access_southbrook_room_wall_user,southbrook.room.wall user,model_southbrook_room_wall,base.group_user,1,0,0,0
 access_southbrook_room_wall_sales,southbrook.room.wall sales,model_southbrook_room_wall,sales_team.group_sale_salesman,1,1,1,1

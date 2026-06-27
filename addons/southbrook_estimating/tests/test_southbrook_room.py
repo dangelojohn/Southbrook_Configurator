@@ -85,3 +85,33 @@ class TestSouthbrookRoom(TransactionCase):
             "name": "Imp", "order_id": self.order.id, "unit_preference": "imperial",
         })
         self.assertEqual(room.unit_preference, "imperial")
+
+    def test_action_open_southbrook_room_single(self):
+        room = self.env["southbrook.room"].create({
+            "name": "Solo", "order_id": self.order.id,
+        })
+        action = self.order.action_open_southbrook_room()
+        self.assertEqual(action.get("res_id"), room.id)
+        self.assertIn(("False", "form"), [(str(v[0]), v[1]) for v in action.get("views", [])])
+
+    def test_action_open_southbrook_room_multi(self):
+        self.env["southbrook.room"].create({"name": "A", "order_id": self.order.id})
+        self.env["southbrook.room"].create({"name": "B", "order_id": self.order.id})
+        action = self.order.action_open_southbrook_room()
+        self.assertEqual(action.get("domain"), [("order_id", "=", self.order.id)])
+        self.assertNotIn("res_id", action)
+
+    def test_room_count_compute(self):
+        self.assertEqual(self.order.room_count, 0)
+        self.env["southbrook.room"].create({"name": "X", "order_id": self.order.id})
+        self.order.invalidate_recordset(["room_count"])
+        self.assertEqual(self.order.room_count, 1)
+
+    def test_room_ids_copy_false_on_duplicate(self):
+        self.env["southbrook.room"].create({
+            "name": "Original", "order_id": self.order.id,
+        })
+        new_order = self.order.copy()
+        self.assertEqual(
+            len(new_order.room_ids), 0,
+            "room_ids must not propagate on copy (NF6 — v2 starts with fresh measurement)")

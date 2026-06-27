@@ -37,6 +37,11 @@ class SouthbrookRoomWall(models.Model):
     has_conflicts = fields.Boolean(
         compute="_compute_conflicts", store=False)
 
+    # sb_width_mm is itself a non-stored compute on sale.order.line that
+    # also depends on `name` (line free-text). Capacity recomputes when
+    # sb_width_mm's SOURCE fields move (product_id, PTAVs, qty) but NOT
+    # on line.name edits alone — acceptable since names are only edited
+    # interactively for demo-seed lines.
     @api.depends("cabinet_line_ids.sb_width_mm", "cabinet_line_ids.product_uom_qty", "length_mm")
     def _compute_capacity(self):
         for rec in self:
@@ -47,12 +52,16 @@ class SouthbrookRoomWall(models.Model):
             rec.used_mm = int(round(used))
             rec.remaining_mm = (rec.length_mm or 0) - rec.used_mm
 
+    # O2m membership (`cabinet_line_ids`) implicitly invalidates when a
+    # line's wall_id changes — listing it as a separate depends entry is
+    # redundant. Payload fields below are what actually drive recompute.
     @api.depends(
-        "cabinet_line_ids.wall_id",
+        "cabinet_line_ids",
         "cabinet_line_ids.position_from_left_mm",
         "cabinet_line_ids.sb_width_mm",
         "constraint_ids.distance_from_left_mm",
         "constraint_ids.width_mm",
+        "constraint_ids.constraint_type",
     )
     def _compute_conflicts(self):
         for rec in self:

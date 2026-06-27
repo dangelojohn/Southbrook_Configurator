@@ -171,8 +171,12 @@ class SaleOrder(models.Model):
     # ------------------------------------------------------------------
     # Room-First UX (Phase 1.3) — O2m to southbrook.room + smart button.
     # ------------------------------------------------------------------
+    # copy=False per NF6 — Duplicate-as-Draft (v1 → v2) typically wants
+    # a fresh room measurement, not a carbon-copy. If a future workflow
+    # needs the room cloned across versions, flip this and add an
+    # explicit override on action_duplicate_as_draft.
     room_ids = fields.One2many(
-        "southbrook.room", "order_id", string="Rooms")
+        "southbrook.room", "order_id", string="Rooms", copy=False)
     room_count = fields.Integer(
         compute="_compute_room_count", store=False)
 

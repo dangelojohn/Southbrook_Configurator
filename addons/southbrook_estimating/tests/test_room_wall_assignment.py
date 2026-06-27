@@ -71,3 +71,55 @@ class TestRoomWallAssignment(TransactionCase):
         new_line = new_order.order_line[0]
         self.assertFalse(new_line.wall_id, "wall_id must not propagate on copy (NF6)")
         self.assertFalse(new_line.position_from_left_mm)
+
+    def test_no_conflict_happy_path(self):
+        # Window 600mm wide at 1000mm from wall A's left corner
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": self.wall_a.id, "constraint_type": "window",
+            "distance_from_left_mm": 1000, "width_mm": 600,
+        })
+        # Cabinet to the LEFT of the window (0-600), no overlap with 1000-1600
+        self.env["sale.order.line"].create({
+            "order_id": self.order.id, "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+            "wall_id": self.wall_a.id, "position_from_left_mm": 0,
+        })
+        self.wall_a.invalidate_recordset(["has_conflicts"])
+        self.assertFalse(self.wall_a.has_conflicts)
+
+    def test_power_outlet_does_not_trigger_conflict(self):
+        # Power outlet is intentionally excluded from collision geometry —
+        # cabinets cover outlets all the time, that is fine.
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": self.wall_a.id, "constraint_type": "power_outlet",
+            "distance_from_left_mm": 200, "width_mm": 100,
+        })
+        self.env["sale.order.line"].create({
+            "order_id": self.order.id, "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+            "wall_id": self.wall_a.id, "position_from_left_mm": 0,
+        })
+        self.wall_a.invalidate_recordset(["has_conflicts"])
+        self.assertFalse(self.wall_a.has_conflicts)
+
+    def test_wall_unlink_cascades_constraints(self):
+        # Deleting a wall should cascade-delete its constraints AND
+        # set-null the wall_id on any cabinet line that was assigned
+        # to it (no orphan FKs).
+        c = self.env["southbrook.room.constraint"].create({
+            "wall_id": self.wall_a.id, "constraint_type": "window",
+            "distance_from_left_mm": 0, "width_mm": 100,
+        })
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id, "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+            "wall_id": self.wall_a.id, "position_from_left_mm": 1500,
+        })
+        c_id, line_id = c.id, line.id
+        self.wall_a.unlink()
+        self.assertFalse(
+            self.env["southbrook.room.constraint"].browse(c_id).exists(),
+            "constraint must cascade-delete with wall")
+        survived_line = self.env["sale.order.line"].browse(line_id)
+        self.assertTrue(survived_line.exists(), "line must survive wall delete")
+        self.assertFalse(survived_line.wall_id, "wall_id must be set NULL")
