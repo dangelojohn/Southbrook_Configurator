@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.40.0",
+    "version": "19.0.4.41.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -128,6 +128,9 @@ southbrook_kitchen_workspace) without duplicating their models.
         # WO form. Loads AFTER mrp_workorder_views.xml because the
         # view adds the launcher button.
         "wizards/southbrook_wo_raise_eco_wizard_views.xml",
+        # W040 (R2.4, 2026-06-27) — Report-a-Problem single-screen
+        # wizard. Same load-after-view rationale.
+        "wizards/southbrook_report_problem_wizard_views.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [

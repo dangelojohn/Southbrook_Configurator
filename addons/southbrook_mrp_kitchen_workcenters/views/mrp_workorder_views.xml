@@ -233,6 +233,14 @@
                                 string="Record Scrap"
                                 class="btn-warning"
                                 help="Open the stock.scrap wizard prefilled with this WO + MO. Auto-debits inventory."/>
+                        <!-- W040 (R2.4, 2026-06-27) — single-screen
+                             Report-a-Problem wizard. Logs scrap +
+                             defect + downtime in one transaction. -->
+                        <button name="action_sbk_open_report_problem_wizard"
+                                type="object"
+                                string="Report a Problem"
+                                class="btn-warning"
+                                help="One screen: scrap + defect + downtime. Atomic — all three land together or none do."/>
                         <!-- W034 (R4.W5, 2026-06-27) — raise an ECO
                              from this WO with photo + WO context. -->
                         <button name="action_sbk_raise_eco_wizard"

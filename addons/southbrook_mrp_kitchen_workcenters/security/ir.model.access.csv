@@ -21,3 +21,5 @@ access_sbk_capacity_day_mrp_user,southbrook.capacity.day mrp user,model_southbro
 access_sbk_capacity_day_mrp_manager,southbrook.capacity.day mrp manager,model_southbrook_capacity_day,mrp.group_mrp_manager,1,1,1,1
 access_sbk_wo_raise_eco_wizard_mrp_user,southbrook.wo.raise.eco.wizard mrp user,model_southbrook_wo_raise_eco_wizard,mrp.group_mrp_user,1,1,1,1
 access_sbk_wo_raise_eco_wizard_mrp_manager,southbrook.wo.raise.eco.wizard mrp manager,model_southbrook_wo_raise_eco_wizard,mrp.group_mrp_manager,1,1,1,1
+access_sbk_report_problem_wizard_mrp_user,southbrook.report.problem.wizard mrp user,model_southbrook_report_problem_wizard,mrp.group_mrp_user,1,1,1,1
+access_sbk_report_problem_wizard_mrp_manager,southbrook.report.problem.wizard mrp manager,model_southbrook_report_problem_wizard,mrp.group_mrp_manager,1,1,1,1
