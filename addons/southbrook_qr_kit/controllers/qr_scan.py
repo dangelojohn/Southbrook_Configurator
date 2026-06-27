@@ -159,6 +159,122 @@ class QrScanController(http.Controller):
         return request.make_response(body, headers=[
             ("Content-Type", "text/html; charset=utf-8")])
 
+    # ------------------------------------------------------------------
+    # W073 (R8.8, 2026-06-27) — Floor companion UI scaffolding.
+    # Two standalone OWL apps, served at /southbrook/floor/bin-scan and
+    # /southbrook/floor/load-unit. They reuse the existing JSON
+    # endpoints (/sb/qr/inventory/bin-scan, /sb/qr/shipping/load-unit)
+    # for the actual writes, and call a small read-only helper here to
+    # populate "what's currently in this bin" before the operator
+    # confirms the move.
+    # ------------------------------------------------------------------
+
+    @http.route("/sb/qr/inventory/bin-inspect", type="json", auth="user",
+                methods=["POST"])
+    def bin_inspect(self, bin=None, **kw):
+        """Read-only helper for the W073 BinScanScreen.
+
+        Body: { "bin": "sb://loc/<id>?...sig" }
+        Returns:
+          {ok:true, location:{id,name,complete_name},
+           quants:[{product_id,product_name,product_code,
+                    qty,uom,lot_name,package_name}, ...]}
+
+        Used to populate the "what's in this bin?" panel BEFORE the
+        operator scans the destination + confirms the move.
+        """
+        env = request.env
+        if not bin:
+            return {"ok": False, "error": "bin required"}
+        try:
+            parsed = env["southbrook.qr.payload"].sudo().parse(bin)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"parse: {exc}"}
+        if not parsed["valid_signature"]:
+            return {"ok": False, "error": "Invalid signature"}
+        if parsed["kind"] != "loc":
+            return {"ok": False, "error":
+                    f"bin-inspect requires 'loc' kind (got '{parsed['kind']}')"}
+        loc = env["stock.location"].browse(int(parsed["ident"])).exists()
+        if not loc:
+            return {"ok": False, "error": "Location not found"}
+        Quant = env["stock.quant"]
+        quants = Quant.search([
+            ("location_id", "=", loc.id),
+            ("quantity", ">", 0),
+        ], limit=200)
+        rows = []
+        for q in quants:
+            rows.append({
+                "product_id": q.product_id.id,
+                "product_name": q.product_id.display_name,
+                "product_code": q.product_id.default_code or "",
+                "qty": q.quantity,
+                "uom": q.product_uom_id.name if q.product_uom_id else "",
+                "lot_name": q.lot_id.name if q.lot_id else "",
+                "package_name": q.package_id.name if q.package_id else "",
+            })
+        return {
+            "ok": True,
+            "location": {
+                "id": loc.id,
+                "name": loc.name,
+                "complete_name": loc.complete_name or loc.name,
+            },
+            "quants": rows,
+        }
+
+    @http.route("/southbrook/floor/bin-scan", type="http", auth="user",
+                methods=["GET"], website=False)
+    def floor_bin_scan_page(self, **kw):
+        """W073 — standalone HTML host for the BinScanScreen OWL app.
+        The page itself is a thin shell that loads the lazy bundle
+        from web.assets_qr_floor (NOT web.assets_backend) so the
+        backend bundle stays slim. The OWL component mounts onto
+        #sb_floor_root."""
+        return self._render_floor_shell(
+            "bin-scan",
+            title="Bin Scan",
+            mount_attr="data-sb-floor-app=\"bin-scan\"",
+        )
+
+    @http.route("/southbrook/floor/load-unit", type="http", auth="user",
+                methods=["GET"], website=False)
+    def floor_load_unit_page(self, **kw):
+        """W073 — standalone HTML host for the LoadUnitScreen OWL app."""
+        return self._render_floor_shell(
+            "load-unit",
+            title="Load Unit",
+            mount_attr="data-sb-floor-app=\"load-unit\"",
+        )
+
+    def _render_floor_shell(self, app_name, title, mount_attr):
+        """Render the bare-minimum HTML host page for a floor OWL app.
+
+        Uses a QWeb template (`southbrook_qr_kit.floor_shell`) which
+        pulls in the dedicated lazy bundle `web.assets_qr_floor`. The
+        bundle contains only what these screens need: the OWL runtime
+        (auto-included by Odoo 19 when an .esm.js asset is present),
+        the W036 scan audio cues, the W037 offline scan queue glue,
+        and the floor_screens components.
+
+        Body carries `sb-dense` (W039 dense class) so touch targets
+        are already sized for tablet operator hands.
+        """
+        # request.render returns a Response with content-type text/html
+        # but the QWeb template renders the <html> tree only. Prepend
+        # the doctype manually so Safari + Chrome use standards mode
+        # (otherwise some lazy rendering quirks bite the OWL mount).
+        resp = request.render("southbrook_qr_kit.floor_shell", {
+            "title": title,
+            "app_name": app_name,
+        })
+        body = resp.get_data(as_text=True)
+        if not body.lstrip().lower().startswith("<!doctype"):
+            body = "<!DOCTYPE html>\n" + body
+            resp.set_data(body)
+        return resp
+
     @http.route("/sb/qr/sw.js", type="http", auth="public",
                 methods=["GET"], csrf=False)
     def service_worker(self, **kw):

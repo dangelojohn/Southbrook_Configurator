@@ -43,7 +43,7 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.9.0",
+    "version": "19.0.0.10.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
@@ -58,6 +58,7 @@ SECURITY:
         "views/southbrook_qr_scan_log_views.xml",
         "views/shipping_unit_views.xml",
         "views/truck_load_views.xml",
+        "views/floor_shell_template.xml",
         "wizards/southbrook_qr_label_print_wizard_views.xml",
     ],
     "external_dependencies": {
@@ -97,6 +98,21 @@ SECURITY:
             "southbrook_qr_kit/static/src/js/dark_mode_toggle.js",
             "southbrook_qr_kit/static/src/scss/dark_mode.scss",
             "southbrook_qr_kit/static/src/js/offline_scan_queue.js",
+        ],
+        # W073 (R8.8, 2026-06-27) — Floor companion UI (Bin Scan +
+        # Load Unit standalone screens). Lazy by route, not by bundle:
+        # the screens are gated behind `data-sb-floor-app` on the
+        # mount element, so the boot is a no-op on every other page
+        # in the frontend bundle. Net cost to non-floor pages is the
+        # one tiny `if (!root) return;` check at DOMContentLoaded.
+        # The scan-audio + offline-queue already live in the same
+        # bundle so they get reused; SCSS is body-class-scoped to
+        # `.sb_floor` so no other page is restyled.
+        "web.assets_qr_floor": [
+            "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
+            "southbrook_qr_kit/static/src/js/offline_scan_queue.js",
+            "southbrook_qr_kit/static/src/js/floor_screens.esm.js",
+            "southbrook_qr_kit/static/src/scss/floor_screens.scss",
         ],
     },
     "installable": True,

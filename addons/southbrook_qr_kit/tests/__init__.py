@@ -2,3 +2,4 @@
 from . import test_w035_pin_operator
 from . import test_w037_offline_scan_queue
 from . import test_w038_dark_mode
+from . import test_w073_floor_screens
