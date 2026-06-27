@@ -34,12 +34,15 @@
 <odoo>
 
     <record id="paperformat_avery_presta_94215" model="report.paperformat">
-        <field name="name">Avery Presta 94215 (3x4 in)</field>
+        <field name="name">Avery Presta 94215 (2-up row, 8x3 in)</field>
         <field name="format">custom</field>
-        <!-- v19 page_height/width are integer mm; 76.2 and 101.6
-             round to 76 and 102 (1 mm clip, well within label tolerance). -->
-        <field name="page_height">76</field>       <!-- 3 in ≈ 76 mm -->
-        <field name="page_width">102</field>       <!-- 4 in ≈ 102 mm -->
+        <!-- 2 identical labels per MO, printed side-by-side. Page is
+             one row of an Avery 94215 sheet: 2 columns × 3 in tall
+             = 8 in × 3 in (204 × 76 mm). v19 paperformat fields are
+             integer mm; the 0.4 mm clip on width is within label
+             tolerance. -->
+        <field name="page_height">76</field>       <!-- 3 in -->
+        <field name="page_width">204</field>       <!-- 8 in (2 × 4 in cells) -->
         <field name="orientation">Landscape</field>
         <field name="margin_top">2</field>
         <field name="margin_bottom">2</field>
@@ -62,17 +65,33 @@
         <field name="print_report_name">'Cabinet Label %s' % (object.name)</field>
     </record>
 
+    <!--
+        Main report — one page per MO. Each page is a row of two
+        identical labels, side-by-side, matching one row of an
+        Avery 94215 sheet (2 columns × 3 rows = 6 labels per sheet).
+        The shop floor uses two: one stuck to the cabinet itself,
+        one stapled to the shop traveller.
+    -->
     <template id="report_cabinet_label">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="mo">
-                <div class="page sbk-label">
+                <div class="page sbk-label-page">
                     <style>
-                        /* Letter-size constraints don't apply — we're
-                           on the 3x4 in custom paperformat. Force
-                           layout to that bounding box and tighten
-                           default Odoo report margins. */
-                        .sbk-label {
+                        /* 2-up row layout — page is 204 × 76 mm
+                           (8 in × 3 in landscape), each label is
+                           96 × 72 mm with a 4 mm gutter between them. */
+                        .sbk-label-page {
                             font-family: Arial, sans-serif;
+                            color: #000;
+                            width: 200mm;
+                            height: 72mm;
+                            display: flex;
+                            gap: 4mm;
+                            box-sizing: border-box;
+                            padding: 0;
+                            margin: 0;
+                        }
+                        .sbk-label {
                             color: #000;
                             width: 96mm;
                             height: 72mm;
@@ -80,6 +99,7 @@
                             padding: 2mm;
                             font-size: 9pt;
                             line-height: 1.15;
+                            flex-shrink: 0;
                         }
                         .sbk-label-header {
                             display: flex;
@@ -91,19 +111,16 @@
                         }
                         .sbk-label-brand {
                             flex: 1;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            padding-right: 3mm;
                         }
-                        .sbk-label-brand-name {
-                            font-size: 18pt;
-                            font-weight: 900;
-                            line-height: 1;
-                            letter-spacing: -0.5px;
-                        }
-                        .sbk-label-brand-sub {
-                            font-size: 18pt;
-                            font-weight: 900;
-                            line-height: 1;
-                            font-style: italic;
-                            margin-top: 1mm;
+                        .sbk-label-brand img {
+                            width: 48mm;
+                            max-height: 14mm;
+                            object-fit: contain;
+                            display: block;
                         }
                         .sbk-label-contact {
                             font-size: 7pt;
@@ -177,79 +194,98 @@
                         }
                     </style>
 
-                    <!-- Brand header + QR -->
-                    <div class="sbk-label-header">
-                        <div class="sbk-label-brand">
-                            <div class="sbk-label-brand-name">southbrook</div>
-                            <div class="sbk-label-brand-sub">cabinetry</div>
-                            <div class="sbk-label-contact">
-                                <span>www.southbrookcabinetry.com</span>
-                                <span>905-761-9801</span>
-                            </div>
-                        </div>
-                        <div class="sbk-label-qr">
-                            <img t-if="mo.sbk_label_qr_image"
-                                 t-att-src="'data:image/png;base64,%s' % mo.sbk_label_qr_image.decode('ascii')"
-                                 alt="QR code"/>
-                        </div>
+                    <!-- Render the same single-label markup twice
+                         side-by-side so the operator gets 2 identical
+                         labels per MO (one for the cabinet, one for
+                         the shop traveller). t-call passes `mo` into
+                         the inner template via the surrounding scope. -->
+                    <div class="sbk-label">
+                        <t t-call="southbrook_kitchen_mrp.report_cabinet_label_one"/>
                     </div>
-
-                    <!-- Body grid -->
-                    <table class="sbk-label-grid">
-                        <tr>
-                            <td class="sbk-label-key">Customer</td>
-                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_customer_name"/>
-                        </tr>
-                        <tr>
-                            <td class="sbk-label-key">PO #</td>
-                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_po_ref"/>
-                        </tr>
-                        <tr>
-                            <td class="sbk-label-key">TAG</td>
-                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_tag"/>
-                        </tr>
-                        <tr>
-                            <td class="sbk-label-key">Door Name</td>
-                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_door_name"/>
-                        </tr>
-                        <tr>
-                            <td class="sbk-label-key">Door Color</td>
-                            <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_door_color"/>
-                        </tr>
-                        <tr>
-                            <td class="sbk-label-key" rowspan="1">Cabinet Interior</td>
-                            <td colspan="3" style="font-weight:700">
-                                White:
-                                <span class="sbk-checkbox">
-                                    <t t-if="mo.sbk_label_interior_is_white">X</t>
-                                </span>
-                                Maple:
-                                <span class="sbk-checkbox">
-                                    <t t-if="mo.sbk_label_interior_is_maple">X</t>
-                                </span>
-                                <t t-if="mo.sbk_label_interior and not mo.sbk_label_interior_is_white and not mo.sbk_label_interior_is_maple">
-                                    &#160;—&#160;<span t-out="mo.sbk_label_interior"/>
-                                </t>
-                            </td>
-                        </tr>
-                    </table>
-
-                    <!-- Footer grid: Code / Hinge / Fin -->
-                    <table class="sbk-label-footer">
-                        <tr>
-                            <td class="sbk-label-footer-h" style="width:54%">Code</td>
-                            <td class="sbk-label-footer-h" style="width:23%">Hinge</td>
-                            <td class="sbk-label-footer-h" style="width:23%">Fin</td>
-                        </tr>
-                        <tr>
-                            <td class="sbk-label-code" t-out="mo.sbk_label_code"/>
-                            <td class="sbk-label-code" t-out="mo.sbk_label_hinge"/>
-                            <td class="sbk-label-code" t-out="mo.sbk_label_fin"/>
-                        </tr>
-                    </table>
+                    <div class="sbk-label">
+                        <t t-call="southbrook_kitchen_mrp.report_cabinet_label_one"/>
+                    </div>
                 </div>
             </t>
         </t>
+    </template>
+
+    <!--
+        Single-label inner template — the actual label markup.
+        Called twice from the main report. Expects `mo` in scope
+        (the calling foreach loop binds it).
+    -->
+    <template id="report_cabinet_label_one">
+        <!-- Brand header + QR -->
+        <div class="sbk-label-header">
+            <div class="sbk-label-brand">
+                <img src="/southbrook_kitchen_mrp/static/src/img/sb_label_logo.png"
+                     alt="Southbrook Cabinetry"/>
+                <div class="sbk-label-contact">
+                    <span>www.southbrookcabinetry.com</span>
+                    <span>905-761-9801</span>
+                </div>
+            </div>
+            <div class="sbk-label-qr">
+                <img t-if="mo.sbk_label_qr_image"
+                     t-att-src="'data:image/png;base64,%s' % mo.sbk_label_qr_image.decode('ascii')"
+                     alt="QR code"/>
+            </div>
+        </div>
+
+        <!-- Body grid -->
+        <table class="sbk-label-grid">
+            <tr>
+                <td class="sbk-label-key">Customer</td>
+                <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_customer_name"/>
+            </tr>
+            <tr>
+                <td class="sbk-label-key">PO #</td>
+                <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_po_ref"/>
+            </tr>
+            <tr>
+                <td class="sbk-label-key">TAG</td>
+                <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_tag"/>
+            </tr>
+            <tr>
+                <td class="sbk-label-key">Door Name</td>
+                <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_door_name"/>
+            </tr>
+            <tr>
+                <td class="sbk-label-key">Door Color</td>
+                <td class="sbk-label-val" colspan="3" t-out="mo.sbk_label_door_color"/>
+            </tr>
+            <tr>
+                <td class="sbk-label-key" rowspan="1">Cabinet Interior</td>
+                <td colspan="3" style="font-weight:700">
+                    White:
+                    <span class="sbk-checkbox">
+                        <t t-if="mo.sbk_label_interior_is_white">X</t>
+                    </span>
+                    Maple:
+                    <span class="sbk-checkbox">
+                        <t t-if="mo.sbk_label_interior_is_maple">X</t>
+                    </span>
+                    <t t-if="mo.sbk_label_interior and not mo.sbk_label_interior_is_white and not mo.sbk_label_interior_is_maple">
+                        &#160;—&#160;<span t-out="mo.sbk_label_interior"/>
+                    </t>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Footer grid: Code / Hinge / Fin -->
+        <table class="sbk-label-footer">
+            <tr>
+                <td class="sbk-label-footer-h" style="width:54%">Code</td>
+                <td class="sbk-label-footer-h" style="width:23%">Hinge</td>
+                <td class="sbk-label-footer-h" style="width:23%">Fin</td>
+            </tr>
+            <tr>
+                <td class="sbk-label-code" t-out="mo.sbk_label_code"/>
+                <td class="sbk-label-code" t-out="mo.sbk_label_hinge"/>
+                <td class="sbk-label-code" t-out="mo.sbk_label_fin"/>
+            </tr>
+        </table>
     </template>
 
     <!-- Smart button on the MO form -->
