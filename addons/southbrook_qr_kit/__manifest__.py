@@ -43,13 +43,17 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.10.0",
+    "version": "19.0.0.11.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
     # W035 (R8.14, 2026-06-27): hr depends added — scan log gains
     # `employee_id` and /sb/qr/identify resolves hr.employee.pin.
-    "depends": ["base", "web", "mail", "stock", "hr"],
+    # W071 (R8.10, 2026-06-27): mrp depends added — trolley QR kind
+    # binds a pre-staged stock.picking (internal) to mrp.workorder via
+    # the new x_sbk_trolley_id field; resolution code reads
+    # employee_assigned_ids / operator_id from mrp.workorder.
+    "depends": ["base", "web", "mail", "stock", "hr", "mrp"],
     "data": [
         "security/ir.model.access.csv",
         "data/qr_kit_config_parameters.xml",

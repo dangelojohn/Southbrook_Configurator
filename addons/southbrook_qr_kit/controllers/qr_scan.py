@@ -980,7 +980,15 @@ class QrScanController(http.Controller):
             "target_id": record.id,
         })
 
-        # Dispatch action
+        # Dispatch action.
+        # W071 (R8.10, 2026-06-27): forward the resolved W035 operator
+        # employee id into params so kinds whose handler runs as an
+        # AbstractModel (no request access) can still credit the human
+        # operator behind the scan — e.g. the trolley-bind handler
+        # needs it to look up the operator's active workorder.
+        if operator:
+            params = dict(params or {})
+            params.setdefault("_w035_employee_id", operator.id)
         try:
             result = handler.handle_action(record, action, params)
             Log.create({**log_vals, "result": "ok"})
