@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_southbrook_room_tree" model="ir.ui.view">
+        <field name="name">southbrook.room.tree</field>
+        <field name="model">southbrook.room</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="order_id"/>
+                <field name="room_type"/>
+                <field name="layout_shape"/>
+                <field name="total_linear_mm"/>
+                <field name="wall_count"/>
+                <field name="layout_complete" widget="boolean_toggle" readonly="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_room_form" model="ir.ui.view">
+        <field name="name">southbrook.room.form</field>
+        <field name="model">southbrook.room</field>
+        <field name="arch" type="xml">
+            <form string="Room">
+                <header/>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Main Kitchen"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="order_id"/>
+                            <field name="room_type"/>
+                            <field name="layout_shape"/>
+                        </group>
+                        <group>
+                            <field name="ceiling_height_mm"/>
+                            <field name="unit_preference"/>
+                            <field name="total_linear_mm" readonly="1"/>
+                            <field name="layout_complete" readonly="1"/>
+                            <field name="has_plumbing" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Walls" name="walls">
+                            <field name="wall_ids">
+                                <list editable="bottom">
+                                    <field name="wall_order" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="length_mm"/>
+                                    <field name="used_mm" readonly="1"/>
+                                    <field name="remaining_mm" readonly="1"/>
+                                    <field name="has_upper_cabinets"/>
+                                    <field name="has_base_cabinets"/>
+                                    <field name="has_tall_cabinets"/>
+                                    <field name="has_conflicts" readonly="1" widget="boolean_toggle"/>
+                                </list>
+                                <form>
+                                    <sheet>
+                                        <group>
+                                            <field name="name"/>
+                                            <field name="length_mm"/>
+                                            <field name="wall_order"/>
+                                        </group>
+                                        <notebook>
+                                            <page string="Constraints">
+                                                <field name="constraint_ids">
+                                                    <list editable="bottom">
+                                                        <field name="constraint_type"/>
+                                                        <field name="distance_from_left_mm"/>
+                                                        <field name="width_mm"/>
+                                                        <field name="height_mm"/>
+                                                        <field name="height_from_floor_mm"/>
+                                                        <field name="notes"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                            <page string="Cabinets">
+                                                <field name="cabinet_line_ids" readonly="1">
+                                                    <list>
+                                                        <field name="name"/>
+                                                        <field name="position_from_left_mm"/>
+                                                        <field name="sb_width_mm"/>
+                                                        <field name="product_uom_qty"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                        </notebook>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Constraints (All)" name="all_constraints">
+                            <field name="constraint_ids" readonly="1">
+                                <list>
+                                    <field name="wall_id"/>
+                                    <field name="constraint_type"/>
+                                    <field name="distance_from_left_mm"/>
+                                    <field name="width_mm"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_room_search" model="ir.ui.view">
+        <field name="name">southbrook.room.search</field>
+        <field name="model">southbrook.room</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="order_id"/>
+                <filter name="filter_complete" string="Layout Complete"
+                        domain="[('layout_complete', '=', True)]"/>
+                <filter name="filter_with_plumbing" string="Has Plumbing"
+                        domain="[('has_plumbing', '=', True)]"/>
+                <group>
+                    <filter name="group_by_shape" string="Shape"
+                            context="{'group_by': 'layout_shape'}"/>
+                    <filter name="group_by_type" string="Room Type"
+                            context="{'group_by': 'room_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_southbrook_room" model="ir.actions.act_window">
+        <field name="name">Rooms</field>
+        <field name="res_model">southbrook.room</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_southbrook_room_search"/>
+    </record>
+
+    <menuitem id="menu_southbrook_rooms" name="Rooms"
+              parent="southbrook_estimating.menu_southbrook_root"
+              action="action_southbrook_room" sequence="20"/>
+
+    <!-- Sale order form: smart button + wall column on line tree -->
+    <record id="view_sale_order_form_southbrook_room" model="ir.ui.view">
+        <field name="name">sale.order.form.southbrook.room</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_southbrook_room"
+                        type="object" class="oe_stat_button" icon="fa-home"
+                        invisible="not room_count">
+                    <field name="room_count" widget="statinfo" string="Room"/>
+                </button>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/list//field[@name='product_uom_qty']" position="before">
+                <field name="wall_id" optional="hide"/>
+                <field name="position_from_left_mm" optional="hide"/>
+                <field name="is_positioned" optional="hide" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

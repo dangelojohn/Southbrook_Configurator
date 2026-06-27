@@ -150,6 +150,11 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "data/cabinet_catalog_metadata.xml",
         # Commit 9 — Order Builder views, user-prefs view, menu
         "views/sale_order_views.xml",
+        # Room-First UX Phase 1.3 — southbrook.room backend views, SO smart button.
+        # MUST load AFTER sale_order_views.xml: inherits the SO form view
+        # which is augmented there, and registers the menu under
+        # menu_southbrook_root (defined in sale_order_views.xml).
+        "views/southbrook_room_views.xml",
         "views/res_users_views.xml",
         # Commit 10 — QWeb reports (routine #6 partial)
         # Styles MUST load before the report templates that reference them
