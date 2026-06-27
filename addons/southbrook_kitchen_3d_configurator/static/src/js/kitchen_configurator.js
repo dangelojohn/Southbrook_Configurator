@@ -13,6 +13,7 @@
 import { Component, onMounted, onWillStart, onWillUnmount, useRef, useState, xml } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { rpc } from "@web/core/network/rpc";
 
 const actionRegistry = registry.category("actions");
 
@@ -62,7 +63,6 @@ function loadThreeJS() {
 // ─── OWL Component ────────────────────────────────────────────────────────────
 class SouthbrookKitchenConfigurator extends Component {
     setup() {
-        this.rpc          = useService("rpc");
         this.notification = useService("notification");
         this.action       = useService("action");
         this.canvas3dRef  = useRef("canvas3d");
@@ -127,7 +127,7 @@ class SouthbrookKitchenConfigurator extends Component {
     // ─── Odoo data ──────────────────────────────────────────────────────────────
     async _loadProducts() {
         try {
-            this.state.products = await this.rpc("/southbrook_kitchen/configurator/products", {});
+            this.state.products = await rpc("/southbrook_kitchen/configurator/products", {});
         } catch (_) {
             this.state.products = [];
         }
@@ -135,7 +135,7 @@ class SouthbrookKitchenConfigurator extends Component {
 
     async _refreshLayout() {
         try {
-            const result = await this.rpc("/southbrook_kitchen/configurator/layout", {
+            const result = await rpc("/southbrook_kitchen/configurator/layout", {
                 room_width_in:  this.state.room.width_in,
                 room_depth_in:  this.state.room.depth_in,
                 room_height_in: this.state.room.height_in,
@@ -552,7 +552,7 @@ class SouthbrookKitchenConfigurator extends Component {
     async _saveDesign() {
         this.state.saving = true;
         try {
-            const result = await this.rpc("/southbrook_kitchen/configurator/save", {
+            const result = await rpc("/southbrook_kitchen/configurator/save", {
                 name:      this.state.designName ||
                            `Kitchen ${this.state.room.width_in}"`,
                 room:      this.state.room,
