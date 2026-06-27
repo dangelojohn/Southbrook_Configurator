@@ -215,6 +215,22 @@ class MrpProduction(models.Model):
     # depends only on `name` — v19 forbids depending on `id` directly.
     # `name` changes once on create (placeholder → sequence) so the QR
     # is regenerated exactly when it should be.
+    #
+    # W007 (MFG-REVIEW-R4 W2 / R9 roadmap): when ``pg_revision_code`` is
+    # stamped on the MO (PG-112 traceability — populated automatically by
+    # the create override at
+    # ``product_graph_release/models/mrp_production.py:51-74`` when the
+    # source ``mrp.bom`` was written by ``pg.release.action_execute_release``),
+    # we append it as a ``?rev=<code>`` query param. Installers scanning
+    # the QR at site can read the rev straight out of the URL without
+    # authenticating into Odoo. Pre-PG-112 MOs (no stamp) get the
+    # original URL — no behaviour change for unstamped records.
+    # Note: ``pg_revision_code`` is NOT in @api.depends — it's added by
+    # the optional sibling addon ``product_graph_release``, which is not
+    # in this addon's manifest depends (this addon is independently
+    # installable). The compute reads via ``getattr`` so unstamped MOs
+    # render unchanged. Since the field is ``store=False`` it recomputes
+    # on every access anyway — no stale-cache risk.
     @api.depends("name")
     def _compute_sbk_label_qr(self):
         Param = self.env["ir.config_parameter"].sudo()
@@ -231,6 +247,13 @@ class MrpProduction(models.Model):
                 f"{base}/odoo/action-mrp.mrp_production_action/{rec.id}"
                 if base else f"/odoo/action-mrp.mrp_production_action/{rec.id}"
             )
+            # W007 — embed engineering revision code in the QR payload
+            # when present. Backward-compatible: NULL/empty rev → no
+            # change to the URL.
+            rev = (getattr(rec, "pg_revision_code", "") or "").strip()
+            if rev:
+                from urllib.parse import quote
+                url = f"{url}?rev={quote(rev, safe='')}"
             rec.sbk_label_qr_url = url
             try:
                 import qrcode  # noqa: WPS433 — optional at compute time

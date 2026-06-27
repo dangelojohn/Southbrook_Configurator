@@ -204,6 +204,20 @@
                     font-weight: bold;
                     background-color: #f2f2f2;
                 }
+                /* W007 — engineering revision footer (only renders when
+                   mrp.production.pg_revision_code is stamped). Tight
+                   one-line cell so the rev never wraps the label. */
+                .sbk-rev-row td {
+                    text-align: center;
+                    font-size: 7pt;
+                    font-weight: bold;
+                    color: #000;
+                    background-color: #fff;
+                    border-top: 0.5px solid #555;
+                    padding: 1px 3px;
+                    letter-spacing: 0.3px;
+                    white-space: nowrap;
+                }
             </style>
             <t t-foreach="docs" t-as="mo">
                 <table class="sbk-label-page">
@@ -305,6 +319,16 @@
                     <td class="val" style="text-align:center; font-size:10pt;" t-out="o.sbk_label_code or ''"/>
                     <td class="val" colspan="2" style="text-align:center;" t-out="o.sbk_label_hinge or ''"/>
                     <td class="val" style="text-align:center;" t-out="o.sbk_label_fin or ''"/>
+                </tr>
+                <!-- W007 — engineering revision row. Conditional on
+                     pg_revision_code being non-empty so MOs that pre-date
+                     the PG-112 traceability stamp render unchanged.
+                     `pg_revision_code` is a related field added by the
+                     sibling product_graph_release addon; on databases
+                     where that addon isn't installed `hasattr(o, ...)`
+                     short-circuits to False and the row is omitted. -->
+                <tr class="sbk-rev-row" t-if="hasattr(o, 'pg_revision_code') and o.pg_revision_code">
+                    <td colspan="4">Rev: <span t-out="o.pg_revision_code"/></td>
                 </tr>
             </table>
         </div>

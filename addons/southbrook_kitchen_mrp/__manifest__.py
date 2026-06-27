@@ -41,7 +41,7 @@ contract, GAP-05 / SYN-02):
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.1.1",
+    "version": "19.0.1.2.0",
     "depends": [
         "mrp",
         "sale",
