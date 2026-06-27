@@ -10,6 +10,9 @@ from . import res_partner
 from . import res_users
 from . import product_attribute_value
 from . import product_pricelist
+from . import southbrook_room
+from . import southbrook_room_wall
+from . import southbrook_room_constraint
 from . import sale_order
 from . import sale_order_line
 from . import product_config_line
