@@ -732,7 +732,7 @@ SouthbrookKitchenConfigurator.template = xml`
             <small><t t-esc="product.cabinet_type"/> | <t t-esc="product.material"/></small>
           </div>
           <span class="o_sbk_prod_sku"  t-esc="product.sku"/>
-          <span class="o_sbk_prod_dim"  t-esc="product.width_in + '\"'"/>
+          <span class="o_sbk_prod_dim"  t-esc="product.width_in + '&quot;'"/>
           <span t-att-class="'o_sbk_prod_qty' + (product.available_qty > 50 ? ' ok' : ' low')"
                 t-esc="product.available_qty"/>
           <span class="o_sbk_prod_price" t-esc="_money(product.price)"/>
