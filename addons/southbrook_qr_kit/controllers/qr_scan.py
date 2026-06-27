@@ -38,6 +38,31 @@ from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
+# W035 (R8.14) — operator identity in the session.
+# Session keys:
+#   sbk_operator_employee_id   int  hr.employee.id resolved from PIN
+#   sbk_operator_pin_at        int  unix-ts of PIN entry (rolling window)
+#   sbk_operator_last_seen     int  unix-ts of last activity (timeout test)
+_SESSION_KEY_EMP = "sbk_operator_employee_id"
+_SESSION_KEY_AT = "sbk_operator_pin_at"
+_SESSION_KEY_SEEN = "sbk_operator_last_seen"
+_DEFAULT_TIMEOUT_MIN = 30
+
+
+def _operator_timeout_seconds(env):
+    """Read `southbrook.operator_session_timeout_min` ICP (minutes).
+    Default 30 min. Clamped to [1, 24*60]."""
+    Param = env["ir.config_parameter"].sudo()
+    raw = Param.get_param(
+        "southbrook.operator_session_timeout_min",
+        str(_DEFAULT_TIMEOUT_MIN))
+    try:
+        mins = int(raw)
+    except (TypeError, ValueError):
+        mins = _DEFAULT_TIMEOUT_MIN
+    mins = max(1, min(mins, 24 * 60))
+    return mins * 60
+
 
 class QrScanController(http.Controller):
 
@@ -191,6 +216,11 @@ class QrScanController(http.Controller):
             unit.action_mark_delivered(signature=signature, photo=photo)
             # Log to scan log under a public "pod_submit" path.
             try:
+                # W035: also stamp employee_id when a PIN-bound
+                # operator captured POD (rare — POD is public — but
+                # supports the field tech workflow where the same
+                # tablet handled the dispatch and the delivery).
+                operator = self._get_operator_employee()
                 env["southbrook.qr.scan.log"].sudo().create({
                     "kind": "ship", "ident": str(unit.id),
                     "action": "delivered", "result": "ok",
@@ -200,6 +230,7 @@ class QrScanController(http.Controller):
                     "source_ip": request.httprequest.remote_addr,
                     "user_agent":
                         (request.httprequest.headers.get("User-Agent") or "")[:255],
+                    "employee_id": operator.id if operator else False,
                 })
             except Exception:  # noqa: BLE001
                 pass
@@ -478,17 +509,150 @@ class QrScanController(http.Controller):
                               source="json")
 
     # ------------------------------------------------------------------
+    # W035 (R8.14) — operator identity via hr.employee.pin
+    # ------------------------------------------------------------------
+
+    @http.route("/sb/qr/identify", type="json", auth="public",
+                csrf=False, methods=["POST"])
+    def identify_operator(self, pin=None, **kw):
+        """Resolve `hr.employee` from PIN and pin the employee id into
+        the session. Subsequent scans credit this employee (not the
+        shared kiosk session user) via `_get_operator_employee`.
+
+        Body:  { "pin": "1234" }
+        Returns:
+          ok:   {"ok": true, "employee": {"id": <id>, "name": "..."},
+                 "timeout_min": <minutes>}
+          fail: {"ok": false, "error": "..."}
+
+        Security:
+          - PIN never echoed back, never logged.
+          - PIN must be all-digits to short-circuit user-table probes.
+          - `sudo()` is used to read hr.employee (operators don't have
+            HR read; PIN itself is the auth factor).
+        """
+        # Normalize. Accept str; reject anything that isn't digits-only
+        # — Odoo's native PIN is stored as a string but is documented
+        # numeric, and keeping it that way means we never PIN-match a
+        # username/passphrase by accident.
+        pin = (pin or "").strip()
+        if not pin:
+            return {"ok": False, "error": "PIN required"}
+        if not pin.isdigit() or not (3 <= len(pin) <= 12):
+            return {"ok": False, "error": "PIN must be 3-12 digits"}
+        emp = request.env["hr.employee"].sudo().search([
+            ("pin", "=", pin),
+            ("active", "=", True),
+        ], limit=1)
+        if not emp:
+            # Constant-time-ish: do NOT include hint about whether the
+            # PIN exists for a deactivated employee. Single message.
+            return {"ok": False, "error": "Unknown PIN"}
+        now = int(time.time())
+        request.session[_SESSION_KEY_EMP] = emp.id
+        request.session[_SESSION_KEY_AT] = now
+        request.session[_SESSION_KEY_SEEN] = now
+        timeout_sec = _operator_timeout_seconds(request.env)
+        return {
+            "ok": True,
+            "employee": {"id": emp.id, "name": emp.name},
+            "timeout_min": timeout_sec // 60,
+        }
+
+    @http.route("/sb/qr/switch-operator", type="json", auth="public",
+                csrf=False, methods=["POST"])
+    def switch_operator(self, **kw):
+        """Clear the session operator binding. The next scan reverts
+        to `env.user.employee_id` fallback until a fresh PIN is entered.
+        UI calls this on the explicit 'Switch Operator' button."""
+        for k in (_SESSION_KEY_EMP, _SESSION_KEY_AT, _SESSION_KEY_SEEN):
+            try:
+                request.session.pop(k, None)
+            except Exception:  # noqa: BLE001
+                pass
+        return {"ok": True}
+
+    @http.route("/sb/qr/whoami", type="json", auth="public",
+                csrf=False, methods=["POST", "GET"])
+    def whoami(self, **kw):
+        """Return the currently-bound operator (if any). UI uses this
+        on tablet load to decide whether to prompt for a PIN."""
+        emp = self._get_operator_employee()
+        timeout_sec = _operator_timeout_seconds(request.env)
+        if not emp:
+            return {"ok": True, "employee": None,
+                    "timeout_min": timeout_sec // 60}
+        return {
+            "ok": True,
+            "employee": {"id": emp.id, "name": emp.name},
+            "timeout_min": timeout_sec // 60,
+        }
+
+    def _get_operator_employee(self):
+        """Resolve the operator for the current request.
+
+        Lookup order:
+          1. `request.session[sbk_operator_employee_id]` (set by
+             /sb/qr/identify) — but only if within the session timeout.
+          2. `env.user.employee_id` — convenient fallback for desk
+             users whose Odoo account already maps to an employee.
+          3. Empty recordset.
+
+        Side effect: bumps `sbk_operator_last_seen` on hit so the
+        rolling timeout extends with activity.
+        """
+        try:
+            eid = request.session.get(_SESSION_KEY_EMP)
+        except Exception:  # noqa: BLE001
+            eid = None
+        if eid:
+            seen = request.session.get(_SESSION_KEY_SEEN) or \
+                request.session.get(_SESSION_KEY_AT) or 0
+            now = int(time.time())
+            timeout_sec = _operator_timeout_seconds(request.env)
+            if now - int(seen) > timeout_sec:
+                # Timed out — clear and fall through to fallback.
+                for k in (_SESSION_KEY_EMP, _SESSION_KEY_AT,
+                          _SESSION_KEY_SEEN):
+                    try:
+                        request.session.pop(k, None)
+                    except Exception:  # noqa: BLE001
+                        pass
+            else:
+                emp = request.env["hr.employee"].sudo().browse(eid)
+                if emp.exists() and emp.active:
+                    # Bump rolling timeout on each scan.
+                    request.session[_SESSION_KEY_SEEN] = now
+                    return emp
+                # Stale id (employee archived) → drop.
+                for k in (_SESSION_KEY_EMP, _SESSION_KEY_AT,
+                          _SESSION_KEY_SEEN):
+                    try:
+                        request.session.pop(k, None)
+                    except Exception:  # noqa: BLE001
+                        pass
+        # Fallback: the kiosk session user may itself have an employee.
+        try:
+            return request.env.user.employee_id
+        except Exception:  # noqa: BLE001
+            return request.env["hr.employee"]
+
+    # ------------------------------------------------------------------
     # Core dispatch
     # ------------------------------------------------------------------
     def _dispatch(self, payload, action, params, source):
         env = request.env
         Log = env["southbrook.qr.scan.log"].sudo()
+        # W035: stamp the resolved operator (may be empty for public
+        # POD scans where no PIN has ever been entered).
+        operator = self._get_operator_employee()
         log_vals = {
             "payload": (payload or "")[:500],
             "action": action,
             "source_ip": request.httprequest.remote_addr,
             "user_agent": (
                 request.httprequest.headers.get("User-Agent") or "")[:255],
+            "employee_id": operator.id if operator else False,
         }
 
         if not payload:

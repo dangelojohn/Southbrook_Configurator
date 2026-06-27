@@ -11,6 +11,7 @@
                   decoration-danger="result in ('invalid_signature','access_denied','error','record_not_found')">
                 <field name="create_date" string="When"/>
                 <field name="user_id"/>
+                <field name="employee_id" optional="show"/>
                 <field name="kind"/>
                 <field name="ident"/>
                 <field name="target_model" optional="show"/>
@@ -29,6 +30,7 @@
         <field name="arch" type="xml">
             <search>
                 <field name="user_id"/>
+                <field name="employee_id"/>
                 <field name="kind"/>
                 <field name="target_model"/>
                 <filter name="ok" string="OK" domain="[('result','=','ok')]"/>
@@ -38,6 +40,7 @@
                 <group>
                     <filter name="g_kind" string="Kind" context="{'group_by':'kind'}"/>
                     <filter name="g_user" string="User" context="{'group_by':'user_id'}"/>
+                    <filter name="g_employee" string="Operator" context="{'group_by':'employee_id'}"/>
                     <filter name="g_result" string="Result" context="{'group_by':'result'}"/>
                 </group>
             </search>

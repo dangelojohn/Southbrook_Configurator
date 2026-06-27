@@ -646,8 +646,24 @@ class MrpWorkorder(models.Model):
         # `user_id` defaults to env.user via the model — but we're
         # using sudo() to bypass the write-restricted ACL, so set it
         # explicitly to keep attribution to the actual viewer.
+        # W035 (R8.14): also resolve the PIN-bound operator (or the
+        # session user's employee_id fallback) so the defect-context
+        # window credits the right human, not the shared kiosk user.
+        employee_id = False
+        try:
+            sess_emp = request.session.get(
+                "sbk_operator_employee_id")
+            if sess_emp:
+                emp = env["hr.employee"].sudo().browse(sess_emp)
+                if emp.exists() and emp.active:
+                    employee_id = emp.id
+            if not employee_id:
+                employee_id = env.user.employee_id.id or False
+        except Exception:  # noqa: BLE001
+            pass
         Log.create({
             "user_id": env.uid,
+            "employee_id": employee_id,
             "kind": "wo",
             "ident": str(wo.id),
             "action": "form_open",

@@ -1,0 +1,140 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// W035 (R8.14, 2026-06-27) — Operator PIN modal + top-bar badge.
+//
+// Lives in BOTH web.assets_backend AND web.assets_frontend so the
+// kiosk operator badge works wherever the shop tablet lands (Odoo
+// backend, public scan UI, customer portal). Light/dark-tolerant.
+
+.sbk-op-badge {
+    position: fixed;
+    top: 6px;
+    right: 12px;
+    z-index: 10000;
+    padding: 6px 12px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: #c92a2a;          // unbound = warning red
+    border-radius: 14px;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+
+    &--bound {
+        background: #2b8a3e;       // bound = ok green
+    }
+}
+
+.sbk-op-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, system-ui, sans-serif;
+}
+
+.sbk-op-modal-card {
+    background: #fff;
+    color: #222;
+    border-radius: 12px;
+    padding: 24px;
+    width: min(360px, 92vw);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+    h2 {
+        margin: 0 0 16px 0;
+        font-size: 20px;
+        font-weight: 600;
+    }
+}
+
+.sbk-op-modal-display {
+    margin-bottom: 12px;
+
+    input {
+        width: 100%;
+        font-size: 24px;
+        text-align: center;
+        padding: 10px;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        letter-spacing: 8px;
+        font-family: monospace;
+    }
+}
+
+.sbk-op-modal-status {
+    min-height: 1.4em;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #555;
+    text-align: center;
+
+    &--err {
+        color: #c92a2a;
+        font-weight: 600;
+    }
+}
+
+.sbk-op-modal-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.sbk-op-key {
+    padding: 16px 0;
+    font-size: 22px;
+    font-weight: 600;
+    background: #f3f3f3;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #222;
+    min-height: 56px;            // R8.1 touch target
+
+    &:hover {
+        background: #e8e8e8;
+    }
+
+    &:active {
+        background: #d8d8d8;
+    }
+
+    &--util {
+        background: #e0e0e0;
+        font-size: 14px;
+    }
+}
+
+.sbk-op-modal-actions {
+    display: flex;
+    gap: 8px;
+
+    .sbk-op-btn {
+        flex: 1;
+        padding: 14px 0;
+        font-size: 16px;
+        font-weight: 600;
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        min-height: 56px;
+
+        &--cancel {
+            background: #e0e0e0;
+            color: #222;
+        }
+
+        &--ok {
+            background: #2b8a3e;
+            color: #fff;
+        }
+    }
+}

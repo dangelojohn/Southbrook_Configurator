@@ -1,5 +1,12 @@
 # SPDX-License-Identifier: LGPL-3.0-only
-"""southbrook.qr.scan.log — append-only scan audit."""
+"""southbrook.qr.scan.log — append-only scan audit.
+
+W035 (R8.14, 2026-06-27) — `employee_id` records the *actual* operator
+behind the scan, resolved via `hr.employee.pin` and held in the session
+as `sbk_operator_employee_id`. `user_id` continues to record the kiosk
+session user (typically a shared tablet account). The two may differ;
+forensics rely on having both.
+"""
 from odoo import fields, models
 
 
@@ -21,8 +28,20 @@ class QrScanLog(models.Model):
     _order = "create_date desc, id desc"
 
     user_id = fields.Many2one(
-        "res.users", string="Scanned By",
+        "res.users", string="Scanned By (Session)",
         default=lambda s: s.env.user, index=True,
+        help="The Odoo session user — typically a shared tablet kiosk "
+             "account. For per-operator credit see Employee.",
+    )
+    # W035 (R8.14): credits the real human operator behind the scan.
+    # Resolved from `hr.employee.pin` via /sb/qr/identify; persisted
+    # in `request.session['sbk_operator_employee_id']`. Falls back to
+    # `env.user.employee_id` when no PIN has been entered. May be empty
+    # for unauthenticated public scans (POD, etc).
+    employee_id = fields.Many2one(
+        "hr.employee", string="Operator", index=True,
+        help="Resolved from the operator's hr.employee.pin entered at "
+             "the tablet. Null on public/unauthenticated scans.",
     )
     kind = fields.Char(index=True)
     ident = fields.Char(string="Ident")

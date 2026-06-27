@@ -43,11 +43,13 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.6.0",
+    "version": "19.0.0.7.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
-    "depends": ["base", "web", "mail", "stock"],
+    # W035 (R8.14, 2026-06-27): hr depends added — scan log gains
+    # `employee_id` and /sb/qr/identify resolves hr.employee.pin.
+    "depends": ["base", "web", "mail", "stock", "hr"],
     "data": [
         "security/ir.model.access.csv",
         "data/qr_kit_config_parameters.xml",
@@ -66,12 +68,20 @@ SECURITY:
     # web.assets_frontend so both backend OWL clients and any public
     # PWA scan UI emit the same beep. Self-installs by patching the
     # global fetch + XMLHttpRequest layers; default = unmuted.
+    # W035 (R8.14, 2026-06-27) — operator PIN modal + top-bar badge
+    # also bundled into BOTH backend and frontend so the operator
+    # identity follows the kiosk regardless of which Odoo surface
+    # the tablet happens to be on.
     "assets": {
         "web.assets_backend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
+            "southbrook_qr_kit/static/src/js/operator_pin_modal.js",
+            "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
         ],
         "web.assets_frontend": [
             "southbrook_qr_kit/static/src/js/scan_audio_cue.js",
+            "southbrook_qr_kit/static/src/js/operator_pin_modal.js",
+            "southbrook_qr_kit/static/src/scss/operator_pin_modal.scss",
         ],
     },
     "installable": True,

@@ -12,4 +12,16 @@
         <field name="key">southbrook.qr_kit.audio_muted</field>
         <field name="value">0</field>
     </record>
+
+    <!-- W035 (R8.14) — operator session timeout in minutes. After
+         N minutes of inactivity (no scans, no whoami refreshes) the
+         tablet's bound operator is cleared and the next scan reverts
+         to env.user.employee_id fallback (or empty). Range is clamped
+         to [1, 1440] in the controller. Default 30 minutes. -->
+    <record id="ir_config_param_operator_session_timeout"
+            model="ir.config_parameter">
+        <field name="key">southbrook.operator_session_timeout_min</field>
+        <field name="value">30</field>
+    </record>
 </odoo>
+
