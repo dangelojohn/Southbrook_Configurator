@@ -66,14 +66,23 @@ class DefectSheetController(http.Controller):
                 f'{key}</div>'
                 f'</div>'
             )
+        # W085 (R5.11) — mobile viewport for in-browser preview.
+        # The print path is unaffected (the @page rule still drives
+        # the printed PDF), but on a phone the page now scales to
+        # the device width instead of horizontal-scrolling at the
+        # fixed letter-paper aspect.
         body = (
             "<html><head><title>Defect QR Sheet</title>"
+            "<meta name=\"viewport\" content=\"width=device-width, "
+            "initial-scale=1, viewport-fit=cover\">"
             "<style>"
+            ".sb-defect-sheet-wrapper { min-width: 320px; }"
             "@media print { @page { size: letter; margin: 0.25in } "
             "  body { margin: 0; } "
             "  .header { display: none } }"
             "</style></head>"
             "<body style='margin:0;padding:0.2in;font-family:system-ui;background:#f6f6f6'>"
+            "<div class='sb-defect-sheet-wrapper'>"
             "<div class='header' style='padding:0.2in 0;text-align:center'>"
             "<h2>Defect Type QR Sheet — Southbrook Floor</h2>"
             "<p style='color:#666;margin:0.3em 0'>"
@@ -81,10 +90,11 @@ class DefectSheetController(http.Controller):
             "Pin to the floor board.</p>"
             "<button onclick='window.print()' "
             "style='padding:0.5em 1em;font-size:1em;cursor:pointer'>"
-            "🖨️ Print</button>"
+            "Print</button>"
             "</div>"
             "<div style='display:flex;flex-wrap:wrap;justify-content:center'>"
             + "".join(cells) +
+            "</div>"
             "</div>"
             "</body></html>"
         )
