@@ -21,3 +21,4 @@ from . import test_w040_report_problem_wizard
 from . import test_w080_tab_consolidation
 from . import test_w087_shift_handover_structured
 from . import test_w090_scrap_ncr_backlink
+from . import test_w069_downtime_notify

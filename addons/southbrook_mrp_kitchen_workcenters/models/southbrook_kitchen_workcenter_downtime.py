@@ -11,11 +11,43 @@ State machine:
   active      downtime is happening now (date_end is None)
   closed      downtime ended; date_end + duration_min are populated
   cancelled   inspector decided this isn't really downtime
+
+W069 (R3.14, 2026-06-27) — downtime → planner-notify cascade
+============================================================
+
+JTBD: "When a workcenter goes down (recorded in
+southbrook.kitchen.workcenter.downtime), I want the planner notified
+at downtime time, not at kanban-turn-red."
+
+On downtime create (or state transition to 'active'), we find every
+WO at the same workcenter currently in 'ready' or 'progress' whose
+scheduled window overlaps the downtime window, then for each affected
+WO we:
+
+  1. Post a chatter message describing the conflict + suggested
+     reschedule delta (downtime_min / workcenter capacity).
+  2. Schedule a mail.activity on the WO targeting the planner
+     (production_id.user_id, falling back to the downtime
+     responsible_id), with deadline = today (planner action
+     needed today).
+
+We DO NOT auto-reschedule. The planner decides. The whole reason this
+is a notify-only listener and not an auto-cascade is that any auto-
+reschedule of a WO that's already in progress will surprise the
+operator standing at the station. Plan-side moves are a human call.
+
+The hook is idempotent per-WO per-downtime: we tag the chatter line
+with the downtime id so re-firing the listener on a write that
+re-touches state won't double-spam the WO with the same message.
 """
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
+
+
+_logger = logging.getLogger(__name__)
 
 
 DOWNTIME_REASONS = [
@@ -194,7 +226,182 @@ class SouthbrookKitchenWorkcenterDowntime(models.Model):
                     # Never block a downtime log on maintenance auto-
                     # escalation. Operator can still hit the button.
                     pass
+        # W069 — notify planner of any WOs that overlap this downtime.
+        # Fire only when the downtime starts already 'active' (i.e. the
+        # operator created it mid-event); draft creates trigger on the
+        # subsequent action_start() write.
+        for rec in records:
+            if rec.state == "active":
+                try:
+                    rec._w069_notify_planner_of_affected_wos()
+                except Exception:  # noqa: BLE001
+                    _logger.exception(
+                        "W069: downtime %s notify hook failed (non-fatal)",
+                        rec.id,
+                    )
         return records
+
+    def write(self, vals):
+        # Detect state transitions to 'active' so a draft → active
+        # action_start() fires the same notify path the active-from-
+        # create path uses. We compare BEFORE/AFTER state to avoid
+        # re-firing on every unrelated write to an already-active row.
+        going_active = vals.get("state") == "active"
+        was_active = {rec.id: rec.state == "active" for rec in self}
+        res = super().write(vals)
+        if going_active:
+            for rec in self:
+                if not was_active.get(rec.id, False):
+                    try:
+                        rec._w069_notify_planner_of_affected_wos()
+                    except Exception:  # noqa: BLE001
+                        _logger.exception(
+                            "W069: downtime %s notify hook failed "
+                            "(non-fatal)", rec.id,
+                        )
+        return res
+
+    # ------------------------------------------------------------------
+    # W069 (R3.14, 2026-06-27) — planner notification listener
+    # ------------------------------------------------------------------
+    def _w069_notify_planner_of_affected_wos(self):
+        """Find WOs at this downtime's WC currently in 'ready' or
+        'progress' that overlap the downtime window, then post a
+        chatter message + schedule a planner activity on each one.
+
+        Notify-only. Never reschedules. Idempotent: each (downtime,
+        WO) pair posts once — we tag the chatter line with the
+        downtime id so a re-fire (a draft → active state flip after
+        the create-time fire) does NOT double-spam.
+        """
+        self.ensure_one()
+        if not self.workcenter_id:
+            return self.env["mrp.workorder"].browse()
+
+        # Overlap window. If the downtime has no end yet (it's just
+        # started), use a 4-hour default lookahead so the planner
+        # gets reasonable coverage of in-progress + immediately-next
+        # WOs. The window expands automatically once date_end lands.
+        dt_start = self.date_start or fields.Datetime.now()
+        dt_end = self.date_end or (dt_start + timedelta(hours=4))
+
+        Workorder = self.env["mrp.workorder"]
+        # Overlap test: WO_start < downtime_end AND WO_end > downtime_start.
+        # Native Odoo WO uses date_start (planned/actual start) and
+        # date_finished (planned/actual finish).
+        affected = Workorder.search([
+            ("workcenter_id", "=", self.workcenter_id.id),
+            ("state", "in", ("ready", "progress")),
+            ("date_start", "!=", False),
+            ("date_finished", "!=", False),
+            ("date_start", "<", dt_end),
+            ("date_finished", ">", dt_start),
+        ])
+        if not affected:
+            return affected
+
+        # Suggested reschedule delta — naive cap: the downtime duration
+        # / 1 (single-channel WC) is just the downtime duration itself
+        # (in hours). If the WC supports parallel jobs, the impact
+        # divides by allows_parallel_jobs concurrency. The planner
+        # decides; this is a hint only.
+        wc = self.workcenter_id
+        downtime_min = self.duration_min or (
+            (dt_end - dt_start).total_seconds() / 60.0)
+        parallel = 1
+        if hasattr(wc, "allows_parallel_jobs") and wc.allows_parallel_jobs:
+            # Best-effort: many "parallel" WCs still serialise around the
+            # downtime cause (e.g. paint booth with multiple racks but
+            # one cure cycle). Halve, do not zero, the delta.
+            parallel = 2
+        suggested_min = max(0.0, downtime_min / parallel)
+
+        reason_label = dict(self._fields["reason"].selection).get(
+            self.reason, self.reason or _("(no reason)"))
+
+        # Resolve the planner: MO's responsible (production_id.user_id)
+        # first, fall back to the downtime's logger.
+        for wo in affected:
+            # Dedupe per (downtime, WO). The chatter tag is a stable
+            # marker we can grep for.
+            tag = "[W069:dt=%d]" % self.id
+            already = wo.message_ids.filtered(
+                lambda m, t=tag: m.body and t in (m.body or ""))
+            if already:
+                continue
+
+            planner = (
+                (wo.production_id.user_id if wo.production_id else False)
+                or self.responsible_id
+                or self.env.user
+            )
+            severity = self._w069_severity_label(wo, dt_start, dt_end)
+            body = _(
+                "%(tag)s Work center <b>%(wc)s</b> went down at "
+                "%(t)s (reason: %(r)s). This WO overlaps the outage "
+                "and will likely slip by ~<b>%(delta).1f min</b>. "
+                "Severity: <b>%(sev)s</b>. Planner action: review "
+                "schedule (no auto-reschedule).",
+                tag=tag,
+                wc=wc.name or "?",
+                t=dt_start,
+                r=reason_label,
+                delta=suggested_min,
+                sev=severity,
+            )
+            wo.message_post(body=body, message_type="notification")
+
+            # Schedule a mail.activity for the planner. Use the generic
+            # 'todo' activity type — every Odoo install has it. Activity
+            # deadline is TODAY because that is the JTBD ("notified at
+            # downtime time, not at kanban-turn-red").
+            try:
+                todo_type = self.env.ref(
+                    "mail.mail_activity_data_todo",
+                    raise_if_not_found=False,
+                )
+                if todo_type and planner:
+                    wo.activity_schedule(
+                        act_type_xmlid="mail.mail_activity_data_todo",
+                        summary=_("Reschedule review — WC %s downtime")
+                                % (wc.name or "?"),
+                        note=body,
+                        user_id=planner.id,
+                        date_deadline=fields.Date.context_today(self),
+                    )
+            except Exception:  # noqa: BLE001
+                _logger.exception(
+                    "W069: scheduling activity on WO %s failed "
+                    "(non-fatal)", wo.id,
+                )
+        _logger.info(
+            "W069: downtime %s notified planner of %d affected WO(s) "
+            "at WC %s", self.id, len(affected), wc.name or "?",
+        )
+        return affected
+
+    def _w069_severity_label(self, wo, dt_start, dt_end):
+        """Severity proportional to overlap fraction of the WO window.
+        >75% overlap = high, 25-75% = medium, <25% = low."""
+        try:
+            wo_start = wo.date_start
+            wo_end = wo.date_finished
+            if not (wo_start and wo_end and wo_end > wo_start):
+                return _("medium")
+            overlap_start = max(wo_start, dt_start)
+            overlap_end = min(wo_end, dt_end)
+            if overlap_end <= overlap_start:
+                return _("low")
+            overlap_sec = (overlap_end - overlap_start).total_seconds()
+            wo_sec = (wo_end - wo_start).total_seconds()
+            frac = overlap_sec / wo_sec if wo_sec > 0 else 0.0
+            if frac >= 0.75:
+                return _("high")
+            if frac >= 0.25:
+                return _("medium")
+            return _("low")
+        except Exception:  # noqa: BLE001
+            return _("medium")
 
     def action_escalate_to_maintenance(self):
         """Operator-driven manual escalation for non-breakdown reasons.
