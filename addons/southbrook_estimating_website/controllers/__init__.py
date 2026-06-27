@@ -4,3 +4,4 @@
 # is now real: main.SouthbrookOrderBuilderPortal hosts the
 # /my/southbrook/order-builder portal route.
 from . import main
+from . import room_api

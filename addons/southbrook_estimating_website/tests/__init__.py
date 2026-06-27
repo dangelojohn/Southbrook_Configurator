@@ -5,3 +5,4 @@ from . import test_send_to_manufacturing
 from . import test_bom_payload_per_line
 from . import test_multi_currency
 from . import test_commercial_page
+from . import test_room_api
