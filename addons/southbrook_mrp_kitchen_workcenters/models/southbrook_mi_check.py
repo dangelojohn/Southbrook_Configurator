@@ -388,7 +388,20 @@ class SouthbrookMiCheck(models.Model):
         """Defaulting rework_workcenter_id by defect type — the
         inspector still chooses, but a sensible default surfaces in
         the form. Mapping uses the southbrook_mrp_pm xml_ids since
-        those are the stable shop-floor station refs."""
+        those are the stable shop-floor station refs.
+
+        W041 (R5, 2026-06-27) — extended mapping to cover the four
+        defect types that previously fell through to "no default":
+          label_error       -> packing (PACK) — label is applied
+                               at pack-out, so rework returns there.
+          missing_component -> assembly (ASSY) — the missing part
+                               needs to be installed at the assembly
+                               cell, not re-cut/re-sanded.
+          packaging_issue   -> packing (PACK) — re-pack the unit.
+          other             -> QC — generic catch-all; QC triages.
+
+        Existing mappings are unchanged.
+        """
         mapping = {
             "scratch": "southbrook_mrp_pm.wc_sand",
             "finish_defect": "southbrook_mrp_pm.wc_paint",
@@ -400,6 +413,11 @@ class SouthbrookMiCheck(models.Model):
             "wrong_dimension": "southbrook_mrp_pm.workcenter_saw",
             "wrong_material": "southbrook_mrp_pm.workcenter_saw",
             "grain_direction": "southbrook_mrp_pm.workcenter_saw",
+            # W041 — previously-unmapped defect types.
+            "label_error": "southbrook_mrp_pm.workcenter_pack",
+            "missing_component": "southbrook_mrp_pm.workcenter_assy",
+            "packaging_issue": "southbrook_mrp_pm.workcenter_pack",
+            "other": "southbrook_mrp_pm.workcenter_qc",
         }
         ref = mapping.get(self.x_sbk_defect_type)
         if ref:
