@@ -1001,9 +1001,42 @@ Drag a placed cabinet along its current wall to fine-tune `position_from_left_mm
 
 **Skip-in-this-batch**: drag the unplaced sidebar cabinet INTO the floor plan to assign (the brief's "drag from sidebar" option). That's drag-and-drop across a component boundary — harder. The existing "Assign…" button covers it for now.
 
-#### Phase 3.C.2c — Elevation view toggle (out of this batch)
+#### Phase 3.C.2c — Elevation view toggle (re-activated)
 
-Deferred. Will need a new `<WallElevationSVG>` component + a "Floor ↔ Elevation" toggle button + per-wall state.
+Side-on view of a single wall's cabinets at their Y heights, with floor line + ceiling line + worktop line + constraints (windows, doors at correct Y positions). Lets the user verify upper/base/tall stack visually.
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js`:
+  - Add `state` to `RoomLayoutTab` via `useState({viewMode: "floor", selectedWallId: null})` for view-mode toggle + which wall to elevate.
+  - New child component `WallElevationSVG` — props: `room`, `wall`, `lines`, `unitPreference`. Pure render. Renders an SVG showing:
+    - Floor line (Y=0) and ceiling line (Y=ceiling_height_mm)
+    - Worktop line at Y=900mm (dashed)
+    - Cabinets as front-face rectangles, positioned along X by `position_from_left_mm` and along Y by their zone:
+      - `base_run`: Y 0 → 900mm (depth ignored — front view)
+      - `wall`: Y 1400 → 2100mm
+      - `tall`: Y 0 → 2100mm (or up to ceiling)
+      - `island`: Y 0 → 900mm
+      - `accessory`: Y 0 → 900mm
+      - `other`: Y 0 → 900mm
+    - Cabinet labels (truncated to ~8 chars centered)
+    - Constraints (window/door) rendered as cut-out rects at their `height_from_floor_mm` + `height_mm`
+    - Per-cabinet zone color (same palette as floor plan)
+  - Scale to a 1024×600 viewBox with 40px padding, single uniform scale.
+  - Empty cases: no wall selected → "Pick a wall to see its elevation" hint; wall with no cabinets → render outline + constraints + worktop line only.
+- Modify `RoomLayoutTab`:
+  - Add a small toolbar above the FloorPlanSVG: "View: [Floor | Elevation]" segmented button + (when Elevation) a wall selector dropdown.
+  - Render `<FloorPlanSVG>` when `state.viewMode === "floor"`, `<WallElevationSVG>` when `state.viewMode === "elevation"`.
+  - On toggle, if no `selectedWallId` is set and `room.walls.length > 0`, default to `room.walls[0].id`.
+- Modify: `addons/southbrook_estimating_website/static/src/xml/room_layout.xml`:
+  - Add `<t t-name="southbrook_estimating_website.WallElevationSVG">` template.
+  - Add the toolbar (view toggle + wall selector) inside the RoomLayoutTab template, conditional renders for the two view modes.
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss`:
+  - Append `.sb-room-plan-view-toggle-*` styles (segmented button).
+  - Append `.sb-room-plan-elev-*` styles for the elevation view chrome.
+- Modify: `addons/southbrook_estimating_website/__manifest__.py`:
+  - Bump `version` `19.0.11.0.0` → `19.0.12.0.0`.
+
+**Skipped in this batch**: drag/click on elevation view (no placement changes from elevation — read-only). User edits via floor plan + AssignToWallModal.
 
 #### Phase 3.C.E — Smoke + review
 
