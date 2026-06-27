@@ -801,23 +801,75 @@ gets a Room smart button + optional wall_id columns on the line tree."
 
 ---
 
-## Phase 2 — Portal: Room Setup Wizard (DRAFT — finalize after Phase 1 lands)
+## Phase 2 — Portal Room Setup (detailed, post-Phase 1 deployment)
 
-Phase 2 must be re-planned with fresh context once Phase 1 is reviewed and merged, because it depends on (a) Phase 1's final ACL/field shapes and (b) inspection of the actual `portal_boot.esm.js` OWL component tree at modification time.
+Phase 1 deployed live to QNAP southbrook 2026-06-27 (`19.0.5.0.0`, 8-step live smoke green). Phase 2 decomposes into 4 sub-phases. Each ships independently to keep blast radius small.
 
-**High-level scope** (Tasks 2.1 + 2.2 in the brief):
+### Phase 2.A — Portal RPC endpoints (server-side only, no UI)
 
-- Inline OWL state machine in `portal_boot.esm.js` (NOT a Bootstrap modal — the portal is 100% OWL). Three steps: Room Type + Shape, Wall Dimensions, Fixed Constraints. Skip-able from Step 3 onward.
-- Live SVG room-outline preview reacts to dimension typing (debounce 100ms via `requestIdleCallback` or `setTimeout`).
-- New portal endpoints in `southbrook_estimating_website/controllers/main.py`:
-  - `POST /southbrook/api/order/<id>/room/create` — wizard completion
-  - `POST /southbrook/api/order/<id>/room/update` — inline edits
-  - `POST /southbrook/api/order/<id>/room/constraint/add` — add constraint
-- Auth/ownership reuses `_southbrook_resolve_order()` (`main.py:844-873`).
-- Room Setup tab added to OWL `_tabs` getter as the **first** tab (sequence index 0). The 6 existing tabs shift right.
-- Order-header summary line: rendered in the OrderBuilder OWL component above the tablist.
+**Files:**
+- Create: `addons/southbrook_estimating_website/controllers/room_api.py`
+- Modify: `addons/southbrook_estimating_website/controllers/__init__.py` (append import)
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` (bump `version` to `19.0.3.0.0`)
+- Create: `addons/southbrook_estimating_website/tests/test_room_api.py` (10 tests, `@tagged("post_install", "-at_install", "southbrook", "southbrook_room_api")`)
+- Modify: `addons/southbrook_estimating_website/tests/__init__.py` (register new test)
 
-**Acceptance**: brief §2.1 + §2.2 acceptance criteria carry forward verbatim.
+**Interfaces:**
+- Produces:
+  - `POST /southbrook/api/order/<int:order_id>/room/get` — returns the order's room dict (or null) for client reconstruction. Body: `{}`. Response: `{ok, room: {id, name, room_type, layout_shape, ceiling_height_mm, unit_preference, layout_complete, has_plumbing, total_linear_mm, walls: [{id, name, length_mm, used_mm, remaining_mm, has_conflicts, wall_order, has_upper_cabinets, has_base_cabinets, has_tall_cabinets, constraints: [{id, constraint_type, distance_from_left_mm, width_mm, height_mm, height_from_floor_mm, notes}, ...]}, ...]}}` or `{ok, room: null}`.
+  - `POST /southbrook/api/order/<int:order_id>/room/create` — body: `{name, room_type, layout_shape, ceiling_height_mm, unit_preference, walls: [{name, length_mm, wall_order, has_upper_cabinets, has_base_cabinets, has_tall_cabinets}, ...], constraints: [{wall_index, constraint_type, distance_from_left_mm, width_mm, height_mm, height_from_floor_mm, notes}, ...]}`. `wall_index` is the 0-based index into the freshly-created walls array (server resolves to the wall_id). Idempotency: if the order already has a room, returns 409 with the existing room dict — caller must call update instead.
+  - `POST /southbrook/api/order/<int:order_id>/room/<int:room_id>/update` — body: any subset of room scalar fields + optional `walls: [{id?, name, length_mm, ...}]` (id present = update, id absent = create). Returns the refreshed room dict.
+  - `POST /southbrook/api/order/<int:order_id>/room/<int:room_id>/wall/<int:wall_id>/constraint/add` — body: `{constraint_type, distance_from_left_mm, width_mm, height_mm?, height_from_floor_mm?, notes?}`. Returns the created constraint dict.
+  - `POST /southbrook/api/order/<int:order_id>/room/<int:room_id>/wall/<int:wall_id>/constraint/<int:constraint_id>/delete` — body: `{}`. Returns `{ok: true}`.
+- Auth model: every endpoint goes through the same `_southbrook_resolve_order(order_id)` helper that exists in `controllers/main.py:844-873`. The room/wall/constraint IDs in the URL are validated as belonging to the resolved order — wrong owner → 403, not 404 (avoid existence-oracle leak).
+
+- [ ] **Step 1: Write failing tests** — `tests/test_room_api.py` (10 tests, JSON-RPC happy paths + ownership-denial + idempotency).
+- [ ] **Step 2: Implement `controllers/room_api.py`**. Reuse `_json_response` + `_southbrook_resolve_order` helpers from `controllers/main.py` (import them).
+- [ ] **Step 3: Register controller in `controllers/__init__.py`** by appending `from . import room_api`.
+- [ ] **Step 4: Bump manifest version** `19.0.2.15.0` → `19.0.3.0.0`.
+- [ ] **Step 5: Smoke test live** — once deployed: `curl -X POST` against each of 5 endpoints from an authenticated session.
+- [ ] **Step 6: Commit**
+
+### Phase 2.B — Room Setup tab (inline, no wizard yet)
+
+Inserts the Room Setup tab as **position 0** in the OrderBuilder OWL tab list. Reads from the new `/room/get` endpoint. Shows either: a room-configured summary card with wall capacity bars, OR an empty-state CTA "Set Up Room" (button stub for now — wired to wizard in 2.C).
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js`:
+  - Insert "Room Setup" entry at index 0 in `_tabs` getter (around line 2885-2929)
+  - Insert conditional render block at line 2238-2379 (the existing pattern: `<div t-if="state.ui.current_tab === 'room_setup'">...</div>`)
+  - Add `roomState` to `state` reactive store + fetch on mount
+  - Add order-header summary line above the tablist
+- Create: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss` (the `sb-room-*` prefix space).
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` (register the new SCSS in `web.assets_frontend`).
+- Modify: `addons/southbrook_estimating_website/controllers/main.py:southbrook_order_builder()` (include `room` dict in the page-load JSON payload — same shape as `/room/get` response).
+
+Acceptance: tab visible to existing orders without breaking 3D Kitchen/Order Lines tabs; empty state on orders without rooms; populated state on the smoke-test SO (S01264) once a room is attached via the backend (Phase 1 path).
+
+### Phase 2.C — 3-step wizard component + live SVG preview
+
+The big OWL component. Modeled as a fullscreen overlay (NOT a Bootstrap modal — the portal is 100% OWL, see audit). Closes via `state.ui.wizard = null` to return to the OrderBuilder root.
+
+**Files:**
+- Create: `addons/southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js` (the wizard component + its 3 sub-step components + the live SVG preview component)
+- Create: `addons/southbrook_estimating_website/static/src/xml/room_setup_wizard.xml` (OWL templates for the 4 components)
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss` (add wizard styles; same `sb-room-*` prefix)
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` (register the 2 new files in `web.assets_frontend`)
+- Modify: `portal_boot.esm.js` — wire the "Set Up Room" button in Room Setup tab → opens wizard; wizard completion → POST `/room/create` → refreshes the order's room state → closes wizard
+
+Wizard structure:
+- `RoomSetupWizard` (parent, state machine: step ∈ {1, 2, 3, submitting, done, error})
+  - Step 1: `<RoomTypeShapeStep>` — 7 room-type tiles (icons via `<svg>` inline) + 8 shape tiles
+  - Step 2: `<WallDimensionsStep>` — dynamic count based on shape, each row: name input + length input + unit toggle (mm ↔ ft/in); shared ceiling-height input above; **live `<RoomOutlinePreview>` SVG sibling reacts via shared OWL state, 100ms debounce**
+  - Step 3: `<ConstraintsStep>` — type chips (toggle to add) + inline form per added constraint (wall selector, distance, width, optional height); "Skip for now" link top-right
+- `RoomOutlinePreview` SVG component — pure compute from `(shape, walls)` → `<polyline>` of room outline + `<circle>` markers per constraint position. Uses a small mm-to-px transform helper (room fits in 720×540 viewBox).
+
+### Phase 2.D — Smoke + review
+
+- Live smoke: walk through the wizard end-to-end on SO `S01264` via the live portal; verify room appears in backend + on the Room Setup tab.
+- Code review on cumulative Phase 2 diff.
+
+**Acceptance** (across 2.A-D): brief §2.1 + §2.2 acceptance criteria.
 
 ---
 
