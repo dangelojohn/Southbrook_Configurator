@@ -79,6 +79,10 @@
                             <field name="product_id" readonly="1"/>
                             <field name="bom_id" readonly="1"/>
                             <field name="bom_version_snapshot" readonly="1"/>
+                            <!-- W079 — cut spec version snapshot at build -->
+                            <field name="x_sbk_cut_spec_version_at_build"
+                                   readonly="1"
+                                   invisible="not x_sbk_cut_spec_version_at_build"/>
                         </group>
                         <group string="Identification">
                             <field name="lot_id" readonly="state in ('sealed','deprecated')"/>

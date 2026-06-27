@@ -84,6 +84,67 @@ class SouthbrookCutSpec(models.Model):
         "canonical #8 workbook lands.",
     )
 
+    # W079 (R4.S8) — auto-incrementing version stamp on the
+    # parametric cut spec.
+    #
+    # JTBD: "Two cabinets built under different cut specs are
+    # distinguishable in warranty." The asbuilt record snapshots
+    # this version at seal time (see x_sbk_cut_spec_version_at_build
+    # on southbrook.asbuilt) so a 3-year-later warranty trace
+    # answers "what reveal / thickness was this cabinet cut to?"
+    # without forensic reconstruction.
+    #
+    # Increment trigger (write() override below): the version
+    # bumps when ANY field in CONSTANT_FIELDS changes. Chatter
+    # posts, name edits, state transitions, note edits, and the
+    # active flag do NOT bump — those are bookkeeping, not
+    # geometric truth. This matches the spec's "significant
+    # fields" constraint and avoids one-bump-per-chatter-post.
+    version = fields.Integer(
+        string="Version",
+        default=1,
+        required=True,
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help="Auto-increments on every write that changes a "
+             "geometric constant (box_th / back_th / rabbet / "
+             "door_th / door_reveal / shelf_tol / shelf_vent_gap / "
+             "toekick_h). Non-geometric edits (name, note, state, "
+             "active) do NOT bump the version. The asbuilt record "
+             "snapshots this value at seal time so warranty trace "
+             "can answer 'what cut spec produced this cabinet'.",
+    )
+
+    def write(self, vals):
+        # W079 — bump version when a CONSTANT_FIELDS value actually
+        # changes. We compare per-record to avoid bumping when the
+        # caller writes the same value (idempotent write should be a
+        # no-op for the version). Cheap because CONSTANT_FIELDS is 8
+        # primitives.
+        bumped_ids = set()
+        for fname in CONSTANT_FIELDS:
+            if fname not in vals:
+                continue
+            new = vals[fname]
+            for rec in self:
+                if rec[fname] != new:
+                    bumped_ids.add(rec.id)
+        result = super().write(vals)
+        if bumped_ids and "version" not in vals:
+            # Re-fetch to use the post-super state; super-call may
+            # have validated / mutated. Then a single grouped write
+            # for the bumped subset.
+            for rec in self.browse(list(bumped_ids)):
+                # Direct write of the integer; recursion is not a
+                # concern because version is NOT in CONSTANT_FIELDS
+                # and the trigger above only fires on CONSTANT_FIELDS
+                # keys.
+                super(SouthbrookCutSpec, rec).write({
+                    "version": (rec.version or 1) + 1,
+                })
+        return result
+
     # ---- The promoted NF14 constants (all millimetres). ----
     box_th = fields.Float(
         "Box / Carcass Thickness (mm)", default=15.875, required=True,

@@ -7,6 +7,7 @@
         <field name="arch" type="xml">
             <list decoration-success="state == 'active'" decoration-muted="state == 'superseded'">
                 <field name="name"/>
+                <field name="version" string="v"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'active'"
                        decoration-info="state == 'draft'"/>
@@ -46,6 +47,10 @@
                     </div>
                     <div class="oe_title">
                         <h1><field name="name" placeholder="e.g. 2026 Workbook Rev B"/></h1>
+                        <div>
+                            <span class="text-muted">Version </span>
+                            <field name="version" readonly="1" class="oe_inline"/>
+                        </div>
                     </div>
                     <group>
                         <group string="Carcass (mm)">

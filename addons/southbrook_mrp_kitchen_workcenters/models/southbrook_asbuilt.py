@@ -102,6 +102,30 @@ class SouthbrookAsbuilt(models.Model):
              "ECO'd since — this is the version that WAS built.",
     )
 
+    # W079 (R4.S8) — cut-spec version snapshot at build time.
+    #
+    # JTBD: two cabinets built under different cut specs (e.g. before
+    # / after an ECO that bumped door_reveal from 3.0 mm to 2.5 mm)
+    # must be distinguishable in warranty. The active southbrook.cut.spec
+    # carries an auto-incrementing `version` integer; this field
+    # snapshots it at asbuilt-create time so the warranty record
+    # remains accurate even after subsequent ECOs supersede the spec.
+    #
+    # Snapshotted in _snapshot_build_context (alongside bom_version_
+    # snapshot). Empty when southbrook_plm is not installed or no
+    # active cut spec exists at create time — both bucketed as
+    # "unknown" in warranty queries (defensive).
+    x_sbk_cut_spec_version_at_build = fields.Integer(
+        string="Cut Spec Version (at build)",
+        readonly=True,
+        copy=False,
+        index=True,
+        help="Snapshot of southbrook.cut.spec.version (the currently-"
+             "active cut spec) at the moment this asbuilt was "
+             "created. Stable for warranty trace even after subsequent "
+             "ECOs supersede the active spec.",
+    )
+
     # --- Identification + traceability ---
     lot_id = fields.Many2one(
         "stock.lot",
@@ -317,6 +341,14 @@ class SouthbrookAsbuilt(models.Model):
         bom = self.production_id.bom_id
         if bom and "southbrook_version" in bom._fields:
             self.bom_version_snapshot = bom.southbrook_version or 1
+        # W079 — cut-spec version snapshot. Soft-resolve so the asbuilt
+        # creation never breaks when southbrook_plm is uninstalled or
+        # no active spec exists.
+        if "southbrook.cut.spec" in self.env:
+            CutSpec = self.env["southbrook.cut.spec"].sudo()
+            active = CutSpec._get_active()
+            if active:
+                self.x_sbk_cut_spec_version_at_build = active.version or 1
         # Pull QC checks tied to this MO. The southbrook.mi.check
         # model has production_id (canonical link).
         Check = self.env["southbrook.mi.check"]
