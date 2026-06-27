@@ -84,4 +84,27 @@
               sequence="80"
               groups="base.group_system"/>
 
+    <!-- W088 (R2.13) — Operator-surfaced reprint of the defect-type
+         QR wallpaper. The DefectSheetController at /sb/qr/defect-sheet
+         (defined in southbrook_mrp_kitchen_workcenters/controllers/
+         defect_sheet.py) renders one QR per defect_type in the
+         southbrook.mi.check selection so operators can pin a fresh sheet
+         to the floor board after a damaged-print or selection-revision
+         event. Surfaced here (Kitchen Ops) instead of buried in the QC
+         manager menu so operators can self-serve. Auth is type="user"
+         on the route; gating via mrp.group_mrp_user keeps it out of the
+         portal-user menu while letting any shop user reprint. -->
+    <record id="action_defect_sheet_reprint" model="ir.actions.act_url">
+        <field name="name">Defect QR Sheet (Reprint)</field>
+        <field name="url">/sb/qr/defect-sheet</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_kitchen_ops_defect_sheet"
+              name="Defect QR Sheet"
+              parent="menu_kitchen_ops_root"
+              action="action_defect_sheet_reprint"
+              sequence="75"
+              groups="mrp.group_mrp_user"/>
+
 </odoo>

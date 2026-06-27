@@ -1,6 +1,6 @@
 {
     'name': 'Southbrook Premium MRP Orchestration',
-    'version': '19.0.4.5.0',
+    'version': '19.0.4.6.0',
     'summary': 'Closes the loop: cron-driven readiness/MI/analytics, always-on project-task spine, '
                'practical-intelligence telemetry, generative + planning activation.',
     'description': """
