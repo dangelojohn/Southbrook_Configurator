@@ -62,12 +62,25 @@ class MrpProduction(models.Model):
         compute="_compute_sbk_label_qr", store=False)
     sbk_label_qr_image = fields.Binary(
         compute="_compute_sbk_label_qr", store=False)
+    # Company logo as PNG base64 (data: URI ready). Bypasses wkhtmltopdf
+    # 0.12.6's flaky WebP rendering AND the `/web/image` URL fetch in
+    # PDF render context. PIL transcodes whatever Odoo stores (often
+    # WebP) into PNG which wkhtmltopdf renders reliably.
+    sbk_company_logo_b64 = fields.Char(
+        compute="_compute_sbk_company_logo", store=False)
 
     # ── Customer / PO / TAG resolution ──────────────────────────────
     @api.depends("sale_line_id", "origin")
     def _compute_sbk_label_customer(self):
         for rec in self:
             so = rec.sale_line_id.order_id
+            # When the MO was created without a sale_line_id link (manual
+            # MO from confirmed SO via legacy import, etc.), fall back to
+            # finding the SO by name == origin. Otherwise customer/PO/TAG
+            # all collapse to the bare SO ref string.
+            if not so and rec.origin:
+                so = rec.env["sale.order"].sudo().search(
+                    [("name", "=", rec.origin)], limit=1)
             if so:
                 partner = so.partner_id or False
                 # Invoices go to the company; the cabinet label
@@ -86,6 +99,53 @@ class MrpProduction(models.Model):
                 rec.sbk_label_customer_name = (rec.origin or "—").upper()
                 rec.sbk_label_po_ref = rec.origin or ""
                 rec.sbk_label_tag = (rec.origin or "").upper()
+
+    # ── Company logo (transcoded to PNG for wkhtmltopdf) ────────────
+    @api.depends("company_id")
+    def _compute_sbk_company_logo(self):
+        """Return company logo as PNG base64 string for inline data: URI.
+
+        Odoo's res.company.logo_web is base64-encoded bytes; the
+        underlying format is whatever was uploaded (PNG, JPEG, WebP).
+        wkhtmltopdf 0.12.6.x renders PNG + JPEG reliably but breaks on
+        WebP. We always transcode through PIL to PNG to be safe.
+        """
+        try:
+            from PIL import Image  # noqa: WPS433 — lazy import is fine
+        except ImportError:
+            for rec in self:
+                rec.sbk_company_logo_b64 = ""
+            return
+        for rec in self:
+            company = rec.company_id or rec.env.company
+            raw_b64 = company.logo_web
+            if not raw_b64:
+                rec.sbk_company_logo_b64 = ""
+                continue
+            try:
+                # logo_web stores base64-encoded image bytes
+                if isinstance(raw_b64, str):
+                    src_bytes = base64.b64decode(raw_b64)
+                else:
+                    src_bytes = base64.b64decode(raw_b64)
+                img = Image.open(io.BytesIO(src_bytes))
+                # Ensure RGBA → RGB conversion for PNG without alpha
+                # issues in wkhtmltopdf
+                if img.mode in ("RGBA", "LA"):
+                    bg = Image.new("RGB", img.size, (255, 255, 255))
+                    bg.paste(img, mask=img.split()[-1])
+                    img = bg
+                elif img.mode != "RGB":
+                    img = img.convert("RGB")
+                buf = io.BytesIO()
+                img.save(buf, format="PNG", optimize=True)
+                rec.sbk_company_logo_b64 = base64.b64encode(
+                    buf.getvalue()).decode("ascii")
+            except Exception as exc:  # noqa: BLE001 — log + continue
+                _logger.warning(
+                    "sbk_company_logo transcode failed for company "
+                    "%s: %s", company.id, exc)
+                rec.sbk_company_logo_b64 = ""
 
     # ── Attribute-driven fields ─────────────────────────────────────
     def _sbk_attribute_value(self, attr_name_candidates, default=""):
