@@ -82,13 +82,60 @@
         </field>
     </record>
 
-    <!-- NCR Queue list: failed / rework checks only -->
+    <!-- W004 — NCR Pareto pivot view.
+         JTBD (R5.2): "When 3 cabinets fail edgebanding on the same shift,
+         I want a pareto by tool + material + operator + workcenter to spot
+         the root cause within the hour." Rows = check stage × defect type;
+         cols = create_date by week; measure = count. Defaults set on the
+         action context below so the view opens in a useful state. -->
+    <record id="view_southbrook_mi_check_ncr_pivot" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.ncr.pivot</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="arch" type="xml">
+            <pivot string="NCR Analysis" sample="1">
+                <field name="x_sbk_check_stage" type="row"/>
+                <field name="x_sbk_defect_type" type="row"/>
+                <field name="create_date" type="col" interval="week"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- W004 — NCR Pareto graph view. Bar chart of NCR count grouped by
+         defect type, stacked by inspector-call severity (minor/major/
+         critical). Catches a defect cluster on one defect type after 1
+         cabinet, not 5. -->
+    <record id="view_southbrook_mi_check_ncr_graph" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.ncr.graph</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="arch" type="xml">
+            <graph string="NCR Pareto" type="bar" stacked="1" sample="1">
+                <field name="x_sbk_defect_type"/>
+                <field name="x_sbk_defect_severity"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- NCR Queue list: failed / rework checks only.
+         W004 added pivot + graph to view_mode so the queue opens with
+         tabs for List / Form / Pivot / Graph (Odoo renders Graph + Pivot
+         as switcher tabs). The context defaults give the pivot a useful
+         opening shape — rows = check_stage × defect_type, cols = week,
+         measure = count — so a supervisor lands on the pareto without
+         touching a groupby. -->
     <record id="action_southbrook_ncr_queue" model="ir.actions.act_window">
         <field name="name">NCR / Rework Queue</field>
         <field name="res_model">southbrook.mi.check</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,pivot,graph</field>
         <field name="domain">[('x_sbk_result', 'in', ['fail', 'rework', 'hold'])]</field>
-        <field name="context">{'search_default_pending_rework': 1}</field>
+        <field name="context">{
+            'search_default_pending_rework': 1,
+            'pivot_measures': ['__count'],
+            'pivot_row_groupby': ['x_sbk_check_stage', 'x_sbk_defect_type'],
+            'pivot_column_groupby': ['create_date:week'],
+            'graph_measure': '__count',
+            'graph_mode': 'bar',
+            'graph_groupbys': ['x_sbk_defect_type', 'x_sbk_defect_severity'],
+        }</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No open NCRs — nice work, floor team!
