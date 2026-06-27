@@ -1,0 +1,74 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* southbrook_kitchen_mrp
+#
+# W070 (R8.9, 2026-06-27) — Mexican Spanish translations for the
+# cabinet label print template (the per-box label the assembler
+# attaches before pack/dispatch). These are the labels the
+# Spanish-speaking operator at the Pack station reads dozens of
+# times per day.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: 2026-06-27 12:00+0000\n"
+"Last-Translator: Southbrook / OdooIQ\n"
+"Language-Team: es-MX\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#. module: southbrook_kitchen_mrp
+msgid "Customer:"
+msgstr "Cliente:"
+
+#. module: southbrook_kitchen_mrp
+msgid "PO #:"
+msgstr "OC #:"
+
+#. module: southbrook_kitchen_mrp
+msgid "TAG:"
+msgstr "ETIQUETA:"
+
+#. module: southbrook_kitchen_mrp
+msgid "Door Name:"
+msgstr "Nombre de puerta:"
+
+#. module: southbrook_kitchen_mrp
+msgid "Door Color:"
+msgstr "Color de puerta:"
+
+#. module: southbrook_kitchen_mrp
+msgid "Interior:"
+msgstr "Interior:"
+
+#. module: southbrook_kitchen_mrp
+msgid "White:"
+msgstr "Blanco:"
+
+#. module: southbrook_kitchen_mrp
+msgid "Maple:"
+msgstr "Maple:"
+
+#. module: southbrook_kitchen_mrp
+msgid "Code"
+msgstr "Código"
+
+#. module: southbrook_kitchen_mrp
+msgid "Hinge"
+msgstr "Bisagra"
+
+#. module: southbrook_kitchen_mrp
+msgid "Fin"
+msgstr "Acabado"
+
+#. module: southbrook_kitchen_mrp
+msgid "Rev:"
+msgstr "Rev:"
+
+# untranslated — long-form report headers + dimension formula text
+# that depends on the spec-book renderer's table layout. Add as needed:
+#   odoo-bin --i18n-export=es.po -d <db> --modules=southbrook_kitchen_mrp
