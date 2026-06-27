@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W048 (R7.4, 2026-06-27) — shop daily snapshot views.
+
+  Pivot is the headline surface for MoM trend analysis (GM month-end
+  rollup target). Graph + list views are supporting; the rebuild
+  server action backfills history from raw source tables.
+-->
+<odoo>
+    <data>
+
+        <record id="view_shop_daily_pivot" model="ir.ui.view">
+            <field name="name">southbrook.shop.daily.pivot</field>
+            <field name="model">southbrook.shop.daily</field>
+            <field name="arch" type="xml">
+                <pivot string="Shop Daily (MoM trend)" sample="1">
+                    <field name="workcenter_id" type="row"/>
+                    <field name="date" type="col" interval="day"/>
+                    <field name="hours_actual" type="measure"/>
+                    <field name="hours_loaded" type="measure"/>
+                    <field name="mo_completed_count" type="measure"/>
+                    <field name="scrap_qty_total" type="measure"/>
+                    <field name="defect_count" type="measure"/>
+                    <field name="downtime_minutes" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_shop_daily_graph" model="ir.ui.view">
+            <field name="name">southbrook.shop.daily.graph</field>
+            <field name="model">southbrook.shop.daily</field>
+            <field name="arch" type="xml">
+                <graph string="Throughput vs Plan" type="bar" sample="1">
+                    <field name="date" interval="day"/>
+                    <field name="workcenter_id"/>
+                    <field name="hours_actual" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="view_shop_daily_list" model="ir.ui.view">
+            <field name="name">southbrook.shop.daily.list</field>
+            <field name="model">southbrook.shop.daily</field>
+            <field name="arch" type="xml">
+                <list string="Shop Daily" create="false" edit="false" delete="false"
+                      decoration-danger="downtime_minutes &gt; 60"
+                      decoration-warning="defect_count &gt; 0">
+                    <field name="date"/>
+                    <field name="workcenter_id"/>
+                    <field name="hours_loaded" sum="Loaded"/>
+                    <field name="hours_actual" sum="Actual"/>
+                    <field name="mo_completed_count" sum="MOs"/>
+                    <field name="scrap_qty_total" sum="Scrap"/>
+                    <field name="defect_count" sum="Defects"/>
+                    <field name="downtime_minutes" sum="Downtime (min)"/>
+                    <field name="refreshed_at" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_shop_daily_search" model="ir.ui.view">
+            <field name="name">southbrook.shop.daily.search</field>
+            <field name="model">southbrook.shop.daily</field>
+            <field name="arch" type="xml">
+                <search string="Shop Daily">
+                    <field name="workcenter_id"/>
+                    <field name="date"/>
+                    <filter name="this_month"
+                            string="This Month"
+                            domain="[
+                                ('date','&gt;=',
+                                 (context_today().replace(day=1)).strftime('%Y-%m-%d')),
+                                ('date','&lt;=', context_today().strftime('%Y-%m-%d'))
+                            ]"/>
+                    <filter name="last_30d"
+                            string="Last 30 Days"
+                            domain="[
+                                ('date','&gt;=',
+                                 (context_today() - relativedelta(days=30)).strftime('%Y-%m-%d'))
+                            ]"/>
+                    <filter name="had_downtime"
+                            string="Had Downtime"
+                            domain="[('downtime_minutes','&gt;',0)]"/>
+                    <filter name="had_defects"
+                            string="Had Defects"
+                            domain="[('defect_count','&gt;',0)]"/>
+                    <group string="Group By">
+                        <filter name="group_by_wc"
+                                string="Work Center"
+                                context="{'group_by': 'workcenter_id'}"/>
+                        <filter name="group_by_day"
+                                string="Day"
+                                context="{'group_by': 'date'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Server action: rebuild last 30 days from raw source tables.
+             Wired as a binding action so PMs can rebuild from the
+             list/pivot Actions menu. -->
+        <record id="action_shop_daily_rebuild" model="ir.actions.server">
+            <field name="name">Rebuild Last 30 Days</field>
+            <field name="model_id" ref="model_southbrook_shop_daily"/>
+            <field name="binding_model_id" ref="model_southbrook_shop_daily"/>
+            <field name="binding_view_types">list,pivot,graph</field>
+            <field name="state">code</field>
+            <field name="code">action = model.action_rebuild_history()</field>
+        </record>
+
+        <!-- Main window action. -->
+        <record id="action_shop_daily" model="ir.actions.act_window">
+            <field name="name">Shop Daily</field>
+            <field name="res_model">southbrook.shop.daily</field>
+            <field name="view_mode">pivot,graph,list</field>
+            <field name="context">{
+                'search_default_last_30d': 1,
+                'search_default_group_by_wc': 1,
+            }</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No shop snapshots yet — the cron at 23:55 builds them
+                    each night.
+                </p>
+                <p>
+                    Each row is one work-center on one day, carrying
+                    hours loaded vs actual, completed MOs, scrap, defects,
+                    and downtime. Use the pivot for month-over-month
+                    rollups; use the rebuild action to backfill history
+                    from raw source tables.
+                </p>
+            </field>
+        </record>
+
+        <!-- Menu entry under Southbrook PM root, sequence 9 (after
+             the Capacity views at 7/8). -->
+        <menuitem
+            id="menu_shop_daily"
+            parent="menu_southbrook_pm_root"
+            name="Shop Daily"
+            action="action_shop_daily"
+            sequence="9"/>
+
+    </data>
+</odoo>

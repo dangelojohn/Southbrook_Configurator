@@ -40,7 +40,7 @@ analysis. Layered build:
       M17 Floor Manager access group
       M20 ECO → in-flight MO notification rule
 """,
-    "version": "19.0.1.10.0",
+    "version": "19.0.1.11.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -114,6 +114,11 @@ analysis. Layered build:
         # mail.activity rows older than 90 days. Garbage collection
         # only; never touches open activities.
         "data/activity_retention_cron.xml",
+        # W048 (R7.4, 2026-06-27) — pre-aggregated daily shop snapshot
+        # for the GM month-end actual-vs-plan rollup. Cron loads here;
+        # the pivot/graph/list views + menu under PM root load next.
+        "data/shop_daily_cron.xml",
+        "views/shop_daily_views.xml",
     ],
     "assets": {
         "web.assets_frontend": [
