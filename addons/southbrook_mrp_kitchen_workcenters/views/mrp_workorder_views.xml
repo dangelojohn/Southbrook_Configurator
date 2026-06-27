@@ -52,6 +52,10 @@
                 <field name="name"/>
                 <field name="x_sbk_cabinet_code"/>
                 <field name="x_sbk_kitchen_room"/>
+                <!-- W054 (R2.12) — per-viewer "my time today" badge.
+                     Compute is depends_context=uid so the value here
+                     belongs to the operator looking at the card. -->
+                <field name="x_sbk_my_time_today_min"/>
                 <templates>
                     <t t-name="card">
                         <div class="oe_kanban_card sb-tablet-card">
@@ -73,6 +77,15 @@
                                     <span>Qty: <field name="qty_production"/></span>
                                     <span t-if="record.date_start.raw_value">
                                         Start: <field name="date_start" widget="datetime"/>
+                                    </span>
+                                    <!-- W054 — operator-visible per-WO
+                                         self-credit. Suppressed when 0
+                                         so a fresh card doesn't carry
+                                         a noisy "0h 0m" stripe. -->
+                                    <span class="sb-my-time-today badge text-bg-primary"
+                                          t-if="record.x_sbk_my_time_today_min.raw_value">
+                                        My time today:
+                                        <field name="x_sbk_my_time_today_min" widget="float_time"/>
                                     </span>
                                 </div>
                             </div>
@@ -144,6 +157,46 @@
                 Start / Pause / Done buttons. Tap a card's action button
                 to drive the WO without opening the dense desktop form.
             </p>
+        </field>
+    </record>
+
+    <!--
+        W054 (R2.12, 2026-06-27) — operator-visible "My Time" tab.
+
+        Native mrp.workorder form has a "Time Tracking" tab gated by
+        mrp.group_mrp_manager — operators can't see it. We add a
+        sibling tab with the SAME productivity model but filtered to
+        the current user's rows via the x_sbk_my_time_ids One2many
+        compute. No group restriction — every internal user sees the
+        tab and reads only their own rows.
+
+        Placed inside the existing notebook via xpath against the
+        native "time_tracking" page (it always exists, even when
+        invisible to the user) so the operator surface sits adjacent
+        to where a planner would find the unrestricted version.
+    -->
+    <record id="view_mrp_workorder_form_sbk_my_time" model="ir.ui.view">
+        <field name="name">mrp.production.workorder.form.sbk.my_time</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_form_view_inherit"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='time_tracking']" position="after">
+                <page string="My Time" name="sbk_my_time">
+                    <div class="alert alert-info" role="status">
+                        <strong>Your time today on this WO:</strong>
+                        <field name="x_sbk_my_time_today_min" widget="float_time" readonly="1"/>
+                    </div>
+                    <field name="x_sbk_my_time_ids" nolabel="1" readonly="1">
+                        <list create="0" edit="0" delete="0">
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="duration" widget="float_time"/>
+                            <field name="loss_id" string="Productivity"/>
+                            <field name="description" optional="hide"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
         </field>
     </record>
 

@@ -180,6 +180,79 @@ class MrpWorkorder(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # W054 (R2.12, 2026-06-27) — operator-visible time tracking.
+    #
+    # JTBD: operators are productivity-comp'd but the native "Time
+    # Tracking" tab on the WO form is gated by mrp.group_mrp_manager
+    # — they cannot audit their own time. Add a filtered surface that
+    # shows ONLY the current user's productivity rows for this WO so
+    # an operator can verify "did the system credit me for that 90min
+    # block I logged before lunch?"
+    #
+    # Two fields:
+    #   x_sbk_my_time_ids        — filtered One2many on time_ids
+    #                               with domain user_id == uid
+    #   x_sbk_my_time_today_min  — total minutes the current user has
+    #                               logged on this WO so far today
+    #
+    # Both fields are non-stored / context-dependent (they vary per
+    # viewer); the field semantics MUST resolve under env.uid at read
+    # time. Implemented as @api.depends_context('uid') computes.
+    #
+    # Security: we filter by user_id on the native mrp.workcenter.
+    # productivity rows, which is the only operator-attribution column
+    # the native model carries in v19 CE. No employee-level filter is
+    # possible at the productivity layer; this is the tightest filter
+    # the model supports.
+    # ------------------------------------------------------------------
+    x_sbk_my_time_ids = fields.One2many(
+        "mrp.workcenter.productivity",
+        compute="_compute_x_sbk_my_time_ids",
+        string="My Time Logs",
+        help="Productivity rows on this WO that belong to the current "
+             "user. Operators use this to audit their own credited "
+             "time without seeing colleagues' rows.",
+    )
+    x_sbk_my_time_today_min = fields.Float(
+        compute="_compute_x_sbk_my_time_today_min",
+        string="My Time Today (min)",
+        digits=(8, 1),
+        help="Total minutes the current user has logged on this WO "
+             "since 00:00 of the local server day. Surfaces on the "
+             "tablet kanban card as a small badge so the operator "
+             "sees their accumulated time at a glance.",
+    )
+
+    @api.depends_context("uid")
+    @api.depends("time_ids", "time_ids.user_id")
+    def _compute_x_sbk_my_time_ids(self):
+        for wo in self:
+            wo.x_sbk_my_time_ids = wo.time_ids.filtered(
+                lambda t: t.user_id.id == self.env.uid
+            )
+
+    @api.depends_context("uid")
+    @api.depends("time_ids", "time_ids.user_id",
+                 "time_ids.duration", "time_ids.date_start")
+    def _compute_x_sbk_my_time_today_min(self):
+        from datetime import datetime, time as dtime
+        # "Today" anchored to the current user's day in server-local
+        # tz. We use a naive midnight on the server's date — Odoo's
+        # date_start is stored UTC-naive but the human "today" is a
+        # close-enough approximation for an at-a-glance badge. A
+        # boundary-of-midnight off-by-one-hour is acceptable for a
+        # progress badge that the operator reads as ballpark.
+        today_start = datetime.combine(
+            fields.Date.context_today(self), dtime.min)
+        for wo in self:
+            mine = wo.time_ids.filtered(
+                lambda t: t.user_id.id == self.env.uid
+                and t.date_start
+                and t.date_start >= today_start
+            )
+            wo.x_sbk_my_time_today_min = sum(mine.mapped("duration"))
+
+    # ------------------------------------------------------------------
     # W049 (R7.5, 2026-06-27) — shift attribution on KPIs.
     #
     # JTBD: "When I'm reviewing this week's KPIs, I want to know which
