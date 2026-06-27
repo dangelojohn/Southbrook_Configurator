@@ -239,6 +239,66 @@ class SouthbrookMiCheck(models.Model):
              "shows the spawned rework.",
     )
 
+    # ------------------------------------------------------------------
+    # W090 (R5.10) — Scrap-NCR reconciliation
+    # ------------------------------------------------------------------
+    #
+    # JTBD: when an NCR triggers a scrap.move, the cost/material
+    # reconciliation gap is the inability to walk from a written-off
+    # piece of inventory back to the defect that caused the scrap.
+    # Today the W040 wizard creates the scrap + the NCR side-by-side
+    # but stamps neither with a reference to the other; finance has
+    # to cross-walk by MO + timestamp + free-text origin.
+    #
+    # Closes the loop with two fields:
+    #
+    #   x_sbk_scrap_id   M2O back-link to the stock.scrap row the
+    #                    W040 wizard (or any future scrap-creating
+    #                    hook) created from this NCR. ondelete='set
+    #                    null' so a finance correction unlinking the
+    #                    scrap doesn't cascade-delete the NCR.
+    #
+    #   x_sbk_scrap_reason Selection mirroring the WIZARD_SCRAP_REASONS
+    #                    list (damage_in_process / wrong_dimension /
+    #                    material_defect / operator_error / other) so
+    #                    the reason is queryable on the NCR pivot
+    #                    without joining through stock.scrap (which
+    #                    has no reason field in v19 CE — currently
+    #                    serialized as a chatter note only).
+    #
+    # Auto-stamping is done by the W040 wizard (see
+    # wizards/southbrook_report_problem_wizard.py — _create_defect
+    # is updated to receive the created scrap recordset + reason and
+    # write them onto the NCR vals dict on the same transaction).
+    x_sbk_scrap_id = fields.Many2one(
+        comodel_name="stock.scrap",
+        string="Triggered Scrap",
+        ondelete="set null",
+        index=True,
+        copy=False,
+        help="The stock.scrap row this NCR triggered (or that "
+             "triggered this NCR). Auto-stamped by the W040 "
+             "Report-a-Problem wizard when both Scrap and Defect "
+             "boxes are checked. Closes the cost/material "
+             "reconciliation walk for finance.",
+    )
+    x_sbk_scrap_reason = fields.Selection(
+        [
+            ("damage_in_process", "Damage In Process"),
+            ("wrong_dimension", "Wrong Dimension"),
+            ("material_defect", "Material Defect"),
+            ("operator_error", "Operator Error"),
+            ("other", "Other"),
+        ],
+        string="Scrap Reason",
+        index=True,
+        copy=False,
+        help="Mirror of the W040 wizard's scrap_reason selection so "
+             "the NCR pivot can group by reason without joining "
+             "stock.scrap. Stock.scrap in v19 CE has no native reason "
+             "column; the reason is also written to the scrap chatter.",
+    )
+
     # W043 (R5.7, 2026-06-27) — re-inspection wiring after rework
     # workorder completion.
     #

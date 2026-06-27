@@ -212,6 +212,17 @@ class SouthbrookReportProblemWizard(models.TransientModel):
                 mi_check = self._create_defect()
             if self.include_downtime:
                 downtime = self._create_downtime()
+            # W090 (R5.10) — when BOTH scrap + defect were created
+            # in this wizard pass, link them so the NCR carries the
+            # scrap back-reference and the scrap reason. Idempotent
+            # by ondelete='set null' on the M2O. Single write inside
+            # the savepoint so a downstream failure rolls the link
+            # back with the rest.
+            if scrap and mi_check:
+                mi_check.sudo().write({
+                    "x_sbk_scrap_id": scrap.id,
+                    "x_sbk_scrap_reason": self.scrap_reason or False,
+                })
 
         # Save the back-refs for the test harness + the success
         # banner. Outside the savepoint because the wizard itself
