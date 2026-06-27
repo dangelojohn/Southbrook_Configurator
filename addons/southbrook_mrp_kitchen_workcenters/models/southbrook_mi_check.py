@@ -158,6 +158,67 @@ class SouthbrookMiCheck(models.Model):
              "shows the spawned rework.",
     )
 
+    # W043 (R5.7, 2026-06-27) — re-inspection wiring after rework
+    # workorder completion.
+    #
+    # The original problem: action_create_rework_workorder spawns a
+    # rework WO, but nothing forces a fresh inspection once the rework
+    # finishes. The NCR's severity stays at 'blocker' (or whatever the
+    # inspector tagged) forever, the asbuilt qc_pass compute only
+    # checks rework_workorder.state == "done" (produced, not
+    # inspected), and the part can ship without a second pair of eyes.
+    #
+    # W043 closes that loop by intercepting mrp.workorder.button_finish
+    # on the rework WO: when the rework finishes, we (a) flip a state
+    # field on the originating check that the asbuilt compute can read,
+    # and (b) auto-create a follow-up `southbrook.mi.check` of category
+    # 'production' requesting re-inspection, with `x_sbk_inspector_id`
+    # explicitly set to a user OTHER than the original inspector
+    # (SoD-light) and `x_sbk_originating_check_id` pointing back to
+    # the parent NCR so the audit trail is one click away.
+    #
+    # We add a field instead of mutating `severity` because severity is
+    # already a triage signal driving _order + the MI engine status —
+    # repurposing it to mean 'reinspection state' would break a lot of
+    # callers.
+    x_sbk_reinspection_state = fields.Selection(
+        [
+            ("not_required", "Not Required"),
+            ("pending", "Pending Re-Inspection"),
+            ("passed", "Re-Inspection Passed"),
+            ("failed", "Re-Inspection Failed"),
+        ],
+        string="Re-Inspection State",
+        default="not_required",
+        index=True,
+        copy=False,
+        help="Tracks the re-inspection requirement triggered when the "
+             "rework workorder finishes. 'pending' = follow-up "
+             "mi.check was auto-spawned and is waiting on an inspector "
+             "who didn't sign off on this original check.",
+    )
+    x_sbk_reinspection_check_id = fields.Many2one(
+        comodel_name="southbrook.mi.check",
+        string="Follow-up Re-Inspection",
+        ondelete="set null",
+        readonly=True,
+        copy=False,
+        help="The follow-up mi.check this NCR spawned when its rework "
+             "workorder finished. Idempotency anchor — re-firing on a "
+             "check that already has one just opens it.",
+    )
+    x_sbk_originating_check_id = fields.Many2one(
+        comodel_name="southbrook.mi.check",
+        string="Original NCR",
+        ondelete="set null",
+        readonly=True,
+        copy=False,
+        index=True,
+        help="When this record IS a re-inspection check (spawned by "
+             "the rework-finish handler), points back at the NCR that "
+             "kicked it off. Empty on first-time NCRs.",
+    )
+
     # SAMI PRD INV-06 (2026-06-25) — NCR auto-quarantine.
     x_sbk_quarantine_picking_id = fields.Many2one(
         comodel_name="stock.picking",
@@ -382,6 +443,116 @@ class SouthbrookMiCheck(models.Model):
             "view_mode": "form",
             "target": "current",
         }
+
+    # --------------------------------------------------------------
+    # W043 (R5.7, 2026-06-27) — re-inspection spawn on rework finish.
+    # --------------------------------------------------------------
+    def _sbk_resolve_reinspector(self):
+        """Return a res.users for the re-inspection follow-up that is
+        NOT the original inspector — SoD-light enforcement.
+
+        Strategy:
+          1. Look for a quality-group user other than the original
+             inspector (group `southbrook_manufacturing_intelligence.
+             group_southbrook_mi_quality` if it exists, otherwise the
+             stock quality group, otherwise any internal user).
+          2. Fall back to the production_id.responsible_id or
+             mrp_workcenter.write_uid as a last resort.
+          3. If absolutely no alternate user can be found (single-
+             user dev / test environments), return False — the caller
+             stamps the new check unassigned and the re-inspection
+             state still records as 'pending'. We never assign the
+             same person back to themselves.
+        """
+        self.ensure_one()
+        original_inspector = self.x_sbk_inspector_id
+        Users = self.env["res.users"]
+        group_xmlids = (
+            "southbrook_manufacturing_intelligence.group_southbrook_mi_quality",
+            "quality.group_quality_user",
+            "base.group_user",
+        )
+        for ref in group_xmlids:
+            group = self.env.ref(ref, raise_if_not_found=False)
+            if not group:
+                continue
+            candidate = Users.search([
+                ("group_ids", "in", group.id),
+                ("id", "!=", original_inspector.id if original_inspector else 0),
+                ("active", "=", True),
+                ("share", "=", False),
+            ], limit=1)
+            if candidate:
+                return candidate
+        # Last-ditch fallback — anyone but the original inspector.
+        fallback = Users.search([
+            ("id", "!=", original_inspector.id if original_inspector else 0),
+            ("active", "=", True),
+            ("share", "=", False),
+        ], limit=1)
+        return fallback or self.env["res.users"]
+
+    def _sbk_spawn_reinspection_check(self):
+        """Create the follow-up `southbrook.mi.check` requesting a
+        re-inspection. Idempotent — re-calling on a check that already
+        has `x_sbk_reinspection_check_id` is a no-op.
+
+        SoD-light: the new check's `x_sbk_inspector_id` is forcibly
+        assigned to a user OTHER than the one who signed off on the
+        original NCR. The new check is NOT auto-passed; it carries
+        x_sbk_result=False so an inspector has to act on it.
+        """
+        self.ensure_one()
+        if self.x_sbk_reinspection_check_id:
+            return self.x_sbk_reinspection_check_id
+        reinspector = self._sbk_resolve_reinspector()
+        defect_label = dict(
+            self._fields["x_sbk_defect_type"].selection
+        ).get(self.x_sbk_defect_type, _("defect"))
+        followup = self.sudo().create({
+            "name": _("Re-inspection: %(orig)s",
+                      orig=self.name or self.id),
+            "severity": "warning",
+            "category": "production",
+            "message": _("Re-inspect the rework for original NCR "
+                         "'%(orig)s' (defect: %(d)s). Confirm the "
+                         "defect is no longer present before the "
+                         "part progresses.",
+                         orig=self.name or self.id, d=defect_label),
+            "recommendation": _("Inspect the reworked part. If it "
+                                "still shows the defect, fail this "
+                                "check and route again."),
+            "production_id": self.production_id.id if self.production_id else False,
+            "x_sbk_check_stage": self.x_sbk_check_stage,
+            "x_sbk_defect_type": self.x_sbk_defect_type,
+            "x_sbk_workorder_id": (
+                self.x_sbk_rework_workorder_id.id
+                if self.x_sbk_rework_workorder_id else False
+            ),
+            "x_sbk_inspector_id": reinspector.id if reinspector else False,
+            "x_sbk_originating_check_id": self.id,
+            "x_sbk_result": False,
+        })
+        self.write({
+            "x_sbk_reinspection_state": "pending",
+            "x_sbk_reinspection_check_id": followup.id,
+        })
+        # Best-effort dashboard ping — non-fatal.
+        try:
+            self.env["southbrook.ops.event"].emit(
+                "override_flagged",
+                _("Re-inspection check %(name)s spawned after rework "
+                  "finish on %(orig)s (assigned to %(who)s)",
+                  name=followup.name or "?",
+                  orig=self.name or "?",
+                  who=reinspector.name if reinspector else _("unassigned")),
+                res_model="southbrook.mi.check",
+                res_id=followup.id,
+                severity="warn",
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return followup
 
     @api.onchange("x_sbk_defect_type")
     def _onchange_defect_type_suggests_rework_workcenter(self):

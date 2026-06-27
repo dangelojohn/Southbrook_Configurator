@@ -63,6 +63,25 @@
                                invisible="not x_sbk_rework_required"/>
                         <field name="x_sbk_rework_workorder_id" readonly="1"/>
                     </group>
+                    <!-- W043 (R5.7) — re-inspection chain visibility.
+                         Surfaces when this NCR has a follow-up
+                         re-inspection check waiting, OR when this
+                         record IS itself a re-inspection (back-link
+                         to the originating NCR). -->
+                    <group string="Re-Inspection"
+                           invisible="x_sbk_reinspection_state == 'not_required' and not x_sbk_originating_check_id">
+                        <field name="x_sbk_reinspection_state"
+                               widget="badge"
+                               decoration-warning="x_sbk_reinspection_state == 'pending'"
+                               decoration-success="x_sbk_reinspection_state == 'passed'"
+                               decoration-danger="x_sbk_reinspection_state == 'failed'"/>
+                        <field name="x_sbk_reinspection_check_id"
+                               readonly="1"
+                               invisible="not x_sbk_reinspection_check_id"/>
+                        <field name="x_sbk_originating_check_id"
+                               readonly="1"
+                               invisible="not x_sbk_originating_check_id"/>
+                    </group>
                     <group string="Quarantine"
                            invisible="not x_sbk_quarantine_picking_id and x_sbk_result != 'fail'">
                         <field name="x_sbk_quarantine_picking_id" readonly="1"/>

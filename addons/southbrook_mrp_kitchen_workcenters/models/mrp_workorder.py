@@ -292,6 +292,41 @@ class MrpWorkorder(models.Model):
             },
         }
 
+    # ------------------------------------------------------------------
+    # W043 (R5.7, 2026-06-27) — re-inspection on rework WO completion.
+    #
+    # When a rework workorder finishes, find every southbrook.mi.check
+    # whose x_sbk_rework_workorder_id == this WO and spawn a follow-up
+    # re-inspection check (assigned to a user other than the original
+    # inspector). The check carries x_sbk_result=False so the new
+    # inspector has to take action — we never auto-pass.
+    #
+    # Wraps the spawn in try/except per check so a single failed spawn
+    # never blocks the operator's button_finish click.
+    # ------------------------------------------------------------------
+    def button_finish(self):
+        result = super().button_finish()
+        try:
+            Check = self.env["southbrook.mi.check"]
+            originating = Check.search([
+                ("x_sbk_rework_workorder_id", "in", self.ids),
+                ("x_sbk_reinspection_check_id", "=", False),
+            ])
+            for check in originating:
+                try:
+                    check._sbk_spawn_reinspection_check()
+                except Exception:  # noqa: BLE001
+                    _logger.warning(
+                        "W043 reinspection spawn failed for check %s",
+                        check.id, exc_info=True,
+                    )
+        except Exception:  # noqa: BLE001
+            _logger.warning(
+                "W043 button_finish post-hook failed for WO %s",
+                self.ids, exc_info=True,
+            )
+        return result
+
     def action_sbk_recalc_kitchen_duration(self):
         """Recompute x_sbk_kitchen_expected_min from the operation
         template bound to this WO's BoM operation. No-op when no
