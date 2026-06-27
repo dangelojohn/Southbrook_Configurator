@@ -1420,3 +1420,90 @@ export class AssignToWallModal extends Component {
         return _humanLenWithPref(mm, this.props.unitPreference || "mm");
     }
 }
+
+// ----------------------------------------------------------------------
+// GapRecommendModal — Phase 6.1.
+//
+// Fullscreen overlay launched from a Room Layout gap-click (replacing
+// the 3.C.2a direct-to-catalog flow). Renders the top-3 recommended
+// cabinet templates returned by the recommend endpoint as a stacked
+// list of cards, plus a "Browse all cabinets…" fallback that escapes
+// to the full catalog modal.
+//
+// Pure presentation — the parent OrderBuilder owns the RPCs (template
+// pick → /add-line + /place-on-wall via the existing pendingGapPlacement
+// stash; Browse all → _openCatalog). The empty-state branch (no
+// recommendations + note=gap_too_small) collapses the card list and
+// shows a friendly note above the Browse all button.
+//
+// Visual chrome mirrors AssignToWallModal (sb-room-plan-modal-* base
+// classes) so the two overlays read as the same UI vocabulary; the
+// recommendation-specific styles live under sb-room-plan-recommend-*.
+// Backdrop click / ESC don't close — consistent with AssignToWallModal
+// (the SHOULD-FIX is parked for both).
+// ----------------------------------------------------------------------
+
+export class GapRecommendModal extends Component {
+    static template = "southbrook_estimating_website.GapRecommendModal";
+    static props = {
+        gapInfo: Object,
+        recommendations: Array,
+        onPick: Function,
+        onBrowseAll: Function,
+        onCancel: Function,
+    };
+
+    setup() {
+        this.state = useState({
+            // Per-card busy flag so the user gets a "Adding…" state on
+            // the clicked card while the parent's _onPickCabinet
+            // pipeline is in-flight (add-line + place-on-wall). The
+            // other cards stay enabled so a slow network doesn't lock
+            // them out of trying a different pick.
+            pickingTemplateId: null,
+        });
+    }
+
+    _onPickClick = async (templateId) => {
+        if (this.state.pickingTemplateId !== null) return;
+        this.state.pickingTemplateId = templateId;
+        try {
+            // Parent closes this modal on success (clears
+            // state.ui.gapRecommend); the try/finally just unblocks
+            // the per-card spinner if the await rejects.
+            await this.props.onPick(templateId);
+        } finally {
+            this.state.pickingTemplateId = null;
+        }
+    };
+
+    _onBrowseAllClick = () => {
+        if (this.state.pickingTemplateId !== null) return;
+        this.props.onBrowseAll();
+    };
+
+    _onCancelClick = () => {
+        if (this.state.pickingTemplateId !== null) return;
+        this.props.onCancel();
+    };
+
+    // Template helpers — declared on the instance so OWL can call them
+    // without a binding shim. `gapInfo.gapMm` is the source of truth
+    // for the gap label.
+    get _gapMm() {
+        return (this.props.gapInfo && this.props.gapInfo.gapMm) || 0;
+    }
+
+    _formatMm(mm) {
+        return `${Math.round(Number(mm) || 0)} mm`;
+    }
+
+    // Best fit as a fraction (rounded down) of the gap — used as a
+    // chip badge on each card to make the score legible. "85% of gap"
+    // is more useful than "score 0.85" for the trade audience.
+    _pctOfGap(bestMm) {
+        const g = this._gapMm;
+        if (!g) return "—";
+        return `${Math.floor(((Number(bestMm) || 0) / g) * 100)}%`;
+    }
+}

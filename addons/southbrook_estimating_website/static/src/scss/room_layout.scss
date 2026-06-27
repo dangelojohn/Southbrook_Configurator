@@ -2064,3 +2064,143 @@
     font-size: 0.75rem;
     fill: var(--sb-ink-dim);
 }
+
+// ---------------------------------------------------------------------
+// GapRecommendModal — Phase 6.1 (2026-06-27).
+//
+// Reuses the AssignToWallModal backdrop + chrome (sb-room-plan-modal-*
+// base classes already loaded above) and adds:
+//   - .sb-room-plan-recommend-modal       → slightly wider dialog so
+//                                            recommendation cards have
+//                                            room for the chip strip.
+//   - .sb-room-plan-recommend-gap         → gap-width summary line.
+//   - .sb-room-plan-recommend-empty       → empty-state friendly note.
+//   - .sb-room-plan-recommend-list / card → top-3 card layout.
+//   - .sb-room-plan-recommend-chip(--best)→ width chips inside cards.
+// ---------------------------------------------------------------------
+
+.sb-room-plan-recommend-modal {
+    max-width: 560px;
+}
+
+.sb-room-plan-recommend-body {
+    gap: 0.85rem;
+}
+
+.sb-room-plan-recommend-gap {
+    margin: 0 0 0.3rem 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    font-size: 0.92rem;
+    color: var(--sb-ink);
+
+    strong {
+        color: var(--sb-walnut-d);
+        font-size: 1rem;
+    }
+}
+
+.sb-room-plan-recommend-gap-label {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+    color: var(--sb-ink-dim);
+    font-weight: 600;
+}
+
+.sb-room-plan-recommend-empty {
+    margin: 0.6rem 0;
+    padding: 0.7rem 0.85rem;
+    background: var(--sb-linen);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius-sm);
+    color: var(--sb-ink);
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.sb-room-plan-recommend-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.sb-room-plan-recommend-card {
+    padding: 0.7rem 0.85rem;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+
+    &:hover {
+        border-color: var(--sb-rule-d);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+}
+
+.sb-room-plan-recommend-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem;
+}
+
+.sb-room-plan-recommend-card-name {
+    font-family: var(--sb-font-display);
+    font-size: 0.98rem;
+    font-weight: 500;
+    color: var(--sb-walnut-d);
+}
+
+.sb-room-plan-recommend-card-code {
+    color: var(--sb-ink-dim);
+    font-size: 0.78rem;
+}
+
+.sb-room-plan-recommend-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--sb-ink-dim);
+}
+
+.sb-room-plan-recommend-widths-label {
+    margin-left: 0.2rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.sb-room-plan-recommend-chip {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    background: var(--sb-linen);
+    color: var(--sb-ink);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius-sm);
+    font-size: 0.78rem;
+    line-height: 1.2;
+
+    &--best {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+        border-color: var(--sb-walnut-d);
+        font-weight: 500;
+    }
+}
+
+.sb-room-plan-recommend-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+}

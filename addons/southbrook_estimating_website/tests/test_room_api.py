@@ -520,3 +520,131 @@ class TestRoomApi(TransactionCase):
             .browse(constraint_id).exists(),
             "constraint should be unlinked",
         )
+
+    # ------------------------------------------------------------------
+    # /recommend — Phase 6.1 cabinet recommendation engine.
+    #
+    # The recommend endpoint scores SB-* product templates against a
+    # gap width and returns the top 3 fits. These tests rely on the
+    # southbrook_estimating seed data (12 SB-* templates + a "Width"
+    # attribute with values `9 in`...`36 in`), which is loaded as a
+    # module dependency. If the seed templates ever stop carrying a
+    # Width attribute, test_recommend_returns_results_for_typical_gap
+    # will surface that as a "no recommendations" assertion failure
+    # — better than silently passing.
+    # ------------------------------------------------------------------
+
+    def _make_room_with_wall(self):
+        """Helper — create a 3000mm room+wall for recommend tests.
+
+        Scope is required: the recommend endpoint walks
+        order → room → wall before scoring, and rejects mismatches
+        as forbidden. We always create the room on `self.order` so the
+        controller's _southbrook_resolve_order succeeds for the admin
+        user used by the tests.
+        """
+        room = self.env["southbrook.room"].create({
+            "name": "Recommend Room",
+            "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "A", "length_mm": 3000})],
+        })
+        return room, room.wall_ids[0]
+
+    def test_recommend_returns_results_for_typical_gap(self):
+        """gap_mm=900 → at least one fitting template, well-formed shape.
+
+        Demo seed has SB-* templates with Width values 9-36 in
+        (228mm-914mm). A 900mm gap fits all of them; the score should
+        favour the widest fitter, with the standard-width bonus
+        promoting 914mm → no, 900 isn't in STANDARD_WIDTHS_MM but
+        914 isn't either. The test is intentionally lax on which
+        template wins — only on the shape of the response.
+        """
+        room, wall = self._make_room_with_wall()
+        controller = ctrl_room.SouthbrookRoomApi()
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_recommend(
+                self.order.id, room.id, wall.id,
+                gap_mm=900,
+                position_from_left_mm=0,
+            )
+        self.assertTrue(
+            result.get("ok"),
+            msg=f"unexpected recommend response: {result}",
+        )
+        self.assertEqual(result["gap_mm"], 900)
+        recs = result.get("recommendations") or []
+        self.assertGreater(
+            len(recs), 0,
+            msg=(
+                "expected at least one recommendation for 900mm gap; "
+                "got empty list. Check that SB-* templates seed with "
+                "a Width attribute (southbrook_estimating data)."
+            ),
+        )
+        self.assertLessEqual(
+            len(recs), 3, msg="recommend must cap at top 3",
+        )
+        for rec in recs:
+            self.assertIn("template_id", rec)
+            self.assertIn("name", rec)
+            self.assertIn("default_code", rec)
+            self.assertIn("fitting_widths_mm", rec)
+            self.assertIn("best_width_mm", rec)
+            self.assertIn("score", rec)
+            self.assertIsInstance(rec["fitting_widths_mm"], list)
+            self.assertGreater(rec["best_width_mm"], 0)
+            self.assertLessEqual(rec["best_width_mm"], 900)
+        # Sorted descending by score — first card is the best fit.
+        scores = [r["score"] for r in recs]
+        self.assertEqual(
+            scores, sorted(scores, reverse=True),
+            "recommendations must be sorted by score desc",
+        )
+
+    def test_recommend_empty_for_tiny_gap(self):
+        """gap_mm=100 → recommendations=[] with note=gap_too_small.
+
+        The smallest seeded Width is 9 in ≈ 228mm; no template fits a
+        100mm gap. The endpoint must return ok=True (this is NOT an
+        error — the modal renders an empty-state message + Browse all
+        fallback) plus the gap_too_small note for the client to key on.
+        """
+        room, wall = self._make_room_with_wall()
+        controller = ctrl_room.SouthbrookRoomApi()
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_recommend(
+                self.order.id, room.id, wall.id,
+                gap_mm=100,
+                position_from_left_mm=0,
+            )
+        self.assertTrue(
+            result.get("ok"),
+            msg=f"unexpected recommend response: {result}",
+        )
+        self.assertEqual(result.get("recommendations"), [])
+        self.assertEqual(result.get("note"), "gap_too_small")
+
+    def test_recommend_rejects_invalid_gap_mm(self):
+        """gap_mm in {0, -5, None} → error=invalid.
+
+        Defensive guard at the controller boundary — a hand-crafted
+        curl with gap_mm=0 should NOT 500 the worker and should NOT
+        return an empty recommendation list (which would be ambiguous
+        with the gap_too_small case).
+        """
+        room, wall = self._make_room_with_wall()
+        controller = ctrl_room.SouthbrookRoomApi()
+        for bad in (0, -5, None):
+            with self.subTest(gap_mm=bad):
+                with stubbed_request(self.env):
+                    result = controller.southbrook_api_recommend(
+                        self.order.id, room.id, wall.id,
+                        gap_mm=bad,
+                        position_from_left_mm=0,
+                    )
+                self.assertEqual(
+                    result.get("error"), "invalid",
+                    msg=f"gap_mm={bad!r} → {result}",
+                )

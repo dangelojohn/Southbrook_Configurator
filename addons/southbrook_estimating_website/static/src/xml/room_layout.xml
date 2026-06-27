@@ -665,4 +665,116 @@
         </svg>
     </t>
 
+    <!-- ============================================================
+         GapRecommendModal — Phase 6.1.
+
+         Opened when the user taps an empty wall gap on the Room
+         Layout floor plan. Shows the top-3 recommended cabinet
+         templates (returned by the recommend endpoint) as a stacked
+         card list, plus a "Browse all cabinets…" button that escapes
+         to the full catalog modal.
+
+         Empty-state branch (recommendations.length === 0) hides the
+         card list and shows the gap_too_small note — still surfaces
+         Browse all so the user has a path forward.
+
+         Visual chrome shares the sb-room-plan-modal-* base classes
+         with AssignToWallModal (mirrors the wizard backdrop). Card-
+         specific styles live under sb-room-plan-recommend-*.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.GapRecommendModal">
+        <div class="sb-room-plan-modal-backdrop">
+            <div class="sb-room-plan-modal sb-room-plan-recommend-modal"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="sb-room-plan-recommend-title">
+                <header class="sb-room-plan-modal-head">
+                    <h2 id="sb-room-plan-recommend-title"
+                        class="sb-room-plan-modal-title">
+                        Recommended for this gap
+                    </h2>
+                    <button type="button"
+                            class="sb-room-plan-modal-close"
+                            aria-label="Cancel"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.pickingTemplateId !== null">×</button>
+                </header>
+
+                <div class="sb-room-plan-modal-body sb-room-plan-recommend-body">
+                    <p class="sb-room-plan-recommend-gap">
+                        <span class="sb-room-plan-recommend-gap-label">Gap width</span>
+                        <strong class="mono"><t t-esc="_formatMm(_gapMm)"/></strong>
+                    </p>
+
+                    <t t-if="props.recommendations.length === 0">
+                        <p class="sb-room-plan-recommend-empty">
+                            This gap is too small for any cabinet in
+                            the catalog. Pick from the full catalog if
+                            you want a custom width.
+                        </p>
+                    </t>
+                    <t t-else="">
+                        <ul class="sb-room-plan-recommend-list">
+                            <t t-foreach="props.recommendations"
+                               t-as="rec"
+                               t-key="rec.template_id">
+                                <li class="sb-room-plan-recommend-card">
+                                    <div class="sb-room-plan-recommend-card-head">
+                                        <span class="sb-room-plan-recommend-card-name"
+                                              t-esc="rec.name"/>
+                                        <span t-if="rec.default_code"
+                                              class="sb-room-plan-recommend-card-code mono"
+                                              t-esc="rec.default_code"/>
+                                    </div>
+                                    <div class="sb-room-plan-recommend-card-meta">
+                                        <span class="sb-room-plan-recommend-chip sb-room-plan-recommend-chip--best mono">
+                                            Best fit <t t-esc="_formatMm(rec.best_width_mm)"/>
+                                            (<t t-esc="_pctOfGap(rec.best_width_mm)"/> of gap)
+                                        </span>
+                                        <t t-if="rec.fitting_widths_mm.length > 1">
+                                            <span class="sb-room-plan-recommend-widths-label">
+                                                Other fitting widths:
+                                            </span>
+                                            <t t-foreach="rec.fitting_widths_mm"
+                                               t-as="w"
+                                               t-key="w">
+                                                <span t-if="w !== rec.best_width_mm"
+                                                      class="sb-room-plan-recommend-chip mono"
+                                                      t-esc="_formatMm(w)"/>
+                                            </t>
+                                        </t>
+                                    </div>
+                                    <div class="sb-room-plan-recommend-card-actions">
+                                        <button type="button"
+                                                class="sb-room-plan-modal-btn sb-room-plan-modal-btn--primary"
+                                                t-on-click="() => this._onPickClick(rec.template_id)"
+                                                t-att-disabled="state.pickingTemplateId !== null">
+                                            <t t-if="state.pickingTemplateId === rec.template_id">Adding…</t>
+                                            <t t-else="">Add this cabinet</t>
+                                        </button>
+                                    </div>
+                                </li>
+                            </t>
+                        </ul>
+                    </t>
+                </div>
+
+                <footer class="sb-room-plan-modal-foot">
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--secondary"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.pickingTemplateId !== null">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--secondary"
+                            t-on-click="_onBrowseAllClick"
+                            t-att-disabled="state.pickingTemplateId !== null">
+                        Browse all cabinets…
+                    </button>
+                </footer>
+            </div>
+        </div>
+    </t>
+
 </templates>

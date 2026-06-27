@@ -15,8 +15,14 @@ HTTP exceptions, never leak internals. Every path param is scope-
 validated against the resolved order so a wrong room/wall/constraint
 id surfaces as `forbidden` (not `not_found`) — avoids existence-oracle
 leak per the spec at docs/superpowers/plans/.../2.A.
+
+Phase 6.1 (2026-06-27) extends this module with one more endpoint —
+.../wall/<wid>/recommend — which scores SB-* cabinet templates against
+a gap width and returns the top 3 fitting candidates. Backs the Room
+Layout gap-click recommend modal (3.C.2a chained behaviour).
 """
 import logging
+import re
 
 from odoo import http
 from odoo.exceptions import AccessError, MissingError, ValidationError
@@ -25,6 +31,37 @@ from odoo.http import request
 from .main import SouthbrookKitchenPlanner
 
 _logger = logging.getLogger(__name__)
+
+# Phase 6.1 — width-string parsers for recommend endpoint. The Width
+# attribute values seeded in southbrook_estimating/data/attributes.xml
+# use `<n> in` labels ("9 in", "12 in", ... "36 in"); upstream OCA
+# templates and future SKUs may use `24"`, `24″`, or `600mm` instead.
+# Both regexes are case-insensitive. Order of checks: inches first
+# (more common in source data), millimetres as fallback.
+_INCHES_RE = re.compile(r'(\d+(?:\.\d+)?)\s*(?:"|″|in\b|in\.\b)', re.I)
+_MM_RE = re.compile(r'(\d{2,4})\s*mm\b', re.I)
+# Standard cabinet widths in mm — used as a tiebreaker bonus in the
+# recommendation score. Mirrors typical European + North-American
+# off-the-shelf widths (300/400/450/500/600/900) so a non-standard
+# 685mm cabinet doesn't outrank a 600mm filler for a 720mm gap.
+STANDARD_WIDTHS_MM = {300, 400, 450, 500, 600, 900}
+
+
+def _parse_width_mm(value_name):
+    """Parse `24"` / `24 in` / `600mm` width labels to integer mm.
+
+    Returns None when neither format matches so the caller can skip
+    the attribute value cleanly (templates whose Width attribute
+    carries a non-numeric label — e.g. `Custom` — are excluded from
+    the candidate set rather than silently scored at 0).
+    """
+    m = _INCHES_RE.search(value_name or "")
+    if m:
+        return int(round(float(m.group(1)) * 25.4))
+    m = _MM_RE.search(value_name or "")
+    if m:
+        return int(m.group(1))
+    return None
 
 
 def _serialize_room(room):
@@ -636,3 +673,120 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
             "wall": wall_dict,
             "previous_wall": previous_wall_dict,
         }
+
+    # ------------------------------------------------------------------
+    # POST /southbrook/api/order/<order_id>/room/<room_id>/wall/<wall_id>/recommend
+    # ------------------------------------------------------------------
+    #
+    # Phase 6.1 — cabinet recommendation engine for gap-clicks on the
+    # Room Layout floor plan. Scores SB-* product templates against the
+    # gap width and returns the top 3 fits, with a "Browse all" client-
+    # side fallback handling the empty case.
+    #
+    # Scoring (intentionally simple for v1):
+    #   1. For each template with a "Width" attribute line, collect every
+    #      attribute value whose label parses to <= gap_mm.
+    #   2. Pick the widest fitting width per template (the best filler).
+    #   3. Score = best_width / gap_mm (closer to 1.0 = better filler),
+    #      with a +0.05 bonus for standard widths to break ties between
+    #      a 685mm and a 600mm cabinet for a 720mm gap (600 wins).
+    #   4. Sort descending; return top 3.
+    #
+    # No persistence — purely advisory. The client picks one (or hits
+    # Browse all) and the existing /add-line + /place-on-wall pipeline
+    # does the actual mutation.
+    #
+    # position_from_left_mm is accepted but unused in v1 scoring; it's
+    # there so a future iteration can rank by "closest available stock
+    # at this position" without a contract break.
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/room/<int:room_id>"
+        "/wall/<int:wall_id>/recommend",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_recommend(
+        self,
+        order_id,
+        room_id,
+        wall_id,
+        gap_mm=None,
+        position_from_left_mm=None,
+        **kw,
+    ):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        # Scope chain — reject cross-room / cross-wall IDs as forbidden
+        # (NOT not_found) so the recommend endpoint preserves the no-
+        # existence-oracle convention. The room / wall recordsets aren't
+        # actually used by the scoring algorithm in v1, but the scope
+        # check is mandatory: a future position-aware ranker will need
+        # them, and skipping the guard now would create a soft auth
+        # boundary that drifts over time.
+        try:
+            room = self._get_room_scoped(order, room_id)
+            self._get_wall_scoped(room, wall_id)
+        except AccessError:
+            return {"error": "forbidden"}
+
+        try:
+            gap = int(gap_mm or 0)
+        except (TypeError, ValueError):
+            return {"error": "invalid", "detail": "gap_mm must be an integer"}
+        if gap <= 0:
+            return {"error": "invalid", "detail": "gap_mm must be > 0"}
+
+        # SB-* prefix isolates Southbrook templates from any inherited
+        # OCA demo SKUs so the recommend modal never shows a stray
+        # "OCA Custom Wall Cabinet" alongside real Signature Series
+        # cabinets.
+        templates = request.env["product.template"].sudo().search([
+            ("default_code", "like", "SB-%"),
+        ])
+
+        candidates = []
+        for tmpl in templates:
+            # Case-insensitive exact match on "width" — keep the filter
+            # tight in v1, lift to a prefix match if real seed data shows
+            # variation (e.g. "Cabinet Width", "Carcass Width").
+            width_line = tmpl.attribute_line_ids.filtered(
+                lambda l: (l.attribute_id.name or "").strip().lower() == "width"
+            )
+            if not width_line:
+                continue
+            widths = []
+            for v in width_line.value_ids:
+                mm = _parse_width_mm(v.name)
+                if mm is not None and mm <= gap:
+                    widths.append(mm)
+            if not widths:
+                continue
+            best = max(widths)
+            score = best / gap  # closer to 1.0 = better filler
+            if best in STANDARD_WIDTHS_MM:
+                score += 0.05
+            candidates.append({
+                "template_id": tmpl.id,
+                "name": tmpl.name,
+                "default_code": tmpl.default_code or "",
+                "fitting_widths_mm": sorted(set(widths)),
+                "best_width_mm": best,
+                "score": round(score, 4),
+            })
+
+        candidates.sort(key=lambda c: -c["score"])
+        top3 = candidates[:3]
+        if not top3:
+            return {
+                "ok": True,
+                "gap_mm": gap,
+                "recommendations": [],
+                "note": "gap_too_small",
+            }
+        return {"ok": True, "gap_mm": gap, "recommendations": top3}

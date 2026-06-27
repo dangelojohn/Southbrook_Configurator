@@ -35,7 +35,7 @@
 import { Component, mount, markup, onMounted, onWillUnmount, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
-import { RoomLayoutTab, AssignToWallModal } from "@southbrook_estimating_website/js/room_layout.esm";
+import { RoomLayoutTab, AssignToWallModal, GapRecommendModal } from "@southbrook_estimating_website/js/room_layout.esm";
 
 // ----------------------------------------------------------------------
 // USD currency formatter — shared between OrderBuilder (probe) + the
@@ -2728,6 +2728,19 @@ const TEMPLATE = xml`
                                unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"
                                onAssign="(wallId, posMm) => this._onAssignSubmit(state.ui.assigning, wallId, posMm)"
                                onCancel="_onAssignCancel"/>
+
+            <!-- Phase 6.1 — GapRecommendModal. Opened from a gap-click
+                 on the Room Layout floor plan. Shows top-3 cabinet
+                 recommendations + a "Browse all" escape to the full
+                 catalog. The catalog-fallback path inside
+                 _onPlanGapClick covers RPC failures so the user is
+                 never stranded if the recommend endpoint misbehaves. -->
+            <GapRecommendModal t-if="state.ui.gapRecommend"
+                               gapInfo="state.ui.gapRecommend"
+                               recommendations="state.ui.gapRecommend.recommendations"
+                               onPick="_onGapPickTemplate"
+                               onBrowseAll="_onGapBrowseAll"
+                               onCancel="_onGapCancel"/>
         </div>
     </div>
 `;
@@ -2753,6 +2766,10 @@ class OrderBuilder extends Component {
         // it floats above the tab chrome (and survives a tab switch
         // mid-pick).
         AssignToWallModal,
+        // Phase 6.1 — fullscreen overlay opened by Room Layout gap-
+        // click; replaces the 3.C.2a direct-to-catalog flow with a top-
+        // 3 recommendation list + Browse all fallback.
+        GapRecommendModal,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -2859,6 +2876,14 @@ class OrderBuilder extends Component {
                 // null when the modal is closed. The render block
                 // mounts <AssignToWallModal/> when this is non-null.
                 assigning: null,
+                // Phase 6.1 — gap-click recommendation modal state.
+                // null when no recommend modal is open; otherwise:
+                //   { gapMm, position, wallId, recommendations: [...] }
+                // Set by _onPlanGapClick after the recommend RPC
+                // resolves; cleared by _onGapPickTemplate (on success),
+                // _onGapBrowseAll (escape to full catalog), or
+                // _onGapCancel (× / Cancel).
+                gapRecommend: null,
             },
             // Phase 3.C.2a — gap-click stash. When the user taps a gap
             // rect on the Room Layout, we record the wall+position here
@@ -3894,21 +3919,99 @@ class OrderBuilder extends Component {
         this._scrollSelectedLineIntoView();
     };
 
-    _onPlanGapClick = (wallId, gapMm, position) => {
-        // Stash the placement intent on the top-level state flag, then
-        // reuse the existing catalog modal. When the user picks a
-        // template + _onPickCabinet fires the /add-line RPC and gets a
-        // line_id back, the auto-place block at the tail of that method
-        // POSTs /place-on-wall against the stashed wall+position and
-        // clears the flag. Failure to place is non-fatal — the cabinet
-        // still exists on the order, just unplaced (which the user can
-        // resolve from the sidebar Assign... button).
+    _onPlanGapClick = async (wallId, gapMm, position) => {
+        // Phase 3.C.2a stashed the placement intent and opened the
+        // catalog directly. Phase 6.1 inserts a recommend step: fetch
+        // top-3 cabinet templates that fit the gap, open the
+        // GapRecommendModal with them, and let the user pick (or hit
+        // Browse all to fall through to the catalog). Stashing is
+        // unchanged — the existing auto-place block at the tail of
+        // _onPickCabinet handles placement regardless of which entry
+        // point created the line.
+        //
+        // Fallback: ANY recommend failure (network, endpoint not
+        // deployed yet on the live worker pool, malformed response)
+        // falls through to the direct-to-catalog path so the user is
+        // never blocked. This preserves the 3.C.2a behaviour as a
+        // safety net.
         this.state.pendingGapPlacement = {
             wallId: wallId,
             position: position,
             gapMm: gapMm,
         };
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/" + encodeURIComponent((this.state.room && this.state.room.id) || 0)
+                + "/wall/" + encodeURIComponent(wallId)
+                + "/recommend",
+                {
+                    gap_mm: gapMm,
+                    position_from_left_mm: position,
+                },
+            );
+            if (r && r.ok) {
+                this.state.ui.gapRecommend = {
+                    gapMm: gapMm,
+                    position: position,
+                    wallId: wallId,
+                    recommendations: r.recommendations || [],
+                };
+                return;
+            }
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn("[OrderBuilder] recommend fetch failed:", e);
+        }
+        // Fallback: open the catalog directly (3.C.2a behaviour).
         this._openCatalog();
+    };
+
+    // Phase 6.1 — user picked a recommended cabinet from the
+    // GapRecommendModal. Close the modal and route through the EXISTING
+    // _onPickCabinet pipeline: that fires /add-line, then the auto-
+    // place block at the tail of _onPickCabinet sees pendingGapPlacement
+    // is still set and POSTs /place-on-wall. We deliberately do NOT add
+    // a parallel placement call here — see CLAUDE.md "Critical guard-
+    // rails: Don't double-place".
+    _onGapPickTemplate = async (templateId) => {
+        const rec = (
+            this.state.ui.gapRecommend
+            && (this.state.ui.gapRecommend.recommendations || []).find(
+                (x) => x.template_id === templateId,
+            )
+        );
+        const label = rec ? (rec.name || rec.default_code || "cabinet") : null;
+        // Close the recommend modal BEFORE the await so the user sees
+        // the catalog-busy state on the order tabs (not on the modal).
+        this.state.ui.gapRecommend = null;
+        try {
+            await this._onPickCabinet(templateId, 1, label);
+        } catch (e) {
+            // _onPickCabinet already surfaces the error via toast.
+            // Swallow here so the modal's await doesn't propagate to
+            // an unhandled rejection.
+            // eslint-disable-next-line no-console
+            console.warn("[OrderBuilder] gap-pick add failed:", e);
+        }
+    };
+
+    // Phase 6.1 — Browse all fallback. Close the recommend modal,
+    // open the full catalog. pendingGapPlacement is preserved so the
+    // auto-place tail still fires once a template is picked from the
+    // catalog.
+    _onGapBrowseAll = () => {
+        this.state.ui.gapRecommend = null;
+        this._openCatalog();
+    };
+
+    // Phase 6.1 — × / Cancel. Drop both the modal state AND the
+    // pendingGapPlacement stash so a subsequent normal "+ Add Another
+    // Cabinet" doesn't inherit the cancelled gap's placement intent.
+    _onGapCancel = () => {
+        this.state.ui.gapRecommend = null;
+        this.state.pendingGapPlacement = null;
     };
 
     _onPlanAssignClick = (lineId) => {
