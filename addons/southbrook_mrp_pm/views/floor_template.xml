@@ -76,12 +76,13 @@
       <t t-call="portal.portal_layout">
         <t t-set="page_name" t-value="'southbrook_floor_wc'"/>
         <t t-set="title"><t t-esc="wc['code']"/> · Queue</t>
-        <!-- 30-second auto-refresh. The browser's refresh timer is
-             reset by any link/form click so the operator isn't
-             interrupted mid-interaction; after a start/finish POST
-             the redirect re-arms the timer for the new page. -->
+        <!-- W056 / R1.11 — meta-refresh is the JS-OFF FALLBACK only.
+             When JS is available, the polling script below removes
+             this tag at load time and runs a lighter setInterval()
+             fetch against /queue.json instead. The full-page reload
+             pattern only fires when the inline script never runs. -->
         <t t-set="head">
-          <meta http-equiv="refresh" content="30"/>
+          <meta http-equiv="refresh" content="30" id="sb_floor_meta_refresh"/>
         </t>
 
         <div class="o_sb_floor o_sb_floor_wc">
@@ -101,8 +102,10 @@
           </header>
 
           <!-- WORK-ORDER QUEUE -->
-          <section class="o_sb_floor_queue">
-            <h2>Queue</h2>
+          <section class="o_sb_floor_queue"
+                   id="sb_floor_queue_root"
+                   t-att-data-wc-id="wc['id']">
+            <h2>Queue <span id="sb_floor_queue_indicator" class="o_sb_floor_indicator" style="display:none">●</span></h2>
             <t t-if="not wo_groups">
               <p class="o_sb_floor_empty">No work orders queued at this station.</p>
             </t>
@@ -172,7 +175,8 @@
           </section>
 
           <!-- EQUIPMENT AT THIS STATION -->
-          <section class="o_sb_floor_equipment" t-if="equipment">
+          <section class="o_sb_floor_equipment" t-if="equipment"
+                   id="sb_floor_equipment_root">
             <h2>Equipment at this Station</h2>
             <ul class="o_sb_floor_eq_list">
               <li t-foreach="equipment" t-as="eq"
@@ -209,6 +213,113 @@
             </ul>
           </section>
         </div>
+        <!-- W056 / R1.11 — JS polling supersedes meta-refresh.
+             On load: remove the meta-refresh tag so the full-page
+             reload never fires when JS is available. Then setInterval
+             every 30s fetching just the queue snapshot. -->
+        <script type="text/javascript">
+          (function () {
+            try {
+              var meta = document.getElementById('sb_floor_meta_refresh');
+              if (meta) { meta.parentNode.removeChild(meta); }
+            } catch (e) { /* ignore — meta tag is optional */ }
+
+            var queueRoot = document.getElementById('sb_floor_queue_root');
+            if (!queueRoot) { return; }
+            var wcId = queueRoot.getAttribute('data-wc-id');
+            if (!wcId) { return; }
+            var indicator = document.getElementById('sb_floor_queue_indicator');
+            var POLL_MS = 30000;
+            var inflight = false;
+
+            function escapeHtml(s) {
+              if (s === null || s === undefined) { return ''; }
+              return String(s)
+                .replace(/&amp;/g, '&amp;amp;').replace(/&lt;/g, '&amp;lt;')
+                .replace(/&gt;/g, '&amp;gt;').replace(/&quot;/g, '&amp;quot;')
+                .replace(/'/g, '&amp;#39;');
+            }
+
+            function renderQueue(data) {
+              var groups = (data &amp;&amp; data.wo_groups) || [];
+              if (!groups.length) {
+                return '&lt;h2&gt;Queue&lt;/h2&gt;' +
+                  '&lt;p class="o_sb_floor_empty"&gt;' +
+                  'No work orders queued at this station.&lt;/p&gt;';
+              }
+              var html = '&lt;h2&gt;Queue&lt;/h2&gt;';
+              for (var i = 0; i &lt; groups.length; i++) {
+                var g = groups[i];
+                html += '&lt;div class="o_sb_floor_mo_card"&gt;';
+                html += '&lt;header class="o_sb_floor_mo_header"&gt;';
+                html += '&lt;strong&gt;' + escapeHtml(g.mo_name) + '&lt;/strong&gt;';
+                html += '&lt;span class="o_sb_floor_mo_sku mono"&gt;' +
+                  escapeHtml(g.product_sku) + '&lt;/span&gt;';
+                html += '&lt;span class="o_sb_floor_mo_state"&gt;' +
+                  escapeHtml(g.mo_state) + '&lt;/span&gt;';
+                if (g.deadline) {
+                  html += '&lt;span class="o_sb_floor_mo_deadline"&gt;Due ' +
+                    escapeHtml(g.deadline) + '&lt;/span&gt;';
+                }
+                html += '&lt;/header&gt;&lt;ul class="o_sb_floor_wo_list"&gt;';
+                var wos = g.wos || [];
+                for (var j = 0; j &lt; wos.length; j++) {
+                  var w = wos[j];
+                  html += '&lt;li class="o_sb_floor_wo o_sb_floor_wo_' +
+                    escapeHtml(w.state) + '"&gt;';
+                  html += '&lt;div class="o_sb_floor_wo_label"&gt;&lt;strong&gt;' +
+                    escapeHtml(w.name) + '&lt;/strong&gt;&lt;/div&gt;';
+                  html += '&lt;div class="o_sb_floor_wo_state mono"&gt;' +
+                    escapeHtml(w.state) + '&lt;/div&gt;';
+                  html += '&lt;div class="o_sb_floor_wo_time mono"&gt;' +
+                    escapeHtml(w.duration_expected) + ' min&lt;/div&gt;';
+                  html += '&lt;/li&gt;';
+                }
+                html += '&lt;/ul&gt;&lt;/div&gt;';
+              }
+              return html;
+            }
+
+            function poll() {
+              if (inflight) { return; }
+              inflight = true;
+              if (indicator) { indicator.style.display = 'inline'; }
+              fetch('/my/southbrook/floor/' + wcId + '/queue.json',
+                    { credentials: 'same-origin',
+                      headers: { 'Accept': 'application/json' } })
+                .then(function (resp) {
+                  if (resp.status === 403) {
+                    throw new Error('forbidden');
+                  }
+                  return resp.json();
+                })
+                .then(function (data) {
+                  if (data &amp;&amp; data.ok) {
+                    queueRoot.innerHTML = renderQueue(data);
+                    // Re-attach the indicator span (it was inside h2
+                    // before we re-rendered; recover it).
+                    var h2 = queueRoot.querySelector('h2');
+                    if (h2 &amp;&amp; !document.getElementById('sb_floor_queue_indicator')) {
+                      var span = document.createElement('span');
+                      span.id = 'sb_floor_queue_indicator';
+                      span.className = 'o_sb_floor_indicator';
+                      span.style.display = 'none';
+                      span.textContent = '●';
+                      h2.appendChild(document.createTextNode(' '));
+                      h2.appendChild(span);
+                      indicator = span;
+                    }
+                  }
+                })
+                .catch(function () { /* swallow — try again next tick */ })
+                .then(function () {
+                  inflight = false;
+                  if (indicator) { indicator.style.display = 'none'; }
+                });
+            }
+            setInterval(poll, POLL_MS);
+          })();
+        </script>
       </t>
     </template>
 
