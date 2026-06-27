@@ -3593,6 +3593,21 @@ class OrderBuilder extends Component {
     _onKitchen3dLineSelected = (lineId) => {
         this.state.ui.current_tab = "lines";
         this.state.ui.selected_line_id = lineId;
+        this._scrollSelectedLineIntoView();
+    };
+
+    // After cross-tab line selection (3D Kitchen tap, Room Layout tap),
+    // the highlighted row may be below the fold — scroll it into view so
+    // the user actually sees the result of their click. Defer past the
+    // OWL render tick via requestAnimationFrame so the DOM has the new
+    // .o_owl_line_selected class before we query for it.
+    _scrollSelectedLineIntoView = () => {
+        requestAnimationFrame(() => {
+            const el = document.querySelector(".o_owl_line_selected");
+            if (el && typeof el.scrollIntoView === "function") {
+                el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            }
+        });
     };
 
     // ------------------------------------------------------------------
@@ -3617,10 +3632,10 @@ class OrderBuilder extends Component {
 
     _onPlanCabinetClick = (lineId) => {
         // Mirror _onKitchen3dLineSelected — same UX (jump to Lines tab,
-        // select the row). The Order Lines tab honours selected_line_id
-        // to scroll + highlight via the existing ConfigDrawer expansion.
+        // select + scroll the row into view).
         this.state.ui.current_tab = "lines";
         this.state.ui.selected_line_id = lineId;
+        this._scrollSelectedLineIntoView();
     };
 
     _onPlanGapClick = (wallId, gapMm, position) => {
@@ -3641,6 +3656,18 @@ class OrderBuilder extends Component {
     };
 
     _onPlanAssignClick = (lineId) => {
+        // Guard: the modal needs walls to populate its dropdown — opening
+        // it with no walls would let the user submit a no-op assign that
+        // the endpoint rejects as a 400. Better to short-circuit with a
+        // friendly note pointing at Room Setup.
+        const walls = (this.state.room && this.state.room.walls) || [];
+        if (walls.length === 0) {
+            alert(
+                "No walls configured yet — add walls in the Room Setup "
+                + "tab before assigning cabinets.",
+            );
+            return;
+        }
         this.state.ui.assigning = lineId;
     };
 
