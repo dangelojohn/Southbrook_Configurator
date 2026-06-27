@@ -549,6 +549,31 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
             except AccessError:
                 return {"error": "forbidden"}
 
+        # Phase 3.C.1 — off-the-end overflow check. The drag/click UX
+        # in 3.C.2a will surface this as a user-facing error path; better
+        # to land the gate now so the caller can render a clean modal.
+        # Skip when sb_width_mm == 0 — width is a computed field that
+        # could fall through to 0 for malformed seed data, and rejecting
+        # in that case would block placement entirely until the data is
+        # fixed.
+        if wall is not None and line.sb_width_mm and (
+            pos_mm + int(line.sb_width_mm)
+        ) > (wall.length_mm or 0):
+            overshoot = (
+                pos_mm + int(line.sb_width_mm)
+            ) - (wall.length_mm or 0)
+            return {
+                "error": "out_of_bounds",
+                "detail": (
+                    f"Cabinet extends past wall edge by {overshoot}mm"
+                ),
+            }
+
+        # Phase 3.C.1 — capture the previous wall recordset BEFORE the
+        # write so the response can carry its post-move metrics too.
+        # Empty recordset when the line was unplaced before this call.
+        previous_wall_rec = line.wall_id
+
         try:
             if wall is None:
                 line.sudo().write({
@@ -568,6 +593,16 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
         line.invalidate_recordset()
         if wall is not None:
             wall.invalidate_recordset()
+        # Phase 3.C.1 — when the line moved between walls, the FROM
+        # wall's computed metrics are stale too (cabinet_line_ids O2m
+        # membership flipped) — invalidate so the response carries
+        # fresh used_mm / remaining_mm / has_conflicts.
+        if previous_wall_rec and (
+            wall is None or previous_wall_rec.id != wall.id
+        ):
+            previous_wall_rec.invalidate_recordset(
+                ["used_mm", "remaining_mm", "has_conflicts"]
+            )
 
         line_dict = {
             "id": line.id,
@@ -583,4 +618,21 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                 "remaining_mm": wall.remaining_mm,
                 "has_conflicts": wall.has_conflicts,
             }
-        return {"ok": True, "line": line_dict, "wall": wall_dict}
+        # Phase 3.C.1 — previous_wall is only meaningful when the line
+        # MOVED off a different wall (not unplace-from-same / first-place).
+        previous_wall_dict = None
+        if previous_wall_rec and (
+            wall is None or previous_wall_rec.id != wall.id
+        ):
+            previous_wall_dict = {
+                "id": previous_wall_rec.id,
+                "used_mm": previous_wall_rec.used_mm,
+                "remaining_mm": previous_wall_rec.remaining_mm,
+                "has_conflicts": previous_wall_rec.has_conflicts,
+            }
+        return {
+            "ok": True,
+            "line": line_dict,
+            "wall": wall_dict,
+            "previous_wall": previous_wall_dict,
+        }

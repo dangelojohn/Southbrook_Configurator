@@ -408,6 +408,90 @@ class TestRoomApi(TransactionCase):
         line_a.invalidate_recordset()
         self.assertFalse(line_a.wall_id)
 
+    def test_place_returns_previous_wall_metrics(self):
+        """Re-placing a line on a different wall returns both wall metrics.
+
+        Phase 3.C.1 — when the line moves from wall A → wall B the
+        response must carry `previous_wall: {...}` for A so the caller's
+        floor-plan re-render shows the correct used_mm on BOTH walls
+        in one round-trip.
+        """
+        room = self.env["southbrook.room"].create({
+            "name": "Two-Wall Room",
+            "order_id": self.order.id,
+            "layout_shape": "l_shape",
+            "wall_ids": [
+                (0, 0, {"name": "A", "length_mm": 3600}),
+                (0, 0, {"name": "B", "length_mm": 2400}),
+            ],
+        })
+        wall_a = room.wall_ids[0]
+        wall_b = room.wall_ids[1]
+        # Line name carries the width parser's "Nmm" token so
+        # sb_width_mm computes to a real value (not the 600 fallback).
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "name": "Base 800mm cabinet",
+        })
+        controller = ctrl_room.SouthbrookRoomApi()
+        # First place on wall A — previous_wall should be null (no
+        # prior wall) on this call.
+        with stubbed_request(self.env):
+            first = controller.southbrook_api_line_place_on_wall(
+                self.order.id, line.id,
+                wall_id=wall_a.id, position_from_left_mm=200,
+            )
+        self.assertTrue(first.get("ok"), msg=f"first place: {first}")
+        self.assertEqual(first["wall"]["id"], wall_a.id)
+        self.assertIsNone(first.get("previous_wall"))
+        # Re-place on wall B — previous_wall must surface wall A's
+        # post-move metrics so the FROM-side floor-plan tile refreshes.
+        with stubbed_request(self.env):
+            second = controller.southbrook_api_line_place_on_wall(
+                self.order.id, line.id,
+                wall_id=wall_b.id, position_from_left_mm=100,
+            )
+        self.assertTrue(second.get("ok"), msg=f"second place: {second}")
+        self.assertEqual(second["wall"]["id"], wall_b.id)
+        self.assertIsNotNone(second.get("previous_wall"))
+        self.assertEqual(second["previous_wall"]["id"], wall_a.id)
+        self.assertIn("used_mm", second["previous_wall"])
+        self.assertIn("remaining_mm", second["previous_wall"])
+        self.assertIn("has_conflicts", second["previous_wall"])
+
+    def test_place_rejects_out_of_bounds(self):
+        """Cabinet pos+width past wall length → out_of_bounds.
+
+        Phase 3.C.1 — Phase 3.C.2a drag UX needs a clean error code so
+        the modal can show "Cabinet extends past wall edge by Nmm"
+        instead of letting the write proceed into an over-full wall.
+        """
+        room = self.env["southbrook.room"].create({
+            "name": "Short Wall Room",
+            "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "Short", "length_mm": 1000})],
+        })
+        wall = room.wall_ids[0]
+        # "600mm" in the name → sb_width_mm computes to 600.0.
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "name": "Base 600mm cabinet",
+        })
+        controller = ctrl_room.SouthbrookRoomApi()
+        # 500 + 600 = 1100 > 1000 → overflow by 100mm.
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_line_place_on_wall(
+                self.order.id, line.id,
+                wall_id=wall.id, position_from_left_mm=500,
+            )
+        self.assertEqual(result.get("error"), "out_of_bounds")
+        self.assertIn("100mm", result.get("detail", ""))
+        # Line must NOT have been mutated.
+        line.invalidate_recordset()
+        self.assertFalse(line.wall_id)
+        self.assertEqual(line.position_from_left_mm, 0)
+
     # ------------------------------------------------------------------
     # /constraint/<cid>/delete
     # ------------------------------------------------------------------
