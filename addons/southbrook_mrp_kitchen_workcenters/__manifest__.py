@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.33.0",
+    "version": "19.0.4.34.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -135,6 +135,20 @@ southbrook_kitchen_workspace) without duplicating their models.
             # Reads the `o_form_dirty` DOM marker so it stays silent
             # on clean / read-only forms and on non-form pages.
             "southbrook_mrp_kitchen_workcenters/static/src/js/wo_dirty_guard.js",
+            # W039 (R8.1, 2026-06-27) — glove-grade tap-target density
+            # bundle. SCSS is fully scoped to body.sb-shopfloor-dense
+            # (off by default — planners + office users see zero
+            # change). JS reads ?shopfloor=1 URL param or localStorage
+            # `sb.shopfloor.dense` to decide whether to add the class.
+            "southbrook_mrp_kitchen_workcenters/static/src/scss/shopfloor_dense.scss",
+            "southbrook_mrp_kitchen_workcenters/static/src/js/shopfloor_density_toggle.js",
+        ],
+        # Same bundle on the frontend so the customer-portal scan /
+        # tablet PWA inherits density when the operator hits the
+        # public scan endpoint from the same kiosk session.
+        "web.assets_frontend": [
+            "southbrook_mrp_kitchen_workcenters/static/src/scss/shopfloor_dense.scss",
+            "southbrook_mrp_kitchen_workcenters/static/src/js/shopfloor_density_toggle.js",
         ],
     },
     "installable": True,

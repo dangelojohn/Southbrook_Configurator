@@ -1,0 +1,150 @@
+// W039 (R8.1, 2026-06-27) — glove-grade tap-target density bundle.
+//
+// JTBD: "When I'm gloved and dusty, I want every tap target to be at
+// least 48x48 px so I don't fat-finger the wrong field."
+//
+// SCOPED to body.sb-shopfloor-dense — every rule below ONLY applies
+// when that class is present on <body>. Non-shopfloor users (planners,
+// office staff, customer-facing portals) see zero visual change.
+//
+// Activation lives in shopfloor_density_toggle.js:
+//   - URL param ?shopfloor=1 turns it on for the current session
+//   - URL param ?shopfloor=0 turns it off
+//   - Otherwise localStorage `sb.shopfloor.dense` is honoured
+//
+// Coverage: inputs, selects, buttons, dropdown menu items, list-view
+// rows, kanban actions. Every visible interactive surface. Floor of
+// 48x48 css px per WCAG 2.5.5 (AAA) and Apple HIG (44pt) — we go
+// 48px for gloves.
+
+body.sb-shopfloor-dense {
+    // -----------------------------------------------------------------
+    // Form inputs — text, number, date, select, textarea
+    // -----------------------------------------------------------------
+    input.o_input,
+    input[type="text"]:not(.o_searchview_input),
+    input[type="number"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="email"],
+    input[type="tel"],
+    select.o_input,
+    .o_input,
+    .o_field_widget input,
+    .o_field_widget select {
+        min-height: 48px;
+        font-size: 1.05rem;
+        padding: 10px 14px;
+    }
+
+    textarea.o_input,
+    .o_field_widget textarea {
+        min-height: 96px;
+        font-size: 1.05rem;
+        padding: 10px 14px;
+    }
+
+    // -----------------------------------------------------------------
+    // Buttons — backend + frontend
+    // -----------------------------------------------------------------
+    .btn,
+    button.btn,
+    a.btn,
+    .o_form_button_save,
+    .o_form_button_cancel,
+    .o_stat_button,
+    button[type="submit"] {
+        min-height: 48px;
+        min-width: 48px;
+        padding: 12px 20px;
+        font-size: 1rem;
+        line-height: 1.2;
+    }
+
+    // Icon-only buttons (X close, kebab menu, etc.) need a larger
+    // hit-box without distorting the icon glyph itself.
+    button.o_button_icon,
+    .o_cp_action_menus .dropdown-toggle,
+    .btn-link {
+        min-height: 48px;
+        min-width: 48px;
+        padding: 12px;
+    }
+
+    // -----------------------------------------------------------------
+    // Dropdown menus — list rows the operator picks from
+    // -----------------------------------------------------------------
+    .dropdown-menu .dropdown-item,
+    .o_menu_item,
+    .o-dropdown--menu .o-dropdown-item,
+    .o-dropdown-item {
+        min-height: 48px;
+        padding: 12px 16px;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+    }
+
+    // -----------------------------------------------------------------
+    // List view rows — the operator scrolls and taps cells
+    // -----------------------------------------------------------------
+    .o_list_view tbody tr,
+    .o_list_renderer tbody tr {
+        td {
+            padding-top: 14px;
+            padding-bottom: 14px;
+            min-height: 48px;
+        }
+    }
+
+    // Checkboxes + radios get bigger hit-targets via padding on the
+    // container; the visual glyph stays standard-sized so the form
+    // doesn't look juvenile.
+    .o_field_widget input[type="checkbox"],
+    .o_field_widget input[type="radio"],
+    input.form-check-input {
+        width: 24px;
+        height: 24px;
+        margin: 12px;
+    }
+
+    // -----------------------------------------------------------------
+    // Kanban records + action footers (used in WO tablet kanban)
+    // -----------------------------------------------------------------
+    .o_kanban_record .oe_kanban_bottom_right .btn,
+    .o_kanban_record .o_kanban_card_actions .btn {
+        min-height: 48px;
+        min-width: 48px;
+    }
+
+    // -----------------------------------------------------------------
+    // Navigation chrome — burger, breadcrumbs, top menu
+    // -----------------------------------------------------------------
+    .o_navbar .o_menu_brand,
+    .o_main_navbar > a,
+    .o_main_navbar > button {
+        min-height: 48px;
+        padding: 12px 16px;
+    }
+
+    // -----------------------------------------------------------------
+    // Notebook / tab headers — operators switch tabs often on the WO
+    // form (Operations / Quality / Reservations).
+    // -----------------------------------------------------------------
+    .o_notebook_headers .nav-link,
+    ul.nav-tabs .nav-link {
+        min-height: 48px;
+        padding: 12px 18px;
+        font-size: 1rem;
+    }
+
+    // -----------------------------------------------------------------
+    // Modal action buttons — confirm / cancel must be enormous so a
+    // mis-tap doesn't drop the operator into a destructive path.
+    // -----------------------------------------------------------------
+    .modal-footer .btn {
+        min-height: 56px;
+        padding: 14px 24px;
+        font-size: 1.05rem;
+    }
+}
