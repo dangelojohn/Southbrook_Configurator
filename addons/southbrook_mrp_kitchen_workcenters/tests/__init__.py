@@ -12,3 +12,4 @@ from . import test_w055_mo_qr_resolve
 from . import test_w014_tablet_kanban
 from . import test_w026_traveler_richness
 from . import test_w043_reinspection_after_rework
+from . import test_w067_capacity_day

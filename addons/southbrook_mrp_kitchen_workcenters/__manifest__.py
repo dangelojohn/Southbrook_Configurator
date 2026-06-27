@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.34.0",
+    "version": "19.0.4.35.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -109,6 +109,11 @@ southbrook_kitchen_workspace) without duplicating their models.
         "views/southbrook_shift_handover_views.xml",
         # OPC-UA gateway prototype (SAMI PRD IOT-02, 2026-06-26).
         "views/southbrook_opcua_views.xml",
+        # W067 (R3.10, 2026-06-27) — calendar-aware capacity per
+        # (WC × day). Cron loads here; views (pivot/graph/list +
+        # menu under southbrook_mrp_pm root) load just after.
+        "data/southbrook_capacity_day_cron.xml",
+        "views/southbrook_capacity_day_views.xml",
         # WO traveler PDF — printable per-WO with embedded scan QR
         # (QR rollout Phase 3+, 2026-06-26). Action lives in
         # mrp.workorder action menu via binding_model_id.

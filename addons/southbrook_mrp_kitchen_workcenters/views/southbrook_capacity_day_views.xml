@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W067 (R3.10, 2026-06-27) — calendar-aware capacity pivot.
+
+  Pairs with southbrook_mrp_pm's legacy Capacity pivot (which sums
+  mrp.workorder.duration_expected and asks the PM to mentally check
+  against an 8h shift). This new pivot uses available_minutes derived
+  from each WC's resource_calendar_id.get_work_hours_count(), so 4-day
+  weeks + holidays + 2-shift calendars are honoured.
+
+  Default measure: headroom_minutes (negative = over-committed; visible
+  red in stock pivot styling). Pivot rows: workcenter. Cols: day.
+
+  "Refresh" button on the list view kicks the rebuild on demand so
+  the PM doesn't have to wait for the 02:30 cron after editing a
+  calendar / declaring a holiday.
+-->
+<odoo>
+    <data>
+
+        <!-- Pivot view — the headline surface. -->
+        <record id="view_capacity_day_pivot" model="ir.ui.view">
+            <field name="name">southbrook.capacity.day.pivot</field>
+            <field name="model">southbrook.capacity.day</field>
+            <field name="arch" type="xml">
+                <pivot string="Calendar-Aware Capacity" sample="1">
+                    <field name="workcenter_id" type="row"/>
+                    <field name="date" type="col" interval="day"/>
+                    <field name="headroom_minutes" type="measure"/>
+                    <field name="loaded_minutes" type="measure"/>
+                    <field name="available_minutes" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- Graph view — stacked-bar utilization per day. -->
+        <record id="view_capacity_day_graph" model="ir.ui.view">
+            <field name="name">southbrook.capacity.day.graph</field>
+            <field name="model">southbrook.capacity.day</field>
+            <field name="arch" type="xml">
+                <graph string="Capacity Utilization" type="bar" sample="1">
+                    <field name="date" interval="day"/>
+                    <field name="workcenter_id"/>
+                    <field name="utilization_pct" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <!-- List view — drill-in for "why is this row red". -->
+        <record id="view_capacity_day_list" model="ir.ui.view">
+            <field name="name">southbrook.capacity.day.list</field>
+            <field name="model">southbrook.capacity.day</field>
+            <field name="arch" type="xml">
+                <list string="Capacity (calendar-aware)" create="false"
+                      edit="false" delete="false"
+                      decoration-danger="headroom_minutes &lt; 0"
+                      decoration-warning="utilization_pct &gt;= 85
+                                          and headroom_minutes &gt;= 0"
+                      decoration-muted="available_minutes == 0">
+                    <field name="date"/>
+                    <field name="workcenter_id"/>
+                    <field name="available_minutes" sum="Available"/>
+                    <field name="loaded_minutes" sum="Loaded"/>
+                    <field name="headroom_minutes" sum="Headroom"/>
+                    <field name="utilization_pct" widget="percentage"/>
+                    <field name="refreshed_at" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Search view — common groupings. -->
+        <record id="view_capacity_day_search" model="ir.ui.view">
+            <field name="name">southbrook.capacity.day.search</field>
+            <field name="model">southbrook.capacity.day</field>
+            <field name="arch" type="xml">
+                <search string="Capacity">
+                    <field name="workcenter_id"/>
+                    <field name="date"/>
+                    <filter name="over_committed"
+                            string="Over Committed"
+                            domain="[('headroom_minutes','&lt;',0)]"/>
+                    <filter name="non_working_day"
+                            string="Non-Working Day"
+                            domain="[('available_minutes','=',0)]"/>
+                    <filter name="next_7d"
+                            string="Next 7 Days"
+                            domain="[
+                                ('date','&gt;=', context_today().strftime('%Y-%m-%d')),
+                                ('date','&lt;=',
+                                 (context_today() + relativedelta(days=7)).strftime('%Y-%m-%d'))
+                            ]"/>
+                    <group string="Group By">
+                        <filter name="group_by_wc"
+                                string="Work Center"
+                                context="{'group_by': 'workcenter_id'}"/>
+                        <filter name="group_by_day"
+                                string="Day"
+                                context="{'group_by': 'date'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Refresh server action — exposed in the action menu so
+             the PM can rebuild on demand after a calendar edit. -->
+        <record id="action_capacity_day_refresh" model="ir.actions.server">
+            <field name="name">Refresh Calendar Capacity</field>
+            <field name="model_id" ref="model_southbrook_capacity_day"/>
+            <field name="binding_model_id" ref="model_southbrook_capacity_day"/>
+            <field name="binding_view_types">list,form,pivot,graph</field>
+            <field name="state">code</field>
+            <field name="code">action = model.action_refresh_capacity()</field>
+        </record>
+
+        <!-- Main window action. -->
+        <record id="action_capacity_day" model="ir.actions.act_window">
+            <field name="name">Capacity (Calendar-Aware)</field>
+            <field name="res_model">southbrook.capacity.day</field>
+            <field name="view_mode">pivot,graph,list</field>
+            <field name="context">{
+                'search_default_next_7d': 1,
+                'search_default_group_by_wc': 1,
+            }</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No capacity rows yet — the daily cron at 02:30 builds them.
+                </p>
+                <p>
+                    Each row is one work-center on one day, with
+                    <strong>available minutes</strong> derived from the work
+                    center's own resource calendar (4-day weeks, holidays,
+                    and 2-shift schedules honoured) and
+                    <strong>loaded minutes</strong> summed from in-flight
+                    work orders. The headroom column is the real
+                    calendar-aware delta — negative is over-committed.
+                </p>
+                <p>
+                    Hit <strong>Actions → Refresh Calendar Capacity</strong>
+                    after editing a calendar or declaring a holiday so
+                    the next standup sees the corrected numbers without
+                    waiting for the overnight cron.
+                </p>
+            </field>
+        </record>
+
+        <!-- Menu entry under Southbrook PM root, sequence 8 (just
+             after the legacy Capacity entry at 7). The legacy view is
+             preserved — PMs who want the raw committed-minutes pivot
+             still have it. -->
+        <menuitem
+            id="menu_capacity_day"
+            parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+            name="Capacity (Calendar-Aware)"
+            action="action_capacity_day"
+            sequence="8"/>
+
+    </data>
+</odoo>
