@@ -1202,3 +1202,70 @@ class TestProjectMrpIntegration(TransactionCase):
             "action_southbrook_open_executive_queue",
         ):
             self.assertIn(token, project_form.arch_db)
+
+    # --- W029 (R3.W5) — Cross-project bottleneck contention view -----------
+    def test_w029_bottleneck_contention_action_is_grouped_by_workcenter(self):
+        """The Bottleneck Contention action must point at project.task and
+        default-group by the current_bottleneck_workcenter_id so the planner
+        sees 'N projects bottlenecked here' at a glance."""
+        action = self.env.ref(
+            "southbrook_project_mrp.action_southbrook_bottleneck_contention")
+        self.assertEqual(action.res_model, "project.task")
+        # Domain must scope to tasks with MOs AND a resolved bottleneck WC
+        # (otherwise the empty-state row dominates the view).
+        self.assertIn("production_count", action.domain)
+        self.assertIn("current_bottleneck_workcenter_id", action.domain)
+        self.assertIn(
+            "search_default_group_current_bottleneck_workcenter",
+            action.context,
+        )
+
+    def test_w029_bottleneck_contention_search_view_exposes_group_by(self):
+        """The inherited search view must expose the group_by filter the
+        action's context references — otherwise the default group is silently
+        dropped and the planner sees a flat list."""
+        search_view = self.env.ref(
+            "southbrook_project_mrp.project_task_search_readiness")
+        self.assertIn(
+            "group_current_bottleneck_workcenter", search_view.arch_db)
+        self.assertIn(
+            "current_bottleneck_workcenter_id", search_view.arch_db)
+
+    def test_w029_contention_surfaces_three_jobs_on_one_workcenter(self):
+        """End-to-end: three customer jobs, all bottlenecked on the same
+        WC, must all appear in the action's filtered set (which the planner
+        will then group by WC to see the contention)."""
+        wc_edge = self.env["mrp.workcenter"].create({"name": "Edge Bander"})
+        tasks = self.env["project.task"]
+        for i in range(3):
+            task = self.env["project.task"].create({
+                "name": "Customer Job %d" % i,
+                "project_id": self.project.id,
+            })
+            mo = self._make_mo()
+            mo.project_task_id = task.id
+            self.env["mrp.workorder"].create({
+                "name": "Edge Band",
+                "production_id": mo.id,
+                "workcenter_id": wc_edge.id,
+                "duration_expected": 60.0,
+            })
+            task.invalidate_recordset()
+            # Force recompute so current_bottleneck_workcenter_id is populated.
+            _ = task.current_bottleneck_workcenter_id
+            tasks |= task
+        # All three tasks should resolve the same bottleneck WC.
+        self.assertEqual(
+            set(tasks.mapped("current_bottleneck_workcenter_id.id")),
+            {wc_edge.id},
+        )
+        # The action's domain must include all three.
+        action = self.env.ref(
+            "southbrook_project_mrp.action_southbrook_bottleneck_contention")
+        domain = action._get_eval_context() and action.domain or action.domain
+        # Evaluate the domain manually (it's a literal string).
+        from ast import literal_eval
+        matched = self.env["project.task"].search(literal_eval(domain))
+        for t in tasks:
+            self.assertIn(t, matched,
+                          "task %s should show up in contention view" % t.name)
