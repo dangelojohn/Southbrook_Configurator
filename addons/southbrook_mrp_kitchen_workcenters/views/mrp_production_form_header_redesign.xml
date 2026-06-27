@@ -90,6 +90,12 @@
 
             <xpath expr="//notebook" position="inside">
                 <page string="Mfg. Intelligence" name="sbk_mi">
+                    <div class="oe_button_box">
+                        <button name="action_recompute_manufacturing_intelligence"
+                                string="↻ Recompute Intelligence"
+                                type="object"
+                                class="btn-primary"/>
+                    </div>
                     <group>
                         <group>
                             <field name="x_mi_status" widget="badge"
@@ -126,6 +132,33 @@
                         </list>
                     </field>
                 </page>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Priority 21 — Hide upstream "Intelligence" page         -->
+    <!--                                                         -->
+    <!-- southbrook_manufacturing_intelligence creates a page    -->
+    <!-- named "manufacturing_intelligence" / labelled            -->
+    <!-- "Intelligence". The new sbk_mi page above is its         -->
+    <!-- superset (it adds bottleneck workcenter + a richer       -->
+    <!-- check list and grafts the Recompute Intelligence         -->
+    <!-- button). To present ONE intelligence tab to the          -->
+    <!-- operator we hide the upstream page instead of removing   -->
+    <!-- it so any external xml_id reference (button binding,     -->
+    <!-- record action, test fixture) still resolves.             -->
+    <!-- ====================================================== -->
+    <record id="view_mrp_production_form_sbk_hide_upstream_mi" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_hide_upstream_mi</field>
+        <field name="model">mrp.production</field>
+        <field name="priority">21</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//page[@name='manufacturing_intelligence']" position="attributes">
+                <attribute name="invisible">1</attribute>
             </xpath>
 
         </field>
