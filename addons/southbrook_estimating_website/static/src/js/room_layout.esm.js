@@ -5,6 +5,7 @@
  * Phase 3.B — Room Layout tab (2026-06-27).
  * Phase 3.C.2a — tap interactivity layer (2026-06-27).
  * Phase 3.C.2c — Floor ↔ Elevation view toggle (2026-06-27).
+ * Phase 3.C.2d — interactive wall resize (2026-06-27).
  *
  * Components:
  *
@@ -226,6 +227,13 @@ class FloorPlanSVG extends Component {
         // AssignToWallModal. Also fired by the ± shifter buttons
         // surfaced for coarse-pointer (touch) devices.
         onCabinetDragEnd: { type: Function, optional: true },
+        // Phase 3.C.2d — wall-resize drag end. Fires with the snapped
+        // (25mm) new wall length_mm. Only fired for walls whose
+        // layout_shape is in _isResizable (straight | island today —
+        // see the helper for why multi-wall shapes are deferred). For
+        // multi-wall shapes the per-wall sidebar surfaces ± 100mm
+        // buttons that call this same handler instead.
+        onWallResizeEnd: { type: Function, optional: true },
         // Phase 4 — unit preference (mm | imperial) for any length
         // labels rendered inside the SVG (today: gap markers).
         unitPreference: { type: String, optional: true },
@@ -253,6 +261,20 @@ class FloorPlanSVG extends Component {
             downXY: null,
             moved: false,
         });
+        // Phase 3.C.2d — wall-resize drag state. Kept SEPARATE from
+        // the cabinet dragState above so a stray pointermove cannot
+        // conflate the two (the document-level listener routes by
+        // checking which state has an active id). Same lifecycle as
+        // the cabinet drag — armed on pointerdown, flipped to
+        // `moved` after the 5px threshold, snapped + RPC'd on
+        // pointerup.
+        this.wallDragState = useState({
+            wallId: null,
+            originalLengthMm: null,
+            currentLengthMm: null,
+            downXY: null,
+            moved: false,
+        });
         // SVG element ref for coordinate transforms (getScreenCTM +
         // createSVGPoint live on the SVGSVGElement).
         this.svgRef = useRef("svgRoot");
@@ -261,6 +283,17 @@ class FloorPlanSVG extends Component {
         // unmount; no need for manual removeEventListener.
         useExternalListener(document, "pointermove", this._onPointerMove);
         useExternalListener(document, "pointerup", this._onPointerUp);
+    }
+
+    // Phase 3.C.2d — V1 scope gate. Only single-wall topologies get
+    // SVG drag handles: there is no shared corner to displace, so
+    // resizing is unambiguous. Multi-wall shapes (l_shape, u_shape,
+    // galley, g_shape) defer to the sidebar's ± 100mm buttons in
+    // RoomLayoutTab — same /room/<rid>/update RPC, simpler topology.
+    // SVG drag for multi-wall shapes is a follow-up that needs to
+    // resolve the "drag the corner OR drag the outer end" UX choice.
+    _isResizable(shape) {
+        return shape === "straight" || shape === "island";
     }
 
     // Phase 3.C.2a — click handlers. Both no-op when the parent didn't
@@ -302,6 +335,15 @@ class FloorPlanSVG extends Component {
     };
 
     _onPointerMove = (ev) => {
+        // Phase 3.C.2d — wall-resize branch first so a wall drag
+        // doesn't fall through into the cabinet drag path. The two
+        // states are mutually exclusive in practice (a pointerdown
+        // arms one or the other, never both) but the explicit
+        // ordering keeps the conditional cheap.
+        if (this.wallDragState.wallId !== null) {
+            this._onWallPointerMove(ev);
+            return;
+        }
         if (this.dragState.lineId === null) return;
         const dx = ev.clientX - this.dragState.downXY.x;
         const dy = ev.clientY - this.dragState.downXY.y;
@@ -330,6 +372,11 @@ class FloorPlanSVG extends Component {
     };
 
     _onPointerUp = (_ev) => {
+        // Phase 3.C.2d — wall-resize branch (mirror _onPointerMove).
+        if (this.wallDragState.wallId !== null) {
+            this._onWallPointerUp(_ev);
+            return;
+        }
         if (this.dragState.lineId === null) return;
         const lineId = this.dragState.lineId;
         const moved = this.dragState.moved;
@@ -350,6 +397,93 @@ class FloorPlanSVG extends Component {
         } else {
             // No movement — treat as a tap.
             this._onCabinetClick(lineId);
+        }
+    };
+
+    // ------------------------------------------------------------------
+    // Phase 3.C.2d — wall resize handlers.
+    //
+    // Mental model:
+    //   - The wall starts at (x0, y0) and grows in the (dx, dy)
+    //     unit-vector direction. Resizing keeps (x0, y0) fixed and
+    //     moves (x1, y1) outward / inward along the wall axis.
+    //   - Min length 200mm prevents the wall collapsing to zero
+    //     (which would break the SVG bbox + auto-place semantics).
+    //   - Snap to 25mm on drop, same grid as cabinet drag.
+    //
+    // The handle is a small circle at the OUTER endpoint. For the
+    // V1 (straight + island only) "outer" is unambiguously (x1, y1)
+    // because there's no shared corner with another wall.
+    // ------------------------------------------------------------------
+
+    _onWallPointerDown = (wall, ev) => {
+        if (!this.props.onWallResizeEnd) return;
+        if (!wall || !wall.id) return;
+        // Inhibit default text selection / native HTML drag (same
+        // rationale as the cabinet drag path).
+        ev.preventDefault();
+        // Belt-and-braces — stopPropagation so the underlying SVG
+        // background never receives this pointerdown (we don't want
+        // a click affordance under the handle to misfire).
+        if (ev.stopPropagation) ev.stopPropagation();
+        this.wallDragState.wallId = wall.id;
+        this.wallDragState.originalLengthMm = wall.length_mm || 0;
+        this.wallDragState.currentLengthMm = wall.length_mm || 0;
+        this.wallDragState.downXY = { x: ev.clientX, y: ev.clientY };
+        this.wallDragState.moved = false;
+        if (ev.target && ev.target.setPointerCapture) {
+            try {
+                ev.target.setPointerCapture(ev.pointerId);
+            } catch (_e) {
+                // Pointer capture races — safe to swallow.
+            }
+        }
+    };
+
+    _onWallPointerMove = (ev) => {
+        if (this.wallDragState.wallId === null) return;
+        const dx = ev.clientX - this.wallDragState.downXY.x;
+        const dy = ev.clientY - this.wallDragState.downXY.y;
+        const dist2 = dx * dx + dy * dy;
+        if (!this.wallDragState.moved && dist2 < 25) {
+            // Under the 5px threshold — no-op (the wall handle has
+            // no tap semantics, but the threshold keeps the drag
+            // from firing on a stationary click).
+            return;
+        }
+        this.wallDragState.moved = true;
+        const seg = this._segments.find(
+            (s) => s.wall && s.wall.id === this.wallDragState.wallId,
+        );
+        if (!seg) return;
+        // Project the cursor onto the wall direction vector to get the
+        // signed mm offset from (x0, y0) — same projection math as the
+        // cabinet drag, just used as a length not a position.
+        const raw = this._pxToMmAlongWall(seg, ev.clientX, ev.clientY);
+        if (raw === null) return;
+        // Min length 200mm — prevents wall collapse + keeps the SVG
+        // bbox from degenerating. No max — long runs are valid.
+        this.wallDragState.currentLengthMm = Math.max(200, raw);
+    };
+
+    _onWallPointerUp = (_ev) => {
+        if (this.wallDragState.wallId === null) return;
+        const wallId = this.wallDragState.wallId;
+        const moved = this.wallDragState.moved;
+        const currentLen = this.wallDragState.currentLengthMm;
+        // Reset state first so the dashed-ghost overlay disappears
+        // immediately on drop, even before the RPC returns.
+        this.wallDragState.wallId = null;
+        this.wallDragState.originalLengthMm = null;
+        this.wallDragState.currentLengthMm = null;
+        this.wallDragState.downXY = null;
+        this.wallDragState.moved = false;
+        if (!moved) return;
+        // Snap to 25mm + min 200mm clamp, then fire the parent's
+        // RPC handler.
+        const snapped = Math.max(200, Math.round(currentLen / 25) * 25);
+        if (this.props.onWallResizeEnd) {
+            this.props.onWallResizeEnd(wallId, snapped);
         }
     };
 
@@ -563,6 +697,47 @@ class FloorPlanSVG extends Component {
             });
         }
         return out;
+    }
+
+    // Phase 3.C.2d — outer-endpoint handle positions, in viewBox px.
+    // Only emitted when the room's layout_shape passes _isResizable
+    // (straight | island). For each resizable wall the outer end is
+    // unambiguously (x1, y1) — no shared corner ambiguity in single-
+    // wall topologies. Multi-wall shapes get the empty list (handles
+    // never render), and the sidebar's ± 100mm buttons handle them.
+    get _resizableWalls() {
+        const room = this.props.room || {};
+        if (!this._isResizable(room.layout_shape)) return [];
+        if (!this.props.onWallResizeEnd) return [];
+        const out = [];
+        for (const s of this._segments) {
+            if (!s.wall || !s.wall.id) continue;
+            const [cx, cy] = this._proj(s.x1, s.y1);
+            out.push({ wall: s.wall, cx, cy });
+        }
+        return out;
+    }
+
+    // Phase 3.C.2d — dashed-ghost preview line endpoints, in viewBox px.
+    // Computed from the live wallDragState.currentLengthMm projected
+    // along the dragged wall's direction vector. Returns null when no
+    // wall drag is active or the source segment can't be matched (e.g.
+    // the wall was deleted server-side mid-drag — defensive).
+    get _wallDragPreview() {
+        const id = this.wallDragState.wallId;
+        if (id === null) return null;
+        if (!this.wallDragState.moved) return null;
+        const seg = this._segments.find(
+            (s) => s.wall && s.wall.id === id,
+        );
+        if (!seg) return null;
+        const len = this.wallDragState.currentLengthMm || 0;
+        const [x1, y1] = this._proj(seg.x0, seg.y0);
+        const [x2, y2] = this._proj(
+            seg.x0 + len * seg.dx,
+            seg.y0 + len * seg.dy,
+        );
+        return { x1, y1, x2, y2 };
     }
 
     // Wall name labels — placed at the segment midpoint, offset
@@ -1185,6 +1360,10 @@ export class RoomLayoutTab extends Component {
         // Threaded straight through to FloorPlanSVG; the parent
         // OrderBuilder owns the /place-on-wall RPC.
         onCabinetDragEnd: { type: Function, optional: true },
+        // Phase 3.C.2d — wall-resize drag end (SVG handle in single-
+        // wall shapes) + ± 100mm sidebar buttons (multi-wall shapes).
+        // The parent OrderBuilder owns the /room/<rid>/update RPC.
+        onWallResizeEnd: { type: Function, optional: true },
         // Phase 4 — unit preference (mm | imperial) for every length
         // label rendered by this tab. Flipped from the Room Setup tab's
         // segmented toggle; FloorPlanSVG receives it via passthrough.
@@ -1239,6 +1418,16 @@ export class RoomLayoutTab extends Component {
     _humanLen(mm) {
         return _humanLenWithPref(mm, this.props.unitPreference || "mm");
     }
+
+    // Phase 3.C.2d — sidebar ± 100mm wall-length shifter. Clamps to
+    // min 200mm (same floor as the SVG drag). Fires the same RPC
+    // handler the SVG handle uses so the parent has one code path
+    // to maintain.
+    _onWallShift = (wallId, currentMm, deltaMm) => {
+        if (!this.props.onWallResizeEnd) return;
+        const next = Math.max(200, (Number(currentMm) || 0) + deltaMm);
+        this.props.onWallResizeEnd(wallId, next);
+    };
 
     // ------------------------------------------------------------------
     // Empty-state predicates — drive the t-if/t-elif cascade in the

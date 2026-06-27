@@ -2525,7 +2525,8 @@ const TEMPLATE = xml`
                                onCabinetClick="_onPlanCabinetClick"
                                onGapClick="_onPlanGapClick"
                                onAssignFromSidebar="_onPlanAssignClick"
-                               onCabinetDragEnd="_onPlanCabinetDragEnd"/>
+                               onCabinetDragEnd="_onPlanCabinetDragEnd"
+                               onWallResizeEnd="_onPlanWallResizeEnd"/>
             </div>
             <div t-elif="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines"
@@ -4109,6 +4110,49 @@ class OrderBuilder extends Component {
         } catch (e) {
             alert(
                 "Could not move cabinet: "
+                + ((e && e.message) ? e.message : String(e)),
+            );
+        }
+    };
+
+    // Phase 3.C.2d — interactive wall resize end handler. Fired by
+    // RoomLayoutTab in two cases:
+    //   - SVG handle drag drop on a single-wall topology (straight |
+    //     island). Pre-snapped to 25mm, min-clamped to 200mm by the
+    //     FloorPlanSVG before reaching us.
+    //   - Sidebar ± 100mm button click on any shape (the only resize
+    //     affordance multi-wall shapes get in v1 — SVG handles for
+    //     l_shape / u_shape / galley / g_shape are deferred).
+    //
+    // Reuses /room/<rid>/update (Phase 2.A endpoint) — that already
+    // accepts `walls: [{id, length_mm}]` for partial wall upserts.
+    // Refreshes room + bumps payload_hash so the next _loadOrder()
+    // takes (the hash-skip path would otherwise no-op on an
+    // unchanged-looking poll). Cabinets that no longer fit surface
+    // via the existing Phase 3.D warning banner — no server-side
+    // cabinet mutation here.
+    _onPlanWallResizeEnd = async (wallId, newLengthMm) => {
+        if (!this.state.room) return;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/"
+                + encodeURIComponent(this.state.room.id)
+                + "/update",
+                { walls: [{ id: wallId, length_mm: newLengthMm }] },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                this.state.payload_hash = "";
+                await this._loadOrder();
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                alert("Could not resize wall: " + detail);
+            }
+        } catch (e) {
+            alert(
+                "Could not resize wall: "
                 + ((e && e.message) ? e.message : String(e)),
             );
         }

@@ -2274,3 +2274,84 @@
     border-radius: var(--sb-radius-sm);
     color: var(--sb-ink);
 }
+
+// ---------------------------------------------------------------------
+// Phase 3.C.2d — interactive wall resize visuals.
+//
+// Two surface areas:
+//   1. SVG handle circle at the outer endpoint of each resizable wall
+//      (V1: straight + island). Hidden by default on desktop; revealed
+//      on canvas hover or when a drag is active on THIS wall. Always
+//      visible on coarse-pointer (touch) devices.
+//   2. Dashed ghost preview line drawn during a drag from the wall's
+//      fixed origin (x0, y0) to the cursor's projected new endpoint.
+//   3. Sidebar ± 100mm buttons on every wall row (mirrors the touch
+//      shifter pattern from Phase 3.C.2b for cabinets — and is the
+//      only resize affordance multi-wall shapes get in v1).
+// ---------------------------------------------------------------------
+
+.sb-room-plan-wall-handle {
+    fill: var(--sb-walnut);
+    stroke: var(--sb-paper);
+    stroke-width: 2;
+    // Generic resize cursor — straight + island both run on a single
+    // axis at a time, so ew-resize reads clearly without committing to
+    // a direction we don't actually know at static SCSS time.
+    cursor: ew-resize;
+    opacity: 0;
+    transition: opacity 100ms ease;
+    pointer-events: all;
+}
+
+.sb-room-plan-wall-handle:hover,
+.sb-room-plan-wall-handle--active {
+    opacity: 1;
+    fill: var(--sb-sky, var(--sb-walnut-d));
+}
+
+// Show all handles when the SVG canvas itself is hovered so the user
+// doesn't need to pixel-hunt for each one.
+.sb-room-plan-svg:hover .sb-room-plan-wall-handle {
+    opacity: 0.8;
+}
+
+// Touch — handles are always visible (no hover to discover them).
+@media (pointer: coarse) {
+    .sb-room-plan-wall-handle {
+        opacity: 1;
+    }
+}
+
+.sb-room-plan-wall-ghost {
+    stroke: var(--sb-walnut-d, #A03E2D);
+    stroke-width: 3;
+    fill: none;
+    pointer-events: none;
+}
+
+// Sidebar ± 100mm length adjusters — render inline next to the wall's
+// length cell so the affordance lives where the user is already
+// reading the number.
+.sb-room-plan-wall-len-shifter {
+    display: inline-flex;
+    gap: 0.25rem;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+
+    button {
+        font-size: 0.7rem;
+        line-height: 1;
+        padding: 0.1rem 0.4rem;
+        background: var(--sb-paper);
+        color: var(--sb-walnut-d);
+        border: 1px solid var(--sb-rule);
+        border-radius: var(--sb-radius-sm);
+        cursor: pointer;
+        font-weight: 700;
+
+        &:hover {
+            border-color: var(--sb-walnut);
+            background: var(--sb-linen);
+        }
+    }
+}

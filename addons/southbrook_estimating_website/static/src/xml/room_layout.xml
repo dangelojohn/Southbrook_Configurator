@@ -111,7 +111,8 @@
                                       unitPreference="props.unitPreference || 'mm'"
                                       onCabinetClick="props.onCabinetClick"
                                       onGapClick="props.onGapClick"
-                                      onCabinetDragEnd="props.onCabinetDragEnd"/>
+                                      onCabinetDragEnd="props.onCabinetDragEnd"
+                                      onWallResizeEnd="props.onWallResizeEnd"/>
                     </t>
                     <t t-if="state.viewMode === 'elevation'">
                         <WallElevationSVG room="props.room"
@@ -149,6 +150,27 @@
                                     <td t-esc="m.name"/>
                                     <td class="sb-room-plan-num mono">
                                         <t t-esc="_humanLen(m.length_mm)"/>
+                                        <!-- Phase 3.C.2d — ± 100mm
+                                             length shifter. Visible
+                                             on every shape so multi-
+                                             wall topologies (l_shape,
+                                             u_shape, galley, g_shape)
+                                             have a path to resize
+                                             until the SVG-handle
+                                             support catches up. Min
+                                             200mm clamp lives in the
+                                             RoomLayoutTab._onWallShift
+                                             helper so the template
+                                             stays declarative. -->
+                                        <span t-if="props.onWallResizeEnd"
+                                              class="sb-room-plan-wall-len-shifter">
+                                            <button type="button"
+                                                    t-on-click="() => this._onWallShift(m.id, m.length_mm, -100)"
+                                                    t-att-aria-label="'Shrink ' + m.name + ' by 100 mm'">−</button>
+                                            <button type="button"
+                                                    t-on-click="() => this._onWallShift(m.id, m.length_mm, 100)"
+                                                    t-att-aria-label="'Grow ' + m.name + ' by 100 mm'">+</button>
+                                        </span>
                                     </td>
                                     <td class="sb-room-plan-num mono">
                                         <t t-esc="_humanLen(m.used_mm)"/>
@@ -418,6 +440,36 @@
                       dominant-baseline="central">
                     <t t-esc="lbl.name"/>
                 </text>
+            </g>
+
+            <!-- Phase 3.C.2d — wall-resize ghost preview line. Drawn
+                 BEFORE the handles so the handle circles stay on top
+                 of the dashed preview during a drag. Only renders
+                 while a wall drag is active AND has crossed the 5px
+                 threshold (per _wallDragPreview). -->
+            <line t-if="_wallDragPreview"
+                  class="sb-room-plan-wall-ghost"
+                  t-att-x1="_wallDragPreview.x1"
+                  t-att-y1="_wallDragPreview.y1"
+                  t-att-x2="_wallDragPreview.x2"
+                  t-att-y2="_wallDragPreview.y2"
+                  stroke-dasharray="6 4"/>
+
+            <!-- Phase 3.C.2d — outer-endpoint resize handles. Rendered
+                 LAST (after labels + ghost) so they hit-test before
+                 the wall lines + background. V1 scope: only single-
+                 wall topologies (straight | island) — multi-wall
+                 shapes get the sidebar ± buttons instead. -->
+            <g class="sb-room-plan-wall-handles-g">
+                <circle t-foreach="_resizableWalls"
+                        t-as="wh"
+                        t-key="wh.wall.id"
+                        class="sb-room-plan-wall-handle"
+                        t-att-class="wallDragState.wallId === wh.wall.id ? 'sb-room-plan-wall-handle sb-room-plan-wall-handle--active' : 'sb-room-plan-wall-handle'"
+                        t-att-cx="wh.cx"
+                        t-att-cy="wh.cy"
+                        r="7"
+                        t-on-pointerdown="(ev) => this._onWallPointerDown(wh.wall, ev)"/>
             </g>
 
         </svg>
