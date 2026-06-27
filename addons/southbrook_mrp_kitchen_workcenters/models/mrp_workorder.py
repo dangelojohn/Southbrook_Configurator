@@ -31,8 +31,39 @@ kitchen reports need but Odoo doesn't:
                                mi.check
   x_sbk_downtime_min           sum of attached downtime durations
   x_sbk_downtime_cost          sum of attached downtime costs
+
+W011 (2026-06-27) — form-open scan log
+=====================================
+
+When an operator opens a WO from the kanban/form (not by scanning a
+QR), we synthesize a `southbrook.qr.scan.log` row with
+``action='form_open'`` so the defect-context window in
+``DefectQrKind._resolve_workorder_from_context`` still resolves to
+the WO actually on screen. Without this, the first defect scan after
+a tap-open silently falls back to the *previous* scan target — a
+quiet attribution bug that R2.2 of MFG-REVIEW-R2 calls out as the
+blocker for the tablet-kanban (W014) work.
+
+Guards: only fires for single-record web_read calls made from a real
+HTTP request that is NOT a cron, NOT a test harness, NOT the QR scan
+controller itself (which already writes its own log row), and NOT
+when the same user has form-opened the same WO within the last
+``_FORM_OPEN_DEDUPE_SEC`` seconds.
 """
+import logging
+
 from odoo import _, api, fields, models
+
+_logger = logging.getLogger(__name__)
+
+
+# Coalesce window for repeat form-opens of the same WO by the same
+# user. Form views in v19 fire web_read on every reload / drawer flip
+# / breadcrumb hop — without dedupe we'd write a row per render and
+# pollute both the audit log AND the defect-context resolver (which
+# only takes order desc, limit=1, so the spam doesn't break it but
+# clutters investigation).
+_FORM_OPEN_DEDUPE_SEC = 30
 
 
 class MrpWorkorder(models.Model):
@@ -268,3 +299,103 @@ class MrpWorkorder(models.Model):
         if template.quantity_driver_type == "fixed":
             return 0.0
         return self.production_id.product_qty or 0.0
+
+    # ------------------------------------------------------------------
+    # W011 — form-open scan log (MFG-REVIEW-R2 §R2.2)
+    # ------------------------------------------------------------------
+
+    def web_read(self, specification):
+        """Override v19 web_read to synthesise a `form_open` scan log
+        row when an operator taps into a WO form. The defect-context
+        window (`DefectQrKind._resolve_workorder_from_context`) walks
+        `southbrook.qr.scan.log` for the user's most recent scan; this
+        keeps that window working for the ~60% of WO opens that do NOT
+        come from a QR scan."""
+        res = super().web_read(specification)
+        try:
+            self._sbk_maybe_log_form_open()
+        except Exception as exc:  # noqa: BLE001
+            # Never let a logging glitch break a form open. The
+            # underlying read succeeded; the worst case is we miss
+            # one scan-log row and the operator has to type a WO
+            # number on their next defect — annoying, not blocking.
+            _logger.warning(
+                "W011 form-open scan log failed for WO %s: %s",
+                self.ids, exc,
+            )
+        return res
+
+    def _sbk_maybe_log_form_open(self):
+        """Create a `form_open` scan log row IF this web_read looks
+        like a UI form-open. Guards:
+          * single-record (form views fetch one record at a time;
+            kanban/list views fetch many — we don't want to spam)
+          * real HTTP request (skip RPC, cron, indirect calls)
+          * not the QR scan controller (which already logs)
+          * not a test run (test_enable context)
+          * not already logged in the last `_FORM_OPEN_DEDUPE_SEC` for
+            this (user, WO) pair (form views re-fire web_read on
+            chatter refreshes / drawer flips)
+        """
+        if len(self) != 1:
+            return
+        env = self.env
+        # Test-harness bypass — TransactionCase sets test_enable=True
+        # on the env's context. Skip silently to keep test runs clean.
+        if env.context.get("test_enable"):
+            return
+        # Cron / sudo with no request — skip.
+        try:
+            from odoo.http import request
+        except Exception:  # noqa: BLE001
+            return
+        if request is None or not getattr(request, "httprequest", None):
+            return
+        # The QR scan controller writes its own log row at
+        # `/sb/qr/scan`; if web_read fires as a side effect of that
+        # path (it shouldn't directly, but follow-up RPCs from the
+        # redirect could), don't double-log.
+        try:
+            path = (request.httprequest.path or "")
+        except Exception:  # noqa: BLE001
+            path = ""
+        if path.startswith("/sb/qr/"):
+            return
+        # The only paths that fire web_read on a single mrp.workorder
+        # in a UI sense are /web/dataset/call_kw and /odoo/* — anything
+        # else (xmlrpc, jsonrpc, REST) is server-to-server and we
+        # don't want to attribute it to the operator's defect window.
+        if not (path.startswith("/web/") or path.startswith("/odoo")):
+            return
+        wo = self
+        Log = env["southbrook.qr.scan.log"].sudo()
+        # Dedupe — same user + same WO within window already logged.
+        from datetime import datetime, timedelta
+        cutoff = datetime.now() - timedelta(seconds=_FORM_OPEN_DEDUPE_SEC)
+        if Log.search_count([
+            ("user_id", "=", env.uid),
+            ("action", "=", "form_open"),
+            ("target_model", "=", "mrp.workorder"),
+            ("target_id", "=", wo.id),
+            ("create_date", ">=", cutoff),
+        ], limit=1):
+            return
+        try:
+            ua = request.httprequest.headers.get("User-Agent") or ""
+            ip = request.httprequest.remote_addr or ""
+        except Exception:  # noqa: BLE001
+            ua, ip = "", ""
+        # `user_id` defaults to env.user via the model — but we're
+        # using sudo() to bypass the write-restricted ACL, so set it
+        # explicitly to keep attribution to the actual viewer.
+        Log.create({
+            "user_id": env.uid,
+            "kind": "wo",
+            "ident": str(wo.id),
+            "action": "form_open",
+            "result": "ok",
+            "target_model": "mrp.workorder",
+            "target_id": wo.id,
+            "source_ip": ip[:255] if ip else False,
+            "user_agent": ua[:255] if ua else False,
+        })
