@@ -288,6 +288,18 @@ class SouthbrookAsbuilt(models.Model):
             if vals.get("name", _("New")) == _("New"):
                 vals["name"] = self.env["ir.sequence"].next_by_code(
                     "southbrook.asbuilt") or _("AB/New")
+            # W042 (MFG-REVIEW-R5.6) — auto-snapshot lot_id from the
+            # MO's lot_producing_id so lot-to-asbuilt warranty trace
+            # works without the operator looking it up. Per R5.6
+            # baseline, this trace fails ~95% of the time today because
+            # nobody stamps the lot manually. If the caller already
+            # supplied lot_id, respect it (don't clobber a deliberate
+            # override).
+            if not vals.get("lot_id") and vals.get("production_id"):
+                mo = self.env["mrp.production"].browse(
+                    vals["production_id"])
+                if mo.exists() and mo.lot_producing_id:
+                    vals["lot_id"] = mo.lot_producing_id.id
         records = super().create(vals_list)
         # Snapshot BoM version + auto-populate QC checks + attachments
         # at create time so the record carries the build-time truth.
