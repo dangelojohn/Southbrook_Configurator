@@ -40,7 +40,7 @@ analysis. Layered build:
       M17 Floor Manager access group
       M20 ECO → in-flight MO notification rule
 """,
-    "version": "19.0.1.8.0",
+    "version": "19.0.1.9.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -82,6 +82,10 @@ analysis. Layered build:
         # with Ready Queue / In Production / Late / Floor Load /
         # Equipment actions.
         "views/pm_menus.xml",
+        # W019 — Today's Plan planner-home view. Must load AFTER
+        # pm_menus.xml so it can hang its menuitem under the
+        # menu_southbrook_pm_root parent declared above.
+        "views/pm_today_plan.xml",
         # Layer 2 commit 2 — M13 — equipment condition field
         # surfaced on the maintenance.equipment form + list views.
         "views/equipment_views.xml",

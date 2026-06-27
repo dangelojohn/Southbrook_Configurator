@@ -18,7 +18,28 @@ by procurement.group from a non-customer route — e.g. stock
 replenishment, MO from inventory rules), the gate does NOT fire. This
 matches the R1 spec's "exempt MOs where procurement_group_id resolves
 through a non-customer route" carve-out.
+
+W019 — Today's Plan planner-home grouping.
+
+`today_plan_section` is a computed (NOT stored) Selection that fuses
+the existing material-availability, MI-status, and approval signals
+into four planner-actionable buckets:
+
+  - overdue       : past date_deadline, not yet done
+  - ready_now     : material available + MI ok + approved, due today
+                    or tomorrow
+  - at_risk       : due within 3 days but material missing OR MI
+                    blocked OR approval pending
+  - long_horizon  : due > 3 days out — no morning action needed
+
+Unstored compute because the inputs change frequently (cron sweeps
+re-fire MI status every 5 min; material availability rolls forward
+on every stock move); a stored field would either be perpetually
+stale or burn writes. The 4-bucket switch is ~8 cheap reads per row,
+and the dashboard kanban renders the relevant slice only.
 """
+from datetime import timedelta
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -92,6 +113,93 @@ class MrpProduction(models.Model):
                 continue
 
             mo.next_action_hint = False
+
+    # ------------------------------------------------------------------
+    # W019 — Today's Plan section bucket
+    # ------------------------------------------------------------------
+    today_plan_section = fields.Selection(
+        [
+            ("overdue", "Overdue"),
+            ("ready_now", "Ready Now"),
+            ("at_risk", "At Risk"),
+            ("long_horizon", "Long Horizon"),
+        ],
+        compute="_compute_today_plan_section",
+        store=False,
+        help=(
+            "Planner-home bucket fusing material availability, MI "
+            "status, approval gate, and due date into a single bucket "
+            "for the Today's Plan kanban (W019)."
+        ),
+    )
+
+    @api.depends(
+        "date_deadline",
+        "state",
+    )
+    def _compute_today_plan_section(self):
+        # Cross-addon fields (components_availability_state, x_mi_*,
+        # production_approval_state) are NOT in @api.depends because
+        # they may not exist when this addon installs alone. The compute
+        # uses getattr to stay defensive. Triggers fire on date_deadline
+        # / state changes — for the others, the W053 5-min MI sweep +
+        # the existing approval write hooks force a re-read on display.
+        today = fields.Date.context_today(self)
+        for mo in self:
+            if mo.state in ("done", "cancel", "draft"):
+                # Done / cancelled / draft MOs do not belong in any
+                # planner-action bucket. Return False -> excluded by
+                # the kanban grouping domain.
+                mo.today_plan_section = False
+                continue
+
+            deadline = mo.date_deadline
+            deadline_date = (
+                fields.Datetime.context_timestamp(mo, deadline).date()
+                if deadline else False
+            )
+
+            # Bucket 1 — Overdue. Past deadline still wins regardless
+            # of MI / material — that's the planner's "fire-first" lane.
+            if deadline_date and deadline_date < today:
+                mo.today_plan_section = "overdue"
+                continue
+
+            # Resolve the three blocker signals.
+            comp_state = (
+                getattr(mo, "components_availability_state", False)
+                or getattr(mo, "reservation_state", False)
+                or ""
+            )
+            material_ok = (not comp_state) or comp_state in (
+                "available", "assigned")
+            mi_status = getattr(mo, "x_mi_status", False) or "ok"
+            mi_blocker_count = getattr(mo, "x_mi_blocker_count", 0) or 0
+            mi_ok = mi_status == "ok" and mi_blocker_count == 0
+            approval = getattr(
+                mo, "production_approval_state", False) or "approved"
+            approval_ok = approval == "approved"
+            all_clear = material_ok and mi_ok and approval_ok
+
+            # Bucket 4 — Long horizon: due > 3 days out (or undated)
+            # and nothing is preventing it from going. Out of today's
+            # planner action surface.
+            if (not deadline_date) or deadline_date > today + timedelta(days=3):
+                # Long horizon ONLY when nothing is gating it. If the
+                # MO is blocked even on a long horizon, surface it in
+                # at-risk so the planner can chase it down early.
+                if all_clear:
+                    mo.today_plan_section = "long_horizon"
+                else:
+                    mo.today_plan_section = "at_risk"
+                continue
+
+            # Within the 3-day window. Ready iff all clear, at-risk
+            # otherwise.
+            if all_clear:
+                mo.today_plan_section = "ready_now"
+            else:
+                mo.today_plan_section = "at_risk"
 
     @api.model_create_multi
     def create(self, vals_list):
