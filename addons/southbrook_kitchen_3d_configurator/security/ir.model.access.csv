@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sbk_kitchen_design_user,southbrook.kitchen.design (user),model_southbrook_kitchen_design,base.group_user,1,1,1,1
+access_sbk_kitchen_design_line_user,southbrook.kitchen.design.line (user),model_southbrook_kitchen_design_line,base.group_user,1,1,1,1

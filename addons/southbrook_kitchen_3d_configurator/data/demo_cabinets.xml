@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- noupdate="1" prevents these records from being overwritten on module upgrade -->
+<odoo noupdate="1">
+
+    <!-- B24 – Standard Base Cabinet ─────────────────────────────────────────── -->
+    <record id="product_tmpl_b24" model="product.template">
+        <field name="name">B24 Base Cabinet</field>
+        <field name="default_code">B24</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+        <field name="list_price">180.00</field>
+        <field name="southbrook_is_cabinet">True</field>
+        <field name="southbrook_cabinet_type">base</field>
+        <field name="southbrook_width_in">24</field>
+        <field name="southbrook_height_in">34.5</field>
+        <field name="southbrook_depth_in">24</field>
+        <field name="southbrook_material">white_melamine</field>
+        <field name="southbrook_door_style">shaker</field>
+        <field name="description_sale">Standard 24-inch base cabinet with one door and one drawer.</field>
+    </record>
+
+    <!-- DB24 – 3-Drawer Base ────────────────────────────────────────────────── -->
+    <record id="product_tmpl_db24" model="product.template">
+        <field name="name">DB24 3-Drawer Base</field>
+        <field name="default_code">DB24</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+        <field name="list_price">210.00</field>
+        <field name="southbrook_is_cabinet">True</field>
+        <field name="southbrook_cabinet_type">base</field>
+        <field name="southbrook_width_in">24</field>
+        <field name="southbrook_height_in">34.5</field>
+        <field name="southbrook_depth_in">24</field>
+        <field name="southbrook_material">white_melamine</field>
+        <field name="southbrook_door_style">shaker</field>
+        <field name="description_sale">24-inch base cabinet with three full-extension drawers.</field>
+    </record>
+
+    <!-- SB30 – Sink Base 30" ────────────────────────────────────────────────── -->
+    <record id="product_tmpl_sb30" model="product.template">
+        <field name="name">SB30 Sink Base 30"</field>
+        <field name="default_code">SB30</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+        <field name="list_price">195.00</field>
+        <field name="southbrook_is_cabinet">True</field>
+        <field name="southbrook_cabinet_type">base</field>
+        <field name="southbrook_width_in">30</field>
+        <field name="southbrook_height_in">34.5</field>
+        <field name="southbrook_depth_in">24</field>
+        <field name="southbrook_material">white_melamine</field>
+        <field name="southbrook_door_style">shaker</field>
+        <field name="description_sale">30-inch sink base, open interior, two doors.</field>
+    </record>
+
+    <!-- W24 – Wall Cabinet ──────────────────────────────────────────────────── -->
+    <record id="product_tmpl_w24" model="product.template">
+        <field name="name">W24 Wall Cabinet</field>
+        <field name="default_code">W24</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+        <field name="list_price">120.00</field>
+        <field name="southbrook_is_cabinet">True</field>
+        <field name="southbrook_cabinet_type">wall</field>
+        <field name="southbrook_width_in">24</field>
+        <field name="southbrook_height_in">30</field>
+        <field name="southbrook_depth_in">12</field>
+        <field name="southbrook_material">white_melamine</field>
+        <field name="southbrook_door_style">shaker</field>
+        <field name="description_sale">24-inch wall cabinet with one door, two adjustable shelves.</field>
+    </record>
+
+    <!-- W24-2 – Wide Wall Cabinet 2 Doors ───────────────────────────────────── -->
+    <record id="product_tmpl_w24_2" model="product.template">
+        <field name="name">W24-2 Wall Cabinet 2 Door</field>
+        <field name="default_code">W24-2</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+        <field name="list_price">150.00</field>
+        <field name="southbrook_is_cabinet">True</field>
+        <field name="southbrook_cabinet_type">wall</field>
+        <field name="southbrook_width_in">24</field>
+        <field name="southbrook_height_in">30</field>
+        <field name="southbrook_depth_in">12</field>
+        <field name="southbrook_material">white_melamine</field>
+        <field name="southbrook_door_style">shaker</field>
+        <field name="description_sale">24-inch wall cabinet with two doors, two adjustable shelves.</field>
+    </record>
+
+    <!-- T24 – Tall Pantry Cabinet ────────────────────────────────────────────── -->
+    <record id="product_tmpl_t24" model="product.template">
+        <field name="name">T24 Tall Pantry Cabinet</field>
+        <field name="default_code">T24</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+        <field name="list_price">380.00</field>
+        <field name="southbrook_is_cabinet">True</field>
+        <field name="southbrook_cabinet_type">tall</field>
+        <field name="southbrook_width_in">24</field>
+        <field name="southbrook_height_in">84</field>
+        <field name="southbrook_depth_in">24</field>
+        <field name="southbrook_material">white_melamine</field>
+        <field name="southbrook_door_style">shaker</field>
+        <field name="description_sale">Floor-to-ceiling 84-inch pantry with four doors and five shelves.</field>
+    </record>
+
+    <!-- FP3 – 3" Filler Panel ───────────────────────────────────────────────── -->
+    <record id="product_tmpl_fp3" model="product.template">
+        <field name="name">FP3 Filler Panel 3"</field>
+        <field name="default_code">FP3</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+        <field name="list_price">35.00</field>
+        <field name="southbrook_is_cabinet">True</field>
+        <field name="southbrook_cabinet_type">filler</field>
+        <field name="southbrook_width_in">3</field>
+        <field name="southbrook_height_in">34.5</field>
+        <field name="southbrook_depth_in">1</field>
+        <field name="southbrook_material">white_melamine</field>
+        <field name="southbrook_door_style">slab</field>
+        <field name="description_sale">3-inch filler panel to close gaps at wall or appliance ends.</field>
+    </record>
+
+</odoo>
