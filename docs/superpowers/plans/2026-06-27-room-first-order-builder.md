@@ -999,10 +999,46 @@ Adds per-line indicator chips + collapsible warning banner + per-zone wall-summa
 
 ---
 
-## Phase 4 — Portal Polish: Progress + Units (DRAFT)
+## Phase 4 — Portal Polish: Progress + Units (detailed, post-Phase 5)
 
-- Persistent 5-step room-setup progress checklist on Room Setup tab.
-- Unit toggle (mm ↔ ft/in) stored on `southbrook.room.unit_preference`; all dimension renders respect it. mm → ft/in helper in `static/src/js/units.esm.js`. Storage stays mm always.
+Two visible polish pieces on the Room Setup tab. Both reuse the existing Phase 2.A endpoints — no new endpoints. Single addon: `southbrook_estimating_website`. Bumps to `19.0.10.0.0`.
+
+### Phase 4.1 — Progress checklist on Room Setup tab
+
+Persistent 5-step horizontal checklist at the top of the Room Setup panel when a room exists. Each step derives from existing `state.room` + `state.lines` data:
+
+1. **Room type & shape selected** — `room.layout_shape != null`
+2. **Wall dimensions entered** — `room.walls.every(w => w.length_mm > 0)`
+3. **Fixed constraints mapped** — `room.constraints.length > 0` (optional gate — passes if user explicitly skipped)
+4. **All cabinets assigned to walls** — `lines.every(l => l.wall_id) || lines.length === 0`
+5. **No conflicts detected** — `room.walls.every(w => !w.has_conflicts)`
+
+Each incomplete step is clickable → scrolls to or opens the relevant section. When all 5 are complete, replaces the checklist with a "Ready for production" celebratory card + CTA pointing to "Send to Production" (the existing action_confirm button or equivalent).
+
+### Phase 4.2 — Unit toggle (mm ↔ ft/in)
+
+Small toggle button in the Room Setup panel header that switches `room.unit_preference` between `mm` and `imperial`. Storage stays mm always — toggle only changes the display formatter.
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js`:
+  - Add `_humanLen(mm)` helper on OrderBuilder + ZoneGroup that consults `state.room?.unit_preference || "mm"`. When imperial: `_imperialFromMm(mm)` → `"3' 6\""` (or `'18"'` if < 1 foot). Reuse the mm→inches conversion math (1 inch = 25.4 mm, round to nearest int).
+  - Pass `unitPreference` (or `_humanLen` callback) into `RoomLayoutTab` props.
+  - Add toggle button to Room Setup panel header that POSTs `/room/<id>/update` with `{unit_preference: <new>}` (Phase 2.A endpoint already supports this). On success, refresh `state.room`.
+  - Add the 5-step progress checklist block to the Room Setup panel render (BEFORE the existing summary card). When all complete, render the celebratory state.
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js`:
+  - Accept `unitPreference` prop (default "mm"). Use it in all length labels in the floor-plan + per-wall metrics + sidebar.
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js`:
+  - Wizard's unit toggle (already in Step 2) reads + writes the same `unit_preference` — confirm consistency.
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss`:
+  - Append `.sb-room-progress-*` styles for the 5-step checklist.
+  - Append `.sb-room-unit-toggle` styles for the header button.
+- Modify: `addons/southbrook_estimating_website/__manifest__.py`:
+  - Bump `version` `19.0.9.0.0` → `19.0.10.0.0`.
+
+### Phase 4.E — Smoke + review
+
+- Live smoke: open Room Setup tab on a room → see progress checklist; toggle unit → all mm labels switch to imperial AND floor plan labels also switch; complete all 5 steps → see celebratory state.
+- Cumulative review on the Phase 4 diff.
 
 ---
 
