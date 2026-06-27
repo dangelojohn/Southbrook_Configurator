@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.31.0",
+    "version": "19.0.4.32.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -129,6 +129,12 @@ southbrook_kitchen_workspace) without duplicating their models.
             # thumb safe-zone on portrait tablets. @media-gated at
             # 768px so desktop layout is unchanged.
             "southbrook_mrp_kitchen_workcenters/static/src/scss/tablet_workorder_mobile.scss",
+            # W075 (R8.12, 2026-06-27) — onbeforeunload guard so a
+            # swipe-back / OS gesture on a dirty WO form prompts
+            # before discarding the operator's in-progress edits.
+            # Reads the `o_form_dirty` DOM marker so it stays silent
+            # on clean / read-only forms and on non-form pages.
+            "southbrook_mrp_kitchen_workcenters/static/src/js/wo_dirty_guard.js",
         ],
     },
     "installable": True,
