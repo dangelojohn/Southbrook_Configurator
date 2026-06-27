@@ -18,3 +18,4 @@ from . import test_w054_my_time_visibility
 from . import test_w067_capacity_day
 from . import test_w034_raise_eco_from_wo
 from . import test_w040_report_problem_wizard
+from . import test_w080_tab_consolidation
