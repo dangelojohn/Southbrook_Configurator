@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.4.0.0",
+    "version": "19.0.5.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -89,6 +89,12 @@
             # portal_boot, so it must load first.
             "southbrook_estimating_website/static/src/js/kitchen_viewport.esm.js",
             "southbrook_estimating_website/static/src/js/portal_boot.esm.js",
+            # Phase 2.C (2026-06-27) — Room Setup wizard. Loaded AFTER
+            # portal_boot.esm.js so the rpcJsonCall export resolves; the
+            # XML template ships in the same bundle so OWL can find the
+            # registered templates at component instantiation.
+            "southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js",
+            "southbrook_estimating_website/static/src/xml/room_setup_wizard.xml",
             # Phase 2 commit 2 — OWL <KitchenPlanner/> boot for
             # /kitchen-planner customer route. Independent of
             # portal_boot.esm.js (each bootstrap finds its own

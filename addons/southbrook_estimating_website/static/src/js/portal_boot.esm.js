@@ -34,6 +34,7 @@
  */
 import { Component, mount, markup, onMounted, onWillUnmount, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
+import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
 
 // ----------------------------------------------------------------------
 // USD currency formatter — shared between OrderBuilder (probe) + the
@@ -55,7 +56,7 @@ function fmtUsd(value) {
 // service registry isn't available.
 // ----------------------------------------------------------------------
 
-async function rpcJsonCall(url, params = {}) {
+export async function rpcJsonCall(url, params = {}) {
     const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2476,6 +2477,15 @@ const TEMPLATE = xml`
                 Commit 13 lands the customer-mode toggle; commit 14
                 is the gate review with John.
             </p>
+
+            <!-- Phase 2.C — Room Setup wizard overlay. Renders only
+                 when the user clicks the "Set Up Room" CTA on the
+                 Room Setup tab. Self-mounts as a fullscreen modal
+                 above all OrderBuilder chrome. -->
+            <RoomSetupWizard t-if="state.ui.wizard === 'room_setup'"
+                             orderId="props.orderId"
+                             onClose="_closeRoomSetupWizard"
+                             onSubmitted="_onRoomSubmitted"/>
         </div>
     </div>
 `;
@@ -2494,6 +2504,7 @@ class OrderBuilder extends Component {
         FooterActions,
         KitchenViewport,
         CatalogPicker,
+        RoomSetupWizard,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -2581,6 +2592,11 @@ class OrderBuilder extends Component {
                 // family group. Cleared by the top-level Browse
                 // Catalog button so it shows everything.
                 catalog_zone_filter: null,
+                // Phase 2.C — fullscreen wizard slot. null when no
+                // wizard is open; "room_setup" when the Room Setup
+                // wizard is mounted. Future wizards (e.g. cabinet
+                // bulk-edit) can reuse this slot.
+                wizard: null,
             },
         });
         // Pre-bind handler methods to this. OWL's template compiler
@@ -3103,12 +3119,29 @@ class OrderBuilder extends Component {
         return Math.min(100, Math.round((used / len) * 100));
     }
 
+    // Phase 2.C — wired. Mounts the RoomSetupWizard overlay; the
+    // template renders it conditional on state.ui.wizard === "room_setup".
     _openRoomSetupWizard() {
-        // Wired in Phase 2.C. For now, a friendly stub.
-        alert("Room setup wizard arrives in Phase 2.C. " +
-              "For now, set up your room via the backend " +
-              "(Sales → Southbrook Estimating → Rooms).");
+        this.state.ui.wizard = "room_setup";
     }
+
+    // Phase 2.C — callbacks the RoomSetupWizard fires via its props.
+    // _closeRoomSetupWizard is the cancel / × path. _onRoomSubmitted
+    // receives the room dict returned by /room/create and caches it on
+    // state.room (so the Room Setup tab re-renders without a round-trip)
+    // then switches to the room_setup tab so the user lands on the
+    // summary card from Phase 2.B.
+    _closeRoomSetupWizard = () => {
+        this.state.ui.wizard = null;
+    };
+
+    _onRoomSubmitted = (room) => {
+        if (room) {
+            this.state.room = room;
+        }
+        this.state.ui.wizard = null;
+        this.state.ui.current_tab = "room_setup";
+    };
 
     async _refreshRoomState() {
         const orderId = this.props.orderId;
