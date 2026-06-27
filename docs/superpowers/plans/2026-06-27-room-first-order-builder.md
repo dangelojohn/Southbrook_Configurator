@@ -918,15 +918,59 @@ The biggest single chunk in Phase 3 — the interactive (initially read-only) to
 - Per-wall metrics panel: hover/click a wall → side panel shows `<wall_name>: <length_mm> total | <used_mm> used | <remaining_mm> left | <conflict_count> conflicts`.
 - Sidebar "Unplaced Cabinets": list of `lines.filter(l => !l.wall_id)`. Read-only in 3.B; 3.C adds the drag/assign affordance.
 
-### Phase 3.C — Layout interactivity (defer-able)
+### Phase 3.C — Layout interactivity (re-activated 2026-06-27)
 
-- Click cabinet rect → propagate `onLineSelected(line.id)` → OrderBuilder switches `current_tab` to `lines` and sets `selected_line_id`.
-- Click gap → modal "Add cabinet here?" with recommended widths (Phase 6.1 dependency — until that lands, the modal lists hardcoded standard widths 300/400/450/500/600/900).
-- Drag-to-reorder cabinets along a wall via mouse drag (viewport ≥ 768px) OR ← → arrow buttons (mobile). On drop, POST `/place-on-wall` (3.A endpoint).
-- Elevation view toggle: click a wall → side panel shows a side-on elevation SVG of that wall's cabinets at their Y heights (`base_run` at 0-900mm, `wall` at 1400-2100mm, `tall` floor-to-ceiling). New `<WallElevationSVG>` component.
-- Assign-from-sidebar: drag an unplaced cabinet to a wall (or click "Assign" → wall dropdown). POST `/place-on-wall`.
+Decomposed into 3 ship-independent steps. Drag (3.C.2b) and Elevation (3.C.2c) are explicitly out-of-scope for this batch; user can re-request after using the tap surface.
 
-3.C ships ONLY after 3.B is verified live. Re-plan post-3.B since interactivity surfaces emerge from rendering.
+#### Phase 3.C.1 — Endpoint hardening (server-side)
+
+Two SHOULD-FIX items from the Phase 3 review become user-reachable through 3.C:
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/controllers/room_api.py` — patch `southbrook_api_line_place_on_wall` (added in 3.A):
+  - **Capture `line.wall_id` BEFORE the write.** After the write, invalidate BOTH the new wall AND the previous wall so `used_mm`/`has_conflicts` reflect the move correctly on both walls. Add the previous wall's metrics to the response under `previous_wall: {id, used_mm, remaining_mm, has_conflicts}` (null when no previous).
+  - **Add off-the-end overflow check.** When `wall_id` is non-null and `position_from_left_mm + line.sb_width_mm > wall.length_mm`, return `{"error": "out_of_bounds", "detail": "Cabinet extends past wall edge by Nmm"}` BEFORE the write. Skip on `sb_width_mm == 0` (defensive — width is computed and could be zero for malformed seed data).
+- Modify: `addons/southbrook_estimating_website/tests/test_room_api.py` — add 2 tests:
+  - `test_place_returns_previous_wall_metrics` — place line on wall A, then re-place on wall B → response includes both `wall` (B) and `previous_wall` (A) with fresh metrics.
+  - `test_place_rejects_out_of_bounds` — wall length 1000mm, line width 600mm, position 500mm → 600+500=1100 > 1000 → expect `out_of_bounds`.
+- Modify: `__manifest__.py` — bump version `19.0.7.0.0` → `19.0.8.0.0`.
+
+#### Phase 3.C.2a — Tap interactivity (this batch)
+
+The "click and pick" layer. Three click affordances + the modals they invoke.
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js`:
+  - `<FloorPlanSVG>` — wire `<polygon>` per cabinet to `onclick="(e) => this.props.onCabinetClick(line.id, e)"`. Same for gap rects → `onGapClick(wall_id, gap_mm, position_from_left_mm)`. Walls themselves don't get a click handler in this batch (elevation is 3.C.2c).
+  - `RoomLayoutTab` — accept new props `onCabinetClick`, `onGapClick`, `onAssignFromSidebar`. The sidebar's unplaced cabinet list gets an "Assign…" button per row.
+  - New child component `AssignToWallModal` — renders inside the tab when `state.assigning?.lineId` is set. Body: dropdown of wall_id options + position_from_left_mm input + Cancel + Assign buttons. On submit → POST `/place-on-wall` → on success: `onAssigned(line, wall, previous_wall)`.
+  - New child component `AddCabinetAtGapModal` — opens when `state.gapPicker` is set. Body: list of standard widths (300/400/450/500/600/900) intersected with cabinets ≤ gap_mm — each clickable. Each entry POSTs `/add-line` (the existing endpoint from main.py:1223) with `product_tmpl_id` of a default base cabinet template at the chosen width. Actually — `/add-line` doesn't take width, it just creates a default-variant line of a template. For 3.C.2a, the gap-modal shows the gap and asks the user to "Add a cabinet from the catalog and assign it here" rather than picking width — cleaner one-step: "Add cabinet to Wall A at position 1000mm" → opens the catalog modal (existing UX) and the user picks a template; on add the new line is then auto-assigned to the wall via a follow-up `/place-on-wall` call. Save the pending placement in `state.pendingGapPlacement` so the line-added callback can apply it.
+- Modify: `addons/southbrook_estimating_website/static/src/xml/room_layout.xml` — add the two new component templates + button bindings.
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss` — append modal styles (sub-prefix `sb-room-plan-modal-*`).
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js`:
+  - Pass new callbacks down to `<RoomLayoutTab>`: `onCabinetClick="_onPlanCabinetClick"`, `onGapClick="_onPlanGapClick"`, `onAssignFromSidebar="_onPlanAssignClick"`.
+  - Add OrderBuilder methods:
+    - `_onPlanCabinetClick(lineId)` → `this.state.ui.current_tab = "lines"; this.state.ui.selected_line_id = lineId;` (the existing Order Lines tab already honors `selected_line_id` to highlight + scroll into view).
+    - `_onPlanGapClick(wallId, gapMm, position)` → opens the catalog modal with a `state.pendingGapPlacement = {wallId, position}` flag. On line added (existing onLineSaved hook), if pendingGapPlacement is set, POST `/place-on-wall` for the new line + clear the flag.
+    - `_onPlanAssignClick(lineId)` → `state.assigning = {lineId}` triggering the AssignToWallModal.
+  - Hook the modal callbacks to refresh `state.room` after successful POSTs.
+- Modify: `__manifest__.py` — bump `19.0.8.0.0` → `19.0.9.0.0`.
+
+**No new endpoints.** Reuses `/place-on-wall` (3.A) + `/add-line` (existing main.py).
+
+#### Phase 3.C.2b — Drag + arrow (out of this batch)
+
+Deferred. User can re-request — the data layer (`/place-on-wall`) and OWL component tree are ready.
+
+#### Phase 3.C.2c — Elevation view toggle (out of this batch)
+
+Deferred. Will need a new `<WallElevationSVG>` component + a "Floor ↔ Elevation" toggle button + per-wall state.
+
+#### Phase 3.C.E — Smoke + review
+
+After 3.C.1 + 3.C.2a land + deploy:
+- Live smoke: click a cabinet → tab switches to Order Lines with that line highlighted. Click a gap → catalog modal opens. Add a cabinet → it appears auto-placed at the gap position. Click "Assign…" on an unplaced cabinet → modal opens, pick wall + position → cabinet appears in Layout.
+- Cumulative review on the 3.C diff.
 
 ### Phase 3.D — Smart inline warnings on Order Lines tab (independent of 3.B)
 
