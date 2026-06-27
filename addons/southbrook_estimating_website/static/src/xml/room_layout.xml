@@ -2,6 +2,7 @@
 <!--
     Phase 3.B — Room Layout tab templates (2026-06-27).
     Phase 3.C.2a — tap interactivity layer (2026-06-27).
+    Phase 3.C.2c — Floor ↔ Elevation view toggle (2026-06-27).
 
     Components mounted into web.assets_frontend via the addon manifest.
     OWL tokenizer rules followed throughout:
@@ -15,7 +16,7 @@
       - gap rect click        → onGapClick(wallId, gapMm, positionMm)
       - sidebar Assign... btn → onAssignFromSidebar(lineId)
 
-    Drag (3.C.2b) and the elevation toggle (3.C.2c) remain deferred.
+    Drag layer added 3.C.2b; elevation toggle added 3.C.2c.
 -->
 <templates xml:space="preserve">
 
@@ -65,12 +66,59 @@
                  class="sb-room-plan-layout">
 
                 <div class="sb-room-plan-canvas">
-                    <FloorPlanSVG room="props.room"
-                                  lines="props.lines"
-                                  unitPreference="props.unitPreference || 'mm'"
-                                  onCabinetClick="props.onCabinetClick"
-                                  onGapClick="props.onGapClick"
-                                  onCabinetDragEnd="props.onCabinetDragEnd"/>
+
+                    <!-- Phase 3.C.2c — view toggle + wall picker.
+                         "Floor" stays the default; switching to
+                         "Elevation" auto-picks the first wall (handled
+                         in _setViewMode). The wall picker appears only
+                         in elevation mode. -->
+                    <div class="sb-room-plan-toolbar" t-if="props.room">
+                        <div class="sb-room-plan-view-toggle" role="tablist">
+                            <button type="button"
+                                    class="sb-room-plan-view-toggle-opt"
+                                    t-att-class="state.viewMode === 'floor' ? 'sb-room-plan-view-toggle-opt--active' : ''"
+                                    t-on-click="() => this._setViewMode('floor')">
+                                Floor
+                            </button>
+                            <button type="button"
+                                    class="sb-room-plan-view-toggle-opt"
+                                    t-att-class="state.viewMode === 'elevation' ? 'sb-room-plan-view-toggle-opt--active' : ''"
+                                    t-on-click="() => this._setViewMode('elevation')">
+                                Elevation
+                            </button>
+                        </div>
+                        <div class="sb-room-plan-wall-picker"
+                             t-if="state.viewMode === 'elevation'">
+                            <label>Wall:</label>
+                            <select t-on-change="(ev) => this._setSelectedWall(parseInt(ev.target.value, 10))">
+                                <t t-foreach="props.room.walls"
+                                   t-as="w"
+                                   t-key="w.id">
+                                    <option t-att-value="w.id"
+                                            t-att-selected="(_selectedWall &amp;&amp; _selectedWall.id === w.id) ? 'selected' : null">
+                                        <t t-esc="w.name"/>
+                                        —
+                                        <t t-esc="_humanLen(w.length_mm)"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <t t-if="state.viewMode === 'floor'">
+                        <FloorPlanSVG room="props.room"
+                                      lines="props.lines"
+                                      unitPreference="props.unitPreference || 'mm'"
+                                      onCabinetClick="props.onCabinetClick"
+                                      onGapClick="props.onGapClick"
+                                      onCabinetDragEnd="props.onCabinetDragEnd"/>
+                    </t>
+                    <t t-if="state.viewMode === 'elevation'">
+                        <WallElevationSVG room="props.room"
+                                          wall="_selectedWall"
+                                          lines="props.lines"
+                                          unitPreference="props.unitPreference || 'mm'"/>
+                    </t>
                 </div>
 
                 <aside class="sb-room-plan-sidebar">
@@ -475,6 +523,146 @@
                 </footer>
             </div>
         </div>
+    </t>
+
+    <!-- ============================================================
+         WallElevationSVG — Phase 3.C.2c.
+
+         Side-on cross-section of one wall. Read-only — no click /
+         drag handlers (those stay on the floor plan).
+
+         Layers, painter's order (back → front):
+           1. Background rect (paper)
+           2. Floor / ceiling / worktop reference lines
+           3. Constraint cutouts (window/door rect, outlet badge)
+           4. Cabinet front-face rectangles (zone-coloured)
+           5. Cabinet labels + Y-axis tick labels
+
+         Empty cases:
+           - props.wall null  → "Pick a wall" placeholder
+           - no cabinets       → outline + constraints only (no skip)
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.WallElevationSVG">
+        <svg class="sb-room-plan-svg sb-room-plan-elev-svg"
+             t-att-viewBox="_viewBox"
+             xmlns="http://www.w3.org/2000/svg"
+             role="img"
+             aria-label="Wall elevation">
+
+            <t t-if="!props.wall">
+                <rect x="0" y="0" width="1024" height="600"
+                      fill="#FAF7EE"/>
+                <text x="512" y="300"
+                      text-anchor="middle"
+                      dominant-baseline="central"
+                      class="sb-room-plan-elev-axis-label">
+                    Pick a wall
+                </text>
+            </t>
+
+            <t t-else="">
+                <!-- Background (linen). -->
+                <rect x="0" y="0"
+                      width="1024" height="600"
+                      fill="#FAF7EE"/>
+
+                <!-- Floor line (solid walnut). -->
+                <line x1="0"
+                      t-att-y1="_floorY"
+                      x2="1024"
+                      t-att-y2="_floorY"
+                      stroke="#5B4A3A"
+                      stroke-width="2"/>
+
+                <!-- Ceiling line (solid walnut) — only when room has
+                     a positive ceiling height. -->
+                <line t-if="props.room.ceiling_height_mm"
+                      x1="0"
+                      t-att-y1="_ceilingY"
+                      x2="1024"
+                      t-att-y2="_ceilingY"
+                      stroke="#5B4A3A"
+                      stroke-width="2"/>
+
+                <!-- Worktop reference (dashed). -->
+                <line x1="0"
+                      t-att-y1="_worktopY"
+                      x2="1024"
+                      t-att-y2="_worktopY"
+                      stroke="#776B5C"
+                      stroke-width="1"
+                      stroke-dasharray="4 3"/>
+
+                <!-- Wall span label (right of top-right corner). -->
+                <text t-if="_wallEnds"
+                      t-att-x="_wallEnds.rightX + 6"
+                      t-att-y="_ceilingY - 4"
+                      class="sb-room-plan-elev-axis-label"
+                      text-anchor="start">
+                    <t t-esc="_wallEnds.label"/>
+                </text>
+
+                <!-- Constraint rectangles + icon badges. -->
+                <g class="sb-room-plan-elev-constraints-g">
+                    <t t-foreach="_constraintRects"
+                       t-as="c"
+                       t-key="c.key">
+                        <rect class="sb-room-plan-constraint"
+                              t-att-class="'sb-room-plan-constraint--' + c.type"
+                              t-att-x="c.x"
+                              t-att-y="c.y"
+                              t-att-width="c.w"
+                              t-att-height="c.h"/>
+                        <text t-if="!c.isIcon"
+                              class="sb-room-plan-constraint-label"
+                              t-att-x="c.cx"
+                              t-att-y="c.cy"
+                              text-anchor="middle"
+                              dominant-baseline="central">
+                            <t t-esc="c.label"/>
+                        </text>
+                    </t>
+                </g>
+
+                <!-- Cabinet front-face rectangles. -->
+                <g class="sb-room-plan-elev-cabs-g">
+                    <t t-foreach="_cabinetRects"
+                       t-as="cab"
+                       t-key="cab.key">
+                        <rect class="sb-room-plan-elev-cabinet"
+                              t-att-class="cab.isConflict
+                                            ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
+                                            : cab.zoneClass"
+                              t-att-x="cab.x"
+                              t-att-y="cab.y"
+                              t-att-width="cab.w"
+                              t-att-height="cab.h"/>
+                        <text t-if="cab.showLabel"
+                              class="sb-room-plan-cab-label"
+                              t-att-x="cab.cx"
+                              t-att-y="cab.cy"
+                              text-anchor="middle"
+                              dominant-baseline="central">
+                            <t t-esc="cab.label"/>
+                        </text>
+                    </t>
+                </g>
+
+                <!-- Y-axis labels — floor / worktop / ceiling. -->
+                <g class="sb-room-plan-elev-axis-g">
+                    <text t-foreach="_axisLabels"
+                          t-as="ax"
+                          t-key="ax.key"
+                          class="sb-room-plan-elev-axis-label"
+                          t-att-x="ax.x"
+                          t-att-y="ax.y"
+                          text-anchor="end"
+                          dominant-baseline="central">
+                        <t t-esc="ax.text"/>
+                    </text>
+                </g>
+            </t>
+        </svg>
     </t>
 
 </templates>

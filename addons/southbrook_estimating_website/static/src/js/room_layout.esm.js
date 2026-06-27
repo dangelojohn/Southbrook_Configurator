@@ -4,6 +4,7 @@
  *
  * Phase 3.B — Room Layout tab (2026-06-27).
  * Phase 3.C.2a — tap interactivity layer (2026-06-27).
+ * Phase 3.C.2c — Floor ↔ Elevation view toggle (2026-06-27).
  *
  * Components:
  *
@@ -13,6 +14,9 @@
  *                       no lines). 3.C.2a adds three click affordances:
  *                       cabinet poly → highlight line, gap rect → catalog
  *                       w/ auto-place, unplaced "Assign..." → modal.
+ *                       3.C.2c adds a "View: [Floor | Elevation]" toggle
+ *                       above the canvas; in elevation mode a single
+ *                       wall is rendered side-on (read-only).
  *
  *   FloorPlanSVG      — pure render. Takes room + lines, emits one big
  *                       inline <svg> with: room outline (per-wall lines),
@@ -20,11 +24,16 @@
  *                       gap markers, and wall name labels. 3.C.2a wires
  *                       click handlers on cabinet polygons + gap rects.
  *
+ *   WallElevationSVG  — pure render. Phase 3.C.2c. Side-on cross-section
+ *                       of a single wall: cabinets as front-face rectangles
+ *                       stacked by zone (base_run 0-900, wall 1400-2100,
+ *                       tall 0-2100, others 0-900), floor / ceiling /
+ *                       worktop reference lines, constraint cutouts.
+ *                       Read-only — no drag/click handlers.
+ *
  *   AssignToWallModal — overlay opened when the user clicks "Assign..."
  *                       on an unplaced cabinet. Wall dropdown + position
  *                       input + Cancel/Assign. Parent owns the RPC.
- *
- * 3.C.2b (drag) and 3.C.2c (elevation view) remain deferred.
  *
  * Geometry sourced from the shared room_geometry.esm.js helper so the
  * wizard preview (Phase 2.C RoomOutlinePreview) and this floor plan
@@ -89,6 +98,36 @@ const DEPTH_MM_BY_ZONE = {
     accessory: 300,
     other:     580,
 };
+
+// ----------------------------------------------------------------------
+// Phase 3.C.2c — elevation Y-range per zone, in mm above floor.
+//
+// Returns [y0_mm, y1_mm] — the bottom and top of the cabinet's front
+// face when viewed from the side. Mirror the standard cabinet stacking
+// used in the BOM rollup:
+//   - base_run / island / accessory / other → sit on the floor, 900mm
+//     to the worktop underside.
+//   - wall → float at 1400mm above floor (worktop + 4" reveal +
+//     backsplash height), 700mm tall → top at 2100mm.
+//   - tall → floor-to-ceiling pantry / oven tower, 0 → 2100mm.
+//
+// Anything taller than this clamps via `maxHeight = max(ceiling, 2100)`
+// in WallElevationSVG._transform so the cabinet still fits the view.
+// ----------------------------------------------------------------------
+
+const ELEVATION_BY_ZONE = {
+    base_run:  [0,    900],
+    wall:      [1400, 2100],
+    tall:      [0,    2100],
+    island:    [0,    900],
+    accessory: [0,    900],
+    other:     [0,    900],
+};
+
+function _elevationRangeFor(line) {
+    const z = (line && line.zone) || "other";
+    return ELEVATION_BY_ZONE[z] || ELEVATION_BY_ZONE.other;
+}
 
 // Zone → CSS variable lookup. Variables themselves resolve at paint
 // time via the design token cascade in portal_root.scss. The CSS class
@@ -834,13 +873,302 @@ class FloorPlanSVG extends Component {
 }
 
 // ----------------------------------------------------------------------
+// WallElevationSVG — Phase 3.C.2c.
+//
+// Pure render. Side-on cross-section of a SINGLE wall picked by the
+// parent's selectedWallId. No interactivity — elevation is reference-
+// only; placement edits stay on the floor plan.
+//
+// Coordinate system:
+//   - X mm = position_from_left_mm along the wall (left → right as the
+//     user faces the wall from inside the room).
+//   - Y mm = height above floor (0 = floor, ceiling_height_mm = top).
+//     SVG Y grows DOWNWARD, so _projY flips on the way out.
+//
+// Layers, painter's order (back → front):
+//   1. Background rect (paper)
+//   2. Floor / ceiling / worktop reference lines
+//   3. Constraint cutouts (window/door rectangles, outlet/post icons)
+//   4. Cabinet front-face rectangles (zone-coloured)
+//   5. Cabinet labels + axis labels (floor / worktop / ceiling)
+//
+// Empty cases:
+//   - props.wall null     → render "Pick a wall" placeholder.
+//   - No cabinets on wall → render outline + constraints only (no skip).
+// ----------------------------------------------------------------------
+
+const ELEV_VIEW_W = 1024;
+const ELEV_VIEW_H = 600;
+const ELEV_PAD = 40;
+const ELEV_INNER_W = ELEV_VIEW_W - 2 * ELEV_PAD;   // 944
+const ELEV_INNER_H = ELEV_VIEW_H - 2 * ELEV_PAD;   // 520
+
+class WallElevationSVG extends Component {
+    static template = "southbrook_estimating_website.WallElevationSVG";
+    static props = {
+        room: Object,
+        wall: { type: Object, optional: true },
+        lines: Array,
+        unitPreference: { type: String, optional: true },
+    };
+
+    // Phase 4 length formatter — honours props.unitPreference.
+    _humanLen(mm) {
+        return _humanLenWithPref(mm, this.props.unitPreference || "mm");
+    }
+
+    get _viewBox() {
+        return "0 0 " + ELEV_VIEW_W + " " + ELEV_VIEW_H;
+    }
+
+    // Effective ceiling: max of the room's actual ceiling and 2100mm so
+    // tall (floor-to-ceiling) cabinets always fit when the room is short.
+    get _maxHeight() {
+        const room = this.props.room || {};
+        const ceil = Number(room.ceiling_height_mm) || 0;
+        return Math.max(ceil, 2100);
+    }
+
+    // Fit (wall length × maxHeight) into the 944×520 inner area with a
+    // single uniform scale. Offsets centre the bbox.
+    get _transform() {
+        const wall = this.props.wall;
+        if (!wall) {
+            return { scale: 1, offX: ELEV_PAD, offY: ELEV_PAD };
+        }
+        const wallLen = Math.max(1, Number(wall.length_mm) || 1);
+        const maxH = this._maxHeight;
+        const scale = Math.min(ELEV_INNER_W / wallLen, ELEV_INNER_H / maxH);
+        const offX = ELEV_PAD + (ELEV_INNER_W - wallLen * scale) / 2;
+        const offY = ELEV_PAD + (ELEV_INNER_H - maxH * scale) / 2;
+        return { scale, offX, offY };
+    }
+
+    _projX(mm) {
+        const t = this._transform;
+        return t.offX + (Number(mm) || 0) * t.scale;
+    }
+
+    // SVG Y grows downward; mm above floor grows upward. Subtract from
+    // maxHeight so floor (0 mm) lands at the BOTTOM of the inner area.
+    _projY(mm) {
+        const t = this._transform;
+        return t.offY + (this._maxHeight - (Number(mm) || 0)) * t.scale;
+    }
+
+    get _floorY() {
+        return this._projY(0);
+    }
+
+    get _ceilingY() {
+        const room = this.props.room || {};
+        return this._projY(Number(room.ceiling_height_mm) || 0);
+    }
+
+    get _worktopY() {
+        return this._projY(900);
+    }
+
+    // Cabinets placed on the selected wall, sorted left → right.
+    get _cabinetsForWall() {
+        const wall = this.props.wall;
+        if (!wall) return [];
+        const lines = this.props.lines || [];
+        return lines
+            .filter((l) => l.wall_id === wall.id)
+            .sort(
+                (a, b) =>
+                    (a.position_from_left_mm || 0)
+                    - (b.position_from_left_mm || 0),
+            );
+    }
+
+    // Cabinet rectangles for the template iteration.
+    get _cabinetRects() {
+        const wall = this.props.wall;
+        if (!wall) return [];
+        const out = [];
+        for (const line of this._cabinetsForWall) {
+            const [y0mm, y1mm] = _elevationRangeFor(line);
+            const pos = line.position_from_left_mm || 0;
+            const widthMm = line.sb_width_mm || 600;
+            const x = this._projX(pos);
+            const w = Math.max(1, widthMm * this._transform.scale);
+            // y is the TOP of the rect in SVG space (y1mm in physical mm).
+            const y = this._projY(y1mm);
+            const h = Math.max(1, (y1mm - y0mm) * this._transform.scale);
+            out.push({
+                key: "elev-cab-" + line.id,
+                x,
+                y,
+                w,
+                h,
+                cx: x + w / 2,
+                cy: y + h / 2,
+                label: this._shortLabel(line.name || ""),
+                zone: line.zone || "other",
+                zoneClass: ZONE_CLASS(line.zone),
+                isConflict: !!wall.has_conflicts,
+                showLabel: w >= MIN_LABEL_VBOX_PX,
+            });
+        }
+        return out;
+    }
+
+    // Constraint rectangles + icon-only fallbacks. Power outlets and
+    // structural posts have no height contribution in the source data —
+    // render them as a small badge floating just above the floor line
+    // rather than dropping them entirely.
+    get _constraintRects() {
+        const wall = this.props.wall;
+        if (!wall) return [];
+        const constraints = wall.constraints || [];
+        const out = [];
+        for (const c of constraints) {
+            const type = c.constraint_type || "other";
+            const posMm = c.distance_from_left_mm || 0;
+            const widthMm = c.width_mm || 100;
+            // Outlet / structural post — icon-only badge at sill height
+            // (default 1100mm — eye-level for outlets, neutral for posts).
+            if (type === "power_outlet" || type === "structural_post") {
+                const yMm = c.height_from_floor_mm || 1100;
+                const x = this._projX(posMm);
+                const y = this._projY(yMm);
+                out.push({
+                    key: "elev-con-" + c.id,
+                    type: type,
+                    isIcon: true,
+                    x,
+                    y,
+                    w: 14,
+                    h: 14,
+                    cx: x + 7,
+                    cy: y + 7,
+                    label: this._humanConstraint(type),
+                    showLabel: false,
+                });
+                continue;
+            }
+            // Sized cutout (window / door / appliance). Fall back to
+            // sensible default heights for entries that lack dimensions.
+            let heightMm = Number(c.height_mm) || 0;
+            let fromFloorMm = Number(c.height_from_floor_mm);
+            if (!Number.isFinite(fromFloorMm)) fromFloorMm = 0;
+            if (heightMm <= 0) {
+                // Type-aware default heights — kept conservative; the
+                // user can edit the constraint to set real dimensions.
+                if (type === "door") {
+                    heightMm = 2030;
+                    fromFloorMm = 0;
+                } else if (type === "window") {
+                    heightMm = 1200;
+                    if (!fromFloorMm) fromFloorMm = 900;
+                } else {
+                    heightMm = 600;
+                }
+            }
+            const y1mm = fromFloorMm + heightMm;
+            const x = this._projX(posMm);
+            const w = Math.max(1, widthMm * this._transform.scale);
+            const y = this._projY(y1mm);
+            const h = Math.max(1, heightMm * this._transform.scale);
+            out.push({
+                key: "elev-con-" + c.id,
+                type: type,
+                isIcon: false,
+                x,
+                y,
+                w,
+                h,
+                cx: x + w / 2,
+                cy: y + h / 2,
+                label: this._humanConstraint(type),
+                showLabel: w >= MIN_LABEL_VBOX_PX,
+            });
+        }
+        return out;
+    }
+
+    // Y-axis tick labels — floor (0), worktop (900), ceiling.
+    get _axisLabels() {
+        const room = this.props.room || {};
+        const ceil = Number(room.ceiling_height_mm) || 0;
+        const t = this._transform;
+        const x = t.offX - 6;
+        const out = [
+            {
+                key: "ax-floor",
+                x: x,
+                y: this._floorY,
+                text: this._humanLen(0) + " · floor",
+            },
+            {
+                key: "ax-worktop",
+                x: x,
+                y: this._worktopY,
+                text: this._humanLen(900) + " · worktop",
+            },
+        ];
+        if (ceil > 0) {
+            out.push({
+                key: "ax-ceil",
+                x: x,
+                y: this._ceilingY,
+                text: this._humanLen(ceil) + " · ceiling",
+            });
+        }
+        return out;
+    }
+
+    // Right-edge of the wall vertical guide — mm at left=0 + mm at
+    // right=wall_length so the user can read the wall span visually.
+    get _wallEnds() {
+        const wall = this.props.wall;
+        if (!wall) return null;
+        const len = Number(wall.length_mm) || 0;
+        return {
+            leftX: this._projX(0),
+            rightX: this._projX(len),
+            topY: this._ceilingY,
+            bottomY: this._floorY,
+            label: this._humanLen(len),
+        };
+    }
+
+    // Mirror FloorPlanSVG._humanConstraint — kept inline so this
+    // component stays a pure leaf (avoid cross-class import).
+    _humanConstraint(code) {
+        return {
+            window: "Window",
+            door: "Door",
+            sink: "Sink",
+            cooktop: "Cooktop",
+            oven: "Oven",
+            dishwasher: "Dishwasher",
+            rangehood: "Rangehood",
+            fridge_space: "Fridge",
+            power_outlet: "Outlet",
+            structural_post: "Post",
+            other: "Other",
+        }[code] || code;
+    }
+
+    _shortLabel(name) {
+        if (!name) return "";
+        const trimmed = name.trim();
+        if (trimmed.length <= 10) return trimmed;
+        return trimmed.slice(0, 10);
+    }
+}
+
+// ----------------------------------------------------------------------
 // RoomLayoutTab — parent. Hosts the SVG + sidebar + per-wall metrics.
 // Owns the empty-state messaging.
 // ----------------------------------------------------------------------
 
 export class RoomLayoutTab extends Component {
     static template = "southbrook_estimating_website.RoomLayoutTab";
-    static components = { FloorPlanSVG };
+    static components = { FloorPlanSVG, WallElevationSVG };
     static props = {
         room: { type: [Object, { value: null }], optional: true },
         lines: { type: Array, optional: true },
@@ -862,6 +1190,40 @@ export class RoomLayoutTab extends Component {
         // segmented toggle; FloorPlanSVG receives it via passthrough.
         unitPreference: { type: String, optional: true },
     };
+
+    // Phase 3.C.2c — view-mode + selected-wall state. Floor is the
+    // default; elevation auto-picks the first wall on first switch so
+    // the toggle "just works" without an extra click.
+    setup() {
+        this.state = useState({
+            viewMode: "floor",
+            selectedWallId: null,
+        });
+    }
+
+    _setViewMode(mode) {
+        this.state.viewMode = mode;
+        if (mode === "elevation" && !this.state.selectedWallId) {
+            const walls = (this.props.room && this.props.room.walls) || [];
+            if (walls.length > 0) {
+                this.state.selectedWallId = walls[0].id;
+            }
+        }
+    }
+
+    _setSelectedWall(wallId) {
+        this.state.selectedWallId = wallId;
+    }
+
+    // The wall record the elevation view is currently rendering. Falls
+    // back to the first wall when the stored selectedWallId is null or
+    // doesn't match any wall on the current room (e.g. wall deleted).
+    get _selectedWall() {
+        const walls = (this.props.room && this.props.room.walls) || [];
+        if (walls.length === 0) return null;
+        const match = walls.find((w) => w.id === this.state.selectedWallId);
+        return match || walls[0];
+    }
 
     // Phase 3.C.2a — sidebar Assign... button handler. No-op when the
     // parent didn't wire a callback (defensive — every production

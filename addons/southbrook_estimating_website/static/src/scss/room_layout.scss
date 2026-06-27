@@ -1943,3 +1943,124 @@
     color: var(--sb-ink-dim);
     font-weight: 400;
 }
+
+// ---------------------------------------------------------------------
+// Phase 3.C.2c — Floor ↔ Elevation view toggle.
+//
+// Toolbar above the floor-plan canvas with a segmented two-button row
+// (Floor | Elevation) + a wall picker (only shown when the elevation
+// view is active). Toolbar styling mirrors .sb-room-unit-toggle (Phase
+// 4) for visual cohesion.
+// ---------------------------------------------------------------------
+
+.sb-room-plan-toolbar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--sb-paper);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius);
+    font-family: var(--sb-font-sans);
+}
+
+.sb-room-plan-view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--sb-rule-d);
+    border-radius: var(--sb-radius-sm);
+    overflow: hidden;
+}
+
+.sb-room-plan-view-toggle-opt {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    background: var(--sb-paper);
+    color: var(--sb-walnut-d);
+    padding: 0.3rem 0.85rem;
+    font-family: var(--sb-font-display);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+
+    & + .sb-room-plan-view-toggle-opt {
+        border-left: 1px solid var(--sb-rule-d);
+    }
+
+    &:hover:not(.sb-room-plan-view-toggle-opt--active) {
+        background: var(--sb-linen);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+        position: relative;
+        z-index: 1;
+    }
+
+    &--active {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+        font-weight: 600;
+    }
+}
+
+.sb-room-plan-wall-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--sb-ink-dim);
+
+    label {
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.72rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    select {
+        padding: 0.3rem 0.55rem;
+        background: var(--sb-paper);
+        color: var(--sb-ink);
+        border: 1px solid var(--sb-rule-d);
+        border-radius: var(--sb-radius-sm);
+        font-family: var(--sb-font-sans);
+        font-size: 0.85rem;
+
+        &:focus-visible {
+            outline: 2px solid var(--sb-sky);
+            outline-offset: 0;
+            border-color: var(--sb-sky);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// Elevation SVG — side-on cross-section. Reuses the zone-coloured
+// .sb-room-plan-cab--<zone> palette from the floor plan so the two
+// views read as the same surface.
+// ---------------------------------------------------------------------
+
+.sb-room-plan-elev-svg {
+    width: 100%;
+    height: 100%;
+    min-height: 460px;
+    display: block;
+}
+
+.sb-room-plan-elev-cabinet {
+    // Defaults — zone-specific fills are applied via the shared
+    // .sb-room-plan-cab--<zone> classes from Phase 3.B above.
+    stroke: var(--sb-walnut-d);
+    stroke-width: 1.5;
+}
+
+.sb-room-plan-elev-axis-label {
+    font-family: var(--sb-font-mono);
+    font-size: 0.75rem;
+    fill: var(--sb-ink-dim);
+}
