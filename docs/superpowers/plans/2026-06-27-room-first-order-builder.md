@@ -958,9 +958,48 @@ The "click and pick" layer. Three click affordances + the modals they invoke.
 
 **No new endpoints.** Reuses `/place-on-wall` (3.A) + `/add-line` (existing main.py).
 
-#### Phase 3.C.2b — Drag + arrow (out of this batch)
+#### Phase 3.C.2b — Drag + arrow buttons (re-activated)
 
-Deferred. User can re-request — the data layer (`/place-on-wall`) and OWL component tree are ready.
+Drag a placed cabinet along its current wall to fine-tune `position_from_left_mm`. No cross-wall drag in v1 — that's "remove + assign" via the existing AssignToWallModal. Touch devices get ← → arrow buttons as the primary affordance instead of drag (drag on small touch screens is hard).
+
+**Files:**
+- Modify: `addons/southbrook_estimating_website/static/src/js/room_layout.esm.js`:
+  - Add `dragState` to `FloorPlanSVG` via `useState({lineId: null, originalMm: null, currentMm: null, downXY: null, moved: false})`.
+  - Wire pointer events on each cabinet `<polygon>`:
+    - `pointerdown` → capture line, original position, cursor XY
+    - `pointermove` (registered globally via `useExternalListener` on the document) → if `dragState.lineId` set AND movement > 5px threshold → set `moved=true` + project cursor back to wall mm coordinates via `_pxToMmAlongWall(line, ev.clientX, ev.clientY)` + update `currentMm`
+    - `pointerup` → if `moved`, call `props.onCabinetDragEnd(lineId, snappedMm)`; if not moved, behave as a click (call existing `onCabinetClick`)
+  - Add coordinate-transform helper `_pxToMmAlongWall(line, screenX, screenY)`:
+    - Get the SVG element's screen CTM (`svg.getScreenCTM().inverse()`)
+    - Multiply (screenX, screenY) by inverse to get viewBox coords
+    - Reverse the existing `_transform` (subtract offset, divide by scale) to get raw mm coords
+    - Find line's wall segment; project mm cursor onto the wall's direction unit vector
+    - Returns the projected `position_from_left_mm` clamped to `[0, wall.length_mm - line.sb_width_mm]`
+  - Snap-to-25mm on drop: `Math.round(rawMm / 25) * 25`.
+  - During drag (when `dragState.lineId === line.id`), render the cabinet polygon at `currentMm` (ghost preview) with reduced opacity + render the ORIGINAL position polygon at very low opacity as the "starting point" reference.
+- `RoomLayoutTab`:
+  - Accept new prop `onCabinetDragEnd(lineId, positionMm)`.
+  - Sidebar already has placed cabinets shown in metrics — add small ← → buttons inside the FloorPlanSVG itself, OR add them to a per-cabinet hover-popup. For v1 keep it simple: add ← → buttons that ONLY appear on `@media (pointer: coarse)` (touch devices), positioned above each cabinet polygon. Click ← → shifts by 25mm via the same `onCabinetDragEnd` callback.
+- Modify: `addons/southbrook_estimating_website/static/src/xml/room_layout.xml`:
+  - Wire `t-on-pointerdown` on each cabinet polygon.
+  - Add hover-overlay group with ← → buttons (conditional on coarse-pointer media).
+- Modify: `addons/southbrook_estimating_website/static/src/scss/room_layout.scss`:
+  - `.sb-room-plan-cab--dragging` opacity 0.4 + dashed outline.
+  - `.sb-room-plan-cab--drag-ghost` opacity 0.15 (original position marker).
+  - `@media (pointer: coarse)` block exposing arrow buttons.
+- Modify: `addons/southbrook_estimating_website/static/src/js/portal_boot.esm.js`:
+  - Add OrderBuilder method `_onPlanCabinetDragEnd(lineId, positionMm)`:
+    - POST `/place-on-wall` (line's current wall_id + new positionMm)
+    - On success: refresh `state.room` + line state
+    - On `out_of_bounds` error: alert with detail message (the snap should already prevent this, but keep as defensive)
+  - Pass `onCabinetDragEnd="_onPlanCabinetDragEnd"` down to `<RoomLayoutTab>`.
+- Modify: `addons/southbrook_estimating_website/__manifest__.py` — bump `version` `19.0.10.0.0` → `19.0.11.0.0`.
+
+**Click-vs-drag threshold**: track `downXY` on pointerdown; on pointermove compute `Math.hypot(clientX - downXY.x, clientY - downXY.y) > 5`. Below threshold = click (fires `onCabinetClick`); above = drag (suppresses click, fires `onCabinetDragEnd` on pointerup).
+
+**Cross-wall constraint**: during drag we only update `position_from_left_mm` — wall_id stays the same. Cross-wall placement requires removing the cabinet and re-assigning via the sidebar Assign… button (existing flow).
+
+**Skip-in-this-batch**: drag the unplaced sidebar cabinet INTO the floor plan to assign (the brief's "drag from sidebar" option). That's drag-and-drop across a component boundary — harder. The existing "Assign…" button covers it for now.
 
 #### Phase 3.C.2c — Elevation view toggle (out of this batch)
 
