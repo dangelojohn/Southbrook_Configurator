@@ -69,7 +69,8 @@
                                   lines="props.lines"
                                   unitPreference="props.unitPreference || 'mm'"
                                   onCabinetClick="props.onCabinetClick"
-                                  onGapClick="props.onGapClick"/>
+                                  onGapClick="props.onGapClick"
+                                  onCabinetDragEnd="props.onCabinetDragEnd"/>
                 </div>
 
                 <aside class="sb-room-plan-sidebar">
@@ -190,6 +191,7 @@
          ============================================================ -->
     <t t-name="southbrook_estimating_website.FloorPlanSVG">
         <svg class="sb-room-plan-svg"
+             t-ref="svgRoot"
              t-att-viewBox="_viewBox"
              xmlns="http://www.w3.org/2000/svg"
              role="img"
@@ -264,17 +266,34 @@
             <!-- Cabinet polygons + (conditional) labels. Phase 3.C.2a
                  wires the click handler so tapping a cabinet jumps to
                  the Order Lines tab + selects the row (parent owns the
-                 state mutation via onCabinetClick). -->
+                 state mutation via onCabinetClick).
+
+                 Phase 3.C.2b adds drag-along-wall via pointer events.
+                 During drag (after the 5px threshold trips) we render
+                 TWO polygons per cabinet: a low-opacity ghost at the
+                 ORIGINAL position + a semi-opaque preview at the
+                 cursor's projected mm. The shifter <g> sibling exposes
+                 ± 25mm buttons that are only visible on coarse-pointer
+                 devices (CSS-gated). -->
             <g class="sb-room-plan-cabs-g">
                 <t t-foreach="_cabinetPolys"
                    t-as="cab"
                    t-key="cab.key">
-                    <polygon t-att-class="cab.conflict
-                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict' + (props.onCabinetClick ? ' sb-room-plan-cab--clickable' : ''))
-                                           : (cab.zoneClass + (props.onCabinetClick ? ' sb-room-plan-cab--clickable' : ''))"
+
+                    <!-- Original/static polygon. When this cabinet is
+                         mid-drag (isDragging) we drop opacity via the
+                         ghost class so the user sees where it came
+                         from while the preview rides the cursor. -->
+                    <polygon t-att-class="(cab.conflict
+                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
+                                           : cab.zoneClass)
+                                          + (props.onCabinetDragEnd ? ' sb-room-plan-cab--clickable' : (props.onCabinetClick ? ' sb-room-plan-cab--clickable' : ''))
+                                          + (cab.isDragging ? ' sb-room-plan-cab--drag-ghost' : '')"
                              t-att-points="cab.points"
+                             t-on-pointerdown="(ev) => this._onCabinetPointerDown(cab.lineRef, ev)"
                              t-on-click="() => this._onCabinetClick(cab.lineId)"/>
-                    <text t-if="cab.showLabel"
+
+                    <text t-if="cab.showLabel &amp;&amp; !cab.isDragging"
                           class="sb-room-plan-cab-label"
                           t-att-x="cab.cx"
                           t-att-y="cab.cy"
@@ -282,6 +301,60 @@
                           dominant-baseline="central">
                         <t t-esc="cab.label"/>
                     </text>
+
+                    <!-- Phase 3.C.2b — drag preview. Semi-opaque polygon
+                         + label that rides at dragState.currentMm.
+                         pointer-events disabled so the cursor still
+                         interacts with the original polygon under it. -->
+                    <polygon t-if="cab.isDragging"
+                             t-att-class="(cab.conflict
+                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
+                                           : cab.zoneClass)
+                                          + ' sb-room-plan-cab--dragging'"
+                             t-att-points="cab.dragPoints"/>
+                    <text t-if="cab.isDragging &amp;&amp; cab.showLabel"
+                          class="sb-room-plan-cab-label"
+                          t-att-x="cab.dragCx"
+                          t-att-y="cab.dragCy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="cab.label"/>
+                    </text>
+
+                    <!-- Phase 3.C.2b: touch shifter (plus/minus 25mm).
+                         Visible only on coarse pointers (CSS @media).
+                         Rendered as a sibling group so the :hover
+                         sibling-combinator on the clickable cabinet
+                         class picks it up on hover for desktop too. -->
+                    <g t-if="props.onCabinetDragEnd &amp;&amp; !cab.isDragging"
+                       class="sb-room-plan-shifter">
+                        <rect class="sb-room-plan-shifter-btn"
+                              t-att-x="cab.cx - 26"
+                              t-att-y="cab.cy + 14"
+                              width="22"
+                              height="18"
+                              rx="3"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, -25)"/>
+                        <text class="sb-room-plan-shifter-glyph"
+                              t-att-x="cab.cx - 15"
+                              t-att-y="cab.cy + 23"
+                              text-anchor="middle"
+                              dominant-baseline="central"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, -25)">−</text>
+                        <rect class="sb-room-plan-shifter-btn"
+                              t-att-x="cab.cx + 4"
+                              t-att-y="cab.cy + 14"
+                              width="22"
+                              height="18"
+                              rx="3"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, 25)"/>
+                        <text class="sb-room-plan-shifter-glyph"
+                              t-att-x="cab.cx + 15"
+                              t-att-y="cab.cy + 23"
+                              text-anchor="middle"
+                              dominant-baseline="central"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, 25)">+</text>
+                    </g>
                 </t>
             </g>
 

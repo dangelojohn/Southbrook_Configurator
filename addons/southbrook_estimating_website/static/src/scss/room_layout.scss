@@ -1383,12 +1383,82 @@
 // ---------------------------------------------------------------------
 
 .sb-room-plan-cab--clickable {
-    cursor: pointer;
+    cursor: grab;
     transition: filter 120ms ease, stroke-width 120ms ease;
 
     &:hover {
         filter: brightness(1.08);
         stroke-width: 2.5;
+    }
+
+    // Active = pointer is down on the polygon — flip the cursor
+    // to grabbing so the user reads the drag affordance mid-press.
+    &:active {
+        cursor: grabbing;
+    }
+}
+
+// Phase 3.C.2b — drag-along-wall visuals. Two transient polygon
+// states per cabinet during a drag:
+//   - drag-ghost   → low-opacity polygon at the ORIGINAL position
+//                    so the user keeps a reference for "where did
+//                    this come from". pointer-events disabled so
+//                    the drag still flows to the moving preview.
+//   - dragging     → semi-opaque polygon at the cursor's projected
+//                    mm. Cursor flips to grabbing.
+.sb-room-plan-cab--dragging {
+    opacity: 0.55;
+    cursor: grabbing;
+    pointer-events: none;
+}
+
+.sb-room-plan-cab--drag-ghost {
+    opacity: 0.18;
+    pointer-events: none;
+}
+
+// Phase 3.C.2b — touch shifter (± 25mm). Hidden on desktop until
+// the user hovers the underlying cabinet polygon; always visible
+// on coarse-pointer (touch) devices. Sibling-combinator selector
+// works because the <g> shifter immediately follows the cabinet
+// polygon inside the per-cabinet <t> block in the template.
+.sb-room-plan-shifter {
+    opacity: 0;
+    transition: opacity 100ms ease;
+    pointer-events: none;
+}
+
+.sb-room-plan-cab--clickable:hover ~ .sb-room-plan-shifter,
+.sb-room-plan-shifter:hover {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sb-room-plan-shifter-btn {
+    fill: var(--sb-paper);
+    stroke: var(--sb-walnut-d);
+    stroke-width: 1;
+    cursor: pointer;
+
+    &:hover {
+        fill: var(--sb-linen);
+    }
+}
+
+.sb-room-plan-shifter-glyph {
+    fill: var(--sb-walnut-d);
+    font-family: var(--sb-font-mono, var(--sb-font-sans));
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    pointer-events: none;
+}
+
+@media (pointer: coarse) {
+    .sb-room-plan-shifter {
+        opacity: 1 !important;
+        pointer-events: auto !important;
     }
 }
 

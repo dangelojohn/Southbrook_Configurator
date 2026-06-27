@@ -2524,7 +2524,8 @@ const TEMPLATE = xml`
                                unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"
                                onCabinetClick="_onPlanCabinetClick"
                                onGapClick="_onPlanGapClick"
-                               onAssignFromSidebar="_onPlanAssignClick"/>
+                               onAssignFromSidebar="_onPlanAssignClick"
+                               onCabinetDragEnd="_onPlanCabinetDragEnd"/>
             </div>
             <div t-elif="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines"
@@ -3963,6 +3964,51 @@ class OrderBuilder extends Component {
 
     _onAssignCancel = () => {
         this.state.ui.assigning = null;
+    };
+
+    // Phase 3.C.2b — drag-along-wall + touch ± shifter end handler.
+    // Fired by FloorPlanSVG with a 25mm-snapped position_from_left_mm
+    // for the dragged cabinet. Reuses /place-on-wall (3.A endpoint)
+    // since this is just a position update on the SAME wall — cross-
+    // wall drag is intentionally out of scope (AssignToWallModal
+    // still owns that flow). Mirrors _onAssignSubmit's success path
+    // (refresh room + load order + bust payload hash).
+    _onPlanCabinetDragEnd = async (lineId, positionMm) => {
+        const line = this._lineById(lineId);
+        if (!line || !line.wall_id) return;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/" + encodeURIComponent(this.props.orderId)
+                + "/line/" + encodeURIComponent(lineId) + "/place-on-wall",
+                {
+                    wall_id: line.wall_id,
+                    position_from_left_mm: positionMm,
+                },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                // Force the next _loadOrder to take (hash-skip path
+                // would otherwise no-op on a same-looking poll).
+                this.state.payload_hash = "";
+                await this._loadOrder();
+            } else if (r && r.error === "out_of_bounds") {
+                // 25mm snap + JS-side clamp should make this
+                // unreachable; defensive surfacing if the server
+                // disagrees (e.g. wall length changed mid-drag).
+                alert(
+                    "Could not move cabinet: "
+                    + (r.detail || "position out of bounds"),
+                );
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                alert("Could not move cabinet: " + detail);
+            }
+        } catch (e) {
+            alert(
+                "Could not move cabinet: "
+                + ((e && e.message) ? e.message : String(e)),
+            );
+        }
     };
 
     _lineById = (id) => {

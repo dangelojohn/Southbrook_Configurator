@@ -37,7 +37,7 @@
  *   - `<` encoded as &lt; in attribute expressions where needed.
  *   - SVG sub-trees are plain XML — OWL handles the namespace.
  */
-import { Component, useState } from "@odoo/owl";
+import { Component, useExternalListener, useRef, useState } from "@odoo/owl";
 import { wallSegmentsForShape } from "@southbrook_estimating_website/js/room_geometry.esm";
 
 // ----------------------------------------------------------------------
@@ -180,10 +180,49 @@ class FloorPlanSVG extends Component {
         // interactivity (e.g. inside the wizard preview pane).
         onCabinetClick: { type: Function, optional: true },
         onGapClick: { type: Function, optional: true },
+        // Phase 3.C.2b — drag-along-wall. Fires with the snapped
+        // (25mm) new position_from_left_mm. Cross-wall drag is
+        // NOT supported here — the position is clamped to the
+        // current wall; cross-wall changes still go through the
+        // AssignToWallModal. Also fired by the ± shifter buttons
+        // surfaced for coarse-pointer (touch) devices.
+        onCabinetDragEnd: { type: Function, optional: true },
         // Phase 4 — unit preference (mm | imperial) for any length
         // labels rendered inside the SVG (today: gap markers).
         unitPreference: { type: String, optional: true },
     };
+
+    // Phase 3.C.2b — drag state + global pointer listeners.
+    //
+    // Drag detection rules (mirror the 3.C.2a comment block):
+    //   - pointerdown on a cabinet polygon arms the drag (records
+    //     lineId, original mm, downXY, moved=false).
+    //   - pointermove flips `moved = true` only after the cursor has
+    //     travelled > 5px from downXY (the click-vs-drag threshold).
+    //   - pointerup with moved=true → snap to 25mm + onCabinetDragEnd.
+    //     pointerup with moved=false → onCabinetClick (the existing tap).
+    //
+    // Pointer move/up are registered at the document level so dragging
+    // outside the polygon bounds still flows. `setPointerCapture` on
+    // the polygon is the belt-and-braces equivalent — keeps events
+    // routed to the originating element even when the cursor exits.
+    setup() {
+        this.dragState = useState({
+            lineId: null,
+            originalMm: null,
+            currentMm: null,
+            downXY: null,
+            moved: false,
+        });
+        // SVG element ref for coordinate transforms (getScreenCTM +
+        // createSVGPoint live on the SVGSVGElement).
+        this.svgRef = useRef("svgRoot");
+        // Document-level move/up so drag continues even when the
+        // cursor leaves the cabinet polygon. OWL auto-cleans on
+        // unmount; no need for manual removeEventListener.
+        useExternalListener(document, "pointermove", this._onPointerMove);
+        useExternalListener(document, "pointerup", this._onPointerUp);
+    }
 
     // Phase 3.C.2a — click handlers. Both no-op when the parent didn't
     // wire a callback so the SVG falls back to read-only.
@@ -193,6 +232,135 @@ class FloorPlanSVG extends Component {
 
     _onGapClick(wallId, gapMm, positionMm) {
         if (this.props.onGapClick) this.props.onGapClick(wallId, gapMm, positionMm);
+    }
+
+    // Phase 3.C.2b — pointerdown on a cabinet polygon. Arms drag
+    // state; tap-vs-drag decision is deferred to pointerup based on
+    // whether `moved` got flipped (> 5px movement) in the interim.
+    _onCabinetPointerDown = (line, ev) => {
+        // Without onCabinetDragEnd wired, fall through to the existing
+        // tap path — the polygon's t-on-click handler still fires.
+        if (!this.props.onCabinetDragEnd) return;
+        // Inhibit default text selection / image-drag ghost — without
+        // this Chrome will start a native HTML drag on the SVG node.
+        ev.preventDefault();
+        this.dragState.lineId = line.id;
+        this.dragState.originalMm = line.position_from_left_mm || 0;
+        this.dragState.currentMm = line.position_from_left_mm || 0;
+        this.dragState.downXY = { x: ev.clientX, y: ev.clientY };
+        this.dragState.moved = false;
+        // Keep pointermove flowing to this element even when the
+        // cursor leaves the polygon. Optional-chained because some
+        // older browsers don't expose setPointerCapture on SVG nodes.
+        if (ev.target && ev.target.setPointerCapture) {
+            try {
+                ev.target.setPointerCapture(ev.pointerId);
+            } catch (_e) {
+                // Some browsers throw if the pointer isn't down on
+                // this element (race). Safe to swallow.
+            }
+        }
+    };
+
+    _onPointerMove = (ev) => {
+        if (this.dragState.lineId === null) return;
+        const dx = ev.clientX - this.dragState.downXY.x;
+        const dy = ev.clientY - this.dragState.downXY.y;
+        const dist2 = dx * dx + dy * dy;
+        if (!this.dragState.moved && dist2 < 25) {
+            // Under the 5px threshold — still a tap candidate.
+            return;
+        }
+        this.dragState.moved = true;
+        // Project to mm along the wall. _pxToMmAlongWall handles the
+        // CTM inverse + reverse _transform + projection onto the
+        // wall unit vector.
+        const line = this._draggingLine;
+        if (!line) return;
+        const seg = this._segments.find(
+            (s) => s.wall && s.wall.id === line.wall_id,
+        );
+        if (!seg) return;
+        const raw = this._pxToMmAlongWall(seg, ev.clientX, ev.clientY);
+        if (raw === null) return;
+        const wallLen = (seg.wall && seg.wall.length_mm) || seg.length_mm || 0;
+        const cabW = line.sb_width_mm || 0;
+        const maxPos = Math.max(0, wallLen - cabW);
+        const clamped = Math.max(0, Math.min(maxPos, raw));
+        this.dragState.currentMm = clamped;
+    };
+
+    _onPointerUp = (_ev) => {
+        if (this.dragState.lineId === null) return;
+        const lineId = this.dragState.lineId;
+        const moved = this.dragState.moved;
+        const currentMm = this.dragState.currentMm;
+        // Reset drag state first so the next render skips the
+        // semi-transparent overlay even if the RPC takes a moment.
+        this.dragState.lineId = null;
+        this.dragState.originalMm = null;
+        this.dragState.currentMm = null;
+        this.dragState.downXY = null;
+        this.dragState.moved = false;
+        if (moved) {
+            // Snap to 25mm grid on drop.
+            const snapped = Math.round(currentMm / 25) * 25;
+            if (this.props.onCabinetDragEnd) {
+                this.props.onCabinetDragEnd(lineId, snapped);
+            }
+        } else {
+            // No movement — treat as a tap.
+            this._onCabinetClick(lineId);
+        }
+    };
+
+    // Phase 3.C.2b — touch shifter (± 25mm). Each click bumps the
+    // line's position_from_left_mm by ±25mm via the same drag-end
+    // RPC. Clamped to [0, wall.length_mm - cabinet.sb_width_mm].
+    _onCabinetShift = (line, deltaMm) => {
+        if (!this.props.onCabinetDragEnd) return;
+        const seg = this._segments.find(
+            (s) => s.wall && s.wall.id === line.wall_id,
+        );
+        const wallLen = seg
+            ? ((seg.wall && seg.wall.length_mm) || seg.length_mm || 0)
+            : 0;
+        const cabW = line.sb_width_mm || 0;
+        const maxPos = Math.max(0, wallLen - cabW);
+        const cur = line.position_from_left_mm || 0;
+        const next = Math.max(0, Math.min(maxPos, cur + deltaMm));
+        this.props.onCabinetDragEnd(line.id, next);
+    };
+
+    // Lookup the line currently being dragged out of props.lines. Used
+    // by _onPointerMove to project the cursor against the right wall.
+    get _draggingLine() {
+        if (this.dragState.lineId === null) return null;
+        const lines = this.props.lines || [];
+        return lines.find((l) => l.id === this.dragState.lineId) || null;
+    }
+
+    // Convert a screen-space (clientX, clientY) into a position along
+    // the wall segment, in mm. Path:
+    //   1. screen → SVG viewBox via getScreenCTM().inverse()
+    //   2. viewBox → mm via reverse of _transform (offX/offY/scale)
+    //   3. (mmX, mmY) relative to wall start, projected onto the wall
+    //      unit vector (dx, dy) → the signed mm offset along the wall.
+    _pxToMmAlongWall(seg, screenX, screenY) {
+        const svg = this.svgRef.el;
+        if (!svg) return null;
+        const ctm = svg.getScreenCTM && svg.getScreenCTM();
+        if (!ctm) return null;
+        const pt = svg.createSVGPoint();
+        pt.x = screenX;
+        pt.y = screenY;
+        const svgPt = pt.matrixTransform(ctm.inverse());
+        const t = this._transform;
+        if (!t || !t.scale) return null;
+        const mmX = (svgPt.x - t.offX) / t.scale + t.minX;
+        const mmY = (svgPt.y - t.offY) / t.scale + t.minY;
+        const proj = (mmX - seg.x0) * seg.dx + (mmY - seg.y0) * seg.dy;
+        return proj;
     }
 
     // Phase 4 — length formatter honouring props.unitPreference. Pure
@@ -421,9 +589,22 @@ class FloorPlanSVG extends Component {
     // Cabinet polygons — zone-coloured, conflict-bordered when the
     // wall has conflicts. Labels (short SKU) only render when the
     // cabinet's projected width is wide enough to fit them.
+    //
+    // Phase 3.C.2b — each entry also carries:
+    //   - `lineRef`: the raw line object (so the template's shifter
+    //     handler can read sb_width_mm + wall_id without a re-lookup).
+    //   - `isDragging`: true when the user is mid-drag of THIS cabinet
+    //     and has crossed the 5px threshold. The template branches on
+    //     this to render two polygons (ghost at original + semi-opaque
+    //     preview at dragState.currentMm).
+    //   - `dragPoints`: the polygon points string at currentMm, only
+    //     populated when isDragging is true.
+    //   - `dragCx` / `dragCy`: centroid of the dragging polygon (so
+    //     the label rides along with the cabinet during drag).
     get _cabinetPolys() {
         const out = [];
         const lbw = this._linesByWallId;
+        const ds = this.dragState || {};
         for (const s of this._segments) {
             const wall = s.wall || {};
             const wallId = wall.id;
@@ -457,12 +638,50 @@ class FloorPlanSVG extends Component {
                 // Approximate the cabinet's projected width in viewBox
                 // px to decide whether to render the inline label.
                 const widthPx = width * this._transform.scale;
+
+                // Phase 3.C.2b — drag preview overlay. Computed up-
+                // front (cheap; the polygon math is the same) so the
+                // template can stay declarative.
+                const isDragging = (
+                    ds.lineId === line.id && ds.moved === true
+                );
+                let dragPoints = "";
+                let dragCx = cx;
+                let dragCy = cy;
+                if (isDragging) {
+                    const dCorners = _cabinetCornersMm(
+                        s,
+                        ds.currentMm || 0,
+                        width,
+                        depth,
+                    );
+                    dragPoints = dCorners
+                        .map(([x, y]) => {
+                            const [px, py] = this._proj(x, y);
+                            return px.toFixed(1) + "," + py.toFixed(1);
+                        })
+                        .join(" ");
+                    let dcx = 0;
+                    let dcy = 0;
+                    for (const [x, y] of dCorners) {
+                        const [px, py] = this._proj(x, y);
+                        dcx += px;
+                        dcy += py;
+                    }
+                    dragCx = dcx / 4;
+                    dragCy = dcy / 4;
+                }
+
                 out.push({
                     key: "cab-" + line.id,
                     // Phase 3.C.2a — surface the line id explicitly so
                     // the template's t-on-click can call back into the
                     // parent without re-parsing the key string.
                     lineId: line.id,
+                    // Phase 3.C.2b — the raw line ref so the shifter
+                    // (± buttons) can read sb_width_mm + wall_id +
+                    // position_from_left_mm without a re-lookup.
+                    lineRef: line,
                     points: pts,
                     zoneClass: ZONE_CLASS(line.zone),
                     conflict: !!wall.has_conflicts,
@@ -470,6 +689,11 @@ class FloorPlanSVG extends Component {
                     cx,
                     cy,
                     showLabel: widthPx >= MIN_LABEL_VBOX_PX,
+                    // Phase 3.C.2b — drag overlay.
+                    isDragging,
+                    dragPoints,
+                    dragCx,
+                    dragCy,
                 });
             }
         }
@@ -629,6 +853,10 @@ export class RoomLayoutTab extends Component {
         onCabinetClick: { type: Function, optional: true },
         onGapClick: { type: Function, optional: true },
         onAssignFromSidebar: { type: Function, optional: true },
+        // Phase 3.C.2b — drag-along-wall + touch ± shifter handler.
+        // Threaded straight through to FloorPlanSVG; the parent
+        // OrderBuilder owns the /place-on-wall RPC.
+        onCabinetDragEnd: { type: Function, optional: true },
         // Phase 4 — unit preference (mm | imperial) for every length
         // label rendered by this tab. Flipped from the Room Setup tab's
         // segmented toggle; FloorPlanSVG receives it via passthrough.
