@@ -241,5 +241,82 @@
             <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
             <field name="color">9</field>
         </record>
+        <record id="course_quality_module" model="slide.channel">
+            <field name="name">Course 22 — Quality Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_quality internals: architecture, NCR state machine, SPC sample + control limit math, Cpk compute, quality dimension master, supplier defect rollup + MI engine integration, customisation patterns.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">220</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">5</field>
+        </record>
+        <record id="course_payroll_module" model="slide.channel">
+            <field name="name">Course 23 — Payroll CA Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_payroll_ca internals: architecture, salary rule chain, CRA bracket math, EFT format support, T4 + ROE generation, integration with native hr.payslip, customisation for new pay scenarios.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">230</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">7</field>
+        </record>
+        <record id="course_finance_module" model="slide.channel">
+            <field name="name">Course 24 — Finance Pack Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_finance_pack internals: architecture, CCA depreciation engine, WIP report query + GL reconciliation, HST return + tax accounts, budget model, MI engine integration, extension points.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">240</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">8</field>
+        </record>
+        <record id="course_integrations_module" model="slide.channel">
+            <field name="name">Course 25 — Integrations Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_integrations internals: architecture, Homag iX simulator, 3PL ASN inbound/outbound, MCP tool registry (vs Hermes registry), label printer integration, building a new vendor adapter, monitoring.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">250</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">2</field>
+        </record>
+        <record id="course_mes_mps_module" model="slide.channel">
+            <field name="name">Course 26 — MES + MPS Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_mes_mps internals: architecture, MPS period + rolling 13-week generator, workcenter capacity calc, OEE snapshot, bottleneck report query, MI engine integration, MPS customisation.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">260</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">4</field>
+        </record>
+        <record id="course_cmms_module" model="slide.channel">
+            <field name="name">Course 27 — CMMS + WMS Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_cmms_wms internals: architecture, breakdown alert + maintenance.request bridge, MTBF/MTTR math, service contracts, oversize permit / landed cost templates, MI engine, adding new equipment types.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">270</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">6</field>
+        </record>
+        <record id="course_exec_dashboard_module" model="slide.channel">
+            <field name="name">Course 28 — Exec Dashboard Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_exec_dashboard internals: architecture + tile registry, tile compute + cron, OWL view + mobile-first layout, drill-through wiring, adding a custom tile, Hermes integration, performance + caching.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">280</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">9</field>
+        </record>
     </data>
 </odoo>

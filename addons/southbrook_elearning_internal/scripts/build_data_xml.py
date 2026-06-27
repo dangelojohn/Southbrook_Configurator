@@ -249,6 +249,76 @@ COURSE_META: List[Tuple[int, str, str, str, int]] = [
         "Anchored on southbrook_exec_dashboard v19.0.1.0.0.",
         9,
     ),
+    (
+        22,
+        "course_quality_module",
+        "Quality Module — Deep Dive",
+        "Seven lessons on southbrook_quality internals: architecture, "
+        "NCR state machine, SPC sample + control limit math, Cpk "
+        "compute, quality dimension master, supplier defect rollup + "
+        "MI engine integration, customisation patterns.",
+        5,
+    ),
+    (
+        23,
+        "course_payroll_module",
+        "Payroll CA Module — Deep Dive",
+        "Seven lessons on southbrook_payroll_ca internals: "
+        "architecture, salary rule chain, CRA bracket math, EFT "
+        "format support, T4 + ROE generation, integration with native "
+        "hr.payslip, customisation for new pay scenarios.",
+        7,
+    ),
+    (
+        24,
+        "course_finance_module",
+        "Finance Pack Module — Deep Dive",
+        "Seven lessons on southbrook_finance_pack internals: "
+        "architecture, CCA depreciation engine, WIP report query + "
+        "GL reconciliation, HST return + tax accounts, budget model, "
+        "MI engine integration, extension points.",
+        8,
+    ),
+    (
+        25,
+        "course_integrations_module",
+        "Integrations Module — Deep Dive",
+        "Seven lessons on southbrook_integrations internals: "
+        "architecture, Homag iX simulator, 3PL ASN inbound/outbound, "
+        "MCP tool registry (vs Hermes registry), label printer "
+        "integration, building a new vendor adapter, monitoring.",
+        2,
+    ),
+    (
+        26,
+        "course_mes_mps_module",
+        "MES + MPS Module — Deep Dive",
+        "Seven lessons on southbrook_mes_mps internals: architecture, "
+        "MPS period + rolling 13-week generator, workcenter capacity "
+        "calc, OEE snapshot, bottleneck report query, MI engine "
+        "integration, MPS customisation.",
+        4,
+    ),
+    (
+        27,
+        "course_cmms_module",
+        "CMMS + WMS Module — Deep Dive",
+        "Seven lessons on southbrook_cmms_wms internals: architecture, "
+        "breakdown alert + maintenance.request bridge, MTBF/MTTR math, "
+        "service contracts, oversize permit / landed cost templates, "
+        "MI engine, adding new equipment types.",
+        6,
+    ),
+    (
+        28,
+        "course_exec_dashboard_module",
+        "Exec Dashboard Module — Deep Dive",
+        "Seven lessons on southbrook_exec_dashboard internals: "
+        "architecture + tile registry, tile compute + cron, OWL view + "
+        "mobile-first layout, drill-through wiring, adding a custom "
+        "tile, Hermes integration, performance + caching.",
+        9,
+    ),
 ]
 
 
