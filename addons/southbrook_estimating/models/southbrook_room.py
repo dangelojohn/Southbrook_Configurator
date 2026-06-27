@@ -18,6 +18,12 @@ _ROOM_TYPES = [
     ("butler", "Butler's Pantry"),
     ("bar", "Bar"),
     ("bathroom", "Bathroom"),
+    # Bath / mudroom / closet aliases the wizard exposes — added so the
+    # Phase 2.C tiles can submit cleanly without server validation
+    # rejecting the value as outside the Selection set.
+    ("bath", "Bath"),
+    ("mudroom", "Mudroom"),
+    ("closet", "Closet"),
     ("office", "Office"),
     ("other", "Other"),
 ]

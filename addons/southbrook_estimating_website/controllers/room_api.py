@@ -44,7 +44,12 @@ _MM_RE = re.compile(r'(\d{2,4})\s*mm\b', re.I)
 # recommendation score. Mirrors typical European + North-American
 # off-the-shelf widths (300/400/450/500/600/900) so a non-standard
 # 685mm cabinet doesn't outrank a 600mm filler for a 720mm gap.
-STANDARD_WIDTHS_MM = {300, 400, 450, 500, 600, 900}
+STANDARD_WIDTHS_MM = {
+    # North-American inch-derived (load-bearing on Southbrook prod):
+    229, 305, 381, 457, 533, 610, 762, 914,
+    # European metric (no-op residue today — kept for future seeds):
+    300, 400, 450, 500, 600, 900,
+}
 
 
 def _parse_width_mm(value_name):
@@ -769,8 +774,12 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                 continue
             best = max(widths)
             score = best / gap  # closer to 1.0 = better filler
+            # +0.10 tuned so a 762mm standard at 0.847 beats an 838mm
+            # non-standard at 0.931 on a 900mm gap (0.947 > 0.931) —
+            # implements the brief's "prefer standard widths". +0.05
+            # (prior) was too small to flip any real comparison.
             if best in STANDARD_WIDTHS_MM:
-                score += 0.05
+                score += 0.10
             candidates.append({
                 "template_id": tmpl.id,
                 "name": tmpl.name,

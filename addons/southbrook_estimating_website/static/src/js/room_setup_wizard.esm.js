@@ -588,6 +588,10 @@ export class RoomSetupWizard extends Component {
     };
 
     _close = () => {
+        // Guard against backdrop-click closing the wizard mid-submit —
+        // would orphan the server-created room while the user thinks
+        // they cancelled. Submit-in-flight blocks close.
+        if (this.state.step === "submitting") return;
         this.props.onClose();
     };
 
