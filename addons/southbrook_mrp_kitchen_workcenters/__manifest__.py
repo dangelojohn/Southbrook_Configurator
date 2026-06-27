@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.39.0",
+    "version": "19.0.4.40.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -62,6 +62,12 @@ southbrook_kitchen_workspace) without duplicating their models.
         # release addon adds those fields to mrp.production (PG-112)
         # and owns the pg.release / pg.ebom / pg.item models.
         "product_graph_release",
+        # W034 (R4.W5, 2026-06-27) — Report-Engineering-Issue wizard
+        # creates a draft southbrook.eco. PLM was already transitively
+        # in the dep chain via southbrook_mrp_pm; declare it directly
+        # so env.ref('southbrook_plm.eco_type_document') is hard-loaded
+        # before this addon's xml validation runs.
+        "southbrook_plm",
     ],
     "data": [
         "security/ir.model.access.csv",
@@ -118,6 +124,10 @@ southbrook_kitchen_workspace) without duplicating their models.
         # (QR rollout Phase 3+, 2026-06-26). Action lives in
         # mrp.workorder action menu via binding_model_id.
         "reports/wo_traveler_report.xml",
+        # W034 (2026-06-27) — operator-facing wizard launched from the
+        # WO form. Loads AFTER mrp_workorder_views.xml because the
+        # view adds the launcher button.
+        "wizards/southbrook_wo_raise_eco_wizard_views.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [

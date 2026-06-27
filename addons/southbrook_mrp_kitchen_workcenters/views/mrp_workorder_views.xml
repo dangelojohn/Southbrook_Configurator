@@ -233,6 +233,13 @@
                                 string="Record Scrap"
                                 class="btn-warning"
                                 help="Open the stock.scrap wizard prefilled with this WO + MO. Auto-debits inventory."/>
+                        <!-- W034 (R4.W5, 2026-06-27) — raise an ECO
+                             from this WO with photo + WO context. -->
+                        <button name="action_sbk_raise_eco_wizard"
+                                type="object"
+                                string="Report Engineering Issue"
+                                class="btn-secondary"
+                                help="Open the W034 wizard — photo + description → draft ECO with full WO context."/>
                     </group>
                 </group>
             </xpath>
