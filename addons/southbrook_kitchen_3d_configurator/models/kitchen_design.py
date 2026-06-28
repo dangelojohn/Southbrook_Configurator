@@ -174,6 +174,168 @@ class SouthbrookKitchenDesign(models.Model):
             },
         }
 
+    # ── D12 — Production-readiness validation ──────────────────────────────────
+    # Pre-quote checks that catch issues which would otherwise surface
+    # in MO creation / cut-spec generation / on the shop floor. Returns
+    # a flat list of {code, severity, message} dicts so the UI can
+    # render them in priority order.
+    #
+    # Severities: blocking (refuses quote), warning (yellow), info.
+    _STD_WIDTHS_IN = (6, 9, 12, 15, 18, 21, 24, 27, 30, 36, 42, 48)
+
+    def _check_production_ready(self):
+        self.ensure_one()
+        issues = []
+
+        # 1) Empty design = blocking
+        if not self.cabinet_line_ids:
+            issues.append({
+                "code":     "EMPTY_DESIGN",
+                "severity": "blocking",
+                "message":  "Design has no cabinets. Add at least one before quoting.",
+            })
+            return issues
+
+        # 2) Customer required
+        if not self.partner_id:
+            issues.append({
+                "code":     "MISSING_CUSTOMER",
+                "severity": "blocking",
+                "message":  "Select a customer before quoting (needed for pricelist resolution).",
+            })
+
+        # 3) Collision detection per cabinet_type (skip fillers — they
+        #    intentionally bridge gaps).
+        by_type = {}
+        for line in self.cabinet_line_ids:
+            by_type.setdefault(line.cabinet_type, []).append(line)
+        for ct, lines in by_type.items():
+            if ct in ("filler", "panel"):
+                continue
+            ordered = sorted(lines, key=lambda l: l.x_position_in)
+            for i in range(len(ordered) - 1):
+                a, b = ordered[i], ordered[i + 1]
+                if a.x_position_in + a.width_in > b.x_position_in + 0.01:
+                    issues.append({
+                        "code":     "CABINET_COLLISION",
+                        "severity": "blocking",
+                        "message":  (
+                            "%s cabinets overlap at x=%.1f\": %s extends past %s start"
+                        ) % (
+                            ct.title(),
+                            b.x_position_in,
+                            a.product_id.display_name,
+                            b.product_id.display_name,
+                        ),
+                    })
+
+        # 4) BOM presence — required for MO generation. Check both
+        #    template-level and variant-level BOMs.
+        Bom = self.env["mrp.bom"]
+        missing = set()
+        for line in self.cabinet_line_ids:
+            if line.cabinet_type in ("filler",):
+                continue
+            if not line.product_id:
+                continue
+            has_bom = Bom.sudo().search_count([
+                "|",
+                ("product_id", "=", line.product_id.id),
+                "&",
+                ("product_tmpl_id", "=", line.product_id.product_tmpl_id.id),
+                ("product_id", "=", False),
+            ], limit=1)
+            if not has_bom:
+                missing.add(line.product_id.display_name)
+        if missing:
+            issues.append({
+                "code":     "MISSING_BOM",
+                "severity": "blocking",
+                "message":  "No BOM defined: %s" % ", ".join(sorted(missing)),
+            })
+
+        # 5) Non-standard widths — soft warning. Catches data-entry
+        #    typos (37" instead of 36") that the shop floor can't
+        #    nest cleanly.
+        for line in self.cabinet_line_ids:
+            if line.cabinet_type == "filler":
+                continue
+            if not line.width_in:
+                continue
+            wr = round(line.width_in)
+            if abs(wr - line.width_in) < 0.01 and int(wr) not in self._STD_WIDTHS_IN:
+                issues.append({
+                    "code":     "NON_STANDARD_WIDTH",
+                    "severity": "warning",
+                    "message":  (
+                        "%s is %d\" wide (non-standard; nesting/cutting may waste material)"
+                    ) % (line.product_id.display_name, int(wr)),
+                })
+
+        # 6) Soffit/ceiling clearance — replicates the controller check
+        #    so the form-level validate button matches the configurator.
+        base_h, wall_h, ctr_t, gap = 34.5, 30.0, 1.5, 18.0
+        for line in self.cabinet_line_ids:
+            if line.cabinet_type == "base":
+                base_h = max(base_h, line.height_in or base_h)
+            elif line.cabinet_type == "wall":
+                wall_h = max(wall_h, line.height_in or wall_h)
+        if (self.wall_cab_top_alignment or "fixed_gap") == "to_soffit":
+            eff_top = self.soffit_height_in or 0
+        else:
+            eff_top = self.room_height_in or 0
+        # Use current wall-cab Z model for the check
+        if self.wall_cab_top_alignment == "to_ceiling":
+            wz = max(base_h + ctr_t + gap, (self.room_height_in or 0) - wall_h)
+        elif self.wall_cab_top_alignment == "to_soffit":
+            wz = max(base_h + ctr_t + gap, (self.soffit_height_in or 0) - wall_h)
+        else:
+            wz = base_h + ctr_t + gap
+        if wz + wall_h > eff_top + 0.01 and eff_top > 0:
+            issues.append({
+                "code":     "WALL_CAB_EXCEEDS_CEILING",
+                "severity": "blocking",
+                "message":  (
+                    "Wall cabinet top reaches %.1f\" but %s sits at %.1f\""
+                ) % (wz + wall_h,
+                     "soffit" if self.wall_cab_top_alignment == "to_soffit" else "ceiling",
+                     eff_top),
+            })
+
+        return issues
+
+    def action_validate_production(self):
+        """Form-button validator. Surfaces all issues in a notification
+        toast — sticky if any blocking, transient otherwise."""
+        self.ensure_one()
+        issues = self._check_production_ready()
+        if not issues:
+            return {
+                "type": "ir.actions.client",
+                "tag":  "display_notification",
+                "params": {
+                    "type":    "success",
+                    "title":   "Production-Ready",
+                    "message": "No blocking issues. Ready to quote.",
+                    "sticky":  False,
+                },
+            }
+        blocking = [i for i in issues if i["severity"] == "blocking"]
+        lines = []
+        for i in issues:
+            tag = "BLOCK" if i["severity"] == "blocking" else "WARN"
+            lines.append("[%s] %s" % (tag, i["message"]))
+        return {
+            "type": "ir.actions.client",
+            "tag":  "display_notification",
+            "params": {
+                "type":    "danger" if blocking else "warning",
+                "title":   "Production check: %d issue(s)" % len(issues),
+                "message": "\n".join(lines),
+                "sticky":  True,
+            },
+        }
+
     # ── D11 — Enriched line name helper ────────────────────────────────────────
     # Renders a single-line spec the customer can recognise on the
     # quote: "Wall 2-Door | 24"W x 30"H x 12"D | Wall | Shaker | Maple
@@ -214,6 +376,18 @@ class SouthbrookKitchenDesign(models.Model):
         for design in self:
             if not design.partner_id:
                 raise UserError("Select a customer before creating a quotation.")
+            # D12 — Gate on production-readiness. Refuses to spawn a
+            # quote when any blocking issue (collision, missing BOM,
+            # wall-cab over ceiling) would burn the customer or the
+            # shop floor later.
+            issues = design._check_production_ready()
+            blocking = [i for i in issues if i["severity"] == "blocking"]
+            if blocking:
+                msg = "\n".join("- %s" % i["message"] for i in blocking)
+                raise UserError(
+                    "Design isn't production-ready. Resolve these blocking "
+                    "issues first:\n\n%s" % msg
+                )
             vals = {
                 "partner_id": design.partner_id.id,
                 "origin":     design.name,

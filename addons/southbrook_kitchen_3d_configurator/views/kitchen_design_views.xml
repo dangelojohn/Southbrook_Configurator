@@ -62,6 +62,15 @@
                             string="Duplicate &amp; Open"
                             class="btn-secondary"
                             icon="fa-copy"/>
+                    <!-- D12 — Pre-quote production-readiness validator.
+                         Runs collision + BOM + width + soffit checks,
+                         surfaces issues in a sticky notification. -->
+                    <button name="action_validate_production"
+                            type="object"
+                            string="Validate"
+                            class="btn-secondary"
+                            icon="fa-check"
+                            invisible="not cabinet_line_ids"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,configured,quoted,ordered"/>
                 </header>
