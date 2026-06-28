@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.3.0.0",
+    "version": "19.0.4.0.0",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -32,6 +32,10 @@
             # window.THREE is populated before kitchen_configurator.js
             # references it. Replaces the previous three@0.128 CDN load.
             "southbrook_estimating/static/lib/three/three.min.js",
+            # 2026-06-28 D1 — OrbitControls UMD shim (decorates window.THREE
+            # with THREE.OrbitControls). Required by the Perspective view's
+            # free-camera mode and zoom dolly.
+            "southbrook_estimating/static/lib/three/OrbitControls.js",
             "southbrook_kitchen_3d_configurator/static/src/scss/kitchen_configurator.scss",
             "southbrook_kitchen_3d_configurator/static/src/js/kitchen_configurator.js",
         ],

@@ -84,22 +84,37 @@ class SouthbrookKitchenConfigurator extends Component {
             summary:   { base_count: 0, wall_count: 0, total: 0, price: 0, remainder_in: 0 },
             designId:  this.props.design_id || null,
             designName: this.props.design_name || "",
+            // D1 — multi-view camera system. 'iso' default; switchable
+            // among iso/top/front/left/right/persp. Hotkeys 1-6 + R reset.
+            view:      "iso",
         });
 
         // ── Three.js scene state (not reactive — managed imperatively) ────────
+        // D1 — `camera` is now `activeCamera`, swapped between the two
+        // instances on `cameras`. `currentTarget` is the live lookAt
+        // point so view transitions can lerp from where we are.
         this.T = {
-            THREE: null, scene: null, camera: null, renderer: null,
+            THREE: null, scene: null, renderer: null,
+            cameras: { ortho: null, persp: null },
+            activeCamera: null,
+            currentTarget: null,
+            viewSpecs: null,    // dict of {iso, top, front, left, right, persp} → {pos, target, up}
+            vsScale:   1,       // ortho zoom multiplier (wheel)
+            orbit:     null,    // OrbitControls instance (persp only)
             raycaster: null,
             roomObjs: [], cabObjs: [], clickable: [],
-            handleMesh: null,
+            handleMesh: null, arrowMeshes: [],
             dragging: false, dragX0: 0, dragW0: 0,
             animId: null,
+            animatingCamera: false,
         };
 
         this._onMouseDown = this._onMouseDown.bind(this);
         this._onMouseMove = this._onMouseMove.bind(this);
         this._onMouseUp   = this._onMouseUp.bind(this);
         this._onMouseOver = this._onMouseOver.bind(this);
+        this._onWheel     = this._onWheel.bind(this);
+        this._onKeyDown   = this._onKeyDown.bind(this);
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
         onWillStart(async () => {
@@ -187,12 +202,25 @@ class SouthbrookKitchenConfigurator extends Component {
         scene.background = new THREE.Color(P.scene);
         this.T.scene = scene;
 
-        // Orthographic isometric camera
+        // D1 — Two camera instances: orthographic for the locked angles
+        // (iso/top/front/left/right) and perspective for free-orbit.
+        // Swap between them on view change. The vs scalar is bootstrap
+        // only; _recomputeViews + _applyOrthoFrustum take over once
+        // _buildScene runs.
         const asp = W / H, vs = 9;
-        const camera = new THREE.OrthographicCamera(-vs * asp, vs * asp, vs, -vs, 0.1, 300);
-        camera.position.set(20, 14, 20);
-        camera.lookAt(4, 2.5, 1.5);
-        this.T.camera = camera;
+        const ortho = new THREE.OrthographicCamera(-vs * asp, vs * asp, vs, -vs, 0.1, 300);
+        ortho.position.set(20, 14, 20);
+        ortho.lookAt(4, 2.5, 1.5);
+        ortho.up.set(0, 1, 0);
+
+        const persp = new THREE.PerspectiveCamera(45, asp, 0.1, 300);
+        persp.position.set(20, 14, 20);
+        persp.lookAt(4, 2.5, 1.5);
+        persp.up.set(0, 1, 0);
+
+        this.T.cameras = { ortho, persp };
+        this.T.activeCamera = ortho;
+        this.T.currentTarget = new THREE.Vector3(4, 2.5, 1.5);
 
         // Renderer — ACES Filmic + sRGB for the canonical Southbrook
         // PBR pipeline (matches cabinet_viewport.esm.js Phase 2.5 spec).
@@ -242,22 +270,37 @@ class SouthbrookKitchenConfigurator extends Component {
         // above still renders the scene fine.
         this._installPbrEnvMap();
 
-        // Render loop
+        // D1 — OrbitControls on the persp camera, disabled until persp
+        // view is activated. Defensive: skip if THREE.OrbitControls
+        // didn't load (e.g. asset bundle didn't include the UMD shim).
+        if (THREE.OrbitControls) {
+            const oc = new THREE.OrbitControls(persp, renderer.domElement);
+            oc.enableDamping = true;
+            oc.dampingFactor = 0.08;
+            oc.minDistance   = 4;
+            oc.maxDistance   = 80;
+            oc.maxPolarAngle = Math.PI / 2 - 0.05;   // never under floor
+            oc.enabled       = false;
+            this.T.orbit = oc;
+        }
+
+        // Render loop — render activeCamera, advance orbit damping when
+        // the persp orbit is active.
         const tick = () => {
             this.T.animId = requestAnimationFrame(tick);
-            renderer.render(scene, camera);
+            if (this.T.orbit && this.T.orbit.enabled) this.T.orbit.update();
+            renderer.render(scene, this.T.activeCamera);
         };
         tick();
 
-        // Resize observer
+        // Resize observer — update BOTH cameras so a swap doesn't pop.
         this._resizeObserver = new ResizeObserver(() => {
             const nw = mount.clientWidth, nh = mount.clientHeight;
             if (!nw || !nh) return;
-            const na = nw / nh, nvs = 9;
-            camera.left = -nvs * na; camera.right = nvs * na;
-            camera.top  = nvs;       camera.bottom = -nvs;
-            camera.updateProjectionMatrix();
+            persp.aspect = nw / nh;
+            persp.updateProjectionMatrix();
             renderer.setSize(nw, nh);
+            this._applyOrthoFrustum();
         });
         this._resizeObserver.observe(mount);
 
@@ -267,6 +310,10 @@ class SouthbrookKitchenConfigurator extends Component {
         mount.addEventListener("mouseup",    this._onMouseUp);
         mount.addEventListener("mouseleave", this._onMouseUp);
         mount.addEventListener("mousemove",  this._onMouseOver);
+        // D1 — wheel zoom (Ortho frustum scale / Persp dolly via orbit)
+        // and view-switch hotkeys (1-6 + R + +/-).
+        mount.addEventListener("wheel", this._onWheel, { passive: false });
+        window.addEventListener("keydown", this._onKeyDown);
     }
 
     // ─── PBR environment map (PMREM) ────────────────────────────────────────────
@@ -304,6 +351,171 @@ class SouthbrookKitchenConfigurator extends Component {
         }
     }
 
+    // ─── D1 — Multi-view camera system ──────────────────────────────────────────
+    // Compute view specs from current room dimensions. Each entry =
+    // { pos: Vector3, target: Vector3, up: Vector3, cam: 'ortho'|'persp',
+    //   vs?: number (ortho frustum half-height in scene-feet) }.
+    _recomputeViews(rw, rh, rd) {
+        const THREE = this.T.THREE;
+        const max3  = Math.max(rw, rd, rh);
+        const max2  = Math.max(rw, rd);
+        const wallH = Math.max(rw, rh);
+        const sideH = Math.max(rd, rh);
+        this.T.viewSpecs = {
+            iso:   { cam: "ortho",
+                     pos:    new THREE.Vector3(rw + 12, rh * 0.7 + 6, rd + 12),
+                     target: new THREE.Vector3(rw / 2, rh * 0.28, rd / 2),
+                     up:     new THREE.Vector3(0, 1, 0),
+                     vs:     max3  * 0.68 + 4.5 },
+            top:   { cam: "ortho",
+                     pos:    new THREE.Vector3(rw / 2, rh + 20, rd / 2),
+                     target: new THREE.Vector3(rw / 2, 0, rd / 2),
+                     up:     new THREE.Vector3(0, 0, -1),
+                     vs:     max2  * 0.60 + 3.0 },
+            front: { cam: "ortho",
+                     pos:    new THREE.Vector3(rw / 2, rh / 2, rd + 18),
+                     target: new THREE.Vector3(rw / 2, rh / 2, 0),
+                     up:     new THREE.Vector3(0, 1, 0),
+                     vs:     wallH * 0.60 + 2.0 },
+            left:  { cam: "ortho",
+                     pos:    new THREE.Vector3(-18, rh / 2, rd / 2),
+                     target: new THREE.Vector3(0, rh / 2, rd / 2),
+                     up:     new THREE.Vector3(0, 1, 0),
+                     vs:     sideH * 0.60 + 2.0 },
+            right: { cam: "ortho",
+                     pos:    new THREE.Vector3(rw + 18, rh / 2, rd / 2),
+                     target: new THREE.Vector3(rw, rh / 2, rd / 2),
+                     up:     new THREE.Vector3(0, 1, 0),
+                     vs:     sideH * 0.60 + 2.0 },
+            persp: { cam: "persp",
+                     pos:    new THREE.Vector3(rw + 10, rh * 0.9, rd + 10),
+                     target: new THREE.Vector3(rw / 2, rh * 0.35, rd / 2),
+                     up:     new THREE.Vector3(0, 1, 0) },
+        };
+    }
+
+    // Apply the current view's ortho frustum + the wheel-zoom multiplier.
+    // Safe to call even when the active camera is perspective (no-op).
+    _applyOrthoFrustum() {
+        const t = this.T;
+        const cam = t.cameras?.ortho;
+        if (!cam || !t.renderer) return;
+        const spec = t.viewSpecs?.[this.state.view];
+        const baseVs = (spec && spec.vs) || 9;
+        const vs = baseVs * (t.vsScale || 1);
+        const W = t.renderer.domElement.width;
+        const H = t.renderer.domElement.height;
+        const asp = (W && H) ? W / H : 1;
+        cam.left  = -vs * asp;  cam.right  = vs * asp;
+        cam.top   =  vs;        cam.bottom = -vs;
+        cam.near  = 0.1;        cam.far    = 300;
+        cam.updateProjectionMatrix();
+    }
+
+    // Swap to a named view. instant=true jumps; otherwise lerps over ms.
+    _setView(key, instant = false) {
+        const t = this.T;
+        if (!t.viewSpecs || !t.viewSpecs[key]) return;
+        const spec = t.viewSpecs[key];
+        this.state.view = key;
+        // Reset wheel-zoom on view change for a predictable starting frame.
+        t.vsScale = 1;
+        // Swap active camera; orbit only enabled in persp.
+        if (spec.cam === "ortho") {
+            t.activeCamera = t.cameras.ortho;
+            if (t.orbit) t.orbit.enabled = false;
+        } else {
+            t.activeCamera = t.cameras.persp;
+            if (t.orbit) {
+                t.orbit.enabled = true;
+                t.orbit.target.copy(spec.target);
+            }
+        }
+        // Hide/show the drag handle + arrow cones per view (only iso + top
+        // expose room-width resize; in other views the right edge isn't
+        // visible or doesn't map intuitively to room width).
+        const handleVisible = (key === "iso" || key === "top");
+        if (t.handleMesh)  t.handleMesh.visible  = handleVisible;
+        if (t.arrowMeshes) t.arrowMeshes.forEach(m => { m.visible = handleVisible; });
+        if (instant) {
+            t.activeCamera.position.copy(spec.pos);
+            t.activeCamera.up.copy(spec.up);
+            t.activeCamera.lookAt(spec.target);
+            t.currentTarget.copy(spec.target);
+            this._applyOrthoFrustum();
+        } else {
+            this._animateCamera(spec.pos, spec.target, spec.up, 400);
+            this._applyOrthoFrustum();
+        }
+    }
+
+    // Lerp the active camera from its current pos+target to the new ones.
+    _animateCamera(toPos, toTarget, toUp, ms = 400) {
+        const t = this.T;
+        const cam = t.activeCamera;
+        if (!cam) return;
+        const fromPos = cam.position.clone();
+        const fromTgt = t.currentTarget.clone();
+        const t0 = performance.now();
+        const ease = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+        t.animatingCamera = true;
+        const step = () => {
+            if (!this.T.activeCamera || this.T.activeCamera !== cam) {
+                t.animatingCamera = false;
+                return;
+            }
+            const dt = Math.min(1, (performance.now() - t0) / ms);
+            const k  = ease(dt);
+            cam.position.lerpVectors(fromPos, toPos, k);
+            const tgt = fromTgt.clone().lerp(toTarget, k);
+            cam.up.copy(toUp);
+            cam.lookAt(tgt);
+            t.currentTarget.copy(tgt);
+            if (t.orbit && t.orbit.enabled) t.orbit.target.copy(tgt);
+            if (dt < 1) requestAnimationFrame(step);
+            else        t.animatingCamera = false;
+        };
+        step();
+    }
+
+    _onWheel(e) {
+        e.preventDefault();
+        const t = this.T;
+        const k = e.deltaY > 0 ? 1.1 : 0.9;
+        if (t.activeCamera === t.cameras.persp && t.orbit) {
+            // Persp dolly via OrbitControls; mirror wheel direction.
+            // OrbitControls handles its own wheel internally if enabled,
+            // but we keep an explicit fallback for parity in case it
+            // gets disabled mid-session.
+            return;   // OrbitControls already wired to wheel when enabled
+        }
+        t.vsScale = Math.max(0.3, Math.min(3.0, (t.vsScale || 1) * k));
+        this._applyOrthoFrustum();
+    }
+
+    _onKeyDown(e) {
+        // Ignore when typing in form inputs.
+        const tag = (e.target && e.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+        const k = e.key;
+        const map = { "1": "iso", "2": "top", "3": "front",
+                       "4": "left", "5": "right", "6": "persp" };
+        if (map[k]) { e.preventDefault(); this._setView(map[k]); return; }
+        if (k === "r" || k === "R") { e.preventDefault(); this._setView("iso"); return; }
+        if (k === "+" || k === "=") {
+            e.preventDefault();
+            this.T.vsScale = Math.max(0.3, (this.T.vsScale || 1) * 0.9);
+            this._applyOrthoFrustum();
+            return;
+        }
+        if (k === "-" || k === "_") {
+            e.preventDefault();
+            this.T.vsScale = Math.min(3.0, (this.T.vsScale || 1) * 1.1);
+            this._applyOrthoFrustum();
+            return;
+        }
+    }
+
     _destroyScene() {
         const t = this.T;
         if (t.animId) cancelAnimationFrame(t.animId);
@@ -315,6 +527,11 @@ class SouthbrookKitchenConfigurator extends Component {
             mount.removeEventListener("mouseup",    this._onMouseUp);
             mount.removeEventListener("mouseleave", this._onMouseUp);
             mount.removeEventListener("mousemove",  this._onMouseOver);
+            mount.removeEventListener("wheel",      this._onWheel);
+        }
+        window.removeEventListener("keydown", this._onKeyDown);
+        if (t.orbit) {
+            try { t.orbit.dispose(); } catch (_) { /* noop */ }
         }
         if (t.renderer) {
             t.renderer.dispose();
@@ -326,8 +543,8 @@ class SouthbrookKitchenConfigurator extends Component {
 
     // ─── Scene builder ──────────────────────────────────────────────────────────
     _buildScene() {
-        const { THREE, scene, camera, renderer } = this.T;
-        if (!scene || !camera || !renderer) return;
+        const { THREE, scene, renderer } = this.T;
+        if (!scene || !renderer) return;
 
         const rw = this.state.room.width_in  * IN;
         const rd = this.state.room.depth_in  * IN;
@@ -348,6 +565,7 @@ class SouthbrookKitchenConfigurator extends Component {
             this.T.handleMesh.material?.dispose();
         }
         this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = []; this.T.handleMesh = null;
+        this.T.arrowMeshes = [];
 
         // Helper: make + add mesh — now PBR (MeshStandardMaterial).
         // opts.rough / opts.metal control the PBR contract; if absent
@@ -534,18 +752,14 @@ class SouthbrookKitchenConfigurator extends Component {
             arr.rotation.z = rotZ;
             arr.position.set(rw + offset, 0.18, rd / 2);
             scene.add(arr);
-            this.T.roomObjs.push(arr);
+            this.T.arrowMeshes.push(arr);
         });
 
-        // ── Re-frame camera ──
-        const maxDim = Math.max(rw, rd, rh);
-        const vs     = maxDim * 0.68 + 4.5;
-        const asp    = renderer.domElement.width / renderer.domElement.height;
-        camera.left = -vs * asp; camera.right = vs * asp;
-        camera.top  = vs;        camera.bottom = -vs;
-        camera.updateProjectionMatrix();
-        camera.position.set(rw + 12, rh * 0.7 + 6, rd + 12);
-        camera.lookAt(rw / 2, rh * 0.28, rd / 2);
+        // ── D1 — Re-compute view specs from current room dims and
+        //         re-apply the active view. instant=true on rebuild so
+        //         the camera doesn't lerp every time a cabinet is added.
+        this._recomputeViews(rw, rh, rd);
+        this._setView(this.state.view || "iso", true);
 
         // Re-apply selection highlight after rebuild
         if (this.state.selected) {
@@ -579,13 +793,16 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     _onMouseDown(e) {
-        const { camera, raycaster, handleMesh, clickable } = this.T;
-        if (!camera || !raycaster) return;
+        const { activeCamera, raycaster, handleMesh, clickable } = this.T;
+        if (!activeCamera || !raycaster) return;
 
-        raycaster.setFromCamera(this._ndcFromEvent(e), camera);
+        raycaster.setFromCamera(this._ndcFromEvent(e), activeCamera);
 
-        // Priority 1: drag handle
-        if (handleMesh && raycaster.intersectObject(handleMesh).length) {
+        // D1 — drag handle is only sensible in iso/top (where the right
+        //      edge of the room is visible + maps to width). In other
+        //      views, fall through to cabinet selection.
+        const handleActive = (this.state.view === "iso" || this.state.view === "top");
+        if (handleActive && handleMesh && raycaster.intersectObject(handleMesh).length) {
             this.T.dragging = true;
             this.T.dragX0   = e.clientX;
             this.T.dragW0   = this.state.room.width_in;
@@ -593,7 +810,7 @@ class SouthbrookKitchenConfigurator extends Component {
             return;
         }
 
-        // Priority 2: cabinet selection
+        // Cabinet selection — works in every view.
         const hits = raycaster.intersectObjects(clickable, false);
         if (hits.length) {
             const h = hits[0].object;
@@ -620,9 +837,10 @@ class SouthbrookKitchenConfigurator extends Component {
 
     _onMouseOver(e) {
         const mount = this.canvas3dRef.el;
-        if (!mount || !this.T.camera || !this.T.raycaster) return;
-        this.T.raycaster.setFromCamera(this._ndcFromEvent(e), this.T.camera);
-        const onH = this.T.handleMesh &&
+        if (!mount || !this.T.activeCamera || !this.T.raycaster) return;
+        this.T.raycaster.setFromCamera(this._ndcFromEvent(e), this.T.activeCamera);
+        const handleActive = (this.state.view === "iso" || this.state.view === "top");
+        const onH = handleActive && this.T.handleMesh &&
             this.T.raycaster.intersectObject(this.T.handleMesh).length > 0;
         const onC = !onH &&
             this.T.raycaster.intersectObjects(this.T.clickable, false).length > 0;
@@ -785,8 +1003,63 @@ SouthbrookKitchenConfigurator.template = xml`
       </div>
 
       <!-- View label -->
-      <div class="o_sbk_viewlabel">⬡ Isometric</div>
-      <div class="o_sbk_draghint">Drag ● to resize • Click cabinet to select</div>
+      <!-- D1 — View switcher toolbar. 6 cameras + reset + zoom. -->
+      <div class="o_sbk_viewbar" role="toolbar" aria-label="Camera view">
+        <button class="o_sbk_viewbtn" t-att-class="'o_sbk_viewbtn' + (state.view === 'iso' ? ' is-active' : '')"
+                t-att-aria-pressed="state.view === 'iso'"
+                aria-label="Isometric view (1)"
+                title="Isometric (1)"
+                t-on-click="() => this._setView('iso')">
+          <span class="o_sbk_viewicon">⬡</span><span class="o_sbk_viewkey">1</span>
+        </button>
+        <button class="o_sbk_viewbtn" t-att-class="'o_sbk_viewbtn' + (state.view === 'top' ? ' is-active' : '')"
+                t-att-aria-pressed="state.view === 'top'"
+                aria-label="Top / Plan view (2)"
+                title="Top / Plan (2)"
+                t-on-click="() => this._setView('top')">
+          <span class="o_sbk_viewicon">▦</span><span class="o_sbk_viewkey">2</span>
+        </button>
+        <button class="o_sbk_viewbtn" t-att-class="'o_sbk_viewbtn' + (state.view === 'front' ? ' is-active' : '')"
+                t-att-aria-pressed="state.view === 'front'"
+                aria-label="Front view (3)"
+                title="Front (3)"
+                t-on-click="() => this._setView('front')">
+          <span class="o_sbk_viewicon">▮</span><span class="o_sbk_viewkey">3</span>
+        </button>
+        <button class="o_sbk_viewbtn" t-att-class="'o_sbk_viewbtn' + (state.view === 'left' ? ' is-active' : '')"
+                t-att-aria-pressed="state.view === 'left'"
+                aria-label="Left view (4)"
+                title="Left side (4)"
+                t-on-click="() => this._setView('left')">
+          <span class="o_sbk_viewicon">◧</span><span class="o_sbk_viewkey">4</span>
+        </button>
+        <button class="o_sbk_viewbtn" t-att-class="'o_sbk_viewbtn' + (state.view === 'right' ? ' is-active' : '')"
+                t-att-aria-pressed="state.view === 'right'"
+                aria-label="Right view (5)"
+                title="Right side (5)"
+                t-on-click="() => this._setView('right')">
+          <span class="o_sbk_viewicon">◨</span><span class="o_sbk_viewkey">5</span>
+        </button>
+        <button class="o_sbk_viewbtn" t-att-class="'o_sbk_viewbtn' + (state.view === 'persp' ? ' is-active' : '')"
+                t-att-aria-pressed="state.view === 'persp'"
+                aria-label="Perspective / free orbit (6)"
+                title="Perspective / orbit (6)"
+                t-on-click="() => this._setView('persp')">
+          <span class="o_sbk_viewicon">◉</span><span class="o_sbk_viewkey">6</span>
+        </button>
+        <div class="o_sbk_viewsep"/>
+        <button class="o_sbk_viewbtn"
+                aria-label="Reset view (R)"
+                title="Reset to Isometric (R)"
+                t-on-click="() => this._setView('iso')">
+          <span class="o_sbk_viewicon">⌂</span><span class="o_sbk_viewkey">R</span>
+        </button>
+      </div>
+      <div class="o_sbk_draghint">
+        <t t-if="state.view === 'iso' || state.view === 'top'">Drag ● to resize • Click cabinet to select • 1-6 to switch view</t>
+        <t t-elif="state.view === 'persp'">Drag to orbit • Wheel to zoom • Click cabinet to select • R to reset</t>
+        <t t-else="">Wheel to zoom • Click cabinet to select • 1-6 to switch view</t>
+      </div>
     </main>
 
     <!-- Right inventory + detail panel -->
