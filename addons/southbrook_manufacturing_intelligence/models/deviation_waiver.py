@@ -173,12 +173,12 @@ class DeviationWaiver(models.Model):
     # ------------------------------------------------------------------
     # Computed fields
     # ------------------------------------------------------------------
-    @api.depends("production_id", "production_id.lot_producing_id")
+    @api.depends("production_id", "production_id.lot_producing_ids")
     def _compute_cabinet_serial(self):
         for rec in self:
             mo = rec.production_id
-            lot = mo.lot_producing_id if mo else False
-            rec.cabinet_serial = lot.name if lot else False
+            lots = mo.lot_producing_ids if mo else False
+            rec.cabinet_serial = lots[:1].name if lots else False
 
     @api.depends("production_id")
     def _compute_customer_id(self):

@@ -56,11 +56,8 @@
                  decoration-danger="x_mi_status == 'blocked'"
                  optional="show"/>
           <field name="x_mi_blocker_count" optional="hide"/>
-          <field name="production_approval_state" widget="badge"
-                 decoration-success="production_approval_state == 'approved'"
-                 decoration-warning="production_approval_state == 'pending'"
-                 decoration-danger="production_approval_state in ['none','rejected']"
-                 optional="show"/>
+          <!-- production_approval_state lives on sale.order in v19, not
+               mrp.production — removed from this list to keep view valid. -->
           <field name="date_start" widget="remaining_days"/>
           <field name="state" widget="badge"/>
         </list>
@@ -90,7 +87,6 @@
           <field name="date_start"/>
           <field name="date_deadline"/>
           <field name="priority"/>
-          <field name="partner_id"/>
           <field name="origin"/>
           <field name="components_availability_state"/>
           <field name="reservation_state"/>
@@ -116,10 +112,6 @@
                       x <field name="product_qty"/>
                       <field name="product_uom_id"/>
                     </span>
-                  </div>
-                  <div class="o_sb_mo_ready_partner"
-                       t-if="record.partner_id.raw_value">
-                    <field name="partner_id"/>
                   </div>
                   <div class="o_sb_mo_ready_origin"
                        t-if="record.origin.raw_value">
@@ -172,10 +164,7 @@
             ('x_mi_status', '=', 'ok'),
           '|',
             ('x_mi_blocker_count', '=', False),
-            ('x_mi_blocker_count', '=', 0),
-          '|',
-            ('production_approval_state', '=', False),
-            ('production_approval_state', '=', 'approved')
+            ('x_mi_blocker_count', '=', 0)
         ]
       </field>
       <field name="context">{}</field>
@@ -233,13 +222,11 @@
       <field name="domain">
         [
           ('state', 'in', ['draft', 'confirmed', 'progress']),
-          '|', '|', '|', '|',
+          '|', '|', '|',
             ('components_availability_state', 'not in',
              ['available', 'assigned']),
             ('x_mi_status', 'in', ['blocked', 'review']),
             ('x_mi_blocker_count', '>', 0),
-            ('production_approval_state', 'in',
-             ['none', 'pending', 'rejected']),
             ('reservation_state', '=', 'waiting')
         ]
       </field>

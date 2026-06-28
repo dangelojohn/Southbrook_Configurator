@@ -84,7 +84,7 @@
                     <filter name="had_defects"
                             string="Had Defects"
                             domain="[('defect_count','&gt;',0)]"/>
-                    <group string="Group By">
+                    <group name="group_by">
                         <filter name="group_by_wc"
                                 string="Work Center"
                                 context="{'group_by': 'workcenter_id'}"/>

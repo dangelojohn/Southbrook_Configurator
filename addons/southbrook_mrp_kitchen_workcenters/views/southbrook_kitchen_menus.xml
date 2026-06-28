@@ -51,8 +51,7 @@
     <menuitem id="menu_sbk_floor_root"
               name="Floor"
               parent="mrp.menu_mrp_root"
-              sequence="5"
-              web_icon="mrp,static/description/icon.png"/>
+              sequence="5"/>
 
     <record id="action_sbk_floor_workcenter_picker" model="ir.actions.act_window">
         <field name="name">Tablet Queues</field>

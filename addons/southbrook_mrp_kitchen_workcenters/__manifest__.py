@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.48.0",
+    "version": "19.0.4.48.5",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -100,6 +100,10 @@ southbrook_kitchen_workspace) without duplicating their models.
         "views/southbrook_kitchen_finish_views.xml",
         "views/southbrook_kitchen_operation_template_views.xml",
         "views/southbrook_kitchen_workcenter_downtime_views.xml",
+        # mrp_workorder_views must load BEFORE mrp_workcenter_views
+        # because the latter's header button references the
+        # action_sbk_tablet_wo_queue xmlid defined in the former.
+        "views/mrp_workorder_views.xml",
         "views/mrp_workcenter_views.xml",
         "views/mrp_production_views.xml",
         # Path B MO form redesign (19.0.4.16.0): header context bar +
@@ -108,7 +112,6 @@ southbrook_kitchen_workspace) without duplicating their models.
         # view-validation time. Companion Cabinet Label tab ships from
         # southbrook_kitchen_mrp.
         "views/mrp_production_form_header_redesign.xml",
-        "views/mrp_workorder_views.xml",
         "views/mrp_bom_views.xml",
         "views/southbrook_kitchen_menus.xml",
         # NCR / Rework Queue surface (SAMI PRD #8 + #9, 2026-06-25).

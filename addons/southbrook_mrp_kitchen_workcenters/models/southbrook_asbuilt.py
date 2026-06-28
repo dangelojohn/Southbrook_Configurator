@@ -322,8 +322,8 @@ class SouthbrookAsbuilt(models.Model):
             if not vals.get("lot_id") and vals.get("production_id"):
                 mo = self.env["mrp.production"].browse(
                     vals["production_id"])
-                if mo.exists() and mo.lot_producing_id:
-                    vals["lot_id"] = mo.lot_producing_id.id
+                if mo.exists() and mo.lot_producing_ids:
+                    vals["lot_id"] = mo.lot_producing_ids[:1].id
         records = super().create(vals_list)
         # Snapshot BoM version + auto-populate QC checks + attachments
         # at create time so the record carries the build-time truth.

@@ -89,7 +89,7 @@
                                 ('date','&lt;=',
                                  (context_today() + relativedelta(days=7)).strftime('%Y-%m-%d'))
                             ]"/>
-                    <group string="Group By">
+                    <group name="group_by">
                         <filter name="group_by_wc"
                                 string="Work Center"
                                 context="{'group_by': 'workcenter_id'}"/>
