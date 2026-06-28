@@ -391,33 +391,65 @@ class SouthbrookKitchenConfigurator extends Component {
         if (!Number.isFinite(pid) || pid <= 0) return;
         const product = (this.state.products || []).find(p => p.product_id === pid);
         if (!product) return;
-        this._addCabinetFromProduct(product);
+        // D14 — raycast the drop point to the floor plane so the new
+        // cabinet lands where the user dropped it (not always at the
+        // end of the run). Falls back to end-of-run if the ray misses
+        // the floor (e.g. dropping in empty sky area of perspective view).
+        const dropX = this._computeDropX(ev);
+        this._addCabinetFromProduct(product, dropX);
+    }
+
+    // D14 — Cast a ray from the active camera through the drop point
+    // and intersect the floor plane (Y=0) in world space, then convert
+    // back to inches and snap to the 6" grid. Returns null when the
+    // ray doesn't hit the floor (e.g. the cursor was over the sky in
+    // a perspective view tilted upward).
+    _computeDropX(ev) {
+        const t = this.T;
+        if (!t.activeCamera || !t.raycaster || !t.THREE) return null;
+        t.raycaster.setFromCamera(this._ndcFromEvent(ev), t.activeCamera);
+        const floor  = new t.THREE.Plane(new t.THREE.Vector3(0, 1, 0), 0);
+        const hit    = new t.THREE.Vector3();
+        const result = t.raycaster.ray.intersectPlane(floor, hit);
+        if (!result) return null;
+        // hit.x is in scene-feet (IN = 1/12). Multiply by 12 to get inches.
+        let xIn = hit.x * 12;
+        // Clamp inside the room, leave at least 6" headroom on the right
+        // for the cabinet to fit, then snap to the 6" grid.
+        const maxX = Math.max(0, this.state.room.width_in - 6);
+        xIn = Math.max(0, Math.min(maxX, xIn));
+        return Math.round(xIn / 6) * 6;
     }
 
     // Generic add — used by drop AND by a future "click to add" button.
-    // New cabinet appends at the end of its cabinet_type group; the
-    // cascade in _recomputeLayoutFromItems then packs everything cleanly.
-    _addCabinetFromProduct(product) {
+    // D14 — `targetX` (inches) sets the new item's sort-key so it
+    // slots in at the dropped position. _recomputeLayoutFromItems
+    // then sorts-by-x and re-packs contiguously: visual semantic is
+    // "where in the run order does this go". `null` = append at end.
+    _addCabinetFromProduct(product, targetX = null) {
         const type = product.cabinet_type || "base";
-        // Default Z: walls + tall stack track the configured wall Z;
-        // everything else sits on the floor.
+        // Default Z: walls track the configured wall Z; everything
+        // else sits on the floor.
         let z = 0;
         if (type === "wall") {
             // Use the most recent z_position_in we saw from the server
             // so the wall cab tracks D8's alignment mode without
             // re-running /layout.
             const walls = (this.state.items || []).filter(it => it.cabinet_type === "wall");
-            z = walls.length ? walls[0].z_position_in : (34.5 + 1.5 + 18.0);
+            z = (walls.length && walls[0].z_position_in) || (34.5 + 1.5 + 18.0);
         }
         // Unique layout_key (timestamp + random tail = collision-free).
         const layoutKey = `${type}-add-${Date.now()}-${Math.floor((performance.now() % 1) * 10000)}`;
+        // D14 — when a targetX is supplied, use it as the cascade
+        // sort-key so the new cabinet lands at that ordered position.
+        // No-target case retains the 1e6 sentinel so the cabinet
+        // appends at the end of its group.
+        const sortX = (typeof targetX === "number" && !Number.isNaN(targetX))
+                      ? targetX : 1e6;
         const newItem = {
             ...product,
             layout_key:    layoutKey,
-            // Big x sort-key forces this item to land at the end of its
-            // group inside _recomputeLayoutFromItems; cascade then
-            // assigns the real x.
-            x_position_in: 1e6,
+            x_position_in: sortX,
             y_position_in: 0,
             z_position_in: z,
             width_in:      product.width_in || 24,
@@ -434,7 +466,17 @@ class SouthbrookKitchenConfigurator extends Component {
             this.state.room.width_in = Math.ceil(required / 6) * 6;
         }
         if (this.T.scene) this._buildScene();
-        this.notification.add(`Added ${product.name}`, { type: "success" });
+        // D14 — Drop UX feedback: tell the rep WHERE it landed when
+        // they used drop-positioning (vs the bare "Added X" toast).
+        if (typeof targetX === "number" && !Number.isNaN(targetX)) {
+            const finalX = newItem.x_position_in;
+            this.notification.add(
+                `Added ${product.name} at ${finalX}″`,
+                { type: "success" }
+            );
+        } else {
+            this.notification.add(`Added ${product.name}`, { type: "success" });
+        }
         this._queueAutoSave();
     }
 
