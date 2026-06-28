@@ -54,6 +54,14 @@
                             class="btn-secondary"
                             icon="fa-file-text-o"
                             invisible="not sale_order_id"/>
+                    <!-- D11 — Duplicate-and-Open: copy the design as draft
+                         and jump into the 3D configurator on the new
+                         record. Saves the typical 4-click clone flow. -->
+                    <button name="action_duplicate_and_open"
+                            type="object"
+                            string="Duplicate &amp; Open"
+                            class="btn-secondary"
+                            icon="fa-copy"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,configured,quoted,ordered"/>
                 </header>

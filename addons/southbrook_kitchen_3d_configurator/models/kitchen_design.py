@@ -174,6 +174,41 @@ class SouthbrookKitchenDesign(models.Model):
             },
         }
 
+    # ── D11 — Enriched line name helper ────────────────────────────────────────
+    # Renders a single-line spec the customer can recognise on the
+    # quote: "Wall 2-Door | 24"W x 30"H x 12"D | Wall | Shaker | Maple
+    # Veneer". Without this every quote line read "[BASE-24] Base
+    # Cabinet" with all the config detail buried.
+    def _quote_line_name(self, line):
+        parts = [line.product_id.display_name]
+        tmpl  = line.product_id.product_tmpl_id
+        # Cabinet type label (Base / Wall / Tall / etc.)
+        type_sel = dict(line._fields["cabinet_type"].selection or [])
+        if line.cabinet_type:
+            parts.append(type_sel.get(line.cabinet_type, line.cabinet_type).title())
+        # Dimensions: drop trailing zeros from floats for readability.
+        parts.append("%g\"W x %g\"H x %g\"D" % (
+            line.width_in or 0, line.height_in or 0, line.depth_in or 0,
+        ))
+        # Door style + material from the product template.
+        door_sel = dict(tmpl._fields["southbrook_door_style"].selection or [])
+        mat_sel  = dict(tmpl._fields["southbrook_material"].selection or [])
+        if tmpl.southbrook_door_style:
+            parts.append(door_sel.get(tmpl.southbrook_door_style,
+                                       tmpl.southbrook_door_style))
+        if tmpl.southbrook_material:
+            parts.append(mat_sel.get(tmpl.southbrook_material,
+                                       tmpl.southbrook_material))
+        return " | ".join(p for p in parts if p)
+
+    # ── D11 — Duplicate-and-Open action ────────────────────────────────────────
+    def action_duplicate_and_open(self):
+        """Copy this design as draft and open the 3D Configurator on
+        the new record. One click instead of Duplicate -> open."""
+        self.ensure_one()
+        copy = self.copy({"name": "%s (Copy)" % self.name, "state": "draft"})
+        return copy.action_open_configurator()
+
     def action_create_quotation(self):
         SaleOrder = self.env["sale.order"]
         for design in self:
@@ -186,7 +221,7 @@ class SouthbrookKitchenDesign(models.Model):
                 "order_line": [
                     (0, 0, {
                         "product_id":      line.product_id.id,
-                        "name":            line.product_id.display_name,
+                        "name":            self._quote_line_name(line),
                         "product_uom_qty": line.quantity,
                         "price_unit":      line.price_unit,
                     })
