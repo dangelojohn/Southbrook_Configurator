@@ -4,13 +4,19 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.4.5.0",
+    "version": "19.0.4.5.1",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
     "license": "LGPL-3",
     "depends": [
         "web", "product", "sale_management", "stock", "mrp",
+        # 2026-06-28 — `<chatter/>` widget in kitchen_design_views.xml
+        # requires mail.thread + mail.activity.mixin on the model.
+        # Adding mail as a hard dependency so the inheritance below
+        # resolves at registry load and `_get_thread_with_access`
+        # is reachable for the mail/data RPC.
+        "mail",
         # 2026-06-28 Tier-A — depend on southbrook_estimating so the
         # vendored r160 Three.js + the channel-pricelist resolver
         # (sale.order._resolve_channel_pricelist) are available. Drops

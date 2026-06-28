@@ -7,6 +7,11 @@ from odoo.exceptions import UserError
 class SouthbrookKitchenDesign(models.Model):
     _name = "southbrook.kitchen.design"
     _description = "Southbrook Kitchen Design"
+    # 2026-06-28 — kitchen_design_views.xml renders `<chatter/>`, which
+    # invokes `_get_thread_with_access` from mail.thread on every
+    # form open. Without these mixins the RPC hits AttributeError
+    # and the form fails to load.
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "write_date desc, id desc"
     _rec_name = "name"
 
@@ -53,6 +58,24 @@ class SouthbrookKitchenDesign(models.Model):
         "res.currency",
         default=lambda self: self.env.company.currency_id,
         required=True,
+    )
+
+    # ── D7 — Filler strategy ────────────────────────────────────────────────────
+    filler_strategy = fields.Selection(
+        selection=[
+            ("split",  "Split (both ends)"),
+            ("right",  "Right side"),
+            ("left",   "Left side"),
+            ("scribe", "Scribe (no filler)"),
+        ],
+        string="Filler Strategy",
+        default="split",
+        help=(
+            "How to distribute the un-modular remainder across the cabinet run.\n"
+            "Split: two half-width fillers, one at each end (most common).\n"
+            "Right/Left: one filler at the chosen end.\n"
+            "Scribe: no filler — the carpenter scribes the end cabinet on site."
+        ),
     )
 
     # ── Workflow ────────────────────────────────────────────────────────────────
