@@ -288,6 +288,33 @@ $sbk-amber:      #B45309;
     border: 1px solid rgba(26, 102, 212, 0.3);
 }
 
+// D8 (+forward-compat D12) — layout validation warnings panel
+.o_sbk_warnings {
+    margin: 10px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.o_sbk_warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.4;
+    background: rgba(231, 206, 122, 0.20);
+    border: 1px solid rgba(231, 206, 122, 0.55);
+    color: #5a4632;
+    &.o_sbk_warning_blocking {
+        background: rgba(192, 73, 47, 0.10);
+        border-color: rgba(192, 73, 47, 0.40);
+        color: #c0492f;
+    }
+}
+.o_sbk_warning_icon { font-size: 13px; line-height: 1; }
+.o_sbk_warning_text { flex: 1; }
+
 // D7 — Filler-strategy selector + snap-hint CTA
 .o_sbk_metric_filler {
     color: #1e9e6a;

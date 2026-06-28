@@ -108,7 +108,13 @@ class SouthbrookKitchenConfigurator extends Component {
             // D7 — filler placement strategy. Drives /layout on each
             // refresh; default matches the controller default ("split"
             // — half-width fillers at both ends, most common spec).
-            fillerStrategy:  "split",
+            fillerStrategy:  this.props.filler_strategy || "split",
+            // D8 — wall-cab Z alignment + soffit height. Defaults match
+            // the model defaults so an unsaved design still computes
+            // sensible wall-cab positions.
+            wallCabTopAlignment: this.props.wall_cab_top_alignment || "fixed_gap",
+            soffitHeightIn:      this.props.soffit_height_in       || 84.0,
+            warnings:            [],
         });
         // Auto-save debounce timer (not reactive; managed imperatively).
         this._autoSaveTimer = null;
@@ -225,15 +231,18 @@ class SouthbrookKitchenConfigurator extends Component {
     async _refreshLayout() {
         try {
             const result = await rpc("/southbrook_kitchen/configurator/layout", {
-                room_width_in:   this.state.room.width_in,
-                room_depth_in:   this.state.room.depth_in,
-                room_height_in:  this.state.room.height_in,
-                partner_id:      this.state.partnerId || false,
-                filler_strategy: this.state.fillerStrategy || "split",
+                room_width_in:           this.state.room.width_in,
+                room_depth_in:           this.state.room.depth_in,
+                room_height_in:          this.state.room.height_in,
+                partner_id:              this.state.partnerId || false,
+                filler_strategy:         this.state.fillerStrategy || "split",
+                wall_cab_top_alignment:  this.state.wallCabTopAlignment || "fixed_gap",
+                soffit_height_in:        this.state.soffitHeightIn || 84.0,
             });
-            this.state.error   = result.error || "";
-            this.state.items   = result.items  || [];
-            this.state.summary = result.summary || this.state.summary;
+            this.state.error    = result.error || "";
+            this.state.items    = result.items  || [];
+            this.state.summary  = result.summary || this.state.summary;
+            this.state.warnings = result.warnings || [];
             if (result.channel) this.state.channel = result.channel;
             if (!this.state.selected && this.state.items.length) {
                 this.state.selected = this.state.items[0];
@@ -268,6 +277,28 @@ class SouthbrookKitchenConfigurator extends Component {
         if (!allowed.includes(v)) return;
         this.state.fillerStrategy = v;
         await this._refreshLayout();
+        this._queueAutoSave();
+    }
+
+    // D8 — Wall-cab top alignment selector. Re-runs layout so the
+    // wall cabinets snap to the chosen mode immediately.
+    async _changeWallAlignment(value) {
+        const allowed = ["fixed_gap", "to_ceiling", "to_soffit"];
+        const v = (value || "").toLowerCase();
+        if (!allowed.includes(v)) return;
+        this.state.wallCabTopAlignment = v;
+        await this._refreshLayout();
+        this._queueAutoSave();
+    }
+
+    async _changeSoffit(rawValue) {
+        const v = parseFloat(rawValue);
+        if (!Number.isFinite(v) || v < 36 || v > 144) return;
+        this.state.soffitHeightIn = v;
+        // Only re-emit if the alignment actually consults soffit.
+        if (this.state.wallCabTopAlignment === "to_soffit") {
+            await this._refreshLayout();
+        }
         this._queueAutoSave();
     }
 
@@ -1304,6 +1335,25 @@ SouthbrookKitchenConfigurator.template = xml`
         </select>
       </label>
 
+      <!-- D8 — Wall cabinet top alignment + soffit height. -->
+      <label class="o_sbk_field">
+        <span>Wall cab top</span>
+        <select class="o_sbk_edit_select"
+                t-att-value="state.wallCabTopAlignment"
+                t-on-change="(ev) => this._changeWallAlignment(ev.target.value)">
+          <option value="fixed_gap"  t-att-selected="state.wallCabTopAlignment === 'fixed_gap'  ? 'selected' : ''">18″ gap above counter</option>
+          <option value="to_ceiling" t-att-selected="state.wallCabTopAlignment === 'to_ceiling' ? 'selected' : ''">Up to ceiling</option>
+          <option value="to_soffit"  t-att-selected="state.wallCabTopAlignment === 'to_soffit'  ? 'selected' : ''">Up to soffit</option>
+        </select>
+      </label>
+      <label t-if="state.wallCabTopAlignment === 'to_soffit'" class="o_sbk_field">
+        <span>Soffit height (in)</span>
+        <input type="number" min="36" max="144" step="1"
+               class="o_sbk_edit_input"
+               t-att-value="state.soffitHeightIn"
+               t-on-change="(ev) => this._changeSoffit(ev.target.value)"/>
+      </label>
+
       <!-- Summary metrics -->
       <div class="o_sbk_divider"/>
 
@@ -1348,6 +1398,15 @@ SouthbrookKitchenConfigurator.template = xml`
       </div>
 
       <div t-if="state.error" class="o_sbk_error" t-esc="state.error"/>
+
+      <!-- D8 (and forward-compat for D12) — layout validation warnings -->
+      <div t-if="state.warnings &amp;&amp; state.warnings.length" class="o_sbk_warnings">
+        <div t-foreach="state.warnings" t-as="w" t-key="w.code"
+             t-att-class="'o_sbk_warning o_sbk_warning_' + (w.severity || 'info')">
+          <strong class="o_sbk_warning_icon">⚠</strong>
+          <span class="o_sbk_warning_text" t-esc="w.message"/>
+        </div>
+      </div>
     </aside>
 
     <!-- 3D Scene panel -->

@@ -37,7 +37,8 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         type="json", auth="user", methods=["POST"],
     )
     def layout(self, room_width_in=12, room_depth_in=24, room_height_in=96,
-               partner_id=False, filler_strategy="split"):
+               partner_id=False, filler_strategy="split",
+               wall_cab_top_alignment="fixed_gap", soffit_height_in=84.0):
         """
         Compute the cabinet fill for the given room dimensions.
 
@@ -73,7 +74,8 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "room": {"width_in": float(room_width_in),
                          "depth_in": float(room_depth_in),
                          "height_in": float(room_height_in)},
-                "channel": self._channel_meta(partner, pricelist),
+                "channel":  self._channel_meta(partner, pricelist),
+                "warnings": [],
             }
 
         module_w = base.product_tmpl_id.southbrook_width_in or 24.0
@@ -86,7 +88,43 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         wall_h = wall.product_tmpl_id.southbrook_height_in or 30.0
         ctr_t  = 1.5    # countertop thickness (in)
         gap    = 18.0   # clearance between counter surface and wall cab bottom
-        wall_z = base_h + ctr_t + gap   # bottom of wall cabinet
+        min_z  = base_h + ctr_t + gap   # bottom of wall cabinet (industry minimum)
+
+        # D8 — Wall-cabinet Z computed from chosen alignment mode.
+        # Never drops the bottom-of-cab below the industry minimum
+        # (18" above counter); the alignment mode only raises it.
+        alignment = (wall_cab_top_alignment or "fixed_gap").lower()
+        soffit_h  = float(soffit_height_in or 0)
+        if alignment == "to_ceiling":
+            wall_z = max(min_z, float(room_height_in) - wall_h)
+        elif alignment == "to_soffit" and soffit_h > 0:
+            wall_z = max(min_z, soffit_h - wall_h)
+        else:
+            alignment = "fixed_gap"
+            wall_z = min_z
+
+        # D8 — Validation: wall cab top must not exceed the effective
+        # ceiling (soffit-bottom when 'to_soffit', otherwise ceiling).
+        effective_ceiling = (soffit_h
+            if (alignment == "to_soffit" and soffit_h > 0)
+            else float(room_height_in))
+        wall_top = wall_z + wall_h
+        warnings = []
+        if wall_top > effective_ceiling + 0.01:
+            warnings.append({
+                "code":     "WALL_CAB_EXCEEDS_CEILING",
+                "severity": "blocking",
+                "message":  (
+                    "Wall cabinet top reaches %.1f\" but %s sits at %.1f\". "
+                    "Either lower the wall cabinets, drop the alignment "
+                    "mode, or raise the %s."
+                ) % (
+                    wall_top,
+                    "soffit" if alignment == "to_soffit" else "ceiling",
+                    effective_ceiling,
+                    "soffit" if alignment == "to_soffit" else "ceiling",
+                ),
+            })
 
         items = []
         for i in range(n):
@@ -153,8 +191,9 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "filler_strategy": filler_strategy,
                 "snap_hint":       self._snap_hint(rw, module_w),
             },
-            "channel": self._channel_meta(partner, pricelist),
-            "error": "",
+            "channel":  self._channel_meta(partner, pricelist),
+            "warnings": warnings,
+            "error":    "",
         }
 
     # ─── D7 — filler helpers ────────────────────────────────────────────────────

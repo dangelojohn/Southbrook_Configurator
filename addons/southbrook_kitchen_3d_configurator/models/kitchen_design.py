@@ -60,6 +60,33 @@ class SouthbrookKitchenDesign(models.Model):
         required=True,
     )
 
+    # ── D8 — Wall-cabinet Z alignment + soffit ─────────────────────────────────
+    soffit_height_in = fields.Float(
+        string="Soffit Height (in)",
+        default=84.0,
+        digits=(6, 2),
+        help=(
+            "Bottom-of-soffit height (typical: 84\" for an 8' ceiling with a "
+            "12\" soffit drop). Only consulted when wall_cab_top_alignment is "
+            "'to_soffit'."
+        ),
+    )
+    wall_cab_top_alignment = fields.Selection(
+        selection=[
+            ("fixed_gap",  "Fixed 18\" gap above counter"),
+            ("to_ceiling", "Up to ceiling"),
+            ("to_soffit",  "Up to soffit"),
+        ],
+        string="Wall Cabinet Top",
+        default="fixed_gap",
+        help=(
+            "Drives the wall cabinet's Z position (bottom-of-cab).\n"
+            "Fixed gap: industry standard 18\" between counter and wall-cab bottom.\n"
+            "Up to ceiling: wall cab top touches ceiling (tall uppers).\n"
+            "Up to soffit: wall cab top touches the soffit drop (8' ceiling specials)."
+        ),
+    )
+
     # ── D7 — Filler strategy ────────────────────────────────────────────────────
     filler_strategy = fields.Selection(
         selection=[
@@ -135,12 +162,15 @@ class SouthbrookKitchenDesign(models.Model):
             "type": "ir.actions.client",
             "tag":  "southbrook_kitchen_configurator",
             "params": {
-                "design_id":      self.id,
-                "design_name":    self.name,
-                "room_width_in":  self.room_width_in,
-                "room_depth_in":  self.room_depth_in,
-                "room_height_in": self.room_height_in,
-                "partner_id":     self.partner_id.id if self.partner_id else False,
+                "design_id":              self.id,
+                "design_name":            self.name,
+                "room_width_in":          self.room_width_in,
+                "room_depth_in":          self.room_depth_in,
+                "room_height_in":         self.room_height_in,
+                "partner_id":             self.partner_id.id if self.partner_id else False,
+                "filler_strategy":        self.filler_strategy or "split",
+                "soffit_height_in":       self.soffit_height_in or 84.0,
+                "wall_cab_top_alignment": self.wall_cab_top_alignment or "fixed_gap",
             },
         }
 
