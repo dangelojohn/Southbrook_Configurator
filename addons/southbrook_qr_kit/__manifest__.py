@@ -43,7 +43,7 @@ SECURITY:
   Optional `expires_in_seconds` per kind — handles "one-time use"
   receipts (e.g. ephemeral POD QRs that expire in 24h).
 """,
-    "version": "19.0.0.11.0",
+    "version": "19.0.0.12.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "category": "Manufacturing",
