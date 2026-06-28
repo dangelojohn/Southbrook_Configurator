@@ -380,7 +380,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
     def _product_payload(self, product, pricelist=False, partner=False):
         tmpl = product.product_tmpl_id
         price = self._channel_price(product, pricelist, partner)
-        return {
+        payload = {
             "product_id":    product.id,
             "template_id":   tmpl.id,
             "name":          product.display_name,
@@ -398,6 +398,26 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             "image_url":     "/web/image/product.product/%d/image_128" % product.id,
             "asset_url":     tmpl.southbrook_3d_asset_url or "",
         }
+        # D17 — Tier-B additive: enrich with archetype taxonomy when
+        # the southbrook_estimating archetype map is set. x_prodboard_
+        # archetype_id is the canonical M2O to southbrook.cabinet.
+        # archetype (223 records: body_class / collection / code from
+        # the Prodboard manifest clone). Falls back silently when the
+        # field doesn't exist (older southbrook_estimating builds) or
+        # the template isn't mapped.
+        archetype = None
+        if hasattr(tmpl, "x_prodboard_archetype_id"):
+            archetype = tmpl.x_prodboard_archetype_id or None
+        if archetype:
+            payload["archetype_code"]       = getattr(archetype, "code", "") or ""
+            payload["archetype_body_class"] = getattr(archetype, "body_class", "") or ""
+            payload["archetype_collection"] = getattr(archetype, "collection", "") or ""
+            # Prefer the archetype-supplied canonical image when set —
+            # vendor renders are richer than auto-generated thumbnails.
+            canon_img = getattr(archetype, "canonical_image_url", "") or ""
+            if canon_img:
+                payload["archetype_image_url"] = canon_img
+        return payload
 
     # ─── D3 — channel pricelist resolution ──────────────────────────────────────
     # Centralise partner/pricelist plumbing so /products + /layout

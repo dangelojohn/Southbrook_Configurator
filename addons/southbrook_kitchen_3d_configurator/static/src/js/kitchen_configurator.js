@@ -2012,6 +2012,12 @@ SouthbrookKitchenConfigurator.template = xml`
           <div class="o_sbk_prod_info">
             <strong t-esc="product.name"/>
             <small><t t-esc="product.cabinet_type"/> | <t t-esc="product.material"/></small>
+            <!-- D17 — Archetype taxonomy badge when the template is
+                 mapped to a Southbrook cabinet archetype. -->
+            <span t-if="product.archetype_code" class="o_sbk_arch_badge"
+                  t-att-title="'Archetype: ' + product.archetype_code + (product.archetype_collection ? ' (' + product.archetype_collection + ')' : '')">
+              <t t-esc="product.archetype_body_class || product.archetype_code"/>
+            </span>
           </div>
           <span class="o_sbk_prod_sku"  t-esc="product.sku"/>
           <span class="o_sbk_prod_dim"  t-esc="product.width_in + '&quot;'"/>
@@ -2086,6 +2092,18 @@ SouthbrookKitchenConfigurator.template = xml`
           <dt>Height</dt>   <dd><t t-esc="state.selected.height_in"/> in</dd>
           <dt>Depth</dt>    <dd><t t-esc="state.selected.depth_in"/> in</dd>
           <dt>Material</dt> <dd><t t-esc="_materialLabel(state.selected.material)"/></dd>
+          <!-- D17 — Archetype taxonomy rows (only when mapped). -->
+          <t t-if="state.selected.archetype_code">
+            <dt>Archetype</dt>
+            <dd>
+              <strong t-esc="state.selected.archetype_code"/>
+              <span t-if="state.selected.archetype_body_class"> · <t t-esc="state.selected.archetype_body_class"/></span>
+            </dd>
+            <t t-if="state.selected.archetype_collection">
+              <dt>Collection</dt>
+              <dd t-esc="state.selected.archetype_collection"/>
+            </t>
+          </t>
           <dt>Available</dt><dd t-att-class="state.selected.available_qty > 0 ? 'ok' : 'low'">
             <t t-esc="state.selected.available_qty"/> pcs
           </dd>
