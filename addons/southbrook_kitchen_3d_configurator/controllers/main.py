@@ -20,10 +20,15 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         Dealer -50%" badge alongside the catalog. Without partner_id
         falls back to product.lst_price (retail).
         """
+        # v19 ORM rejects dotted M2O field references in order= clauses
+        # ("Invalid field property '<name>' on <model>.<m2o>") even
+        # though it accepts them in domains. Sort by sortable column-
+        # local fields here; the JS layer groups by cabinet_type on
+        # display.
         products = request.env["product.product"].search([
             ("product_tmpl_id.southbrook_is_cabinet", "=", True),
             ("sale_ok", "=", True),
-        ], order="product_tmpl_id.southbrook_cabinet_type, default_code, name")
+        ], order="default_code, name")
         partner = self._browse_partner(partner_id)
         pricelist = self._resolve_pricelist(partner)
         return {
