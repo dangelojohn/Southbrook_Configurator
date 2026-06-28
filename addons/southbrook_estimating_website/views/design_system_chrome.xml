@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Stage 3a of the 2026-06-26 Trade Portal Design System rollout.
+
+  Adds the anti-FOUC inline <script> to <head> on every website-layout
+  page. The script reads localStorage('sb-theme') and the OS prefers-
+  color-scheme media query and sets [data-theme] on <html> BEFORE the
+  stylesheet loads. Without this, users with a stored 'dark' preference
+  see a flash of light theme on every navigation.
+
+  The brief mandates this script be inline in <head>; the asset bundle
+  is deferred-loaded so it can't substitute.
+
+  The companion toggle button is injected client-side from
+  static/src/js/sb_theme_toggle.esm.js — see that file for the click
+  handler + cross-tab sync.
+-->
+<odoo>
+    <template id="design_system_fouc_guard"
+              inherit_id="website.layout"
+              priority="20"
+              name="Southbrook Design System — anti-FOUC theme guard">
+        <xpath expr="//head/meta[@charset]" position="after">
+            <!-- IMPORTANT: must run before any stylesheet loads, otherwise
+                 slow connections still flash light theme before re-flipping.
+                 Inserted right after <meta charset> so it's the FIRST thing
+                 the browser processes after charset detection — before the
+                 stylesheet <link> tags Odoo emits later in <head>. -->
+            <script t-translation="off">
+(function(){try{var s=localStorage.getItem('sb-theme');document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
+            </script>
+        </xpath>
+    </template>
+</odoo>

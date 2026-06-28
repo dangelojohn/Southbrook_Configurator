@@ -259,3 +259,385 @@
 .sb-channel-bigbox       { background: #999;               color: white; }
 .sb-channel-refacing     { background: #a08868;            color: white; }
 .sb-channel-retail       { background: var(--sb-paper);    color: var(--sb-ink); border: 1px solid var(--sb-rule); }
+
+
+// =====================================================================
+// 6 · 2026-06-26 Trade Portal Design System
+//
+// Warm taupe + slate-blue identity, gold primary action, slate ink on
+// soft grey-blue surfaces. Strict-BEM `.sb-*--variant` class set lives
+// alongside the legacy `.sb-*-variant` classes above so existing
+// markup is unaffected; templates opt into the new look by adopting
+// the new class names. Dark mode is gated by BOTH prefers-color-scheme
+// AND a [data-theme] attribute so a manual toggle can override the OS.
+//
+// Hard contract (do not weaken):
+//   - Gold primary button uses INK text in BOTH themes (white-on-gold
+//     fails WCAG at 2.53:1; ink passes at 6.13/8.39 in light/dark).
+//   - Taupe is accent/selected-state only — never small body text on
+//     a taupe background (3.30:1, UI only).
+//   - Focus rings via :focus-visible (not :focus); never remove an
+//     outline without replacing it with the box-shadow ring.
+// =====================================================================
+
+:root {
+  // 6.1 Brand
+  --sb-taupe:        #A9876B;
+  --sb-taupe-dark:   #8A6B52;
+  --sb-slate-blue:   #5B7C99;
+  --sb-ink-soft:     #2F3B52;
+
+  // 6.2 Actions
+  --sb-gold:         #C89B5A;
+  --sb-gold-hover:   #B5883F;
+  --sb-blue:         #2F57C4;
+  --sb-blue-hover:   #2546A6;
+
+  // 6.3 Surfaces
+  --sb-bg:           #FFFFFF;
+  --sb-surface:      #F6F8FB;
+  --sb-panel-grad:   linear-gradient(160deg, #F3F5F9, #E6EAF1);
+  --sb-border:       #D6DAE3;
+
+  // 6.4 Status
+  --sb-success:      #1E9E6A;
+  --sb-success-bg:   #E6F7EE;
+  --sb-warn-bg:      #FBF3D6;
+  --sb-warn-border:  #E7CE7A;
+  --sb-danger:       #C0492F;
+
+  // 6.5 Shape, type, motion, focus (brief-aligned)
+  --sb-radius-card:  12px;
+  --sb-radius-btn:   9px;
+  --sb-radius-pill:  20px;
+  --sb-font:         "Inter", "Odoo Unicode Support Noto", sans-serif;
+  --sb-shadow-card:  0 1px 3px rgba(29, 36, 51, 0.08),
+                     0 8px 24px rgba(29, 36, 51, 0.06);
+  --sb-transition:   0.14s ease-in-out;
+  --sb-focus-ring:        0 0 0 3px rgba(47, 87, 196, 0.45);
+  --sb-focus-ring-gold:   0 0 0 3px rgba(200, 155, 90, 0.45);
+
+  // 6.6 LIGHT-MODE rebind of LEGACY palette tokens to the new design
+  //     system equivalents. Without this, existing portal_root.scss
+  //     rules that use var(--sb-linen) / var(--sb-paper) / var(--sb-rule)
+  //     / var(--sb-ink) / var(--sb-walnut) still render in the old
+  //     warm-cream Signature Series palette, defeating the "one
+  //     cohesive design system" requirement of the 2026-06-26 brief.
+  //     Rebinds map each legacy semantic role to its nearest new
+  //     palette equivalent. Action accent --sb-sky is left alone so
+  //     existing channel-tradesperson badges keep their distinctive
+  //     blue. Equivalents in Section 6.4 of the dark-mode mixin keep
+  //     these tokens consistent across themes.
+  --sb-linen:        #F6F8FB;   // was #F4EDE2 cream → cool surface
+  --sb-paper:        #FFFFFF;   // was #FBF7EF cream-white → pure white
+  --sb-rule:         #D6DAE3;   // was #D8CFBF warm rule → cool border
+  --sb-rule-d:       #C2C8D4;   // was #B5A890 darker warm → cool darker border
+  --sb-ink:          #1D2433;   // was #1A1814 warm black → cool slate ink
+  --sb-ink-dim:      #6B7280;   // was #6B665E warm dim → cool dim
+  --sb-walnut:       #8A6B52;   // was #6B3F2A deep walnut → taupe-dark accent
+  --sb-walnut-d:     #5A4232;   // was #4A2B1D darker walnut → darker taupe
+  --sb-walnut-l:     #A9876B;   // was #C89E85 light walnut → taupe accent
+}
+
+// 6.6 Dark mode — applies via OS preference OR explicit data-theme="dark".
+//     The legacy --sb-ink token is intentionally re-bound here so existing
+//     elements that reference it pick up the dark palette automatically.
+@mixin sb-dark-vars {
+  --sb-taupe:        #C6A483;
+  --sb-taupe-dark:   #A9876B;
+  --sb-slate-blue:   #7FA0BD;
+  --sb-ink:          #E7EAF0;
+  --sb-ink-soft:     #F2F4F8;
+  --sb-gold:         #D6A862;
+  --sb-gold-hover:   #E4B976;
+  --sb-blue:         #5B82E6;
+  --sb-blue-hover:   #7196EC;
+  --sb-bg:           #14181F;
+  --sb-surface:      #1C222C;
+  --sb-panel-grad:   linear-gradient(160deg, #1E2530, #161B23);
+  --sb-border:       #2D3542;
+  --sb-success:      #34C98B;
+  --sb-success-bg:   rgba(52, 201, 139, 0.15);
+  --sb-warn-bg:      rgba(231, 206, 122, 0.14);
+  --sb-warn-border:  #C9AD55;
+  --sb-danger:       #E06B52;
+  --sb-shadow-card:  0 1px 2px rgba(0, 0, 0, 0.5),
+                     0 10px 28px rgba(0, 0, 0, 0.45);
+  --sb-focus-ring:        0 0 0 3px rgba(91, 130, 230, 0.55);
+  --sb-focus-ring-gold:   0 0 0 3px rgba(214, 168, 98, 0.55);
+
+  // Stage 3c — rebind LEGACY surface tokens so existing portal_root.scss
+  // rules that reference var(--sb-linen) / var(--sb-paper) / var(--sb-rule)
+  // automatically pick up dark equivalents. Without this, OWL inner panels
+  // (zone subtotals, line head, drawer, illus banner) stayed cream in dark
+  // mode because their declarations live in portal_root.scss which I'm
+  // intentionally not editing in this rollout.
+  --sb-linen:        #1C222C;   // was #F4EDE2 cream — now matches --sb-surface
+  --sb-paper:        #14181F;   // was #FBF7EF near-white — now matches --sb-bg
+  --sb-rule:         #2D3542;   // was #D8CFBF warm rule — now matches --sb-border
+  --sb-rule-d:       #3A4350;   // was #B5A890 darker warm rule
+  --sb-ink-dim:      #8A93A3;   // was #6B665E warm dim — now cool dim
+  --sb-sky-l:        #1C222C;   // was #D8E3EC pale sky — used by .o_owl_hs_customer
+}
+[data-theme="dark"] { @include sb-dark-vars; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { @include sb-dark-vars; }
+}
+
+// =====================================================================
+// 7 · Brief component classes (strict BEM, opt-in)
+// =====================================================================
+
+.sb-btn, .sb-chip, .sb-input {
+  font-family: var(--sb-font);
+  font-size: 14px;
+  transition: color var(--sb-transition),
+              background-color var(--sb-transition),
+              border-color var(--sb-transition),
+              box-shadow var(--sb-transition),
+              transform var(--sb-transition);
+}
+.sb-btn { cursor: pointer; font-weight: 600; }
+
+// 7.1 Primary (gold) — INK text mandatory in both themes
+.sb-btn.sb-btn--primary {
+  background: var(--sb-gold);
+  color: var(--sb-ink);
+  border: 1px solid var(--sb-gold);
+  border-radius: var(--sb-radius-btn);
+  padding: 13px 26px;
+
+  &:hover { background: var(--sb-gold-hover); border-color: var(--sb-gold-hover); }
+  &:active { background: var(--sb-gold-hover); transform: translateY(1px); }
+  &:focus-visible { outline: none; box-shadow: var(--sb-focus-ring-gold); }
+  &:disabled, &[aria-disabled="true"] {
+    background: #E3D7C2; border-color: #E3D7C2; color: #fff;
+    opacity: 0.7; cursor: not-allowed; transform: none;
+  }
+}
+[data-theme="dark"] .sb-btn.sb-btn--primary { color: #1A140B; }
+[data-theme="dark"] .sb-btn--primary:disabled { background: #5A5040; color: #A89C86; }
+
+// 7.2 Secondary (blue)
+.sb-btn.sb-btn--secondary {
+  background: var(--sb-blue);
+  color: #fff;
+  border: 1px solid var(--sb-blue);
+  border-radius: var(--sb-radius-btn);
+  padding: 13px 26px;
+
+  &:hover  { background: var(--sb-blue-hover); border-color: var(--sb-blue-hover); }
+  &:active { background: var(--sb-blue-hover); transform: translateY(1px); }
+  &:focus-visible { outline: none; box-shadow: var(--sb-focus-ring); }
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
+}
+
+// 7.3 Ghost
+.sb-btn.sb-btn--ghost {
+  background: #fff;
+  color: var(--sb-ink);
+  border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius-btn);
+  padding: 13px 26px;
+
+  &:hover  { background: var(--sb-surface); border-color: #C2C8D4; }
+  &:active { background: #EEF1F6; transform: translateY(1px); }
+  &:focus-visible { outline: none; box-shadow: var(--sb-focus-ring); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+[data-theme="dark"] .sb-btn.sb-btn--ghost {
+  background: var(--sb-surface); color: var(--sb-ink); border-color: var(--sb-border);
+}
+[data-theme="dark"] .sb-btn--ghost:hover { background: #232B36; border-color: #3A4350; }
+
+// 7.4 Danger
+.sb-btn.sb-btn--danger {
+  background: transparent;
+  color: var(--sb-danger);
+  border: 1px solid var(--sb-danger);
+  border-radius: var(--sb-radius-btn);
+  padding: 13px 26px;
+
+  &:hover  { background: var(--sb-danger); color: #fff; }
+  &:active { background: #A23B25; border-color: #A23B25; transform: translateY(1px); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(192, 73, 47, 0.40); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+// 7.5 Cards & panels
+.sb-card, .sb-panel {
+  background: #fff;
+  border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius-card);
+  box-shadow: var(--sb-shadow-card);
+}
+[data-theme="dark"] .sb-card,
+[data-theme="dark"] .sb-panel {
+  background: var(--sb-surface);
+  border-color: var(--sb-border);
+}
+.sb-preview {
+  background: var(--sb-panel-grad);
+  border-radius: var(--sb-radius-card);
+}
+
+// 7.6 Option chips
+.sb-chip {
+  background: #fff;
+  color: var(--sb-ink);
+  border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius-pill);
+  padding: 7px 12px;
+  cursor: pointer;
+
+  &:hover { border-color: var(--sb-taupe); background: #FBF9F6; }
+  &:focus-visible { outline: none; box-shadow: var(--sb-focus-ring-gold); }
+  &[aria-pressed="true"], &.is-selected {
+    border-color: var(--sb-taupe);
+    background: rgba(169, 135, 107, 0.12);
+    color: var(--sb-ink);
+    font-weight: 600;
+  }
+  &:disabled { opacity: 0.45; cursor: not-allowed; background: var(--sb-surface); }
+}
+[data-theme="dark"] .sb-chip {
+  background: var(--sb-surface); color: var(--sb-ink); border-color: var(--sb-border);
+}
+[data-theme="dark"] .sb-chip:hover { background: #232B36; border-color: var(--sb-taupe); }
+[data-theme="dark"] .sb-chip.is-selected,
+[data-theme="dark"] .sb-chip[aria-pressed="true"] {
+  background: rgba(198, 164, 131, 0.20);
+  border-color: var(--sb-taupe);
+}
+
+// 7.7 Inputs
+.sb-input {
+  background: #fff;
+  color: var(--sb-ink);
+  border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius-btn);
+  padding: 10px 12px;
+
+  &:hover { border-color: #C2C8D4; }
+  &:focus { outline: none; border-color: var(--sb-blue); box-shadow: var(--sb-focus-ring); }
+  &:disabled { background: var(--sb-surface); color: #9AA1AE; cursor: not-allowed; }
+  &.is-invalid {
+    border-color: var(--sb-danger);
+    box-shadow: 0 0 0 3px rgba(192, 73, 47, 0.25);
+  }
+}
+[data-theme="dark"] .sb-input {
+  background: #11151C; color: var(--sb-ink); border-color: var(--sb-border);
+}
+[data-theme="dark"] .sb-input::placeholder { color: #7C8593; }
+
+// 7.8 Links
+a.sb-link {
+  color: var(--sb-blue);
+  text-decoration: none;
+  &:hover { color: var(--sb-blue-hover); text-decoration: underline; }
+  &:focus-visible { outline: none; box-shadow: var(--sb-focus-ring); border-radius: 3px; }
+}
+
+// 7.9 Badges + seed-data note
+.sb-badge--live {
+  background: var(--sb-success-bg);
+  color: var(--sb-success);
+  border-radius: var(--sb-radius-pill);
+  font-weight: 700; font-size: 10px; letter-spacing: 0.05em;
+  padding: 2px 8px;
+}
+.sb-badge--preview {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--sb-ink-soft);
+  border-radius: var(--sb-radius-pill);
+  font-weight: 700; font-size: 10px; letter-spacing: 0.05em;
+  padding: 3px 9px;
+}
+.sb-note--seed {
+  background: var(--sb-warn-bg);
+  border-left: 4px solid var(--sb-warn-border);
+  border-radius: var(--sb-radius-card);
+  padding: 12px 14px;
+}
+
+// 7.10 Stage stepper — DRAFT → ESTIMATING → APPROVAL → CONFIRMED → IN PRODUCTION
+.sb-stepper { display: flex; gap: 6px; flex-wrap: wrap; }
+.sb-step    { padding: 8px 16px; border-radius: 6px; font-size: 12px;
+              font-weight: 600; letter-spacing: 0.03em; }
+.sb-step--complete { background: var(--sb-success); color: #fff; }
+.sb-step--active   { background: var(--sb-ink);     color: #fff; }
+.sb-step--upcoming { background: var(--sb-surface); color: #6B7280; }
+[data-theme="dark"] .sb-step--active   { background: #E7EAF0; color: #14181F; }
+[data-theme="dark"] .sb-step--upcoming { background: #1C222C; color: #8A93A3; }
+
+// 7.11 Theme toggle button — uses .sb-btn--ghost as base
+.sb-theme-toggle .sb-theme-icon { margin-right: 6px; }
+
+// =====================================================================
+// 8 · Stage 3b — global dark-mode re-skin for elements that DON'T carry
+//     .sb-* classes. Lifts body background, generic Bootstrap-style
+//     .card surfaces, and Southbrook portal-specific wrappers into the
+//     dark palette so the page chrome respects the theme even where
+//     individual templates haven't adopted the design system classes.
+//
+//     Scoped to [data-theme="dark"] only — light theme inherits Odoo
+//     defaults. Specificity bumped via compound selectors where Odoo's
+//     own rules already declare a background/color at single-class
+//     specificity (e.g. `.card`).
+// =====================================================================
+
+[data-theme="dark"] body,
+[data-theme="dark"] body.o_portal {
+  background: var(--sb-bg);
+  color: var(--sb-ink);
+}
+
+// Bootstrap card surfaces used widely across Odoo portal templates.
+[data-theme="dark"] .card.card,
+[data-theme="dark"] .card-body.card-body {
+  background: var(--sb-surface);
+  color: var(--sb-ink);
+  border-color: var(--sb-border);
+}
+[data-theme="dark"] .card.card .text-muted,
+[data-theme="dark"] .card.card .card-text.small {
+  color: #8A93A3;
+}
+
+// Southbrook portal-specific wrappers from portal_template.xml.
+[data-theme="dark"] .o_southbrook_portal_header.card,
+[data-theme="dark"] .o_southbrook_portal_cta.card {
+  background: var(--sb-surface);
+  color: var(--sb-ink);
+  border-color: var(--sb-border);
+}
+
+// Homepage hero / feature panels (defined in homepage.scss with old
+// palette tokens). Re-skin via .o_sb_hero / .o_sb_feature wrappers.
+[data-theme="dark"] .o_sb_hero,
+[data-theme="dark"] .o_sb_feature,
+[data-theme="dark"] .o_sb_section,
+[data-theme="dark"] section.o_sb_section {
+  background: var(--sb-bg);
+  color: var(--sb-ink);
+}
+[data-theme="dark"] .o_sb_hero h1,
+[data-theme="dark"] .o_sb_hero h2,
+[data-theme="dark"] .o_sb_section h2,
+[data-theme="dark"] .o_sb_section h3 {
+  color: var(--sb-ink-soft);
+}
+[data-theme="dark"] .o_sb_hero p,
+[data-theme="dark"] .o_sb_section p {
+  color: #B8BEC9;
+}
+
+// Catch-all for any portal section/main that Odoo paints white by default.
+[data-theme="dark"] main,
+[data-theme="dark"] .o_portal_wrap,
+[data-theme="dark"] .container,
+[data-theme="dark"] .container-fluid {
+  background: var(--sb-bg);
+  color: var(--sb-ink);
+}

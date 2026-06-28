@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.18.0.2",
+    "version": "19.0.19.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -39,6 +39,10 @@
         # potentially non-singleton pricelist recordset. Override
         # swaps to website.currency_id (singleton, always available).
         "views/shop_configurator_currency_fix.xml",
+        # 2026-06-26 Stage 3a — anti-FOUC inline <script> for the
+        # design system theme toggle. MUST inline in <head> per the
+        # brief (asset bundle JS loads too late to prevent flash).
+        "views/design_system_chrome.xml",
     ],
     # Dedicated asset bundle (charter Q4 answer) so the OWL portal
     # components only load on the Order Builder route. Other portal
@@ -74,6 +78,14 @@
             # "southbrook_estimating/static/lib/three/GLTFLoader.js",
             "southbrook_estimating/static/src/js/cabinet_glb_loader.esm.js",
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
+            # 2026-06-26 Stage 3c — cascade-tie resolver. MUST load
+            # AFTER portal_root.scss so equal-specificity .sb-* rules
+            # win the source-order tie against legacy .o_owl_* rules.
+            # Without this, the modal Send-to-Production primary, the
+            # ILLUSTRATIVE SEED banner border/radius, and the order-
+            # lines table header (hardcoded #faf4e8) stay on the old
+            # palette.
+            "southbrook_estimating_website/static/src/scss/_southbrook_design_overrides.scss",
             # Phase 2.B (2026-06-27) — Room Setup tab styles. Loaded
             # after portal_root.scss so the --sb-* tokens are bound to
             # the active theme; sb-room-* classes only attach inside
@@ -112,6 +124,11 @@
             # mount-point div and returns early if absent on the
             # current page).
             "southbrook_estimating_website/static/src/js/planner_boot.esm.js",
+            # 2026-06-26 Stage 3a — design-system theme toggle button
+            # (creates the fixed-position top-right toggle on every
+            # portal page; pairs with views/design_system_chrome.xml
+            # which inlines the anti-FOUC guard).
+            "southbrook_estimating_website/static/src/js/sb_theme_toggle.esm.js",
         ],
     },
     "installable": True,
