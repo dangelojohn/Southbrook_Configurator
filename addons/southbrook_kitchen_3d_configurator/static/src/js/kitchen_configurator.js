@@ -87,6 +87,19 @@ class SouthbrookKitchenConfigurator extends Component {
             // D1 — multi-view camera system. 'iso' default; switchable
             // among iso/top/front/left/right/persp. Hotkeys 1-6 + R reset.
             view:      "iso",
+            // D3 — partner-driven channel pricelist. partnerId is set
+            // from props (when opened from a design with a customer)
+            // or stays null (configurator opened standalone). channel
+            // meta is populated by the first /products + /layout RPC
+            // response and drives the topbar badge.
+            partnerId: this.props.partner_id || null,
+            channel:   {
+                partner_name:    "",
+                channel:         "retail",
+                channel_label:   "Retail",
+                pricelist_name:  "",
+                currency_symbol: "$",
+            },
         });
 
         // ── Three.js scene state (not reactive — managed imperatively) ────────
@@ -143,7 +156,17 @@ class SouthbrookKitchenConfigurator extends Component {
     // ─── Odoo data ──────────────────────────────────────────────────────────────
     async _loadProducts() {
         try {
-            this.state.products = await rpc("/southbrook_kitchen/configurator/products", {});
+            const resp = await rpc("/southbrook_kitchen/configurator/products", {
+                partner_id: this.state.partnerId || false,
+            });
+            // D3 — response is now {channel, products}; handle the
+            // legacy bare-array shape too for forward-compat.
+            if (Array.isArray(resp)) {
+                this.state.products = resp;
+            } else {
+                this.state.products = resp.products || [];
+                if (resp.channel) this.state.channel = resp.channel;
+            }
         } catch (_) {
             this.state.products = [];
         }
@@ -155,10 +178,12 @@ class SouthbrookKitchenConfigurator extends Component {
                 room_width_in:  this.state.room.width_in,
                 room_depth_in:  this.state.room.depth_in,
                 room_height_in: this.state.room.height_in,
+                partner_id:     this.state.partnerId || false,
             });
             this.state.error   = result.error || "";
             this.state.items   = result.items  || [];
             this.state.summary = result.summary || this.state.summary;
+            if (result.channel) this.state.channel = result.channel;
             if (!this.state.selected && this.state.items.length) {
                 this.state.selected = this.state.items[0];
             }
@@ -972,7 +997,10 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // ─── Formatting helpers ───────────────────────────────────────────────────────
-    _money(v) { return `$${Number(v || 0).toFixed(2)}`; }
+    _money(v) {
+        const sym = (this.state.channel && this.state.channel.currency_symbol) || "$";
+        return `${sym}${Number(v || 0).toFixed(2)}`;
+    }
 
     _materialLabel(k) {
         return ({
@@ -1000,6 +1028,16 @@ SouthbrookKitchenConfigurator.template = xml`
         <div class="o_sbk_brand_label">SOUTHBROOK KITCHEN</div>
         <h1 class="o_sbk_title">3D Room Configurator</h1>
       </div>
+    </div>
+    <!-- D3 — Channel pricing badge. Shows the partner-resolved
+         pricelist so every price the user sees in the configurator
+         is the one the quote will use. Suppressed for the default
+         retail/no-partner case so it doesn't clutter the topbar. -->
+    <div t-if="state.channel.channel !== 'retail'" class="o_sbk_channel_badge"
+         t-att-title="'Pricelist: ' + state.channel.pricelist_name + (state.channel.partner_name ? ' (' + state.channel.partner_name + ')' : '')">
+      <span class="o_sbk_channel_dot"
+            t-att-class="'o_sbk_channel_dot o_sbk_ch_' + state.channel.channel"/>
+      <span class="o_sbk_channel_label" t-esc="state.channel.channel_label"/>
     </div>
     <div class="o_sbk_actions">
       <button class="o_sbk_btn o_sbk_btn_ghost"
@@ -1256,6 +1294,9 @@ SouthbrookKitchenConfigurator.props = {
     room_width_in:  { type: Number, optional: true },
     room_depth_in:  { type: Number, optional: true },
     room_height_in: { type: Number, optional: true },
+    // D3 — partner for channel pricelist resolution.
+    partner_id:     { type: Number, optional: true },
+    "*":            true,
 };
 SouthbrookKitchenConfigurator.defaultProps = {};
 

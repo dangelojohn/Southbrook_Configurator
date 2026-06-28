@@ -98,15 +98,22 @@ class SouthbrookKitchenDesign(models.Model):
         return True
 
     def action_open_configurator(self):
-        """Open the 3D Configurator pre-loaded with this design's dimensions."""
+        """Open the 3D Configurator pre-loaded with this design's dimensions.
+
+        D3 — also forwards partner_id so the configurator resolves the
+        channel pricelist (Dealer/Tradesperson/etc.) for live pricing,
+        instead of always showing retail.
+        """
         return {
             "type": "ir.actions.client",
             "tag":  "southbrook_kitchen_configurator",
             "params": {
-                "design_id":     self.id,
+                "design_id":      self.id,
+                "design_name":    self.name,
                 "room_width_in":  self.room_width_in,
                 "room_depth_in":  self.room_depth_in,
                 "room_height_in": self.room_height_in,
+                "partner_id":     self.partner_id.id if self.partner_id else False,
             },
         }
 

@@ -11,20 +11,33 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         "/southbrook_kitchen/configurator/products",
         type="json", auth="user", methods=["POST"],
     )
-    def products(self):
-        """Return all cabinet products available to the configurator."""
+    def products(self, partner_id=False):
+        """Return all cabinet products available to the configurator.
+
+        D3 — when partner_id is supplied, prices reflect the partner's
+        channel pricelist (Dealer/Tradesperson/etc.). Also returns the
+        resolved channel metadata so the UI can show a "Channel:
+        Dealer -50%" badge alongside the catalog. Without partner_id
+        falls back to product.lst_price (retail).
+        """
         products = request.env["product.product"].search([
             ("product_tmpl_id.southbrook_is_cabinet", "=", True),
             ("sale_ok", "=", True),
         ], order="product_tmpl_id.southbrook_cabinet_type, default_code, name")
-        return [self._product_payload(p) for p in products]
+        partner = self._browse_partner(partner_id)
+        pricelist = self._resolve_pricelist(partner)
+        return {
+            "channel": self._channel_meta(partner, pricelist),
+            "products": [self._product_payload(p, pricelist, partner) for p in products],
+        }
 
     # ── Layout calculation ───────────────────────────────────────────────────────
     @http.route(
         "/southbrook_kitchen/configurator/layout",
         type="json", auth="user", methods=["POST"],
     )
-    def layout(self, room_width_in=12, room_depth_in=24, room_height_in=96):
+    def layout(self, room_width_in=12, room_depth_in=24, room_height_in=96,
+               partner_id=False):
         """
         Compute the cabinet fill for the given room dimensions.
 
@@ -32,11 +45,20 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
           room        — echoed dimensions
           items       — list of cabinet placement records
           summary     — counts, totals, remainder
+          channel     — pricelist metadata (D3)
           error       — non-empty string if no products configured
+
+        D3 — partner_id (optional) drives channel-pricelist resolution
+        so per-item prices and the summary total reflect Dealer /
+        Tradesperson / KD / etc. discounts. Falls back to retail when
+        no partner is supplied.
         """
         env = request.env
         base = self._first_product(env, "base")
         wall = self._first_product(env, "wall")
+
+        partner = self._browse_partner(partner_id)
+        pricelist = self._resolve_pricelist(partner)
 
         if not base or not wall:
             return {
@@ -51,6 +73,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "room": {"width_in": float(room_width_in),
                          "depth_in": float(room_depth_in),
                          "height_in": float(room_height_in)},
+                "channel": self._channel_meta(partner, pricelist),
             }
 
         module_w = base.product_tmpl_id.southbrook_width_in or 24.0
@@ -68,14 +91,14 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         items = []
         for i in range(n):
             x = i * module_w
-            items.append(self._layout_item(base, i, x, 0.0, 0.0))
-            items.append(self._layout_item(wall, i, x, 0.0, wall_z))
+            items.append(self._layout_item(base, i, x, 0.0, 0.0,    pricelist, partner))
+            items.append(self._layout_item(wall, i, x, 0.0, wall_z, pricelist, partner))
 
         # Filler panel if there is significant remainder
         if remainder >= 1.0:
             filler = self._first_product(env, "filler")
             if filler:
-                fp = self._product_payload(filler)
+                fp = self._product_payload(filler, pricelist, partner)
                 fp.update({
                     "layout_key":    "filler-0",
                     "x_position_in": n * module_w,
@@ -103,6 +126,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "price":        total_price,
                 "remainder_in": round(remainder, 2),
             },
+            "channel": self._channel_meta(partner, pricelist),
             "error": "",
         }
 
@@ -165,8 +189,8 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             ("sale_ok", "=", True),
         ], limit=1)
 
-    def _layout_item(self, product, index, x, y, z):
-        payload = self._product_payload(product)
+    def _layout_item(self, product, index, x, y, z, pricelist=False, partner=False):
+        payload = self._product_payload(product, pricelist, partner)
         payload.update({
             "layout_key":    "%s-%d" % (payload["cabinet_type"], index + 1),
             "x_position_in": x,
@@ -175,8 +199,9 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         })
         return payload
 
-    def _product_payload(self, product):
+    def _product_payload(self, product, pricelist=False, partner=False):
         tmpl = product.product_tmpl_id
+        price = self._channel_price(product, pricelist, partner)
         return {
             "product_id":    product.id,
             "template_id":   tmpl.id,
@@ -188,9 +213,83 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             "depth_in":      tmpl.southbrook_depth_in  or 24.0,
             "material":      tmpl.southbrook_material   or "white_melamine",
             "door_style":    tmpl.southbrook_door_style or "shaker",
-            "price":         product.lst_price,
+            "price":         price,
+            "list_price":    product.lst_price,
             "available_qty": product.qty_available,
             "bom_available": tmpl.southbrook_bom_available,
             "image_url":     "/web/image/product.product/%d/image_128" % product.id,
             "asset_url":     tmpl.southbrook_3d_asset_url or "",
         }
+
+    # ─── D3 — channel pricelist resolution ──────────────────────────────────────
+    # Centralise partner/pricelist plumbing so /products + /layout
+    # share the same resolver and the UI gets a single channel-meta
+    # block to render the topbar badge.
+
+    def _browse_partner(self, partner_id):
+        if not partner_id:
+            return request.env["res.partner"]
+        try:
+            pid = int(partner_id)
+        except (TypeError, ValueError):
+            return request.env["res.partner"]
+        if pid <= 0:
+            return request.env["res.partner"]
+        return request.env["res.partner"].sudo().browse(pid).exists()
+
+    def _resolve_pricelist(self, partner):
+        # Reuses the canonical southbrook_estimating dispatcher so the
+        # configurator's live preview matches the price the Order
+        # Builder + spec sheet PDF will charge. Falls back to retail
+        # when no partner.
+        SaleOrder = request.env["sale.order"]
+        if hasattr(SaleOrder, "_resolve_channel_pricelist"):
+            try:
+                return SaleOrder._resolve_channel_pricelist(partner)
+            except Exception:
+                pass
+        # Fallback if southbrook_estimating isn't installed: partner's
+        # property pricelist, else the env default.
+        if partner:
+            pl = partner.property_product_pricelist
+            if pl:
+                return pl
+        return request.env["product.pricelist"].search([], limit=1)
+
+    def _channel_price(self, product, pricelist, partner):
+        if not pricelist:
+            return product.lst_price
+        try:
+            # v19 unified API: pricelist._get_product_price(product, qty, partner)
+            return pricelist._get_product_price(product, 1.0, partner or False)
+        except Exception:
+            return product.lst_price
+
+    def _channel_meta(self, partner, pricelist):
+        # Compact dict the UI renders into a topbar badge.
+        channel = (partner and partner.channel) or "retail"
+        # Best-effort tier suffix for tradesperson.
+        suffix = ""
+        if channel == "tradesperson" and partner:
+            tier = getattr(partner, "tradesperson_tier", False)
+            if tier:
+                suffix = " T%s" % tier
+        return {
+            "partner_id":     (partner and partner.id) or False,
+            "partner_name":   (partner and partner.display_name) or "",
+            "channel":        channel,
+            "channel_label":  self._CHANNEL_LABELS.get(channel, channel.title()) + suffix,
+            "pricelist_id":   (pricelist and pricelist.id) or False,
+            "pricelist_name": (pricelist and pricelist.display_name) or "",
+            "currency_id":    (pricelist and pricelist.currency_id.id) or False,
+            "currency_symbol": (pricelist and pricelist.currency_id.symbol) or "$",
+        }
+
+    _CHANNEL_LABELS = {
+        "retail":       "Retail",
+        "dealer":       "Dealer -50%",
+        "tradesperson": "Contractor",
+        "kd":           "KD",
+        "bigbox":       "Big-Box",
+        "refacing":     "Refacing",
+    }

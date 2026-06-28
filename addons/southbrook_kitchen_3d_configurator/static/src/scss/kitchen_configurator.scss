@@ -288,6 +288,36 @@ $sbk-amber:      #B45309;
     border: 1px solid rgba(26, 102, 212, 0.3);
 }
 
+// D3 — Channel pricing badge (topbar, between brand and action cluster)
+.o_sbk_channel_badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    margin: 0 12px;
+    background: rgba(26, 102, 212, 0.07);
+    border: 1px solid rgba(26, 102, 212, 0.28);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f3a8a;
+    white-space: nowrap;
+    line-height: 1;
+    align-self: center;
+}
+.o_sbk_channel_dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #6c757d;
+}
+.o_sbk_channel_dot.o_sbk_ch_dealer       { background: #2f57c4; }
+.o_sbk_channel_dot.o_sbk_ch_tradesperson { background: #1e9e6a; }
+.o_sbk_channel_dot.o_sbk_ch_kd           { background: #c89b5a; }
+.o_sbk_channel_dot.o_sbk_ch_bigbox       { background: #888; }
+.o_sbk_channel_dot.o_sbk_ch_refacing     { background: #a08868; }
+.o_sbk_channel_dot.o_sbk_ch_retail       { background: #6c757d; }
+
 // D1 — View switcher toolbar (top-right of scene panel)
 .o_sbk_viewbar {
     position: absolute;
