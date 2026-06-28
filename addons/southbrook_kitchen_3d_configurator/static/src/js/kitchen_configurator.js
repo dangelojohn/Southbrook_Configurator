@@ -100,7 +100,14 @@ class SouthbrookKitchenConfigurator extends Component {
                 pricelist_name:  "",
                 currency_symbol: "$",
             },
+            // D5 — debounced auto-save state. autoSaving renders the
+            // tiny "Saving..." pill; lastAutoSaveAt feeds the "Saved
+            // <Xs> ago" hint.
+            autoSaving:      false,
+            lastAutoSaveAt:  0,
         });
+        // Auto-save debounce timer (not reactive; managed imperatively).
+        this._autoSaveTimer = null;
 
         // ── Three.js scene state (not reactive — managed imperatively) ────────
         // D1 — `camera` is now `activeCamera`, swapped between the two
@@ -240,11 +247,13 @@ class SouthbrookKitchenConfigurator extends Component {
         const min = { width_in: 12, depth_in: 12, height_in: 84 };
         this.state.room[field] = Math.max(min[field] || 12, v);
         await this._refreshLayout();
+        this._queueAutoSave();    // D5
     }
 
     async _stretchWidth(delta) {
         this.state.room.width_in = Math.max(12, this.state.room.width_in + delta);
         await this._refreshLayout();
+        this._queueAutoSave();    // D5
     }
 
     _selectCabinet(item) {
@@ -274,6 +283,7 @@ class SouthbrookKitchenConfigurator extends Component {
         sel.width_in = v;
         this._recomputeLayoutFromItems();
         if (this.T.scene) this._buildScene();
+        this._queueAutoSave();    // D5
     }
 
     // Product swap: replace cabinet at the same position with the
@@ -302,6 +312,7 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.selected = merged;
         this._recomputeLayoutFromItems();
         if (this.T.scene) this._buildScene();
+        this._queueAutoSave();    // D5
     }
 
     // Remove the selected cabinet entirely.
@@ -315,6 +326,7 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.selected = this.state.items[idx] || this.state.items[idx - 1] || null;
         this._recomputeLayoutFromItems();
         if (this.T.scene) this._buildScene();
+        this._queueAutoSave();    // D5
     }
 
     // Cascade x positions inside each cabinet group (base / wall / filler).
@@ -678,6 +690,12 @@ class SouthbrookKitchenConfigurator extends Component {
 
     _destroyScene() {
         const t = this.T;
+        // D5 — clear any pending auto-save so we don't fire after the
+        // component unmounts (would leak network and warn the console).
+        if (this._autoSaveTimer) {
+            clearTimeout(this._autoSaveTimer);
+            this._autoSaveTimer = null;
+        }
         if (t.animId) cancelAnimationFrame(t.animId);
         if (this._resizeObserver) this._resizeObserver.disconnect();
         const mount = this.canvas3dRef.el;
@@ -991,7 +1009,7 @@ class SouthbrookKitchenConfigurator extends Component {
     _onMouseUp() {
         if (this.T.dragging) {
             this.T.dragging = false;
-            this._refreshLayout();
+            this._refreshLayout().then(() => this._queueAutoSave());   // D5
         }
     }
 
@@ -1013,19 +1031,62 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.saving = true;
         try {
             const result = await rpc("/southbrook_kitchen/configurator/save", {
-                name:      this.state.designName ||
-                           `Kitchen ${this.state.room.width_in}"`,
-                room:      this.state.room,
-                items:     this.state.items,
-                design_id: this.state.designId || false,
+                name:       this.state.designName ||
+                            `Kitchen ${this.state.room.width_in}"`,
+                room:       this.state.room,
+                items:      this.state.items,
+                design_id:  this.state.designId || false,
+                partner_id: this.state.partnerId || false,
             });
-            this.state.designId   = result.id;
-            this.state.designName = result.name;
+            this.state.designId       = result.id;
+            this.state.designName     = result.name;
+            this.state.lastAutoSaveAt = Date.now();
             this.notification.add(`Saved: ${result.name}`, { type: "success" });
         } catch (e) {
             this.notification.add("Save failed: " + (e.message || e), { type: "danger" });
         } finally {
             this.state.saving = false;
+        }
+    }
+
+    // ─── D5 — Debounced auto-save ───────────────────────────────────────────────
+    // Called from every mutation path (room change, drag-resize end,
+    // cabinet edit drawer ops). 3s after the last edit, fires a silent
+    // save against /save. Skipped when state.items is empty (nothing
+    // to persist) or a manual save is in flight.
+    _queueAutoSave() {
+        if (this._autoSaveTimer) {
+            clearTimeout(this._autoSaveTimer);
+            this._autoSaveTimer = null;
+        }
+        if (!this.state.items || !this.state.items.length) return;
+        this._autoSaveTimer = setTimeout(() => {
+            this._autoSaveTimer = null;
+            this._autoSave();
+        }, 3000);
+    }
+
+    async _autoSave() {
+        if (this.state.saving) return;       // manual save in flight - skip
+        if (this.state.autoSaving) return;   // another auto-save in flight
+        this.state.autoSaving = true;
+        try {
+            const result = await rpc("/southbrook_kitchen/configurator/save", {
+                name:       this.state.designName || "Untitled Kitchen",
+                room:       this.state.room,
+                items:      this.state.items,
+                design_id:  this.state.designId || false,
+                partner_id: this.state.partnerId || false,
+            });
+            this.state.designId       = result.id;
+            this.state.designName     = result.name;
+            this.state.lastAutoSaveAt = Date.now();
+        } catch (e) {
+            // Silent on auto-save: manual save will surface errors. Log
+            // for diagnostics only.
+            console.warn("[SouthbrookKitchenConfigurator] auto-save failed:", e);
+        } finally {
+            this.state.autoSaving = false;
         }
     }
 
@@ -1092,6 +1153,11 @@ SouthbrookKitchenConfigurator.template = xml`
               t-on-click="_openDesigns">
         Kitchen Designs
       </button>
+      <!-- D5 — Background auto-save status pill. Quiet by default;
+           pops "Saving..." during a debounced save and a green
+           checkmark for ~3s after success. -->
+      <span t-if="state.autoSaving" class="o_sbk_autosave">Saving…</span>
+      <span t-elif="state.lastAutoSaveAt &gt; 0" class="o_sbk_autosave is-ok">✓ Auto-saved</span>
       <button class="o_sbk_btn o_sbk_btn_primary"
               t-att-disabled="state.saving || !state.items.length"
               t-on-click="_saveDesign">

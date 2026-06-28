@@ -288,6 +288,26 @@ $sbk-amber:      #B45309;
     border: 1px solid rgba(26, 102, 212, 0.3);
 }
 
+// D5 — Auto-save status pill (sits left of the Save Design button)
+.o_sbk_autosave {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 11px;
+    color: #6c757d;
+    border-radius: 4px;
+    background: rgba(108, 117, 125, 0.10);
+    margin-right: 8px;
+    font-family: -apple-system, "Inter", sans-serif;
+    white-space: nowrap;
+    &.is-ok {
+        color: #1e9e6a;
+        background: rgba(30, 158, 106, 0.10);
+    }
+}
+
 // D4 — "Save as my default" link in left controls
 .o_sbk_save_default_link {
     display: inline-block;
