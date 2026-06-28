@@ -111,10 +111,11 @@ class SouthbrookKitchenDesign(models.Model):
         }
 
     def action_create_quotation(self):
+        SaleOrder = self.env["sale.order"]
         for design in self:
             if not design.partner_id:
                 raise UserError("Select a customer before creating a quotation.")
-            order = self.env["sale.order"].create({
+            vals = {
                 "partner_id": design.partner_id.id,
                 "origin":     design.name,
                 "note":       design.notes or "",
@@ -127,7 +128,16 @@ class SouthbrookKitchenDesign(models.Model):
                     })
                     for line in design.cabinet_line_ids
                 ],
-            })
+            }
+            # 2026-06-28 Tier-A — resolve the channel pricelist BEFORE
+            # create so the order opens on the right pricelist (Dealer
+            # −50% / Tradesperson tier-3 −35% / etc.) instead of the
+            # default retail. Without this, a Dealer customer who saw
+            # $1,036 in the Order Builder would see $1,594 here.
+            pricelist = SaleOrder._resolve_channel_pricelist(design.partner_id)
+            if pricelist:
+                vals["pricelist_id"] = pricelist.id
+            order = SaleOrder.create(vals)
             design.sale_order_id = order.id
             design.state = "quoted"
         return {

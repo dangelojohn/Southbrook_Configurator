@@ -46,18 +46,19 @@ const P = {
     arrow:   0x1866D4,
 };
 
-// ─── Dynamic Three.js loader ──────────────────────────────────────────────────
-const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js";
-
+// ─── Three.js loader ──────────────────────────────────────────────────────────
+// As of 19.0.3.0.0 we depend on southbrook_estimating, which ships a
+// vendored r160 build of THREE in web.assets_backend (via this addon's
+// manifest). The previous CDN load of three@0.128 was dropped — it
+// lacked SRGBColorSpace / ACESFilmicToneMapping (r152+) and double-
+// loaded against the catalog's local copy. window.THREE is guaranteed
+// to be present at module load time.
 function loadThreeJS() {
     if (window.THREE) return Promise.resolve(window.THREE);
-    return new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = THREE_CDN;
-        s.onload  = () => resolve(window.THREE);
-        s.onerror = () => reject(new Error("Failed to load Three.js from CDN"));
-        document.head.appendChild(s);
-    });
+    return Promise.reject(new Error(
+        "Three.js not available. southbrook_estimating's vendored " +
+        "three.min.js must load before kitchen_configurator.js (see manifest)."
+    ));
 }
 
 // ─── OWL Component ────────────────────────────────────────────────────────────
@@ -193,29 +194,53 @@ class SouthbrookKitchenConfigurator extends Component {
         camera.lookAt(4, 2.5, 1.5);
         this.T.camera = camera;
 
-        // Renderer
+        // Renderer — ACES Filmic + sRGB for the canonical Southbrook
+        // PBR pipeline (matches cabinet_viewport.esm.js Phase 2.5 spec).
+        // The previous NoToneMapping + MeshLambertMaterial combo crushed
+        // mid-tones and made the cabinets look uniformly dark.
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(W, H);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+        if (THREE.SRGBColorSpace) {
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+        }
+        renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
         mount.appendChild(renderer.domElement);
         this.T.renderer = renderer;
 
-        // Lighting
-        scene.add(new THREE.AmbientLight(0xFFF5E8, 0.65));
-        const sun = new THREE.DirectionalLight(0xFFFAF0, 0.88);
-        sun.position.set(20, 30, 20);
-        sun.castShadow = true;
-        sun.shadow.mapSize.set(2048, 2048);
-        Object.assign(sun.shadow.camera, { left: -25, right: 25, top: 25, bottom: -25, far: 120 });
-        scene.add(sun);
-        const fill   = new THREE.DirectionalLight(0xCCDDFF, 0.20);
-        fill.position.set(-10, 8, -10);
-        scene.add(fill);
-        const bounce = new THREE.DirectionalLight(0xFFEECC, 0.10);
-        bounce.position.set(0, -5, 15);
-        scene.add(bounce);
+        // Lighting — 4-light rig (hemi + key/fill/front directional)
+        // ported from southbrook_estimating/cabinet_viewport.esm.js.
+        // HemisphereLight does the heavy lift for "cabinets aren't dark";
+        // the key + fill + front trio gives every face direct illumination
+        // without flat shadowing.
+        const hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbf, 0.5);
+        scene.add(hemi);
+
+        const dirA = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirA.position.set(20, 30, 20);
+        dirA.castShadow = true;
+        dirA.shadow.mapSize.set(2048, 2048);
+        Object.assign(dirA.shadow.camera, {
+            left: -25, right: 25, top: 25, bottom: -25, near: 0.1, far: 120,
+        });
+        dirA.shadow.bias = -0.0005;
+        scene.add(dirA);
+
+        const dirB = new THREE.DirectionalLight(0xffffff, 0.3);
+        dirB.position.set(-10, 12, -8);
+        scene.add(dirB);
+
+        const dirFront = new THREE.DirectionalLight(0xffffff, 0.4);
+        dirFront.position.set(0, 8, 25);
+        scene.add(dirFront);
+
+        // PBR env map — async, non-blocking. Falls back silently if the
+        // PMREM step fails on the user's GL stack; the direct-lit rig
+        // above still renders the scene fine.
+        this._installPbrEnvMap();
 
         // Render loop
         const tick = () => {
@@ -242,6 +267,41 @@ class SouthbrookKitchenConfigurator extends Component {
         mount.addEventListener("mouseup",    this._onMouseUp);
         mount.addEventListener("mouseleave", this._onMouseUp);
         mount.addEventListener("mousemove",  this._onMouseOver);
+    }
+
+    // ─── PBR environment map (PMREM) ────────────────────────────────────────────
+    // Builds a small studio HDR-equivalent from a vertical gradient on a
+    // canvas, runs it through PMREMGenerator, and assigns the result as
+    // scene.environment. Adds soft PBR reflections on MeshStandardMaterial
+    // metalness/roughness without needing an HDR file at runtime.
+    // Mirrors southbrook_estimating_website/kitchen_viewport.esm.js.
+    _installPbrEnvMap() {
+        const { THREE, scene, renderer } = this.T;
+        if (!THREE || !scene || !renderer) return;
+        if (!THREE.PMREMGenerator)        return;
+        try {
+            const canvas = document.createElement("canvas");
+            const w = 512, h = 256;
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0.00, "#fff5e8");   // overhead warm
+            grad.addColorStop(0.40, "#e8e4dc");   // soft mid
+            grad.addColorStop(0.70, "#c9c4ba");   // shadow side
+            grad.addColorStop(1.00, "#8a8680");   // floor
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.mapping = THREE.EquirectangularReflectionMapping;
+            if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+            const pmrem = new THREE.PMREMGenerator(renderer);
+            const envRT = pmrem.fromEquirectangular(tex);
+            scene.environment = envRT.texture;
+            tex.dispose();
+            pmrem.dispose();
+        } catch (exc) {
+            console.warn("[SouthbrookKitchenConfigurator] PBR env install skipped:", exc);
+        }
     }
 
     _destroyScene() {
@@ -289,9 +349,17 @@ class SouthbrookKitchenConfigurator extends Component {
         }
         this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = []; this.T.handleMesh = null;
 
-        // Helper: make + add mesh
+        // Helper: make + add mesh — now PBR (MeshStandardMaterial).
+        // opts.rough / opts.metal control the PBR contract; if absent
+        // we default to a matte-carcass profile (rough=0.7, metal=0.0).
+        // cs/rs flags toggle shadow casting/receiving as before.
         const mk = (geo, color, pos, rotE, opts = {}) => {
-            const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
+            const mat = new THREE.MeshStandardMaterial({
+                color,
+                roughness: opts.rough != null ? opts.rough : 0.7,
+                metalness: opts.metal != null ? opts.metal : 0.0,
+            });
+            const m = new THREE.Mesh(geo, mat);
             m.position.set(...pos);
             if (rotE) { m.rotation.x = rotE[0]; m.rotation.y = rotE[1]; m.rotation.z = rotE[2]; }
             if (opts.cs) m.castShadow    = true;
@@ -301,16 +369,16 @@ class SouthbrookKitchenConfigurator extends Component {
             return m;
         };
 
-        // ── Room shell ──
-        const floor = mk(new THREE.PlaneGeometry(rw, rd), P.floor, [rw/2, 0, rd/2], [-Math.PI/2, 0, 0], { rs: true });
-        const bwall = mk(new THREE.PlaneGeometry(rw, rh), P.wall1, [rw/2, rh/2, 0],  null,              { rs: true });
-        const lwall = mk(new THREE.PlaneGeometry(rd, rh), P.wall2, [0, rh/2, rd/2],  [0, Math.PI/2, 0], { rs: true });
+        // ── Room shell ── (matte plaster + flooring; high roughness)
+        const floor = mk(new THREE.PlaneGeometry(rw, rd), P.floor, [rw/2, 0, rd/2], [-Math.PI/2, 0, 0], { rs: true, rough: 0.95, metal: 0.0 });
+        const bwall = mk(new THREE.PlaneGeometry(rw, rh), P.wall1, [rw/2, rh/2, 0],  null,              { rs: true, rough: 0.9,  metal: 0.0 });
+        const lwall = mk(new THREE.PlaneGeometry(rd, rh), P.wall2, [0, rh/2, rd/2],  [0, Math.PI/2, 0], { rs: true, rough: 0.9,  metal: 0.0 });
 
-        // Wainscoting rail on back wall
+        // Wainscoting rail on back wall — semi-gloss wood trim
         const railY = 36 * IN;
         this.T.roomObjs.push(
             floor, bwall, lwall,
-            mk(new THREE.BoxGeometry(rw, 0.012, 0.02), P.cabDark, [rw/2, railY, 0.01], null, {})
+            mk(new THREE.BoxGeometry(rw, 0.012, 0.02), P.cabDark, [rw/2, railY, 0.01], null, { rough: 0.55, metal: 0.0 })
         );
 
         // Floor grid
@@ -335,56 +403,61 @@ class SouthbrookKitchenConfigurator extends Component {
             const cbH = item.height_in * IN;
             const cbD = item.depth_in  * IN;
 
-            // Toe kick
+            // Toe kick — flat black/matte
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(cbW - 0.01, 3.5 * IN, cbD - 0.01), P.toekick,
-                [x + cbW/2, 3.5*IN/2, cbD/2], null, { cs: true }
+                [x + cbW/2, 3.5*IN/2, cbD/2], null, { cs: true, rough: 0.95, metal: 0.0 }
             ));
 
-            // Cabinet body
+            // Cabinet body — satin-lacquer carcass
             const body = mk(
                 new THREE.BoxGeometry(cbW - 0.02, cbH - 3.5*IN, cbD - 0.02), P.cab,
                 [x + cbW/2, 3.5*IN + (cbH - 3.5*IN)/2, cbD/2], null,
-                { cs: true, rs: true, ud: { cab: true, cabType: "base", item } }
+                { cs: true, rs: true, rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "base", item } }
             );
             this.T.cabObjs.push(body);
             this.T.clickable.push(body);
 
-            // Shaker door upper inset
+            // Shaker door upper inset — slightly glossier than carcass
             const dH = (cbH - 3.5*IN) * 0.60;
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(cbW - 0.10, dH, 0.016), P.cabDark,
                 [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.72 - dH/2, cbD - 0.001], null,
-                { ud: { cab: true, cabType: "base", item } }
+                { rough: 0.6, metal: 0.05, ud: { cab: true, cabType: "base", item } }
             ));
 
             // Drawer face
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(cbW - 0.10, (cbH - 3.5*IN) * 0.21, 0.016), P.cab,
                 [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.13, cbD - 0.001], null,
-                { ud: { cab: true, cabType: "base", item } }
+                { rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "base", item } }
             ));
 
-            // Door handle
+            // Door handle — brushed metal (this is the realism win — handles
+            // were the flattest part of the old Lambert pass)
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(cbW * 0.44, 0.025, 0.040), P.handle,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.42, cbD + 0.018], null, {}
+                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.42, cbD + 0.018], null,
+                { rough: 0.35, metal: 0.85 }
             ));
-            // Drawer handle
+            // Drawer handle — same brushed metal
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(cbW * 0.30, 0.025, 0.038), P.handle,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.13, cbD + 0.018], null, {}
+                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.13, cbD + 0.018], null,
+                { rough: 0.35, metal: 0.85 }
             ));
 
-            // Countertop
+            // Countertop — quartz/stone (low roughness, faint specular)
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(cbW + 0.005, CTR, cbD + 0.07), P.counter,
-                [x + cbW/2, cbH + CTR/2, cbD/2 + 0.03], null, { cs: true }
+                [x + cbW/2, cbH + CTR/2, cbD/2 + 0.03], null,
+                { cs: true, rough: 0.4, metal: 0.05 }
             ));
             // Countertop drip edge
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(cbW + 0.005, CTR * 0.6, 0.022), P.cabDark,
-                [x + cbW/2, cbH + CTR * 0.3, cbD + 0.07], null, {}
+                [x + cbW/2, cbH + CTR * 0.3, cbD + 0.07], null,
+                { rough: 0.5, metal: 0.05 }
             ));
         });
 
@@ -395,11 +468,11 @@ class SouthbrookKitchenConfigurator extends Component {
             const wbD = item.depth_in  * IN;
             const wbY = WBY;   // wall cabinet bottom
 
-            // Wall body
+            // Wall body — satin-lacquer carcass
             const wbody = mk(
                 new THREE.BoxGeometry(wbW - 0.02, wbH, wbD - 0.02), P.cab,
                 [x + wbW/2, wbY + wbH/2, wbD/2], null,
-                { cs: true, rs: true, ud: { cab: true, cabType: "wall", item } }
+                { cs: true, rs: true, rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "wall", item } }
             );
             this.T.cabObjs.push(wbody);
             this.T.clickable.push(wbody);
@@ -408,35 +481,42 @@ class SouthbrookKitchenConfigurator extends Component {
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(wbW - 0.10, wbH - 0.10, 0.016), P.cabDark,
                 [x + wbW/2, wbY + wbH/2, wbD - 0.001], null,
-                { ud: { cab: true, cabType: "wall", item } }
+                { rough: 0.6, metal: 0.05, ud: { cab: true, cabType: "wall", item } }
             ));
-            // Wall handle
+            // Wall handle — brushed metal
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(wbW * 0.38, 0.025, 0.038), P.handle,
-                [x + wbW/2, wbY + wbH * 0.60, wbD + 0.018], null, {}
+                [x + wbW/2, wbY + wbH * 0.60, wbD + 0.018], null,
+                { rough: 0.35, metal: 0.85 }
             ));
-            // Bottom rail
+            // Bottom rail — matches the countertop sheen
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(wbW - 0.02, 0.025, wbD - 0.02), P.counter,
-                [x + wbW/2, wbY - 0.010, wbD/2], null, {}
+                [x + wbW/2, wbY - 0.010, wbD/2], null,
+                { rough: 0.4, metal: 0.05 }
             ));
         });
 
-        // Filler panels
+        // Filler panels — matte/satin matching the door style
         fillerItems.forEach(item => {
             const x   = item.x_position_in * IN;
             const fpW = item.width_in * IN;
             this.T.cabObjs.push(mk(
                 new THREE.BoxGeometry(fpW, BH, 0.042), P.cabDark,
-                [x + fpW/2, BH/2, 0.021], null, {}
+                [x + fpW/2, BH/2, 0.021], null,
+                { rough: 0.55, metal: 0.0 }
             ));
         });
 
-        // ── Drag handle ──
+        // ── Drag handle ── (PBR sphere with self-emissive glow so it
+        // pops out of the scene against any background/exposure)
         const THREE3 = this.T.THREE;
         const hdl = new THREE3.Mesh(
             new THREE3.SphereGeometry(0.18, 20, 20),
-            new THREE3.MeshLambertMaterial({ color: P.drag, emissive: 0x001166 })
+            new THREE3.MeshStandardMaterial({
+                color: P.drag, emissive: 0x001166, emissiveIntensity: 0.4,
+                roughness: 0.3, metalness: 0.1,
+            })
         );
         hdl.position.set(rw + 0.08, 0.18, rd / 2);
         hdl.userData = { isDragHandle: true };
@@ -447,7 +527,9 @@ class SouthbrookKitchenConfigurator extends Component {
         [{ offset: -0.42, rotZ: Math.PI/2 }, { offset: 0.42, rotZ: -Math.PI/2 }].forEach(({ offset, rotZ }) => {
             const arr = new THREE3.Mesh(
                 new THREE3.ConeGeometry(0.08, 0.22, 8),
-                new THREE3.MeshLambertMaterial({ color: P.arrow })
+                new THREE3.MeshStandardMaterial({
+                    color: P.arrow, roughness: 0.4, metalness: 0.1,
+                })
             );
             arr.rotation.z = rotZ;
             arr.position.set(rw + offset, 0.18, rd / 2);
