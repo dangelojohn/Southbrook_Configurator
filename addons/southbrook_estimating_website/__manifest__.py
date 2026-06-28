@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.19.0.0",
+    "version": "19.0.20.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -110,12 +110,19 @@
             # (wizard) and FloorPlanSVG (Room Layout tab). Loads BEFORE
             # both consumers.
             "southbrook_estimating_website/static/src/js/room_geometry.esm.js",
+            # Stage B (2026-06-28) — architectural symbol library
+            # consumed by FloorPlanSVG to render per-type top-down
+            # symbols inside constraint polygons. Loads BEFORE
+            # room_layout.esm.js so the import resolves at first
+            # FloorPlanSVG mount.
+            "southbrook_estimating_website/static/src/js/architectural_symbols.esm.js",
             "southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js",
             "southbrook_estimating_website/static/src/xml/room_setup_wizard.xml",
             # Phase 3.B (2026-06-27) — Room Layout tab. Read-only top-
             # down floor plan SVG + per-wall metrics + unplaced cabinet
             # sidebar. Click handlers, drag, and the elevation toggle
-            # are Phase 3.C.
+            # are Phase 3.C. Stage B (2026-06-28) — type-specific
+            # architectural symbols replace the labeled rectangles.
             "southbrook_estimating_website/static/src/js/room_layout.esm.js",
             "southbrook_estimating_website/static/src/xml/room_layout.xml",
             # Phase 2 commit 2 — OWL <KitchenPlanner/> boot for

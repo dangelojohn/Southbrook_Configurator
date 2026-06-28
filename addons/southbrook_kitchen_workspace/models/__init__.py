@@ -5,3 +5,4 @@ from . import sb_kitchen_appliance
 from . import sb_kitchen_approval
 from . import sb_kitchen_design_option
 from . import sb_kitchen_project
+from . import southbrook_room_constraint

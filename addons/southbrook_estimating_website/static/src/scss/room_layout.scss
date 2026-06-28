@@ -1246,6 +1246,37 @@
     pointer-events: none;
 }
 
+// ─── Stage B — architectural symbols ─────────────────────────────────
+//
+// When the architectural-symbols branch is active (every constraint
+// poly carries the `--arch` modifier from FloorPlanSVG's template),
+// mute the colored fill so the line-drawing symbol on top reads as
+// the dominant visual. The colored fill collapses to a subtle wash
+// that conveys "this is a window" / "this is a fridge" at a glance
+// without competing with the symbol's strokes.
+//
+// The label is suppressed at this layer because the symbol is the
+// label. If the constraint is smaller than ~30 px wide it falls
+// back to the label (handled in JS by emitting an empty symbol).
+.sb-room-plan-constraint--arch {
+    fill-opacity: 0.10 !important;
+    stroke-opacity: 0.55;
+}
+
+.sb-room-plan-constraints-g .sb-room-plan-constraint-label {
+    display: none;
+}
+
+.sb-room-plan-constraint-symbol {
+    pointer-events: none;
+    // Inline SVG inside the symbol uses style="" attributes for
+    // stroke/fill; this rule provides a baseline so any path/circle
+    // without explicit styles inherits a neutral architectural look.
+    line, path, circle, rect, polygon {
+        vector-effect: non-scaling-stroke;
+    }
+}
+
 // Gap markers — dashed rect, no fill.
 .sb-room-plan-gap {
     fill: none;

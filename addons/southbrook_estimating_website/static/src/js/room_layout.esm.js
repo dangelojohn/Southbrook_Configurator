@@ -47,8 +47,9 @@
  *   - `<` encoded as &lt; in attribute expressions where needed.
  *   - SVG sub-trees are plain XML — OWL handles the namespace.
  */
-import { Component, useExternalListener, useRef, useState } from "@odoo/owl";
+import { Component, markup, useExternalListener, useRef, useState } from "@odoo/owl";
 import { wallSegmentsForShape } from "@southbrook_estimating_website/js/room_geometry.esm";
+import { symbolFor } from "@southbrook_estimating_website/js/architectural_symbols.esm";
 
 // ----------------------------------------------------------------------
 // Phase 4 — mm ↔ ft/in conversion helpers (module-local).
@@ -764,6 +765,21 @@ class FloorPlanSVG extends Component {
     }
 
     // Constraints — one polygon per constraint, projected to px.
+    //
+    // Stage B (architectural symbols): along with the existing polygon
+    // (hit target + colored fill), each entry now carries:
+    //   - bboxW, bboxH   — the constraint's projected pixel dims along
+    //                       the wall direction (W) and across the wall
+    //                       depth (H).
+    //   - transform      — an SVG transform that places the (0,0)-(W,H)
+    //                       local frame at the projected world position
+    //                       of corner[0] and rotates by the wall angle.
+    //   - symbol         — markup() output from architectural_symbols.
+    //                       Type-specific SVG primitives (burner circles
+    //                       for ranges, swing arcs for doors, etc.).
+    //
+    // The template renders the polygon as the hit target (transparent
+    // fill via CSS) and the symbol on top inside the transform group.
     get _constraintPolys() {
         const out = [];
         for (const s of this._segments) {
@@ -771,22 +787,42 @@ class FloorPlanSVG extends Component {
             const constraints = wall.constraints || [];
             for (const c of constraints) {
                 const corners = _constraintCornersMm(s, c);
-                const pts = corners
-                    .map(([x, y]) => {
-                        const [px, py] = this._proj(x, y);
-                        return px.toFixed(1) + "," + py.toFixed(1);
-                    })
+                const projCorners = corners.map(([x, y]) => this._proj(x, y));
+                const pts = projCorners
+                    .map(([px, py]) => px.toFixed(1) + "," + py.toFixed(1))
                     .join(" ");
                 // Label centroid (4-corner centroid is fine for a quad).
                 let cx = 0;
                 let cy = 0;
-                for (const [x, y] of corners) {
-                    const [px, py] = this._proj(x, y);
+                for (const [px, py] of projCorners) {
                     cx += px;
                     cy += py;
                 }
                 cx /= 4;
                 cy /= 4;
+                // Local-frame bbox: width along wall (corner0→corner1),
+                // depth across wall (corner0→corner3). Pixel distances.
+                const [px0, py0] = projCorners[0];
+                const [px1, py1] = projCorners[1];
+                const [px3, py3] = projCorners[3];
+                const bboxW = Math.hypot(px1 - px0, py1 - py0);
+                const bboxH = Math.hypot(px3 - px0, py3 - py0);
+                const angleDeg = Math.atan2(py1 - py0, px1 - px0) * 180 / Math.PI;
+                const transform =
+                    `translate(${px0.toFixed(1)}, ${py0.toFixed(1)}) ` +
+                    `rotate(${angleDeg.toFixed(2)})`;
+                // Per-type symbol options. swing_direction + panel_count
+                // come from the room.constraint record if the server
+                // included them in the read (Stage A model extension).
+                // Defaults are graceful — door swings right, window has
+                // 1 panel — so the visual reads correctly even pre-A.
+                const symbolOpts = {
+                    swing: c.swing_direction || "right",
+                    panelCount: c.panel_count || 1,
+                };
+                const symbolSvg = symbolFor(
+                    c.constraint_type, bboxW, bboxH, symbolOpts,
+                );
                 out.push({
                     key: "c-" + c.id,
                     points: pts,
@@ -794,6 +830,10 @@ class FloorPlanSVG extends Component {
                     label: this._humanConstraint(c.constraint_type),
                     cx,
                     cy,
+                    transform,
+                    bboxW,
+                    bboxH,
+                    symbol: symbolSvg ? markup(symbolSvg) : "",
                 });
             }
         }

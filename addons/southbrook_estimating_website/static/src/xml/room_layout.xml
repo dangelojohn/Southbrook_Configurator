@@ -290,14 +290,24 @@
                       t-att-y2="w.y2"/>
             </g>
 
-            <!-- Constraint polygons + labels. -->
+            <!-- Constraint polygons + architectural symbols + labels.
+                 Stage B: the polygon stays as the (transparent) hit target
+                 and per-type background tint; the architectural symbol
+                 renders inside a translate+rotate group so each constraint
+                 type reads as a top-down floor-plan drawing rather than a
+                 labeled box. The label is kept as a fallback when the
+                 symbol is too small to identify visually. -->
             <g class="sb-room-plan-constraints-g">
                 <t t-foreach="_constraintPolys"
                    t-as="c"
                    t-key="c.key">
                     <polygon class="sb-room-plan-constraint"
-                             t-att-class="'sb-room-plan-constraint--' + c.type"
+                             t-att-class="'sb-room-plan-constraint--' + c.type + ' sb-room-plan-constraint--arch'"
                              t-att-points="c.points"/>
+                    <g class="sb-room-plan-constraint-symbol"
+                       t-att-transform="c.transform">
+                        <t t-out="c.symbol"/>
+                    </g>
                     <text class="sb-room-plan-constraint-label"
                           t-att-x="c.cx"
                           t-att-y="c.cy"
