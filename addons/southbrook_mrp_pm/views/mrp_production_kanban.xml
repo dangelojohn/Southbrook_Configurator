@@ -151,7 +151,13 @@
                     <span class="o_sb_mo_qty"
                           t-att-title="'Quantity: ' + record.product_qty.value">
                       <strong>
-                        <t t-out="Number.isInteger(record.product_qty.raw_value)
+                        <!-- 2026-06-28 hotfix: OWL t-out context doesn't
+                             expose `Number` global; the earlier
+                             Number.isInteger(...) call evaluates to
+                             undefined.isInteger(...) and throws. Use
+                             `% 1 === 0` modulo check (pure arithmetic,
+                             no global lookup). -->
+                        <t t-out="(record.product_qty.raw_value % 1) === 0
                                   ? record.product_qty.raw_value
                                   : record.product_qty.raw_value.toFixed(2)"/>
                       </strong>
