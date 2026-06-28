@@ -117,6 +117,9 @@ class SouthbrookKitchenConfigurator extends Component {
             wallCabTopAlignment: this.props.wall_cab_top_alignment || "fixed_gap",
             soffitHeightIn:      this.props.soffit_height_in       || 84.0,
             warnings:            [],
+            // D13 — searchable inventory + drag-and-drop add.
+            inventorySearch: "",
+            dragHover:       false,
         });
         // Auto-save debounce timer (not reactive; managed imperatively).
         this._autoSaveTimer = null;
@@ -321,6 +324,136 @@ class SouthbrookKitchenConfigurator extends Component {
         this._highlightSelected(item);
     }
 
+    // ─── D13 — Searchable inventory + drag-and-drop add ─────────────────────────
+    // Case-insensitive filter across name / SKU / cabinet type / material.
+    // Returns the full catalog when the search box is empty.
+    _filteredProducts() {
+        const q = (this.state.inventorySearch || "").toLowerCase().trim();
+        const list = this.state.products || [];
+        if (!q) return list;
+        return list.filter(p =>
+            (p.name && p.name.toLowerCase().includes(q)) ||
+            (p.sku && p.sku.toLowerCase().includes(q)) ||
+            (p.cabinet_type && p.cabinet_type.toLowerCase().includes(q)) ||
+            (p.material && p.material.toLowerCase().includes(q)) ||
+            (p.door_style && p.door_style.toLowerCase().includes(q))
+        );
+    }
+
+    _onSearchInput(ev) {
+        this.state.inventorySearch = ev.target.value || "";
+    }
+
+    _clearSearch() {
+        this.state.inventorySearch = "";
+    }
+
+    // Drag-from-inventory: stash the product_id in dataTransfer so the
+    // canvas drop handler can resolve it. text/plain mirror for older
+    // browsers + Safari quirks.
+    _onProductDragStart(ev, product) {
+        if (!ev.dataTransfer) return;
+        ev.dataTransfer.effectAllowed = "copy";
+        ev.dataTransfer.setData(
+            "application/x-sbk-product",
+            JSON.stringify({ product_id: product.product_id })
+        );
+        ev.dataTransfer.setData("text/plain", String(product.product_id));
+    }
+
+    // Allow drop on the canvas wrapper. preventDefault is mandatory or
+    // browsers default to "no-drop".
+    _onCanvasDragOver(ev) {
+        if (!ev.dataTransfer) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = "copy";
+        if (!this.state.dragHover) this.state.dragHover = true;
+    }
+
+    _onCanvasDragLeave(ev) {
+        // Only clear when the cursor truly leaves the canvas wrapper
+        // (children fire dragleave when crossing internal elements).
+        if (ev.currentTarget && ev.currentTarget.contains(ev.relatedTarget)) return;
+        this.state.dragHover = false;
+    }
+
+    _onCanvasDrop(ev) {
+        ev.preventDefault();
+        this.state.dragHover = false;
+        let pid = null;
+        try {
+            const raw = ev.dataTransfer.getData("application/x-sbk-product");
+            if (raw) pid = JSON.parse(raw).product_id;
+            else     pid = parseInt(ev.dataTransfer.getData("text/plain"), 10);
+        } catch (_) {
+            return;
+        }
+        if (!Number.isFinite(pid) || pid <= 0) return;
+        const product = (this.state.products || []).find(p => p.product_id === pid);
+        if (!product) return;
+        this._addCabinetFromProduct(product);
+    }
+
+    // Generic add — used by drop AND by a future "click to add" button.
+    // New cabinet appends at the end of its cabinet_type group; the
+    // cascade in _recomputeLayoutFromItems then packs everything cleanly.
+    _addCabinetFromProduct(product) {
+        const type = product.cabinet_type || "base";
+        // Default Z: walls + tall stack track the configured wall Z;
+        // everything else sits on the floor.
+        let z = 0;
+        if (type === "wall") {
+            // Use the most recent z_position_in we saw from the server
+            // so the wall cab tracks D8's alignment mode without
+            // re-running /layout.
+            const walls = (this.state.items || []).filter(it => it.cabinet_type === "wall");
+            z = walls.length ? walls[0].z_position_in : (34.5 + 1.5 + 18.0);
+        }
+        // Unique layout_key (timestamp + random tail = collision-free).
+        const layoutKey = `${type}-add-${Date.now()}-${Math.floor((performance.now() % 1) * 10000)}`;
+        const newItem = {
+            ...product,
+            layout_key:    layoutKey,
+            // Big x sort-key forces this item to land at the end of its
+            // group inside _recomputeLayoutFromItems; cascade then
+            // assigns the real x.
+            x_position_in: 1e6,
+            y_position_in: 0,
+            z_position_in: z,
+            width_in:      product.width_in || 24,
+            height_in:     product.height_in || (type === "wall" ? 30 : 34.5),
+            depth_in:      product.depth_in  || (type === "wall" ? 12 : 24),
+        };
+        this.state.items = [...(this.state.items || []), newItem];
+        this.state.selected = newItem;
+        this._recomputeLayoutFromItems();
+        // Room width may now be short. Auto-extend so the new cabinet
+        // is visible (no scrolling around an off-canvas insert).
+        const required = this._currentRunWidthIn();
+        if (required > this.state.room.width_in) {
+            this.state.room.width_in = Math.ceil(required / 6) * 6;
+        }
+        if (this.T.scene) this._buildScene();
+        this.notification.add(`Added ${product.name}`, { type: "success" });
+        this._queueAutoSave();
+    }
+
+    // Total inches consumed by the longest cabinet row (max of base
+    // run / wall run / extras). Used to auto-extend room width on add.
+    _currentRunWidthIn() {
+        const items = this.state.items || [];
+        const by = {};
+        for (const it of items) {
+            const t = it.cabinet_type || "other";
+            by[t] = (by[t] || 0) + (it.width_in || 0);
+        }
+        // Bases + extras pack on the floor row; walls pack on the upper row.
+        const floorRow = (by.base || 0) + (by.filler || 0) + (by.tall || 0)
+                       + (by.panel || 0) + (by.corner || 0) + (by.other || 0);
+        const wallRow  = (by.wall || 0);
+        return Math.max(floorRow, wallRow);
+    }
+
     // ─── D2 — Inline cabinet edit drawer ────────────────────────────────────────
     // Filter the loaded product catalog by cabinet_type so the swap
     // dropdown only shows compatible substitutes (a wall cab can't
@@ -389,34 +522,38 @@ class SouthbrookKitchenConfigurator extends Component {
         this._queueAutoSave();    // D5
     }
 
-    // Cascade x positions inside each cabinet group (base / wall / filler).
-    // Bases are packed left-to-right contiguously; walls track bases by
-    // x order (so swapping a base width pushes walls along too); fillers
-    // sit at the right end of the base run. summary.price recomputes.
+    // Cascade x positions inside each cabinet group.
+    //  - Bases pack left-to-right contiguously on the floor row.
+    //  - Walls track their own left-to-right order on the upper row.
+    //  - Tall / corner / filler / panel pack at the right end of the
+    //    base run (so a drag-dropped tall cab lands after the bases).
+    //  - Summary price excludes fillers per the existing convention.
     _recomputeLayoutFromItems() {
         const items = this.state.items || [];
-        const bases   = items.filter(it => it.cabinet_type === "base")
-                              .sort((a, b) => a.x_position_in - b.x_position_in);
-        const walls   = items.filter(it => it.cabinet_type === "wall")
-                              .sort((a, b) => a.x_position_in - b.x_position_in);
-        const fillers = items.filter(it => it.cabinet_type === "filler");
+        const sortX = (a, b) => (a.x_position_in || 0) - (b.x_position_in || 0);
+
+        const bases   = items.filter(it => it.cabinet_type === "base").sort(sortX);
+        const walls   = items.filter(it => it.cabinet_type === "wall").sort(sortX);
+        const tails   = items.filter(it =>
+            ["tall", "corner", "filler", "panel"].includes(it.cabinet_type)
+        ).sort(sortX);
 
         let bx = 0;
-        for (const b of bases) { b.x_position_in = bx; bx += b.width_in; }
+        for (const b of bases) { b.x_position_in = bx; bx += (b.width_in || 0); }
         let wx = 0;
-        for (const w of walls) { w.x_position_in = wx; wx += w.width_in; }
-        for (const f of fillers) { f.x_position_in = bx; bx += f.width_in; }
+        for (const w of walls) { w.x_position_in = wx; wx += (w.width_in || 0); }
+        for (const t of tails) { t.x_position_in = bx; bx += (t.width_in || 0); }
 
         let price = 0;
         for (const it of items) {
             if (it.cabinet_type !== "filler") price += (it.price || 0);
         }
         this.state.summary = {
+            ...(this.state.summary || {}),
             base_count: bases.length,
             wall_count: walls.length,
             total: bases.length + walls.length,
             price: price,
-            remainder_in: this.state.summary?.remainder_in || 0,
         };
     }
 
@@ -976,7 +1113,13 @@ class SouthbrookKitchenConfigurator extends Component {
             const wbW = item.width_in  * IN;
             const wbH = item.height_in * IN;
             const wbD = item.depth_in  * IN;
-            const wbY = WBY;   // wall cabinet bottom
+            // D8 follow-up — respect the per-item z_position_in the
+            // controller computed (varies by wall_cab_top_alignment:
+            // fixed_gap / to_ceiling / to_soffit). Falls back to WBY
+            // for items that pre-date D8.
+            const wbY = (item.z_position_in != null && item.z_position_in !== 0)
+                        ? item.z_position_in * IN
+                        : WBY;
 
             // Wall body — satin-lacquer carcass
             const wbody = mk(
@@ -1005,6 +1148,48 @@ class SouthbrookKitchenConfigurator extends Component {
                 [x + wbW/2, wbY - 0.010, wbD/2], null,
                 { rough: 0.4, metal: 0.05 }
             ));
+        });
+
+        // D13 — Generic-type fallback: tall / corner / panel cabinets
+        // dropped via the inventory drag-and-drop. Renders as a simple
+        // PBR box at the item's reported (x, z, dims) so the cabinet
+        // becomes visible immediately instead of silently dropping out
+        // of the scene. Detailed per-type geometry can layer on top later.
+        const knownTypes = new Set(["base", "wall", "filler"]);
+        const otherItems = items.filter(it => !knownTypes.has(it.cabinet_type));
+        otherItems.forEach(item => {
+            const x  = (item.x_position_in || 0) * IN;
+            const w  = (item.width_in  || 24) * IN;
+            const h  = (item.height_in || 34.5) * IN;
+            const d  = (item.depth_in  || 24) * IN;
+            const z0 = (item.z_position_in || 0) * IN;
+
+            // Toe-kick for floor-standing types (tall / corner); panels
+            // sit flush, no toe-kick.
+            if (item.cabinet_type === "tall" || item.cabinet_type === "corner") {
+                this.T.cabObjs.push(mk(
+                    new THREE.BoxGeometry(w - 0.01, 3.5 * IN, d - 0.01), P.toekick,
+                    [x + w/2, z0 + 3.5*IN/2, d/2], null, { cs: true, rough: 0.95, metal: 0.0 }
+                ));
+                const body = mk(
+                    new THREE.BoxGeometry(w - 0.02, h - 3.5*IN, d - 0.02), P.cab,
+                    [x + w/2, z0 + 3.5*IN + (h - 3.5*IN)/2, d/2], null,
+                    { cs: true, rs: true, rough: 0.55, metal: 0.0,
+                      ud: { cab: true, cabType: item.cabinet_type, item } }
+                );
+                this.T.cabObjs.push(body);
+                this.T.clickable.push(body);
+            } else {
+                // Panel / corner-without-toekick / anything else.
+                const body = mk(
+                    new THREE.BoxGeometry(w - 0.02, h, d - 0.02), P.cab,
+                    [x + w/2, z0 + h/2, d/2], null,
+                    { cs: true, rs: true, rough: 0.55, metal: 0.0,
+                      ud: { cab: true, cabType: item.cabinet_type, item } }
+                );
+                this.T.cabObjs.push(body);
+                this.T.clickable.push(body);
+            }
         });
 
         // Filler panels — matte/satin matching the door style
@@ -1459,7 +1644,13 @@ SouthbrookKitchenConfigurator.template = xml`
     </aside>
 
     <!-- 3D Scene panel -->
-    <main class="o_sbk_scene_panel">
+    <!-- D13 — Wrapper carries the drag-and-drop handlers; the canvas3d
+         div stays clean for Three.js. dragHover toggles a brand-blue
+         outline so the rep gets immediate "drop here" feedback. -->
+    <main t-att-class="'o_sbk_scene_panel' + (state.dragHover ? ' is-drag-hover' : '')"
+          t-on-dragover="_onCanvasDragOver"
+          t-on-dragleave="_onCanvasDragLeave"
+          t-on-drop="_onCanvasDrop">
       <div t-ref="canvas3d" class="o_sbk_canvas3d"/>
 
       <!-- Dimension ruler overlay -->
@@ -1534,7 +1725,30 @@ SouthbrookKitchenConfigurator.template = xml`
     <!-- Right inventory + detail panel -->
     <aside class="o_sbk_inventory">
 
-      <h3>Cabinet Inventory</h3>
+      <div class="o_sbk_inv_head">
+        <h3>Cabinet Inventory</h3>
+        <span class="o_sbk_inv_count">
+          <t t-esc="_filteredProducts().length"/> / <t t-esc="state.products.length"/>
+        </span>
+      </div>
+
+      <!-- D13 — Searchable inventory. Filters by name, SKU, cabinet
+           type, material, door style. Empty = full catalog. -->
+      <div class="o_sbk_inv_search">
+        <input type="search" class="o_sbk_inv_search_input"
+               placeholder="Search by name, SKU, type, material…"
+               t-att-value="state.inventorySearch"
+               t-on-input="_onSearchInput"
+               aria-label="Search cabinet inventory"/>
+        <button t-if="state.inventorySearch" class="o_sbk_inv_search_clear"
+                t-on-click="_clearSearch" aria-label="Clear search">×</button>
+      </div>
+
+      <!-- D13 — Drag hint pill. Only shown when search has results so it
+           doesn't clutter the empty state. -->
+      <div t-if="_filteredProducts().length" class="o_sbk_inv_draghint">
+        ↔ Drag any product into the scene to add it
+      </div>
 
       <!-- Column header -->
       <div class="o_sbk_inv_header">
@@ -1543,9 +1757,12 @@ SouthbrookKitchenConfigurator.template = xml`
 
       <!-- Product rows -->
       <div class="o_sbk_product_list">
-        <button t-foreach="state.products" t-as="product" t-key="product.product_id"
-            t-att-class="'o_sbk_product_row' + (state.selected &amp;&amp; state.selected.product_id === product.product_id ? ' is-selected' : '')"
-            t-on-click="() => this._selectCabinet(product)">
+        <button t-foreach="_filteredProducts()" t-as="product" t-key="product.product_id"
+            t-att-class="'o_sbk_product_row o_sbk_prod_draggable' + (state.selected &amp;&amp; state.selected.product_id === product.product_id ? ' is-selected' : '')"
+            draggable="true"
+            t-on-dragstart="(ev) => this._onProductDragStart(ev, product)"
+            t-on-click="() => this._selectCabinet(product)"
+            t-att-title="'Click to select · Drag onto scene to add ' + product.name">
           <div class="o_sbk_prod_thumb">
             <img t-att-src="product.image_url" alt="" loading="lazy"/>
           </div>
@@ -1559,6 +1776,12 @@ SouthbrookKitchenConfigurator.template = xml`
                 t-esc="product.available_qty"/>
           <span class="o_sbk_prod_price" t-esc="_money(product.price)"/>
         </button>
+        <!-- D13 — Empty-state when search yields zero matches. -->
+        <div t-if="!_filteredProducts().length &amp;&amp; state.products.length"
+             class="o_sbk_inv_empty">
+          No products match "<t t-esc="state.inventorySearch"/>".
+          <button class="o_sbk_inv_empty_clear" t-on-click="_clearSearch">Clear search</button>
+        </div>
       </div>
 
       <!-- D2 — Selected cabinet inline-edit drawer.

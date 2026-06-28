@@ -288,6 +288,107 @@ $sbk-amber:      #B45309;
     border: 1px solid rgba(26, 102, 212, 0.3);
 }
 
+// D13 — Searchable inventory + drag-and-drop
+.o_sbk_inv_head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    h3 { margin: 0; }
+}
+.o_sbk_inv_count {
+    font-size: 11px;
+    color: $sbk-muted;
+    font-variant-numeric: tabular-nums;
+}
+.o_sbk_inv_search {
+    position: relative;
+    margin: 8px 0 6px;
+}
+.o_sbk_inv_search_input {
+    width: 100%;
+    padding: 7px 32px 7px 28px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 4px;
+    background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") 8px center no-repeat;
+    font-size: 13px;
+    color: $sbk-ink;
+    line-height: 1;
+    &:focus-visible {
+        outline: 2px solid rgba(26, 102, 212, 0.55);
+        outline-offset: 0;
+        border-color: rgba(26, 102, 212, 0.45);
+    }
+    &::-webkit-search-cancel-button { display: none; }
+}
+.o_sbk_inv_search_clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    border: 0;
+    background: transparent;
+    color: $sbk-muted;
+    font-size: 16px;
+    cursor: pointer;
+    line-height: 1;
+    border-radius: 4px;
+    &:hover { background: rgba(0,0,0,0.06); color: $sbk-ink; }
+}
+.o_sbk_inv_draghint {
+    margin: 0 0 8px;
+    padding: 6px 10px;
+    background: rgba(26, 102, 212, 0.06);
+    border: 1px dashed rgba(26, 102, 212, 0.30);
+    border-radius: 4px;
+    font-size: 11px;
+    color: #0f3a8a;
+    text-align: center;
+}
+.o_sbk_inv_empty {
+    padding: 14px 12px;
+    text-align: center;
+    color: $sbk-muted;
+    font-size: 12px;
+}
+.o_sbk_inv_empty_clear {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: #1866d4;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 12px;
+}
+.o_sbk_prod_draggable {
+    cursor: grab;
+    &:active { cursor: grabbing; }
+}
+// Drag-hover highlight on the scene panel.
+.o_sbk_scene_panel.is-drag-hover {
+    position: relative;
+    &::after {
+        content: "Release to add cabinet";
+        position: absolute;
+        inset: 12px;
+        border: 3px dashed rgba(26, 102, 212, 0.65);
+        border-radius: 10px;
+        background: rgba(26, 102, 212, 0.05);
+        z-index: 7;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0f3a8a;
+        font-weight: 600;
+        font-size: 14px;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    }
+}
+
 // D10 — Empty-catalog onboarding nudge (left controls, replaces raw error)
 .o_sbk_onboard {
     margin: 10px 0;
