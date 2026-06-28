@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-only
+from . import product_template
 from . import sb_kitchen_ai_analysis
 from . import sb_kitchen_appliance
 from . import sb_kitchen_approval

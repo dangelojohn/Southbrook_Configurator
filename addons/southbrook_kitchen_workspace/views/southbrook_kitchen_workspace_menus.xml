@@ -10,4 +10,10 @@
               parent="menu_southbrook_kitchen_workspace_root"
               action="action_sb_kitchen_project"
               sequence="10"/>
+
+    <menuitem id="menu_kitchen_appliance_catalog"
+              name="Appliance Catalog"
+              parent="menu_southbrook_kitchen_workspace_root"
+              action="action_kitchen_appliance_catalog"
+              sequence="20"/>
 </odoo>

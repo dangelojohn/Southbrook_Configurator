@@ -4,7 +4,7 @@
         <field name="name">sb.kitchen.approval.list</field>
         <field name="model">sb.kitchen.approval</field>
         <field name="arch" type="xml">
-            <list>
+            <list class="o_sb_kitchen_workspace_scroll">
                 <field name="project_id"/>
                 <field name="approval_type"/>
                 <field name="approver_id"/>

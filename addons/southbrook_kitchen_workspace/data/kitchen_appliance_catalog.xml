@@ -1,0 +1,1038 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Size-template placeholders for the Southbrook Kitchen Workspace.
+        Each record is a dimensional stand-in (type + size) that designers
+        drop into a kitchen room before a real appliance is spec'd. Pure
+        dimensional info — no brand, no fuel — so the same record covers
+        both gas and induction "30\" range" placements. Replace with
+        branded SKUs later when product selection is finalized.
+    -->
+    <record id="kapp_range_range_stove_24" model="product.template">
+        <field name="name">24" Range / Stove (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE-24-RANGE/</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">685.8</field>
+        <field name="kitchen_appliance_height_mm">914.4</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_range_stove_30" model="product.template">
+        <field name="name">30" Range / Stove (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE-30-RANGE/</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">685.8</field>
+        <field name="kitchen_appliance_height_mm">914.4</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_range_stove_36" model="product.template">
+        <field name="name">36" Range / Stove (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE-36-RANGE/</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">685.8</field>
+        <field name="kitchen_appliance_height_mm">914.4</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_range_stove_48" model="product.template">
+        <field name="name">48" Range / Stove (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE-48-RANGE/</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range</field>
+        <field name="kitchen_appliance_width_mm">1219.2</field>
+        <field name="kitchen_appliance_depth_mm">685.8</field>
+        <field name="kitchen_appliance_height_mm">914.4</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_range_stove_60" model="product.template">
+        <field name="name">60" Range / Stove (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE-60-RANGE/</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range</field>
+        <field name="kitchen_appliance_width_mm">1524.0</field>
+        <field name="kitchen_appliance_depth_mm">685.8</field>
+        <field name="kitchen_appliance_height_mm">914.4</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_cooktop_cooktop_24" model="product.template">
+        <field name="name">24" Cooktop (Placeholder)</field>
+        <field name="default_code">KAPP-COOKTOP-24-COOKTO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">cooktop</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">533.4</field>
+        <field name="kitchen_appliance_height_mm">101.6</field>
+        <field name="kitchen_appliance_clearance_mm">609.6</field>
+    </record>
+    <record id="kapp_cooktop_cooktop_30" model="product.template">
+        <field name="name">30" Cooktop (Placeholder)</field>
+        <field name="default_code">KAPP-COOKTOP-30-COOKTO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">cooktop</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">533.4</field>
+        <field name="kitchen_appliance_height_mm">101.6</field>
+        <field name="kitchen_appliance_clearance_mm">609.6</field>
+    </record>
+    <record id="kapp_cooktop_cooktop_36" model="product.template">
+        <field name="name">36" Cooktop (Placeholder)</field>
+        <field name="default_code">KAPP-COOKTOP-36-COOKTO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">cooktop</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">533.4</field>
+        <field name="kitchen_appliance_height_mm">101.6</field>
+        <field name="kitchen_appliance_clearance_mm">609.6</field>
+    </record>
+    <record id="kapp_cooktop_cooktop_42" model="product.template">
+        <field name="name">42" Cooktop (Placeholder)</field>
+        <field name="default_code">KAPP-COOKTOP-42-COOKTO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">cooktop</field>
+        <field name="kitchen_appliance_width_mm">1066.8</field>
+        <field name="kitchen_appliance_depth_mm">533.4</field>
+        <field name="kitchen_appliance_height_mm">101.6</field>
+        <field name="kitchen_appliance_clearance_mm">609.6</field>
+    </record>
+    <record id="kapp_cooktop_cooktop_48" model="product.template">
+        <field name="name">48" Cooktop (Placeholder)</field>
+        <field name="default_code">KAPP-COOKTOP-48-COOKTO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">cooktop</field>
+        <field name="kitchen_appliance_width_mm">1219.2</field>
+        <field name="kitchen_appliance_depth_mm">533.4</field>
+        <field name="kitchen_appliance_height_mm">101.6</field>
+        <field name="kitchen_appliance_clearance_mm">609.6</field>
+    </record>
+    <record id="kapp_wall_oven_single_wall_oven_24" model="product.template">
+        <field name="name">24" Single Wall Oven (Placeholder)</field>
+        <field name="default_code">KAPP-WALL_OVEN-24-SINGLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wall_oven</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">736.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wall_oven_single_wall_oven_27" model="product.template">
+        <field name="name">27" Single Wall Oven (Placeholder)</field>
+        <field name="default_code">KAPP-WALL_OVEN-27-SINGLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wall_oven</field>
+        <field name="kitchen_appliance_width_mm">685.8</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">736.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wall_oven_single_wall_oven_30" model="product.template">
+        <field name="name">30" Single Wall Oven (Placeholder)</field>
+        <field name="default_code">KAPP-WALL_OVEN-30-SINGLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wall_oven</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">736.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wall_oven_double_double_wall_oven_27" model="product.template">
+        <field name="name">27" Double Wall Oven (Placeholder)</field>
+        <field name="default_code">KAPP-WALL_OVEN_DOUBLE-27-DOUBLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wall_oven_double</field>
+        <field name="kitchen_appliance_width_mm">685.8</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">1295.4</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wall_oven_double_double_wall_oven_30" model="product.template">
+        <field name="name">30" Double Wall Oven (Placeholder)</field>
+        <field name="default_code">KAPP-WALL_OVEN_DOUBLE-30-DOUBLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wall_oven_double</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">1295.4</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_microwave_over-the-range_microwave_30" model="product.template">
+        <field name="name">30" Over-the-Range Microwave (Placeholder)</field>
+        <field name="default_code">KAPP-MICROWAVE-30-OVER-T</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">microwave</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">406.4</field>
+        <field name="kitchen_appliance_height_mm">406.4</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_microwave_over-the-range_microwave_36" model="product.template">
+        <field name="name">36" Over-the-Range Microwave (Placeholder)</field>
+        <field name="default_code">KAPP-MICROWAVE-36-OVER-T</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">microwave</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">406.4</field>
+        <field name="kitchen_appliance_height_mm">406.4</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_microwave_drawer_microwave_24" model="product.template">
+        <field name="name">24" Drawer Microwave (Placeholder)</field>
+        <field name="default_code">KAPP-MICROWAVE-24-DRAWER</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">microwave</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">584.2</field>
+        <field name="kitchen_appliance_height_mm">381.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_microwave_drawer_microwave_30" model="product.template">
+        <field name="name">30" Drawer Microwave (Placeholder)</field>
+        <field name="default_code">KAPP-MICROWAVE-30-DRAWER</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">microwave</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">584.2</field>
+        <field name="kitchen_appliance_height_mm">381.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_built-in_full-height_fridge_30" model="product.template">
+        <field name="name">30" Built-In Full-Height Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-30-BUILT-</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_built-in_full-height_fridge_36" model="product.template">
+        <field name="name">36" Built-In Full-Height Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-36-BUILT-</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_built-in_full-height_fridge_42" model="product.template">
+        <field name="name">42" Built-In Full-Height Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-42-BUILT-</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">1066.8</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_built-in_full-height_fridge_48" model="product.template">
+        <field name="name">48" Built-In Full-Height Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-48-BUILT-</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">1219.2</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_counter-depth_freestanding_fridge_30" model="product.template">
+        <field name="name">30" Counter-Depth Freestanding Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-30-COUNTE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">660.4</field>
+        <field name="kitchen_appliance_height_mm">1778.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_counter-depth_freestanding_fridge_33" model="product.template">
+        <field name="name">33" Counter-Depth Freestanding Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-33-COUNTE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">838.2</field>
+        <field name="kitchen_appliance_depth_mm">660.4</field>
+        <field name="kitchen_appliance_height_mm">1778.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_counter-depth_freestanding_fridge_36" model="product.template">
+        <field name="name">36" Counter-Depth Freestanding Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-36-COUNTE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">660.4</field>
+        <field name="kitchen_appliance_height_mm">1778.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_refrigerator_undercounter_fridge_drawers_24" model="product.template">
+        <field name="name">24" Undercounter Fridge / Drawers (Placeholder)</field>
+        <field name="default_code">KAPP-REFRIGERATOR-24-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">refrigerator</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_freezer_column_freezer_18" model="product.template">
+        <field name="name">18" Column Freezer (Placeholder)</field>
+        <field name="default_code">KAPP-FREEZER-18-COLUMN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">freezer</field>
+        <field name="kitchen_appliance_width_mm">457.2</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_freezer_column_freezer_24" model="product.template">
+        <field name="name">24" Column Freezer (Placeholder)</field>
+        <field name="default_code">KAPP-FREEZER-24-COLUMN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">freezer</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_freezer_column_freezer_30" model="product.template">
+        <field name="name">30" Column Freezer (Placeholder)</field>
+        <field name="default_code">KAPP-FREEZER-30-COLUMN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">freezer</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_freezer_column_freezer_36" model="product.template">
+        <field name="name">36" Column Freezer (Placeholder)</field>
+        <field name="default_code">KAPP-FREEZER-36-COLUMN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">freezer</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_dishwasher_built-in_dishwasher_18" model="product.template">
+        <field name="name">18" Built-In Dishwasher (Placeholder)</field>
+        <field name="default_code">KAPP-DISHWASHER-18-BUILT-</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">dishwasher</field>
+        <field name="kitchen_appliance_width_mm">457.2</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_dishwasher_built-in_dishwasher_24" model="product.template">
+        <field name="name">24" Built-In Dishwasher (Placeholder)</field>
+        <field name="default_code">KAPP-DISHWASHER-24-BUILT-</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">dishwasher</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_dishwasher_drawer_dishwasher_24" model="product.template">
+        <field name="name">24" Drawer Dishwasher (Placeholder)</field>
+        <field name="default_code">KAPP-DISHWASHER-24-DRAWER</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">dishwasher</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">431.8</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_single-bowl_sink_24" model="product.template">
+        <field name="name">24" Single-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-24-SINGLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_single-bowl_sink_30" model="product.template">
+        <field name="name">30" Single-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-30-SINGLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_single-bowl_sink_33" model="product.template">
+        <field name="name">33" Single-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-33-SINGLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">838.2</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_single-bowl_sink_36" model="product.template">
+        <field name="name">36" Single-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-36-SINGLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_double-bowl_sink_30" model="product.template">
+        <field name="name">30" Double-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-30-DOUBLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_double-bowl_sink_33" model="product.template">
+        <field name="name">33" Double-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-33-DOUBLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">838.2</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_double-bowl_sink_36" model="product.template">
+        <field name="name">36" Double-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-36-DOUBLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_double-bowl_sink_39" model="product.template">
+        <field name="name">39" Double-Bowl Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-39-DOUBLE</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">990.6</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_bar_prep_sink_12" model="product.template">
+        <field name="name">12" Bar / Prep Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-12-BAR/PR</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">304.8</field>
+        <field name="kitchen_appliance_depth_mm">457.2</field>
+        <field name="kitchen_appliance_height_mm">203.2</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_bar_prep_sink_15" model="product.template">
+        <field name="name">15" Bar / Prep Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-15-BAR/PR</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">381.0</field>
+        <field name="kitchen_appliance_depth_mm">457.2</field>
+        <field name="kitchen_appliance_height_mm">203.2</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_bar_prep_sink_18" model="product.template">
+        <field name="name">18" Bar / Prep Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-18-BAR/PR</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">457.2</field>
+        <field name="kitchen_appliance_depth_mm">457.2</field>
+        <field name="kitchen_appliance_height_mm">203.2</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_farmhouse_apron_sink_30" model="product.template">
+        <field name="name">30" Farmhouse / Apron Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-30-FARMHO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_farmhouse_apron_sink_33" model="product.template">
+        <field name="name">33" Farmhouse / Apron Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-33-FARMHO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">838.2</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_sink_farmhouse_apron_sink_36" model="product.template">
+        <field name="name">36" Farmhouse / Apron Sink (Placeholder)</field>
+        <field name="default_code">KAPP-SINK-36-FARMHO</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">sink</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">558.8</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_range_hood_wall-mount_range_hood_30" model="product.template">
+        <field name="name">30" Wall-Mount Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-30-WALL-M</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_wall-mount_range_hood_36" model="product.template">
+        <field name="name">36" Wall-Mount Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-36-WALL-M</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_wall-mount_range_hood_42" model="product.template">
+        <field name="name">42" Wall-Mount Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-42-WALL-M</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1066.8</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_wall-mount_range_hood_48" model="product.template">
+        <field name="name">48" Wall-Mount Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-48-WALL-M</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1219.2</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_wall-mount_range_hood_54" model="product.template">
+        <field name="name">54" Wall-Mount Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-54-WALL-M</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1371.6</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_wall-mount_range_hood_60" model="product.template">
+        <field name="name">60" Wall-Mount Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-60-WALL-M</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1524.0</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_undercabinet_range_hood_30" model="product.template">
+        <field name="name">30" Undercabinet Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-30-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">203.2</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_undercabinet_range_hood_36" model="product.template">
+        <field name="name">36" Undercabinet Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-36-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">203.2</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_undercabinet_range_hood_42" model="product.template">
+        <field name="name">42" Undercabinet Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-42-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1066.8</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">203.2</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_undercabinet_range_hood_48" model="product.template">
+        <field name="name">48" Undercabinet Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-48-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1219.2</field>
+        <field name="kitchen_appliance_depth_mm">508.0</field>
+        <field name="kitchen_appliance_height_mm">203.2</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_island_range_hood_30" model="product.template">
+        <field name="name">30" Island Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-30-ISLAND</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">711.2</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_island_range_hood_36" model="product.template">
+        <field name="name">36" Island Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-36-ISLAND</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">914.4</field>
+        <field name="kitchen_appliance_depth_mm">711.2</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_island_range_hood_42" model="product.template">
+        <field name="name">42" Island Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-42-ISLAND</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1066.8</field>
+        <field name="kitchen_appliance_depth_mm">711.2</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_island_range_hood_48" model="product.template">
+        <field name="name">48" Island Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-48-ISLAND</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1219.2</field>
+        <field name="kitchen_appliance_depth_mm">711.2</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_range_hood_island_range_hood_54" model="product.template">
+        <field name="name">54" Island Range Hood (Placeholder)</field>
+        <field name="default_code">KAPP-RANGE_HOOD-54-ISLAND</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">range_hood</field>
+        <field name="kitchen_appliance_width_mm">1371.6</field>
+        <field name="kitchen_appliance_depth_mm">711.2</field>
+        <field name="kitchen_appliance_height_mm">762.0</field>
+        <field name="kitchen_appliance_clearance_mm">762.0</field>
+    </record>
+    <record id="kapp_wine_fridge_undercounter_wine_fridge_15" model="product.template">
+        <field name="name">15" Undercounter Wine Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-WINE_FRIDGE-15-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wine_fridge</field>
+        <field name="kitchen_appliance_width_mm">381.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wine_fridge_undercounter_wine_fridge_18" model="product.template">
+        <field name="name">18" Undercounter Wine Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-WINE_FRIDGE-18-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wine_fridge</field>
+        <field name="kitchen_appliance_width_mm">457.2</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wine_fridge_undercounter_wine_fridge_24" model="product.template">
+        <field name="name">24" Undercounter Wine Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-WINE_FRIDGE-24-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wine_fridge</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wine_fridge_undercounter_wine_fridge_30" model="product.template">
+        <field name="name">30" Undercounter Wine Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-WINE_FRIDGE-30-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wine_fridge</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wine_fridge_column_wine_fridge_18" model="product.template">
+        <field name="name">18" Column Wine Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-WINE_FRIDGE-18-COLUMN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wine_fridge</field>
+        <field name="kitchen_appliance_width_mm">457.2</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wine_fridge_column_wine_fridge_24" model="product.template">
+        <field name="name">24" Column Wine Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-WINE_FRIDGE-24-COLUMN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wine_fridge</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_wine_fridge_column_wine_fridge_30" model="product.template">
+        <field name="name">30" Column Wine Fridge (Placeholder)</field>
+        <field name="default_code">KAPP-WINE_FRIDGE-30-COLUMN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">wine_fridge</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">2133.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_beverage_center_beverage_center_24" model="product.template">
+        <field name="name">24" Beverage Center (Placeholder)</field>
+        <field name="default_code">KAPP-BEVERAGE_CENTER-24-BEVERA</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">beverage_center</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_warming_drawer_warming_drawer_24" model="product.template">
+        <field name="name">24" Warming Drawer (Placeholder)</field>
+        <field name="default_code">KAPP-WARMING_DRAWER-24-WARMIN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">warming_drawer</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_warming_drawer_warming_drawer_27" model="product.template">
+        <field name="name">27" Warming Drawer (Placeholder)</field>
+        <field name="default_code">KAPP-WARMING_DRAWER-27-WARMIN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">warming_drawer</field>
+        <field name="kitchen_appliance_width_mm">685.8</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_warming_drawer_warming_drawer_30" model="product.template">
+        <field name="name">30" Warming Drawer (Placeholder)</field>
+        <field name="default_code">KAPP-WARMING_DRAWER-30-WARMIN</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">warming_drawer</field>
+        <field name="kitchen_appliance_width_mm">762.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">254.0</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_coffee_built_in_built-in_coffee_machine_24" model="product.template">
+        <field name="name">24" Built-In Coffee Machine (Placeholder)</field>
+        <field name="default_code">KAPP-COFFEE_BUILT_IN-24-BUILT-</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">coffee_built_in</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">457.2</field>
+        <field name="kitchen_appliance_height_mm">457.2</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_ice_maker_undercounter_ice_maker_15" model="product.template">
+        <field name="name">15" Undercounter Ice Maker (Placeholder)</field>
+        <field name="default_code">KAPP-ICE_MAKER-15-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">ice_maker</field>
+        <field name="kitchen_appliance_width_mm">381.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_ice_maker_undercounter_ice_maker_24" model="product.template">
+        <field name="name">24" Undercounter Ice Maker (Placeholder)</field>
+        <field name="default_code">KAPP-ICE_MAKER-24-UNDERC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">ice_maker</field>
+        <field name="kitchen_appliance_width_mm">609.6</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_trash_compactor_trash_compactor_12" model="product.template">
+        <field name="name">12" Trash Compactor (Placeholder)</field>
+        <field name="default_code">KAPP-TRASH_COMPACTOR-12-TRASHC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">trash_compactor</field>
+        <field name="kitchen_appliance_width_mm">304.8</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+    <record id="kapp_trash_compactor_trash_compactor_15" model="product.template">
+        <field name="name">15" Trash Compactor (Placeholder)</field>
+        <field name="default_code">KAPP-TRASH_COMPACTOR-15-TRASHC</field>
+        <field name="type">consu</field>
+        <field name="sale_ok" eval="False"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="is_kitchen_appliance" eval="True"/>
+        <field name="kitchen_appliance_type">trash_compactor</field>
+        <field name="kitchen_appliance_width_mm">381.0</field>
+        <field name="kitchen_appliance_depth_mm">609.6</field>
+        <field name="kitchen_appliance_height_mm">863.6</field>
+        <field name="kitchen_appliance_clearance_mm">0.0</field>
+    </record>
+</odoo>
