@@ -120,6 +120,12 @@ class SouthbrookKitchenConfigurator extends Component {
             // D13 — searchable inventory + drag-and-drop add.
             inventorySearch: "",
             dragHover:       false,
+            // D16 — Track which product is being dragged from the
+            // inventory so the canvas can highlight the matching
+            // drop-lane. HTML5 dragover events don't expose
+            // dataTransfer payloads (only types) for security, so we
+            // stash the product on dragstart / clear on dragend|drop.
+            draggedProduct:  null,
         });
         // Auto-save debounce timer (not reactive; managed imperatively).
         this._autoSaveTimer = null;
@@ -139,6 +145,8 @@ class SouthbrookKitchenConfigurator extends Component {
             raycaster: null,
             roomObjs: [], cabObjs: [], clickable: [],
             handleMesh: null, arrowMeshes: [],
+            // D16 — Per-zone drop lanes (visible during drag)
+            laneMeshes: null,
             dragging: false, dragX0: 0, dragW0: 0,
             animId: null,
             animatingCamera: false,
@@ -355,7 +363,9 @@ class SouthbrookKitchenConfigurator extends Component {
 
     // Drag-from-inventory: stash the product_id in dataTransfer so the
     // canvas drop handler can resolve it. text/plain mirror for older
-    // browsers + Safari quirks.
+    // browsers + Safari quirks. D16 — also stash the full product on
+    // component state so the lane-highlight code knows which type is
+    // mid-drag (dataTransfer.getData isn't readable during dragover).
     _onProductDragStart(ev, product) {
         if (!ev.dataTransfer) return;
         ev.dataTransfer.effectAllowed = "copy";
@@ -364,6 +374,16 @@ class SouthbrookKitchenConfigurator extends Component {
             JSON.stringify({ product_id: product.product_id })
         );
         ev.dataTransfer.setData("text/plain", String(product.product_id));
+        this.state.draggedProduct = product;
+        this._updateLaneVisibility();
+    }
+
+    // D16 — Clear the dragged-product state when the gesture ends
+    // (drop succeeded OR user released outside any drop target).
+    _onProductDragEnd(_ev) {
+        this.state.draggedProduct = null;
+        this.state.dragHover      = false;
+        this._updateLaneVisibility();
     }
 
     // Allow drop on the canvas wrapper. preventDefault is mandatory or
@@ -372,7 +392,10 @@ class SouthbrookKitchenConfigurator extends Component {
         if (!ev.dataTransfer) return;
         ev.preventDefault();
         ev.dataTransfer.dropEffect = "copy";
-        if (!this.state.dragHover) this.state.dragHover = true;
+        if (!this.state.dragHover) {
+            this.state.dragHover = true;
+            this._updateLaneVisibility();
+        }
     }
 
     _onCanvasDragLeave(ev) {
@@ -380,11 +403,14 @@ class SouthbrookKitchenConfigurator extends Component {
         // (children fire dragleave when crossing internal elements).
         if (ev.currentTarget && ev.currentTarget.contains(ev.relatedTarget)) return;
         this.state.dragHover = false;
+        this._updateLaneVisibility();
     }
 
     _onCanvasDrop(ev) {
         ev.preventDefault();
-        this.state.dragHover = false;
+        this.state.dragHover     = false;
+        this.state.draggedProduct = null;
+        this._updateLaneVisibility();
         let pid = null;
         try {
             const raw = ev.dataTransfer.getData("application/x-sbk-product");
@@ -402,6 +428,31 @@ class SouthbrookKitchenConfigurator extends Component {
         // the floor (e.g. dropping in empty sky area of perspective view).
         const dropX = this._computeDropX(ev);
         this._addCabinetFromProduct(product, dropX);
+    }
+
+    // D16 — Show / hide the per-zone drop lanes and brighten the lane
+    // matching the dragged product's cabinet_type. Called from each
+    // drag-state mutation; no requestAnimationFrame needed because
+    // the scene's tick loop redraws every frame regardless.
+    _updateLaneVisibility() {
+        const lanes = this.T.laneMeshes;
+        if (!lanes) return;
+        const show  = !!(this.state.dragHover && this.state.draggedProduct);
+        const type  = (this.state.draggedProduct && this.state.draggedProduct.cabinet_type) || "";
+        // Bright opacity for the matching lane, dim for the others
+        // so the rep gets immediate "this goes here" feedback even
+        // before they release.
+        const baseHi = (type === "base" || type === "filler");
+        const wallHi = (type === "wall");
+        const tallHi = (type === "tall" || type === "corner" || type === "panel");
+        lanes.base.visible = show;
+        lanes.wall.visible = show;
+        lanes.tall.visible = show;
+        if (show) {
+            lanes.base.material.opacity = baseHi ? 0.42 : 0.14;
+            lanes.wall.material.opacity = wallHi ? 0.42 : 0.14;
+            lanes.tall.material.opacity = tallHi ? 0.42 : 0.14;
+        }
     }
 
     // D14 — Cast a ray from the active camera through the drop point
@@ -1044,6 +1095,17 @@ class SouthbrookKitchenConfigurator extends Component {
             this.T.handleMesh.geometry?.dispose();
             this.T.handleMesh.material?.dispose();
         }
+        // D16 — Dispose lane meshes from the previous build.
+        if (this.T.laneMeshes) {
+            for (const k of ["base", "wall", "tall"]) {
+                const m = this.T.laneMeshes[k];
+                if (!m) continue;
+                scene.remove(m);
+                m.geometry?.dispose();
+                m.material?.dispose();
+            }
+            this.T.laneMeshes = null;
+        }
         this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = []; this.T.handleMesh = null;
         this.T.arrowMeshes = [];
 
@@ -1282,6 +1344,56 @@ class SouthbrookKitchenConfigurator extends Component {
             scene.add(arr);
             this.T.arrowMeshes.push(arr);
         });
+
+        // ── D16 — Per-zone drop lanes (visible during drag-from-inventory).
+        // BASE lane: thin floor band 24" deep along the back wall.
+        // WALL lane: tall band on the back wall sitting at the
+        //   configured wall_z (D8 alignment-aware).
+        // TALL_END lane: full-height band at the right end of the
+        //   base run, where dropped tall / corner / panel land.
+        const wallH    = 30 * IN;
+        const baseD    = 24 * IN;
+        const wallBotZ = WBY;                 // bottom of wall cabinet
+        // BASE lane — floor band along back wall, full room width
+        const baseLane = new THREE.Mesh(
+            new THREE.PlaneGeometry(rw, baseD),
+            new THREE.MeshBasicMaterial({
+                color: 0x1866d4, transparent: true, opacity: 0.0,
+                side: THREE.DoubleSide, depthWrite: false,
+            }),
+        );
+        baseLane.rotation.x = -Math.PI / 2;
+        baseLane.position.set(rw / 2, 0.004, baseD / 2);
+        baseLane.visible = false;
+        scene.add(baseLane);
+        // WALL lane — vertical band on the back wall at wall cab z
+        const wallLane = new THREE.Mesh(
+            new THREE.PlaneGeometry(rw, wallH),
+            new THREE.MeshBasicMaterial({
+                color: 0x1e9e6a, transparent: true, opacity: 0.0,
+                side: THREE.DoubleSide, depthWrite: false,
+            }),
+        );
+        wallLane.position.set(rw / 2, wallBotZ + wallH / 2, 0.004);
+        wallLane.visible = false;
+        scene.add(wallLane);
+        // TALL_END lane — full-height band at the right end of base run,
+        //   24" wide × room_height × cabinet depth. Caps at room height.
+        const tallH = Math.max(rh - 3.5 * IN, 60 * IN);
+        const tallW = 24 * IN;
+        const tallLane = new THREE.Mesh(
+            new THREE.BoxGeometry(tallW, tallH, baseD),
+            new THREE.MeshBasicMaterial({
+                color: 0xc89b5a, transparent: true, opacity: 0.0,
+                depthWrite: false,
+            }),
+        );
+        // Position at the right edge of current room width
+        tallLane.position.set(rw - tallW / 2, 3.5 * IN + tallH / 2, baseD / 2);
+        tallLane.visible = false;
+        scene.add(tallLane);
+        this.T.laneMeshes = { base: baseLane, wall: wallLane, tall: tallLane };
+        this._updateLaneVisibility();
 
         // ── D1 — Re-compute view specs from current room dims and
         //         re-apply the active view. instant=true on rebuild so
@@ -1891,6 +2003,7 @@ SouthbrookKitchenConfigurator.template = xml`
             t-att-class="'o_sbk_product_row o_sbk_prod_draggable' + (state.selected &amp;&amp; state.selected.product_id === product.product_id ? ' is-selected' : '')"
             draggable="true"
             t-on-dragstart="(ev) => this._onProductDragStart(ev, product)"
+            t-on-dragend="(ev) => this._onProductDragEnd(ev)"
             t-on-click="() => this._selectCabinet(product)"
             t-att-title="'Click to select · Drag onto scene to add ' + product.name">
           <div class="o_sbk_prod_thumb">
