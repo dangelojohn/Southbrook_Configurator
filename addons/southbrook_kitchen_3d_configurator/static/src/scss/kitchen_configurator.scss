@@ -288,6 +288,72 @@ $sbk-amber:      #B45309;
     border: 1px solid rgba(26, 102, 212, 0.3);
 }
 
+// D10 — Empty-catalog onboarding nudge (left controls, replaces raw error)
+.o_sbk_onboard {
+    margin: 10px 0;
+    padding: 12px;
+    background: rgba(26, 102, 212, 0.06);
+    border: 1px solid rgba(26, 102, 212, 0.30);
+    border-radius: 6px;
+    font-size: 12px;
+    color: #0f3a8a;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.o_sbk_onboard_title {
+    font-size: 13px;
+    color: #1a2233;
+}
+.o_sbk_onboard_body {
+    margin: 0;
+    line-height: 1.4;
+    color: #4a5568;
+}
+.o_sbk_onboard_cta {
+    margin-top: 6px;
+    padding: 7px 12px;
+    background: #1866d4;
+    color: white;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    text-align: left;
+    align-self: flex-start;
+    transition: background-color 0.12s ease;
+    &:hover { background: #0f3a8a; }
+}
+
+// D10 — BOM-missing banner in selected-cabinet drawer
+.o_sbk_bom_warn {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    background: rgba(192, 73, 47, 0.10);
+    border: 1px solid rgba(192, 73, 47, 0.35);
+    color: #c0492f;
+    border-radius: 4px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    strong { font-size: 12px; }
+}
+.o_sbk_bom_warn_btn {
+    margin-left: auto;
+    padding: 4px 10px;
+    background: #c0492f;
+    color: white;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    &:hover { background: #9c3a25; }
+}
+
 // D8 (+forward-compat D12) — layout validation warnings panel
 .o_sbk_warnings {
     margin: 10px 0 0;

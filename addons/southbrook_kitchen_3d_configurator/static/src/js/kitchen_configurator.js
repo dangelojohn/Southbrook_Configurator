@@ -72,7 +72,9 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state = useState({
             loading:  true,
             saving:   false,
-            error:    "",
+            error:     "",
+            errorCode: "",
+            errorCta:  null,
             room: {
                 width_in:  this.props.room_width_in  || 12,
                 depth_in:  this.props.room_depth_in  || 24,
@@ -239,10 +241,12 @@ class SouthbrookKitchenConfigurator extends Component {
                 wall_cab_top_alignment:  this.state.wallCabTopAlignment || "fixed_gap",
                 soffit_height_in:        this.state.soffitHeightIn || 84.0,
             });
-            this.state.error    = result.error || "";
-            this.state.items    = result.items  || [];
-            this.state.summary  = result.summary || this.state.summary;
-            this.state.warnings = result.warnings || [];
+            this.state.error      = result.error || "";
+            this.state.errorCode  = result.error_code || "";
+            this.state.errorCta   = result.error_cta || null;
+            this.state.items      = result.items  || [];
+            this.state.summary    = result.summary || this.state.summary;
+            this.state.warnings   = result.warnings || [];
             if (result.channel) this.state.channel = result.channel;
             if (!this.state.selected && this.state.items.length) {
                 this.state.selected = this.state.items[0];
@@ -1207,6 +1211,41 @@ class SouthbrookKitchenConfigurator extends Component {
         );
     }
 
+    // D10 — Run the controller-supplied CTA action (typically opens
+    // the Cabinet Products list filtered by southbrook_is_cabinet).
+    async _runErrorCta() {
+        const cta = this.state.errorCta;
+        if (!cta || !cta.action) return;
+        try {
+            return this.action.doAction(cta.action);
+        } catch (e) {
+            this.notification.add(
+                "Couldn't open the cabinet catalog: " + (e.message || e),
+                { type: "danger" }
+            );
+        }
+    }
+
+    // D10 — Open the BOM list for the currently-selected product so
+    // the rep can add a BoM and unblock manufacturing in one click.
+    async _openSelectedProductBom() {
+        const sel = this.state.selected;
+        if (!sel || !sel.template_id) return;
+        return this.action.doAction({
+            type:      "ir.actions.act_window",
+            name:      "Bill of Materials",
+            res_model: "mrp.bom",
+            view_mode: "list,form",
+            views:     [[false, "list"], [false, "form"]],
+            domain:    [["product_tmpl_id", "=", sel.template_id]],
+            context:   {
+                default_product_tmpl_id: sel.template_id,
+                default_type:            "normal",
+            },
+            target:    "current",
+        });
+    }
+
     // ─── Formatting helpers ───────────────────────────────────────────────────────
     _money(v) {
         const sym = (this.state.channel && this.state.channel.currency_symbol) || "$";
@@ -1397,7 +1436,17 @@ SouthbrookKitchenConfigurator.template = xml`
         </button>
       </div>
 
-      <div t-if="state.error" class="o_sbk_error" t-esc="state.error"/>
+      <!-- D10 — Structured onboarding nudge when no cabinet products
+           are configured (NO_CABINETS). Falls back to the bare error
+           string for any other error. -->
+      <div t-if="state.error &amp;&amp; state.errorCode === 'NO_CABINETS'" class="o_sbk_onboard">
+        <strong class="o_sbk_onboard_title">Catalog is empty</strong>
+        <p class="o_sbk_onboard_body" t-esc="state.error"/>
+        <button t-if="state.errorCta" class="o_sbk_onboard_cta" t-on-click="_runErrorCta">
+          <t t-esc="state.errorCta.label"/> →
+        </button>
+      </div>
+      <div t-elif="state.error" class="o_sbk_error" t-esc="state.error"/>
 
       <!-- D8 (and forward-compat for D12) — layout validation warnings -->
       <div t-if="state.warnings &amp;&amp; state.warnings.length" class="o_sbk_warnings">
@@ -1533,6 +1582,15 @@ SouthbrookKitchenConfigurator.template = xml`
             <p class="o_sbk_detail_name"><t t-esc="state.selected.name"/></p>
             <p class="o_sbk_detail_type"><t t-esc="state.selected.cabinet_type"/> cabinet</p>
           </div>
+        </div>
+
+        <!-- D10 — BOM warning banner: red bar with one-click jump to
+             the BoM form pre-filtered to this product. Without a BoM
+             the MO can't be generated even though the quote will save. -->
+        <div t-if="state.selected.bom_available === false" class="o_sbk_bom_warn">
+          <strong>⚠ No BOM defined</strong>
+          <span> — this product can't be manufactured until a Bill of Materials exists.</span>
+          <button class="o_sbk_bom_warn_btn" t-on-click="_openSelectedProductBom">Open BoM →</button>
         </div>
 
         <!-- Inline edit controls -->

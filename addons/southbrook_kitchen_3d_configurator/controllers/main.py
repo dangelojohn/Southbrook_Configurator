@@ -62,12 +62,35 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         pricelist = self._resolve_pricelist(partner)
 
         if not base or not wall:
+            missing = []
+            if not base: missing.append("Base Cabinet")
+            if not wall: missing.append("Wall Cabinet")
             return {
                 "error": (
-                    "No cabinet products configured. "
-                    "Open Southbrook Kitchen > Cabinet Products and add at least "
-                    "one Base Cabinet and one Wall Cabinet."
-                ),
+                    "No %s product configured. "
+                    "Tag a saleable product with 'Southbrook Cabinet' + "
+                    "the matching cabinet type to populate the catalog."
+                ) % " / ".join(missing),
+                # D10 — structured error code + CTA so the UI can render
+                # an onboarding nudge with a real button instead of a
+                # bare error string.
+                "error_code": "NO_CABINETS",
+                "error_cta":  {
+                    "label": "Open Cabinet Products",
+                    "action": {
+                        "type":      "ir.actions.act_window",
+                        "name":      "Southbrook Cabinet Products",
+                        "res_model": "product.template",
+                        "view_mode": "list,form",
+                        "views":     [(False, "list"), (False, "form")],
+                        "domain":    [("southbrook_is_cabinet", "=", True)],
+                        "target":    "current",
+                        "context":   {
+                            "default_southbrook_is_cabinet": True,
+                            "default_sale_ok":               True,
+                        },
+                    },
+                },
                 "items": [],
                 "summary": {"base_count": 0, "wall_count": 0, "total": 0,
                              "price": 0.0, "remainder_in": 0.0},
@@ -277,22 +300,35 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             "state":          "configured",
         }
 
+        # D9 — Non-destructive save. Update existing lines by
+        # layout_key, create only new ones, unlink only those that
+        # disappeared from the incoming set. Manual lines (added in
+        # the backend form, origin='manual') are NEVER touched.
+        Line = request.env["southbrook.kitchen.design.line"]
         if design_id:
             design = Design.browse(int(design_id))
             design.write(vals)
-            design.cabinet_line_ids.unlink()
+            configurator_lines = design.cabinet_line_ids.filtered(
+                lambda l: l.origin == "configurator"
+            )
+            existing_by_key = {
+                l.layout_key: l for l in configurator_lines if l.layout_key
+            }
         else:
             design = Design.create(vals)
+            existing_by_key = {}
 
+        incoming_keys = set()
         for seq, item in enumerate(items, start=1):
             product = request.env["product.product"].browse(int(item["product_id"]))
             tmpl    = product.product_tmpl_id
-            request.env["southbrook.kitchen.design.line"].create({
-                "design_id":      design.id,
+            layout_key = item.get("layout_key") or "auto-%d" % seq
+            incoming_keys.add(layout_key)
+            line_vals = {
                 "sequence":       seq * 10,
                 "product_id":     product.id,
                 "quantity":       1,
-                "price_unit":     product.lst_price,
+                "price_unit":     item.get("price") or product.lst_price,
                 "cabinet_type":   tmpl.southbrook_cabinet_type,
                 "width_in":       item.get("width_in",  tmpl.southbrook_width_in or 24.0),
                 "height_in":      item.get("height_in", tmpl.southbrook_height_in or 34.5),
@@ -300,7 +336,23 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "x_position_in":  item.get("x_position_in", 0),
                 "y_position_in":  item.get("y_position_in", 0),
                 "z_position_in":  item.get("z_position_in", 0),
-            })
+                "layout_key":     layout_key,
+                "origin":         "configurator",
+            }
+            if layout_key in existing_by_key:
+                existing_by_key[layout_key].write(line_vals)
+            else:
+                Line.create({"design_id": design.id, **line_vals})
+
+        # Unlink configurator-origin lines that the user removed in the
+        # 3D pane. Manual-origin lines are excluded from existing_by_key
+        # so they survive every save.
+        removed_keys = set(existing_by_key) - incoming_keys
+        if removed_keys:
+            stale = Line.browse([])
+            for k in removed_keys:
+                stale |= existing_by_key[k]
+            stale.unlink()
 
         return {
             "id":   design.id,

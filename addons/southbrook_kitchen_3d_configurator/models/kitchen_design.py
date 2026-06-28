@@ -287,6 +287,29 @@ class SouthbrookKitchenDesignLine(models.Model):
     price_unit  = fields.Monetary(required=True, string="Unit Price")
     currency_id = fields.Many2one(related="design_id.currency_id", store=True)
 
+    # ── D9 — Stable identity for non-destructive save_design ───────────────
+    # layout_key matches the JS side's per-cabinet key (e.g. "base-3",
+    # "wall-1", "filler-L"). origin distinguishes lines created by the
+    # 3D configurator (which can be wiped + recreated on save) from
+    # lines created in the backend form (which must NEVER be wiped by
+    # a 3D save).
+    layout_key = fields.Char(
+        string="Layout Key",
+        index=True,
+        help="Stable identifier matching the 3D configurator's per-cabinet key.",
+    )
+    origin = fields.Selection(
+        selection=[
+            ("configurator", "3D Configurator"),
+            ("manual",       "Manual / Backend"),
+        ],
+        string="Source",
+        default="manual",
+        required=True,
+        help="Lines from the configurator can be replaced on re-save; "
+             "manual lines are preserved across configurator saves.",
+    )
+
     cabinet_type = fields.Selection([
         ("base",   "Base Cabinet"),
         ("wall",   "Wall Cabinet"),
