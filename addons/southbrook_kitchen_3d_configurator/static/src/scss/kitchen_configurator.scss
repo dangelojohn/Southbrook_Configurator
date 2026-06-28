@@ -491,6 +491,67 @@ $sbk-amber:      #B45309;
     }
 }
 
+// D2 — Inline edit-drawer styles
+.o_sbk_detail_head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 10px;
+    h4 { margin: 0; }
+}
+.o_sbk_detail_remove {
+    border: 1px solid rgba(192, 73, 47, 0.35);
+    background: transparent;
+    color: #c0492f;
+    width: 24px;
+    height: 24px;
+    line-height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: center;
+    padding: 0;
+    transition: background-color 0.12s ease;
+    &:hover { background: rgba(192, 73, 47, 0.12); }
+}
+.o_sbk_edit_grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 10px;
+    background: rgba(26, 102, 212, 0.04);
+    border: 1px solid rgba(26, 102, 212, 0.16);
+    border-radius: 6px;
+}
+.o_sbk_edit_field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    span {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: $sbk-muted;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+}
+.o_sbk_edit_select,
+.o_sbk_edit_input {
+    padding: 6px 8px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 4px;
+    background: white;
+    font-size: 13px;
+    color: $sbk-ink;
+    &:focus-visible {
+        outline: 2px solid rgba(26, 102, 212, 0.55);
+        outline-offset: 0;
+        border-color: rgba(26, 102, 212, 0.45);
+    }
+}
+.o_sbk_edit_input { font-variant-numeric: tabular-nums; }
+
 .o_sbk_detail_card {
     display: flex;
     gap: 10px;

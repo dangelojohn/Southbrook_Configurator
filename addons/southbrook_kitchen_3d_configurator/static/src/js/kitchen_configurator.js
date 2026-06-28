@@ -188,6 +188,102 @@ class SouthbrookKitchenConfigurator extends Component {
         this._highlightSelected(item);
     }
 
+    // ─── D2 — Inline cabinet edit drawer ────────────────────────────────────────
+    // Filter the loaded product catalog by cabinet_type so the swap
+    // dropdown only shows compatible substitutes (a wall cab can't
+    // replace a base cab — different mount Z, different depth).
+    _sameTypeProducts(cabinetType) {
+        return (this.state.products || []).filter(
+            p => p.cabinet_type === cabinetType
+        );
+    }
+
+    // Width edit: validate, mutate item, cascade x positions, rebuild.
+    _updateSelectedWidth(rawValue) {
+        const v = parseFloat(rawValue);
+        if (!Number.isFinite(v) || v < 6 || v > 48) return;
+        const sel = this.state.selected;
+        if (!sel) return;
+        const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
+        if (idx < 0) return;
+        this.state.items[idx].width_in = v;
+        sel.width_in = v;
+        this._recomputeLayoutFromItems();
+        if (this.T.scene) this._buildScene();
+    }
+
+    // Product swap: replace cabinet at the same position with the
+    // new product's payload, keeping position + layout_key + dimensions.
+    _swapSelectedProduct(rawProductId) {
+        const pid = parseInt(rawProductId, 10);
+        if (!Number.isFinite(pid)) return;
+        const product = (this.state.products || []).find(p => p.product_id === pid);
+        if (!product) return;
+        const sel = this.state.selected;
+        if (!sel) return;
+        const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
+        if (idx < 0) return;
+        const oldItem = this.state.items[idx];
+        // Preserve position + layout_key + current width (user may have
+        // dialed in a custom width; swapping product shouldn't reset it).
+        const merged = {
+            ...product,
+            layout_key:    oldItem.layout_key,
+            x_position_in: oldItem.x_position_in,
+            y_position_in: oldItem.y_position_in,
+            z_position_in: oldItem.z_position_in,
+            width_in:      oldItem.width_in,
+        };
+        this.state.items[idx] = merged;
+        this.state.selected = merged;
+        this._recomputeLayoutFromItems();
+        if (this.T.scene) this._buildScene();
+    }
+
+    // Remove the selected cabinet entirely.
+    _removeSelectedCabinet() {
+        const sel = this.state.selected;
+        if (!sel) return;
+        const idx = this.state.items.findIndex(it => it.layout_key === sel.layout_key);
+        if (idx < 0) return;
+        this.state.items.splice(idx, 1);
+        // Pick a neighbour as the new selection (or null if empty).
+        this.state.selected = this.state.items[idx] || this.state.items[idx - 1] || null;
+        this._recomputeLayoutFromItems();
+        if (this.T.scene) this._buildScene();
+    }
+
+    // Cascade x positions inside each cabinet group (base / wall / filler).
+    // Bases are packed left-to-right contiguously; walls track bases by
+    // x order (so swapping a base width pushes walls along too); fillers
+    // sit at the right end of the base run. summary.price recomputes.
+    _recomputeLayoutFromItems() {
+        const items = this.state.items || [];
+        const bases   = items.filter(it => it.cabinet_type === "base")
+                              .sort((a, b) => a.x_position_in - b.x_position_in);
+        const walls   = items.filter(it => it.cabinet_type === "wall")
+                              .sort((a, b) => a.x_position_in - b.x_position_in);
+        const fillers = items.filter(it => it.cabinet_type === "filler");
+
+        let bx = 0;
+        for (const b of bases) { b.x_position_in = bx; bx += b.width_in; }
+        let wx = 0;
+        for (const w of walls) { w.x_position_in = wx; wx += w.width_in; }
+        for (const f of fillers) { f.x_position_in = bx; bx += f.width_in; }
+
+        let price = 0;
+        for (const it of items) {
+            if (it.cabinet_type !== "filler") price += (it.price || 0);
+        }
+        this.state.summary = {
+            base_count: bases.length,
+            wall_count: walls.length,
+            total: bases.length + walls.length,
+            price: price,
+            remainder_in: this.state.summary?.remainder_in || 0,
+        };
+    }
+
     // ─── Three.js initialisation ────────────────────────────────────────────────
     _initScene() {
         const THREE  = this.T.THREE;
@@ -1092,9 +1188,18 @@ SouthbrookKitchenConfigurator.template = xml`
         </button>
       </div>
 
-      <!-- Selected cabinet detail -->
+      <!-- D2 — Selected cabinet inline-edit drawer.
+           Width / product swap / remove are now first-class edits;
+           the scene rebuilds locally on every change. Save Design
+           still persists the result; D5 will add debounced auto-save. -->
       <div t-if="state.selected" class="o_sbk_detail">
-        <h4>Selected Cabinet</h4>
+        <div class="o_sbk_detail_head">
+          <h4>Selected Cabinet</h4>
+          <button class="o_sbk_detail_remove"
+                  aria-label="Remove this cabinet from the layout"
+                  title="Remove cabinet"
+                  t-on-click="_removeSelectedCabinet">✕</button>
+        </div>
         <div class="o_sbk_detail_card">
           <div class="o_sbk_detail_img">
             <img t-if="state.selected.image_url" t-att-src="state.selected.image_url" alt=""/>
@@ -1105,9 +1210,31 @@ SouthbrookKitchenConfigurator.template = xml`
             <p class="o_sbk_detail_type"><t t-esc="state.selected.cabinet_type"/> cabinet</p>
           </div>
         </div>
+
+        <!-- Inline edit controls -->
+        <div class="o_sbk_edit_grid">
+          <label class="o_sbk_edit_field">
+            <span>Product</span>
+            <select class="o_sbk_edit_select"
+                    t-att-value="state.selected.product_id"
+                    t-on-change="(ev) => this._swapSelectedProduct(ev.target.value)">
+              <option t-foreach="_sameTypeProducts(state.selected.cabinet_type)"
+                      t-as="p" t-key="p.product_id"
+                      t-att-value="p.product_id"
+                      t-att-selected="p.product_id === state.selected.product_id ? 'selected' : ''"
+                      t-esc="p.name + ' — ' + p.width_in + ' in'"/>
+            </select>
+          </label>
+          <label class="o_sbk_edit_field">
+            <span>Width (in)</span>
+            <input type="number" min="6" max="48" step="3" class="o_sbk_edit_input"
+                   t-att-value="state.selected.width_in"
+                   t-on-change="(ev) => this._updateSelectedWidth(ev.target.value)"/>
+          </label>
+        </div>
+
         <dl class="o_sbk_spec_grid">
           <dt>SKU</dt>      <dd><t t-esc="state.selected.sku || '—'"/></dd>
-          <dt>Width</dt>    <dd><t t-esc="state.selected.width_in"/> in</dd>
           <dt>Height</dt>   <dd><t t-esc="state.selected.height_in"/> in</dd>
           <dt>Depth</dt>    <dd><t t-esc="state.selected.depth_in"/> in</dd>
           <dt>Material</dt> <dd><t t-esc="_materialLabel(state.selected.material)"/></dd>
