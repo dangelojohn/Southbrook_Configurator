@@ -67,21 +67,23 @@
         <field name="name">product.template.search.kitchen.appliance</field>
         <field name="model">product.template</field>
         <field name="arch" type="xml">
-            <search string="Kitchen Appliance Catalog">
+            <!-- v19: <search string="..."> + <group expand="0"> in
+                 search views fail ir.ui.view._check_xml validation.
+                 Use a flat filter list with <separator/> instead. -->
+            <search>
                 <field name="name"/>
                 <field name="default_code"/>
                 <field name="kitchen_appliance_type"/>
                 <filter string="Appliances"
                         name="filter_is_kitchen_appliance"
                         domain="[('is_kitchen_appliance', '=', True)]"/>
-                <group expand="0">
-                    <filter string="Type" name="group_type"
-                            context="{'group_by': 'kitchen_appliance_type'}"/>
-                    <filter string="Install Type" name="group_install"
-                            context="{'group_by': 'kitchen_appliance_install_type'}"/>
-                    <filter string="Fuel" name="group_fuel"
-                            context="{'group_by': 'kitchen_appliance_fuel_type'}"/>
-                </group>
+                <separator/>
+                <filter string="Group by: Type" name="group_type"
+                        context="{'group_by': 'kitchen_appliance_type'}"/>
+                <filter string="Group by: Install Type" name="group_install"
+                        context="{'group_by': 'kitchen_appliance_install_type'}"/>
+                <filter string="Group by: Fuel" name="group_fuel"
+                        context="{'group_by': 'kitchen_appliance_fuel_type'}"/>
             </search>
         </field>
     </record>
