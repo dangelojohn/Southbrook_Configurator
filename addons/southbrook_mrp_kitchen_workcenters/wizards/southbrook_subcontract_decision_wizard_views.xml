@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W066 (R3.9, 2026-06-27) — Subcontract Decision Wizard view.
+
+  Three readonly context bands + one decision band:
+    1. WO + MO + workcenter context (auto-filled)
+    2. Capacity status (from W067) — utilization% + warning text
+    3. Qualified candidate vendors (from pg.vendor AVL, W031)
+    4. Decision: vendor pick, qty, requested date, notes
+
+  Submit creates a pg.rfq with source_type='subcontract' (W078)
+  and opens it. Canonical BOM routing is NEVER mutated.
+-->
+<odoo>
+
+    <record id="view_sbk_subcontract_decision_wizard_form" model="ir.ui.view">
+        <field name="name">southbrook.subcontract.decision.wizard.form</field>
+        <field name="model">southbrook.subcontract.decision.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Divert to Subcontractor">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Divert this MO operation to a qualified subcontractor</h2>
+                        <p class="text-muted">
+                            Per-MO divert only — the canonical BOM
+                            routing is NOT modified. A subcontract
+                            RFQ is created in draft; the buyer
+                            confirms the award before any PO lands.
+                        </p>
+                    </div>
+                    <group string="Context (from this Work Order)">
+                        <group>
+                            <field name="workorder_id" readonly="1"/>
+                            <field name="production_id" readonly="1"/>
+                            <field name="workcenter_id" readonly="1"/>
+                            <field name="operation_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="product_id" readonly="1"/>
+                            <field name="planned_date"/>
+                        </group>
+                    </group>
+                    <group string="Capacity (from W067 — calendar-aware)">
+                        <group>
+                            <field name="current_utilization_pct"
+                                   widget="percentage"
+                                   readonly="1"/>
+                            <field name="capacity_day_id"
+                                   readonly="1"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                        <group>
+                            <field name="capacity_warning"
+                                   readonly="1"
+                                   nolabel="1"/>
+                        </group>
+                    </group>
+                    <group string="Qualified Candidates (from pg.vendor AVL)">
+                        <field name="candidate_count" readonly="1"/>
+                        <field name="candidate_vendor_ids"
+                               readonly="1"
+                               widget="many2many_tags"
+                               options="{'no_create': True}"/>
+                    </group>
+                    <group string="Decision">
+                        <group>
+                            <field name="selected_vendor_id"
+                                   domain="[('id','in',candidate_vendor_ids)]"
+                                   options="{'no_create': True}"/>
+                            <field name="subcontract_qty"/>
+                            <field name="requested_completion_date"/>
+                        </group>
+                        <group>
+                            <field name="notes"
+                                   placeholder="e.g. CNC2 at 140% week of 6-30, Vendor Acme has bandwidth, MO ships Wed"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm"
+                            type="object"
+                            string="Create Subcontract RFQ"
+                            class="btn-primary"/>
+                    <button special="cancel"
+                            string="Cancel"
+                            class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!--
+      W066 at-risk WO list — shortcut surface that pre-filters to WOs
+      whose workcenter has utilization > 100% on the WO's planned
+      day. The list reuses the planner's existing WO model; the
+      "Divert" button on the form (via mrp_workorder_views.xml) is
+      what actually opens the wizard.
+
+      We don't try to embed a per-row "Divert" button on the list
+      itself — the per-row button pattern is fragile in v19 list
+      views and the form button is one click further. Acceptable
+      cost for stability.
+    -->
+    <record id="action_sbk_at_risk_workorders" model="ir.actions.act_window">
+        <field name="name">At-Risk Work Orders (over capacity)</field>
+        <field name="res_model">mrp.workorder</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="context">{
+            'search_default_filter_at_risk': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No WOs at over-capacity workcenters right now.
+            </p>
+            <p>
+                When a WO appears here, open it and use the
+                <strong>"Divert to Subcontractor"</strong> button to
+                file a subcontract RFQ against a qualified vendor.
+            </p>
+        </field>
+    </record>
+
+    <!-- W066 menu entry under the Southbrook PM root, just after the
+         W067 calendar-aware capacity entry (sequence 9). -->
+    <menuitem
+        id="menu_sbk_subcontract_at_risk_wos"
+        parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+        name="Subcontract Candidates"
+        action="action_sbk_at_risk_workorders"
+        sequence="9"/>
+
+</odoo>

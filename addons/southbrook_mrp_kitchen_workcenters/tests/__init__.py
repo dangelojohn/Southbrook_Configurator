@@ -22,3 +22,4 @@ from . import test_w080_tab_consolidation
 from . import test_w087_shift_handover_structured
 from . import test_w090_scrap_ncr_backlink
 from . import test_w069_downtime_notify
+from . import test_w066_subcontract_decision

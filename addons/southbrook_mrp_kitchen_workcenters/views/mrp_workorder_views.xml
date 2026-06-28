@@ -248,6 +248,15 @@
                                 string="Report Engineering Issue"
                                 class="btn-secondary"
                                 help="Open the W034 wizard — photo + description → draft ECO with full WO context."/>
+                        <!-- W066 (R3.9, 2026-06-27) — divert this WO
+                             to a qualified subcontractor when its
+                             workcenter is over capacity. Per-MO
+                             only; canonical BOM routing untouched. -->
+                        <button name="action_sbk_subcontract_decision_wizard"
+                                type="object"
+                                string="Divert to Subcontractor"
+                                class="btn-secondary"
+                                help="Open the W066 wizard — fuses W067 capacity + W031 AVL + W078 subcontract RFQ into a 3-click divert."/>
                     </group>
                 </group>
             </xpath>

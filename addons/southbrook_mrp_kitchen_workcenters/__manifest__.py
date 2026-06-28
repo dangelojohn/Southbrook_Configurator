@@ -35,7 +35,7 @@ existing Southbrook modules (southbrook_kitchen_mrp,
 southbrook_manufacturing_intelligence, southbrook_mrp_pm,
 southbrook_kitchen_workspace) without duplicating their models.
 """,
-    "version": "19.0.4.47.0",
+    "version": "19.0.4.48.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -68,6 +68,13 @@ southbrook_kitchen_workspace) without duplicating their models.
         # so env.ref('southbrook_plm.eco_type_document') is hard-loaded
         # before this addon's xml validation runs.
         "southbrook_plm",
+        # W066 (R3.9, 2026-06-27) — Subcontract Decision wizard
+        # creates a pg.rfq with source_type='subcontract' (W078) and
+        # filters candidates against pg.vendor / pg.vendor.part (W031
+        # AVL). Hard-dep on both so env['pg.rfq'] + env['pg.vendor']
+        # are guaranteed at install time.
+        "product_graph_rfq",
+        "product_graph_vendor",
     ],
     "data": [
         "security/ir.model.access.csv",
@@ -131,6 +138,12 @@ southbrook_kitchen_workspace) without duplicating their models.
         # W040 (R2.4, 2026-06-27) — Report-a-Problem single-screen
         # wizard. Same load-after-view rationale.
         "wizards/southbrook_report_problem_wizard_views.xml",
+        # W066 (R3.9, 2026-06-27) — Subcontract Decision wizard +
+        # at-risk-WOs action + menu. Loads AFTER mrp_workorder_views
+        # (button on WO form) and AFTER southbrook_capacity_day_views
+        # (menu sequence is 9, sits next to W067's "Capacity
+        # (Calendar-Aware)" entry at sequence 8).
+        "wizards/southbrook_subcontract_decision_wizard_views.xml",
         # Demo data — loaded only when demo flag is set.
     ],
     "demo": [
