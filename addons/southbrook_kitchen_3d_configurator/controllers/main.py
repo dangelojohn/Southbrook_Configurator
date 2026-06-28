@@ -37,7 +37,7 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         type="json", auth="user", methods=["POST"],
     )
     def layout(self, room_width_in=12, room_depth_in=24, room_height_in=96,
-               partner_id=False):
+               partner_id=False, filler_strategy="split"):
         """
         Compute the cabinet fill for the given room dimensions.
 
@@ -94,23 +94,44 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             items.append(self._layout_item(base, i, x, 0.0, 0.0,    pricelist, partner))
             items.append(self._layout_item(wall, i, x, 0.0, wall_z, pricelist, partner))
 
-        # Filler panel if there is significant remainder
-        if remainder >= 1.0:
-            filler = self._first_product(env, "filler")
-            if filler:
-                fp = self._product_payload(filler, pricelist, partner)
-                fp.update({
-                    "layout_key":    "filler-0",
-                    "x_position_in": n * module_w,
-                    "y_position_in": 0.0,
-                    "z_position_in": 0.0,
-                    "width_in":      remainder,  # override to actual gap
-                    "cabinet_type":  "filler",
-                })
-                items.append(fp)
+        # D7 — Smart filler placement. Honors the chosen filler_strategy:
+        #  split: half-width filler at each end (default; pushes bases by half)
+        #  left:  single filler at x=0 (push all bases right by remainder)
+        #  right: single filler at x = n * module_w (right end)
+        #  scribe: no filler (carpenter scribes end cabinet on site)
+        filler_strategy = (filler_strategy or "split").lower()
+        if filler_strategy not in ("split", "left", "right", "scribe"):
+            filler_strategy = "split"
+        if remainder >= 1.0 and filler_strategy != "scribe":
+            if filler_strategy == "split":
+                half = remainder / 2.0
+                # Shift bases + walls right by `half` so the left filler
+                # sits at x=0 cleanly.
+                for it in items:
+                    if it["cabinet_type"] in ("base", "wall"):
+                        it["x_position_in"] = it["x_position_in"] + half
+                lf = self._make_filler(env, half, 0.0,
+                                        "filler-L", pricelist, partner)
+                rf = self._make_filler(env, half, n * module_w + half,
+                                        "filler-R", pricelist, partner)
+                if lf: items.append(lf)
+                if rf: items.append(rf)
+            elif filler_strategy == "left":
+                for it in items:
+                    if it["cabinet_type"] in ("base", "wall"):
+                        it["x_position_in"] = it["x_position_in"] + remainder
+                lf = self._make_filler(env, remainder, 0.0,
+                                        "filler-L", pricelist, partner)
+                if lf: items.append(lf)
+            else:   # right
+                rf = self._make_filler(env, remainder, n * module_w,
+                                        "filler-R", pricelist, partner)
+                if rf: items.append(rf)
 
-        total_price = sum(it["price"] for it in items
-                          if it["cabinet_type"] not in ("filler",))
+        cabinet_price = sum(it["price"] for it in items
+                             if it["cabinet_type"] not in ("filler",))
+        filler_price  = sum(it["price"] for it in items
+                             if it["cabinet_type"] == "filler")
 
         return {
             "room": {
@@ -120,15 +141,70 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             },
             "items": items,
             "summary": {
-                "base_count":   n,
-                "wall_count":   n,
-                "total":        n * 2,
-                "price":        total_price,
-                "remainder_in": round(remainder, 2),
+                "base_count":      n,
+                "wall_count":      n,
+                "total":           n * 2,
+                # Backward compat: 'price' kept as cabinet total. The
+                # UI can now show filler as a separate breakdown row.
+                "price":           cabinet_price,
+                "cabinet_price":   cabinet_price,
+                "filler_price":    filler_price,
+                "remainder_in":    round(remainder, 2),
+                "filler_strategy": filler_strategy,
+                "snap_hint":       self._snap_hint(rw, module_w),
             },
             "channel": self._channel_meta(partner, pricelist),
             "error": "",
         }
+
+    # ─── D7 — filler helpers ────────────────────────────────────────────────────
+    def _make_filler(self, env, width_in, x, key, pricelist, partner):
+        """Build a single filler item at position x, width prorated."""
+        filler = self._first_product(env, "filler")
+        if not filler:
+            return None
+        fp = self._product_payload(filler, pricelist, partner)
+        # Prorate price by actual filler width vs the catalog standard
+        # width. Avoids over-charging for a 0.5" filler at the price of
+        # a 6" panel.
+        std_w = float(fp.get("width_in") or width_in or 1.0)
+        if std_w <= 0:
+            std_w = 1.0
+        prorated = (fp.get("price") or 0.0) * (max(width_in, 0.5) / std_w)
+        fp.update({
+            "layout_key":    key,
+            "x_position_in": x,
+            "y_position_in": 0.0,
+            "z_position_in": 0.0,
+            "width_in":      width_in,
+            "cabinet_type":  "filler",
+            "price":         round(prorated, 2),
+        })
+        return fp
+
+    def _snap_hint(self, rw, module_w):
+        """When rw is 1-6 inches away from a module-clean total, suggest
+        the nearest clean width so the rep can avoid filler altogether."""
+        if not module_w or module_w <= 0:
+            return None
+        # Floor count
+        n_floor = int(rw // module_w)
+        clean_lo = n_floor * module_w
+        clean_hi = (n_floor + 1) * module_w
+        gap_lo = rw - clean_lo
+        gap_hi = clean_hi - rw
+        if gap_lo == 0:
+            return None
+        # Suggest hi (stretch) if rw is close enough to hi; else lo (shrink)
+        if 0 < gap_hi <= 6.0:
+            return {"target_width": clean_hi,
+                    "delta":         round(gap_hi, 2),
+                    "direction":     "expand"}
+        if 0 < gap_lo <= 6.0:
+            return {"target_width": clean_lo,
+                    "delta":         round(-gap_lo, 2),
+                    "direction":     "shrink"}
+        return None
 
     # ── Save design ──────────────────────────────────────────────────────────────
     @http.route(

@@ -288,6 +288,40 @@ $sbk-amber:      #B45309;
     border: 1px solid rgba(26, 102, 212, 0.3);
 }
 
+// D7 — Filler-strategy selector + snap-hint CTA
+.o_sbk_metric_filler {
+    color: #1e9e6a;
+    font-size: 12px;
+}
+.o_sbk_remainder_strategy {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-left: 4px;
+}
+.o_sbk_snap_hint {
+    margin: 8px 0 4px;
+}
+.o_sbk_snap_btn {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    padding: 7px 10px;
+    background: rgba(30, 158, 106, 0.10);
+    border: 1px solid rgba(30, 158, 106, 0.35);
+    color: #1e9e6a;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+    &:hover { background: rgba(30, 158, 106, 0.18); }
+    &:focus-visible {
+        outline: 2px solid rgba(30, 158, 106, 0.55);
+        outline-offset: 1px;
+    }
+}
+
 // D5 — Auto-save status pill (sits left of the Save Design button)
 .o_sbk_autosave {
     display: inline-flex;

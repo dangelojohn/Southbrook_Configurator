@@ -105,6 +105,10 @@ class SouthbrookKitchenConfigurator extends Component {
             // <Xs> ago" hint.
             autoSaving:      false,
             lastAutoSaveAt:  0,
+            // D7 — filler placement strategy. Drives /layout on each
+            // refresh; default matches the controller default ("split"
+            // — half-width fillers at both ends, most common spec).
+            fillerStrategy:  "split",
         });
         // Auto-save debounce timer (not reactive; managed imperatively).
         this._autoSaveTimer = null;
@@ -221,10 +225,11 @@ class SouthbrookKitchenConfigurator extends Component {
     async _refreshLayout() {
         try {
             const result = await rpc("/southbrook_kitchen/configurator/layout", {
-                room_width_in:  this.state.room.width_in,
-                room_depth_in:  this.state.room.depth_in,
-                room_height_in: this.state.room.height_in,
-                partner_id:     this.state.partnerId || false,
+                room_width_in:   this.state.room.width_in,
+                room_depth_in:   this.state.room.depth_in,
+                room_height_in:  this.state.room.height_in,
+                partner_id:      this.state.partnerId || false,
+                filler_strategy: this.state.fillerStrategy || "split",
             });
             this.state.error   = result.error || "";
             this.state.items   = result.items  || [];
@@ -254,6 +259,26 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.room.width_in = Math.max(12, this.state.room.width_in + delta);
         await this._refreshLayout();
         this._queueAutoSave();    // D5
+    }
+
+    // D7 — Change the filler placement strategy + re-emit the layout.
+    async _changeFillerStrategy(value) {
+        const allowed = ["split", "left", "right", "scribe"];
+        const v = (value || "").toLowerCase();
+        if (!allowed.includes(v)) return;
+        this.state.fillerStrategy = v;
+        await this._refreshLayout();
+        this._queueAutoSave();
+    }
+
+    // D7 — Apply the server's snap hint: round room width to the
+    // nearest module-clean value to eliminate the filler.
+    async _applySnapHint() {
+        const hint = this.state.summary && this.state.summary.snap_hint;
+        if (!hint || !hint.target_width) return;
+        this.state.room.width_in = hint.target_width;
+        await this._refreshLayout();
+        this._queueAutoSave();
     }
 
     _selectCabinet(item) {
@@ -1266,6 +1291,19 @@ SouthbrookKitchenConfigurator.template = xml`
         Save as my default
       </button>
 
+      <!-- D7 — Filler placement strategy. -->
+      <label class="o_sbk_field">
+        <span>Filler strategy</span>
+        <select class="o_sbk_edit_select"
+                t-att-value="state.fillerStrategy"
+                t-on-change="(ev) => this._changeFillerStrategy(ev.target.value)">
+          <option value="split"  t-att-selected="state.fillerStrategy === 'split'  ? 'selected' : ''">Split — both ends</option>
+          <option value="right"  t-att-selected="state.fillerStrategy === 'right'  ? 'selected' : ''">Right end only</option>
+          <option value="left"   t-att-selected="state.fillerStrategy === 'left'   ? 'selected' : ''">Left end only</option>
+          <option value="scribe" t-att-selected="state.fillerStrategy === 'scribe' ? 'selected' : ''">Scribe — no filler</option>
+        </select>
+      </label>
+
       <!-- Summary metrics -->
       <div class="o_sbk_divider"/>
 
@@ -1279,12 +1317,34 @@ SouthbrookKitchenConfigurator.template = xml`
       </div>
       <div class="o_sbk_metric o_sbk_metric_price">
         <strong><t t-esc="_money(state.summary.price)"/></strong>
-        estimate
+        cabinets
+      </div>
+
+      <!-- D7 — Filler price as a separate breakdown row when present -->
+      <div t-if="state.summary.filler_price &gt; 0" class="o_sbk_metric o_sbk_metric_filler">
+        <strong>+ <t t-esc="_money(state.summary.filler_price)"/></strong>
+        filler
       </div>
 
       <div t-if="state.summary.remainder_in > 0" class="o_sbk_remainder">
         <span class="o_sbk_remainder_icon">▤</span>
-        <t t-esc="state.summary.remainder_in.toFixed(1)"/> in filler needed
+        <t t-esc="state.summary.remainder_in.toFixed(1)"/> in filler
+        <span class="o_sbk_remainder_strategy"> (<t t-esc="state.fillerStrategy"/>)</span>
+      </div>
+
+      <!-- D7 — Snap-to-clean-width CTA when room is a few inches off
+           a module-clean total. One click eliminates the filler. -->
+      <div t-if="state.summary.snap_hint" class="o_sbk_snap_hint">
+        <button class="o_sbk_snap_btn"
+                t-on-click="_applySnapHint"
+                t-att-title="'Round room to ' + state.summary.snap_hint.target_width + &quot; in to eliminate filler&quot;">
+          <t t-if="state.summary.snap_hint.direction === 'expand'">
+            ↗ Stretch to <t t-esc="state.summary.snap_hint.target_width"/>″ (no filler)
+          </t>
+          <t t-else="">
+            ↙ Shrink to <t t-esc="state.summary.snap_hint.target_width"/>″ (no filler)
+          </t>
+        </button>
       </div>
 
       <div t-if="state.error" class="o_sbk_error" t-esc="state.error"/>
