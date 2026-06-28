@@ -11,6 +11,10 @@ class SouthbrookKitchenDesign(models.Model):
     _rec_name = "name"
 
     # ── Identity ────────────────────────────────────────────────────────────────
+    # D4 — default kept generic; auto-rename happens at save-time in
+    # the controller using the resolved partner + room dims + date so
+    # the tree view stops collecting identical "New Kitchen Design"
+    # rows.
     name = fields.Char(
         string="Design Name",
         required=True,

@@ -140,14 +140,25 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         Persist (or update) a KitchenDesign and its layout lines.
 
         Pass design_id to overwrite an existing record.
+
+        D4 — auto-names new designs (no design_id, no real name) using
+        the customer + room dims + date so the design tree view doesn't
+        fill with "New Kitchen Design" collisions.
         """
         Design = request.env["southbrook.kitchen.design"]
+        room_w = room.get("width_in",  12)
+        room_d = room.get("depth_in",  24)
+        room_h = room.get("height_in", 96)
+        if not design_id and (not name or name.strip() in (
+            "", "Kitchen Design", "New Kitchen Design", "Untitled Kitchen",
+        )):
+            name = self._auto_name(self._browse_partner(partner_id), room_w, room_d)
         vals = {
             "name":           name or "Kitchen Design",
             "partner_id":     partner_id or False,
-            "room_width_in":  room.get("width_in",  12),
-            "room_depth_in":  room.get("depth_in",  24),
-            "room_height_in": room.get("height_in", 96),
+            "room_width_in":  room_w,
+            "room_depth_in":  room_d,
+            "room_height_in": room_h,
             "state":          "configured",
         }
 
@@ -293,3 +304,43 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         "bigbox":       "Big-Box",
         "refacing":     "Refacing",
     }
+
+    # ─── D4 — auto-name + per-user sticky room defaults ─────────────────────────
+    @http.route(
+        "/southbrook_kitchen/configurator/user_defaults",
+        type="json", auth="user", methods=["POST"],
+    )
+    def user_defaults(self, save=False, width=None, depth=None, height=None):
+        """Read or write the current user's preferred room dimensions.
+
+        Stored as ir.config_parameter keyed by uid so each rep gets
+        their own sticky defaults; no res.users schema bump required.
+        """
+        ICP = request.env["ir.config_parameter"].sudo()
+        uid = request.env.uid
+        keys = {
+            "w": "southbrook_kitchen.default_room_width_in.%d"  % uid,
+            "d": "southbrook_kitchen.default_room_depth_in.%d"  % uid,
+            "h": "southbrook_kitchen.default_room_height_in.%d" % uid,
+        }
+        if save:
+            if width  is not None: ICP.set_param(keys["w"], str(width))
+            if depth  is not None: ICP.set_param(keys["d"], str(depth))
+            if height is not None: ICP.set_param(keys["h"], str(height))
+
+        def _read(k, default):
+            try:
+                return float(ICP.get_param(keys[k], default))
+            except Exception:
+                return default
+        return {
+            "width":  _read("w", 12),
+            "depth":  _read("d", 24),
+            "height": _read("h", 96),
+        }
+
+    def _auto_name(self, partner, room_w, room_d):
+        from odoo import fields as _fields
+        today = _fields.Date.context_today(request.env.user).strftime("%Y-%m-%d")
+        pname = (partner and partner.display_name) or "Walk-in"
+        return "%s - %dx%d - %s" % (pname, int(room_w or 0), int(room_d or 0), today)

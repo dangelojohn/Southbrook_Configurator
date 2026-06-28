@@ -134,6 +134,7 @@ class SouthbrookKitchenConfigurator extends Component {
             const [THREE] = await Promise.all([
                 loadThreeJS(),
                 this._loadProducts(),
+                this._loadUserDefaults(),
             ]);
             this.T.THREE    = THREE;
             this.T.raycaster = new THREE.Raycaster();
@@ -154,6 +155,44 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // ─── Odoo data ──────────────────────────────────────────────────────────────
+    // ─── D4 — sticky per-user room defaults ─────────────────────────────────────
+    // Reads the user's saved defaults. If the configurator was opened
+    // without a design_id or pre-set room dims, prefill the room
+    // inputs so the rep doesn't retype 192/144/96 on every new design.
+    async _loadUserDefaults() {
+        try {
+            const d = await rpc("/southbrook_kitchen/configurator/user_defaults", {
+                save: false,
+            });
+            this._userDefaults = d;
+            const hasExplicitProps = !!(this.props.room_width_in
+                                    || this.props.room_depth_in
+                                    || this.props.room_height_in
+                                    || this.props.design_id);
+            if (!hasExplicitProps && d) {
+                if (d.width  > 0) this.state.room.width_in  = d.width;
+                if (d.depth  > 0) this.state.room.depth_in  = d.depth;
+                if (d.height > 0) this.state.room.height_in = d.height;
+            }
+        } catch (_) {
+            this._userDefaults = null;
+        }
+    }
+
+    async _saveAsMyDefault() {
+        try {
+            await rpc("/southbrook_kitchen/configurator/user_defaults", {
+                save:   true,
+                width:  this.state.room.width_in,
+                depth:  this.state.room.depth_in,
+                height: this.state.room.height_in,
+            });
+            this.notification.add("Saved as your default room size.", { type: "success" });
+        } catch (e) {
+            this.notification.add("Couldn't save default: " + (e.message || e), { type: "danger" });
+        }
+    }
+
     async _loadProducts() {
         try {
             const resp = await rpc("/southbrook_kitchen/configurator/products", {
@@ -1098,6 +1137,13 @@ SouthbrookKitchenConfigurator.template = xml`
                t-att-value="state.room.height_in"
                t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
       </label>
+
+      <!-- D4 — Save current room dims as this user's default. -->
+      <button class="o_sbk_save_default_link"
+              t-on-click="_saveAsMyDefault"
+              title="Use these room dimensions as the prefill for every new design you open">
+        Save as my default
+      </button>
 
       <!-- Summary metrics -->
       <div class="o_sbk_divider"/>
