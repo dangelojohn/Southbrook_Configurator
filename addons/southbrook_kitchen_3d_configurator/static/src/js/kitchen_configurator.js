@@ -142,6 +142,11 @@ class SouthbrookKitchenConfigurator extends Component {
             dragging: false, dragX0: 0, dragW0: 0,
             animId: null,
             animatingCamera: false,
+            // D15 — Drag-to-reposition existing cabinets
+            movingItem:      null,
+            moveStartClient: { x: 0, y: 0 },
+            moveLastX:       null,
+            moveCommitted:   false,
         };
 
         this._onMouseDown = this._onMouseDown.bind(this);
@@ -715,8 +720,11 @@ class SouthbrookKitchenConfigurator extends Component {
         });
         this._resizeObserver.observe(mount);
 
-        // Events
-        mount.addEventListener("mousedown",  this._onMouseDown);
+        // Events — D15: mousedown in capture phase so we intercept
+        // before OrbitControls (bound to renderer.domElement, child
+        // of mount) sees it. Lets us cancel orbit when arming a
+        // cabinet move via stopPropagation.
+        mount.addEventListener("mousedown",  this._onMouseDown, { capture: true });
         mount.addEventListener("mousemove",  this._onMouseMove);
         mount.addEventListener("mouseup",    this._onMouseUp);
         mount.addEventListener("mouseleave", this._onMouseUp);
@@ -993,7 +1001,8 @@ class SouthbrookKitchenConfigurator extends Component {
         if (this._resizeObserver) this._resizeObserver.disconnect();
         const mount = this.canvas3dRef.el;
         if (mount) {
-            mount.removeEventListener("mousedown",  this._onMouseDown);
+            // D15 — mousedown must match the capture-phase add.
+            mount.removeEventListener("mousedown",  this._onMouseDown, { capture: true });
             mount.removeEventListener("mousemove",  this._onMouseMove);
             mount.removeEventListener("mouseup",    this._onMouseUp);
             mount.removeEventListener("mouseleave", this._onMouseUp);
@@ -1330,22 +1339,71 @@ class SouthbrookKitchenConfigurator extends Component {
             return;
         }
 
-        // Cabinet selection — works in every view.
+        // Cabinet selection — works in every view. D15 — also arms a
+        // potential move: actual move only commits if the cursor
+        // travels >5px before mouseup (otherwise this stays a click +
+        // select).
         const hits = raycaster.intersectObjects(clickable, false);
         if (hits.length) {
             const h = hits[0].object;
             if (h.userData?.item) {
                 this._selectCabinet(h.userData.item);
+                // D15 — arm move on this item. Skip fillers (their
+                // position is computed; manual moves don't make sense).
+                if (h.userData.item.cabinet_type !== "filler") {
+                    this.T.movingItem      = h.userData.item;
+                    this.T.moveStartClient = { x: e.clientX, y: e.clientY };
+                    this.T.moveLastX       = h.userData.item.x_position_in;
+                    this.T.moveCommitted   = false;
+                    // D15 — Stop propagation so OrbitControls (capture-
+                    // bound on canvas below) doesn't also start an
+                    // orbit gesture on the same mousedown. Empty-space
+                    // clicks fall through to OrbitControls normally.
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
             }
         }
     }
 
     _onMouseMove(e) {
-        if (!this.T.dragging) return;
-        const dx = e.clientX - this.T.dragX0;
-        // ~55 px ≈ 1 ft at typical zoom
-        const nw = Math.max(12, Math.min(288, this.T.dragW0 + dx * (12 / 55)));
-        this.state.room.width_in = Math.round(nw / 6) * 6; // snap to 6-inch grid
+        // Room-width drag handle (existing).
+        if (this.T.dragging) {
+            const dx = e.clientX - this.T.dragX0;
+            // ~55 px ≈ 1 ft at typical zoom
+            const nw = Math.max(12, Math.min(288, this.T.dragW0 + dx * (12 / 55)));
+            this.state.room.width_in = Math.round(nw / 6) * 6; // snap to 6-inch grid
+            return;
+        }
+
+        // D15 — Cabinet drag-to-reposition. Disambiguate from a plain
+        // click by requiring >5px of cursor travel before committing
+        // to a move. Once committed, snap to the 6" grid via the
+        // floor-plane raycast and rebuild only when the snapped slot
+        // actually changes (naturally throttles _buildScene to ~once
+        // per grid step, not once per pixel).
+        if (this.T.movingItem) {
+            const dx = e.clientX - this.T.moveStartClient.x;
+            const dy = e.clientY - this.T.moveStartClient.y;
+            if (!this.T.moveCommitted && Math.hypot(dx, dy) < 5) return;
+            if (!this.T.moveCommitted) {
+                this.T.moveCommitted = true;
+                const cvs = this.T.renderer && this.T.renderer.domElement;
+                if (cvs) cvs.style.cursor = "move";
+            }
+            const targetX = this._computeDropX(e);
+            // Null = floor not intersected (side views with orthographic
+            // rays parallel to the floor). Silent no-op; user can
+            // switch to Iso/Top/Persp to move.
+            if (targetX == null) return;
+            if (this.T.movingItem.x_position_in === targetX) return;
+            this.T.movingItem.x_position_in = targetX;
+            this.T.moveLastX = targetX;
+            // Live preview: rebuild scene with the moving cabinet at
+            // its new x. Other items stay in their current packed
+            // positions until mouseup runs the full cascade.
+            if (this.T.scene) this._buildScene();
+        }
     }
 
     _onMouseUp() {
@@ -1353,11 +1411,37 @@ class SouthbrookKitchenConfigurator extends Component {
             this.T.dragging = false;
             this._refreshLayout().then(() => this._queueAutoSave());   // D5
         }
+
+        // D15 — Finalize cabinet move. If the user dragged (committed),
+        // run the cascade so neighbours pack contiguously, rebuild
+        // the scene, and queue an auto-save. If they only clicked
+        // (no move committed), the selection from mousedown was
+        // already applied — just clear the move-arm state.
+        if (this.T.movingItem) {
+            const item = this.T.movingItem;
+            const wasCommitted = this.T.moveCommitted;
+            this.T.movingItem    = null;
+            this.T.moveCommitted = false;
+            const cvs = this.T.renderer && this.T.renderer.domElement;
+            if (cvs) cvs.style.cursor = "";
+            if (wasCommitted) {
+                this._recomputeLayoutFromItems();
+                if (this.T.scene) this._buildScene();
+                this.notification.add(
+                    `Moved ${item.name} to ${item.x_position_in}″`,
+                    { type: "success" }
+                );
+                this._queueAutoSave();
+            }
+        }
     }
 
     _onMouseOver(e) {
         const mount = this.canvas3dRef.el;
         if (!mount || !this.T.activeCamera || !this.T.raycaster) return;
+        // D15 — Don't override cursor mid-move (_onMouseMove already
+        // set it to "move"); the move-commit/finalize path resets it.
+        if (this.T.movingItem && this.T.moveCommitted) return;
         this.T.raycaster.setFromCamera(this._ndcFromEvent(e), this.T.activeCamera);
         const handleActive = (this.state.view === "iso" || this.state.view === "top");
         const onH = handleActive && this.T.handleMesh &&
@@ -1365,7 +1449,11 @@ class SouthbrookKitchenConfigurator extends Component {
         const onC = !onH &&
             this.T.raycaster.intersectObjects(this.T.clickable, false).length > 0;
         const cvs = this.T.renderer?.domElement;
-        if (cvs) cvs.style.cursor = this.T.dragging ? "ew-resize" : onH ? "ew-resize" : onC ? "pointer" : "default";
+        // D15 — grab cursor over cabinets to hint they're draggable.
+        if (cvs) cvs.style.cursor = this.T.dragging ? "ew-resize"
+                                  : onH ? "ew-resize"
+                                  : onC ? "grab"
+                                        : "default";
     }
 
     // ─── Save ─────────────────────────────────────────────────────────────────────
@@ -1758,9 +1846,9 @@ SouthbrookKitchenConfigurator.template = xml`
         </button>
       </div>
       <div class="o_sbk_draghint">
-        <t t-if="state.view === 'iso' || state.view === 'top'">Drag ● resize • Click select • ←/→ cycle • 1-6 views • ⌘S save • Esc clear</t>
-        <t t-elif="state.view === 'persp'">Drag orbit • Wheel zoom • Click select • ←/→ cycle • R reset • ⌘S save</t>
-        <t t-else="">+/- zoom • Click select • ←/→ cycle • 1-6 views • ⌘S save</t>
+        <t t-if="state.view === 'iso' || state.view === 'top'">Drag cabinet to move • Drag ● to resize room • Click select • ←/→ cycle • 1-6 views • ⌘S save</t>
+        <t t-elif="state.view === 'persp'">Drag cabinet to move • Drag empty space to orbit • Wheel zoom • ←/→ cycle • R reset</t>
+        <t t-else="">+/- zoom • Click select • ←/→ cycle • Switch to Iso/Top/Persp to move cabinets</t>
       </div>
     </main>
 
