@@ -134,7 +134,9 @@ class SouthbrookKitchenDesign(models.Model):
             "type":      "ir.actions.act_window",
             "res_model": "sale.order",
             "res_id":    self.sale_order_id.id,
+            "views":     [(False, "form")],
             "view_mode": "form",
+            "target":    "current",
         }
 
     # ── Layout engine ────────────────────────────────────────────────────────────

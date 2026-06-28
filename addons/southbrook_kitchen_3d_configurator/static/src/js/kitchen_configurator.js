@@ -570,11 +570,9 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     async _openDesigns() {
-        return this.action.doAction({
-            type:      "ir.actions.act_window",
-            res_model: "southbrook.kitchen.design",
-            view_mode: "list,form",
-        });
+        return this.action.doAction(
+            "southbrook_kitchen_3d_configurator.action_sbk_kitchen_designs"
+        );
     }
 
     // ─── Formatting helpers ───────────────────────────────────────────────────────
