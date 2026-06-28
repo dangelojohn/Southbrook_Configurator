@@ -668,24 +668,78 @@ class SouthbrookKitchenConfigurator extends Component {
     _onKeyDown(e) {
         // Ignore when typing in form inputs.
         const tag = (e.target && e.target.tagName) || "";
-        if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+            e.target?.isContentEditable) return;
         const k = e.key;
+        const ctrl = e.metaKey || e.ctrlKey;
+
+        // D6 — Cmd/Ctrl+S manual save (debounced auto-save also covers
+        // this, but power users expect the muscle-memory shortcut).
+        if (ctrl && (k === "s" || k === "S")) {
+            e.preventDefault();
+            this._saveDesign();
+            return;
+        }
+
         const map = { "1": "iso", "2": "top", "3": "front",
                        "4": "left", "5": "right", "6": "persp" };
-        if (map[k]) { e.preventDefault(); this._setView(map[k]); return; }
-        if (k === "r" || k === "R") { e.preventDefault(); this._setView("iso"); return; }
-        if (k === "+" || k === "=") {
+        if (!ctrl && map[k]) { e.preventDefault(); this._setView(map[k]); return; }
+        if (!ctrl && (k === "r" || k === "R")) { e.preventDefault(); this._setView("iso"); return; }
+        if (!ctrl && (k === "+" || k === "=")) {
             e.preventDefault();
             this.T.vsScale = Math.max(0.3, (this.T.vsScale || 1) * 0.9);
             this._applyOrthoFrustum();
             return;
         }
-        if (k === "-" || k === "_") {
+        if (!ctrl && (k === "-" || k === "_")) {
             e.preventDefault();
             this.T.vsScale = Math.min(3.0, (this.T.vsScale || 1) * 1.1);
             this._applyOrthoFrustum();
             return;
         }
+
+        // D6 — Arrow keys cycle selection through cabinets in x-position
+        // order (bases first, then walls). Skips fillers since they're
+        // not user-editable.
+        if (!ctrl && (k === "ArrowLeft" || k === "ArrowRight")) {
+            e.preventDefault();
+            this._cycleSelection(k === "ArrowRight" ? 1 : -1);
+            return;
+        }
+
+        // D6 — Esc clears the cabinet selection.
+        if (k === "Escape") {
+            if (this.state.selected) {
+                this.state.selected = null;
+                this._highlightSelected(null);
+                e.preventDefault();
+            }
+            return;
+        }
+    }
+
+    // D6 — cycle selection through selectable items (bases then walls,
+    // each sorted left-to-right). +1 = next, -1 = previous; wraps.
+    _cycleSelection(dir) {
+        const items = this.state.items || [];
+        const selectable = items
+            .filter(it => it.cabinet_type === "base" || it.cabinet_type === "wall")
+            .sort((a, b) => {
+                if (a.cabinet_type !== b.cabinet_type) {
+                    return a.cabinet_type === "base" ? -1 : 1;
+                }
+                return (a.x_position_in || 0) - (b.x_position_in || 0);
+            });
+        if (!selectable.length) return;
+        let idx = -1;
+        if (this.state.selected) {
+            idx = selectable.findIndex(
+                it => it.layout_key === this.state.selected.layout_key
+            );
+        }
+        idx = (idx + dir + selectable.length) % selectable.length;
+        if (idx < 0) idx += selectable.length;
+        this._selectCabinet(selectable[idx]);
     }
 
     _destroyScene() {
@@ -946,11 +1000,12 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     _highlightSelected(item) {
-        if (!item) return;
-        // Reset all cabinet colours
+        // Reset all cabinet colours (always — needed for the deselect
+        // path so Esc/arrow-cycle visibly clears the previous highlight).
         this.T.cabObjs.forEach(m => {
             if (m.userData?.cab) m.material.color.setHex(P.cab);
         });
+        if (!item) return;
         // Highlight matching item
         this.T.cabObjs.forEach(m => {
             if (m.userData?.cab &&
@@ -1302,9 +1357,9 @@ SouthbrookKitchenConfigurator.template = xml`
         </button>
       </div>
       <div class="o_sbk_draghint">
-        <t t-if="state.view === 'iso' || state.view === 'top'">Drag ● to resize • Click cabinet to select • 1-6 to switch view</t>
-        <t t-elif="state.view === 'persp'">Drag to orbit • Wheel to zoom • Click cabinet to select • R to reset</t>
-        <t t-else="">Wheel to zoom • Click cabinet to select • 1-6 to switch view</t>
+        <t t-if="state.view === 'iso' || state.view === 'top'">Drag ● resize • Click select • ←/→ cycle • 1-6 views • ⌘S save • Esc clear</t>
+        <t t-elif="state.view === 'persp'">Drag orbit • Wheel zoom • Click select • ←/→ cycle • R reset • ⌘S save</t>
+        <t t-else="">+/- zoom • Click select • ←/→ cycle • 1-6 views • ⌘S save</t>
       </div>
     </main>
 
