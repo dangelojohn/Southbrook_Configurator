@@ -39,7 +39,22 @@ import {
     useState,
     xml,
 } from "@odoo/owl";
-import { rpcJsonCall } from "@southbrook_estimating_website/js/portal_boot.esm";
+// rpcJsonCall is defined locally to avoid a circular dependency with
+// portal_boot.esm (which imports RoomSetupWizard from this module).
+async function rpcJsonCall(url, params = {}) {
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "call", params, id: Math.floor(Math.random() * 1e9) }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const json = await res.json();
+    if (json.error) {
+        const msg = json.error.data?.message || json.error.message || "RPC error";
+        throw new Error(msg);
+    }
+    return json.result;
+}
 import {
     wallSegmentsForShape,
     polylinePointsFromSegments,
