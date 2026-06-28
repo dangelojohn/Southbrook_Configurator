@@ -50,6 +50,7 @@
 import { Component, markup, useExternalListener, useRef, useState } from "@odoo/owl";
 import { wallSegmentsForShape } from "@southbrook_estimating_website/js/room_geometry.esm";
 import { symbolFor } from "@southbrook_estimating_website/js/architectural_symbols.esm";
+import { AppliancePalette } from "@southbrook_estimating_website/js/appliance_palette.esm";
 
 // ----------------------------------------------------------------------
 // Phase 4 — mm ↔ ft/in conversion helpers (module-local).
@@ -238,6 +239,12 @@ class FloorPlanSVG extends Component {
         // Phase 4 — unit preference (mm | imperial) for any length
         // labels rendered inside the SVG (today: gap markers).
         unitPreference: { type: String, optional: true },
+        // Stage D (2026-06-28) — parent-supplied mutable object that
+        // FloorPlanSVG fills on setup with public callable methods.
+        // RoomLayoutTab uses this to call _findDropTarget from its
+        // _onTemplateDrop handler. Optional so read-only mounts (e.g.
+        // wizard preview) don't have to plumb it.
+        api: { type: Object, optional: true },
     };
 
     // Phase 3.C.2b — drag state + global pointer listeners.
@@ -255,6 +262,13 @@ class FloorPlanSVG extends Component {
     // the polygon is the belt-and-braces equivalent — keeps events
     // routed to the originating element even when the cursor exits.
     setup() {
+        // Stage D — expose the drop-target resolver to parent. Parent
+        // passes a mutable `api` prop; we attach our public methods
+        // here at setup so any later call from the parent (e.g.
+        // _onTemplateDrop) finds them ready.
+        if (this.props.api) {
+            this.props.api.findDropTarget = this._findDropTarget.bind(this);
+        }
         this.dragState = useState({
             lineId: null,
             originalMm: null,
@@ -762,6 +776,171 @@ class FloorPlanSVG extends Component {
             });
         }
         return out;
+    }
+
+    // Stage D3 (2026-06-28) — kitchen work-triangle hint edges.
+    //
+    // The classic kitchen "work triangle" connects the three primary
+    // workstations: sink, cooktop / range, and refrigerator. Drawing
+    // the dotted triangle between them gives designers immediate
+    // visual feedback on circulation distance — the National Kitchen
+    // & Bath Association guideline is 4-9 feet per leg, with the
+    // total perimeter ≤ 26 feet.
+    //
+    // Edges render only when 2+ vertices are present so an empty room
+    // doesn't pollute the canvas; the third edge auto-completes when
+    // the third vertex is placed. The hint is read-only — it does
+    // not block placement; designers can violate the guideline and
+    // see the WARNING label on the over-length leg.
+    get _workTriangleEdges() {
+        const vertices = this._workTriangleVertices;
+        if (vertices.length < 2) return [];
+        const scale = this._transform.scale;
+        const edges = [];
+        for (let i = 0; i < vertices.length; i++) {
+            for (let j = i + 1; j < vertices.length; j++) {
+                const a = vertices[i];
+                const b = vertices[j];
+                const lenPx = Math.hypot(b.cx - a.cx, b.cy - a.cy);
+                const lenMm = scale > 0 ? lenPx / scale : 0;
+                const lenIn = lenMm / 25.4;
+                const lenFt = lenIn / 12;
+                // NKBA guideline: each leg 4-9 ft. Over → warn.
+                const violation = lenFt > 9 || lenFt < 4;
+                edges.push({
+                    key: `wt-${a.role}-${b.role}`,
+                    x1: a.cx,
+                    y1: a.cy,
+                    x2: b.cx,
+                    y2: b.cy,
+                    midX: (a.cx + b.cx) / 2,
+                    midY: (a.cy + b.cy) / 2,
+                    labelMm: Math.round(lenMm),
+                    label: this._formatTriangleLen(lenMm),
+                    violation,
+                });
+            }
+        }
+        return edges;
+    }
+
+    get _workTriangleVertices() {
+        const polys = this._constraintPolys;
+        if (!polys.length) return [];
+        const ROLE_FOR_TYPE = {
+            sink: "sink",
+            cooktop: "cooktop",
+            range: "cooktop",
+            fridge_space: "fridge",
+            freezer: "fridge",
+            wine_fridge: "fridge",
+        };
+        // Take FIRST of each role — multiple sinks or cooktops are
+        // rare in residential; the triangle picks the primary set.
+        const byRole = new Map();
+        for (const p of polys) {
+            const role = ROLE_FOR_TYPE[p.type];
+            if (!role || byRole.has(role)) continue;
+            byRole.set(role, { role, cx: p.cx, cy: p.cy });
+        }
+        return Array.from(byRole.values());
+    }
+
+    _formatTriangleLen(mm) {
+        if (!Number.isFinite(mm) || mm <= 0) return "";
+        const pref = this.props.unitPreference || "mm";
+        if (pref === "imperial") {
+            const inches = Math.round(mm / 25.4);
+            const ft = Math.floor(inches / 12);
+            const remIn = inches - ft * 12;
+            if (ft === 0) return `${remIn}"`;
+            if (remIn === 0) return `${ft}'`;
+            return `${ft}'${remIn}"`;
+        }
+        return `${Math.round(mm)}mm`;
+    }
+
+    // Stage D (2026-06-28) — public API exposed to RoomLayoutTab so
+    // it can resolve a drop point (in browser client coords) to a
+    // wall + offset on this floor plan. Returns { wallId, offsetMm,
+    // wallName, wallLengthMm } or null if the drop missed every
+    // wall. Uses the same _segments + _transform the renderer uses,
+    // so there's a single source of truth for px ↔ mm mapping.
+    //
+    // Algorithm:
+    //   1. Map client (px) → SVG viewBox (px) using the SVG's
+    //      bounding-client-rect aspect.
+    //   2. For each wall segment in viewBox px, compute the
+    //      perpendicular distance from the drop to the segment +
+    //      the parametric projection t ∈ [0, 1].
+    //   3. Pick the segment with the smallest perpendicular distance.
+    //   4. Convert t → wall offset (mm) via wall.length_mm.
+    //   5. Centre the item under the cursor + clamp to wall extent.
+    //   6. Snap to 25mm grid (the wall canonical grid; same as cabinet
+    //      drag and resize use elsewhere in this file).
+    _findDropTarget(clientX, clientY, itemWidthMm) {
+        const svg = this.svgRef.el;
+        if (!svg) return null;
+        const rect = svg.getBoundingClientRect();
+        if (!rect.width || !rect.height) return null;
+        const vbX = (clientX - rect.left) * (SVG_W / rect.width);
+        const vbY = (clientY - rect.top) * (SVG_H / rect.height);
+        const segs = this._segments;
+        if (!segs.length) return null;
+        let best = null;
+        for (const s of segs) {
+            const dx = s.x1 - s.x0;
+            const dy = s.y1 - s.y0;
+            const len2 = dx * dx + dy * dy;
+            if (!len2) continue;
+            const t = Math.max(0, Math.min(1,
+                ((vbX - s.x0) * dx + (vbY - s.y0) * dy) / len2,
+            ));
+            const projX = s.x0 + t * dx;
+            const projY = s.y0 + t * dy;
+            const dist = Math.hypot(vbX - projX, vbY - projY);
+            if (!best || dist < best.dist) {
+                best = { seg: s, dist, t };
+            }
+        }
+        if (!best) return null;
+        const wall = best.seg.wall || {};
+        const wallLengthMm = wall.length_mm || 0;
+        if (!wallLengthMm || !wall.id) return null;
+        const itemW = Number.isFinite(itemWidthMm) ? itemWidthMm : 600;
+        let offsetMm = Math.round(best.t * wallLengthMm - itemW / 2);
+        offsetMm = Math.max(0, Math.min(wallLengthMm - itemW, offsetMm));
+        offsetMm = Math.round(offsetMm / 25) * 25;
+        // Stage D5 — overlap + clearance check against existing
+        // constraints on this wall. status is one of 'ok' (no neighbor
+        // within 50mm), 'tight' (neighbor within 50mm but no overlap),
+        // 'overlap' (would overlap an existing constraint).
+        const a0 = offsetMm;
+        const a1 = offsetMm + itemW;
+        let status = "ok";
+        let conflictName = null;
+        for (const c of (wall.constraints || [])) {
+            const b0 = c.distance_from_left_mm || 0;
+            const b1 = b0 + (c.width_mm || 0);
+            if (a0 < b1 && b0 < a1) {
+                status = "overlap";
+                conflictName = c.constraint_type;
+                break;
+            }
+            const gap = Math.min(Math.abs(a1 - b0), Math.abs(b1 - a0));
+            if (gap < 50 && status === "ok") {
+                status = "tight";
+                conflictName = c.constraint_type;
+            }
+        }
+        return {
+            wallId: wall.id,
+            wallName: wall.name,
+            offsetMm,
+            wallLengthMm,
+            status,
+            conflictName,
+        };
     }
 
     // Constraints — one polygon per constraint, projected to px.
@@ -1383,7 +1562,7 @@ class WallElevationSVG extends Component {
 
 export class RoomLayoutTab extends Component {
     static template = "southbrook_estimating_website.RoomLayoutTab";
-    static components = { FloorPlanSVG, WallElevationSVG };
+    static components = { FloorPlanSVG, WallElevationSVG, AppliancePalette };
     static props = {
         room: { type: [Object, { value: null }], optional: true },
         lines: { type: Array, optional: true },
@@ -1404,6 +1583,12 @@ export class RoomLayoutTab extends Component {
         // wall shapes) + ± 100mm sidebar buttons (multi-wall shapes).
         // The parent OrderBuilder owns the /room/<rid>/update RPC.
         onWallResizeEnd: { type: Function, optional: true },
+        // Stage C (2026-06-28) — AppliancePalette drag-drop. Fired when
+        // the user drops a catalog item onto the floor plan SVG. Parent
+        // OrderBuilder is expected to ORM.create the constraint and
+        // reload state.room. v0 places on the FIRST wall at the wall
+        // midpoint; Stage D adds px→wall snap math.
+        onConstraintCreate: { type: Function, optional: true },
         // Phase 4 — unit preference (mm | imperial) for every length
         // label rendered by this tab. Flipped from the Room Setup tab's
         // segmented toggle; FloorPlanSVG receives it via passthrough.
@@ -1418,6 +1603,12 @@ export class RoomLayoutTab extends Component {
             viewMode: "floor",
             selectedWallId: null,
         });
+        // Stage D — mutable handle the child FloorPlanSVG fills with
+        // its public methods (today: findDropTarget). NOT reactive —
+        // we never use it inside a getter. Re-creating on every render
+        // would break the child's attachment, so it lives on `this`
+        // (not in useState).
+        this.floorPlanApi = {};
     }
 
     _setViewMode(mode) {
@@ -1452,6 +1643,89 @@ export class RoomLayoutTab extends Component {
             this.props.onAssignFromSidebar(lineId);
         }
     }
+
+    // Stage D4 — kitchen-essential checklist for the sidebar. Walks
+    // every wall's constraints and reports which "essential" roles
+    // are placed vs missing. Used by the template to render a status
+    // row above the palette so designers see at a glance what the
+    // kitchen still needs.
+    get _missingEssentials() {
+        const ESSENTIALS = [
+            { role: "sink",       label: "Sink",       types: ["sink"] },
+            { role: "cooktop",    label: "Cooktop",    types: ["cooktop", "range"] },
+            { role: "fridge",     label: "Fridge",     types: ["fridge_space", "freezer", "wine_fridge"] },
+            { role: "dishwasher", label: "Dishwasher", types: ["dishwasher"] },
+        ];
+        const walls = (this.props.room && this.props.room.walls) || [];
+        const seenTypes = new Set();
+        for (const w of walls) {
+            for (const c of (w.constraints || [])) {
+                seenTypes.add(c.constraint_type);
+            }
+        }
+        return ESSENTIALS.map((e) => ({
+            ...e,
+            present: e.types.some((t) => seenTypes.has(t)),
+        }));
+    }
+
+    // Stage D — palette probe. Called by AppliancePalette on every
+    // pointermove during drag so the ghost preview can show "→ Wall
+    // A @ 850mm" feedback in real time. Returns null when the cursor
+    // isn't over a wall (palette falls back to dimensions-only).
+    _getDropTarget = (clientX, clientY, itemWidthMm) => {
+        if (typeof this.floorPlanApi.findDropTarget !== "function") return null;
+        return this.floorPlanApi.findDropTarget(clientX, clientY, itemWidthMm);
+    };
+
+    // Stage C/D — AppliancePalette drop handler. Receives the raw drop
+    // event from the palette (browser client coords). Stage D now uses
+    // the FloorPlanSVG-attached api.findDropTarget() to resolve the
+    // closest wall + projected offset (snapped to 25mm). Falls back to
+    // the v0 "first wall at midpoint" path only when the api hasn't
+    // attached yet or no wall is reachable.
+    _onTemplateDrop = (dropInfo) => {
+        if (!this.props.onConstraintCreate) return;
+        const walls = (this.props.room && this.props.room.walls) || [];
+        if (walls.length === 0) return;
+        const tmpl = dropInfo.template;
+        const itemWidthMm = Math.round(tmpl.kitchen_appliance_width_mm || 600);
+        let wallId = null;
+        let offsetMm = null;
+        if (typeof this.floorPlanApi.findDropTarget === "function") {
+            const hit = this.floorPlanApi.findDropTarget(
+                dropInfo.clientX, dropInfo.clientY, itemWidthMm,
+            );
+            if (hit) {
+                wallId = hit.wallId;
+                offsetMm = hit.offsetMm;
+            }
+        }
+        if (!wallId) {
+            // Fallback — drop missed every wall (or the api isn't
+            // attached). Place on first wall, centred.
+            const fb = walls[0];
+            wallId = fb.id;
+            offsetMm = Math.max(0,
+                Math.round((fb.length_mm || 1000) / 2 - itemWidthMm / 2));
+            offsetMm = Math.round(offsetMm / 25) * 25;
+        }
+        const payload = {
+            constraint_type: dropInfo.constraintType,
+            wall_id: wallId,
+            distance_from_left_mm: offsetMm,
+            width_mm: itemWidthMm,
+            height_mm: Math.round(tmpl.kitchen_appliance_height_mm || 0),
+            height_from_floor_mm: Math.round(tmpl.kitchen_appliance_sill_mm || 0),
+        };
+        if (tmpl.id && !tmpl.synthetic) {
+            payload.appliance_template_id = tmpl.id;
+        }
+        if (tmpl.swing_direction) {
+            payload.swing_direction = tmpl.swing_direction;
+        }
+        this.props.onConstraintCreate(payload);
+    };
 
     // Phase 4 — template-facing length formatter. Honours the
     // unit-preference passed in from the parent OrderBuilder.

@@ -433,6 +433,12 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
         height_mm=None,
         height_from_floor_mm=None,
         notes=None,
+        # Stage A (2026-06-28) — fields added by southbrook_kitchen_workspace
+        # inherit on southbrook.room.constraint. Optional so portal calls
+        # from pre-A clients don't error.
+        swing_direction=None,
+        panel_count=None,
+        appliance_template_id=None,
         **kw,
     ):
         try:
@@ -475,9 +481,22 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
             vals["height_from_floor_mm"] = int(height_from_floor_mm)
         if notes is not None:
             vals["notes"] = notes
+        # Stage A optional fields — only set when the inherit module is
+        # loaded (silently ignore otherwise so the controller stays
+        # compatible with either deploy state).
+        Constraint = request.env["southbrook.room.constraint"]
+        if swing_direction is not None and "swing_direction" in Constraint._fields:
+            vals["swing_direction"] = swing_direction
+        if panel_count is not None and "panel_count" in Constraint._fields:
+            vals["panel_count"] = int(panel_count or 1)
+        if appliance_template_id is not None and "appliance_template_id" in Constraint._fields:
+            try:
+                vals["appliance_template_id"] = int(appliance_template_id)
+            except (TypeError, ValueError):
+                pass
 
         try:
-            c = request.env["southbrook.room.constraint"].sudo().create(vals)
+            c = Constraint.sudo().create(vals)
         except (ValidationError, ValueError) as e:
             # Selection field bad-enum (e.g. unit_preference="bogus")
             # raises ValueError, not ValidationError — surface both

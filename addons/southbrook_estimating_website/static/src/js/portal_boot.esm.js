@@ -3303,7 +3303,8 @@ const TEMPLATE = xml`
                                onGapClick="_onPlanGapClick"
                                onAssignFromSidebar="_onPlanAssignClick"
                                onCabinetDragEnd="_onPlanCabinetDragEnd"
-                               onWallResizeEnd="_onPlanWallResizeEnd"/>
+                               onWallResizeEnd="_onPlanWallResizeEnd"
+                               onConstraintCreate="_onPlanConstraintCreate"/>
             </div>
             <div t-elif="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines"
@@ -5443,6 +5444,38 @@ class OrderBuilder extends Component {
     // unchanged-looking poll). Cabinets that no longer fit surface
     // via the existing Phase 3.D warning banner — no server-side
     // cabinet mutation here.
+    // Stage C (2026-06-28) — AppliancePalette drop-to-create handler.
+    // Fired by RoomLayoutTab._onTemplateDrop. The payload already
+    // carries wall_id + computed distance_from_left_mm (stage-C v0
+    // picks the first wall's midpoint; Stage D will replace that with
+    // a closest-wall + projected-offset heuristic). Re-uses the existing
+    // /constraint/add endpoint extended with Stage A optional fields.
+    _onPlanConstraintCreate = async (payload) => {
+        if (!this.state.room || !payload || !payload.wall_id) return;
+        try {
+            const url =
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/" + encodeURIComponent(this.state.room.id)
+                + "/wall/" + encodeURIComponent(payload.wall_id)
+                + "/constraint/add";
+            const r = await rpcJsonCall(url, payload);
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                alert("Could not place item: " + detail);
+            }
+        } catch (e) {
+            alert(
+                "Could not place item: "
+                + ((e && e.message) ? e.message : String(e)),
+            );
+        }
+    };
+
     _onPlanWallResizeEnd = async (wallId, newLengthMm) => {
         if (!this.state.room) return;
         try {

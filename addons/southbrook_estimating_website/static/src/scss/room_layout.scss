@@ -1277,6 +1277,321 @@
     }
 }
 
+// ─── Stage C — AppliancePalette docked sidebar ────────────────────
+.sb-palette {
+    border-top: 1px solid var(--sb-rule, #d8d3c8);
+    padding-top: 12px;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 60vh;
+    overflow: hidden;
+}
+
+.sb-palette-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sb-palette-search {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--sb-rule, #d8d3c8);
+    border-radius: 6px;
+    background: var(--sb-paper, #fff);
+    font-family: var(--sb-font-sans);
+    font-size: 12px;
+    min-height: 32px;
+    &:focus {
+        outline: 2px solid var(--sb-walnut, #8c6d4f);
+        outline-offset: 1px;
+    }
+}
+
+.sb-palette-loading,
+.sb-palette-empty {
+    color: var(--sb-ink-dim, #6f6a60);
+    font-size: 12px;
+    font-style: italic;
+    padding: 8px;
+    text-align: center;
+}
+
+.sb-palette-groups {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sb-palette-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.sb-palette-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    background: var(--sb-linen, #f5f1ea);
+    border: 1px solid var(--sb-rule, #d8d3c8);
+    border-radius: 4px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-family: var(--sb-font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    color: var(--sb-ink, #2c3038);
+    min-height: 44px;  // Stage E — Apple HIG min tap target
+    &:hover {
+        background: var(--sb-walnut-tint, #ebe5db);
+    }
+}
+
+.sb-palette-group-chevron {
+    display: inline-block;
+    transition: transform 120ms ease;
+    font-size: 14px;
+    &.sb-palette-group-chevron--collapsed {
+        transform: rotate(-90deg);
+    }
+}
+
+.sb-palette-group-label {
+    flex: 1;
+}
+
+.sb-palette-group-count {
+    color: var(--sb-ink-dim, #6f6a60);
+    font-size: 11px;
+}
+
+.sb-palette-group-items {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0 4px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sb-palette-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--sb-rule, #d8d3c8);
+    border-radius: 4px;
+    background: var(--sb-paper, #fff);
+    font-family: var(--sb-font-sans);
+    font-size: 13px;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-drag: none;  // Pointer events handle this manually
+    touch-action: none;        // Prevent iOS scroll on touchdrag
+    min-height: 44px;          // Stage E — Apple HIG min tap target
+    &:hover {
+        background: var(--sb-linen, #f5f1ea);
+        border-color: var(--sb-walnut, #8c6d4f);
+    }
+    &:active {
+        cursor: grabbing;
+        background: var(--sb-walnut-tint, #ebe5db);
+    }
+}
+
+// ─── Stage E — iPad/tablet adaptations ─────────────────────────────
+// On touch-primary devices the palette gets a wider docked column and
+// the ghost preview gets a chunkier footprint so it doesn't feel
+// lost in a finger-sized cursor area.
+@media (pointer: coarse) {
+    .sb-palette {
+        max-height: 70vh;
+    }
+    .sb-palette-item {
+        font-size: 14px;
+        min-height: 48px;
+        padding: 10px 12px;
+    }
+    .sb-palette-group-header {
+        min-height: 48px;
+        padding: 10px 12px;
+    }
+    .sb-palette-search {
+        font-size: 14px;
+        min-height: 44px;
+    }
+    .sb-palette-ghost {
+        font-size: 13px;
+        padding: 8px 14px;
+        min-width: 180px;
+    }
+}
+
+.sb-palette-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sb-palette-item-size {
+    color: var(--sb-ink-dim, #6f6a60);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+// Ghost preview — fixed position, follows the cursor during drag.
+// pointer-events:none so the drop hit-test sees the SVG underneath.
+.sb-palette-ghost {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    background: var(--sb-paper, #fff);
+    border: 2px solid var(--sb-walnut, #8c6d4f);
+    border-radius: 6px;
+    padding: 6px 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: var(--sb-font-sans);
+    font-size: 12px;
+    min-width: 140px;
+    transition: border-color 100ms ease, box-shadow 100ms ease;
+    .sb-palette-ghost-name {
+        font-weight: 600;
+        color: var(--sb-ink, #2c3038);
+    }
+    .sb-palette-ghost-size {
+        color: var(--sb-ink-dim, #6f6a60);
+        font-size: 11px;
+    }
+    .sb-palette-ghost-snap {
+        color: var(--sb-success, #2f7a3d);
+        font-size: 11px;
+        font-weight: 600;
+        padding-top: 3px;
+        border-top: 1px dashed var(--sb-success, #2f7a3d);
+        margin-top: 2px;
+    }
+    &.sb-palette-ghost--targeting {
+        border-color: var(--sb-success, #2f7a3d);
+        box-shadow: 0 4px 16px rgba(47, 122, 61, 0.25);
+    }
+    &.sb-palette-ghost--tight {
+        border-color: var(--sb-warn, #d9a85f);
+        box-shadow: 0 4px 16px rgba(217, 168, 95, 0.30);
+    }
+    &.sb-palette-ghost--overlap {
+        border-color: var(--sb-alert, #d94e3a);
+        box-shadow: 0 4px 16px rgba(217, 78, 58, 0.30);
+    }
+    .sb-palette-ghost-warn {
+        color: var(--sb-alert, #d94e3a);
+        font-size: 11px;
+        font-weight: 600;
+        padding-top: 3px;
+        border-top: 1px dashed var(--sb-alert, #d94e3a);
+        margin-top: 2px;
+    }
+    .sb-palette-ghost-tight {
+        color: var(--sb-warn, #d9a85f);
+        font-size: 11px;
+        font-weight: 600;
+        padding-top: 3px;
+        border-top: 1px dashed var(--sb-warn, #d9a85f);
+        margin-top: 2px;
+    }
+}
+
+// ─── Stage D4 — kitchen-essentials checklist ─────────────────────
+.sb-essentials {
+    border-top: 1px solid var(--sb-rule, #d8d3c8);
+    padding-top: 12px;
+    margin-top: 12px;
+}
+
+.sb-essentials-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.sb-essentials-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: var(--sb-font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.sb-essentials-item--present {
+    color: var(--sb-success, #2f7a3d);
+    background: rgba(47, 122, 61, 0.08);
+    border-color: rgba(47, 122, 61, 0.30);
+}
+
+.sb-essentials-item--missing {
+    color: var(--sb-warn, #d9a85f);
+    background: rgba(217, 168, 95, 0.08);
+    border-color: rgba(217, 168, 95, 0.40);
+}
+
+.sb-essentials-mark {
+    font-size: 13px;
+    line-height: 1;
+}
+
+// ─── Stage D3 — kitchen work-triangle hints ───────────────────────
+// Dotted line from sink to cooktop to fridge. NKBA guideline: each
+// leg 4-9 ft; total perimeter ≤ 26 ft. In-range legs render neutral
+// grey; out-of-range legs render red dashed to draw the eye.
+.sb-room-plan-triangle {
+    stroke: rgba(80, 120, 160, 0.55);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+    fill: none;
+    pointer-events: none;
+    vector-effect: non-scaling-stroke;
+}
+
+.sb-room-plan-triangle--warn {
+    stroke: var(--sb-alert, #d94e3a);
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
+}
+
+.sb-room-plan-triangle-label {
+    fill: var(--sb-ink-dim, #6f6a60);
+    font-family: var(--sb-font-mono, var(--sb-font-sans));
+    font-size: 10px;
+    font-weight: 600;
+    pointer-events: none;
+    paint-order: stroke;
+    stroke: var(--sb-paper, #fff);
+    stroke-width: 3;
+    stroke-linejoin: round;
+}
+
+.sb-room-plan-triangle-label--warn {
+    fill: var(--sb-alert, #d94e3a);
+}
+
 // Gap markers — dashed rect, no fill.
 .sb-room-plan-gap {
     fill: none;

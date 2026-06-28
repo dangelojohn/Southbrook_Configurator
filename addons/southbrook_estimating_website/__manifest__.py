@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.20.0.0",
+    "version": "19.0.24.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -116,6 +116,11 @@
             # room_layout.esm.js so the import resolves at first
             # FloorPlanSVG mount.
             "southbrook_estimating_website/static/src/js/architectural_symbols.esm.js",
+            # Stage C (2026-06-28) — AppliancePalette docked sidebar +
+            # drag-and-drop. Loads BEFORE room_layout.esm.js so the
+            # import resolves at RoomLayoutTab mount.
+            "southbrook_estimating_website/static/src/js/appliance_palette.esm.js",
+            "southbrook_estimating_website/static/src/xml/appliance_palette.xml",
             "southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js",
             "southbrook_estimating_website/static/src/xml/room_setup_wizard.xml",
             # Phase 3.B (2026-06-27) — Room Layout tab. Read-only top-

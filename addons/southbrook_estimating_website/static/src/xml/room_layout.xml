@@ -112,7 +112,8 @@
                                       onCabinetClick="props.onCabinetClick"
                                       onGapClick="props.onGapClick"
                                       onCabinetDragEnd="props.onCabinetDragEnd"
-                                      onWallResizeEnd="props.onWallResizeEnd"/>
+                                      onWallResizeEnd="props.onWallResizeEnd"
+                                      api="floorPlanApi"/>
                     </t>
                     <t t-if="state.viewMode === 'elevation'">
                         <WallElevationSVG room="props.room"
@@ -242,6 +243,42 @@
                             No cabinets in this order yet.
                         </p>
                     </section>
+
+                    <!-- Stage C (2026-06-28) — AppliancePalette. Docked
+                         drag-able catalog of kitchen appliances + standard
+                         window/door sizes. Drop onto FloorPlanSVG creates
+                         a constraint via the parent OrderBuilder. Renders
+                         only when the parent wired onConstraintCreate (the
+                         RPC layer the palette depends on). -->
+                    <!-- Stage D4 — missing-essential checklist. Renders
+                         above the AppliancePalette so designers see at
+                         a glance whether sink + cooktop + fridge +
+                         dishwasher are placed. Pure read-out; clicking
+                         is Stage E follow-up. -->
+                    <section t-if="props.onConstraintCreate"
+                             class="sb-essentials">
+                        <h3 class="sb-room-plan-section-title">
+                            Essentials
+                        </h3>
+                        <ul class="sb-essentials-list">
+                            <li t-foreach="_missingEssentials"
+                                t-as="e"
+                                t-key="e.role"
+                                class="sb-essentials-item"
+                                t-att-class="e.present ? 'sb-essentials-item--present' : 'sb-essentials-item--missing'">
+                                <span class="sb-essentials-mark"
+                                      t-esc="e.present ? '✓' : '⚠'"/>
+                                <span class="sb-essentials-label"
+                                      t-esc="e.label"/>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <AppliancePalette t-if="props.onConstraintCreate"
+                                      roomId="(props.room &amp;&amp; props.room.id) || false"
+                                      unitPreference="props.unitPreference || 'mm'"
+                                      onTemplateDrop="_onTemplateDrop"
+                                      getDropTarget="_getDropTarget"/>
                 </aside>
             </div>
         </div>
@@ -324,6 +361,31 @@
                  only when a click handler is wired (props.onGapClick on
                  the FloorPlanSVG, threaded down by RoomLayoutTab from
                  the OrderBuilder). -->
+
+            <!-- Stage D3 — kitchen work-triangle hints. Dotted lines
+                 between sink + cooktop/range + fridge centers. Edges
+                 render only when 2+ of the three roles have been placed
+                 (so an empty room stays clean). NKBA-violating legs
+                 (over 9 ft or under 4 ft) get the warn modifier for
+                 red dashed strokes; in-range legs stay neutral grey. -->
+            <g class="sb-room-plan-triangle-g"
+               t-if="_workTriangleEdges.length">
+                <t t-foreach="_workTriangleEdges"
+                   t-as="edge"
+                   t-key="edge.key">
+                    <line t-att-class="edge.violation ? 'sb-room-plan-triangle sb-room-plan-triangle--warn' : 'sb-room-plan-triangle'"
+                          t-att-x1="edge.x1" t-att-y1="edge.y1"
+                          t-att-x2="edge.x2" t-att-y2="edge.y2"/>
+                    <text class="sb-room-plan-triangle-label"
+                          t-att-class="edge.violation ? 'sb-room-plan-triangle-label sb-room-plan-triangle-label--warn' : 'sb-room-plan-triangle-label'"
+                          t-att-x="edge.midX"
+                          t-att-y="edge.midY"
+                          text-anchor="middle"
+                          dominant-baseline="central"
+                          t-esc="edge.label"/>
+                </t>
+            </g>
+
             <g class="sb-room-plan-gaps-g">
                 <t t-foreach="_gapMarkers"
                    t-as="g"
