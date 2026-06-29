@@ -23,7 +23,7 @@
 
 set -euo pipefail
 
-QNAP_HOST="${QNAP_HOST:-admin@ssh.odooiq.com}"
+QNAP_HOST="${QNAP_HOST:-admin@ssh.southbrookcabinetry.space}"
 QNAP_DOCKER="${QNAP_DOCKER:-/share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker}"
 CONTAINER="${CONTAINER:-southbrook-odoo}"
 DB="${DB:-southbrook}"

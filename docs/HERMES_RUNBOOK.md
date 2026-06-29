@@ -57,7 +57,7 @@ git commit -m "fix(hermes): …"
 ./scripts/deploy_to_qnap.sh southbrook_hermes
 
 # Or with explicit tunnel routing:
-QNAP_HOST=admin@ssh.odooiq.com RESTART=1 ./scripts/deploy_to_qnap.sh southbrook_hermes
+QNAP_HOST=admin@ssh.southbrookcabinetry.space RESTART=1 ./scripts/deploy_to_qnap.sh southbrook_hermes
 
 # 3. Smoke test against prod.
 ./scripts/smoke_hermes.sh
@@ -114,7 +114,7 @@ question. Expect a streamed answer back within ~10s.
 
 ```bash
 # On the QNAP host
-ssh admin@ssh.odooiq.com
+ssh admin@ssh.southbrookcabinetry.space
 cd /share/CACHEDEV3_DATA/Container/southbrook
 ./build_image.sh                          # builds southbrook-odoo:dev from services/odoo/Dockerfile
 docker-compose up -d --force-recreate southbrook-odoo
@@ -174,7 +174,7 @@ for the 2026-06-16 incident (which was Fabio Ask's dep cycle).
 
 Usually a controller load error. Pull the cold-upgrade log:
 ```bash
-ssh admin@ssh.odooiq.com 'cat /tmp/deploy_upgrade.log' | grep -E 'ERROR|Traceback'
+ssh admin@ssh.southbrookcabinetry.space 'cat /tmp/deploy_upgrade.log' | grep -E 'ERROR|Traceback'
 ```
 If a Python import error shows up, fix the import and redeploy. If the
 log says `Modules have inconsistent states`, see the previous section.
@@ -198,11 +198,11 @@ SECRET=$(openssl rand -hex 32)
 echo "$SECRET" > /tmp/hermes-jwt-secret.txt
 chmod 600 /tmp/hermes-jwt-secret.txt
 
-ssh admin@ssh.odooiq.com "/share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker exec southbrook-odoo bash -c \"echo 'env[\\\"ir.config_parameter\\\"].sudo().set_param(\\\"southbrook_hermes.jwt_secret\\\", \\\"$SECRET\\\"); env.cr.commit()' | odoo shell -d southbrook --no-http\""
+ssh admin@ssh.southbrookcabinetry.space "/share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker exec southbrook-odoo bash -c \"echo 'env[\\\"ir.config_parameter\\\"].sudo().set_param(\\\"southbrook_hermes.jwt_secret\\\", \\\"$SECRET\\\"); env.cr.commit()' | odoo shell -d southbrook --no-http\""
 
 # Restart so workers reload (config params are read fresh per call, but a
 # restart is the easy safe thing).
-ssh admin@ssh.odooiq.com '/share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker restart southbrook-odoo'
+ssh admin@ssh.southbrookcabinetry.space '/share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker restart southbrook-odoo'
 
 # If the sidecar is live, MIRROR the new value to Vercel:
 cd .claude/worktrees/hermes-trade-partner-v1/sidecar
