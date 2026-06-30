@@ -35,8 +35,11 @@ def list_my_orders(env, partner_id: int):
 def get_order_status(env, order_id: int):
     order = env["sale.order"].browse(order_id)
     try:
-        order.check_access_rights("read")
-        order.check_access_rule("read")
+        # v18+ merged check_access_rights + check_access_rule into a single
+        # check_access(operation); the old pair is deprecated and spams
+        # the test log with multi-frame DeprecationWarning tracebacks
+        # (~32 hits across read_tools.py + write_tools.py per R3 log).
+        order.check_access("read")
     except Exception:
         raise MissingError("Order not visible to this user.")
     # Both project.task and mrp.production are read WITHOUT sudo so portal
@@ -74,8 +77,7 @@ def _count_mos_for_order(env, order):
 def get_order_line(env, order_id: int, line_id: int):
     order = env["sale.order"].browse(order_id)
     try:
-        order.check_access_rights("read")
-        order.check_access_rule("read")
+        order.check_access("read")
     except Exception:
         raise MissingError("Order not visible to this user.")
     line = order.order_line.filtered(lambda l: l.id == line_id)
@@ -135,8 +137,7 @@ def get_kitchen_project(env, project_id: int):
         raise MissingError("Kitchen projects not available on this instance.")
     project = Project.browse(project_id)
     try:
-        project.check_access_rights("read")
-        project.check_access_rule("read")
+        project.check_access("read")
     except Exception:
         raise MissingError("Project not visible to this user.")
     return {
@@ -157,8 +158,7 @@ def get_kitchen_project(env, project_id: int):
 def get_install_schedule(env, order_id: int):
     order = env["sale.order"].browse(order_id)
     try:
-        order.check_access_rights("read")
-        order.check_access_rule("read")
+        order.check_access("read")
     except Exception:
         raise MissingError("Order not visible to this user.")
     return {
@@ -178,8 +178,7 @@ def get_install_schedule(env, order_id: int):
 def get_quote_pdf_url(env, order_id: int):
     order = env["sale.order"].browse(order_id)
     try:
-        order.check_access_rights("read")
-        order.check_access_rule("read")
+        order.check_access("read")
     except Exception:
         raise MissingError("Order not visible to this user.")
     base_url = env["ir.config_parameter"].sudo().get_param("web.base.url", "")
