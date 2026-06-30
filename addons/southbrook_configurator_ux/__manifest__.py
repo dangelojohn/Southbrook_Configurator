@@ -64,7 +64,7 @@ Phase 5 — Tests + a11y
     engine, ARIA roles on chip selectors and import modal,
     keyboard navigation.
 """,
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.7.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -110,6 +110,10 @@ Phase 5 — Tests + a11y
         # that were only mentioned in Contractor / Signature rules.
         # Loads LAST so the catalog templates are fully wired first.
         "data/rule_completion.xml",
+        # NOTE: the English-Canada CAD-position flip used to live here
+        # as a data XML; doesn't work because base.CAD has
+        # noupdate=True on its ir.model.data row. It now ships as
+        # migrations/19.0.1.2.0/post-migration.py instead.
     ],
     "assets": {
         "web.assets_frontend": [

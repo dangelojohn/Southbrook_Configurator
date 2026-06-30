@@ -152,7 +152,38 @@ class ConfiguratorV2 extends Component {
 
         <div class="sb_cfg_viewer" t-ref="viewer">
           <div class="sb_cfg_badge" t-esc="state.previewBadge"/>
-          <div class="sb_cfg_cab" t-out="cabinetMarkup"/>
+          <div t-attf-class="sb_cfg_cab {{ state.previewDragging ? 'sb_cfg_cab_dragging' : '' }}"
+               t-attf-style="--cab-yaw: {{state.previewYaw}}deg; --cab-pitch: {{state.previewPitch}}deg;"
+               t-on-pointerdown="onPreviewPointerDown"
+               t-on-pointermove="onPreviewPointerMove"
+               t-on-pointerup="onPreviewPointerUp"
+               t-on-pointercancel="onPreviewPointerUp"
+               t-on-pointerleave="onPreviewPointerUp"
+               t-on-dblclick="onPreviewReset"
+               aria-label="Drag to rotate the cabinet preview. Double-click to reset.">
+            <t t-out="cabinetMarkup"/>
+          </div>
+          <div class="sb_cfg_preview_controls" t-if="!state.userPhoto">
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('front') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('front')"
+                    title="Front view">Front</button>
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('three_quarter') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('three_quarter')"
+                    title="3/4 view">3/4</button>
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('side') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('side')"
+                    title="Side view">Side</button>
+            <button type="button"
+                    t-attf-class="{{ isPreviewView('top') ? 'is-active' : '' }}"
+                    t-on-click="() =&gt; this.setPreviewView('top')"
+                    title="Top view">Top</button>
+            <button type="button"
+                    t-on-click="onPreviewReset"
+                    title="Reset to default view">↻</button>
+          </div>
           <button type="button"
                   class="sb_cfg_editimg"
                   t-on-click="onReplacePhoto"
@@ -319,6 +350,13 @@ class ConfiguratorV2 extends Component {
             closedGroups: {},               // {<title>: true}  — collapsed groups
             userPhoto: null,                // dataURL or null
             previewBadge: "LIVE PREVIEW",
+            // 3D-rotatable preview — yaw (Y-axis spin) + pitch
+            // (X-axis tilt) applied as CSS custom properties on
+            // the .sb_cfg_cab wrapper. Initial 3/4-view shows
+            // depth without obscuring the front-face controls.
+            previewYaw: -22,
+            previewPitch: -8,
+            previewDragging: false,
             // Bulk tools — Phase 4: full server-side preview/commit
             // pipeline. importReport caches the entire /preview or
             // /commit response so the commit step doesn't need to
@@ -860,34 +898,372 @@ class ConfiguratorV2 extends Component {
             const v = a.values.find((vv) => vv.id === valId);
             return v ? v.name : fallback;
         };
+
+        // ── Cabinet KIND (base / wall / tall / drawer-bank) ─────────
+        // Detection prefers a real attribute if the template exposes
+        // one ("Cabinet Type" or "Construction"); falls back to a
+        // product-name regex so legacy templates still get the right
+        // drawing. Wall cabs sit on a soffit (no feet); base + tall
+        // sit on adjustable levellers (feet + toe-kick on base).
+        const productName = (this.state.product && this.state.product.name) || "";
+        const upperName = productName.toUpperCase();
+        const typeAttr = pickedNameOf("Cabinet Type",
+            pickedNameOf("Construction", null));
+        let kind = "base";
+        if (typeAttr && /wall/i.test(typeAttr)) {
+            kind = "wall";
+        } else if (typeAttr && /(tall|pantry|oven|utility)/i.test(typeAttr)) {
+            kind = "tall";
+        } else if (/\b(W\d|WALL|UPPER)\b/.test(upperName)) {
+            kind = "wall";
+        } else if (/\b(TALL|PANTRY|OVEN|UTILITY|T\d{2})\b/.test(upperName)) {
+            kind = "tall";
+        }
+
+        // Drawer-bank detection: explicit "Drawer Count" attr OR
+        // product name says drawer/bank/DB-prefix. Drawer banks
+        // render N horizontal fronts instead of vertical doors.
+        const drawerCountName = pickedNameOf("Drawer Count", null);
+        const drawerCount = drawerCountName ? parseInt(drawerCountName, 10) : 0;
+        const isDrawerBank = drawerCount > 0
+            || /\b(DRAWER|BANK|DB\d)\b/.test(upperName);
+
+        // ── Width → body width in px (existing scale preserved) ─────
         const widthName = pickedNameOf("Width", "15 in");
         const wIdx = ["9 in", "12 in", "15 in", "18 in", "21 in", "24 in",
                       "27 in", "30 in", "33 in", "36 in"].indexOf(widthName);
         const wpx = 70 + Math.max(0, wIdx) * 16;
+        // Parsed numeric width (inches) — used by the door-count
+        // width fallback further down AND the dim model below.
+        const _widthInchesMatch = widthName.match(/(\d+(?:\.\d+)?)/);
+        const widthInches = _widthInchesMatch
+            ? parseFloat(_widthInchesMatch[1])
+            : 15;
+
+        // ── Real-world dimensions in inches → px at uniform scale ───
+        // Width keeps the existing sub-linear visual scale (the
+        // wpx formula above is tuned for page-pane ergonomics);
+        // depth + height use a uniform DH_SCALE so the depth:height
+        // ratio matches industry-standard cabinet dimensions.
+        //
+        // Industry standards (English-Canada cabinetry):
+        //   Base  cab : 24" deep, 34.5" tall (countertop sold separately)
+        //   Wall  cab : 12" deep, 30" tall
+        //   Tall  cab : 24" deep, 84" tall (clamped to viewer)
+        //   Drawer bank: same depth+height as base
+        const REAL_DIMS = {
+            base:        { depth: 24, height: 34.5 },
+            wall:        { depth: 12, height: 30 },
+            tall:        { depth: 24, height: 84 },
+            drawer_bank: { depth: 24, height: 34.5 },
+        };
+        // widthInches computed earlier (right after wpx) for the
+        // door-count width fallback to use.
+
+        const dimKey = isDrawerBank
+            ? (kind === "tall" ? "tall" : "drawer_bank")
+            : kind;
+
+        // Depth — Depth attribute beats industry default
+        const depthAttrName = pickedNameOf("Depth", null);
+        let depthInches = REAL_DIMS[dimKey].depth;
+        if (depthAttrName) {
+            const dm = depthAttrName.match(/(\d+(?:\.\d+)?)/);
+            if (dm) depthInches = parseFloat(dm[1]);
+        }
+
+        // Height — Height attribute beats industry default
+        const heightAttrName = pickedNameOf("Height", null);
+        let heightInches = REAL_DIMS[dimKey].height;
+        if (heightAttrName) {
+            const hm = heightAttrName.match(/(\d+(?:\.\d+)?)/);
+            if (hm) heightInches = parseFloat(hm[1]);
+        }
+
+        // 5 px/inch for depth + height — fits 30" base in 250px
+        // viewer cleanly while preserving the real width:depth:height
+        // ratio (30 × 24 × 34.5 → 150 × 120 × 173 px).
+        const DH_SCALE = 5;
+        const depthPx = Math.round(depthInches * DH_SCALE);
+        const MAX_BODY_PX = 200;  // viewer is 250 — leave headroom
+        const bodyHeight = Math.min(
+            MAX_BODY_PX,
+            Math.round(heightInches * DH_SCALE)
+        );
+
+        // ── Finish color (existing) ─────────────────────────────────
         const finishName = pickedNameOf("Finish",
             pickedNameOf("Box Material", "White"));
         const color = FINISH_COLORS[finishName] || "#dcd3c4";
-        const doorCountName = pickedNameOf("Door Count", "1");
-        const doors = doorCountName === "2" ? 2 : 1;
+
+        // ── Frame style: framed shows a thicker border on door faces.
+        const frameStyle = pickedNameOf("Frame Style",
+            pickedNameOf("Construction", "Frameless"));
+        const isFramed = /framed/i.test(frameStyle);
+        const doorBorder = isFramed
+            ? "2px solid rgba(0,0,0,.22)"
+            : "1px solid rgba(0,0,0,.12)";
+
+        // ── Overlay: inset doors sit deeper inside the carcass ──────
+        const overlay = pickedNameOf("Overlay",
+            pickedNameOf("Door Overlay", "Full Overlay"));
+        const insetGap = /inset/i.test(overlay) ? 8 : 6;
+
+        // ── Hinge + handle ──────────────────────────────────────────
+        // Door Count — explicit attribute wins. When the template
+        // doesn't expose it (3 corner-base templates audited 2026-
+        // 06-26, plus drawer-only bases), fall back to width-based
+        // industry default: ≥24" base cabs are typically two-door.
+        // We DON'T attribute drawer-only kinds (isDrawerBank) to
+        // doors — those render rows instead.
+        const doorCountAttr = pickedNameOf("Door Count", null);
+        let doors;
+        if (doorCountAttr) {
+            doors = doorCountAttr === "2" ? 2 : 1;
+        } else if (kind === "base" && widthInches >= 24 && !isDrawerBank) {
+            doors = 2;
+        } else if (kind === "tall" && widthInches >= 24) {
+            doors = 2;
+        } else {
+            doors = 1;
+        }
         const hinge = pickedNameOf("Hinge Side", "LH (Left Hand)");
         const isLH = hinge.startsWith("LH");
         const handle = pickedNameOf("Handle", "Bar Pull");
-        const handleHtml = (handle === "None") ? "" :
-            (handle === "Knob"
-                ? `<div style="position:absolute;top:50%;${isLH ? "right:8px" : "left:8px"};width:7px;height:7px;border-radius:50%;background:#2f3b52"></div>`
-                : `<div style="position:absolute;top:50%;${isLH ? "right:7px" : "left:7px"};width:4px;height:26px;border-radius:3px;background:#2f3b52"></div>`);
-        const doorHtml = (doors === 2)
-            ? `<div style="position:absolute;inset:6px;display:flex;gap:4px">
-                  <div style="flex:1;position:relative;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.12)">
-                    <div style="position:absolute;top:50%;right:5px;width:3px;height:20px;border-radius:3px;background:#2f3b52"></div>
-                  </div>
-                  <div style="flex:1;position:relative;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.12)">
-                    <div style="position:absolute;top:50%;left:5px;width:3px;height:20px;border-radius:3px;background:#2f3b52"></div>
-                  </div>
+
+        // Pull Finish → handle color. Mapped from the 8 finishes
+        // seeded on the Pull Finish attribute (per the audit
+        // 2026-06-26). Default falls back to brushed nickel grey.
+        const PULL_COLORS = {
+            "Polished Nickel":   "#c0c0c8",
+            "Brushed Nickel":    "#9ea2ab",
+            "Matte Black":       "#1a1a1a",
+            "Antique Bronze":    "#5e4a32",
+            "Brushed Brass":     "#b8a062",
+            "Polished Chrome":   "#d8dde2",
+            "Oil-Rubbed Bronze": "#3a2b1f",
+            "Champagne Bronze":  "#a8956a",
+        };
+        const pullFinish = pickedNameOf("Pull Finish", "Brushed Nickel");
+        const handleColor = PULL_COLORS[pullFinish] || "#2f3b52";
+
+        const sideHandle = (side) => {
+            if (handle === "None") return "";
+            if (handle === "Knob") {
+                return `<div style="position:absolute;top:50%;${side}:8px;width:7px;height:7px;border-radius:50%;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
+            }
+            if (handle === "Cup Pull") {
+                return `<div style="position:absolute;top:50%;${side}:5px;width:5px;height:14px;border-radius:0 4px 4px 0;background:${handleColor}"></div>`;
+            }
+            // Bar Pull / Integrated default
+            return `<div style="position:absolute;top:50%;${side}:7px;width:4px;height:26px;border-radius:3px;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
+        };
+        const centerHandle = () => {
+            if (handle === "None") return "";
+            if (handle === "Knob") {
+                return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
+            }
+            if (handle === "Cup Pull") {
+                return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:22px;height:5px;border-radius:0 0 6px 6px;background:${handleColor}"></div>`;
+            }
+            return `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:28px;height:4px;border-radius:3px;background:${handleColor};box-shadow:0 1px 1px rgba(0,0,0,.3)"></div>`;
+        };
+
+        // ── Base cabinet sub-type detection ─────────────────────────
+        // Sinks have no top drawer (plumbing). Cooktops have no top
+        // drawer (cooktop above takes the space). Microwave drawer
+        // bases have a TALL top section (the mw itself). Default
+        // base cabinets have a small top drawer + door(s) below.
+        const isSinkBase = /\bsink\b/i.test(productName);
+        const isCooktopBase = /\bcooktop\b/i.test(productName);
+        const isMicrowaveDrawerBase = /microwave.*drawer/i.test(productName);
+        const isPullOutBase = /pull.?out/i.test(productName);
+        const isCornerBase = /\bcorner\b/i.test(productName);
+        const isStandardBaseWithDrawer = (
+            kind === "base"
+            && !isDrawerBank
+            && !isSinkBase
+            && !isCooktopBase
+            && !isMicrowaveDrawerBase
+            && !isPullOutBase
+            && !isCornerBase
+        );
+        // Top-drawer height as fraction of body (industry standard:
+        // a 6" drawer in a 34.5" cabinet = ~17%; microwave occupies
+        // the upper ~38% of the cabinet).
+        const topDrawerFrac = isMicrowaveDrawerBase ? 0.38 : 0.17;
+
+        const renderDoorArea = (doorsN, areaInsetGap) => {
+            if (doorsN === 2) {
+                return `<div style="position:absolute;inset:${areaInsetGap}px;display:flex;gap:4px">
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("right")}</div>
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("left")}</div>
+                </div>`;
+            }
+            // Single door — handle on the OPPOSITE side from the hinge.
+            // LH = hinged left, handle on right.
+            return `<div style="position:absolute;inset:${areaInsetGap}px;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle(isLH ? "right" : "left")}</div>`;
+        };
+
+        const renderDrawerStrip = (heightPct, areaInsetGap, label) => {
+            // A single drawer occupying the top heightPct of the front.
+            return `<div style="position:absolute;left:${areaInsetGap}px;right:${areaInsetGap}px;top:${areaInsetGap}px;height:calc(${heightPct * 100}% - ${areaInsetGap * 2}px);border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.14)"${label ? ` aria-label="${label}"` : ""}>${centerHandle()}</div>`;
+        };
+
+        // ── Front face — pick the right layout for the sub-type ─────
+        let frontHtml;
+        if (isDrawerBank) {
+            // Pure drawer banks: 1-5 horizontal drawer fronts.
+            const fallbackN = (kind === "tall" ? 4 : 3);
+            const drawerN = Math.max(1, Math.min(5,
+                drawerCount || fallbackN));
+            const rows = [];
+            for (let i = 0; i < drawerN; i++) {
+                rows.push(
+                    `<div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${centerHandle()}</div>`
+                );
+            }
+            frontHtml = `<div style="position:absolute;inset:${insetGap}px;display:flex;flex-direction:column;gap:3px">${rows.join("")}</div>`;
+        } else if (isStandardBaseWithDrawer || isMicrowaveDrawerBase) {
+            // Top drawer + door(s) below — the standard base-cab
+            // pattern. Microwave drawer bases get a TALL top drawer.
+            const tdHeight = topDrawerFrac;
+            const dvDoorTop = `${tdHeight * 100}%`;
+            const doorsArea = doors === 2
+                ? `<div style="position:absolute;left:${insetGap}px;right:${insetGap}px;top:calc(${dvDoorTop} + 3px);bottom:${insetGap}px;display:flex;gap:4px">
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("right")}</div>
+                    <div style="flex:1;position:relative;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle("left")}</div>
                 </div>`
-            : `<div style="position:absolute;inset:6px;border:1px solid rgba(0,0,0,.12);border-radius:3px;background:rgba(255,255,255,.1)">${handleHtml}</div>`;
+                : `<div style="position:absolute;left:${insetGap}px;right:${insetGap}px;top:calc(${dvDoorTop} + 3px);bottom:${insetGap}px;border:${doorBorder};border-radius:3px;background:rgba(255,255,255,.12)">${sideHandle(isLH ? "right" : "left")}</div>`;
+            frontHtml = renderDrawerStrip(
+                tdHeight,
+                insetGap,
+                isMicrowaveDrawerBase ? "Microwave compartment" : "Top drawer"
+            ) + doorsArea;
+        } else if (doors === 2) {
+            // Sink Base / Cooktop with 2 doors — full-height doors,
+            // no top drawer.
+            frontHtml = renderDoorArea(2, insetGap);
+        } else {
+            // Single-door fall-through (sink-single, cooktop-single,
+            // pull-out, corner, anything else with doors=1)
+            frontHtml = renderDoorArea(1, insetGap);
+        }
+
+        // ── Toe-kick band (base cabs only) ──────────────────────────
+        const toeKickHtml = (kind === "base")
+            ? `<div style="position:absolute;bottom:0;left:0;right:0;height:14px;background:rgba(0,0,0,.18);border-radius:0 0 4px 4px"></div>`
+            : "";
+
+        // ── Accessibility: spoken description matches drawing ───────
+        const kindLabel = isDrawerBank
+            ? `${drawerCount || (kind === "tall" ? 4 : 3)}-drawer ${kind === "tall" ? "tall" : "base"} bank`
+            : `${doors === 2 ? "Two-door " : ""}${kind === "wall" ? "wall" : (kind === "tall" ? "tall" : "base")} cabinet`;
+        const aria = `${kindLabel}${isFramed ? ", framed" : ", frameless"}${(kind === "base" || kind === "tall") ? ", on adjustable levelling feet" : ""}`;
+
+        // ── Darker side/back tone for visible depth at 3/4 view ─────
+        const sideColor = `color-mix(in srgb, ${color} 70%, #000)`;
+        const backColor = `color-mix(in srgb, ${color} 80%, #000)`;
+
+        const w = wpx, h = bodyHeight, d = depthPx;
+        // Faces — each is position:absolute, centered via translate
+        // (-50%, -50%), then rotated and pushed to the box surface.
+        const facePos = (extra) =>
+            `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) ${extra};box-sizing:border-box;`;
+
+        // Front carries all the existing dynamic content (doors /
+        // drawer fronts / handles / toe-kick).
+        const frontFaceStyle =
+            `${facePos(`translateZ(${d / 2}px)`)}`
+            + `width:${w}px;height:${h}px;background:${color};`
+            + `border-top:3px solid rgba(0,0,0,.08);border-radius:4px;`
+            + `box-shadow:0 18px 30px -12px rgba(40,55,80,.35);`;
+        const frontFace = `<div class="sb_cab_face sb_cab_face_front" style="${frontFaceStyle}">${frontHtml}${toeKickHtml}</div>`;
+
+        // Back face — plain panel of slightly darker hue.
+        const backFaceStyle =
+            `${facePos(`rotateY(180deg) translateZ(${d / 2}px)`)}`
+            + `width:${w}px;height:${h}px;background:${backColor};`
+            + `border-radius:4px;`;
+        const backFace = `<div class="sb_cab_face sb_cab_face_back" style="${backFaceStyle}"></div>`;
+
+        // Left side — D × H panel, rotated -90° around Y.
+        const leftFaceStyle =
+            `${facePos(`rotateY(-90deg) translateZ(${w / 2}px)`)}`
+            + `width:${d}px;height:${h}px;background:${sideColor};`
+            + `border-radius:3px;`;
+        const leftFace = `<div class="sb_cab_face sb_cab_face_left" style="${leftFaceStyle}"></div>`;
+
+        // Right side — symmetric.
+        const rightFaceStyle =
+            `${facePos(`rotateY(90deg) translateZ(${w / 2}px)`)}`
+            + `width:${d}px;height:${h}px;background:${sideColor};`
+            + `border-radius:3px;`;
+        const rightFace = `<div class="sb_cab_face sb_cab_face_right" style="${rightFaceStyle}"></div>`;
+
+        // Top — W × D panel, rotated 90° around X (visible when
+        // pitched downward).
+        const topFaceStyle =
+            `${facePos(`rotateX(90deg) translateZ(${h / 2}px)`)}`
+            + `width:${w}px;height:${d}px;background:${backColor};`
+            + `border-radius:3px;`;
+        const topFace = `<div class="sb_cab_face sb_cab_face_top" style="${topFaceStyle}"></div>`;
+
+        // ── 4 adjustable corner legs — INSIDE the 3D box so they ────
+        // rotate with the cabinet. Positioned at the 4 bottom corners
+        // (front-left, front-right, back-left, back-right), inset from
+        // the carcass sides + recessed behind the toe-kick at front.
+        //
+        // Real legs are ~3" tall × 0.5" wide × 0.5" deep; at DH_SCALE
+        // px/inch that is ~15 × 2.5 × 2.5 px. We slightly oversize to
+        // 18 × 5 × 5 px for visibility at the preview scale.
+        const legW = 5;
+        const legD = 5;
+        const legH = 18;
+        const sideInsetPx = Math.round(0.6 * DH_SCALE);          // 0.6" in from sides
+        const frontInsetPx = Math.round(3 * DH_SCALE);           // 3" behind toe-kick front edge
+        const backInsetPx = Math.round(0.75 * DH_SCALE);         // small inset from back face
+
+        const legXAbs = w / 2 - sideInsetPx - legW / 2;          // distance from center
+        const legZFront = d / 2 - frontInsetPx - legD / 2;       // toward +Z = front
+        const legZBack = -(d / 2) + backInsetPx + legD / 2;      // toward -Z = back
+        const legYTop = h / 2 + legH / 2;                        // sit just below box
+
+        const makeLeg = (xOff, zOff) => {
+            const tx = `translate(-50%, -50%) translate3d(${xOff}px, ${legYTop}px, ${zOff}px)`;
+            return `<div class="sb_cab_leg" style="position:absolute;top:50%;left:50%;width:${legW}px;height:${legH}px;background:#1c1c1c;border-radius:0 0 2px 2px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 1px 1px rgba(0,0,0,.35);transform:${tx};backface-visibility:hidden;"></div>`;
+        };
+
+        const legsHtml = (kind === "base" || kind === "tall" || isDrawerBank)
+            ? [
+                makeLeg(-legXAbs, legZFront),    // front-left
+                makeLeg(legXAbs, legZFront),     // front-right
+                makeLeg(-legXAbs, legZBack),     // back-left
+                makeLeg(legXAbs, legZBack),      // back-right
+            ].join("")
+            : "";
+
+        // Box wrapper has fixed pixel dimensions; legs extend below
+        // visually but are part of the rotated box so they spin
+        // with it. Outer wrapper gives layout room for the legs +
+        // perspective overhang.
+        const boxWrapperStyle =
+            `position:relative;width:${w}px;height:${h}px;`;
+        const outerStyle =
+            `display:flex;flex-direction:column;align-items:center;`
+            + `min-height:${h + legH + 12}px;`;
+
         return markup(
-            `<div style="width:${wpx}px;height:150px;background:${color};position:relative;border-top:3px solid rgba(0,0,0,.08);border-radius:4px;box-shadow:0 18px 30px -12px rgba(40,55,80,.4)">${doorHtml}</div>`
+            `<div role="img" aria-label="${aria}" style="${outerStyle}">
+                <div class="sb_cab_3d_box" style="${boxWrapperStyle}">
+                    ${frontFace}
+                    ${backFace}
+                    ${leftFace}
+                    ${rightFace}
+                    ${topFace}
+                    ${legsHtml}
+                </div>
+            </div>`
         );
     }
 
@@ -908,6 +1284,87 @@ class ConfiguratorV2 extends Component {
             this.state.previewBadge = "CUSTOM PHOTO";
         };
         r.readAsDataURL(f);
+    }
+
+    // ------------------------------------------------------------------
+    // 3D preview rotation — pointer drag rotates the cabinet around
+    // Y (yaw) and X (pitch) axes. Touch and mouse both work via the
+    // unified Pointer Events API.
+    // ------------------------------------------------------------------
+    onPreviewPointerDown(ev) {
+        // Custom-photo branch is a flat <img>, don't rotate it.
+        if (this.state.userPhoto) return;
+        this.state.previewDragging = true;
+        this._previewDrag = {
+            startX: ev.clientX,
+            startY: ev.clientY,
+            startYaw: this.state.previewYaw,
+            startPitch: this.state.previewPitch,
+        };
+        if (ev.currentTarget && ev.currentTarget.setPointerCapture) {
+            try {
+                ev.currentTarget.setPointerCapture(ev.pointerId);
+            } catch (_) { /* ignore */ }
+        }
+    }
+
+    onPreviewPointerMove(ev) {
+        if (!this.state.previewDragging || !this._previewDrag) return;
+        const dx = ev.clientX - this._previewDrag.startX;
+        const dy = ev.clientY - this._previewDrag.startY;
+        // 0.45 deg per pixel — fast enough for full spin in a
+        // typical drag, slow enough that fine adjustments work.
+        const newYaw = this._previewDrag.startYaw + dx * 0.45;
+        // Clamp pitch to keep the cabinet legible (no upside-down).
+        const rawPitch = this._previewDrag.startPitch + dy * 0.30;
+        const newPitch = Math.max(-55, Math.min(40, rawPitch));
+        this.state.previewYaw = newYaw;
+        this.state.previewPitch = newPitch;
+    }
+
+    onPreviewPointerUp(ev) {
+        if (!this.state.previewDragging) return;
+        this.state.previewDragging = false;
+        this._previewDrag = null;
+        if (ev && ev.currentTarget && ev.currentTarget.releasePointerCapture) {
+            try {
+                ev.currentTarget.releasePointerCapture(ev.pointerId);
+            } catch (_) { /* ignore */ }
+        }
+    }
+
+    onPreviewReset() {
+        this.state.previewYaw = -22;
+        this.state.previewPitch = -8;
+    }
+
+    setPreviewView(view) {
+        // Preset angles for common views. Touch-target ergonomics.
+        if (view === "front") {
+            this.state.previewYaw = 0;
+            this.state.previewPitch = 0;
+        } else if (view === "side") {
+            this.state.previewYaw = -85;
+            this.state.previewPitch = 0;
+        } else if (view === "three_quarter") {
+            this.state.previewYaw = -28;
+            this.state.previewPitch = -10;
+        } else if (view === "top") {
+            this.state.previewYaw = 0;
+            this.state.previewPitch = -55;
+        }
+    }
+
+    isPreviewView(view) {
+        const eps = 3; // degrees of tolerance for "active" highlight
+        const yaw = this.state.previewYaw;
+        const pitch = this.state.previewPitch;
+        const same = (a, b) => Math.abs(a - b) <= eps;
+        if (view === "front") return same(yaw, 0) && same(pitch, 0);
+        if (view === "side") return same(yaw, -85) && same(pitch, 0);
+        if (view === "three_quarter") return same(yaw, -28) && same(pitch, -10);
+        if (view === "top") return same(yaw, 0) && same(pitch, -55);
+        return false;
     }
 
     _wireViewerDragDrop() {

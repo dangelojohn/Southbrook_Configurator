@@ -227,14 +227,75 @@ $sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
         outline: 3px dashed $sb-cfg-blue;
         outline-offset: -6px;
     }
+
+    // 3D-rotatable cabinet preview. The .sb_cfg_cab is the
+    // perspective wrapper; the .sb_cab_3d_box inside is what
+    // actually rotates. Yaw/pitch come from OWL state via CSS
+    // custom properties set on .sb_cfg_cab inline.
     .sb_cfg_cab {
-        transition: width 350ms ease, height 350ms ease,
-                    background 350ms ease;
-        border-radius: 4px;
-        box-shadow: 0 18px 30px -12px rgba(40, 55, 80, 0.4);
+        perspective: 900px;
+        perspective-origin: 50% 38%;
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+
+        &:active {
+            cursor: grabbing;
+        }
+
+        .sb_cab_3d_box {
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateY(var(--cab-yaw, 0deg))
+                       rotateX(var(--cab-pitch, 0deg));
+            transform-origin: 50% 50%;
+            transition: transform 0.22s ease;
+            will-change: transform;
+        }
+        &.sb_cfg_cab_dragging .sb_cab_3d_box {
+            transition: none;
+        }
+
+        .sb_cab_face {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            box-sizing: border-box;
+            backface-visibility: hidden;
+        }
 
         @media (prefers-reduced-motion: reduce) {
-            transition: none;
+            .sb_cab_3d_box {
+                transition: none;
+            }
+        }
+    }
+
+    .sb_cfg_preview_controls {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        display: flex;
+        gap: 4px;
+        z-index: 2;
+
+        button {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid $sb-cfg-blue-rule;
+            background: rgba(255, 255, 255, 0.92);
+            color: $sb-cfg-blue;
+            cursor: pointer;
+
+            &:hover {
+                background: white;
+            }
+            &.is-active {
+                background: $sb-cfg-blue;
+                color: white;
+            }
         }
     }
     .sb_cfg_badge {
