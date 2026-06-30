@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_wip_report_list" model="ir.ui.view">
+        <field name="name">southbrook.finance.wip_report.list</field>
+        <field name="model">southbrook.finance.wip_report</field>
+        <field name="arch" type="xml">
+            <list string="WIP Reports">
+                <field name="name"/>
+                <field name="as_of_date"/>
+                <field name="total_wip_value"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_wip_report_form" model="ir.ui.view">
+        <field name="name">southbrook.finance.wip_report.form</field>
+        <field name="model">southbrook.finance.wip_report</field>
+        <field name="arch" type="xml">
+            <form string="WIP Report">
+                <header>
+                    <button name="action_compute" type="object"
+                            string="Compute" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <field name="as_of_date"/>
+                        <field name="total_wip_value" readonly="1"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <notebook>
+                        <page string="WIP Lines">
+                            <field name="line_ids">
+                                <list>
+                                    <field name="production_id"/>
+                                    <field name="product_id"/>
+                                    <field name="qty_consumed"/>
+                                    <field name="standard_cost"/>
+                                    <field name="wip_value"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_wip_report" model="ir.actions.act_window">
+        <field name="name">WIP Reports</field>
+        <field name="res_model">southbrook.finance.wip_report</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

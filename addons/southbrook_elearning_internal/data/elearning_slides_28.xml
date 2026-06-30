@@ -1,0 +1,1018 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_28_exec_architecture" model="slide.slide">
+            <field name="name">Exec Dashboard Module — Architecture and Tile Registry</field>
+            <field name="channel_id" ref="course_exec_dashboard_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer learning southbrook_exec_dashboard internals.</field>
+            <field name="html_content"><![CDATA[<h1 id="exec-dashboard-module-architecture-and-tile-registry">Exec Dashboard Module — Architecture and Tile Registry</h1>
+<h2 id="the-module-at-a-glance">The module at a glance</h2>
+<ul>
+<li>Path: <code>addons/southbrook_exec_dashboard/</code></li>
+<li>Version: 19.0.1.0.0</li>
+<li>Depends on: <code>base</code>, <code>mail</code>, <code>web</code>,
+  <code>southbrook_manufacturing_intelligence</code>,
+  <code>southbrook_hermes</code> (for Hermes tile)</li>
+</ul>
+<h2 id="source-layout">Source layout</h2>
+<pre><code>addons/southbrook_exec_dashboard/
+├── models/
+│   ├── tile.py              — base tile model
+│   ├── tile_kpi.py          — KPI/metric tiles
+│   ├── tile_hermes.py       — Hermes-flagged items tile
+│   └── exec_view.py         — view-side model wrapping the OWL component
+├── views/
+│   ├── exec_dashboard_views.xml
+│   └── exec_dashboard_menus.xml
+├── static/src/
+│   ├── exec_dashboard.js    — OWL component
+│   ├── exec_dashboard.xml   — OWL template
+│   └── exec_dashboard.scss  — mobile-first styles
+└── controllers/
+    └── exec_api.py          — JSON endpoint for tile data
+</code></pre>
+<h2 id="tile-model">Tile model</h2>
+<pre><code class="language-python">class SouthbrookExecDashboardTile(models.Model):
+    _name = &quot;southbrook.exec_dashboard.tile&quot;
+    _description = &quot;Exec Dashboard Tile&quot;
+    _order = &quot;sequence&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name              = fields.Char(required=True)
+tile_code         = fields.Char(required=True, index=True)
+tile_type         = fields.Selection([
+    (&quot;kpi&quot;, &quot;KPI&quot;),
+    (&quot;trend&quot;, &quot;Trend&quot;),
+    (&quot;list&quot;, &quot;List&quot;),
+    (&quot;hermes&quot;, &quot;Hermes Flagged&quot;),
+])
+sequence          = fields.Integer()
+compute_method    = fields.Char()
+refresh_interval_min = fields.Integer(default=5)
+last_value_json   = fields.Text()
+last_computed_at  = fields.Datetime()
+visible_to_group_ids = fields.Many2many(&quot;res.groups&quot;)
+</code></pre>
+<h2 id="tile-registry-pattern">Tile registry pattern</h2>
+<p>The <code>tile_code</code> field links to a method on a registered model.
+The compute_method is resolved at runtime:</p>
+<pre><code class="language-python">def compute(self):
+    &quot;&quot;&quot;Resolve the compute_method + run.&quot;&quot;&quot;
+    self.ensure_one()
+    model, method_name = self.compute_method.split(&quot;.&quot;, 1)
+    if model not in self.env:
+        raise UserError(_(&quot;Model %s not registered&quot;) % model)
+    method = getattr(self.env[model], method_name, None)
+    if not callable(method):
+        raise UserError(_(&quot;Method %s not callable&quot;) % method_name)
+    return method()
+</code></pre>
+<p>So <code>compute_method = "southbrook.mi.engine.get_quality_health_tile"</code>
+resolves to that method call.</p>
+<h2 id="tile-data-xml">Tile data XML</h2>
+<pre><code class="language-xml">&lt;record id=&quot;tile_quality_health&quot; model=&quot;southbrook.exec_dashboard.tile&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Quality Health&lt;/field&gt;
+    &lt;field name=&quot;tile_code&quot;&gt;quality_health&lt;/field&gt;
+    &lt;field name=&quot;tile_type&quot;&gt;kpi&lt;/field&gt;
+    &lt;field name=&quot;sequence&quot;&gt;10&lt;/field&gt;
+    &lt;field name=&quot;compute_method&quot;&gt;southbrook.mi.engine.get_quality_health_tile&lt;/field&gt;
+    &lt;field name=&quot;refresh_interval_min&quot;&gt;5&lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<h2 id="owl-view-at-execmorning">OWL view at /exec/morning</h2>
+<pre><code class="language-python">class SouthbrookExecDashboardController(http.Controller):
+
+    @http.route(&quot;/exec/morning&quot;, type=&quot;http&quot;, auth=&quot;user&quot;)
+    def morning_briefing(self):
+        return request.render(
+            &quot;southbrook_exec_dashboard.morning_briefing_template&quot;)
+</code></pre>
+<p>The template mounts the OWL component which queries the API.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Tile shows but value is missing"</strong> — compute method may be
+  failing. Check the tile record's chatter for errors.</li>
+<li><strong>"Tile not refreshing"</strong> — <code>refresh_interval_min</code> may be too
+  long, OR the cron isn't running.</li>
+<li><strong>"New tile not appearing"</strong> — <code>visible_to_group_ids</code> excludes
+  user. Check group membership.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> What's the relationship between tile_code and compute_method?</p>
+<blockquote>
+<p><code>tile_code</code> is the short label; <code>compute_method</code> is the actual
+Python-method-dotted-path that produces the value.</p>
+</blockquote>
+<p><strong>Q2.</strong> Tile model — how does it know what to render?</p>
+<blockquote>
+<p><code>tile_type</code> (kpi/trend/list/hermes) drives the OWL template's
+render path.</p>
+</blockquote>
+<p><strong>Q3.</strong> Visibility per group — how enforced?</p>
+<blockquote>
+<p><code>visible_to_group_ids</code> m2m. API filters tiles by user's groups.</p>
+</blockquote>
+<p><strong>Q4.</strong> Add a new tile via XML — minimum fields?</p>
+<blockquote>
+<p>name, tile_code, tile_type, compute_method.</p>
+</blockquote>
+<p><strong>Q5.</strong> Tile compute method errors. Effect on tile?</p>
+<blockquote>
+<p><code>last_value_json</code> stays at the last successful value. UI shows
+stale data + chatter has the error log.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_28_exec_tile_compute" model="slide.slide">
+            <field name="name">Exec Dashboard Module — Tile Compute Pattern and Cron</field>
+            <field name="channel_id" ref="course_exec_dashboard_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Developer working on tile compute logic.</field>
+            <field name="html_content"><![CDATA[<h1 id="exec-dashboard-module-tile-compute-pattern-and-cron">Exec Dashboard Module — Tile Compute Pattern and Cron</h1>
+<h2 id="compute-method-return-shape">Compute method return shape</h2>
+<p>Every compute method returns the same shape:</p>
+<pre><code class="language-python">{
+    &quot;title&quot;: &quot;Quality Health&quot;,  # display label
+    &quot;value&quot;: &quot;3 critical NCRs&quot;, # primary value
+    &quot;subtitle&quot;: &quot;12 open total&quot;, # secondary
+    &quot;color&quot;: &quot;amber&quot;,            # green/amber/red/grey
+    &quot;trend&quot;: [5, 4, 6, 3, 4],    # last N values for sparkline
+    &quot;drill_action&quot;: &quot;southbrook_quality.action_southbrook_ncr&quot;,
+    &quot;drill_domain&quot;: [(&quot;state&quot;, &quot;in&quot;, [&quot;open&quot;, &quot;quarantine&quot;])],
+}
+</code></pre>
+<h2 id="example-compute-methods">Example compute methods</h2>
+<h3 id="kpi-tile">KPI tile</h3>
+<pre><code class="language-python">class SouthbrookMiEngine(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.engine&quot;
+
+    @api.model
+    def get_quality_health_tile(self):
+        ncrs = self.env[&quot;southbrook.ncr&quot;].search([
+            (&quot;state&quot;, &quot;in&quot;, [&quot;open&quot;, &quot;quarantine&quot;]),
+        ])
+        critical = ncrs.filtered(lambda n: n.severity == &quot;critical&quot;)
+        color = &quot;red&quot; if critical else &quot;amber&quot; if ncrs else &quot;green&quot;
+        return {
+            &quot;title&quot;: &quot;Quality Health&quot;,
+            &quot;value&quot;: f&quot;{len(critical)} critical NCRs&quot;,
+            &quot;subtitle&quot;: f&quot;{len(ncrs)} open total&quot;,
+            &quot;color&quot;: color,
+            &quot;trend&quot;: self._quality_trend_last_7d(),
+            &quot;drill_action&quot;: &quot;southbrook_quality.action_southbrook_ncr&quot;,
+            &quot;drill_domain&quot;: [(&quot;state&quot;, &quot;in&quot;, [&quot;open&quot;, &quot;quarantine&quot;])],
+        }
+</code></pre>
+<h3 id="trend-tile">Trend tile</h3>
+<pre><code class="language-python">@api.model
+def get_wip_trend_tile(self):
+    snapshots = self._wip_last_30_days()
+    current = snapshots[-1] if snapshots else 0
+    return {
+        &quot;title&quot;: &quot;WIP Trend&quot;,
+        &quot;value&quot;: f&quot;${current:,.0f}&quot;,
+        &quot;color&quot;: self._wip_color(current),
+        &quot;trend&quot;: snapshots,
+        &quot;drill_action&quot;: &quot;southbrook_finance_pack.action_wip_report&quot;,
+    }
+</code></pre>
+<h3 id="hermes-flagged-tile">Hermes-flagged tile</h3>
+<pre><code class="language-python">@api.model
+def get_hermes_flagged_tile(self):
+    recs = self.env[&quot;hermes.recommendation&quot;].search([
+        (&quot;state&quot;, &quot;=&quot;, &quot;pending_review&quot;),
+        (&quot;persona&quot;, &quot;in&quot;, self._user_personas()),
+    ])
+    return {
+        &quot;title&quot;: &quot;Awaiting Your Review&quot;,
+        &quot;value&quot;: f&quot;{len(recs)} flagged&quot;,
+        &quot;color&quot;: &quot;amber&quot; if recs else &quot;green&quot;,
+        &quot;list&quot;: [{&quot;id&quot;: r.id, &quot;subject&quot;: r.subject} for r in recs[:5]],
+        &quot;drill_action&quot;: &quot;hermes.action_recommendations&quot;,
+    }
+</code></pre>
+<h2 id="cron-based-refresh">Cron-based refresh</h2>
+<pre><code class="language-python">@api.model
+def _cron_refresh_tiles(self):
+    &quot;&quot;&quot;Every 5 minutes: refresh tiles past their refresh_interval.&quot;&quot;&quot;
+    now = fields.Datetime.now()
+
+    for tile in self.search([]):
+        stale_after = (tile.last_computed_at or
+                       fields.Datetime.from_string(&quot;2000-01-01&quot;)) + \
+                      relativedelta(minutes=tile.refresh_interval_min)
+        if now &lt; stale_after:
+            continue
+
+        try:
+            result = tile.compute()
+            tile.write({
+                &quot;last_value_json&quot;: json.dumps(result),
+                &quot;last_computed_at&quot;: now,
+            })
+        except Exception as e:
+            tile.message_post(body=_(&quot;Compute failed: %s&quot;) % str(e))
+</code></pre>
+<p>Cron runs every 5 minutes; tiles with longer refresh_interval
+just skip.</p>
+<h2 id="live-override">Live override</h2>
+<p>For tiles users want fresh:</p>
+<pre><code class="language-python">def force_refresh(self):
+    self.ensure_one()
+    self.last_computed_at = False  # invalidate cache
+    return self.compute()
+</code></pre>
+<p>Triggered from the OWL component's "refresh" icon.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Return shape inconsistent"</strong> — different tiles return different
+  keys. The OWL template gracefully handles missing keys, but
+  warnings emit. Standardise.</li>
+<li><strong>"Tile compute slow"</strong> — heavy DB query. Optimise OR cache the
+  intermediate via Postgres MATERIALIZED VIEW.</li>
+<li><strong>"<code>trend</code> field huge"</strong> — limit to last 7 or 30 data points.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Return shape includes <code>color</code>. Acceptable values?</p>
+<blockquote>
+<p>green / amber / red / grey. Drives OWL component's CSS class.</p>
+</blockquote>
+<p><strong>Q2.</strong> Tile with <code>refresh_interval_min = 60</code>. Cron runs every
+5 min. Re-computes how often?</p>
+<blockquote>
+<p>Hourly. Cron skips tiles still within their interval.</p>
+</blockquote>
+<p><strong>Q3.</strong> Compute method raises exception. Effect on tile_value?</p>
+<blockquote>
+<p><code>last_value_json</code> stays old. Chatter logs error. UI shows
+stale data + a "stale" badge (depending on UI).</p>
+</blockquote>
+<p><strong>Q4.</strong> Drill_action = "module.action_name". Format?</p>
+<blockquote>
+<p>XML reference. Resolved client-side to load the act_window.</p>
+</blockquote>
+<p><strong>Q5.</strong> New compute method that returns inconsistent keys — what
+happens?</p>
+<blockquote>
+<p>OWL template uses defaults; missing keys = empty cell. Add
+validation in the model to enforce shape.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_28_exec_owl_view" model="slide.slide">
+            <field name="name">Exec Dashboard Module — OWL View and Mobile-First Layout</field>
+            <field name="channel_id" ref="course_exec_dashboard_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Frontend developer working on the OWL component.</field>
+            <field name="html_content"><![CDATA[<h1 id="exec-dashboard-module-owl-view-and-mobile-first-layout">Exec Dashboard Module — OWL View and Mobile-First Layout</h1>
+<h2 id="the-owl-component">The OWL component</h2>
+<pre><code class="language-javascript">/** @odoo-module **/
+import { Component, useState, onWillStart } from &quot;@odoo/owl&quot;;
+import { registry } from &quot;@web/core/registry&quot;;
+import { useService } from &quot;@web/core/utils/hooks&quot;;
+
+export class ExecDashboard extends Component {
+    static template = &quot;southbrook_exec_dashboard.ExecDashboardView&quot;;
+
+    setup() {
+        this.orm = useService(&quot;orm&quot;);
+        this.action = useService(&quot;action&quot;);
+        this.state = useState({ tiles: [], loading: true });
+
+        onWillStart(async () =&gt; {
+            await this.loadTiles();
+        });
+    }
+
+    async loadTiles() {
+        const data = await this.orm.call(
+            &quot;southbrook.exec_dashboard.tile&quot;,
+            &quot;get_dashboard_data&quot;,
+            [],
+        );
+        this.state.tiles = data;
+        this.state.loading = false;
+    }
+
+    async onTileClick(tile) {
+        if (!tile.drill_action) return;
+        this.action.doAction(tile.drill_action, {
+            additionalContext: {
+                search_default_filters: tile.drill_domain || [],
+            },
+        });
+    }
+}
+
+registry.category(&quot;actions&quot;).add(
+    &quot;southbrook_exec_dashboard.exec_dashboard_view&quot;,
+    ExecDashboard,
+);
+</code></pre>
+<h2 id="the-owl-template">The OWL template</h2>
+<pre><code class="language-xml">&lt;templates xml:space=&quot;preserve&quot;&gt;
+    &lt;t t-name=&quot;southbrook_exec_dashboard.ExecDashboardView&quot;&gt;
+        &lt;div class=&quot;o_exec_dashboard&quot;&gt;
+            &lt;div t-if=&quot;state.loading&quot; class=&quot;text-center&quot;&gt;
+                &lt;i class=&quot;fa fa-spinner fa-spin&quot;/&gt; Loading...
+            &lt;/div&gt;
+            &lt;div t-else=&quot;&quot; class=&quot;o_exec_dashboard_grid&quot;&gt;
+                &lt;t t-foreach=&quot;state.tiles&quot; t-as=&quot;tile&quot; t-key=&quot;tile.id&quot;&gt;
+                    &lt;div class=&quot;o_exec_tile&quot;
+                         t-attf-class=&quot;o_exec_tile_{{tile.color}}&quot;
+                         t-on-click=&quot;() =&amp;gt; this.onTileClick(tile)&quot;&gt;
+                        &lt;div class=&quot;o_exec_tile_title&quot;&gt;
+                            &lt;t t-esc=&quot;tile.title&quot;/&gt;
+                        &lt;/div&gt;
+                        &lt;div class=&quot;o_exec_tile_value&quot;&gt;
+                            &lt;t t-esc=&quot;tile.value&quot;/&gt;
+                        &lt;/div&gt;
+                        &lt;div t-if=&quot;tile.subtitle&quot; class=&quot;o_exec_tile_subtitle&quot;&gt;
+                            &lt;t t-esc=&quot;tile.subtitle&quot;/&gt;
+                        &lt;/div&gt;
+                        &lt;div t-if=&quot;tile.trend&quot; class=&quot;o_exec_tile_sparkline&quot;&gt;
+                            &lt;!-- sparkline component --&gt;
+                        &lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/t&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/t&gt;
+&lt;/templates&gt;
+</code></pre>
+<h2 id="mobile-first-css">Mobile-first CSS</h2>
+<pre><code class="language-scss">.o_exec_dashboard {
+    padding: 1rem;
+    max-width: 100vw;
+
+    .o_exec_dashboard_grid {
+        display: grid;
+        grid-template-columns: 1fr;  // single column on mobile
+        gap: 1rem;
+    }
+
+    .o_exec_tile {
+        background: var(--card-bg);
+        border-radius: 8px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: transform 0.1s;
+
+        &amp;:hover {
+            transform: translateY(-2px);
+        }
+
+        &amp;.o_exec_tile_green { border-left: 4px solid #4caf50; }
+        &amp;.o_exec_tile_amber { border-left: 4px solid #ff9800; }
+        &amp;.o_exec_tile_red { border-left: 4px solid #f44336; }
+        &amp;.o_exec_tile_grey { border-left: 4px solid #9e9e9e; }
+    }
+
+    // Tablet
+    @media (min-width: 768px) {
+        .o_exec_dashboard_grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    // Desktop
+    @media (min-width: 1200px) {
+        .o_exec_dashboard_grid {
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+        }
+    }
+}
+</code></pre>
+<h2 id="why-mobile-first">Why mobile-first</h2>
+<ul>
+<li>Owner reads it on phone over coffee</li>
+<li>Plant GM reads on tablet on the floor</li>
+<li>Desktop is the "deep dive" case, not the primary use</li>
+</ul>
+<p>Designing for the smallest viewport first ensures all info is
+visible everywhere.</p>
+<h2 id="owl-hot-reload">OWL hot reload</h2>
+<p>During development:</p>
+<pre><code class="language-bash"># Run odoo with assets in dev mode
+docker exec southbrook-odoo bash -c 'odoo --dev=qweb,assets'
+</code></pre>
+<p>Changes to <code>.js</code>, <code>.xml</code>, <code>.scss</code> reload without full restart.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"OWL template not found"</strong> — <code>static.assets_backend</code> doesn't
+  include the file. Check manifest.</li>
+<li><strong>"State not updating on click"</strong> — OWL state must be from
+  <code>useState</code>; raw object modifications don't trigger re-render.</li>
+<li><strong>"Mobile breakpoints not working"</strong> — caching. Hard refresh.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> OWL component registration — what's the category?</p>
+<blockquote>
+<p><code>actions</code> (for full-page views). Registry: <code>registry.category("actions").add(...)</code>.</p>
+</blockquote>
+<p><strong>Q2.</strong> <code>useState</code> vs plain object?</p>
+<blockquote>
+<p><code>useState</code> is reactive — changes trigger re-render. Plain
+object changes don't.</p>
+</blockquote>
+<p><strong>Q3.</strong> Mobile-first means CSS designed for smallest viewport
+first. Why?</p>
+<blockquote>
+<p>Easier to scale up than down. Smartphone constraints force
+simplification; if the dashboard works on phone, desktop will
+work.</p>
+</blockquote>
+<p><strong>Q4.</strong> Click handler is <code>() =&gt; this.onTileClick(tile)</code>. Why
+arrow function?</p>
+<blockquote>
+<p>Preserves <code>this</code> binding to the component. Without arrow,
+<code>this</code> would be undefined in the OWL event context.</p>
+</blockquote>
+<p><strong>Q5.</strong> OWL hot reload — what command?</p>
+<blockquote>
+<p><code>--dev=qweb,assets</code>. Changes to assets reload without restart.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_28_exec_drill_through" model="slide.slide">
+            <field name="name">Exec Dashboard Module — Drill-Through Wiring</field>
+            <field name="channel_id" ref="course_exec_dashboard_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Developer implementing tile drill-through.</field>
+            <field name="html_content"><![CDATA[<h1 id="exec-dashboard-module-drill-through-wiring">Exec Dashboard Module — Drill-Through Wiring</h1>
+<h2 id="what-drill-through-means">What drill-through means</h2>
+<p>Click a tile → land on the source data filtered to what the tile
+showed. E.g. click "Open NCRs: 12" → NCR list filtered to open.</p>
+<h2 id="the-3-components">The 3 components</h2>
+<ol>
+<li><strong>drill_action</strong> — the XML id of the target action</li>
+<li><strong>drill_domain</strong> — filter pre-applied</li>
+<li><strong>drill_context</strong> — additional context (active_tab, group_by, etc.)</li>
+</ol>
+<h2 id="action-handler">Action handler</h2>
+<pre><code class="language-python">def onTileClick(tile) {
+    if (!tile.drill_action) return;
+
+    this.action.doAction(tile.drill_action, {
+        additionalContext: tile.drill_context || {},
+        domain: tile.drill_domain || [],
+    });
+}
+</code></pre>
+<p>The <code>action</code> service handles routing to the target.</p>
+<h2 id="pre-applied-filter">Pre-applied filter</h2>
+<p>When the target action loads, the filter shows as a pill at the
+top of the search bar. User can clear it to see all records.</p>
+<h2 id="examples">Examples</h2>
+<h3 id="quality-tile-ncr-list-filtered-to-open">Quality tile → NCR list filtered to open</h3>
+<pre><code class="language-python">return {
+    ...,
+    &quot;drill_action&quot;: &quot;southbrook_quality.action_southbrook_ncr&quot;,
+    &quot;drill_domain&quot;: [(&quot;state&quot;, &quot;in&quot;, [&quot;open&quot;, &quot;quarantine&quot;])],
+}
+</code></pre>
+<h3 id="sales-tile-sos-from-yesterday">Sales tile → SOs from yesterday</h3>
+<pre><code class="language-python">return {
+    ...,
+    &quot;drill_action&quot;: &quot;sale.action_quotations&quot;,
+    &quot;drill_domain&quot;: [(&quot;date_order&quot;, &quot;&gt;=&quot;, yesterday)],
+    &quot;drill_context&quot;: {&quot;search_default_filter_done&quot;: 1},
+}
+</code></pre>
+<h3 id="maintenance-tile-breakdown-alerts-grouped-by-equipment">Maintenance tile → breakdown alerts grouped by equipment</h3>
+<pre><code class="language-python">return {
+    ...,
+    &quot;drill_action&quot;: &quot;southbrook_cmms_wms.action_breakdown_alerts&quot;,
+    &quot;drill_context&quot;: {
+        &quot;search_default_group_by_equipment&quot;: 1,
+        &quot;search_default_filter_open&quot;: 1,
+    },
+}
+</code></pre>
+<h2 id="when-the-target-action-doesnt-exist">When the target action doesn't exist</h2>
+<p>Common scenarios:
+- Module not installed (e.g. southbrook_quality)
+- Action XML id renamed</p>
+<p>Defensive handling:</p>
+<pre><code class="language-python">@api.model
+def get_dashboard_data(self):
+    tiles = self.search([])
+    visible_tiles = []
+    for tile in tiles:
+        data = json.loads(tile.last_value_json or &quot;{}&quot;)
+        # Verify drill action exists
+        if data.get(&quot;drill_action&quot;):
+            try:
+                self.env.ref(data[&quot;drill_action&quot;])
+            except ValueError:
+                data[&quot;drill_action&quot;] = None  # Disable click
+        visible_tiles.append(data)
+    return visible_tiles
+</code></pre>
+<h2 id="group-by-chart-on-drill-through">Group-by + chart on drill-through</h2>
+<p>For tiles that drill to a graph view, use <code>view_type</code>:</p>
+<pre><code class="language-python">return {
+    ...,
+    &quot;drill_action&quot;: &quot;southbrook_quality.action_southbrook_ncr&quot;,
+    &quot;drill_context&quot;: {
+        &quot;search_default_group_by_severity&quot;: 1,
+        &quot;view_type&quot;: &quot;graph&quot;,
+    },
+}
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Drill click does nothing"</strong> — drill_action XML id doesn't
+  exist. Verify via <em>Settings → Technical → Actions</em>.</li>
+<li><strong>"Filter not pre-applied"</strong> — drill_domain syntax wrong. Must
+  be Odoo-domain list, not string.</li>
+<li><strong>"User sees error: NotFound"</strong> — action exists but user's
+  group can't access. Check ACL.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Tile click → drill_action. What service routes the
+action?</p>
+<blockquote>
+<p><code>action</code> service (<code>useService("action")</code>). Calls <code>doAction()</code>.</p>
+</blockquote>
+<p><strong>Q2.</strong> drill_domain format?</p>
+<blockquote>
+<p>Odoo domain list: <code>[("state", "=", "open"), ...]</code>. Same as
+Python domain.</p>
+</blockquote>
+<p><strong>Q3.</strong> Target action doesn't exist. User clicks. Effect?</p>
+<blockquote>
+<p>NotFound error popup. Defensively disable click + remove
+drill_action via env.ref check.</p>
+</blockquote>
+<p><strong>Q4.</strong> Drill to graph view — how?</p>
+<blockquote>
+<p>Set <code>drill_context = {"view_type": "graph"}</code>.</p>
+</blockquote>
+<p><strong>Q5.</strong> Multiple tiles drill to same action with different
+filters. Issue?</p>
+<blockquote>
+<p>No — same action can take different domains. Each tile's
+drill is independent.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_28_exec_custom_tile" model="slide.slide">
+            <field name="name">Exec Dashboard Module — Adding a Custom Tile</field>
+            <field name="channel_id" ref="course_exec_dashboard_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer building a new exec tile.</field>
+            <field name="html_content"><![CDATA[<h1 id="exec-dashboard-module-adding-a-custom-tile">Exec Dashboard Module — Adding a Custom Tile</h1>
+<h2 id="the-4-step-pattern">The 4-step pattern</h2>
+<ol>
+<li>Write the compute method</li>
+<li>Register the tile via XML</li>
+<li>Test the compute output</li>
+<li>Verify in the UI</li>
+</ol>
+<h2 id="a-worked-example-top-3-customers-by-revenue-last-30-days">A worked example: "Top 3 Customers by Revenue (Last 30 Days)"</h2>
+<h3 id="step-1-compute-method">Step 1: Compute method</h3>
+<p>In a custom addon (e.g. <code>southbrook_exec_dashboard_custom</code>):</p>
+<pre><code class="language-python">class SouthbrookMiEngine(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.engine&quot;
+
+    @api.model
+    def get_top3_customers_tile(self):
+        thirty_days_ago = fields.Date.today() - relativedelta(days=30)
+
+        # Aggregate revenue by customer
+        self.env.cr.execute(&quot;&quot;&quot;
+            SELECT partner_id, SUM(amount_total) AS revenue
+            FROM account_move
+            WHERE move_type = 'out_invoice'
+              AND date &gt;= %s
+              AND state = 'posted'
+            GROUP BY partner_id
+            ORDER BY revenue DESC
+            LIMIT 3
+        &quot;&quot;&quot;, (thirty_days_ago,))
+
+        rows = self.env.cr.fetchall()
+        partner_dict = {
+            p.id: p.name
+            for p in self.env[&quot;res.partner&quot;].browse([r[0] for r in rows])
+        }
+
+        top3 = [{
+            &quot;partner_id&quot;: r[0],
+            &quot;name&quot;: partner_dict.get(r[0], f&quot;Partner {r[0]}&quot;),
+            &quot;revenue&quot;: r[1],
+        } for r in rows]
+
+        total = sum(t[&quot;revenue&quot;] for t in top3)
+
+        return {
+            &quot;title&quot;: &quot;Top 3 Customers (30d)&quot;,
+            &quot;value&quot;: f&quot;${total:,.0f}&quot;,
+            &quot;subtitle&quot;: &quot;, &quot;.join(t[&quot;name&quot;] for t in top3),
+            &quot;color&quot;: &quot;green&quot;,  # Always positive signal
+            &quot;list&quot;: top3,
+            &quot;drill_action&quot;: &quot;sale.action_orders&quot;,
+            &quot;drill_domain&quot;: [
+                (&quot;partner_id&quot;, &quot;in&quot;, [t[&quot;partner_id&quot;] for t in top3]),
+            ],
+        }
+</code></pre>
+<h3 id="step-2-tile-xml">Step 2: Tile XML</h3>
+<pre><code class="language-xml">&lt;record id=&quot;tile_top3_customers&quot; model=&quot;southbrook.exec_dashboard.tile&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Top 3 Customers (30d)&lt;/field&gt;
+    &lt;field name=&quot;tile_code&quot;&gt;top3_customers&lt;/field&gt;
+    &lt;field name=&quot;tile_type&quot;&gt;list&lt;/field&gt;
+    &lt;field name=&quot;sequence&quot;&gt;25&lt;/field&gt;
+    &lt;field name=&quot;compute_method&quot;&gt;southbrook.mi.engine.get_top3_customers_tile&lt;/field&gt;
+    &lt;field name=&quot;refresh_interval_min&quot;&gt;60&lt;/field&gt;
+    &lt;field name=&quot;visible_to_group_ids&quot; eval=&quot;[(4, ref('exec_dashboard_user'))]&quot;/&gt;
+&lt;/record&gt;
+</code></pre>
+<h3 id="step-3-test-the-compute">Step 3: Test the compute</h3>
+<pre><code class="language-python"># In odoo shell
+env[&quot;southbrook.mi.engine&quot;].get_top3_customers_tile()
+# Should return the dict
+</code></pre>
+<h3 id="step-4-refresh-the-dashboard">Step 4: Refresh the dashboard</h3>
+<pre><code class="language-bash">docker exec southbrook-odoo kill -HUP 1  # if new public routes
+</code></pre>
+<p>Visit /exec/morning; the new tile should appear.</p>
+<h2 id="tile-sequence-ordering">Tile sequence ordering</h2>
+<p>Tiles render in <code>sequence</code> ascending. Standard sequence ranges:</p>
+<table>
+<thead>
+<tr>
+<th>Range</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1-9</td>
+<td>Top row (cash flow / revenue / today plan)</td>
+</tr>
+<tr>
+<td>10-29</td>
+<td>Operational health</td>
+</tr>
+<tr>
+<td>30-49</td>
+<td>Risk surface</td>
+</tr>
+<tr>
+<td>50-79</td>
+<td>Hermes-flagged + executive actions</td>
+</tr>
+<tr>
+<td>80+</td>
+<td>Custom tiles</td>
+</tr>
+</tbody>
+</table>
+<p>Pick a sequence that places your tile correctly.</p>
+<h2 id="visibility">Visibility</h2>
+<p><code>visible_to_group_ids</code> controls who sees the tile:
+- Empty m2m = visible to all dashboard users
+- One or more groups = visible only to members</p>
+<p>Useful for:
+- Finance tiles → visible only to finance group
+- Quality tiles → visible to QC + Plant GM only
+- HR tiles → visible to HR group</p>
+<h2 id="refresh-interval-choice">Refresh interval choice</h2>
+<table>
+<thead>
+<tr>
+<th>Interval</th>
+<th>Use case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5 min</td>
+<td>Real-time operational tiles (NCRs, breakdowns)</td>
+</tr>
+<tr>
+<td>15-30 min</td>
+<td>Hourly trend tiles</td>
+</tr>
+<tr>
+<td>60 min</td>
+<td>Daily-relevant tiles (top customers, AR)</td>
+</tr>
+<tr>
+<td>24h</td>
+<td>Strategic tiles (week-over-week trends)</td>
+</tr>
+</tbody>
+</table>
+<p>Longer intervals reduce server load; shorter intervals trade
+freshness for cost.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Tile doesn't appear after install"</strong> — visibility group
+  doesn't include your user. Check group membership.</li>
+<li><strong>"Compute method returns nothing"</strong> — method may have raised
+  exception silently caught. Test in odoo shell.</li>
+<li><strong>"drill_action XML id wrong"</strong> — typo. Use <code>Settings →
+  Technical → Actions</code> to find correct id.</li>
+<li><strong>"Tile not refreshing"</strong> — cron skipping due to recent
+  compute. Force refresh via cog → Refresh.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Tile shows on /exec/morning but says "no data." Diagnose?</p>
+<blockquote>
+<p>Compute method may be failing silently. Run from odoo shell;
+if error, fix the method.</p>
+</blockquote>
+<p><strong>Q2.</strong> New tile at sequence 5 — placement?</p>
+<blockquote>
+<p>Top row. Among the cash/revenue tiles.</p>
+</blockquote>
+<p><strong>Q3.</strong> Visible_to_group_ids m2m empty. Who sees it?</p>
+<blockquote>
+<p>All users with dashboard access.</p>
+</blockquote>
+<p><strong>Q4.</strong> Tile refresh_interval = 1440. How often computes?</p>
+<blockquote>
+<p>Once per day. Cron runs every 5 min but only computes when
+<code>last_computed_at &lt; now - 1440 min</code>.</p>
+</blockquote>
+<p><strong>Q5.</strong> Tile XML loads but tile_code conflicts with existing.
+Effect?</p>
+<blockquote>
+<p>XML id collision (use unique id). <code>tile_code</code> is just a string;
+can be duplicate (would be a logic bug but not error).</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_28_exec_hermes_integration" model="slide.slide">
+            <field name="name">Exec Dashboard Module — Hermes Integration</field>
+            <field name="channel_id" ref="course_exec_dashboard_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Developer integrating Hermes recommendations into exec view.</field>
+            <field name="html_content"><![CDATA[<h1 id="exec-dashboard-module-hermes-integration">Exec Dashboard Module — Hermes Integration</h1>
+<h2 id="the-hermes-flagged-tile">The Hermes-flagged tile</h2>
+<pre><code class="language-python">@api.model
+def get_hermes_flagged_tile(self):
+    user_personas = self._user_personas()
+    recs = self.env[&quot;hermes.recommendation&quot;].search([
+        (&quot;state&quot;, &quot;=&quot;, &quot;pending_review&quot;),
+        (&quot;persona&quot;, &quot;in&quot;, user_personas),
+    ])
+
+    return {
+        &quot;title&quot;: &quot;Hermes Awaiting Your Review&quot;,
+        &quot;value&quot;: f&quot;{len(recs)} flagged&quot;,
+        &quot;subtitle&quot;: &quot;Tap to triage&quot;,
+        &quot;color&quot;: &quot;red&quot; if len(recs) &gt; 10 \
+                 else &quot;amber&quot; if len(recs) &gt; 0 \
+                 else &quot;green&quot;,
+        &quot;list&quot;: [{
+            &quot;id&quot;: r.id,
+            &quot;subject&quot;: r.subject,
+            &quot;confidence&quot;: r.confidence,
+            &quot;created_days_ago&quot;: (
+                fields.Datetime.now() - r.create_date).days,
+        } for r in recs[:10]],
+        &quot;drill_action&quot;: &quot;hermes.action_recommendations&quot;,
+        &quot;drill_domain&quot;: [
+            (&quot;state&quot;, &quot;=&quot;, &quot;pending_review&quot;),
+            (&quot;persona&quot;, &quot;in&quot;, user_personas),
+        ],
+    }
+</code></pre>
+<h2 id="personas-resolution">Personas resolution</h2>
+<pre><code class="language-python">@api.model
+def _user_personas(self):
+    &quot;&quot;&quot;Return list of persona codes the current user has.&quot;&quot;&quot;
+    user = self.env.user
+    personas = []
+    if user.has_group(&quot;southbrook_hermes.group_hermes_exec&quot;):
+        personas.append(&quot;exec_owner&quot;)
+    if user.has_group(&quot;southbrook_hermes.group_hermes_mfg_manager&quot;):
+        personas.append(&quot;mfg_manager&quot;)
+    if user.has_group(&quot;southbrook_hermes.group_hermes_controller&quot;):
+        personas.append(&quot;controller&quot;)
+    # ... etc.
+    return personas
+</code></pre>
+<p>So a user with multiple groups sees recommendations for any of
+their personas.</p>
+<h2 id="inline-approvereject-from-dashboard">Inline approve/reject from dashboard</h2>
+<p>Power users may want to act on recommendations without leaving
+the dashboard:</p>
+<pre><code class="language-python">def approve_from_dashboard(self, rec_id):
+    rec = self.env[&quot;hermes.recommendation&quot;].browse(rec_id)
+    if not rec.exists() or rec.state != &quot;pending_review&quot;:
+        raise UserError(_(&quot;Already processed&quot;))
+    rec.action_apply()
+    return True
+</code></pre>
+<pre><code class="language-javascript">async approveRec(recId) {
+    await this.orm.call(
+        &quot;southbrook.exec_dashboard.tile&quot;,
+        &quot;approve_from_dashboard&quot;,
+        [recId],
+    );
+    await this.loadTiles();  // Refresh tile
+}
+</code></pre>
+<h2 id="hermes-flagged-categories">Hermes flagged categories</h2>
+<p>The tile can split by category for finer triage:</p>
+<pre><code class="language-python">return {
+    ...,
+    &quot;subtitle&quot;: f&quot;{n_quality} quality, {n_finance} finance, &quot;
+                f&quot;{n_ops} ops&quot;,
+}
+</code></pre>
+<p>User sees the breakdown without opening each.</p>
+<h2 id="when-hermes-is-unavailable">When Hermes is unavailable</h2>
+<p>Defensive handling:</p>
+<pre><code class="language-python">try:
+    rec_count = self.env[&quot;hermes.recommendation&quot;].search_count(...)
+except KeyError:
+    # Hermes module not installed; show gracefully
+    return {
+        &quot;title&quot;: &quot;Hermes Awaiting Your Review&quot;,
+        &quot;value&quot;: &quot;N/A&quot;,
+        &quot;color&quot;: &quot;grey&quot;,
+    }
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Tile says '5 flagged' but I'm not in the right group"</strong> —
+  persona mismatch. Verify user_personas correctly resolves.</li>
+<li><strong>"Inline approve from dashboard doesn't reflect"</strong> — refresh
+  not called after action. Call <code>loadTiles()</code>.</li>
+<li><strong>"Tile shows 100+"</strong> — backlog accumulated; not a tile bug.
+  Triage time.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Hermes-flagged tile colour green / amber / red?</p>
+<blockquote>
+<p>Green = 0 flagged. Amber = 1-10. Red = 10+ (threshold tuneable).</p>
+</blockquote>
+<p><strong>Q2.</strong> User in multiple persona groups. Sees what recs?</p>
+<blockquote>
+<p>Recs targeted to any of their persona codes.</p>
+</blockquote>
+<p><strong>Q3.</strong> Inline approve / reject — pros vs cons vs drilling to
+Hermes Console?</p>
+<blockquote>
+<p>Pro: faster, fewer clicks. Con: less context for each rec; may
+rush a decision that deserves more review.</p>
+</blockquote>
+<p><strong>Q4.</strong> Hermes not installed but tile is configured. Effect?</p>
+<blockquote>
+<p>Should show grey/"N/A" gracefully. Without defensive code, KeyError
+on model lookup.</p>
+</blockquote>
+<p><strong>Q5.</strong> Recommendation persona = "exec_owner". Tile shows it to whom?</p>
+<blockquote>
+<p>Users with <code>group_hermes_exec</code>. Single persona match suffices.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_28_exec_performance" model="slide.slide">
+            <field name="name">Exec Dashboard Module — Performance and Caching</field>
+            <field name="channel_id" ref="course_exec_dashboard_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Developer optimising dashboard load times.</field>
+            <field name="html_content"><![CDATA[<h1 id="exec-dashboard-module-performance-and-caching">Exec Dashboard Module — Performance and Caching</h1>
+<h2 id="the-performance-triangle">The performance triangle</h2>
+<p>Three optimisation axes:</p>
+<ol>
+<li><strong>Tile compute time</strong> — how long each method takes</li>
+<li><strong>Refresh interval</strong> — how often computes run</li>
+<li><strong>API response time</strong> — what the user actually waits</li>
+</ol>
+<h2 id="tile-compute-time">Tile compute time</h2>
+<p>Slow tiles dominate the cron's runtime. Profile via:</p>
+<pre><code class="language-python">import time
+
+def compute(self):
+    start = time.time()
+    result = self._do_compute()
+    elapsed = time.time() - start
+    if elapsed &gt; 2.0:
+        _logger.warning(
+            &quot;Slow tile %s: %.2fs&quot;, self.tile_code, elapsed)
+    return result
+</code></pre>
+<p>Aim for &lt; 1 second per tile. If a compute is heavier:
+- Cache intermediates in DB
+- Use materialised views for aggregates
+- Pre-compute via cron, not on demand</p>
+<h2 id="refresh-interval-tuning">Refresh interval tuning</h2>
+<pre><code>Acceptable freshness  vs  Server load
+5 min                     High (12 computes/hour)
+15 min                    Moderate (4/hour)
+60 min                    Low (1/hour)
+</code></pre>
+<p>For real-time operational signals: 5 min.
+For trends / weekly views: 60 min.
+For strategic / monthly: 24h.</p>
+<h2 id="api-response-time">API response time</h2>
+<p>The exec dashboard API endpoint should respond &lt; 200ms.
+Approaches:</p>
+<h3 id="1-pre-aggregate">1. Pre-aggregate</h3>
+<p>Don't compute on request; serve <code>last_value_json</code> from DB.</p>
+<pre><code class="language-python">@api.model
+def get_dashboard_data(self):
+    tiles = self.search([...])
+    return [{
+        &quot;id&quot;: t.id,
+        **json.loads(t.last_value_json or &quot;{}&quot;),
+    } for t in tiles]
+</code></pre>
+<p>Single query → fast.</p>
+<h3 id="2-edge-caching">2. Edge caching</h3>
+<p>If your dashboard is publicly cacheable (rare for exec
+dashboard), use Caddy / Cloudflare cache.</p>
+<h3 id="3-client-side-caching">3. Client-side caching</h3>
+<p>Browser cache for sparkline images. Don't cache the API itself.</p>
+<h2 id="materialised-views-for-aggregates">Materialised views for aggregates</h2>
+<p>Some computes can be backed by PostgreSQL materialised views:</p>
+<pre><code class="language-sql">CREATE MATERIALIZED VIEW mv_daily_revenue AS
+SELECT DATE_TRUNC('day', date) AS day, SUM(amount_total) AS rev
+FROM account_move
+WHERE move_type = 'out_invoice'
+  AND state = 'posted'
+  AND date &gt;= NOW() - INTERVAL '90 days'
+GROUP BY 1;
+</code></pre>
+<p>Refresh nightly via cron:</p>
+<pre><code class="language-python">@api.model
+def _cron_refresh_mvs(self):
+    self.env.cr.execute(&quot;REFRESH MATERIALIZED VIEW mv_daily_revenue;&quot;)
+</code></pre>
+<p>Tile reads from MV instantly.</p>
+<h2 id="profiling">Profiling</h2>
+<pre><code class="language-python">import cProfile
+import pstats
+
+profiler = cProfile.Profile()
+profiler.enable()
+self.env[&quot;southbrook.mi.engine&quot;].get_quality_health_tile()
+profiler.disable()
+
+stats = pstats.Stats(profiler).sort_stats(&quot;cumulative&quot;)
+stats.print_stats(20)
+</code></pre>
+<p>Identifies hot spots.</p>
+<h2 id="memory-usage">Memory usage</h2>
+<p>Each tile's <code>last_value_json</code> &lt; 10 KB typically. With 50 tiles
+and full sparklines, ~500 KB total per user. Fine.</p>
+<p>Watch for:
+- Large list payloads
+- Embedded base64 images (don't do this)
+- Trend arrays &gt; 100 points</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Dashboard loads slowly first time"</strong> — likely cold cache.
+  Pre-warm via a cron that triggers <code>get_dashboard_data</code> on
+  startup.</li>
+<li><strong>"Tile shows briefly then disappears"</strong> — OWL render error.
+  Check browser console.</li>
+<li><strong>"Memory growth in worker"</strong> — caching beyond worker
+  lifetime; verify no global dicts.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Slow tile dominates the cron. Approach?</p>
+<blockquote>
+<p>Profile to find the hot spot. If a single query, optimise it.
+If many queries, consider materialised view.</p>
+</blockquote>
+<p><strong>Q2.</strong> Materialised view refreshes nightly. Latency impact?</p>
+<blockquote>
+<p>Tile shows yesterday's data until refresh runs. Acceptable for
+trend tiles; not for real-time operations.</p>
+</blockquote>
+<p><strong>Q3.</strong> Tile compute takes 5 seconds. What to do?</p>
+<blockquote>
+<p>Pre-compute via cron; tile reads cached value. User wait =
+~10ms (DB read).</p>
+</blockquote>
+<p><strong>Q4.</strong> Dashboard load time = 3 seconds. Acceptable?</p>
+<blockquote>
+<p>Too slow. Aim for &lt; 500ms. Profile API endpoint; likely
+heavy compute on request.</p>
+</blockquote>
+<p><strong>Q5.</strong> Sparkline with 1000 data points per tile. Effect?</p>
+<blockquote>
+<p>Heavy payload + slow OWL render. Limit to 30 points; aggregate
+server-side if needed.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

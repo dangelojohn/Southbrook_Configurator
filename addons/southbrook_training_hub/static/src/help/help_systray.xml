@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_training_hub.HelpSystrayItem">
+        <div class="o-dropdown dropdown o-mail-NotificationItem">
+            <button class="dropdown-toggle o-no-caret btn"
+                    title="Training Help — find a lesson, micro, or runbook"
+                    t-on-click="onClick">
+                <i class="fa fa-question-circle"
+                   role="img"
+                   aria-label="Training Help"/>
+            </button>
+        </div>
+    </t>
+
+</templates>

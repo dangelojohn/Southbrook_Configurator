@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_iot_label_log_list" model="ir.ui.view">
+        <field name="name">southbrook.integrations.iot_label_log.list</field>
+        <field name="model">southbrook.integrations.iot_label_log</field>
+        <field name="arch" type="xml">
+            <list string="Label Print Log"
+                  decoration-success="status == 'ok'"
+                  decoration-info="status == 'queued'"
+                  decoration-danger="status == 'error'">
+                <field name="printed_at"/>
+                <field name="printer_id"/>
+                <field name="record_ref"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_iot_label_log" model="ir.actions.act_window">
+        <field name="name">Label Print Log</field>
+        <field name="res_model">southbrook.integrations.iot_label_log</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

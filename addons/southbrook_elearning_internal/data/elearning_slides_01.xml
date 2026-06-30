@@ -1,0 +1,1774 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_01_workcenters_orientation" model="slide.slide">
+            <field name="name">What is a Southbrook Kitchen Workcenter</field>
+            <field name="channel_id" ref="course_workcenter_operators"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Every shop-floor operator on their first day at Southbrook.</field>
+            <field name="html_content"><![CDATA[<h1 id="what-is-a-southbrook-kitchen-workcenter">What is a Southbrook Kitchen Workcenter</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're new to the Southbrook shop floor and you've been told you'll work at
+a station — the edge bander, the CNC, the assembly bench, the sanding line,
+the paint booth. This 15-minute lesson tells you what a "workcenter" is in
+Odoo, how Southbrook customised it for cabinet work, and where your station
+sits in the day's flow. Every other Course 1 lesson assumes you've read this.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your operator account.</p>
+<blockquote>
+<p><strong>Manufacturing → Configuration → Work Centers</strong></p>
+</blockquote>
+<p>That's the master list of every station in the shop. The Southbrook-custom
+fields show up as a "Kitchen" tab on each workcenter form.</p>
+<p>The menu you'll spend most of your day in is the touchscreen-friendly view:</p>
+<blockquote>
+<p><strong>Manufacturing → Operations → Work Orders</strong></p>
+</blockquote>
+<p>Filtered by your station, that's your queue.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Open a workcenter (e.g. <strong>SB-EDGE Edge Bander</strong>) and you'll see two layers:</p>
+<p><strong>The Odoo native fields</strong> — these come stock with Odoo MRP and apply to
+every shop floor on earth:</p>
+<ul>
+<li><strong>Name</strong> + <strong>Code</strong> — human label + short identifier you use in
+  conversation ("I'm on SB-EDGE today").</li>
+<li><strong>Working hours</strong> + <strong>Time efficiency</strong> — when the station is open, and
+  how much of nominal capacity it really delivers.</li>
+<li><strong>Cost per hour</strong> (<code>costs_hour</code>) — the dollar rate the planner uses to
+  cost a job.</li>
+<li><strong>OEE target</strong> (<code>oee_target</code>) — the Overall Equipment Effectiveness
+  number your station is held to. Southbrook standard is 85%.</li>
+</ul>
+<p><strong>The Southbrook kitchen fields</strong> — added by
+<code>southbrook_mrp_kitchen_workcenters</code>, prefixed <code>x_sbk_*</code>:</p>
+<ul>
+<li><strong>Station type</strong> (<code>x_sbk_station_type</code> on <code>mrp.workcenter</code>) — the
+  category your station belongs to, drawn from a fixed list of 14:
+  engineering, cutting, cnc, edge_banding, drilling, sanding, finishing,
+  countertop, assembly, hardware, quality, packing, subcontract, other.
+  This is what the scheduler uses to figure out "this MO needs an
+  edge_banding step — who's available?"</li>
+<li><strong>Bottleneck (Configuration)</strong> (<code>x_sbk_is_bottleneck</code>) — a True/False
+  flag. True means the planner treats your station as the constraint
+  that decides the whole shop's daily throughput. Not the same as "I'm
+  busy right now"; it's a structural decision the engineer made.</li>
+<li><strong>Supported materials</strong> (<code>x_sbk_supported_material_ids</code>) — m2m to
+  <code>southbrook.kitchen.material</code>. The materials your station can handle
+  (e.g. SB-EDGE supports melamine, MDF, particle board; not solid wood).</li>
+<li><strong>Supported finishes</strong> (<code>x_sbk_supported_finish_ids</code>) — same idea for
+  paint/lacquer/waterborne finishes. Important on PAINT.</li>
+<li><strong>Max panel size</strong> (<code>x_sbk_max_panel_length_mm</code> /
+  <code>x_sbk_max_panel_width_mm</code>) — the physical envelope. A 2800mm panel
+  doesn't fit on a 2500mm bed.</li>
+<li><strong>Default setup time</strong> (<code>x_sbk_default_setup_time_min</code>) — the minutes
+  the planner adds to every fresh job on this station for tool prep.</li>
+<li><strong>Changeover time</strong> (<code>x_sbk_changeover_time_min</code>) — the minutes added
+  when consecutive jobs need a tool/colour/material swap.</li>
+<li><strong>Allows parallel jobs</strong> (<code>x_sbk_allows_parallel_jobs</code>) — True if more
+  than one work order can run at once (e.g. CURE has many panels drying
+  simultaneously; SB-EDGE does one at a time).</li>
+<li><strong>OEE target</strong> (<code>x_sbk_oee_target</code>) — Southbrook overrides the native
+  target per station. 0.85 = 85% = world-class threshold.</li>
+</ul>
+<h2 id="the-14-seeded-workcenters">The 14 seeded workcenters</h2>
+<p>Memorise these — they're the shop. Codes are stable; you'll see them on
+every traveler and every cut spec.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Name</th>
+<th>Station type</th>
+<th>Bottleneck</th>
+<th>Parallel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENG01</code></td>
+<td>Design Review / Production Engineering</td>
+<td>engineering</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>SB-SAW</code></td>
+<td>Panel Saw / CNC Nesting</td>
+<td>cutting</td>
+<td><strong>Yes</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>SB-CNC-BORE</code></td>
+<td>CNC Boring</td>
+<td>cnc</td>
+<td><strong>Yes</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>CNC02</code></td>
+<td>CNC Router 02 (Backup)</td>
+<td>cnc</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>DOOR-SHOP</code></td>
+<td>Door Shop</td>
+<td>cnc</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>SB-EDGE</code></td>
+<td>Edge Bander</td>
+<td>edge_banding</td>
+<td><strong>Yes</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>SB-ASSY</code></td>
+<td>Carcass Assembly</td>
+<td>assembly</td>
+<td><strong>Yes</strong></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>SB-DOOR</code></td>
+<td>Door Hanging</td>
+<td>assembly</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>SB-HW</code></td>
+<td>Hardware Fitting</td>
+<td>hardware</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>SAND</code></td>
+<td>Sanding Prep</td>
+<td>sanding</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>PAINT</code></td>
+<td>Paint Booth</td>
+<td>finishing</td>
+<td><strong>Yes</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>CURE</code></td>
+<td>Cure / Dry Room</td>
+<td>finishing</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>SB-QC</code></td>
+<td>Quality Control</td>
+<td>quality</td>
+<td><strong>Yes</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>SB-PACK</code></td>
+<td>Pack &amp; Label</td>
+<td>packing</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p>The six <strong>bottlenecks</strong> are the stations the planner protects: cutting
+(SB-SAW), CNC boring (SB-CNC-BORE), edge banding (SB-EDGE), carcass
+assembly (SB-ASSY), paint (PAINT), and quality (SB-QC). If you work at
+one of those, your idle time becomes a P0 issue on the manager's
+dashboard within a shift.</p>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Day-to-day operation of a specific station — see the role lessons:
+  edge banding (1.2), CNC (1.3), assembly (1.4), finishing (1.5).</li>
+<li>Native Odoo MRP vocabulary (Manufacturing Order, Work Order, BoM,
+  Routing) — covered by Odoo's own training portal.</li>
+<li>Logging downtime — lesson 1.6.</li>
+<li>Reading a cut spec from PLM — lesson 1.7.</li>
+<li>What the planner does with bottleneck flags — Course 2 (Production
+  Planning).</li>
+</ul>
+<h2 id="quiz-3-short-questions">Quiz (3 short questions)</h2>
+<p><strong>1.</strong> You're hired at Southbrook and told you'll be working at "SB-EDGE."
+What station type is that, and is it a bottleneck?</p>
+<blockquote>
+<p>SB-EDGE is the Edge Bander. Its <code>x_sbk_station_type</code> is <code>edge_banding</code>
+and its <code>x_sbk_is_bottleneck</code> is True. Your idle time matters.</p>
+</blockquote>
+<p><strong>2.</strong> Your supervisor says "we need to run the backup CNC today." Which
+code is that, and which primary does it back up?</p>
+<blockquote>
+<p>Code is <code>CNC02</code> (CNC Router 02 — Backup). It backs up <code>SB-CNC-BORE</code>
+(CNC Boring), wired through <code>alternative_workcenter_ids</code> on the
+primary so the scheduler can route to it automatically.</p>
+</blockquote>
+<p><strong>3.</strong> The paint booth (<code>PAINT</code>) is a bottleneck with <code>x_sbk_allows_parallel_jobs</code>
+set to False, but the cure room (<code>CURE</code>) right next to it has the same
+station type (<code>finishing</code>) and <code>x_sbk_allows_parallel_jobs</code> set to True.
+Why the difference?</p>
+<blockquote>
+<p>Physical reality. The booth sprays one job at a time — you can't
+spray two colours in the same chamber. The cure room is a big warm
+room with racks: many panels can dry in parallel, so the planner
+can pile work there without losing throughput.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_01_edge_banding_operator" model="slide.slide">
+            <field name="name">Edge Banding Operator — Your Daily Flow</field>
+            <field name="channel_id" ref="course_workcenter_operators"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Edge Banding Operator (works the HOMAG edge bander at workcenter SB-EDGE).</field>
+            <field name="html_content"><![CDATA[<h1 id="edge-banding-operator-your-daily-flow">Edge Banding Operator — Your Daily Flow</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the operator standing at the <strong>HOMAG Edge Bander</strong> (workcenter code
+<code>SB-EDGE</code>). Your job is to apply edge tape to cabinet panels that come off
+CNC and pass them down the line to assembly. You're a bottleneck — if
+panels pile up at your station, the whole shop slips. This lesson is the
+practical reality of using the Southbrook MRP system from your station.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your operator account,
+then:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenters → Edge Bander (SB-EDGE)</strong></p>
+</blockquote>
+<p>You'll see the workcenter overview. The day's work orders for your machine
+are listed at the bottom under <strong>Work Orders</strong>. That's your queue.</p>
+<p>If you prefer the shop-floor view (large buttons, touchscreen-friendly):</p>
+<blockquote>
+<p><strong>Kitchen Ops → Shop Floor → SB-EDGE</strong></p>
+</blockquote>
+<p>Both views read the same data. The shop-floor view is what you'll use
+day-to-day; the workcenter overview is what your supervisor uses when
+they're standing next to you.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The shop-floor view for SB-EDGE shows:</p>
+<ul>
+<li><strong>Today's queue</strong> — the work orders scheduled to run on the edge bander
+  today, in the order the planner sequenced them. Each row is one
+  operation step from one Manufacturing Order (MO).</li>
+<li><strong>Current operation</strong> — the one you're working on right now, big
+  number, with the panel list expanded.</li>
+<li><strong>Setup time</strong> (<code>x_sbk_default_setup_time_min</code> on <code>mrp.workcenter</code>) —
+  for SB-EDGE this is the changeover time when you switch from one
+  edge tape colour/material to another. Logged on the workorder so
+  planning can predict realistically.</li>
+<li><strong>Material constraints</strong> (<code>x_sbk_supported_material_ids</code>) — your edge
+  bander handles melamine, MDF, and particleboard. If the planner
+  scheduled solid-wood panels here by accident, the cell turns amber
+  and the panel doesn't run.</li>
+<li><strong>Max panel size</strong> (<code>x_sbk_max_panel_length_mm</code> /
+  <code>x_sbk_max_panel_width_mm</code>) — SB-EDGE has limits; oversize panels
+  shouldn't be in your queue and will be flagged.</li>
+<li><strong>Bottleneck flag</strong> (<code>x_sbk_is_bottleneck = True</code> for SB-EDGE) — this
+  is <em>configuration</em>, not <em>current state</em>. It means <strong>planning treats
+  your station as the constraint that decides the day's max throughput</strong>.
+  You'll see this flag honoured in two places: (a) the planner avoids
+  parallel routes through you; (b) the MI report flags an extended idle
+  on your machine as a P0 issue.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (5 min):</strong></p>
+<ul>
+<li>Open <strong>Kitchen Ops → Shop Floor → SB-EDGE</strong>.</li>
+<li>Look at <em>Today's queue</em> — count the work orders. A normal day is 8–14
+  rows. If you see 25+, the planner overloaded you; flag it before you
+  start (see "Common mistakes" below).</li>
+<li>Check the <em>Material</em> column on the first 3 work orders. If two
+  consecutive ones use the <strong>same edge tape colour</strong>, the planner has
+  already sequenced you to avoid changeover; if not, ask your supervisor
+  whether to resequence.</li>
+</ul>
+<p><strong>2. Per work order (the loop):</strong></p>
+<p>For each row in <em>Today's queue</em>:</p>
+<ul>
+<li>Tap the row → opens the <strong>Work Order</strong> detail.</li>
+<li>Verify the panel list matches the kit that's physically at your station.
+  Each panel has a <strong>cut spec</strong> label (printed at CNC) showing the
+  panel ID and which edges need tape. Mismatch → escalate, don't band.</li>
+<li>Tap <strong>Start</strong> — this records the actual start time on
+  <code>mrp.workorder.duration</code> and changes the work order state to
+  <code>progress</code>. Your supervisor's MI dashboard now shows you've engaged the
+  job.</li>
+<li>Apply the tape. The HOMAG handles the actual machining; your job is
+  loading panels, watching the feed, and catching defects.</li>
+<li>When the kit is done, tap <strong>Done</strong>. This records actual end time and
+  the system computes your actual cycle time vs the planned cycle time.
+  If actual is more than 20% over plan, the MI engine will file a
+  <code>slow_workorder</code> recommendation overnight for your supervisor to review.</li>
+<li>If the next work order uses a different tape colour, tap <strong>Changeover</strong>
+  before starting it. This logs <code>x_sbk_changeover_time_min</code> against
+  the operation so the planner's next-day predictions stay honest.</li>
+</ul>
+<p><strong>3. End of shift (5 min):</strong></p>
+<ul>
+<li>Check <em>Today's queue</em> — any rows still open?</li>
+<li><strong>Open and partially done</strong> — tap the row, set the <strong>completed panel
+    count</strong> so the system knows how many panels remain. The next-shift
+    operator picks up from where you stopped.</li>
+<li><strong>Open and not started</strong> — leave it; the planner will roll it to
+    tomorrow.</li>
+<li>If you broke a tape, ran out of consumables, or the machine jammed,
+  log it as <strong>downtime</strong> (see lesson 1.6) before clocking out.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"My queue is showing 25 rows and the day's only 8 hours long."</strong></p>
+<p>The planner ran an unconstrained schedule against you. Tell your
+supervisor. The fix is on the planner side (lesson 2.3): the planner
+re-runs scheduling with the bottleneck flag honoured. Do <strong>not</strong> try to
+work through 25 rows — the MO release queue will pile up downstream
+and the platform will start raising warnings.</p>
+<p><strong>"The work order says HOMAG-supported tape but the cut spec on the
+panel calls for a tape colour I don't have in stock."</strong></p>
+<p>Don't band the wrong colour to keep the line moving. Open the work
+order → click <em>Block</em> (in the kebab menu) and add a one-line reason. The
+system files a <code>materials_blocked</code> recommendation overnight for the
+production manager. The work order stays in your queue but is excluded
+from your daily count.</p>
+<p><strong>"I tapped Start on the wrong row."</strong></p>
+<p>Tap the row again → <em>Undo Start</em>. Available for 5 minutes after the
+start tap. After 5 minutes, you need to mark it Done with <code>notes:
+"misclick — actual not run"</code> and the planner will reschedule. The MI
+engine ignores undone-as-misclick rows so it doesn't pollute your stats.</p>
+<p><strong>"I finished a kit but the cut spec says 6 panels and I only banded 5
+because one was damaged at CNC."</strong></p>
+<p>Tap Done → enter <strong>completed panel count: 5</strong> → enter the <strong>scrap
+reason</strong> for the missing panel. The system raises a <code>scrap_event</code>
+recommendation for the production manager AND a <code>cut_spec_audit</code>
+recommendation for the PLM engineer, so the engineer can decide if
+the cut spec needs a tolerance update.</p>
+<p><strong>"The HOMAG threw an error mid-kit and I'm not sure if I should hit
+Done."</strong></p>
+<p>Don't hit Done — that records the kit as complete. Instead:
+- Tap <em>Pause</em> on the work order.
+- Log <strong>downtime</strong> with the equipment ID <code>HOMAG Edge Bander</code> (see
+  lesson 1.6).
+- When the machine is back up, tap <em>Resume</em> and continue where you
+  stopped. The system stitches the two durations together and the
+  downtime is excluded from your cycle-time stat.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(Optional reading — useful if you want to understand what your taps are
+writing into the database.)</p>
+<p>Every action you take on the shop-floor view writes to one of three
+tables:</p>
+<ul>
+<li><strong><code>mrp.workorder</code></strong> — the row in your queue. <em>Start</em> / <em>Done</em> /
+  <em>Pause</em> / <em>Resume</em> update its <code>state</code> (<code>pending → progress → done</code>)
+  and its <code>date_start</code> / <code>date_finished</code> fields.</li>
+<li><strong><code>mrp.workorder.duration</code></strong> — every Start/Done pair adds a row here
+  with <code>time_start</code>, <code>time_stop</code>, and <code>loss_id</code> if there was a
+  downtime cause. The MI engine reads these to compute OEE and cycle
+  time variance.</li>
+<li><strong><code>southbrook_kitchen_workcenter_downtime</code></strong> (Southbrook-custom) —
+  when you log downtime, a row is added here linking the workcenter,
+  the equipment, the reason category (mechanical / electrical /
+  consumable / scheduled), and the duration. This is what feeds the
+  manager's downtime-by-cause Pareto chart.</li>
+</ul>
+<p>The bottleneck flag (<code>x_sbk_is_bottleneck = True</code> on SB-EDGE) is a
+<strong>configuration</strong> on the workcenter record set at install time
+(<code>southbrook_mrp_kitchen_workcenters/data/mrp_workcenter_seed.xml</code>).
+Nothing you do on the shop floor changes it. It's what makes the
+planner's algorithm decide that your station is the throughput
+constraint of the shop, and what makes the MI engine treat your idle
+minutes as P0.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You start your shift, open <em>Today's queue</em> on SB-EDGE, and see 8
+rows. Rows 1, 2, and 4 all use white melamine tape; row 3 uses black
+melamine. What's the right action?</p>
+<blockquote>
+<p>Suggest to your supervisor that rows 3 and 4 be swapped, so you run
+all three white rows back-to-back and do the black tape change only
+once. Saves one changeover (~15 min). Don't swap them yourself —
+the planner has the authority and the audit trail.</p>
+</blockquote>
+<p><strong>2.</strong> You tap <strong>Start</strong> on a work order, realise 30 seconds later it's
+the wrong row, and look for the Undo button. Where is it?</p>
+<blockquote>
+<p>The same row in your queue — the <em>Start</em> button has flipped to
+<em>Undo Start</em> for the first 5 minutes. After 5 minutes, you must mark
+Done with a <code>misclick</code> note instead and ask the planner to reschedule.</p>
+</blockquote>
+<p><strong>3.</strong> A work order in your queue is for a panel that's 2800mm long.
+SB-EDGE's <code>x_sbk_max_panel_length_mm</code> is 2500mm. What happens, and what
+do you do?</p>
+<blockquote>
+<p>The shop floor view flags the row amber. <strong>Do not start it.</strong> Tell
+your supervisor — the cut spec from PLM probably calls for the long
+panel to be banded in two passes, or the panel needs to be banded on
+the larger HOMAG outside your station. The planner will reroute it.</p>
+</blockquote>
+<p><strong>4.</strong> The HOMAG jams mid-kit. You pause the work order and the
+machine is down for 47 minutes while maintenance fixes a feed roller.
+Which of these do you do?</p>
+<blockquote>
+<p>(a) Resume the work order — that's it. The pause-to-resume gap is
+already captured. But <strong>also</strong> log a downtime entry with cause
+<code>mechanical</code> and equipment <code>HOMAG Edge Bander</code>. Without the
+downtime entry, the 47 minutes lands on YOUR cycle-time stat
+instead of being attributed to a machine fault.</p>
+</blockquote>
+<p><strong>5.</strong> Your supervisor says "the MI dashboard shows your OEE was 64%
+yesterday, target is 78% — what happened?" You look at the work orders
+you ran and they all finished on time. What's most likely wrong?</p>
+<blockquote>
+<p>You likely didn't log changeovers between tape colours, so the
+system thinks every minute between Start and Done on consecutive
+different-colour rows was "running" when in fact you were swapping
+tape rolls. OEE = available time / good output, so unlogged
+changeovers depress it. Lesson: tap <strong>Changeover</strong> between
+different-tape rows, every time.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>General Odoo navigation, work-order vocabulary, and MRP basics →
+  Odoo's own native eLearning track.</li>
+<li>Downtime logging details → lesson 1.6.</li>
+<li>Reading a cut spec from PLM → lesson 1.7.</li>
+<li>What happens to your work orders after Done — pick-and-pass to
+  assembly → lesson 1.4.</li>
+<li>What the planner does with your station's data — lesson 2.3.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_01_cnc_router_operator" model="slide.slide">
+            <field name="name">CNC Router Operator — Your Daily Flow</field>
+            <field name="channel_id" ref="course_workcenter_operators"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">CNC operator working SB-CNC-BORE (primary) and CNC02 (backup).</field>
+            <field name="html_content"><![CDATA[<h1 id="cnc-router-operator-your-daily-flow">CNC Router Operator — Your Daily Flow</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the operator standing at the <strong>CNC Boring</strong> machine (workcenter code
+<code>SB-CNC-BORE</code>, branded as the Biesse Rover) and you're the trained backup on
+<strong>CNC Router 02</strong> (<code>CNC02</code>, the ShopSabre IS510). Your job is to cut and bore
+nested sheets according to the day's cut spec, then hand the cut panels off
+to edge banding. You're a bottleneck — <code>x_sbk_is_bottleneck = True</code> on
+SB-CNC-BORE — so a backed-up queue at your station ripples through the whole
+shop. This lesson is what your day looks like.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your operator account.</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenters → CNC Boring (SB-CNC-BORE)</strong></p>
+</blockquote>
+<p>You'll land on the workcenter overview. The day's work orders for SB-CNC-BORE
+are at the bottom under <strong>Work Orders</strong>. That's your queue. When the primary
+is down or in changeover and you've moved to the backup:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenters → CNC Router 02 (CNC02)</strong></p>
+</blockquote>
+<p>Both stations share the same shop-floor view shape; what changes is the
+machine, not the screen.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The shop-floor view for SB-CNC-BORE shows:</p>
+<ul>
+<li><strong>Today's queue</strong> — work orders scheduled to run on the CNC today, in
+  the order the planner sequenced them. Each row is one operation step
+  from one Manufacturing Order (MO).</li>
+<li><strong>Current operation</strong> — the one you're working on right now, big
+  number, with the panel list expanded.</li>
+<li><strong>Tool readiness</strong> (<code>southbrook_tool_readiness_state</code> on
+  <code>mrp.workorder</code>) — <code>not_checked</code> / <code>ready</code> / <code>warning</code> / <code>blocked</code>.
+  Coloured badge. If the badge is red (<code>blocked</code>), the system has
+  refused to let you tap Start until the missing bit is checked out
+  of the tool crib. The detail box names what's missing.</li>
+<li><strong>Setup time</strong> (<code>x_sbk_default_setup_time_min</code> on <code>mrp.workcenter</code>) —
+  the changeover the planner allowed you between sheets. On SB-CNC-BORE
+  this is the tool-change time when the next sheet calls for a
+  different bit.</li>
+<li><strong>Material constraints</strong> (<code>x_sbk_supported_material_ids</code>) — your CNC
+  handles the sheet stock listed here. If the planner scheduled a
+  material your machine isn't set up for, the cell turns amber.</li>
+<li><strong>Max panel size</strong> (<code>x_sbk_max_panel_length_mm</code> /
+  <code>x_sbk_max_panel_width_mm</code>) — the physical envelope of your bed.
+  Oversized sheets shouldn't reach your queue.</li>
+<li><strong>Bottleneck flag</strong> (<code>x_sbk_is_bottleneck = True</code> on SB-CNC-BORE) —
+  configuration, not state. Means the planner protects your station
+  from overload and the MI engine treats extended idle here as a P0
+  issue.</li>
+<li><strong>Alternative work centers</strong> (<code>alternative_workcenter_ids</code>) — wired so
+  the scheduler can move a job to <code>CNC02</code> when SB-CNC-BORE is in
+  changeover or down. You'll see this populated on the form.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (10 min):</strong></p>
+<ul>
+<li>Open <strong>Kitchen Ops → Workcenters → CNC Boring (SB-CNC-BORE)</strong>.</li>
+<li>Glance at <em>Today's queue</em> — count the work orders. A normal day is
+  6–10 nested sheets. If you see 15+, flag the planner before you
+  start (see "Common mistakes").</li>
+<li>Tap each of the first 3 work orders and check <strong>Tool Readiness</strong>.
+  Anything red means the bit isn't in the crib (or it's in
+  <code>needs_sharpening</code>). Walk to the tool crib and check out what you
+  need before you fire up the spindle, not after.</li>
+<li>Read the <strong>cut spec ID</strong> on the first sheet (the printed traveler
+  matches a row in <code>southbrook.cut.spec</code>; lesson 1.7 covers reading
+  it). Confirm the box thickness, rabbet depth, and drill pattern
+  match the bit you've loaded.</li>
+</ul>
+<p><strong>2. Per sheet (the loop):</strong></p>
+<p>For each row in <em>Today's queue</em>:</p>
+<ul>
+<li>Tap the row → opens the <strong>Work Order</strong> detail.</li>
+<li>Verify the nest layout printed on the traveler matches the sheet
+  loaded on the bed. The panel IDs on the traveler are what the
+  banding op downstream will scan; if you mis-nest, banding can't
+  find the right panel.</li>
+<li>Tap <strong>Start</strong> — this records the actual start time on the work
+  order, changes <code>state</code> from <code>pending</code> to <code>progress</code>, and signals
+  the MI dashboard that you've engaged.</li>
+<li>Run the program. The CNC handles the toolpath; your job is
+  loading the sheet, monitoring the cut, vacuuming chips, and
+  catching tear-out on the edges.</li>
+<li>When the sheet is finished, tap <strong>Done</strong>. Move the cut panels to
+  the rolling cart bound for edge banding. The downstream operator
+  at SB-EDGE scans the panel IDs and the system links your output
+  to their input.</li>
+<li>If the next sheet calls for a different bit, tap <strong>Changeover</strong>
+  before starting. This logs <code>x_sbk_changeover_time_min</code> against
+  the operation so tomorrow's planning math accounts for the swap.</li>
+</ul>
+<p><strong>3. Backup machine handoff (when called):</strong></p>
+<p>If the supervisor tells you to move work to CNC02:</p>
+<ul>
+<li>The planner re-routes a queued WO from SB-CNC-BORE to CNC02 in
+  the backend (<code>alternative_workcenter_ids</code> makes this a one-click
+  move).</li>
+<li>The WO now appears in CNC02's queue. Walk to CNC02, repeat the
+  Per-sheet loop. Same screen, different station.</li>
+</ul>
+<p><strong>4. End of shift (5 min):</strong></p>
+<ul>
+<li>Check <em>Today's queue</em> — any rows still open?</li>
+<li><strong>Open and partially done</strong> — tap the row, set <strong>completed sheet
+    count</strong> so the next-shift operator picks up cleanly.</li>
+<li><strong>Open and not started</strong> — leave it; the planner will roll it
+    to tomorrow.</li>
+<li>If you broke a bit, ran out of vacuum, or the spindle threw a
+  fault, log it as <strong>downtime</strong> (lesson 1.6) with the right equipment
+  link before clocking out.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"My queue is showing 15 sheets and the day's only 8 hours long."</strong></p>
+<p>The planner ran the schedule without honouring <code>x_sbk_is_bottleneck</code>.
+Tell the planner. The fix is on the planner side (lesson 2.3); do not
+try to grind through 15 sheets — the downstream MO release queue piles
+up and the platform raises warnings overnight.</p>
+<p><strong>"I tapped Start, then noticed the bit in the machine doesn't match
+the cut spec."</strong></p>
+<p>Tap <em>Pause</em> on the work order immediately. Don't cut with the wrong
+bit — you'll scrap the sheet. Change the bit, then tap <em>Resume</em> and
+continue. The pause-to-resume gap is captured in
+<code>mrp.workorder.duration</code> and the MI engine sees it as a setup event,
+not a slow cycle.</p>
+<p><strong>"Tool readiness is blocked because the CNC bit I need is showing
+<code>needs_sharpening</code>."</strong></p>
+<p>Don't start. The kitchen_tools cron flipped that asset to
+<code>needs_sharpening</code> overnight because its life ran out. Check out a
+backup bit from the same <code>tool_category</code> (the readiness check accepts
+any descendant of the requirement's category). If no backup exists in
+the crib, tell the supervisor and log downtime with reason
+<code>material_not_available</code> until a sharpened bit is back.</p>
+<p><strong>"I finished a sheet but two panels had blow-out and I scrapped them."</strong></p>
+<p>Tap Done → enter <strong>completed panel count</strong> minus the 2 scrapped ones →
+enter a scrap reason. The system raises a <code>scrap_event</code> recommendation
+for the production manager AND a <code>cut_spec_audit</code> recommendation for
+the PLM engineer. If the same panel ID blows out repeatedly, the
+engineer revises the cut spec (different feed/speed, different bit)
+through an ECO — see lesson 1.7.</p>
+<p><strong>"The CNC threw a spindle fault mid-sheet."</strong></p>
+<p>Don't tap Done — that records the sheet as cut. Instead:
+- Tap <em>Pause</em> on the work order.
+- Log <strong>downtime</strong> (lesson 1.6) with equipment ID <code>Biesse Rover K FT</code>
+  for SB-CNC-BORE or <code>ShopSabre IS510</code> for CNC02. Reason
+  <code>machine_breakdown</code>.
+- When the machine is back up, tap <em>Resume</em> and continue from the
+  paused toolpath if the controller supports it; otherwise mark the
+  partial sheet as scrap and re-nest.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(Optional reading — the database trail of your taps.)</p>
+<p>Every action you take writes to one of these tables:</p>
+<ul>
+<li><strong><code>mrp.workorder</code></strong> — the row in your queue. <em>Start</em> / <em>Done</em> /
+  <em>Pause</em> / <em>Resume</em> update its <code>state</code> and its <code>date_start</code> /
+  <code>date_finished</code> fields.</li>
+<li><strong><code>mrp.workorder.duration</code></strong> — every Start/Done pair adds a row
+  here with <code>time_start</code>, <code>time_stop</code>, and <code>loss_id</code> if there was
+  a downtime cause.</li>
+<li><strong><code>southbrook.workorder.tool.consumption</code></strong> — when a CNC bit's
+  life ticks down, a row here records the consumption against the
+  asset, decrements <code>remaining_life_qty</code>, and bumps
+  <code>total_usage_qty</code>. The daily <code>_cron_maintenance_sweep</code> reads this
+  to know when to flip the asset to <code>needs_sharpening</code>.</li>
+<li><strong><code>southbrook.kitchen.workcenter.downtime</code></strong> — downtime entries
+  you log, linked to the workcenter, equipment, reason, and
+  duration.</li>
+</ul>
+<p>The <code>alternative_workcenter_ids</code> wiring between SB-CNC-BORE and CNC02
+is set in <code>southbrook_mrp_kitchen_workcenters/data/mrp_workcenter_seed.xml</code>
+and is what lets the planner re-route in one click instead of
+reconfiguring the routing.</p>
+<p>The cut spec your traveler references lives in the single active row
+of <code>southbrook.cut.spec</code> — see lesson 1.7. The numbers driving your
+toolpath (box thickness, rabbet depth, drill pattern reference) are
+read from that record by the BoM generator at the moment the MO was
+created. If those numbers change, an engineer raised an ECO of
+<code>target_kind = 'cut_spec'</code>; the chatter on the cut-spec record names
+who approved it and when.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open <em>Today's queue</em> and the first WO shows Tool Readiness
+in red with the message "Need: 1 × 8mm Compression Spiral Bit
+(category: CNC bits) — found 0 available in crib." What do you do?</p>
+<blockquote>
+<p>Don't tap Start — the readiness gate will refuse anyway. Walk to
+the tool crib. The named bit may be there but marked
+<code>needs_sharpening</code> (still passes <code>is_available</code> but readiness
+rejects it). Either pull a sharpened backup from the same category
+or, if none exists, escalate to the supervisor and log downtime
+with reason <code>material_not_available</code> until a bit is back in stock.</p>
+</blockquote>
+<p><strong>2.</strong> A WO is in your queue with a 2750mm sheet. SB-CNC-BORE's
+<code>x_sbk_max_panel_length_mm</code> is 2500mm. What's the right action?</p>
+<blockquote>
+<p>Don't load it. The shop-floor view flags the row amber. Tell the
+planner — the cut spec from PLM probably calls for the sheet to be
+reduced at SB-SAW first, or the job needs to go to a station with
+a longer bed. The planner reroutes it.</p>
+</blockquote>
+<p><strong>3.</strong> You're halfway through the day on SB-CNC-BORE and the
+supervisor says "switch to CNC02 — the Biesse is in scheduled
+maintenance." What happens to your in-progress WO and your queue?</p>
+<blockquote>
+<p>The planner uses <code>alternative_workcenter_ids</code> to move queued
+(not-started) WOs from SB-CNC-BORE to CNC02. Your in-progress WO
+stays where it is — finish it first on the Biesse, then walk over
+to CNC02 for the next one. Don't try to migrate a started WO
+across machines; mark it Done first or Pause and resume after
+the swap.</p>
+</blockquote>
+<p><strong>4.</strong> A spindle fault stops the machine for 35 minutes. You pause
+the WO, maintenance fixes it, and you resume. The next morning your
+supervisor says your cycle time on that WO was 35 minutes over plan.
+What happened?</p>
+<blockquote>
+<p>You forgot to log downtime. The pause-to-resume gap is captured
+on <code>mrp.workorder.duration</code>, but without a matching
+<code>southbrook.kitchen.workcenter.downtime</code> row linking the fault to
+the <code>Biesse Rover K FT</code> equipment, the MI engine attributes the
+35 minutes to your operator cycle time instead of to a machine
+fault. Fix: log it now (lesson 1.6) — the report re-aggregates.</p>
+</blockquote>
+<p><strong>5.</strong> A nested sheet finishes and the panel IDs printed on the
+traveler don't match the panel-list scan at SB-EDGE. The edge bander
+operator is asking what happened. What's the most likely cause and
+where do you look?</p>
+<blockquote>
+<p>You probably loaded the wrong sheet onto the bed (wrong material
+or wrong nest revision). The traveler IDs are generated from the
+cut spec at MO creation; if you ran the right toolpath against a
+different physical sheet, the panel labels off the CNC don't
+match. Look at the sheet barcode against the traveler; if they
+mismatch, the cut sheet is scrap and the MO needs to re-cut.
+Escalate scrap reason + cost via the Done flow as above.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Native Odoo work-order vocabulary and MRP basics — Odoo's own
+  e-learning portal.</li>
+<li>Edge banding (the next stop after CNC) — lesson 1.2.</li>
+<li>Assembly (after banding) — lesson 1.4.</li>
+<li>Downtime logging in detail — lesson 1.6.</li>
+<li>Reading a PLM cut spec — lesson 1.7.</li>
+<li>What the planner does with the bottleneck flag — lesson 2.3.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_01_assembler" model="slide.slide">
+            <field name="name">Assembler — Your Daily Flow</field>
+            <field name="channel_id" ref="course_workcenter_operators"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Cabinet assembler working SB-ASSY (carcass) and SB-DOOR (door hanging).</field>
+            <field name="html_content"><![CDATA[<h1 id="assembler-your-daily-flow">Assembler — Your Daily Flow</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the assembler at <strong>Carcass Assembly</strong> (workcenter code <code>SB-ASSY</code>) and
+you may also rotate through <strong>Door Hanging</strong> (<code>SB-DOOR</code>). Your job is to
+take banded panels off the cart from SB-EDGE, square them up with the
+hardware kit pulled by SB-HW, glue and screw the carcass together, and pass
+the finished box to sanding. SB-ASSY is a bottleneck — but it's also one of
+the few stations where <code>x_sbk_allows_parallel_jobs = True</code>, so two assemblers
+can work the same MO at once. This lesson is how that works in practice.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your operator account.</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenters → Carcass Assembly (SB-ASSY)</strong></p>
+</blockquote>
+<p>You'll see the workcenter overview. Your queue is the <strong>Work Orders</strong> list
+at the bottom. If you're rotating to door hanging:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenters → Door Hanging (SB-DOOR)</strong></p>
+</blockquote>
+<p>Same screen shape, different station, different parallel rules.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The shop-floor view for SB-ASSY shows:</p>
+<ul>
+<li><strong>Today's queue</strong> — work orders scheduled to assemble today. Each row
+  is one operation step on one MO; one MO can have its assembly step
+  split across two operators because <code>x_sbk_allows_parallel_jobs</code> is
+  True at SB-ASSY.</li>
+<li><strong>Current operation</strong> — the carcass you're building right now.</li>
+<li><strong>Setup time</strong> (<code>x_sbk_default_setup_time_min</code> on <code>mrp.workcenter</code>) —
+  the minutes the planner reserved for jig setup at the start of a fresh
+  MO. Carcass jig changes between a base cabinet and a tall pantry are
+  the dominant case.</li>
+<li><strong>Material constraints</strong> (<code>x_sbk_supported_material_ids</code>) — your
+  assembly bench can handle any carcass material the shop builds. This
+  rarely flags amber here; it does flag if someone tries to schedule
+  a solid-surface countertop assembly at SB-ASSY (wrong station type
+  — should be <code>countertop</code>).</li>
+<li><strong>Parallel jobs</strong> (<code>x_sbk_allows_parallel_jobs = True</code>) — confirms
+  you can be on the same MO as a partner. The system tracks each
+  assembler's contribution to the work order duration separately.</li>
+<li><strong>Required skills</strong> (<code>x_sbk_required_skill_ids</code> on <code>mrp.workcenter</code>)
+  — reuses Odoo's <code>hr.skill</code>. If a complex carcass (corner unit,
+  appliance garage) calls for a specific skill, the planner only
+  routes it to assemblers whose <code>hr.employee.employee_skill_ids</code>
+  cover it.</li>
+<li><strong>Bottleneck flag</strong> (<code>x_sbk_is_bottleneck = True</code>) — yes, you're a
+  bottleneck. Idle time at SB-ASSY shows up on the manager's MI
+  dashboard quickly.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (5 min):</strong></p>
+<ul>
+<li>Open <strong>Kitchen Ops → Workcenters → Carcass Assembly (SB-ASSY)</strong>.</li>
+<li>Glance at <em>Today's queue</em> — count the MOs. A normal day is 5–8
+  carcasses per assembler, double that for the bay when both
+  benches are running.</li>
+<li>Check the <strong>hardware-kit ready</strong> flag on the first 2 work orders.
+  The SB-HW operator marks the kit ready when it's on the cart; if
+  it's not, you can't start the carcass. If the flag is amber, walk
+  to SB-HW and check the cart — the kit may be physically there but
+  the operator forgot to tap Done.</li>
+<li>Read the <strong>cabinet code</strong> + <strong>kitchen project</strong> on the first MO
+  (lesson 1.7 explains the cut spec the engineer authored). A base
+  1-door is a 15-minute job; a tall pantry with internal drawers
+  is closer to 45.</li>
+</ul>
+<p><strong>2. Per carcass (the loop):</strong></p>
+<p>For each row in <em>Today's queue</em>:</p>
+<ul>
+<li>Tap the row → opens the <strong>Work Order</strong> detail. The panel list shows
+  every banded panel that should be at your bench; tick each one off
+  against the physical cart.</li>
+<li>If a partner assembler will work the same MO, both of you tap
+  <strong>Start</strong>. The work order goes to <code>progress</code>. The system records
+  two <code>mrp.workorder.duration</code> rows, one per <code>user_id</code>.</li>
+<li>Square the panels on the assembly jig. Apply glue at the dowel +
+  cam-lock joints — the cut spec calls out which joints are
+  glued and which are screw-only.</li>
+<li>Drive dowels / cam locks per the assembly drawing. Hand-screw the
+  back panel (the rabbet depth comes from the cut spec — see lesson
+  1.7).</li>
+<li>Check squareness with the diagonal-measure tape. If the carcass is
+  out of square by more than the <code>shelf_tol</code> value in the cut spec,
+  loosen and re-square; do <strong>not</strong> sand-fit it square later.</li>
+<li>Tap <strong>Done</strong>. The system records actual cycle time. If you and your
+  partner are both on the WO, you both tap Done; the system stitches
+  your durations together.</li>
+<li>Push the carcass to the SAND cart. Sanding (lesson 1.5) picks it
+  up next.</li>
+</ul>
+<p><strong>3. Door hanging (SB-DOOR rotation):</strong></p>
+<p>When you rotate to SB-DOOR:</p>
+<ul>
+<li>The screen looks the same but station type is <code>assembly</code> and
+  <code>x_sbk_is_bottleneck = False</code> — relief. Idle minutes here aren't
+  P0.</li>
+<li>The planner's <code>x_sbk_planning_notes</code> on SB-DOOR explain why:
+  door hanging is split from the carcass bay so the door / paint
+  branch can converge here without blocking carcass throughput.</li>
+<li>Doors arrive from PAINT + CURE (lesson 1.5) on a separate cart.
+  Match them to the carcass by <code>cabinet_code</code> on the MO.</li>
+</ul>
+<p><strong>4. End of shift (5 min):</strong></p>
+<ul>
+<li>Check <em>Today's queue</em> — any WOs still open?</li>
+<li><strong>Open and partially done</strong> — tap the row, set the <strong>completed
+    carcass count</strong> so the next-shift assembler picks up where you
+    stopped.</li>
+<li><strong>Open and not started</strong> — leave it; the planner rolls it
+    forward.</li>
+<li>If a panel was damaged at CNC + you scrapped a carcass, log it as
+  a scrap event on the Done flow.</li>
+<li>If the carcass jig broke, log it as <strong>downtime</strong> (lesson 1.6) with
+  reason <code>tool_change</code> or <code>machine_breakdown</code> before clocking out.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"My partner and I both tapped Start, but the system is showing the WO
+as <code>progress</code> only under my name."</strong></p>
+<p>You're fine. The work order's <code>state</code> is a single field — <code>progress</code> —
+and only flips once when the first Start lands. What's different is
+the <code>mrp.workorder.duration</code> table: there should be two rows now, one
+per <code>user_id</code>. Check the <em>Time Tracking</em> tab on the WO; if you only
+see your row, your partner's tap didn't register. Have them tap Start
+again — duplicate start taps within the same minute are deduped.</p>
+<p><strong>"The hardware kit is at my bench but parts are missing — there's no
+hinge package for one of the doors."</strong></p>
+<p>Don't start. Walk to SB-HW. The operator marked the kit ready in the
+system but didn't verify the count physically. Either the missing part
+is back at the crib, or it never got picked. The SB-HW operator can
+re-open the kit, mark it incomplete, and have the maintenance
+technician escalate. Meanwhile your WO stays in <em>pending</em> and the
+next MO in your queue is fine to start.</p>
+<p><strong>"I assembled the carcass and it's 4mm out of square."</strong></p>
+<p>Stop. The cut spec's <code>shelf_tol</code> is 1.5mm — 4mm is far beyond it.
+Disassemble enough to reseat the back panel; the rabbet capture is
+usually what's binding. If the cut spec is wrong (the panels physically
+don't square up no matter how you seat them), tap <em>Block</em> on the WO and
+the system raises a <code>cut_spec_audit</code> recommendation for the PLM engineer.
+The engineer reviews and may raise an ECO against <code>southbrook.cut.spec</code>.</p>
+<p><strong>"I tapped Done on the wrong row."</strong></p>
+<p>Open the work order, tap <em>Undo Done</em> — available for 10 minutes.
+After that, the work order is in <code>done</code> state and you have to
+manually set the WO back to <code>progress</code> (supervisor-only). The MI
+engine treats a Done-then-Undone WO as misclick and excludes it
+from cycle-time stats so your numbers stay clean.</p>
+<p><strong>"The kitchen_project_id on my MO has been flipped from
+<code>in_production</code> back to <code>approved</code> — the WO disappeared from my queue
+mid-shift."</strong></p>
+<p>That means ENG01 (Design Review) revoked the production release on
+your kitchen project, probably because the engineer caught a problem
+with the cut spec. The MO is paused upstream; your WO is automatically
+removed from your queue. Don't try to keep building — flag it to your
+supervisor and move to the next MO. The project will reappear in your
+queue when ENG01 re-releases.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(Optional reading — the database trail of your taps.)</p>
+<p>When you tap Start on a parallel-assembled WO, here's what happens:</p>
+<ul>
+<li><strong><code>mrp.workorder</code></strong> — <code>state</code> flips from <code>pending</code> to <code>progress</code>
+  on the first Start tap. Subsequent Start taps from other users
+  are recorded but don't re-flip the state.</li>
+<li><strong><code>mrp.workorder.duration</code></strong> — one row per operator session.
+  <code>user_id</code> is you, <code>time_start</code> is now, <code>time_stop</code> is null until
+  Done. With parallel assembly, two rows track in parallel.</li>
+<li><strong><code>mrp.production</code></strong> — the parent MO. Its
+  <code>x_sbk_kitchen_project_id</code> (from <code>southbrook_kitchen_workspace</code>'s
+  <code>sb.kitchen.project</code> model) tells the MI engine which kitchen
+  this carcass belongs to. The <code>cabinet_code</code> + <code>kitchen_room</code> on
+  the production record drive the traveler labels.</li>
+</ul>
+<p>The <code>x_sbk_allows_parallel_jobs = True</code> setting on SB-ASSY is what
+makes the planner schedule a single MO across two assemblers
+instead of treating SB-ASSY as a queue of length 1. The setting
+is configuration, applied at install in
+<code>southbrook_mrp_kitchen_workcenters/data/mrp_workcenter_seed.xml</code>.</p>
+<p>The downstream handoff: when you tap Done at SB-ASSY, the next
+operation in the routing (sanding at SAND) becomes eligible. The
+sander's queue refreshes within a minute. Your output is their
+input; there's no separate "release" step.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A complex corner cabinet shows up in your queue. The
+<code>x_sbk_required_skill_ids</code> on SB-ASSY includes "Corner Carcass
+Assembly" but the field is empty on your <code>hr.employee</code> record. What
+happens, and what should you do?</p>
+<blockquote>
+<p>The scheduler is permissive — it routed the MO to SB-ASSY even
+though you don't carry the skill, because the matching is hr-side,
+not work-order-side, in v19 CE. You should not start the WO —
+escalate to your supervisor. The supervisor can either ask the
+trained assembler to take the row, or have HR add the skill to
+your <code>employee_skill_ids</code> after a quick certification.</p>
+</blockquote>
+<p><strong>2.</strong> You and a partner are running parallel on the same MO. Your
+partner gets pulled to SB-DOOR mid-carcass. What do you tap, and
+what happens to their duration row?</p>
+<blockquote>
+<p>Your partner should tap <em>Done</em> on their session before walking
+away — that closes their <code>mrp.workorder.duration</code> row with a
+<code>time_stop</code> now, and their contribution to the WO is captured.
+You keep going solo; your row stays open until you finish. If
+they forget, their row hangs open and the MI engine flags an
+unclosed duration as a data-quality issue on tomorrow's report.</p>
+</blockquote>
+<p><strong>3.</strong> The hardware kit for an MO arrives at your bench but the kit
+flag is still amber (not ready) on your screen. You can see the
+parts physically. What's the right move?</p>
+<blockquote>
+<p>Don't start — the readiness gate isn't just decoration. Walk to
+SB-HW and ask the hardware operator to mark the kit Done. They
+tap Done on their WO and your screen refreshes within a minute.
+If you start anyway, the MO's hardware step shows as still in
+progress while you're working downstream, which corrupts the
+MO's flow time on the MI report.</p>
+</blockquote>
+<p><strong>4.</strong> You finish a carcass at 14:32, push it to sanding, and at
+14:45 the sander says it's 2mm out of square along the diagonal.
+You tapped Done at 14:32. What do you do?</p>
+<blockquote>
+<p>Tap <em>Undo Done</em> on the WO — it's been less than 10 minutes since
+Done. The WO flips back to <code>progress</code>. Pull the carcass back from
+the SAND cart, fix the squareness, then tap Done again. The MI
+engine accepts the Done-Undo-Done cycle as a quality recovery and
+doesn't penalise your cycle-time stat. If you were past the
+10-minute window, you'd need supervisor help to flip the state
+back.</p>
+</blockquote>
+<p><strong>5.</strong> Your supervisor says SB-ASSY ran at 91% OEE yesterday — above
+the 0.85 target. You feel like you were idle a lot. What's the most
+likely explanation?</p>
+<blockquote>
+<p>Two things compound to inflate OEE: (a) parallel-jobs counted as
+two assemblers busy on one WO doubles the "available time
+productive" number; (b) you and your partner closed your duration
+rows promptly. OEE = available time / good output, so when you
+close cleanly with no unlogged idle gaps, the math rewards you.
+Idle for a coffee + bathroom break that takes &lt;5 minutes doesn't
+register; longer idle does. So the supervisor's number is real.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Native Odoo work-order vocabulary and MRP basics — Odoo's own
+  training portal.</li>
+<li>Edge banding (your upstream) — lesson 1.2.</li>
+<li>CNC routing (your upstream's upstream) — lesson 1.3.</li>
+<li>Sanding + finishing (your downstream) — lesson 1.5.</li>
+<li>Downtime logging in detail — lesson 1.6.</li>
+<li>Reading a PLM cut spec for assembly fields (rabbet, dowel spacing,
+  joinery) — lesson 1.7.</li>
+<li>The kitchen project release gate that ENG01 runs — Course 2,
+  lesson 2.2.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_01_finisher" model="slide.slide">
+            <field name="name">Sander / Finisher — Your Daily Flow</field>
+            <field name="channel_id" ref="course_workcenter_operators"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Sander or finisher rotating between SAND, PAINT, and CURE.</field>
+            <field name="html_content"><![CDATA[<h1 id="sander-finisher-your-daily-flow">Sander / Finisher — Your Daily Flow</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the sander or finisher rotating between three stations: <strong>Sanding
+Prep</strong> (<code>SAND</code>), <strong>Paint Booth</strong> (<code>PAINT</code>), and <strong>Cure / Dry Room</strong> (<code>CURE</code>).
+You're at the back end of the carcass + door pipeline — assembly hands you
+a raw carcass, you sand it, finish it, dry it, and pass it to door hanging
+(SB-DOOR) or QC (SB-QC). PAINT is a bottleneck; the colour-changeover
+constraint shapes the planner's whole day. SAND and CURE allow parallel
+jobs and are designed to absorb flow. This lesson is the practical reality
+of moving panels through that three-station chain.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your operator account.
+You'll switch between three menu paths depending on where you're standing:</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenters → Sanding Prep (SAND)</strong>
+<strong>Kitchen Ops → Workcenters → Paint Booth (PAINT)</strong>
+<strong>Kitchen Ops → Workcenters → Cure / Dry Room (CURE)</strong></p>
+</blockquote>
+<p>The three stations share screen shape but have very different field
+defaults — SAND and CURE allow parallel jobs, PAINT does not; PAINT's
+<code>x_sbk_supported_finish_ids</code> is the strictest list in the shop.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The shop-floor view shows (with station-specific notes):</p>
+<ul>
+<li><strong>Today's queue</strong> — the WOs scheduled at this station today. At PAINT
+  the planner groups by colour to minimise changeover; at CURE you'll
+  see many WOs in parallel.</li>
+<li><strong>Setup time</strong> (<code>x_sbk_default_setup_time_min</code> on <code>mrp.workcenter</code>) —
+  at SAND, this is grit-paper change. At PAINT, this is the spray-gun
+  flush + cup change between colour batches. At CURE, this is
+  essentially zero (panels just go on racks).</li>
+<li><strong>Changeover time</strong> (<code>x_sbk_changeover_time_min</code>) — this is the big
+  one at PAINT. A colour swap from white to dark walnut is 30+
+  minutes of gun cleaning. The planner's <code>x_sbk_planning_notes</code> on
+  PAINT spell it out: "Paint colour changeover is the dominant
+  scheduling constraint — group like-colours into runs whenever
+  possible."</li>
+<li><strong>Supported finishes</strong> (<code>x_sbk_supported_finish_ids</code> on
+  <code>mrp.workcenter</code>) — m2m to <code>southbrook.kitchen.finish</code>. <strong>PAINT
+  only handles the finishes seeded here.</strong> If your shop hasn't seeded
+  solvent finishes against PAINT, the planner won't route solvent
+  jobs to PAINT — they'd go to a subcontractor (station type
+  <code>subcontract</code>) instead.</li>
+<li><strong>Allows parallel jobs</strong> (<code>x_sbk_allows_parallel_jobs</code>):</li>
+<li>SAND: True — multiple sanders work side by side.</li>
+<li>PAINT: False — one spray job at a time.</li>
+<li>CURE: True — many panels drying on racks at once. The cure
+    room's <code>x_sbk_planning_notes</code> notes that
+    <code>finish.cure_time_buffer_min</code> drives how long each part stays
+    here.</li>
+<li><strong>Bottleneck flag</strong> (<code>x_sbk_is_bottleneck</code>):</li>
+<li>SAND: False.</li>
+<li>PAINT: True.</li>
+<li>CURE: False.</li>
+<li><strong>Quality notes</strong> (<code>x_sbk_quality_notes</code> on <code>mrp.workcenter</code>) —
+  station-specific defect modes wired into the M3 <code>mi.check</code> flow.
+  At SAND it lists swirl marks, missed corners, grit-skip. At PAINT
+  it lists orange peel, runs, fish-eye.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (10 min):</strong></p>
+<ul>
+<li>Open <strong>Kitchen Ops → Workcenters → SAND</strong> (or wherever your day
+  starts).</li>
+<li>Check the <strong>queue length</strong> at all three stations. SAND with 12
+  carcasses and PAINT with 4 batches is normal. PAINT with 12
+  batches across 6 colours is a colour-grouping problem; flag the
+  planner.</li>
+<li>At PAINT specifically: open the first 2 WOs and check the
+  <strong>finish</strong> field. If two consecutive WOs are different colours and
+  could be reordered to land same-colour back-to-back, suggest it to
+  the supervisor before you mix the first cup.</li>
+</ul>
+<p><strong>2. SAND — per carcass (the loop):</strong></p>
+<p>For each row in <em>Today's queue</em>:</p>
+<ul>
+<li>Tap the row → opens the <strong>Work Order</strong> detail. The panel list
+  shows what's on your cart.</li>
+<li>Verify the carcass has the assembly Done stamp (from SB-ASSY,
+  lesson 1.4). If not, escalate — don't sand an in-progress
+  carcass.</li>
+<li>Tap <strong>Start</strong>.</li>
+<li>Run the grit sequence the operation template specifies (typically
+  120 → 180 → 220 for stain-grade, 120 → 180 for paint-grade). The
+  operation template's <code>complexity_factor</code> drives how much time the
+  planner allowed.</li>
+<li>Tap <strong>Done</strong> when the carcass is at the target grit and visually
+  clean.</li>
+<li>Push the carcass to the PAINT staging area, grouped by colour
+  (look at the next WO's finish field).</li>
+</ul>
+<p><strong>3. PAINT — per batch (the loop):</strong></p>
+<p>For each row in <em>Today's queue</em>:</p>
+<ul>
+<li>Confirm the <strong>finish</strong> field matches the colour currently loaded
+  in the gun. If it doesn't, tap <strong>Changeover</strong> before Start. The
+  changeover logs <code>x_sbk_changeover_time_min</code> and the planner's
+  next-day prediction stays honest.</li>
+<li>Tap <strong>Start</strong>.</li>
+<li>Spray the carcass per the finish's spec (number of coats, flash
+  time between coats).</li>
+<li>When the batch is done, tap <strong>Done</strong> and move the rack to CURE.</li>
+<li>If a defect (run, orange peel, fish-eye) shows up, the QC flow
+  (lesson 1.4-adjacent — the <code>southbrook.mi.check</code> model) lets
+  you record <code>result = rework</code> and the WO loops back. You don't
+  tap Done on a defect batch; you tap Block + raise the check.</li>
+</ul>
+<p><strong>4. CURE — manage the racks:</strong></p>
+<p>CURE is different — you're not running an operation, you're
+managing time. Each WO at CURE has a cure-time clock that started
+when PAINT marked it Done.</p>
+<ul>
+<li>The CURE shop-floor view shows each rack with a countdown to
+  cure-time expiry (<code>finish.cure_time_buffer_min</code> drives the
+  countdown).</li>
+<li>When a rack's clock hits zero, the WO at CURE is eligible to be
+  marked Done. Push that rack out, mark the WO Done, and load the
+  next wet rack into the vacated slot.</li>
+<li>Parallel jobs at CURE means many WOs are in <code>progress</code> at the
+  same time. Don't confuse "this rack is dry" with "this WO is
+  next in queue."</li>
+</ul>
+<p><strong>5. End of shift (5 min):</strong></p>
+<ul>
+<li>Walk SAND → PAINT → CURE one more time. Anything still in
+  <code>progress</code>?</li>
+<li>For CURE specifically: panels still wet after your shift will
+  finish curing on the night shift — leave the WOs in <code>progress</code>
+  and the next-shift finisher will mark them Done.</li>
+<li>Log downtime (lesson 1.6) for any booth fault, gun clog, or
+  compressor failure before clocking out.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"PAINT's queue has 6 colours and 12 batches — the planner gave me a
+nightmare."</strong></p>
+<p>Tell your supervisor. The fix is on the planner side (Course 2,
+lesson 2.3): the planner groups by colour. PAINT's
+<code>x_sbk_planning_notes</code> literally says to do this. If the planner
+forgot the bottleneck flag honoured during the schedule run, the
+re-run will sequence you correctly. Meanwhile sort the physical carts
+into colour groups yourself so when the re-run lands you can blast
+through them.</p>
+<p><strong>"A WO at PAINT has <code>finish_id</code> set to a solvent finish, but PAINT's
+<code>x_sbk_supported_finish_ids</code> only lists waterborne. Why is it even in
+my queue?"</strong></p>
+<p>It shouldn't be — the scheduler filters on supported finishes when it
+picks a station. If it's there anyway, the planner overrode the
+scheduler manually. Don't spray it. Tap <em>Block</em> on the WO with reason
+"finish not supported at PAINT — should route to subcontract." The
+system raises a <code>materials_blocked</code> recommendation overnight. The
+production manager reviews and either reroutes to a finishing
+subcontractor (<code>station_type = 'subcontract'</code>) or sources a different
+finish.</p>
+<p><strong>"A carcass came to me at SAND but the <code>x_sbk_kitchen_project_id</code> on
+the MO has been revoked — it's not in <code>in_production</code> anymore."</strong></p>
+<p>That means ENG01 (Design Review) pulled the kitchen project back to
+<code>approved</code>. The WO disappears from your active queue but the physical
+carcass is sitting at your bench. Don't sand. Park it on the hold
+shelf and let your supervisor know. The kitchen project will reappear
+in your queue when ENG01 re-releases.</p>
+<p><strong>"I tapped Done at PAINT but the carcass had a run I didn't see
+until 10 minutes later."</strong></p>
+<p>Undo Done — available for 10 minutes. After that, the WO is
+permanently <code>done</code> from the PAINT perspective. The recovery is:
+manually create a rework WO at SAND + PAINT through the QC flow
+(<code>mi.check.result = rework</code>). The system creates a new pair of WOs
+linked back to the original via <code>x_sbk_rework_workorder_id</code> on the
+mi.check record, and the cost rolls up to your supervisor's rework
+report.</p>
+<p><strong>"The cure timer says 240 min but the supervisor wants the carcass
+pushed to SB-DOOR after 180 — is it OK to short-cycle?"</strong></p>
+<p>No. The cure time comes from <code>finish.cure_time_buffer_min</code> and is
+chemistry, not preference. Short-cycling causes paint marring at
+SB-DOOR when the door is mounted against the still-tacky surface.
+If the supervisor insists, document it (<code>notes</code> on the WO) and let
+the production manager carry the QC risk; the system will not stop
+you from tapping Done early but the chatter will record the deviation.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(Optional reading — the database trail.)</p>
+<p>Every action you take writes to one of these tables:</p>
+<ul>
+<li><strong><code>mrp.workorder</code></strong> — your queue rows. <code>state</code> flips
+  pending → progress → done as you tap.</li>
+<li><strong><code>mrp.workorder.duration</code></strong> — Start/Done pairs add rows here.</li>
+<li><strong><code>southbrook.mi.check</code></strong> — the QC step. When you mark a defect
+  through the check, this row records the defect type, severity
+  (minor / major / critical), and result (pass / fail / rework /
+  hold). If result is <code>rework</code>, the computed
+  <code>x_sbk_rework_required</code> is True and the system creates a rework
+  WO linked back via <code>x_sbk_rework_workorder_id</code>.</li>
+<li><strong><code>southbrook.kitchen.finish</code></strong> — the master record for each
+  finish. <code>cure_time_buffer_min</code> drives the CURE clock; the
+  finish's complexity_factor scales the operation template's
+  duration math at PAINT.</li>
+</ul>
+<p>The PAINT bottleneck flag (<code>x_sbk_is_bottleneck = True</code>) and the
+False parallel-jobs flag together mean the planner treats PAINT as
+the lowest-throughput station in the shop and groups colour batches
+aggressively. This is the single most impactful scheduling decision
+of the day — when the manager looks at why an MO is late, PAINT is
+the first place she checks.</p>
+<p>CURE's high parallel capacity + non-bottleneck status mean CURE will
+almost never be on the manager's critical path. It absorbs flow time,
+not throughput. Your job at CURE is timing, not speed.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> At PAINT, you finish a white batch and the next WO in queue is
+dark walnut. The system shows a <code>x_sbk_changeover_time_min</code> of 30
+minutes on PAINT. Do you tap Changeover before Start on the walnut
+WO?</p>
+<blockquote>
+<p>Yes. Tapping Changeover logs the 30 minutes against the operation
+as setup (not running) time. If you skip it and just tap Start, the
+30 minutes you spent flushing the gun lands on your cycle-time
+stat as if you were spraying slowly. OEE drops, the manager asks
+why, and the data lies.</p>
+</blockquote>
+<p><strong>2.</strong> A solvent-finish WO appears in PAINT's queue. PAINT's
+<code>x_sbk_supported_finish_ids</code> doesn't include any solvent finishes.
+What do you do, and what's the underlying database fix?</p>
+<blockquote>
+<p>Don't spray. Tap <em>Block</em> on the WO with reason "finish not
+supported at PAINT — should route to subcontract" — this raises a
+<code>materials_blocked</code> recommendation. The underlying fix is either
+(a) add the solvent finish to PAINT's <code>x_sbk_supported_finish_ids</code>
+if the booth has been upgraded, or (b) the planner reroutes to a
+subcontractor workcenter (<code>station_type = 'subcontract'</code>). The
+supervisor + production manager decide which.</p>
+</blockquote>
+<p><strong>3.</strong> You're at CURE and 4 racks are in <code>progress</code> at the same time
+on different MOs. How does the system track which rack is whose,
+and what does <code>x_sbk_allows_parallel_jobs = True</code> mean here?</p>
+<blockquote>
+<p>Each WO is its own <code>mrp.workorder</code> row at CURE; the parallel flag
+means the scheduler is willing to start multiple WOs at once
+without queuing them. The <code>mrp.workorder.duration</code> table tracks
+each WO's Start/Done independently. The physical rack-to-WO
+mapping is on you — that's a sticky label on the rack, not in the
+database. If you mix racks, you'll mark the wrong WO Done at the
+wrong time.</p>
+</blockquote>
+<p><strong>4.</strong> Your supervisor says SAND ran at 78% OEE yesterday, below the
+0.85 target. You and the other sander were busy all day. What's the
+most likely explanation?</p>
+<blockquote>
+<p>Two candidates: (a) you both forgot to tap Start when you began a
+WO and tapped only Done at the end, so the duration looks like
+"instant" and the rest of the day looks idle; (b) you ran rework
+through SAND that wasn't logged as rework, so the time appears
+as fresh production (which scopes into OEE's "good output"
+denominator). Fix going forward: tap Start before grit-up, and
+if a rework comes through SAND from PAINT, use the QC flow so
+the rework time is attributed.</p>
+</blockquote>
+<p><strong>5.</strong> The cure clock on a WO at CURE just hit zero, but the carcass
+on the rack physically feels tacky. What do you do?</p>
+<blockquote>
+<p>Don't mark Done. The clock is a model derived from
+<code>finish.cure_time_buffer_min</code> and is the <em>minimum</em> the engineer
+set; humidity, temperature, and coat thickness can extend real
+cure time. Trust your finger. Log a downtime entry against CURE
+with reason <code>other</code> and notes "cure time exceeded model — humid
+day" so the engineer can update the finish's
+<code>cure_time_buffer_min</code> if it's a pattern.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Native Odoo work-order vocabulary and MRP basics — Odoo's own
+  training portal.</li>
+<li>Assembly (your upstream) — lesson 1.4.</li>
+<li>Door hanging at SB-DOOR (your downstream for fronts) — lesson 1.4
+  covers the SB-DOOR rotation.</li>
+<li>Quality control at SB-QC — covered in Course 3.</li>
+<li>Downtime logging — lesson 1.6.</li>
+<li>Reading PLM cut specs for finish call-outs (the finish_id and
+  cure_time_buffer_min on the spec) — lesson 1.7.</li>
+<li>The colour-grouping algorithm the planner uses — Course 2,
+  lesson 2.3.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_01_logging_downtime" model="slide.slide">
+            <field name="name">Logging Downtime — Every Operator, Every Shift</field>
+            <field name="channel_id" ref="course_workcenter_operators"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Every shop-floor operator.</field>
+            <field name="html_content"><![CDATA[<h1 id="logging-downtime-every-operator-every-shift">Logging Downtime — Every Operator, Every Shift</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a shop-floor operator and your machine just stopped — or you stopped,
+or you're waiting on a part, or a tool changeover is taking longer than
+planned. This lesson is how you log that idle time so that <strong>(a)</strong> it
+doesn't depress your personal cycle-time stat, and <strong>(b)</strong> your manager
+sees a clean picture of where the shop loses time. Every operator does
+this; the model is the same regardless of which station you work.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your operator account.</p>
+<blockquote>
+<p><strong>Manufacturing → Operations → Southbrook Kitchen → Work Center Downtime</strong></p>
+</blockquote>
+<p>That's the master list of every downtime entry in the shop. To raise a new
+entry from your workcenter screen, the workcenter form has a <em>Log Downtime</em>
+button that pre-fills the workcenter field — that's the faster path during
+a shift.</p>
+<blockquote>
+<p><strong>Kitchen Ops → Workcenters → (your station) → [Log Downtime]</strong></p>
+</blockquote>
+<p>The list view supports search by workcenter, reason, and date; the form
+view has the state machine buttons (Start / Close / Cancel).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The downtime form (model: <code>southbrook.kitchen.workcenter.downtime</code>) shows:</p>
+<ul>
+<li><strong>Description</strong> (<code>name</code>) — short label for the event. Defaults to
+  "Downtime" — overwrite with something useful like "HOMAG feed roller
+  jam" or "Out of edge tape — white melamine."</li>
+<li><strong>State</strong> (<code>state</code>) — <code>draft</code> → <code>active</code> → <code>closed</code> (or <code>cancelled</code>).
+  Tracked on the chatter. <code>draft</code> is when you're typing it; <code>active</code>
+  is when the downtime is <em>happening now</em> (clock running);
+  <code>closed</code> is when it's over and the duration is final.</li>
+<li><strong>Work Center</strong> (<code>workcenter_id</code>) — required. Pre-filled if you
+  opened from the workcenter screen.</li>
+<li><strong>Work Order</strong> (<code>workorder_id</code>) — optional. Fill in if the downtime
+  was tied to a specific WO running at the time (the machine jammed
+  mid-WO). The system auto-links the production order through the
+  related field <code>production_id</code>.</li>
+<li><strong>Reason</strong> (<code>reason</code>) — required. A fixed list of 13 codes:</li>
+<li><code>material_not_available</code> — out of stock at your station</li>
+<li><code>drawing_issue</code> — cut spec / drawing problem</li>
+<li><code>machine_breakdown</code> — mechanical fault</li>
+<li><code>tool_change</code> — swapping bits / blades</li>
+<li><code>setup_time</code> — initial setup on a fresh MO</li>
+<li><code>color_finish_changeover</code> — paint colour swap at PAINT</li>
+<li><code>waiting_previous_operation</code> — upstream WO isn't done</li>
+<li><code>waiting_quality_approval</code> — held at QC</li>
+<li><code>rework</code> — looping back from a defect</li>
+<li><code>operator_unavailable</code> — you stepped away</li>
+<li><code>subcontract_delay</code> — outside vendor late</li>
+<li><code>maintenance</code> — planned, scheduled service</li>
+<li><code>other</code> — anything that doesn't fit</li>
+<li><strong>Start / End</strong> (<code>date_start</code> / <code>date_end</code>) — timestamps. Start
+  defaults to "now"; end is filled by Close.</li>
+<li><strong>Duration (min)</strong> (<code>duration_min</code>) — computed from start/end but
+  editable, so you can backfill an estimate if you forgot to start
+  the timer.</li>
+<li><strong>Downtime Cost</strong> (<code>downtime_cost</code>) — computed:
+  <code>duration_min / 60 × workcenter.costs_hour</code>. Read-only. This is
+  what rolls up to the manager's Pareto chart.</li>
+<li><strong>Logged By</strong> (<code>responsible_id</code>) — defaults to you.</li>
+<li><strong>Notes</strong> (<code>notes</code>) — free-form. Describe what happened. The
+  next-shift operator + the maintenance technician read this.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. The moment the line stops:</strong></p>
+<ul>
+<li>From your workcenter screen, tap <em>Log Downtime</em>. A new draft entry
+  opens with workcenter pre-filled.</li>
+<li>Fill in <strong>Reason</strong> — the dropdown of 13. Pick the most specific.</li>
+<li>If a specific WO was running, fill in <strong>Work Order</strong>. Otherwise
+  leave it blank.</li>
+<li>Tap <strong>Start</strong>. The <code>state</code> flips from <code>draft</code> to <code>active</code>, and
+  <code>date_start</code> is stamped to now.</li>
+<li>Walk away. Fix the problem. Don't fiddle with the form while the
+  clock is running.</li>
+</ul>
+<p><strong>2. When the problem is fixed:</strong></p>
+<ul>
+<li>Come back to the entry (still open on your tablet, or find it in
+  the active filter on the list view).</li>
+<li>Tap <strong>Close</strong>. The <code>state</code> flips to <code>closed</code>, <code>date_end</code> is
+  stamped to now, and <code>duration_min</code> + <code>downtime_cost</code> compute
+  automatically.</li>
+<li>Optionally add a <strong>Notes</strong> entry — what was the root cause? What
+  did you do? This is what the maintenance technician reads when
+  the same fault recurs.</li>
+</ul>
+<p><strong>3. Backfilling (when you forgot to start the timer):</strong></p>
+<ul>
+<li>Open the list view → <em>Create</em>.</li>
+<li>Fill in workcenter + reason + the <strong>Start</strong> and <strong>End</strong> timestamps
+  manually (your best estimate).</li>
+<li>Save in <code>draft</code>. The duration field computes from your timestamps
+  but is editable, so adjust if your estimate is rough.</li>
+<li>Tap <strong>Close</strong> directly to skip the active state. The entry is
+  immediately final.</li>
+</ul>
+<p><strong>4. End of shift:</strong></p>
+<ul>
+<li>Open the list view, filter "Logged By = me" + "Today."</li>
+<li>Every entry should be <code>closed</code> or <code>cancelled</code>. Any in <code>active</code> is
+  still ticking, inflating its duration. Close them before clocking
+  out.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I had a 47-minute machine fault and I forgot to log downtime. The
+next morning my cycle-time stat for that WO is awful."</strong></p>
+<p>Backfill the downtime entry. Open the list view → Create → set the
+workcenter, reason <code>machine_breakdown</code>, equipment + workorder fields,
+and the actual start/end times (within 10 minutes is fine — the MI
+engine doesn't penalise small estimation error). Save and close.
+The downtime aggregator re-reads the table on its next cron run and
+your cycle-time number recomputes.</p>
+<p><strong>"I logged downtime but picked the wrong reason."</strong></p>
+<p>Open the entry — <code>reason</code> is editable while the state is <code>draft</code> or
+<code>active</code>. If it's already <code>closed</code>, the field is still editable but
+the chatter records the change so the manager can see the
+correction. The Pareto chart re-reads on the next refresh.</p>
+<p><strong>"I started downtime but never closed it. It's been three days."</strong></p>
+<p>The entry is still <code>active</code> and is showing an inflated duration on
+the manager's report. Open it, tap <em>Close</em> — <code>date_end</code> is stamped
+now (huge value), then manually edit <code>duration_min</code> to the real
+number. The <code>_check_non_negative_duration</code> constraint enforces
+positive duration; the chatter records the manual override.</p>
+<p><strong>"The downtime cost looks wrong — it's $0."</strong></p>
+<p><code>downtime_cost = duration_min / 60 × workcenter.costs_hour</code>. If the
+workcenter has <code>costs_hour = 0</code> (often true for non-machine stations
+like ENG01), the cost computes to zero. That's correct — downtime
+at a free-cost station has no dollar impact, only flow impact. The
+manager's Pareto chart shows count + duration alongside cost so the
+zero-cost stations still surface.</p>
+<p><strong>"My downtime entry's <code>duration_min</code> is showing 0 even though I
+filled in start and end."</strong></p>
+<p>Check the constraint: <code>date_end</code> must be strictly after <code>date_start</code>,
+not equal. If you tapped Start then Close within the same second,
+the duration computes to zero. Edit <code>date_start</code> back by a minute
+and save — the system uses the more accurate manual override.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(Optional reading — the database trail.)</p>
+<p>When you tap Start on a downtime entry, the model
+<code>southbrook.kitchen.workcenter.downtime</code> writes:</p>
+<ul>
+<li>A new row with <code>state = 'active'</code>, <code>date_start = now()</code>,
+  <code>date_end = null</code>, <code>responsible_id = &lt;you&gt;</code>.</li>
+<li>The chatter (mail.thread) records the state change.</li>
+</ul>
+<p>When you tap Close:</p>
+<ul>
+<li>The row updates <code>state = 'closed'</code>, <code>date_end = now()</code>.</li>
+<li><code>_compute_duration</code> fires and computes <code>duration_min</code> from the
+  delta.</li>
+<li><code>_compute_downtime_cost</code> fires and computes <code>downtime_cost</code> from
+  <code>duration_min / 60 × workcenter.costs_hour</code>.</li>
+</ul>
+<p>The MI engine's nightly aggregator reads this table grouped by
+<code>workcenter_id</code> + <code>reason</code> to produce the <strong>downtime-by-cause Pareto
+chart</strong> the manager sees. Your machine-attributed downtime (reason
+<code>machine_breakdown</code>, <code>tool_change</code>, <code>maintenance</code>, <code>subcontract_delay</code>)
+is excluded from your <em>personal</em> cycle-time stat — that's the
+point. The MI engine's cycle-time-variance calculation reads
+<code>mrp.workorder.duration</code> rows and subtracts any overlapping downtime
+windows linked to the same <code>workorder_id</code>.</p>
+<p>Operator-attributed reasons (<code>operator_unavailable</code>, partial
+<code>rework</code>) DO land on your cycle-time stat — which is also correct:
+they reflect human factors, not machine factors.</p>
+<p>If you link the downtime to a <code>workorder_id</code>, the related
+<code>production_id</code> field auto-populates so the manager can search
+"all downtime on MO/0042" and see exactly when each fault hit
+during that order's lifecycle.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> The HOMAG edge bander throws an error mid-WO. You pause the WO,
+maintenance fixes the feed roller in 42 minutes, you resume. You forget
+to log downtime. The next day your supervisor says your cycle time
+on that WO is 42 minutes over plan. Why and how do you fix it?</p>
+<blockquote>
+<p>The pause-to-resume gap is captured on <code>mrp.workorder.duration</code>,
+but without a <code>southbrook.kitchen.workcenter.downtime</code> row with
+reason <code>machine_breakdown</code> linking the workorder + the workcenter,
+the MI engine can't subtract the fault window from your cycle
+time. Fix: create the downtime entry now — workcenter <code>SB-EDGE</code>,
+reason <code>machine_breakdown</code>, the actual start + end (your best
+estimate), and tie it to that workorder_id. The MI re-aggregator
+on the next cron run will recompute and the 42 minutes will drop
+off your cycle-time stat.</p>
+</blockquote>
+<p><strong>2.</strong> You're at PAINT swapping from white to walnut. You don't bother
+logging downtime because "it's just a colour change, the system knows
+the changeover time." What's the consequence?</p>
+<blockquote>
+<p>The <code>x_sbk_changeover_time_min</code> configured on PAINT is the <em>planned</em>
+changeover — the planner used it to allow time in the schedule.
+But it's not automatically logged as actual; the system relies on
+you tapping <em>Changeover</em> on the WO (which writes to
+<code>mrp.workorder.duration</code> with the loss attribution) or logging a
+downtime entry with reason <code>color_finish_changeover</code>. Without one
+of those, the actual changeover lands on your spray cycle-time
+stat. OEE drops.</p>
+</blockquote>
+<p><strong>3.</strong> You log a downtime entry, tap Start, then realise the line is
+actually fine — false alarm. What do you do?</p>
+<blockquote>
+<p>Tap <em>Cancel</em>. The state flips to <code>cancelled</code>. The entry stays in
+the database for audit (so a recurring "false alarm" pattern is
+visible) but is excluded from duration and cost aggregates.</p>
+</blockquote>
+<p><strong>4.</strong> A downtime entry shows <code>duration_min = 0</code> and <code>downtime_cost
+= $0.00</code> even though you remember the line was down for 25 minutes.
+What happened, and what do you do?</p>
+<blockquote>
+<p>Two possibilities: (a) <code>date_start = date_end</code> because you tapped
+Start and Close within the same second — fix by editing
+<code>date_start</code> back 25 minutes; or (b) you cancelled instead of
+closed — open the entry, check <code>state</code>. If it's <code>cancelled</code>,
+reopen by editing <code>state</code> to <code>closed</code> and set the timestamps.
+The duration recomputes.</p>
+</blockquote>
+<p><strong>5.</strong> Your manager opens the downtime Pareto for last month. The
+top reason is <code>waiting_previous_operation</code> at SB-EDGE for 17 hours
+of total lost time. What does that mean about the shop, and which
+station's data does she go look at next?</p>
+<blockquote>
+<p>SB-EDGE was idle waiting on SB-SAW or SB-CNC-BORE to deliver cut
+panels. The bottleneck this month was upstream of the edge
+bander, not at it. She'd open SB-SAW's downtime and OEE reports
+next — probably finding either machine_breakdown at SB-SAW or
+material_not_available (the cutting station ran out of sheet
+stock). The edge bander operator wasn't slow; the cutting
+station starved them. The fix is upstream.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Native Odoo work-order vocabulary and MRP basics — Odoo's own
+  training portal.</li>
+<li>Your station's daily flow — your role-specific lesson (1.2–1.5).</li>
+<li>How the MI engine processes downtime into reports — Course 3,
+  lesson 3.1 (MI dashboards) + 3.3 (OEE).</li>
+<li>The QC flow and rework loops — covered alongside the finisher
+  lesson and Course 3.</li>
+<li>How the planner uses your downtime to re-tune cycle-time
+  estimates for tomorrow's schedule — Course 2, lesson 2.3.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_01_reading_cut_spec" model="slide.slide">
+            <field name="name">Reading a Cut Spec from PLM</field>
+            <field name="channel_id" ref="course_workcenter_operators"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">CNC, edge banding, and assembly operators who see the cut spec on the floor.</field>
+            <field name="html_content"><![CDATA[<h1 id="reading-a-cut-spec-from-plm">Reading a Cut Spec from PLM</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're at SB-CNC-BORE, SB-EDGE, or SB-ASSY and the traveler on your bench
+references a <strong>cut spec</strong> — a row in <code>southbrook.cut.spec</code> that the
+engineer authored and an ECO promoted to live. The cut spec is the
+parametric source of truth for every panel dimension, every rabbet, every
+reveal in the shop. This lesson is how to read it, what each field means
+in your station's vocabulary, and when to escalate back to the engineer
+instead of cutting / banding / assembling around a wrong number.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with your operator account.</p>
+<blockquote>
+<p><strong>Manufacturing → Engineering → Cut Specifications</strong></p>
+</blockquote>
+<p>The list shows every cut spec, ordered by create date desc. Exactly one row
+is in state <code>active</code> — that's the spec the BoM math currently reads. Other
+rows are <code>draft</code> (proposed but not promoted) or <code>superseded</code> (formerly
+active, retained for audit).</p>
+<p>Your traveler references the spec by name (e.g. "NF14 Cut Spec — Rev C").
+The spec name and the chatter on its record together tell you which ECO
+promoted it and when.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Open the active cut spec and you'll see:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code> on <code>southbrook.cut.spec</code>) — human label like "NF14 Cut
+  Spec — Rev C." This is what appears on the traveler.</li>
+<li><strong>State</strong> (<code>state</code>) — <code>draft</code> / <code>active</code> / <code>superseded</code>. Only the
+  <code>active</code> row drives live production. The <code>_check_single_active</code>
+  constraint enforces exactly one active spec at a time.</li>
+<li><strong>Provenance note</strong> (<code>note</code>) — free text describing where the values
+  came from. Reads like "values from workbook revision 8, measured
+  2026-05-12 by Peter T." Useful when the numbers feel wrong and you
+  need to know whether to escalate.</li>
+<li><strong>Engineering Change Orders</strong> (<code>southbrook_eco_ids</code> — inverse of
+  <code>southbrook.eco.cut_spec_id</code>) — the ECOs that proposed or activated
+  this spec. The smart-button on the form shows the count.</li>
+</ul>
+<p>The eight numeric fields (all millimetres) drive every panel-cut
+calculation downstream:</p>
+<ul>
+<li><strong>Box / Carcass Thickness</strong> (<code>box_th</code>, default 15.875mm = 5/8" melamine) —
+  the carcass material thickness. Sides, top, bottom, fixed shelves
+  all this thick. CNC tooling for grooves and rabbets references this.</li>
+<li><strong>Back-Panel Thickness</strong> (<code>back_th</code>, default 6.35mm = 1/4" hardboard) —
+  the back panel thickness. The rabbet at the rear edge of the sides
+  is depth <code>rabbet</code> and width <code>back_th</code> so the back drops in flush.</li>
+<li><strong>Rabbet Depth</strong> (<code>rabbet</code>, default 6.35mm) — the routed channel at
+  the rear of sides/top/bottom that captures the back panel. CNC
+  cuts this; if the value's wrong the back won't seat flush.</li>
+<li><strong>Door Thickness</strong> (<code>door_th</code>, default 18.0mm = 3/4") — slab or
+  5-piece door thickness. Drives door-hinge cup depth at SB-DOOR.</li>
+<li><strong>Door Reveal</strong> (<code>door_reveal</code>, default 3.0mm) — the uniform gap on
+  all four edges of the door against the cabinet face. Drives door
+  panel size relative to opening size; SB-DOOR uses this to set the
+  hinge baseline.</li>
+<li><strong>Shelf Tolerance</strong> (<code>shelf_tol</code>, default 1.5mm) — hand-placement
+  clearance subtracted from the inside width when computing
+  adjustable-shelf dimensions. Also the squareness tolerance
+  assembly works to.</li>
+<li><strong>Shelf Ventilation Gap</strong> (<code>shelf_vent_gap</code>, default 12.7mm = 1/2") —
+  subtracted from depth at the back so shelves don't trap moisture
+  against the back panel.</li>
+<li><strong>Toe-Kick Height</strong> (<code>toekick_h</code>, default 101.6mm = 4") — integrated
+  into the side panels for base / sink / tall / vanity cabinets.</li>
+</ul>
+<h2 id="your-daily-flow-how-to-read-the-spec-at-each-station">Your daily flow — how to read the spec at each station</h2>
+<p><strong>At SB-CNC-BORE / CNC02 (CNC operator):</strong></p>
+<ul>
+<li>The traveler tells you which cut spec is active and which cabinet
+  template the MO is built from. Both are deterministic — the BoM
+  math at MO creation read the active spec via the
+  <code>_get_cut_constants()</code> seam in <code>southbrook_estimating/models/mrp_bom.py</code>.</li>
+<li>Confirm the <strong>box_th</strong> value matches the sheet stock loaded on the
+  bed. 15.875mm is 5/8" melamine; if the sheet is 18mm and the spec
+  says 15.875, the engineer either revised the spec without telling
+  the shop, or the wrong sheet is loaded. Don't cut — escalate.</li>
+<li>Confirm the <strong>rabbet</strong> depth matches your loaded bit's depth-of-cut
+  setting. The toolpath was generated from the spec; if your bit
+  is set to 8mm and the spec says 6.35mm, the back-panel groove
+  won't capture properly.</li>
+<li>The <strong>toekick_h</strong> is integrated into the side panels for base
+  units. If you see a base cabinet's side panel cut with no toekick
+  notch, the spec was changed mid-batch — escalate.</li>
+</ul>
+<p><strong>At SB-EDGE (edge banding operator):</strong></p>
+<ul>
+<li>The cut spec drives which edges get tape. The panel labels on each
+  cart panel (printed at CNC) reference the cabinet model's edge
+  pattern. The traveler typically attaches the edge spec sheet as
+  a printout.</li>
+<li>The <strong>box_th</strong> value drives the tape height. 15.875mm tape on a
+  15.875mm panel; if the engineer revised box_th to 19mm but you're
+  still loaded with 15.875mm tape, you'll have a strip of bare
+  particleboard at the top.</li>
+<li>Match the panel <strong>count</strong> on the traveler against the cart count.
+  Mismatch → escalate (CNC scrapped one or the cart was mis-loaded).</li>
+</ul>
+<p><strong>At SB-ASSY (assembler):</strong></p>
+<ul>
+<li>The <strong>shelf_tol</strong> value is your squareness tolerance. The diagonal
+  measure across the carcass should be within <code>shelf_tol</code> mm of
+  perfect square; if it's outside, re-square (see lesson 1.4).</li>
+<li>The <strong>rabbet</strong> + <strong>back_th</strong> values define how the back panel
+  seats. If the back is loose in the groove, back_th is too thin
+  for the spec; if it binds, back_th is too thick. Either is a spec
+  mismatch — escalate.</li>
+<li>The <strong>door_reveal</strong> is set by SB-DOOR, not you, but if you're
+  rotating through SB-DOOR you'll set the hinge baseline using it.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The cut spec on the traveler says NF14 Rev B but the active spec
+in Odoo is NF14 Rev C. Which one do I follow?"</strong></p>
+<p>Follow the active one (Rev C). The traveler was printed when the MO
+was created — if the spec was upgraded after MO creation but before
+your shift, the printed traveler shows the older revision. Open the
+active cut spec in Odoo and check the eight numeric values against
+what your work calls for. If anything changed materially (a rabbet
+depth shifted from 6.35 to 7mm), the cut-spec form's chatter has the
+diff. If you're unsure, escalate before cutting; do not assume the
+older traveler is wrong without confirmation.</p>
+<p><strong>"The spec says box_th = 15.875mm but my CNC operator loaded an 18mm
+sheet. Who's wrong?"</strong></p>
+<p>Probably the operator (wrong sheet from stock), but it could be the
+spec (engineer hasn't propagated a thickness change). Stop and
+confirm:
+- Open the active spec → read box_th.
+- Read the sheet label on the bed.
+- If they don't match, do NOT cut. The cabinet panels will be the
+  wrong thickness; downstream banding tape, rabbet, and door reveal
+  will all be off.
+- Escalate to PLM via the <em>Block</em> button on the WO — the system
+  raises a <code>cut_spec_audit</code> recommendation for the engineer.</p>
+<p><strong>"The cut spec hasn't been updated in 6 months but the cabinet
+template was updated last week. Why does the math still work?"</strong></p>
+<p>The cabinet template and the cut spec live separately. The template
+defines the cabinet's bounding dimensions (W × H × D) and which
+panels exist; the cut spec defines the <em>thicknesses, reveals, and
+tolerances</em> applied to those panels. A template change rarely
+needs a spec change — you can introduce a new cabinet shape without
+revising material thicknesses. They only co-revise when materials
+or joinery technique change shop-wide.</p>
+<p><strong>"I think the active spec is wrong — the rabbet depth is 6.35mm
+but every back panel I've banded this week is loose."</strong></p>
+<p>You may be right. Don't fix it yourself. Open the active spec → tap
+the smart-button to see the ECOs that bound it — was there a recent
+ECO that activated this spec? Talk to the engineer who applied it.
+If they agree it's wrong, the path is a new ECO of <code>target_kind =
+'cut_spec'</code> that proposes a revised spec, the ECO is approved, and
+<code>action_apply</code> calls <code>action_activate</code> on the new spec. The old
+spec moves to <code>superseded</code> automatically. The chatter on both
+records traces the change.</p>
+<p><strong>"I see two specs both showing state <code>active</code>."</strong></p>
+<p>You shouldn't — the <code>_check_single_active</code> constraint on
+<code>southbrook.cut.spec</code> enforces exactly one active at a time, and
+it's a backstop for manual edits. If you genuinely see two,
+something has gone wrong in the database; raise it to the
+engineer or IT admin immediately. The cut-math seam returns
+<code>limit=1</code> so it'll pick one of the two arbitrarily — the wrong
+one half the time. This is a P0 data integrity issue.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>(Optional reading — the database trail.)</p>
+<p>The cut spec is the parametric source of truth for the panel
+dimensions in every BoM. When an MO is created from an estimating
+session, <code>southbrook_estimating/models/mrp_bom.py</code>'s
+<code>_get_cut_constants()</code> seam calls <code>southbrook.cut.spec._get_active()</code>,
+which returns the single <code>active</code> row. The eight constants are then
+applied to the cabinet template's W × H × D to produce panel
+dimensions, edge counts, rabbet positions, and toolpath references.</p>
+<p>When an engineer revises the spec:</p>
+<ol>
+<li>They create a new <code>southbrook.cut.spec</code> row in <code>draft</code> state,
+   with the proposed values.</li>
+<li>They raise a <code>southbrook.eco</code> of <code>target_kind = 'cut_spec'</code>
+   pointing at the draft.</li>
+<li>The ECO goes through its approval stages (covered in Course 4,
+   lesson 4.1).</li>
+<li>On approval, <code>southbrook.eco.action_apply</code> calls the new spec's
+   <code>action_activate()</code> method:
+   - The current active spec is found via <code>_get_active()</code>.
+   - The current active is updated to <code>state = 'superseded'</code> and
+     its chatter records "Superseded by cut spec <new>."
+   - The new spec is updated to <code>state = 'active'</code> and its
+     chatter records "Activated as the live cut specification."</li>
+<li>The next MO created after activation uses the new constants.
+   In-flight MOs (created before activation) still reference the
+   old constants on their existing BoM lines.</li>
+</ol>
+<p>This is why an in-flight MO carries the cut spec values it was
+born with — the BoM rows are stored, not recomputed. If you need
+to re-issue an in-flight MO against a revised spec, the engineer
+re-creates the MO; existing work orders are not retroactively
+patched.</p>
+<p>The chatter on the cut spec is your audit trail. When the manager
+asks "when did this rabbet depth change?", the chatter on the now-
+<code>active</code> spec answers it — including which ECO and which user
+applied it.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> The CNC traveler at your station references "NF14 Cut Spec —
+Rev C." You open the cut-spec list in Odoo. There's a Rev C in state
+<code>active</code> and a Rev B in state <code>superseded</code>. Both exist, no error.
+What does this tell you?</p>
+<blockquote>
+<p>The spec was upgraded recently — Rev B was the previous active,
+Rev C is the current. Your traveler matches the current state.
+The MO was created after Rev C went active so the BoM lines use
+Rev C's constants. Proceed.</p>
+</blockquote>
+<p><strong>2.</strong> Your traveler references Rev B but the active spec is Rev C.
+You're at SB-EDGE about to band a panel. What do you do?</p>
+<blockquote>
+<p>Stop. Open both specs and compare the <code>box_th</code> and any other
+value that affects your station. If they're identical for your
+fields, you can proceed with the Rev B traveler (the BoM rows
+for this MO were calculated under Rev B and the panels were cut
+to Rev B — banding them under Rev C tape height would be
+incorrect). If they differ at fields you care about, escalate
+via <em>Block</em> on the WO and let the engineer decide whether to
+re-issue the MO or accept the in-flight Rev B build.</p>
+</blockquote>
+<p><strong>3.</strong> You see a row in state <code>draft</code> named "NF14 Cut Spec — Rev D"
+with <code>rabbet</code> set to 8mm (Rev C had 6.35mm). It's not active. Does
+it affect your work today?</p>
+<blockquote>
+<p>No. Only the <code>active</code> row drives the BoM math. The draft is a
+proposal — an ECO is probably in review somewhere targeting this
+spec. When the ECO is approved and applied, <code>action_activate</code>
+will promote the draft to active and supersede Rev C. Until
+then, ignore it.</p>
+</blockquote>
+<p><strong>4.</strong> At SB-ASSY, your carcass measures 4mm out of square. The
+active cut spec's <code>shelf_tol</code> is 1.5mm. Is the carcass acceptable?</p>
+<blockquote>
+<p>No. The tolerance is 1.5mm, the diagonal is 4mm out — that's
+2.6× the tolerance. Re-square (loosen and reseat the back panel
+usually fixes it; the rabbet capture is normally what's
+binding). If you can't get it within 1.5mm, the cut spec or the
+panels themselves may be wrong — escalate via <em>Block</em> and the
+PLM engineer will audit.</p>
+</blockquote>
+<p><strong>5.</strong> Your supervisor says "the engineer changed the door reveal
+this morning, push it through fast." You check <code>southbrook.cut.spec</code>
+— the active spec still shows <code>door_reveal = 3.0mm</code>, unchanged
+since last quarter. Where's the disconnect?</p>
+<blockquote>
+<p>The engineer's change is probably still in <code>draft</code> state, or
+the ECO hasn't been applied yet. Don't act on the supervisor's
+verbal — the active spec is the source of truth. Either find
+the draft spec + the pending ECO and ask why it hasn't been
+applied (maybe it's stuck waiting for approval), or confirm the
+supervisor was wrong about what changed. The chatter on the
+active spec will show no change event if nothing's been applied.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Native Odoo work-order vocabulary and MRP basics — Odoo's own
+  training portal.</li>
+<li>Raising or approving an ECO (engineering-side) — Course 4,
+  lesson 4.1.</li>
+<li>Authoring a new cut spec — Course 4, lesson 4.2.</li>
+<li>The BoM math that applies the spec to cabinet templates — Course 5,
+  lesson 5.1.</li>
+<li>Your station's daily flow — lessons 1.2–1.5.</li>
+<li>Downtime logging — lesson 1.6.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

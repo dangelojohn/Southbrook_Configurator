@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <!-- ================================================================
+         LIST VIEW — dispatcher's daily list
+         ================================================================ -->
+    <record id="view_installer_job_list" model="ir.ui.view">
+        <field name="name">southbrook.installer.job.list</field>
+        <field name="model">southbrook.installer.job</field>
+        <field name="arch" type="xml">
+            <list string="Installer Jobs"
+                  decoration-danger="is_blocked"
+                  decoration-muted="stage_is_terminal"
+                  decoration-info="priority == '1'">
+                <field name="name" string="Job Ref"/>
+                <field name="priority" widget="priority"/>
+                <field name="scheduled_date"/>
+                <field name="project_id"/>
+                <field name="unit_number"/>
+                <field name="site_address" optional="show"/>
+                <field name="lead_installer_id"/>
+                <field name="stage_id" widget="badge"/>
+                <field name="completion_pct" widget="progressbar"/>
+                <field name="delivery_confirmed" widget="boolean_toggle"
+                       optional="show" readonly="1"/>
+                <field name="open_damage_count" optional="show"
+                       decoration-danger="open_damage_count &gt; 0"/>
+                <field name="is_blocked" widget="boolean_toggle"
+                       optional="show" readonly="1"/>
+                <field name="active" invisible="1"/>
+                <field name="stage_is_terminal" invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         KANBAN VIEW — board grouped by workflow stage
+         ================================================================ -->
+    <record id="view_installer_job_kanban" model="ir.ui.view">
+        <field name="name">southbrook.installer.job.kanban</field>
+        <field name="model">southbrook.installer.job</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="stage_id"
+                    class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="project_id"/>
+                <field name="unit_number"/>
+                <field name="site_address"/>
+                <field name="lead_installer_id"/>
+                <field name="scheduled_date"/>
+                <field name="completion_pct"/>
+                <field name="is_blocked"/>
+                <field name="priority"/>
+                <field name="color"/>
+                <field name="stage_id"/>
+                <field name="stage_is_terminal"/>
+                <templates>
+                    <t t-name="card">
+                        <div t-attf-class="oe_kanban_card">
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title">
+                                        <field name="name"/>
+                                    </strong>
+                                    <small class="text-muted">
+                                        <field name="project_id"/> ·
+                                        <field name="unit_number"/>
+                                    </small>
+                                </div>
+                                <field name="priority" widget="priority"/>
+                            </div>
+                            <div class="o_kanban_record_body">
+                                <div>
+                                    <i class="fa fa-map-marker"/>
+                                    <field name="site_address"/>
+                                </div>
+                                <div>
+                                    <i class="fa fa-clock-o"/>
+                                    <field name="scheduled_date"/>
+                                </div>
+                                <div>
+                                    <i class="fa fa-user"/>
+                                    <field name="lead_installer_id"/>
+                                </div>
+                                <div class="mt-2">
+                                    <field name="completion_pct" widget="progressbar"/>
+                                </div>
+                                <div t-if="record.is_blocked.raw_value"
+                                     class="badge text-bg-danger mt-1">
+                                    BLOCKED
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         SEARCH VIEW
+         ================================================================ -->
+    <record id="view_installer_job_search" model="ir.ui.view">
+        <field name="name">southbrook.installer.job.search</field>
+        <field name="model">southbrook.installer.job</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="project_id"/>
+                <field name="unit_number"/>
+                <field name="site_address"/>
+                <field name="lead_installer_id"/>
+                <field name="builder_contact_id"/>
+                <filter name="my_jobs" string="My Jobs"
+                        domain="[('lead_installer_id.user_id', '=', uid)]"/>
+                <filter name="active_jobs" string="Active"
+                        domain="[('stage_is_terminal', '=', False)]"/>
+                <filter name="blocked" string="Blocked"
+                        domain="[('is_blocked', '=', True)]"/>
+                <filter name="urgent" string="Urgent"
+                        domain="[('priority', '=', '1')]"/>
+                <separator/>
+                <filter name="scheduled_today" string="Scheduled Today"
+                        domain="[('scheduled_date', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')),
+                                 ('scheduled_date', '&lt;', (context_today() + relativedelta(days=1)).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <filter name="this_week" string="This Week"
+                        domain="[('scheduled_date', '&gt;=', (context_today() - relativedelta(days=context_today().weekday())).strftime('%Y-%m-%d 00:00:00')),
+                                 ('scheduled_date', '&lt;', (context_today() + relativedelta(days=7 - context_today().weekday())).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <group>
+                    <filter name="g_stage" string="Stage"
+                            context="{'group_by': 'stage_id'}"/>
+                    <filter name="g_lead" string="Lead Installer"
+                            context="{'group_by': 'lead_installer_id'}"/>
+                    <filter name="g_project" string="Project"
+                            context="{'group_by': 'project_id'}"/>
+                    <filter name="g_date" string="Scheduled Date"
+                            context="{'group_by': 'scheduled_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         FORM VIEW — the job card
+         ================================================================ -->
+    <record id="view_installer_job_form" model="ir.ui.view">
+        <field name="name">southbrook.installer.job.form</field>
+        <field name="model">southbrook.installer.job</field>
+        <field name="arch" type="xml">
+            <form string="Installer Job">
+                <header>
+                    <button name="action_mark_arrived" type="object"
+                            string="📍 Mark Arrived" class="oe_highlight"
+                            invisible="gps_arrival_time or stage_is_terminal"/>
+                    <button name="action_open_manifest" type="object"
+                            string="📦 Open Delivery Manifest"
+                            class="oe_highlight"
+                            invisible="delivery_confirmed or stage_is_terminal"/>
+                    <button name="action_advance_stage" type="object"
+                            string="↪ Advance Stage" class="oe_highlight"
+                            invisible="stage_is_terminal"/>
+                    <button name="action_open_punchlist" type="object"
+                            string="✍ Open Punchlist + Sign-Off"
+                            invisible="sign_off_received or stage_is_terminal"/>
+                    <button name="action_open_closeout" type="object"
+                            string="📋 Open Close-Out"
+                            invisible="closeout_done or stage_is_terminal"/>
+                    <button name="action_mark_departed" type="object"
+                            string="🚚 Mark Departed"
+                            invisible="gps_departure_time or not gps_arrival_time"/>
+                    <field name="stage_id" widget="statusbar"
+                           options="{'clickable': '0'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_phase_logs" type="object"
+                                class="oe_stat_button" icon="fa-tasks">
+                            <field name="stage_log_done_count"
+                                   string="Phases Done" widget="statinfo"/>
+                        </button>
+                        <button name="action_open_manifest" type="object"
+                                class="oe_stat_button" icon="fa-truck">
+                            <div>
+                                <field name="delivery_confirmed"
+                                       widget="boolean_toggle" readonly="1"
+                                       nolabel="1"/>
+                                <span>Manifest</span>
+                            </div>
+                        </button>
+                        <button name="action_view_damage_flags" type="object"
+                                class="oe_stat_button" icon="fa-flag">
+                            <field name="open_damage_count"
+                                   string="Open Flags" widget="statinfo"/>
+                        </button>
+                        <button name="action_view_tool_loans" type="object"
+                                class="oe_stat_button" icon="fa-wrench">
+                            <field name="tool_loan_open_count"
+                                   string="Tools Out" widget="statinfo"/>
+                        </button>
+                        <button name="action_open_closeout" type="object"
+                                class="oe_stat_button" icon="fa-check-square-o">
+                            <div>
+                                <field name="closeout_done"
+                                       widget="boolean_toggle" readonly="1"
+                                       nolabel="1"/>
+                                <span>Close-Out</span>
+                            </div>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Blocked"
+                            bg_color="bg-danger"
+                            invisible="not is_blocked"/>
+                    <widget name="web_ribbon" title="Archived"
+                            bg_color="bg-secondary"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                        <div>
+                            <field name="priority" widget="priority"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group string="Site">
+                            <field name="project_id"
+                                   options="{'no_create_edit': True}"/>
+                            <field name="unit_number"/>
+                            <field name="site_address"/>
+                            <field name="site_address_lat"/>
+                            <field name="site_address_lng"/>
+                            <field name="builder_contact_id"/>
+                            <field name="builder_phone" widget="phone"/>
+                        </group>
+                        <group string="Crew &amp; Schedule">
+                            <field name="lead_installer_id"/>
+                            <field name="assigned_crew_ids" widget="many2many_tags"/>
+                            <field name="scheduled_date"/>
+                            <field name="arrival_window_end"/>
+                            <field name="estimated_duration_hours"
+                                   widget="float_time"/>
+                            <field name="kit_picking_id"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <group string="Progress &amp; Telemetry">
+                        <group>
+                            <field name="completion_pct" widget="progressbar"/>
+                            <field name="delivery_confirmed" readonly="1"/>
+                            <field name="is_blocked" readonly="1"/>
+                            <field name="open_damage_count" readonly="1"/>
+                            <field name="blocking_damage_count" readonly="1"
+                                   invisible="blocking_damage_count == 0"/>
+                            <field name="sign_off_received"
+                                   widget="boolean_toggle"/>
+                            <field name="closeout_done" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="gps_arrival_time" readonly="1"/>
+                            <field name="gps_departure_time" readonly="1"/>
+                            <field name="on_site_duration_hrs"
+                                   widget="float_time" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Delivery" name="delivery">
+                            <group>
+                                <field name="kit_picking_id"
+                                       options="{'no_create': True}"/>
+                                <field name="manifest_id" readonly="1"/>
+                            </group>
+                            <field name="manifest_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="total_lines"/>
+                                    <field name="lines_ok"/>
+                                    <field name="lines_damaged"/>
+                                    <field name="lines_missing"/>
+                                    <field name="confirmation_pct"
+                                           widget="progressbar"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Tools" name="tools">
+                            <field name="tool_loan_ids">
+                                <list editable="bottom"
+                                      decoration-success="returned and return_condition == 'good'"
+                                      decoration-warning="returned and return_condition == 'maintenance'"
+                                      decoration-danger="returned and return_condition in ('damaged','lost')"
+                                      decoration-info="not returned">
+                                    <field name="equipment_id"/>
+                                    <field name="tool_type"/>
+                                    <field name="signed_out_by_id"/>
+                                    <field name="signed_out_time"/>
+                                    <field name="returned" widget="boolean_toggle"/>
+                                    <field name="return_condition"/>
+                                    <field name="days_on_loan"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Close-Out" name="closeout"
+                              invisible="not closeout_id">
+                            <field name="closeout_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="builder_approves_cleanup"/>
+                                    <field name="all_tools_returned"/>
+                                    <field name="all_flags_resolved_or_eta"/>
+                                    <field name="installer_confirmed"/>
+                                    <field name="return_picking_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Issues" name="issues">
+                            <widget name="web_ribbon" title="BLOCKED"
+                                    bg_color="bg-danger"
+                                    invisible="not is_blocked"/>
+                            <field name="damage_flag_ids" readonly="1">
+                                <list decoration-danger="urgency == 'blocking' and state not in ('resolved','cancelled')"
+                                      decoration-warning="urgency == 'non_blocking' and state not in ('resolved','cancelled')"
+                                      decoration-muted="state in ('resolved','cancelled')">
+                                    <field name="name"/>
+                                    <field name="reported_time"/>
+                                    <field name="product_id"/>
+                                    <field name="issue_type"/>
+                                    <field name="urgency" widget="badge"/>
+                                    <field name="qty_affected"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="replacement_po_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Installation Phases" name="phases">
+                            <field name="stage_log_ids">
+                                <list editable="bottom"
+                                      decoration-success="state == 'done'"
+                                      decoration-warning="state == 'in_progress'"
+                                      decoration-muted="state == 'skipped'">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="phase_id" readonly="1"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="photo_count"/>
+                                    <field name="min_photos_required"
+                                           string="Min Photos"/>
+                                    <field name="photo_gate_passed"
+                                           widget="boolean_toggle"/>
+                                    <field name="duration_mins"/>
+                                    <field name="completed_by_id" optional="show"/>
+                                    <field name="complete_time" optional="show"/>
+                                    <button name="action_mark_in_progress"
+                                            type="object" string="Start"
+                                            icon="fa-play"
+                                            invisible="state in ('in_progress', 'done')"/>
+                                    <button name="action_mark_done"
+                                            type="object" string="Complete"
+                                            icon="fa-check" class="oe_highlight"
+                                            invisible="state == 'done'"/>
+                                    <button name="action_mark_skipped"
+                                            type="object" string="Skip"
+                                            icon="fa-step-forward"
+                                            invisible="state == 'done'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Photos" name="photos">
+                            <field name="phase_photo_ids"
+                                   widget="many2many_binary"/>
+                        </page>
+                        <page string="Feedback" name="feedback">
+                            <group>
+                                <field name="builder_rating" widget="priority"/>
+                                <field name="builder_rating_notes"/>
+                            </group>
+                            <separator string="Notes"/>
+                            <field name="notes"/>
+                        </page>
+                        <page string="Advanced" name="advanced" groups="southbrook_installer.group_sami_dispatcher">
+                            <group>
+                                <field name="active"/>
+                                <field name="color"/>
+                                <field name="stage_is_terminal" readonly="1"/>
+                                <field name="sign_request_ref"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         WINDOW ACTION
+         ================================================================ -->
+    <record id="action_installer_job" model="ir.actions.act_window">
+        <field name="name">Installer Jobs</field>
+        <field name="res_model">southbrook.installer.job</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{"search_default_active_jobs": 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first installer job
+            </p>
+            <p>
+                Jobs flow through eight workflow stages:
+                Scheduled → Pre-Site Confirm → Delivery Received →
+                Installation In Progress → Final Sign-Off →
+                Closed Out → Complete → Invoiced.
+            </p>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,13 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mps_period_user,southbrook.mes_mps.mps_period user,model_southbrook_mes_mps_mps_period,group_mes_user,1,1,0,0
+access_mps_period_mgr,southbrook.mes_mps.mps_period manager,model_southbrook_mes_mps_mps_period,group_mes_manager,1,1,1,1
+access_wc_capacity_user,southbrook.mes_mps.workcenter_capacity user,model_southbrook_mes_mps_workcenter_capacity,group_mes_user,1,0,0,0
+access_wc_capacity_mgr,southbrook.mes_mps.workcenter_capacity manager,model_southbrook_mes_mps_workcenter_capacity,group_mes_manager,1,1,1,1
+access_oee_snapshot_user,southbrook.mes_mps.oee_snapshot user,model_southbrook_mes_mps_oee_snapshot,group_mes_user,1,0,0,0
+access_oee_snapshot_mgr,southbrook.mes_mps.oee_snapshot manager,model_southbrook_mes_mps_oee_snapshot,group_mes_manager,1,1,1,1
+access_bottleneck_report_user,southbrook.mes_mps.bottleneck_report user,model_southbrook_mes_mps_bottleneck_report,group_mes_user,1,0,0,0
+access_bottleneck_report_mgr,southbrook.mes_mps.bottleneck_report manager,model_southbrook_mes_mps_bottleneck_report,group_mes_manager,1,1,1,1
+access_bottleneck_line_user,southbrook.mes_mps.bottleneck_line user,model_southbrook_mes_mps_bottleneck_line,group_mes_user,1,0,0,0
+access_bottleneck_line_mgr,southbrook.mes_mps.bottleneck_line manager,model_southbrook_mes_mps_bottleneck_line,group_mes_manager,1,1,1,1
+access_mi_tiles_user,southbrook.mes_mps.mi_tiles user,model_southbrook_mes_mps_mi_tiles,group_mes_user,1,1,1,1
+access_mi_tiles_mgr,southbrook.mes_mps.mi_tiles manager,model_southbrook_mes_mps_mi_tiles,group_mes_manager,1,1,1,1

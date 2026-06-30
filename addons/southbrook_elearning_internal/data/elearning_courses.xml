@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="tag_group_internal" model="slide.channel.tag.group">
+            <field name="name">Southbrook Internal</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="tag_internal" model="slide.channel.tag">
+            <field name="name">Internal Custom Modules</field>
+            <field name="group_id" ref="tag_group_internal"/>
+            <field name="color">3</field>
+        </record>
+        <record id="course_workcenter_operators" model="slide.channel">
+            <field name="name">Course 1 — Workcenter Operators</field>
+            <field name="description">Daily flow for the people who run the shop — edge banding, CNC, assembly, sanding, finishing. Anchored on real workcenters: SB-EDGE, SB-CNC-BORE, SB-ASSY, SAND, PAINT, CURE.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">10</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">3</field>
+        </record>
+        <record id="course_production_planning" model="slide.channel">
+            <field name="name">Course 2 — Production Planning</field>
+            <field name="description">For the human sequencing the day&#x27;s work against workcenters, running the release gate, and reading the MI report. Native MRP is assumed knowledge; these lessons cover the Southbrook deltas.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">20</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">4</field>
+        </record>
+        <record id="course_floor_management" model="slide.channel">
+            <field name="name">Course 3 — Floor Management</field>
+            <field name="description">Manufacturing Intelligence dashboards, Fabio recommendation queue, and OEE per workcenter — what a production manager watches and approves.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">30</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">5</field>
+        </record>
+        <record id="course_plm_design" model="slide.channel">
+            <field name="name">Course 4 — PLM + Design</field>
+            <field name="description">Engineering Change Orders, cut spec authoring, FreeCAD render pipeline, and Gemini-backed AI design assist. For designers and ECO engineers.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">40</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">6</field>
+        </record>
+        <record id="course_estimating_configurator" model="slide.channel">
+            <field name="name">Course 5 — Estimating + Configurator</field>
+            <field name="description">Turning a customer&#x27;s kitchen design into a configured quote — OCA configurator vocabulary, the Southbrook Order Builder, the Marathon hardware catalog, and the v2 UX deltas.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">50</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">7</field>
+        </record>
+        <record id="course_customer_touchpoints" model="slide.channel">
+            <field name="name">Course 6 — Customer Touchpoints</field>
+            <field name="description">Customer portal (/my/kitchen-projects), dealer portal with scoped pricing visibility, and the Fabio queue from the CS perspective.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">60</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">8</field>
+        </record>
+        <record id="course_sysadmin" model="slide.channel">
+            <field name="name">Course 7 — Sysadmin</field>
+            <field name="description">Maintaining the platform — the 6 nightly orchestration crons, the QNAP backup pipeline, and the external Hermes Console recommendation queue.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">70</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">2</field>
+        </record>
+        <record id="course_estimating_deep" model="slide.channel">
+            <field name="name">Course 8 — Estimating Deep Dive</field>
+            <field name="description">Six deep-dive lessons on the Southbrook Estimating addon — architecture, Order Builder walkthrough, zone/channel pricing math, quote-to-MO handoff, QWeb reports, and the revision/versioning chain. Goes deeper than Course 5.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">80</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">9</field>
+        </record>
+        <record id="course_productgraph" model="slide.channel">
+            <field name="name">Course 9 — ProductGraph PLM</field>
+            <field name="description">Six deep-dive lessons on ProductGraph — the OpenBOM-mirror PLM platform sitting next to (NOT inside) Southbrook. Property templates, vendor stubs, the native BoM editor, the MCP sidecar, and the Southbrook bridge.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">90</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">10</field>
+        </record>
+        <record id="course_configurator_deep" model="slide.channel">
+            <field name="name">Course 10 — Configurator Deep Dive</field>
+            <field name="description">Seven deep-dive lessons on the 5-addon configurator stack. Architecture, new-product setup, session state machine, sale + MRP integration, the v2 UX overlay, and the common gotchas (exclusion explosions, rule ordering, performance).</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">100</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">11</field>
+        </record>
+        <record id="course_new_product_workflow" model="slide.channel">
+            <field name="name">Course 11 — Creating a New Product End-to-End</field>
+            <field name="description">Eight cross-system lessons walking a new cabinet from conception through ProductGraph entry, cut spec, BoM, configurator setup, pricing, first MO, and release. The course that ties every module together.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">110</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">1</field>
+        </record>
+        <record id="course_kitchen_ops_deep" model="slide.channel">
+            <field name="name">Course 12 — Kitchen Ops Module</field>
+            <field name="description">Seven deep-dive lessons on the Kitchen Ops umbrella menu — the parent menu architecture, project lifecycle, jobs board, production release queue, floor load dashboards, MI engine observability, and the cut/hardware/production package trio.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">120</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">4</field>
+        </record>
+        <record id="course_fabio_module" model="slide.channel">
+            <field name="name">Course 13 — Fabio Module (Hermes)</field>
+            <field name="description">Seven deep-dive lessons on the Southbrook Fabio AI assistant surface — architecture, the recommendation queue, JWT auth + persona resolution, the tool registry, all 13 read+write tools, and the OWL chat panel + Vercel sidecar.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">130</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">5</field>
+        </record>
+        <record id="course_project_module" model="slide.channel">
+            <field name="name">Course 14 — Project Module (Customized)</field>
+            <field name="description">Seven deep-dive lessons on Southbrook&#x27;s customizations of Odoo&#x27;s Project module — kitchen vs general projects, the 13-gate readiness algorithm, 5 release sign-offs, task→MO linkage, custom views, and project-level reporting.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">140</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">6</field>
+        </record>
+        <record id="course_manufacturing_module" model="slide.channel">
+            <field name="name">Course 15 — Manufacturing Module (Customized)</field>
+            <field name="description">Seven deep-dive lessons on Southbrook&#x27;s customizations of Odoo&#x27;s Manufacturing module — architecture, MO + workorder + BoM extensions, the workcenter surface, custom Kanbans, and the MO↔cut-list↔hardware-package linkage.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">150</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">7</field>
+        </record>
+        <record id="course_whmis_base" model="slide.channel">
+            <field name="name">Course 16 — WHMIS Base Training (Cabinet Shop)</field>
+            <field name="description">Six base-training lessons on Workplace Hazardous Materials Information System (WHMIS 2015 / GHS) for Southbrook cabinet manufacturing — overview, pictograms, labels, Safety Data Sheets, cabinet-shop-specific hazards, and worker rights + emergency response. Required for every employee on hire + annual refresher.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">160</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">9</field>
+        </record>
+        <record id="course_jtbd_micros" model="slide.channel">
+            <field name="name">Course 17 — JTBD Micro Library — In-the-Moment Help</field>
+            <field name="description">Forty short, verb-phrase task tutorials — each one answers a specific &#x27;how do I...?&#x27; question users hit during their day. Designed for the in-app Help systray, not for sit-down learning. Indexed by department: Sales (8), Design (5), Planning (4), Floor (6), Maintenance (4), Quality (4), Finance (4), Payroll (5).</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">170</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">2</field>
+        </record>
+        <record id="course_quality_persona" model="slide.channel">
+            <field name="name">Course 18 — Quality Inspector — Persona Track</field>
+            <field name="description">Five lessons for the QC inspector / quality manager: menu orientation, NCR open + escalate, SPC sampling discipline, Cpk + capability analysis, supplier scorecards. Anchored on southbrook_quality v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">180</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">5</field>
+        </record>
+        <record id="course_payroll_persona" model="slide.channel">
+            <field name="name">Course 19 — Payroll Administrator — Persona Track</field>
+            <field name="description">Five lessons for the payroll admin running the bi-weekly cycle on CRA 2026 brackets: menu orientation, pre-run checks, compute + approve, EFT + bank upload, mid-cycle adjustments. Anchored on southbrook_payroll_ca v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">190</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">7</field>
+        </record>
+        <record id="course_finance_persona" model="slide.channel">
+            <field name="name">Course 20 — Controller — Persona Track (Monthly Close)</field>
+            <field name="description">Five lessons for the controller doing the monthly close: menu orientation, WIP reconciliation deep-dive, CCA depreciation + asset register, HST input/output filing, period lock + audit pack. Anchored on southbrook_finance_pack v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">200</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">8</field>
+        </record>
+        <record id="course_exec_persona" model="slide.channel">
+            <field name="name">Course 21 — Executive / Owner — Persona Track</field>
+            <field name="description">Four lessons for the owner / Plant GM using the daily morning briefing dashboard: 5-minute scan, tile drill-through, OEE + bottleneck reading, approving + delegating via Hermes. Anchored on southbrook_exec_dashboard v19.0.1.0.0.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">210</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">9</field>
+        </record>
+        <record id="course_quality_module" model="slide.channel">
+            <field name="name">Course 22 — Quality Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_quality internals: architecture, NCR state machine, SPC sample + control limit math, Cpk compute, quality dimension master, supplier defect rollup + MI engine integration, customisation patterns.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">220</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">5</field>
+        </record>
+        <record id="course_payroll_module" model="slide.channel">
+            <field name="name">Course 23 — Payroll CA Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_payroll_ca internals: architecture, salary rule chain, CRA bracket math, EFT format support, T4 + ROE generation, integration with native hr.payslip, customisation for new pay scenarios.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">230</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">7</field>
+        </record>
+        <record id="course_finance_module" model="slide.channel">
+            <field name="name">Course 24 — Finance Pack Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_finance_pack internals: architecture, CCA depreciation engine, WIP report query + GL reconciliation, HST return + tax accounts, budget model, MI engine integration, extension points.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">240</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">8</field>
+        </record>
+        <record id="course_integrations_module" model="slide.channel">
+            <field name="name">Course 25 — Integrations Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_integrations internals: architecture, Homag iX simulator, 3PL ASN inbound/outbound, MCP tool registry (vs Hermes registry), label printer integration, building a new vendor adapter, monitoring.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">250</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">2</field>
+        </record>
+        <record id="course_mes_mps_module" model="slide.channel">
+            <field name="name">Course 26 — MES + MPS Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_mes_mps internals: architecture, MPS period + rolling 13-week generator, workcenter capacity calc, OEE snapshot, bottleneck report query, MI engine integration, MPS customisation.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">260</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">4</field>
+        </record>
+        <record id="course_cmms_module" model="slide.channel">
+            <field name="name">Course 27 — CMMS + WMS Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_cmms_wms internals: architecture, breakdown alert + maintenance.request bridge, MTBF/MTTR math, service contracts, oversize permit / landed cost templates, MI engine, adding new equipment types.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">270</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">6</field>
+        </record>
+        <record id="course_exec_dashboard_module" model="slide.channel">
+            <field name="name">Course 28 — Exec Dashboard Module — Deep Dive</field>
+            <field name="description">Seven lessons on southbrook_exec_dashboard internals: architecture + tile registry, tile compute + cron, OWL view + mobile-first layout, drill-through wiring, adding a custom tile, Hermes integration, performance + caching.</field>
+            <field name="channel_type">training</field>
+            <field name="visibility">connected</field>
+            <field name="enroll">public</field>
+            <field name="sequence">280</field>
+            <field name="is_published" eval="True"/>
+            <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+            <field name="color">9</field>
+        </record>
+    </data>
+</odoo>

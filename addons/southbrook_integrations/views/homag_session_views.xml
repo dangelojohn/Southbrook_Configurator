@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_homag_session_list" model="ir.ui.view">
+        <field name="name">southbrook.integrations.homag_session.list</field>
+        <field name="model">southbrook.integrations.homag_session</field>
+        <field name="arch" type="xml">
+            <list string="Homag Sessions" decoration-info="state == 'sent_to_homag'"
+                  decoration-success="state == 'completed'"
+                  decoration-danger="state == 'error'">
+                <field name="name"/>
+                <field name="production_id"/>
+                <field name="state"/>
+                <field name="expected_count"/>
+                <field name="count_received"/>
+                <field name="scrap_qty"/>
+                <field name="discrepancy_pct"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_homag_session_form" model="ir.ui.view">
+        <field name="name">southbrook.integrations.homag_session.form</field>
+        <field name="model">southbrook.integrations.homag_session</field>
+        <field name="arch" type="xml">
+            <form string="Homag Session">
+                <header>
+                    <button name="action_export_to_homag" type="object" string="Export to Homag"
+                            invisible="state != 'draft'" class="oe_highlight"/>
+                    <button name="action_simulate_homag_count" type="object" string="Simulate Count"
+                            invisible="state not in ('sent_to_homag', 'cutting', 'draft')"/>
+                    <button name="action_post_to_mo" type="object" string="Post to MO"
+                            invisible="state != 'count_received'" class="oe_highlight"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,sent_to_homag,cutting,count_received,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="production_id"/>
+                            <field name="expected_count"/>
+                            <field name="count_received"/>
+                            <field name="scrap_qty"/>
+                            <field name="discrepancy_pct"/>
+                        </group>
+                        <group>
+                            <field name="simulator_seed"/>
+                            <field name="error_message" invisible="not error_message"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="BTL Payload">
+                            <field name="btl_export_payload" widget="ace"
+                                   options="{'mode': 'json'}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_homag_session" model="ir.actions.act_window">
+        <field name="name">Homag Sessions</field>
+        <field name="res_model">southbrook.integrations.homag_session</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

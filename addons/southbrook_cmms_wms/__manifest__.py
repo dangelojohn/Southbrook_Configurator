@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+{
+    "name": "Southbrook CMMS & Inventory WMS",
+    "summary": "MTBF/MTTR + breakdown-MO block + service-contract expiry + oversize-permit on picking + landed-cost templates",
+    "version": "19.0.1.0.0",
+    "license": "LGPL-3",
+    "author": "Southbrook Cabinetry / OdooIQ",
+    "category": "Manufacturing/Maintenance",
+    "depends": [
+        "base", "mail",
+        "mrp", "stock", "purchase", "delivery",
+        "maintenance", "stock_landed_costs",
+        "southbrook_manufacturing_intelligence",
+        "southbrook_mrp_kitchen_tools",
+    ],
+    "data": [
+        "security/groups.xml",
+        "security/ir.model.access.csv",
+        "data/ir_sequence.xml",
+        "data/cron_service_contract_expiry.xml",
+        "data/cron_mtbf_mttr_daily.xml",
+        "views/mtbf_mttr_report_views.xml",
+        "views/breakdown_alert_views.xml",
+        "views/service_contract_views.xml",
+        "views/stock_picking_inherit_views.xml",
+        "views/landed_cost_template_views.xml",
+        "views/mi_engine_ext_views.xml",
+        "views/menus.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

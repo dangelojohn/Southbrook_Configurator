@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_payroll_t4_preview_list" model="ir.ui.view">
+        <field name="name">southbrook.payroll.t4_preview.list</field>
+        <field name="model">southbrook.payroll.t4_preview</field>
+        <field name="arch" type="xml">
+            <list string="T4 Previews">
+                <field name="tax_year"/>
+                <field name="employee_id"/>
+                <field name="box_14_employment_income" sum="Box 14"/>
+                <field name="box_16_cpp" sum="Box 16"/>
+                <field name="box_18_ei" sum="Box 18"/>
+                <field name="box_22_income_tax" sum="Box 22"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_payroll_t4_preview_form" model="ir.ui.view">
+        <field name="name">southbrook.payroll.t4_preview.form</field>
+        <field name="model">southbrook.payroll.t4_preview</field>
+        <field name="arch" type="xml">
+            <form string="T4 Preview">
+                <header>
+                    <button name="action_generate_for_year" type="object"
+                            string="Regenerate from Payslips"
+                            class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="employee_id"/>
+                            <field name="tax_year"/>
+                        </group>
+                        <group string="Boxes">
+                            <field name="box_14_employment_income"/>
+                            <field name="box_16_cpp"/>
+                            <field name="box_18_ei"/>
+                            <field name="box_22_income_tax"/>
+                            <field name="box_24_ei_insurable_earnings"/>
+                            <field name="box_26_cpp_pensionable_earnings"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_payroll_t4_preview" model="ir.actions.act_window">
+        <field name="name">T4 Previews</field>
+        <field name="res_model">southbrook.payroll.t4_preview</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

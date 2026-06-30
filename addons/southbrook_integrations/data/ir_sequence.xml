@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_homag_session" model="ir.sequence">
+            <field name="name">Southbrook Homag Session</field>
+            <field name="code">southbrook.integrations.homag_session</field>
+            <field name="prefix">HOMAG/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_asn_3pl" model="ir.sequence">
+            <field name="name">Southbrook 3PL ASN</field>
+            <field name="code">southbrook.integrations.asn_3pl</field>
+            <field name="prefix">ASN/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

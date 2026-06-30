@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_training_item_user,training.item.user,model_southbrook_training_item,base.group_user,1,0,0,0
+access_training_item_curator,training.item.curator,model_southbrook_training_item,southbrook_training_hub.group_training_curator,1,1,1,1
+access_training_tag_user,training.tag.user,model_southbrook_training_tag,base.group_user,1,0,0,0
+access_training_tag_curator,training.tag.curator,model_southbrook_training_tag,southbrook_training_hub.group_training_curator,1,1,1,1
+access_training_menu_link_user,training.menu_link.user,model_southbrook_training_menu_link,base.group_user,1,0,0,0
+access_training_menu_link_curator,training.menu_link.curator,model_southbrook_training_menu_link,southbrook_training_hub.group_training_curator,1,1,1,1

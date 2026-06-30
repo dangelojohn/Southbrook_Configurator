@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_installer_phase_list" model="ir.ui.view">
+        <field name="name">southbrook.installer.phase.list</field>
+        <field name="model">southbrook.installer.phase</field>
+        <field name="arch" type="xml">
+            <list string="Installation Phases">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="require_photo"/>
+                <field name="min_photos"/>
+                <field name="estimated_duration_mins"/>
+                <field name="diagram_tag" optional="show"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_installer_phase_form" model="ir.ui.view">
+        <field name="name">southbrook.installer.phase.form</field>
+        <field name="model">southbrook.installer.phase</field>
+        <field name="arch" type="xml">
+            <form string="Installation Phase">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived"
+                            bg_color="bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Phase Name"/></h1>
+                        <h3><field name="code" placeholder="PHASE_XX"/></h3>
+                    </div>
+                    <group>
+                        <group string="Ordering">
+                            <field name="sequence"/>
+                            <field name="estimated_duration_mins"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Photo Gate">
+                            <field name="require_photo"/>
+                            <field name="min_photos"
+                                   readonly="not require_photo"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="diagram_tag"/>
+                    </group>
+                    <separator string="Description"/>
+                    <field name="description" nolabel="1"
+                           placeholder="What the installer must do in this phase."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_installer_phase" model="ir.actions.act_window">
+        <field name="name">Installation Phases</field>
+        <field name="res_model">southbrook.installer.phase</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

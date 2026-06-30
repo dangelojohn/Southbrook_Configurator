@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Production Release Queue — the kanban of kitchen jobs whose
+        production-release decision is anything other than "ready".
+        Default-filtered to review + blocked so the PM works the queue
+        from the top of the list every morning.
+    -->
+
+    <record id="view_production_release_list" model="ir.ui.view">
+        <field name="name">project.task.production.release.list</field>
+        <field name="model">project.task</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <list string="Production Release Queue"
+                  decoration-danger="southbrook_production_release_state == 'blocked'"
+                  decoration-warning="southbrook_production_release_state == 'review'"
+                  decoration-success="southbrook_production_release_state == 'ready'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="southbrook_production_release_state" widget="badge"
+                       decoration-danger="southbrook_production_release_state == 'blocked'"
+                       decoration-warning="southbrook_production_release_state == 'review'"
+                       decoration-success="southbrook_production_release_state == 'ready'"/>
+                <field name="readiness_score"/>
+                <field name="install_due_date"/>
+                <field name="x_southbrook_sale_order_id"/>
+                <field name="job_at_risk" widget="boolean_toggle" readonly="1" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_production_release_search" model="ir.ui.view">
+        <field name="name">project.task.production.release.search</field>
+        <field name="model">project.task</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <search string="Production Release Queue">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <filter name="blocked"
+                        string="Blocked"
+                        domain="[('southbrook_production_release_state','=','blocked')]"/>
+                <filter name="review"
+                        string="Needs Review"
+                        domain="[('southbrook_production_release_state','=','review')]"/>
+                <separator/>
+                <filter name="my_jobs"
+                        string="My Jobs"
+                        domain="[('user_ids','in',uid)]"/>
+                <group name="group_by_release_queue">
+                    <filter name="group_release_state"
+                            string="Release State"
+                            context="{'group_by': 'southbrook_production_release_state'}"/>
+                    <filter name="group_partner"
+                            string="Customer"
+                            context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_production_release_queue" model="ir.actions.act_window">
+        <field name="name">Production Release Queue</field>
+        <field name="res_model">project.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('southbrook_production_release_state','in',('review','blocked')),('x_southbrook_sale_order_id','!=',False)]</field>
+        <field name="search_view_id" ref="view_production_release_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Release queue is clear
+            </p>
+            <p>
+                Every kitchen job is either already released to production
+                or hasn't tripped a release gate yet. When a job lands in
+                review or blocked state, it shows up here.
+            </p>
+        </field>
+    </record>
+
+</odoo>

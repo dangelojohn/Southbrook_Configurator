@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Kitchen Ops top-level menu — Phase 1.4.
+
+        Every action= reference below points at a record DEFINED in a
+        sibling view/wizard file. Odoo resolves these at parse time,
+        NOT at end-of-data — so this file MUST load AFTER every file
+        that defines an action it references. The __manifest__.py
+        `data` list places this file last for that reason. The
+        previous comment here claimed end-of-data resolution; that was
+        wrong and fresh installs ParseError'd at the first menuitem
+        (warm-registry upgrades hid it because the records already
+        existed). Corrected 2026-06-23 by the Tier B floor_traveler
+        cold-install survey.
+    -->
+    <menuitem id="menu_kitchen_ops_root"
+              name="Kitchen Ops"
+              sequence="20"
+              action="action_kitchen_ops_dashboard"
+              web_icon="southbrook_premium_orchestration,static/description/icon.png"/>
+
+    <!--
+        Dashboard menu item — gives the dashboard a dedicated link in
+        the submenu (sequence=5 so it sorts above the existing views).
+        The root menu item ALSO opens the dashboard on click (the
+        action= above), so opening "Kitchen Ops" lands on the
+        dashboard by default. Child menu items remain navigable
+        and unchanged.
+    -->
+    <menuitem id="menu_kitchen_ops_dashboard"
+              name="Dashboard"
+              parent="menu_kitchen_ops_root"
+              action="action_kitchen_ops_dashboard"
+              sequence="5"/>
+
+    <menuitem id="menu_kitchen_ops_jobs"
+              name="Kitchen Jobs"
+              parent="menu_kitchen_ops_root"
+              action="action_kitchen_jobs_board"
+              sequence="10"/>
+
+    <menuitem id="menu_kitchen_ops_release_queue"
+              name="Production Release Queue"
+              parent="menu_kitchen_ops_root"
+              action="action_production_release_queue"
+              sequence="20"/>
+
+    <menuitem id="menu_kitchen_ops_install_risk"
+              name="Install Risk"
+              parent="menu_kitchen_ops_root"
+              action="action_install_risk_board"
+              sequence="30"/>
+
+    <menuitem id="menu_kitchen_ops_workcenter_bottleneck"
+              name="Workcenter Bottlenecks"
+              parent="menu_kitchen_ops_root"
+              action="action_workcenter_bottleneck_board"
+              sequence="40"/>
+
+    <menuitem id="menu_kitchen_ops_mi_engine"
+              name="MI Engine Status"
+              parent="menu_kitchen_ops_root"
+              action="action_mi_engine_status"
+              sequence="50"/>
+
+    <menuitem id="menu_kitchen_ops_tool_lifecycle"
+              name="Tool Lifecycle Board"
+              parent="menu_kitchen_ops_root"
+              action="action_tool_lifecycle_board"
+              sequence="60"/>
+
+    <menuitem id="menu_kitchen_ops_cut_spec_overrides"
+              name="Cut-Spec Overrides"
+              parent="menu_kitchen_ops_root"
+              action="action_cut_spec_override_list"
+              sequence="70"/>
+
+    <menuitem id="menu_kitchen_ops_archive_test_users"
+              name="Archive Test Users"
+              parent="menu_kitchen_ops_root"
+              action="action_test_user_archive_wizard"
+              sequence="80"
+              groups="base.group_system"/>
+
+    <!-- W088 (R2.13) — Operator-surfaced reprint of the defect-type
+         QR wallpaper. The DefectSheetController at /sb/qr/defect-sheet
+         (defined in southbrook_mrp_kitchen_workcenters/controllers/
+         defect_sheet.py) renders one QR per defect_type in the
+         southbrook.mi.check selection so operators can pin a fresh sheet
+         to the floor board after a damaged-print or selection-revision
+         event. Surfaced here (Kitchen Ops) instead of buried in the QC
+         manager menu so operators can self-serve. Auth is type="user"
+         on the route; gating via mrp.group_mrp_user keeps it out of the
+         portal-user menu while letting any shop user reprint. -->
+    <record id="action_defect_sheet_reprint" model="ir.actions.act_url">
+        <field name="name">Defect QR Sheet (Reprint)</field>
+        <field name="url">/sb/qr/defect-sheet</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_kitchen_ops_defect_sheet"
+              name="Defect QR Sheet"
+              parent="menu_kitchen_ops_root"
+              action="action_defect_sheet_reprint"
+              sequence="75"
+              groups="mrp.group_mrp_user"/>
+
+</odoo>

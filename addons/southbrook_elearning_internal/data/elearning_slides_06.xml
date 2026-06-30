@@ -1,0 +1,1002 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_06_customer_portal" model="slide.slide">
+            <field name="name">Customer Service — Reading the Customer Portal</field>
+            <field name="channel_id" ref="course_customer_touchpoints"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Customer Service rep who fields phone + email questions about the /my/kitchen-projects portal.</field>
+            <field name="html_content"><![CDATA[<h1 id="customer-service-reading-the-customer-portal">Customer Service — Reading the Customer Portal</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the Customer Service rep who picks up the phone when a customer
+calls asking "Where are my design options?", "I think I clicked the wrong
+one — can you fix it?", or "I never got my welcome email." You don't
+design kitchens and you don't run MRP — but you need to see exactly what
+the customer is seeing on their portal, know what they're allowed to do,
+and know what's deliberately hidden from them so you don't accidentally
+read internal pricing off the screen during a call.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The customer's portal lives at:</p>
+<blockquote>
+<p><strong>southbrookcabinetry.space → Sign in → My Account → Kitchen Projects</strong></p>
+</blockquote>
+<p>Direct portal route:</p>
+<blockquote>
+<p><strong>&gt; /my/kitchen-projects</strong> — list of the customer's projects
+<strong>&gt; /my/kitchen-project/<id></strong> — the A/B/C concept review page</p>
+</blockquote>
+<p>Your back-office view of the same data:</p>
+<blockquote>
+<p><strong>Sales → Kitchen Workspace → Projects → [open the row]</strong></p>
+</blockquote>
+<p>That back-office form (<code>sb.kitchen.project</code>) shows everything the customer
+sees <strong>plus</strong> the internal fields (estimated cost breakdown, salesperson,
+opportunity link, chatter, approval audit trail). When a customer calls
+asking about their portal, open the back-office form alongside — the
+customer's view is a strict subset of yours.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The portal list page (<code>/my/kitchen-projects</code>) shows one row per project
+the customer owns. Columns:</p>
+<ul>
+<li><strong>Project</strong> — code + name (<code>code</code> and <code>name</code> on <code>sb.kitchen.project</code>,
+  e.g. <code>KP/2026/000123 — Wilson Coastal Remodel</code>).</li>
+<li><strong>Theme</strong> — one of Signature / Elegance / Contemporary / Contractor
+  (<code>theme</code> on <code>sb.kitchen.project</code>).</li>
+<li><strong>State</strong> — current lifecycle stage (<code>state</code> on <code>sb.kitchen.project</code>):
+  <code>draft → designing → awaiting_customer → approved → in_production →
+  done</code> (plus <code>cancelled</code> off the side).</li>
+<li><strong>Target</strong> — target completion date (<code>date_target</code>).</li>
+</ul>
+<p>The detail page (<code>/my/kitchen-project/&lt;id&gt;</code>) is the meat of the customer's
+experience:</p>
+<ul>
+<li><strong>3D Preview pane</strong> — a Three.js canvas reading from the selected
+  option's <code>placement_data_json</code>. If no option is selected yet, it shows
+  the first option in sequence. If JavaScript is off, a "JavaScript is
+  required" notice replaces the canvas (silent — the rest of the page
+  still works).</li>
+<li><strong>Design Options grid</strong> — one card per <code>sb.kitchen.design.option</code> row,
+  showing <code>name</code> (e.g. "Option A — Coastal Walnut"), <code>description</code>
+  (HTML), <code>estimated_price</code> (the customer's price, NOT the cost), and
+  <code>estimated_lead_time_days</code>.</li>
+<li><strong>"Select this option" button</strong> — visible per card while the project
+  state is <code>designing</code> or <code>awaiting_customer</code> AND that card isn't already
+  selected. Posts to <code>/my/kitchen-project/&lt;id&gt;/select/&lt;option_id&gt;</code> and
+  flips <code>is_selected = True</code> on that row (the design-option model's
+  <code>write()</code> override forces the other cards to <code>False</code> atomically — only
+  one option may carry <code>is_selected = True</code> at a time).</li>
+<li><strong>"I approve <option_name>" button</strong> — appears only when state is
+  <code>awaiting_customer</code> AND a design option is selected. Posts to
+  <code>/my/kitchen-project/&lt;id&gt;/approve</code>, which creates an
+  <code>sb.kitchen.approval</code> record (<code>approval_type='design'</code>,
+  <code>approver_type='customer'</code>, <code>state='approved'</code>) and runs
+  <code>action_customer_approves()</code> on the project, advancing state to
+  <code>approved</code>.</li>
+<li><strong>Spec Sheet PDF</strong> — appears after the customer approves; renders
+  inline via <code>&lt;iframe&gt;</code> on desktop + Android, downloadable on iOS Safari
+  (which silently blanks PDF iframes — so the "Download Spec Sheet"
+  button is the only path that works there).</li>
+</ul>
+<p>What the customer <strong>cannot see</strong> (and what you must not read off your
+screen during a call):</p>
+<ul>
+<li><strong>Cost breakdown.</strong> The customer sees one number per option,
+  <code>estimated_price</code>. They do not see materials cost, labour cost, the
+  margin, or the dealer-pricelist column. None of those fields are
+  rendered on the portal templates.</li>
+<li><strong>Internal chatter.</strong> The <code>mail.thread</code> on <code>sb.kitchen.project</code> is back
+  office only. Notes the designer wrote ("customer wants drawer pulls
+  but won't say which") never reach the portal.</li>
+<li><strong>Dealer pricing.</strong> If the customer is attached to a dealer, the dealer
+  sees the −50% column on /my/dealer/orders — but the <strong>customer</strong> never
+  sees the dealer's pricelist, only their own retail-equivalent
+  <code>estimated_price</code>. Two pricelist columns are a dealer thing
+  (lesson 6.2), not a customer thing.</li>
+<li><strong>Other customers' projects.</strong> The portal ACL is enforced by
+  <code>rule_portal_kitchen_project_own_only</code> (record rule on
+  <code>sb.kitchen.project</code>, <code>domain_force = [('partner_id', '=',
+  user.partner_id.id)]</code>). A portal user <em>cannot</em> see, link to, or even
+  probe-by-ID another customer's project — the controller's
+  <code>_fetch_project_for_user</code> raises <code>MissingError</code> for both "no such
+  project" and "wrong customer" using the same message, so existence of
+  other projects can't be inferred.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (5 min):</strong></p>
+<ul>
+<li>Open <strong>Sales → Kitchen Workspace → Projects</strong> and filter by
+  <strong>State = Awaiting Customer</strong>. These are the customers who currently
+  have the ball — they've seen the A/B/C and need to pick + approve.</li>
+<li>Sort by <code>date_target</code> ascending. The ones near their target completion
+  date are the calls most likely to come in today.</li>
+</ul>
+<p><strong>2. Per customer call (the loop):</strong></p>
+<p>When a customer calls asking "what's going on with my kitchen":</p>
+<ul>
+<li>Search the projects list by their phone or email. Open the row.</li>
+<li>Read <code>state</code> first — that one field tells you which sentence to say:</li>
+<li><code>draft</code> → "We've just created your project — your designer is
+    starting on options this week."</li>
+<li><code>designing</code> → "Your designer is working on three concepts; they'll
+    be in your portal in a few days."</li>
+<li><code>awaiting_customer</code> → "Your three concepts are live in the portal —
+    you need to pick one and approve. Want me to walk you to the URL?"</li>
+<li><code>approved</code> → "You approved — we're scheduling production."</li>
+<li><code>in_production</code> → "We're building it. The target completion is
+    &lt;<code>date_target</code>&gt;."</li>
+<li><code>done</code> → "It's installed. Anything wrong?"</li>
+<li>If they want to know what they're seeing on the portal, <strong>read the
+  same <code>sb.kitchen.design.option</code> rows back off the back-office form</strong>.
+  Same names, same prices, same lead times.</li>
+</ul>
+<p><strong>3. Walking a customer through first login (3 min):</strong></p>
+<p>When a customer says "I never got my password email":</p>
+<ul>
+<li>Open the customer's <code>res.partner</code> form.</li>
+<li>Check the customer's <code>res.users</code> link (the user record under
+  <em>Settings → Users</em>). If there's no user, click the partner-form <strong>Grant
+  Portal Access</strong> action (native Odoo); that triggers the standard portal
+  invite email — the customer gets a signup link that lets them set their
+  own password.</li>
+<li>If the user exists but the customer never set a password, the same
+  <em>Grant Portal Access</em> action re-sends the invite.</li>
+<li>Tell them what URL they're going to:
+  <code>southbrookcabinetry.space/my/kitchen-projects</code> is the bookmark.</li>
+</ul>
+<p><strong>4. Spotting customers who've gone quiet (5 min at start of shift):</strong></p>
+<ul>
+<li>Filter projects on <strong>State = Awaiting Customer</strong> AND
+  <code>write_date &lt; today - 14 days</code>. These are projects where the customer
+  was told "your concepts are ready" two weeks ago and hasn't acted.</li>
+<li>Cross-check the customer's <code>res.users.login_date</code> (Odoo native field
+  on the user record) — if they've never logged in OR their last login
+  was before the project was submitted, the welcome path is probably
+  broken (wrong email, spam folder).</li>
+<li>Call the customer. Don't email — a customer who isn't reading the
+  portal email isn't reading your follow-up email either.</li>
+</ul>
+<p><strong>5. End of shift (5 min):</strong></p>
+<ul>
+<li>Any customer you walked through approving a design — open their
+  project, check <code>state</code> is now <code>approved</code> and there's a fresh row on
+  the <strong>Approvals</strong> tab with <code>approver_type = customer</code>. If state is
+  still <code>awaiting_customer</code>, they didn't actually click — call back
+  tomorrow.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The customer says they clicked Approve but my back-office still says
+awaiting_customer."</strong></p>
+<p>Two real causes:</p>
+<ol>
+<li>They clicked <strong>Select this option</strong> (the per-card button) but never
+   scrolled down to <strong>I approve <option></strong> (the green button at the
+   bottom of the page). Selection ≠ approval. Check <code>selected_design_
+   option_id</code> on the project — if it's set but state is still
+   <code>awaiting_customer</code>, that's the diagnosis. Walk them through the
+   second click.</li>
+<li>They got a CSRF token error and the redirect bounced them back to
+   the same page. Rare, but happens when they leave the tab open
+   overnight. Ask them to reload the page first, then click Approve.</li>
+</ol>
+<p><strong>"The customer says they want to change which option they selected
+after they already approved."</strong></p>
+<p>Approval flips the project to <code>approved</code> and the state-machine
+disallows going backward through the public actions. You <strong>cannot</strong>
+un-approve via the portal — there's no button for it. From your back
+office: the designer can run <code>action_set_state('designing')</code> (back to
+designing), the customer re-selects + re-approves, and a fresh
+<code>sb.kitchen.approval</code> row is created. <strong>Escalate this to the
+designer</strong> — don't write the state field yourself.</p>
+<p><strong>"The customer says the portal shows the wrong price."</strong></p>
+<p>The portal shows <code>sb.kitchen.design.option.estimated_price</code>. If that's
+wrong, it's wrong on the model — the portal is just a window. Open the
+back-office form, fix the value on the relevant option row, and tell
+the customer to refresh. <strong>Do not</strong> quote them a different price over
+the phone without changing the field — what they see on screen IS the
+contractual quote.</p>
+<p><strong>"The customer is asking why their installation date moved."</strong></p>
+<p><code>date_target</code> on the project is the only date the portal shows. If the
+production planner moved it, it moved on the project. The customer
+won't see a chatter note explaining why (chatter is internal). You'll
+have to read the planner's chatter entry yourself and translate it
+into a customer-friendly sentence on the call.</p>
+<p><strong>"A second customer called saying they can see another customer's
+project."</strong></p>
+<p>That's a P0 — escalate to IT immediately. The portal ACL
+(<code>rule_portal_kitchen_project_own_only</code>) is supposed to make this
+impossible. If it actually happened, either (a) a customer is logged
+in as the wrong <code>res.users</code>, or (b) the rule has been disabled. <strong>Do
+not write to the project</strong> while investigating — you'll mess up the
+audit trail.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Each portal click writes to one of three tables:</p>
+<ul>
+<li><strong><code>sb.kitchen.design.option</code></strong> — <em>Select this option</em> sets
+  <code>is_selected = True</code> on the chosen row. The model's <code>write()</code> override
+  runs an atomic compensating write that sets <code>is_selected = False</code> on
+  every other option for the same project, so the one-of-N invariant is
+  enforced at the ORM layer, not by the UI.</li>
+<li><strong><code>sb.kitchen.approval</code></strong> — <em>I approve</em> creates a new approval row
+  with <code>approval_type='design'</code>, <code>approver_id = current portal user</code>,
+  <code>approver_type='customer'</code>, <code>state='approved'</code>, <code>date_decided=now</code>.
+  This is the audit trail; it's permanent and append-only.</li>
+<li><strong><code>sb.kitchen.project</code></strong> — the same <em>I approve</em> call then runs
+  <code>action_customer_approves()</code>, which (a) checks a design option is
+  selected, (b) calls <code>action_set_state('approved')</code> (which validates
+  against the <code>VALID_TRANSITIONS</code> set in
+  <code>southbrook_kitchen_workspace/models/sb_kitchen_project.py</code> — an
+  off-graph transition like <code>draft → approved</code> raises <code>UserError</code>), and
+  (c) triggers the <code>email_template_design_approved</code> lifecycle email via
+  <code>_send_lifecycle_email</code>.</li>
+</ul>
+<p>The portal controller (<code>southbrook_customer_portal/controllers/main.py</code>)
+uses <code>sudo()</code> on all reads because the portal user's own ACL is
+read-only on the project (per <code>ir.model.access.csv</code> —
+<code>perm_read=1,perm_write=0</code>). The controller is the layer that decides
+<em>which</em> project to read; the record rule
+(<code>rule_portal_kitchen_project_own_only</code>) is the layer that decides which
+project the portal user is even <em>allowed</em> to read if they probe by ID.
+Two layers of defence; both have to fail for cross-customer leakage.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A customer calls and says: "I clicked Approve but the page came
+back and the green button is gone — did it work?" The state on your
+back-office form still reads <code>awaiting_customer</code>. What do you check
+first?</p>
+<blockquote>
+<p>Open the customer's project in back office and look at
+<code>selected_design_option_id</code>. If it's set but state is still
+<code>awaiting_customer</code>, they only clicked <strong>Select this option</strong>, not
+<strong>I approve</strong>. Walk them through scrolling down to the green button.
+If <code>selected_design_option_id</code> is empty, they never even selected —
+tell them to pick a card first.</p>
+</blockquote>
+<p><strong>2.</strong> A customer says: "I want to see the cost breakdown — what's the
+labour cost on Option B?" Where do you read that off the portal?</p>
+<blockquote>
+<p>You don't. The portal shows ONE number per option,
+<code>estimated_price</code> on <code>sb.kitchen.design.option</code>. There is no cost
+breakdown rendered on the customer-facing template. If they want
+a breakdown, the conversation goes to their designer / salesperson,
+not to you. Don't read the back-office cost figures out loud — those
+aren't priced for the customer.</p>
+</blockquote>
+<p><strong>3.</strong> Filter projects by <strong>State = Awaiting Customer</strong>. You spot one
+that's been in that state for 18 days, last write was 17 days ago.
+What's your next action?</p>
+<blockquote>
+<p>Open the customer's <code>res.users</code> (linked from <code>res.partner</code>) and check
+<code>login_date</code>. If they've never logged in or last logged in before the
+project was submitted, the welcome path is broken — phone them, not
+email. Re-issue the portal invite via <em>Grant Portal Access</em> on the
+partner form if their account exists but has never been used.</p>
+</blockquote>
+<p><strong>4.</strong> A customer says: "I just opened my portal and I can see another
+customer's project — there's a kitchen called 'Smith Renovation' but
+I'm not Smith." What do you do?</p>
+<blockquote>
+<p>Treat as a P0 security incident. Do NOT write to either project
+while investigating. The record rule
+<code>rule_portal_kitchen_project_own_only</code> is supposed to make this
+impossible — if it actually happened, either the customer is logged
+in as the wrong user account or the rule has been disabled.
+Escalate to IT immediately and capture the screen state on the call.</p>
+</blockquote>
+<p><strong>5.</strong> The customer says: "I changed my mind — I want Option C, not
+Option B. Can you switch it for me?" The project state is <code>approved</code>.
+What's the right answer?</p>
+<blockquote>
+<p>"You can't un-approve from the portal — there's no public button for
+it." Don't try to flip <code>is_selected</code> on Option C from your back
+office while state is <code>approved</code> — the project state-machine treats
+approval as a contractual gate. <strong>Escalate to the designer</strong>: they
+can run <code>action_set_state('designing')</code> to roll the project back to
+the designing stage, the customer re-selects + re-approves, and a
+fresh <code>sb.kitchen.approval</code> row is created so the audit trail shows
+the change.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>General Odoo portal mechanics (sign-up, password reset internals) →
+  Odoo's own native eLearning track.</li>
+<li>The dealer-portal surface (separate URL, separate rules, different
+  audience) → lesson 6.2.</li>
+<li>Fabio's customer-communication recommendations queue (when the
+  system flags a customer who's been quiet) → lesson 6.3.</li>
+<li>The Configuration Engine output that feeds <code>placement_data_json</code>
+  and what the 3D preview is actually rendering — that's a designer /
+  config-engine topic, not a CS topic.</li>
+<li>How the spec-sheet PDF is generated (the
+  <code>report_signature_spec_sheet_doc</code> template) → estimating /
+  configurator track, lesson 5.2.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_06_dealer_portal" model="slide.slide">
+            <field name="name">Customer Service — Dealer Portal + Channel Pricing</field>
+            <field name="channel_id" ref="course_customer_touchpoints"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Customer Service rep who handles dealer-account questions (different rep, usually, from the one who handles end-customer calls).</field>
+            <field name="html_content"><![CDATA[<h1 id="customer-service-dealer-portal-channel-pricing">Customer Service — Dealer Portal + Channel Pricing</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the Customer Service rep who picks up the phone when <strong>a dealer</strong>
+calls — Image Floor, Amazing Window, Pro Finish, Richwood, or any
+Tradesperson / KD / Big-Box partner. Dealers are not end customers.
+They re-sell Southbrook kitchens to <em>their</em> customers, they get a
+channel discount, and they have a different portal at a different URL
+with different security rules. This lesson is the practical reality of
+supporting that channel without leaking another dealer's order data and
+without misquoting the dealer pricelist.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The dealer portal lives at:</p>
+<blockquote>
+<p><strong>southbrookcabinetry.space → Sign in (as a dealer-channel user) → My Account</strong></p>
+</blockquote>
+<p>Direct dealer routes (only resolve for partners with
+<code>res.partner.channel = 'dealer'</code>):</p>
+<blockquote>
+<p><strong>&gt; /my/dealer/orders</strong> — list of the dealer's own sale orders
+<strong>&gt; /my/dealer/production-package/<pkg_id>/kd</strong> — KD flat-pack JSON download (Central Kitchens channel)
+<strong>&gt; /my/dealer/production-package/<pkg_id>/installation-pdf</strong> — installation reference PDF (drawings + cut list + hardware schedule + KD holes)</p>
+</blockquote>
+<p>Your back-office view of the dealer's data:</p>
+<blockquote>
+<p><strong>Sales → Orders → Orders</strong> — filter by <code>partner_id</code> = the dealer
+<strong>Contacts → [open the dealer] → Sales &amp; Purchase tab → Southbrook Channel</strong></p>
+</blockquote>
+<p>The Southbrook Channel group on the partner form shows the two fields
+that drive everything:</p>
+<ul>
+<li><code>channel</code> (<code>res.partner.channel</code>) — selection of <code>retail / dealer /
+  tradesperson / kd / bigbox / refacing</code>.</li>
+<li><code>tradesperson_tier</code> (<code>res.partner.tradesperson_tier</code>) — only meaningful
+  when <code>channel == 'tradesperson'</code>; selection of <code>1 / 2 / 3</code> for the
+  Tier 1 (−25%) / Tier 2 (−30%) / Tier 3 (−35%) discount cascade.</li>
+</ul>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The dealer portal's order list (<code>/my/dealer/orders</code>) shows the dealer's
+own sale orders only. Columns rendered by
+<code>southbrook_dealer_portal.portal_dealer_orders_list</code>:</p>
+<ul>
+<li><strong>Order</strong> — <code>name</code> on <code>sale.order</code> (e.g. <code>S00123</code>).</li>
+<li><strong>Date</strong> — <code>date_order</code>.</li>
+<li><strong>State</strong> — Odoo native <code>state</code> (<code>draft / sent / sale / done / cancel</code>).</li>
+<li><strong>Total (Dealer)</strong> — <code>amount_total</code>, already computed against the
+  dealer's pricelist. This is the column the dealer cares about.</li>
+</ul>
+<p>How "the dealer's pricelist" gets resolved:</p>
+<ul>
+<li>Each dealer partner has <code>channel='dealer'</code>. Resolution happens at
+  <code>sale.order</code> creation through the custom routine <code>_resolve_channel_
+  pricelist</code> (the dispatcher referenced in <code>res_partner.py</code> comments)
+  which maps the channel onto <code>pricelist_dealer</code> from
+  <code>southbrook_estimating/data/pricelists.xml</code>. That pricelist is a
+  flat <code>price_discount = 50</code> global item — every line is list price
+  × 0.50 automatically.</li>
+<li>The retail / list column appears as a strikethrough on the spec
+  sheet so the dealer can show <em>their</em> end customer the
+  "before/after" pricing. The dealer sees both sides: their cost
+  (the −50% dealer total) and the retail equivalent. Their own
+  customer sees only the retail side.</li>
+<li>A <strong>Tradesperson (Contractor)</strong> partner is similar but uses
+  <code>pricelist_tradesperson</code> and an extra tier multiplier
+  (Tier 1 / 2 / 3 → 25 / 30 / 35% off the cost+5% floor). Read
+  <code>tradesperson_tier</code> on the partner; if blank when channel is
+  <code>tradesperson</code>, the onchange defaults it to Tier 3 (the entry tier).</li>
+</ul>
+<p>What the dealer <strong>cannot see</strong> (and what the controller enforces):</p>
+<ul>
+<li><strong>Other dealers' orders.</strong> The list controller filters with
+  <code>[("partner_id", "=", partner.id)]</code> where <code>partner</code> is
+  <code>request.env.user.partner_id</code> — i.e. the logged-in dealer's own
+  partner record. Per-dealer scoping is done at the <strong>controller
+  layer</strong>: a dealer can never widen the search to include another
+  dealer's sale orders, even by URL probing, because the controller
+  ignores any partner argument from the request and always uses the
+  authenticated user's partner.</li>
+<li><strong>The dealer-portal route at all</strong> if they're not on the dealer
+  channel. Every dealer route calls <code>_require_dealer()</code> first, which
+  reads <code>partner.channel</code> and raises <code>AccessError(...)</code> if it isn't
+  <code>'dealer'</code>. So a retail customer who has the URL can't load the
+  dealer pages.</li>
+<li><strong>Internal cost.</strong> The dealer sees their cost (the −50% line) and
+  the retail-equivalent. They do NOT see Southbrook's own COGS, the
+  margin, or the cost-plus floor on the Tradesperson channel.</li>
+</ul>
+<p>What you should also know:</p>
+<ul>
+<li>The <strong>production-package</strong> routes (KD export + installation PDF)
+  rely on the dealer naming a <code>pkg_id</code> — Phase-1 scope accepts any
+  package the dealer can name (the manifest documents this as a
+  scoping gap to be tightened "when Module 4 hooks the production
+  package to MO + the MO ↔ SO link is mrp standard"). Until that
+  tightening lands, a curious dealer with another dealer's package ID
+  could theoretically download it. Watch for this in support tickets —
+  if a dealer asks about a package they shouldn't know exists,
+  escalate to IT.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (5 min):</strong></p>
+<ul>
+<li>Open <em>Contacts</em>, filter by <strong>Southbrook Channel = Dealer</strong>. That's
+  your active dealer roster.</li>
+<li>Skim <em>Sales → Orders</em>, filter by partner-is-in-dealer-roster, sort
+  by <code>date_order desc</code>. The dealers calling today are usually asking
+  about an order placed in the last week.</li>
+</ul>
+<p><strong>2. Per dealer call (the loop):</strong></p>
+<p>When a dealer calls:</p>
+<ul>
+<li>Identify the dealer's <code>res.partner</code>. Their portal user account is
+  linked via <code>res.users.partner_id = partner.id</code>; the partner is the
+  authoritative key.</li>
+<li>Check <code>channel</code> and <code>tradesperson_tier</code> on the partner form. If
+  they're calling about pricing, those two fields are the conversation:</li>
+<li><code>channel='dealer'</code> → flat −50% off retail, no tier.</li>
+<li><code>channel='tradesperson'</code>, <code>tradesperson_tier='3'</code> → Tier 3 (−35%)
+    off the cost+5% floor.</li>
+<li><code>channel='kd'</code> → Central KD pricing (≈46% of retail, component
+    pricing only — no assembly).</li>
+<li><code>channel='bigbox'</code> → fixed wholesale.</li>
+<li><code>channel='refacing'</code> → per-SF margin-target pricing (35% target).</li>
+<li>Open the order they're calling about in <em>Sales → Orders</em>. Read
+  <code>amount_total</code> — that's their price. If they say "I see $X on my
+  portal but you're quoting me $Y", <code>amount_total</code> is the
+  authoritative number — the portal renders that value, not a
+  cached one.</li>
+</ul>
+<p><strong>3. Adding a new dealer (10 min):</strong></p>
+<p>When the sales team signs a new dealer:</p>
+<ul>
+<li>Create the <code>res.partner</code> record (Contacts → Create).</li>
+<li>Set <strong>Southbrook Channel</strong> (<code>channel</code>) to <code>dealer</code>.</li>
+<li>For a Tradesperson, also set <code>tradesperson_tier</code> (defaults to <code>3</code>
+  via the <code>_onchange_channel_default_tier</code> onchange when channel
+  switches to <code>tradesperson</code>).</li>
+<li><em>Grant Portal Access</em> via the native partner-form action — that
+  triggers the standard portal invite email so the dealer can set
+  their own password. They land on <code>/my/dealer/orders</code> after first
+  login (if <code>channel == 'dealer'</code>; otherwise the dealer-only routes
+  refuse them).</li>
+<li>Tell them their URL is
+  <code>southbrookcabinetry.space/my/dealer/orders</code>. Bookmark it.</li>
+</ul>
+<p><strong>4. Dealer-to-customer attribution (when applicable):</strong></p>
+<p>When an end customer registers via a dealer's referral, the sales team
+attaches the customer's <code>res.partner</code> as a contact of the dealer's
+partner record (Odoo's native <code>parent_id</code> link). Phase 1 does NOT have
+a first-class "attributed-by-dealer" model — attribution is captured
+on the sale order's salesperson + the customer's <code>parent_id</code>. <strong>TBD
+in this addon:</strong> there's no first-class <code>referred_by_dealer_id</code>
+field; if a sales-process change requires a stronger link, raise it
+to the product owner — don't fake one with a tag.</p>
+<p><strong>5. End of shift (5 min):</strong></p>
+<ul>
+<li>Any new dealer you onboarded — confirm their portal login worked
+  (check <code>res.users.login_date</code> on their user record). If never set,
+  the welcome email probably went to spam; re-issue.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The dealer says the price changed between yesterday and today."</strong></p>
+<p>Three real causes, in order of likelihood:</p>
+<ol>
+<li>The retail list price on <code>product.template.list_price</code> changed
+   upstream — the dealer pricelist is <code>price_discount = 50</code> of list,
+   so if list moved, the dealer total moved. Diagnose by opening the
+   product template + checking the chatter for a recent edit.</li>
+<li>The dealer's <code>channel</code> was changed on their partner record. Rare,
+   but happens during channel-migration projects. Check the partner
+   form's chatter for a <code>channel</code> change.</li>
+<li>They're looking at an old quote from a different sale order. Ask
+   for the order code (<code>name</code> on <code>sale.order</code>).</li>
+</ol>
+<p>Do NOT promise the old price without checking — <code>amount_total</code> on the
+order is the authoritative number.</p>
+<p><strong>"The dealer says they can see another dealer's order on their
+portal."</strong></p>
+<p>P0 — escalate to IT. The controller filter
+(<code>partner_id = partner.id</code>, using the authenticated user's partner)
+should make this impossible. If it actually happened, either (a) the
+dealer is logged in as the wrong <code>res.users</code> (multi-tab session
+mix-up), or (b) the controller has been bypassed. Capture the screen
+state on the call. Do not write to either dealer's records while
+investigating.</p>
+<p><strong>"The Tradesperson dealer is angry because their portal isn't loading
+— it says 'This area is for Southbrook dealers only.'"</strong></p>
+<p>Their <code>channel</code> is <code>tradesperson</code>, not <code>dealer</code>. The
+<code>_require_dealer()</code> helper specifically checks
+<code>partner.channel == 'dealer'</code> and rejects everything else. Per the
+Phase-1 scope, <strong>the dealer portal routes are only for the <code>dealer</code>
+channel</strong> — Tradespersons see their orders through the normal
+<code>/my/orders</code> portal route (Odoo native), not <code>/my/dealer/orders</code>.
+This is a real product gap; tell the Tradesperson "the wholesale
+portal is dealer-only for now, here's your direct order link" and
+log a ticket so the gap is visible.</p>
+<p><strong>"The dealer downloaded the KD JSON and it's empty / missing panels."</strong></p>
+<p><code>export_kd_envelope()</code> raises <code>UserError</code> when <code>cutlist_id</code> is unset
+on the production package. If the JSON downloaded fine but is
+missing entries, the cutlist is probably empty too — the production
+package was created without panels generated. Escalate to the
+production planner (the MO probably hasn't been built yet).</p>
+<p><strong>"The dealer says the installation PDF is missing the elevation
+drawings — pages 2 isn't there."</strong></p>
+<p>The PDF includes elevation views only when the freecad-bridge
+sidecar returns SVGs (env vars <code>FREECAD_BRIDGE_URL</code> and
+<code>FREECAD_BRIDGE_SECRET</code> must be set). When the bridge is unreachable
+or the secret isn't configured, the PDF gracefully degrades to
+text-only: cover page → cut list → hardware schedule → optional KD
+holes. This isn't a bug; it's the documented degradation. Escalate
+to IT to check the bridge if elevations are needed.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Each click on a dealer-portal route runs through this gauntlet:</p>
+<ol>
+<li><strong>Authentication.</strong> <code>auth="user"</code> on the route forces Odoo's standard
+   portal login.</li>
+<li><strong>Channel gate.</strong> <code>_require_dealer()</code> reads
+   <code>request.env.user.partner_id.channel</code> and raises <code>AccessError</code> if it
+   isn't exactly <code>'dealer'</code>. So a <code>tradesperson</code> or <code>retail</code> user gets
+   refused even with a valid session.</li>
+<li><strong>Per-dealer scoping.</strong> The orders search uses
+   <code>[("partner_id", "=", partner.id)]</code> where <code>partner</code> is the
+   authenticated user's partner — never a URL argument. A dealer cannot
+   widen their view to another dealer's orders. The <strong>record rule that
+   enforces this at the ORM layer</strong> is named
+   <code>rule_portal_dealer_production_package</code> in
+   <code>southbrook_dealer_portal/security/dealer_portal_security.xml</code>
+   (Model: <code>sb.production.package</code>, Groups: <code>base.group_portal</code>).
+   Note: that rule's <code>domain_force</code> is currently <code>[]</code> (Phase-1
+   compromise — see the rule's XML comments); the controller filter is
+   doing the real scoping work for sale orders until Module 4 wires
+   MO ↔ SO ↔ package linkage and the rule can be tightened. <strong>For sale
+   orders specifically, scoping is controller-layer, not ORM-rule
+   layer, in Phase 1.</strong></li>
+<li><strong>Pricelist resolution.</strong> <code>_resolve_channel_pricelist</code> runs at order
+   creation, reads <code>partner.channel</code>, and maps to the right
+   <code>product.pricelist</code> (<code>pricelist_dealer</code>, <code>pricelist_tradesperson</code>,
+   etc.). The order line totals are recomputed against the resolved
+   pricelist — switching a partner's <code>channel</code> on an existing order
+   re-prices on next save.</li>
+</ol>
+<p>The <code>channel</code> field is the keystone of the whole pricing model. Don't
+write to it directly on a partner who's mid-flight on an active
+quote — change the partner's channel mid-quote and every line
+recomputes. Always create a fresh quote instead.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A new Image Floor dealer sales rep calls and asks "how do I see
+my orders". You go to add them. What two fields on their
+<code>res.partner</code> do you set, in what order, and what triggers the
+welcome email?</p>
+<blockquote>
+<p>Set <code>channel = 'dealer'</code> on the partner form's Sales &amp; Purchase tab
+(Southbrook Channel group). <code>tradesperson_tier</code> stays blank — it's
+only meaningful when <code>channel = 'tradesperson'</code>. Save the partner,
+then click the partner-form's <strong>Grant Portal Access</strong> action (native
+Odoo). That triggers the standard portal invite email; the dealer
+sets their own password and lands on /my/dealer/orders.</p>
+</blockquote>
+<p><strong>2.</strong> A Tradesperson partner (Richwood, Tier 3) calls and says
+"why am I seeing −35% off when last week I saw −25% off?" Where do
+you check first?</p>
+<blockquote>
+<p>Open Richwood's partner form. Check <code>tradesperson_tier</code>. If it's
+<code>'3'</code>, Tier 3 is −35% off the cost+5% floor — that's correct as of
+today. The −25% they remember is Tier 1; either their tier was
+changed (check the partner chatter for a tier-change entry) or they
+were misremembering. Don't promise them −25% unless the partner
+record actually carries Tier 1.</p>
+</blockquote>
+<p><strong>3.</strong> A dealer calls and says "I'm seeing Wilson Smith's kitchen
+order on my portal. I'm not Wilson Smith." What do you do, in what
+order?</p>
+<blockquote>
+<p>P0 security incident. (1) Don't write to anything — capture screen
+state, ask the dealer to read the order number off-screen. (2) Open
+a ticket to IT with the dealer's partner ID, the order code, and
+the timestamp. (3) Ask the dealer to log out + close all browser
+tabs (multi-tab session mix-up is the most common false positive).
+The controller filter <code>partner_id = request.env.user.partner_id.id</code>
+should make true cross-dealer leakage impossible — if it actually
+happened, that filter or auth is bypassed and IT needs to look
+immediately.</p>
+</blockquote>
+<p><strong>4.</strong> A dealer downloads the installation PDF and complains "page 2
+is missing — there's no elevation drawing." What do you check?</p>
+<blockquote>
+<p>The elevation page is rendered only when the freecad-bridge
+sidecar returns SVGs. Check the Odoo container logs for
+<code>elevation: bridge unreachable</code> or <code>elevation: bridge secret unset,
+skipping</code> — if you see either, the bridge needs IT attention. The
+PDF is documented to gracefully degrade to text-only (cover → cut
+list → hardware → optional KD holes). Tell the dealer the bridge
+is being checked, don't promise a fix on the call.</p>
+</blockquote>
+<p><strong>5.</strong> A dealer's <code>amount_total</code> on their portal reads $4,200; they
+swear yesterday it was $3,800. Where do you look first?</p>
+<blockquote>
+<p>Open the order, then the order's chatter — any <code>product.template</code>
+price changes or <code>partner.channel</code> changes upstream are tracked.
+Most likely cause is a list-price change on one of the line items
+(dealer pricelist is <code>price_discount = 50</code> of list — if list moved,
+dealer total moved). Second likeliest is the partner's <code>channel</code>
+being changed (rare, but check). Do NOT honour the $3,800 without
+finding the change — <code>amount_total</code> on the order is authoritative.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The end-customer portal (different URL, different ACL, different
+  audience) → lesson 6.1.</li>
+<li>How the channel pricelists are seeded
+  (<code>southbrook_estimating/data/pricelists.xml</code>, the six pricelists
+  per Q1 of the build brief) → estimating track, lesson 5.2 +
+  <code>Southbrook_Excel_to_Odoo_Mapping.md</code> §3.4.</li>
+<li>Fabio's customer-communication recommendations (when the system
+  flags a quiet dealer the way it flags a quiet customer) →
+  lesson 6.3.</li>
+<li>The KD JSON envelope schema, the Central Kitchens consumer
+  cabling, the FreeCAD elevation render pipeline — those are
+  production / engineering topics, not CS topics.</li>
+<li>Native Odoo Sales workflow (quotation states, invoicing) → Odoo's
+  own native eLearning track.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_06_hermes_cs_view" model="slide.slide">
+            <field name="name">Customer Service Lead — The Fabio Recommendation Queue</field>
+            <field name="channel_id" ref="course_customer_touchpoints"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Customer Service Lead who triages Fabio (Hermes) recommendations that affect customer communication, distinct from the Production Manager who triages MO-related recs.</field>
+            <field name="html_content"><![CDATA[<h1 id="customer-service-lead-the-fabio-recommendation-queue">Customer Service Lead — The Fabio Recommendation Queue</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the Customer Service Lead. You don't approve manufacturing
+recommendations — that's the Production Manager's job (lesson 3.2). You
+<em>do</em> approve the recommendations Fabio raises about <strong>customers who
+need attention</strong>: somebody who hasn't logged into the portal for three
+weeks, somebody whose A/B/C concepts were published nine days ago and
+who hasn't picked, a dealer whose order has been sitting in draft. Your
+queue is the customer-side of Fabio's output. This lesson is the
+practical reality of triaging it without sending a customer two
+follow-ups in the same week.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in to Odoo back office, then:</p>
+<blockquote>
+<p><strong>Fabio → Recommendations</strong></p>
+</blockquote>
+<p>The same queue, filtered to only the rows that came from a
+customer-communication signal:</p>
+<blockquote>
+<p><strong>Fabio → Recommendations</strong> → Search bar → Filter on Source Model =
+<code>sb.kitchen.project</code> OR <code>res.partner</code> AND State = <code>draft</code> or <code>ready</code></p>
+</blockquote>
+<p>There's also an <strong>Ask</strong> menu:</p>
+<blockquote>
+<p><strong>Fabio → Ask</strong></p>
+</blockquote>
+<p>That's the chat surface (<code>southbrook.hermes.question</code>) where you can
+ask Fabio about a specific customer or project in natural language and
+optionally promote the answer to a draft recommendation. The
+recommendation queue is what you act <em>on</em>; the Ask surface is what you
+probe <em>with</em>.</p>
+<p>To see ALL of Fabio's recommendations including production ones (the
+Production Manager's queue):</p>
+<blockquote>
+<p><strong>Fabio → Recommendations</strong> → clear all filters</p>
+</blockquote>
+<p>You and the Production Manager share one table — different filters,
+different rows.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The Fabio Recommendation list (<code>southbrook.hermes.recommendation</code>)
+columns:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code> on <code>southbrook.hermes.recommendation</code>) — short
+  one-line summary, e.g. "Wilson Coastal — awaiting customer 12d".</li>
+<li><strong>Type</strong> (<code>recommendation_type</code>) — selection of <code>task / risk / note /
+  followup</code>. CS-relevant rows are usually <code>followup</code> (a customer needs
+  contact) or <code>task</code> (a measurable action to schedule).</li>
+<li><strong>Priority</strong> (<code>priority</code>) — selection of <code>low / normal / high /
+  blocker</code>. The list view colours <code>priority='blocker'</code> rows red.</li>
+<li><strong>Agent</strong> (<code>agent_partner_id</code>) — always Fabio (defaults to the
+  seeded <code>partner_fabio_agent</code> record).</li>
+<li><strong>State</strong> (<code>state</code>) — <code>draft → ready → approved → applied</code>, plus
+  <code>rejected</code> off the side. The list view colours <code>applied</code> green and
+  <code>rejected</code> muted.</li>
+<li><strong>Agent run id</strong> (<code>agent_run_id</code>) — traces back to the Fabio sidecar
+  batch that produced the rec; useful when several recs share a root
+  cause.</li>
+<li><strong>Model provider</strong> + <strong>Model name</strong> — which LLM (or rule engine)
+  produced the rec. CS-relevant recs are typically rule-based, not
+  LLM-generated.</li>
+<li><strong>Reviewer</strong> (<code>reviewer_id</code>) — set when you approve / reject.</li>
+<li><strong>Reviewed date</strong> / <strong>Applied date</strong> — timestamps of the human gate.</li>
+</ul>
+<p>The form view adds:</p>
+<ul>
+<li><strong>Summary</strong> (<code>summary</code>) — the body of what Fabio thinks.</li>
+<li><strong>Proposed action</strong> (<code>proposed_action</code>) — Fabio's suggested next
+  step in human terms.</li>
+<li><strong>Rationale</strong> (<code>rationale</code>) — why Fabio raised it (which signal fired).</li>
+<li><strong>Source model</strong> + <strong>Source res_id</strong> — the record the rec is about.
+  For CS-relevant recs, source_model is usually <code>sb.kitchen.project</code>
+  or <code>res.partner</code>.</li>
+<li><strong>Payload</strong> tab (<code>payload_json</code>) — structured JSON. For task recs
+  this carries <code>project_id</code>, <code>task_name</code>, <code>description</code>; the
+  <code>action_apply</code> flow reads it to create a <code>project.task</code> record.</li>
+</ul>
+<p>The <strong>chatter</strong> at the bottom (<code>mail.thread</code>) is where you record what
+you actually did. Every approve / reject / apply posts an automatic
+message; you can add a manual note ("called customer, voicemail").</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Start of shift (5 min):</strong></p>
+<ul>
+<li>Open <strong>Fabio → Recommendations</strong>.</li>
+<li>Filter on <strong>State = Ready</strong> (and <strong>Source Model = sb.kitchen.project</strong>
+  OR <strong>= res.partner</strong>) — that's your queue. The Production Manager's
+  filter excludes those source models and picks up <code>mrp.production</code>,
+  <code>sb.production.package</code>, etc.</li>
+<li>Group by <strong>Priority</strong> to surface blockers first.</li>
+</ul>
+<p><strong>2. Per recommendation (the loop):</strong></p>
+<p>For each row in your filtered queue:</p>
+<ul>
+<li>Open the row. Read <strong>Summary</strong> → <strong>Proposed action</strong> → <strong>Rationale</strong>
+  in that order. Summary tells you the symptom; proposed action tells
+  you what Fabio thinks to do; rationale tells you why Fabio thinks
+  so (and whether the signal is still valid — sometimes by the time
+  you read the rec, the customer already logged in).</li>
+<li>Click into the <strong>Source res_id</strong> record if you need context (Fabio
+  links it but the form doesn't auto-jump — read <code>source_model</code> +
+  <code>source_res_id</code> and navigate manually).</li>
+<li>Decide:</li>
+<li><strong>Approve</strong> if Fabio's proposed action is what you'd do anyway.
+    Click <em>Approve</em>. State flips to <code>approved</code>. <code>reviewer_id</code> and
+    <code>reviewed_date</code> are set automatically.</li>
+<li><strong>Reject</strong> if the signal is stale (customer already logged in
+    yesterday) or the proposed action is wrong for context (e.g.
+    Fabio suggests calling the customer but you already emailed them
+    this morning). Click <em>Reject</em>; record a manual chatter note
+    explaining why.</li>
+<li>After approval, do the thing. Then click <strong>Apply</strong> — state flips to
+  <code>applied</code>, <code>applied_date</code> is set. For <code>task</code>-type recs, <em>Apply</em>
+  creates a <code>project.task</code> record from the payload's <code>project_id</code> +
+  <code>task_name</code> (<code>_create_project_task</code> on the recommendation model).
+  For <code>followup</code> / <code>risk</code> / <code>note</code> types, <em>Apply</em> is the manual gate
+  — it doesn't create a task, but it does record that you followed
+  through and prevents Fabio from re-raising the same rec.</li>
+</ul>
+<p><strong>Hot rule:</strong> approval ≠ done. The model's <code>action_apply</code> constraint
+checks <code>state == 'approved'</code> — you can't skip approval and go straight
+to applied. The two-stage gate is deliberate; approval says "yes this
+is the right move", apply says "yes I did it".</p>
+<p><strong>3. CS-relevant recommendation types you'll see:</strong></p>
+<p>These are the patterns Fabio emits for the customer-communication
+surface. Each is a <code>southbrook.hermes.recommendation</code> row with the
+shape described:</p>
+<ul>
+<li><strong>Customer awaiting approval (Nd)</strong> — <code>source_model =
+  'sb.kitchen.project'</code>, <code>recommendation_type = 'followup'</code>. Triggered
+  when project state has been <code>awaiting_customer</code> for more than N
+  days (N defaults to 7). Proposed action: call the customer to
+  walk them through the approval click. <strong>Your action:</strong> open the
+  project, call the customer, log a chatter note on the project
+  with the conversation outcome, then approve + apply the rec.</li>
+<li><strong>Design A/B/C choice abandoned</strong> — <code>source_model =
+  'sb.kitchen.project'</code>, <code>recommendation_type = 'followup'</code>. Triggered
+  when project state has been <code>designing</code> for more than 21 days and
+  no <code>selected_design_option_id</code> has been set. Proposed action:
+  contact the customer about whether the concepts landed at all.
+  <strong>Your action:</strong> check the customer's <code>res.users.login_date</code> — if
+  they've never opened the portal, the welcome path is broken;
+  re-issue the portal invite before calling.</li>
+<li><strong>Portal not logged into for X weeks</strong> — <code>source_model =
+  'res.partner'</code>, <code>recommendation_type = 'followup'</code>. Triggered when
+  the partner has an active kitchen project and the linked user's
+  <code>login_date</code> is more than X weeks ago (X defaults to 3). Proposed
+  action: check whether the project is stalled awaiting a customer
+  action; phone the customer if so. <strong>Your action:</strong> look at the
+  project state; if it's <code>designing</code> or <code>in_production</code> the customer
+  isn't holding the ball — they can be quiet — but if it's
+  <code>awaiting_customer</code> or <code>approved</code> (i.e. they should be looking),
+  phone them.</li>
+<li><strong>Dealer order stalled in draft</strong> — <code>source_model = 'sale.order'</code>,
+  <code>recommendation_type = 'task'</code>. Triggered when a dealer's sale
+  order has been in <code>draft</code> state for more than 14 days. Proposed
+  action: contact the dealer to confirm they're still working on the
+  quote. <strong>Your action:</strong> phone the dealer-portal contact; if they
+  abandoned the quote, cancel the order to clean up the dealer's
+  portal list.</li>
+</ul>
+<p><strong>4. End of shift (5 min):</strong></p>
+<ul>
+<li>Re-filter to <strong>State = Approved</strong> (yours). These are recs you
+  approved earlier in the day but haven't applied yet. Either apply
+  them (action complete) or convert to a <code>project.task</code> for tomorrow.
+  Leaving rows in <code>approved</code> overnight is fine; leaving them in
+  <code>approved</code> for a week is sloppy — Fabio will re-emit a similar rec
+  and your queue will bloat.</li>
+</ul>
+<h2 id="when-to-escalate-to-the-production-manager">When to escalate to the Production Manager</h2>
+<p>These look like CS recs but actually need the Production Manager's
+gate (lesson 3.2). If you open one of these by mistake, click
+<strong>Reject</strong> with a chatter note "wrong queue, see Production":</p>
+<ul>
+<li><code>recommendation_type = 'risk'</code> with <code>source_model = 'mrp.production'</code>
+  — production-floor risk, not your call.</li>
+<li><code>priority = 'blocker'</code> with <code>source_model</code> in
+  (<code>mrp.production</code>, <code>sb.production.package</code>, <code>mrp.workorder</code>) — that's
+  a shop-floor blocker; the Production Manager has authority to
+  approve a workaround.</li>
+<li>Any rec where the proposed action involves moving a date on a
+  manufacturing order, changing a workcenter assignment, or releasing
+  an MO early. Those are production decisions; CS doesn't touch them.</li>
+</ul>
+<p>Conversely, the Production Manager should hand you anything where
+the proposed action is "contact the customer" or "contact the dealer"
+— those are your queue, regardless of what the source model is.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I approved the rec but I didn't do the thing — I forgot. Two days
+later Fabio raised the same rec again."</strong></p>
+<p>Fabio's deduplication keys off the source record + signal type, not
+off whether you remembered. The duplicate is the signal that the
+underlying issue is still there. Open the original (search
+<code>agent_run_id</code>), see what state it's in:
+- If still <code>approved</code> (you never applied): apply it now AND act on
+  the duplicate. Both rows close out.
+- If <code>applied</code> but the action didn't actually work: reject the
+  duplicate with a chatter note "previous follow-up didn't land,
+  escalating to manager".</p>
+<p><strong>"I clicked Apply on a <code>followup</code> rec but the customer never picked
+up — did Apply actually do anything?"</strong></p>
+<p>For <code>followup</code> / <code>risk</code> / <code>note</code> types, <em>Apply</em> sets <code>state='applied'</code>
+and <code>applied_date=now</code>. It does NOT create a project.task, send an
+email, or update anything outside the recommendation itself — it's a
+manual gate that says "I acknowledged this and I acted on it." If
+the customer didn't pick up, your chatter note should say so, and
+you should leave the recommendation <code>applied</code> (don't un-apply it —
+there's no un-apply path; the state machine treats <code>applied</code> as
+terminal). Fabio will raise a fresh rec tomorrow if the project is
+still stuck.</p>
+<p><strong>"I clicked Reject by mistake — can I undo it?"</strong></p>
+<p>The state machine allows <code>rejected → approved</code> only via the <em>Approve</em>
+button (<code>action_approve</code> accepts state in <code>('draft', 'ready')</code>, so
+no — once <code>rejected</code>, you can't approve it again on the same row).
+You can re-create an equivalent rec manually (create a draft
+recommendation, mark ready, approve), but Fabio will probably re-emit
+the original signal soon anyway. Leave it; wait for the next emit.</p>
+<p><strong>"The Production Manager keeps approving recs that should be mine
+and I keep approving recs that should be theirs."</strong></p>
+<p>You're both filtering the same table. Agree on the filter contract:
+the Production Manager filters source_model to
+(<code>mrp.production</code>, <code>sb.production.package</code>, <code>mrp.workorder</code>,
+<code>southbrook.mi.check</code>); you filter to (<code>sb.kitchen.project</code>,
+<code>res.partner</code>, <code>sale.order</code>). If a rec doesn't fit either filter,
+read <code>proposed_action</code> — whoever's named in the action ("CS to call
+customer" / "Production Manager to release MO") is the owner.</p>
+<p><strong>"A customer-flagged followup says 'call customer about A/B/C
+abandonment' but the customer already picked Option B yesterday."</strong></p>
+<p>Stale signal. The rec was emitted by the Fabio sidecar before the
+customer acted. Reject with a chatter note "customer selected Option
+B on <date>, signal pre-dates that". Fabio's next batch will not
+re-raise because the underlying signal (no <code>selected_design_option_id</code>)
+no longer fires.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Each click on the recommendation view writes to
+<code>southbrook.hermes.recommendation</code> plus its <code>mail.thread</code>:</p>
+<ul>
+<li><strong>Approve</strong> — sets <code>state='approved'</code>, <code>reviewer_id=current user</code>,
+  <code>reviewed_date=now</code>. Posts to <code>mail.thread</code>: "Fabio recommendation
+  approved."</li>
+<li><strong>Reject</strong> — sets <code>state='rejected'</code>, same reviewer fields. Posts:
+  "Fabio recommendation rejected." Constraint: applied recommendations
+  cannot be rejected.</li>
+<li><strong>Apply</strong> — only allowed when <code>state=='approved'</code>. Sets
+  <code>state='applied'</code>, <code>applied_date=now</code>. For <code>recommendation_type='task'</code>,
+  runs <code>_create_project_task()</code>, which reads <code>payload_json</code> for
+  <code>project_id</code> + <code>task_name</code>, creates a <code>project.task</code>, links it to
+  <code>created_task_id</code>, and posts a confirmation to both threads.</li>
+</ul>
+<p>The state machine is enforced in <code>action_*</code> methods on
+<code>southbrook.hermes.recommendation</code>. Off-graph transitions raise
+<code>UserError</code> — you can't bypass approve to apply, you can't approve a
+recommendation that's already rejected, you can't reject an applied
+one. Fabio emits drafts (<code>state='draft'</code>); a sidecar lifecycle hook
+marks them <code>ready</code> after validation; only humans can move
+<code>ready → approved → applied</code>.</p>
+<p>The CS-only filter (Source Model in (<code>sb.kitchen.project</code>,
+<code>res.partner</code>, <code>sale.order</code>)) is a <strong>convention</strong>, not a hard rule.
+The model itself doesn't know about CS-vs-Production scope — there's
+no <code>team</code> field on <code>southbrook.hermes.recommendation</code>. You and the
+Production Manager are filtering the same table by source_model
+agreement. If that gets confusing, raise a ticket to add a <code>team</code>
+selection.</p>
+<p>The seeded <strong>Fabio Reviewer</strong> group (<code>group_hermes_reviewer</code> in
+<code>southbrook_hermes/security/hermes_security.xml</code>) is what gates
+visibility of the Fabio menu and the approve / reject / apply
+buttons. Both CS and Production Managers are members of that group;
+your access to the table is identical. Filter discipline is the only
+thing separating the two queues today.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open Fabio → Recommendations, filter on <strong>State = Ready,
+Source Model = sb.kitchen.project</strong>, and see a rec named "Smith
+Modern — awaiting customer 9d". You click in, the rationale says
+"project has been in <code>awaiting_customer</code> for 9 days, customer last
+logged in 11 days ago." What's your first move?</p>
+<blockquote>
+<p>Don't approve yet. Open the project (use the source_res_id), check
+whether <code>selected_design_option_id</code> is set (they may have selected
+but not approved) and read recent project chatter. THEN call the
+customer — if they've selected, walk them through the green button.
+Once the customer either acts or commits to acting, return to the
+rec: approve + apply if they're going to act today, reject with a
+chatter note if they need a longer follow-up that you'll schedule
+as a separate task.</p>
+</blockquote>
+<p><strong>2.</strong> You see a <code>priority=blocker</code> rec in your queue. The source
+model is <code>mrp.production</code> and the proposed action says "release MO
+early to hit customer install date." What do you do?</p>
+<blockquote>
+<p>This is not your queue. Reject the rec with a chatter note "wrong
+queue, source_model is mrp.production — Production Manager owns
+the MO release decision (lesson 3.2)." Then ping the Production
+Manager so they pick it up from their own filtered queue. Don't
+approve it — you don't have manufacturing authority and clicking
+approve creates a paper trail that says you did.</p>
+</blockquote>
+<p><strong>3.</strong> You approved a <code>followup</code> rec yesterday ("call Wilson about
+A/B/C choice") but you never actually called. Today Fabio raised a
+duplicate. What do you do with the duplicate?</p>
+<blockquote>
+<p>The duplicate is the signal that the underlying issue is still
+there. Open yesterday's rec — it'll still be in <code>approved</code> state.
+Apply it today (after actually calling the customer), and reject
+the duplicate with a chatter note "rolled up into yesterday's rec
+<id>." Both rows close out; Fabio's dedup won't raise a third.</p>
+</blockquote>
+<p><strong>4.</strong> A <code>followup</code> rec for a dealer's stalled draft order has been
+sitting in your queue for two days. You phone the dealer, they
+confirm they're not progressing the quote and want it cancelled.
+What's the right sequence in Odoo?</p>
+<blockquote>
+<p>(1) Cancel the dealer's <code>sale.order</code> (the dealer's portal list will
+stop showing it as draft). (2) Open the Fabio rec, click Approve,
+then Apply — <code>state='applied'</code>, <code>applied_date=now</code>. (3) Add a
+chatter note on the rec: "dealer confirmed abandonment, order
+cancelled <date>." Order of operations matters: cancel the order
+<em>first</em> so the dealer's view is clean before you log the rec as
+applied.</p>
+</blockquote>
+<p><strong>5.</strong> You click Reject on a rec by mistake (meant to click
+Approve). You realise immediately. Can you un-reject?</p>
+<blockquote>
+<p>No. The state machine allows approve from <code>draft</code> or <code>ready</code> only
+— once rejected, the rec is terminal for that row. You can
+manually create a fresh draft recommendation with the same body,
+mark ready, approve, apply — that's the workaround. In practice
+the cleaner move is to act on the customer / dealer directly (do
+the thing) and trust that Fabio will re-emit the signal tomorrow
+if it still applies; your chatter note on the rejected row should
+say "rejected in error, action taken outside the queue on <date>."</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Production-side Fabio recommendations (the MO + workcenter +
+  scrap recs) — covered from the Production Manager's perspective in
+  lesson 3.2.</li>
+<li>Sysadmin-side Fabio recommendations (orchestration crons, backup
+  warnings, system-health recs) — lesson 7.3.</li>
+<li>The Fabio sidecar itself — how it produces recommendations, the
+  rule rules + LLM pipeline, the JWT-based API gating. That's
+  infrastructure, not CS workflow.</li>
+<li>The Ask Fabio chat surface in depth (Fabio → Ask) — covered as a
+  cross-cutting tool in lesson 3.2 alongside the production view.</li>
+<li>The customer-facing /my/fabio surface (customers asking Fabio
+  about their own project) — that's the customer's experience, not
+  the CS Lead's queue.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

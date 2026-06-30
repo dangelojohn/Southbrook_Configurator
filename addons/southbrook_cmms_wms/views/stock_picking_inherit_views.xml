@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Per project gotcha #11: never use `<xpath expr="//notebook" position="inside">`
+  on stock.picking — it consistently breaks across CE deployments. We instead
+  inject a NEW notebook page at the end via `position="after"` on the last
+  existing page.
+-->
+<odoo>
+
+    <record id="view_southbrook_cmms_picking_form" model="ir.ui.view">
+        <field name="name">stock.picking.form.southbrook_cmms</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[last()]" position="after">
+                <page name="oversize_3pl" string="Oversize &amp; 3PL">
+                    <group>
+                        <group string="Oversize Permit">
+                            <field name="is_oversize_load" readonly="1"/>
+                            <field name="oversize_permit_state"/>
+                            <field name="oversize_permit_jurisdictions"
+                                   placeholder="ON, QC, NB"/>
+                            <field name="oversize_permit_attachment_ids"
+                                   widget="many2many_binary"/>
+                        </group>
+                        <group string="3PL Pickup">
+                            <field name="is_3pl_asn" readonly="1"/>
+                            <field name="pickup_3pl_carrier"/>
+                            <field name="pickup_3pl_tracking_url" widget="url"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

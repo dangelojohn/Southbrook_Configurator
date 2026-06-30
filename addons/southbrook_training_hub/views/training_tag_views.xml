@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_training_tag_list" model="ir.ui.view">
+        <field name="name">southbrook.training.tag.list</field>
+        <field name="model">southbrook.training.tag</field>
+        <field name="arch" type="xml">
+            <list string="Training Tags" decoration-info="kind == 'jtbd'"
+                  decoration-muted="kind == 'course'">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="item_count"/>
+                <field name="description" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_training_tag_form" model="ir.ui.view">
+        <field name="name">southbrook.training.tag.form</field>
+        <field name="model">southbrook.training.tag</field>
+        <field name="arch" type="xml">
+            <form string="Training Tag">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. create a kitchen quote"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="kind"/>
+                            <field name="sequence"/>
+                            <field name="color" widget="color_picker"/>
+                        </group>
+                        <group>
+                            <field name="item_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Tagged Items" name="items">
+                            <field name="item_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="kind"/>
+                                    <field name="audience"/>
+                                    <field name="minutes"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_training_tag_search" model="ir.ui.view">
+        <field name="name">southbrook.training.tag.search</field>
+        <field name="model">southbrook.training.tag</field>
+        <field name="arch" type="xml">
+            <search string="Training Tags">
+                <field name="name"/>
+                <filter name="kind_jtbd" string="JTBD"
+                        domain="[('kind','=','jtbd')]"/>
+                <filter name="kind_role" string="Role"
+                        domain="[('kind','=','role')]"/>
+                <filter name="kind_module" string="Module"
+                        domain="[('kind','=','module')]"/>
+                <filter name="kind_department" string="Department"
+                        domain="[('kind','=','department')]"/>
+                <filter name="kind_course" string="Course"
+                        domain="[('kind','=','course')]"/>
+                <group>
+                    <filter name="group_kind" string="Kind"
+                            context="{'group_by': 'kind'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_training_tag" model="ir.actions.act_window">
+        <field name="name">Training Tags</field>
+        <field name="res_model">southbrook.training.tag</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_training_tag_search"/>
+    </record>
+
+</odoo>

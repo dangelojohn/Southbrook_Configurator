@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_training_menu_link_list" model="ir.ui.view">
+        <field name="name">southbrook.training.menu_link.list</field>
+        <field name="model">southbrook.training.menu_link</field>
+        <field name="arch" type="xml">
+            <list string="Menu Links">
+                <field name="sequence" widget="handle"/>
+                <field name="menu_id"/>
+                <field name="item_id"/>
+                <field name="note"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_training_menu_link_form" model="ir.ui.view">
+        <field name="name">southbrook.training.menu_link.form</field>
+        <field name="model">southbrook.training.menu_link</field>
+        <field name="arch" type="xml">
+            <form string="Menu Link">
+                <sheet>
+                    <group>
+                        <field name="menu_id"/>
+                        <field name="item_id"/>
+                        <field name="sequence"/>
+                        <field name="note"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_training_menu_link" model="ir.actions.act_window">
+        <field name="name">Pin Lessons to Menus</field>
+        <field name="res_model">southbrook.training.menu_link</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

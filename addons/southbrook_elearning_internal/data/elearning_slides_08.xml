@@ -1,0 +1,2417 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_08_estimating_architecture" model="slide.slide">
+            <field name="name">Estimating Architecture — The Model Topology Behind the Order Builder</field>
+            <field name="channel_id" ref="course_estimating_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Estimator team lead + developer extending the module. Reads like a map you keep next to your monitor when something downstream &quot;doesn&#x27;t add up&quot; and you need to know which table to inspect.</field>
+            <field name="html_content"><![CDATA[<h1 id="estimating-architecture-the-model-topology-behind-the-order-builder">Estimating Architecture — The Model Topology Behind the Order Builder</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're either the team lead the estimators escalate to ("the BoM preview
+is empty and I don't know why"), or the developer who's about to extend
+<code>southbrook_estimating</code> and needs to know what's already wired before you
+add another <code>_inherit</code>. Either way, you need the map: which model carries
+which field, what gets recomputed when, which inheritance chain owns the
+notebook page, and where the report data comes from. This lesson is that
+map. It's the deepest dive in the Estimating course — every later lesson
+points back here.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>There is no single screen for "architecture." The addon root is the map:</p>
+<blockquote>
+<p><strong><code>addons/southbrook_estimating/</code></strong> in the repo</p>
+</blockquote>
+<p>Backend menus you'll exercise while reading along:</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder</strong> (top-level app drawer)
+<strong>Sales → Orders → Order Builder</strong> (legacy Build-Spec §2.2 placement)
+<strong>Southbrook Estimating → Launch 3D Configurator</strong> (NF27 shortcut)
+<strong>Settings → Technical → Database Structure → Models</strong> (filter
+<code>southbrook.*</code> to see the custom model surface)</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>You won't be on one screen — you'll be in a code editor with the addon
+open. The four directories that own the architecture:</p>
+<ul>
+<li><strong><code>models/</code></strong> — Python <code>_inherit</code> extensions + the one new model
+  (<code>southbrook.order.analytics</code>). 9 files, all pure data + small
+  computed fields. The custom-routine register lives here.</li>
+<li><strong><code>views/</code></strong> — XML xpaths that inject Southbrook fields and tabs into
+  the standard Odoo forms. 6 files; the load-bearing one is
+  <code>sale_order_views.xml</code>.</li>
+<li><strong><code>reports/</code></strong> — 3 QWeb PDF templates + the shared style sheet. The
+  style sheet must load first.</li>
+<li><strong><code>data/</code></strong> — 8 XML files seeding attributes, pricelists, templates,
+  rules, and config-step buckets. Load order is significant and
+  documented in <code>__manifest__.py</code>.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>This isn't a daily-flow lesson in the operator sense — it's a "when
+you need to debug or extend, walk these steps" flow.</p>
+<p><strong>1. The model topology — what extends what.</strong></p>
+<p>The Order Builder is not a new model; it's the standard <code>sale.order</code>
+with Southbrook fields layered through <code>_inherit</code>:</p>
+<ul>
+<li><strong><code>sale.order</code></strong> (extended in <code>models/sale_order.py</code>) — adds:</li>
+<li><code>southbrook_submitted_date</code> (Datetime) — set by the portal
+    "Request a Price" action; the customer-visible "submitted on" chip
+    in the StagePipeline.</li>
+<li><code>parent_order_id</code> (Many2one→self) + <code>version</code> (Integer) — the
+    NF6 Image Floor iterative-design chain.</li>
+<li><code>_CHANNEL_PRICELISTS</code> (class-level dict) — the channel→pricelist
+    xml_id table, dispatched by <code>_resolve_channel_pricelist</code>.</li>
+<li><code>_TRADESPERSON_TIER_PRICELISTS</code> (class-level dict) — tier→
+    pricelist xml_id for the contractor sub-tiers.</li>
+<li><code>_ZONE_LAYOUT</code> (class-level dict) — zone→(cursor, y_floor,
+    z_offset) for the 3D Kitchen Preview tab.</li>
+<li><code>action_confirm()</code> override — calls super, then
+    <code>southbrook.order.analytics.capture(order)</code>.</li>
+<li><code>action_duplicate_as_draft()</code> — clones the order, links
+    <code>parent_order_id</code>, increments <code>version</code>.</li>
+<li><code>get_kitchen_3d_payload()</code> — multi-cabinet 3D payload for the
+    notebook viewport.</li>
+<li>
+<p><code>_southbrook_history_chain(max_depth=20)</code> — version-chain walker
+    for the customer portal timeline.</p>
+</li>
+<li>
+<p><strong><code>sale.order.line</code></strong> (extended in <code>models/sale_order_line.py</code>) — adds:</p>
+</li>
+<li><code>zone</code> (Selection: base_run / wall / tall / island / accessory /
+    other) — drives the multi-zone grid grouping in the Order Builder
+    and the spec-sheet PDF grouping.</li>
+<li><code>zone_label</code> (Char) — free-text label, visible only when
+    <code>zone='other'</code>. Cleared on onchange when zone moves off <code>'other'</code>.</li>
+<li><code>sb_panel_count</code> (Integer, computed, not stored) — panel count
+    rolled up live from <code>_compute_sb_panel_rollup</code>.</li>
+<li><code>sb_door_count</code> (Integer, computed, not stored) — door/drawer-
+    front count.</li>
+<li><code>sb_width_mm</code> (Float, computed, not stored) — derived width.</li>
+<li><code>_sb_derive_dimensions()</code> — helper: walks variant attributes
+    first, then parses <code>line.name</code> (regex <code>_WIDTH_INCHES_RE</code>,
+    <code>_FAMILY_RE</code>, <code>_DOOR_COUNT_RE</code>), then falls back to family
+    defaults (<code>_SB_DEFAULT_HEIGHT_MM</code> and friends).</li>
+<li>
+<p><code>action_reconfigure()</code> — entry point for the click-to-edit
+    behaviour in the OWL 3D viewport.</p>
+</li>
+<li>
+<p><strong><code>res.partner</code></strong> (extended in <code>models/res_partner.py</code>) — adds:</p>
+</li>
+<li><code>channel</code> (Selection: retail / dealer / tradesperson / kd /
+    bigbox / refacing) — the pricing-resolution keystone.</li>
+<li><code>tradesperson_tier</code> (Selection: 1 / 2 / 3) — meaningful only
+    when channel=<code>tradesperson</code>.</li>
+<li>
+<p><code>_onchange_channel_default_tier()</code> — defaults a new tradesperson
+    to Tier 3 and clears tier when channel moves away from
+    <code>tradesperson</code>.</p>
+</li>
+<li>
+<p><strong><code>res.users</code></strong> (extended in <code>models/res_users.py</code>) — adds:</p>
+</li>
+<li><code>southbrook_default_series</code> (Selection) — NF7, Amazing Window
+    keyboard-first pattern.</li>
+<li>
+<p><code>southbrook_order_entry_mode</code> (Selection: family_first /
+    width_first) — NF8, Pro Finish spec-driven pattern.</p>
+</li>
+<li>
+<p><strong><code>product.template</code></strong> (extended in <code>models/product_template.py</code>) — adds:</p>
+</li>
+<li><code>southbrook_category</code> (Selection: Wall/Base/Drawer/Tall/Vanity/
+    Extras) — catalog picker filter pill key.</li>
+<li><code>southbrook_description</code> (Char, translate=True) — one-sentence
+    catalog card blurb.</li>
+<li><code>southbrook_dimensions</code> (Char) — display dimensions string.</li>
+<li><code>southbrook_icon_key</code> (Char) — key into the OWL <code>CABINET_ICONS</code>
+    SVG map.</li>
+<li>
+<p><code>action_southbrook_launch_3d_configurator()</code> — wraps OCA's
+    <code>configure_product()</code> so a Southbrook header button always renders
+    (NF26 mitigation for the unreliable OCA group-gated header
+    button).</p>
+</li>
+<li>
+<p><strong><code>product.attribute.value</code></strong> (extended in
+  <code>models/product_attribute_value.py</code>) — adds (Q3 + Q4):</p>
+</li>
+<li><code>value_inches</code> (Float) — imperial display value.</li>
+<li><code>value_mm</code> (Integer) — canonical mm value (do NOT compute one
+    from the other — see the NF14 note).</li>
+<li>
+<p><code>lead_time_extra</code> (Float, days) — maple box = 14.0.</p>
+</li>
+<li>
+<p><strong><code>product.pricelist.item</code></strong> (extended in <code>models/product_pricelist.py</code>)
+  — adds:</p>
+</li>
+<li>
+<p><code>is_refacing_margin_target</code> (Boolean) + <code>_compute_refacing_price</code>
+    method — custom routine #2, the only non-declarative pricing
+    rule in the addon.</p>
+</li>
+<li>
+<p><strong><code>mrp.bom</code></strong> (extended in <code>models/mrp_bom.py</code>) — adds:</p>
+</li>
+<li><code>_get_cut_constants()</code> — the load-bearing PLM seam. Returns box_th,
+    back_th, rabbet, door_th, etc. <code>southbrook_plm.mrp_bom</code> overrides
+    this method to read the active <code>southbrook.cut.spec</code> record. Per
+    the <code>southbrook_plm_deploy</code> memory: removing this seam causes
+    <code>AttributeError</code> on every BoM operation in any DB with PLM
+    installed.</li>
+<li><code>_compute_panel_dimensions()</code> — custom routine #1, the parametric
+    panel-cut math. Returns side_L, side_R, top, bottom, back, shelf,
+    door tuples + hardware counts + edge_banding scalar.</li>
+<li><code>_compute_edge_banding_length()</code> — the Phase-1 scalar perimeter
+    sum (per-edge mapping deferred to Phase 4).</li>
+<li><code>southbrook_lead_time_extra</code> (Float, stored, computed) — sum of
+    <code>lead_time_extra</code> across variant attributes.</li>
+<li>
+<p><code>effective_produce_delay</code> (Float, stored, computed) — base
+    <code>produce_delay</code> + <code>southbrook_lead_time_extra</code>.</p>
+</li>
+<li>
+<p><strong><code>product.config.session</code></strong> (extended in
+  <code>models/product_config_line.py</code>, named the file after the historical
+  NF2 hook) — adds:</p>
+</li>
+<li><code>validate_configuration()</code> — pass-through override reserving the
+    swap site for OCA's eventual dict-return → raise migration.</li>
+<li><code>get_3d_payload()</code> — single-cabinet 3D payload (the wizard
+    viewport).</li>
+<li><code>_SKU_DEFAULTS</code> (class-level dict) — the 12 Q8 SKUs with their
+    seed family/W/H/D so the first wizard render has correct
+    geometry before any <code>value_ids</code> are picked.</li>
+<li>
+<p><code>_extract_cabinet_inputs()</code>, <code>_cut_list_to_3d_payload()</code>,
+    <code>_emit_doors()</code>, <code>_emit_drawer_fronts()</code>, <code>_3d_payload_worktop()</code>,
+    <code>_3d_payload_accessory()</code> — geometry emitters per family.</p>
+</li>
+<li>
+<p><strong><code>southbrook.order.analytics</code></strong> (new model in
+  <code>models/southbrook_order_analytics.py</code>) — the AI data spine. One row
+  per confirmed sale.order; captures channel, tier, dealer_id, series,
+  cabinet/panel/door counts, lifecycle timestamps. <code>capture()</code> is
+  idempotent.</p>
+</li>
+</ul>
+<p><strong>2. The view inheritance graph.</strong></p>
+<p>The Order Builder is <code>sale.view_order_form</code> extended via
+<code>view_order_form_southbrook</code> (in <code>views/sale_order_views.xml</code>). Each
+xpath in that view does one thing:</p>
+<ul>
+<li>(1) Inject the ILLUSTRATIVE SEED banner above <code>//sheet</code>, gated on the
+  <code>seed_mode_canonical</code> context flag.</li>
+<li>(2) After <code>//field[@name='partner_id']</code> — inject <code>parent_order_id</code>
+  (readonly, invisible when absent) and <code>version</code> (readonly,
+  <code>groups="base.group_no_one"</code>).</li>
+<li>(3) Inside <code>//div[@name='button_box']</code> — inject the stat-button
+  <strong>Duplicate as Draft</strong> calling <code>action_duplicate_as_draft</code>.</li>
+<li>(4) Before <code>//field[@name='order_line']/list/field[@name='product_id']</code>
+  — inject the <code>zone</code> column (optional="show") and <code>zone_label</code>
+  (invisible when zone != 'other').</li>
+<li>(5) On <code>//field[@name='order_line']/list</code> — set
+  <code>default_group_by="zone"</code> and <code>expand="1"</code> for the multi-zone
+  grouping behaviour.</li>
+<li>(6) On the order-line <code>price_subtotal</code> — set <code>sum="Zone Subtotal"</code>
+  to defend against future Odoo aggregation defaults.</li>
+<li>(7) Inside <code>//notebook</code> — inject a new page <code>kitchen_3d_preview</code>
+  hosting the OWL <code>kitchen_viewport</code> widget at 520px height.</li>
+</ul>
+<p>Plus the partner-form extension (<code>views/res_partner_views.xml</code>) which
+injects a Southbrook Channel group inside the Sales tab
+(<code>page[@name='sales_purchases']</code>).</p>
+<p>Plus the user-preferences view (<code>views/res_users_views.xml</code>) for the
+NF7/NF8 fields.</p>
+<p>Plus <code>views/product_template_3d_launch_view.xml</code> — adds the <strong>Configure
+3D Southbrook</strong> stat button (NF26) on every configurable product
+template.</p>
+<p>Plus <code>views/launch_3d_menu.xml</code> — defines the <strong>Launch 3D
+Configurator</strong> menu item under the top-level Southbrook root (NF27).</p>
+<p>The two top-level menus live in <code>sale_order_views.xml</code>:
+<code>menu_southbrook_root</code> (top-level with web_icon) and the duplicate
+<code>menu_southbrook_order_builder</code> under <code>sale.sale_order_menu</code> (NF23 —
+preserves Build-Spec §2.2 placement while giving the addon main-app
+drawer presence).</p>
+<p><strong>3. Controller routes.</strong></p>
+<p>There are <strong>no controller routes</strong> in <code>southbrook_estimating</code> itself.
+Everything is backend-only. The customer-facing one-page configurator
+ships in the companion addon <code>southbrook_estimating_website</code> (Phase 2,
+not yet shipped). The "controller-side" references you'll see in test
+files are aspirational — they describe behaviour expected once the
+companion addon lands.</p>
+<p>So when an estimator asks "is there a public URL for an order?", the
+answer today is "via Odoo's standard portal at <code>/my/quotes</code>" — not via
+a Southbrook-custom route.</p>
+<p><strong>4. The report data flow.</strong></p>
+<p>Three QWeb reports, three different data bindings — this catches
+people:</p>
+<ul>
+<li>
+<p><strong><code>signature_spec_sheet.xml</code></strong> — bound to <strong><code>sale.order</code></strong>. Customer-
+  facing PDF. The customer's signed deliverable. Reads <code>o.partner_id</code>,
+  <code>o.name</code>, <code>o.version</code>, <code>o.date_order</code>, <code>o.order_line</code> (with <code>zone</code>,
+  <code>product_id.display_name</code>, <code>product_uom_qty</code>, <code>price_unit</code>,
+  <code>price_subtotal</code>), <code>o.amount_total</code>, <code>o.currency_id</code>. Honours
+  <code>southbrook.seed_mode = illustrative</code> ir.config_parameter to show
+  the demo banner.</p>
+</li>
+<li>
+<p><strong><code>shop_copy.xml</code></strong> — bound to <strong><code>mrp.production</code></strong> (NOT sale.order).
+  The shop-floor work-order companion. Pulls <code>mo.bom_id.bom_line_ids</code>,
+  <code>mo.bom_id.effective_produce_delay</code>,
+  <code>mo.bom_id.southbrook_lead_time_extra</code>. Resolves the originating SO
+  via <code>mo.sale_line_id.order_id</code> (NF25 — the canonical link through
+  <code>sale_mrp</code>; Odoo 19 dropped the legacy <code>mo.sale_id</code> shortcut).
+  Falls back to <code>mo.origin</code> free-text when <code>sale_line_id</code> is empty
+  (manual MOs). Phase-4 cut list pulls from
+  <code>sb.production.package.cutlist_id.line_ids</code> via <code>env.get</code> so it
+  no-ops when <code>southbrook_kitchen_mrp</code> isn't installed.</p>
+</li>
+<li>
+<p><strong><code>door_order.xml</code></strong> — bound to <strong><code>sale.order</code></strong>. Door-supplier
+  schedule. Loops <code>o.order_line</code> and pulls <code>Series</code>, <code>Door Style</code>,
+  <code>Finish</code>, <code>Hinge Side</code> attribute values via
+  <code>product_template_attribute_value_ids.filtered(lambda v:
+  v.attribute_id.name == '&lt;attr_name&gt;')[:1].name</code>. Uses
+  <code>line.sb_door_count</code> and <code>line.sb_width_mm</code> for the schedule cells.
+  Aggregates a "Doors by Series" footer.</p>
+</li>
+</ul>
+<p>All three reports <code>t-call="southbrook_estimating.southbrook_report_styles"</code>
+which defines the CSS variables (<code>--southbrook-walnut</code>, <code>-sky</code>,
+<code>-linen</code>, etc. — currently TBD-marked per NF15 until the Signature
+Series spec book lands as artifact #7).</p>
+<p>The manifest data list orders this critically:
+<code>southbrook_report_styles.xml</code> must precede <code>signature_spec_sheet.xml</code>,
+<code>shop_copy.xml</code>, and <code>door_order.xml</code>. If a contributor alphabetises
+the data list, the templates fail to render. The same load-order
+discipline applies to <code>product_templates.xml</code> before <code>config_rules.xml</code>
+(the rules reference attribute_line_ids on templates).</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a new model <code>southbrook.thing</code> and the install crashes
+with <code>model not found</code> from another module's view."</strong></p>
+<p>The <code>__manifest__.py</code> <code>data</code> list order is load-bearing. If you added
+a view that references a model from another module that loads after
+yours, install fails. Move your model's data to the right point in
+the load list, or add a dependency to your manifest. The estimating
+addon's <code>data</code> list is heavily commented — read the comments before
+inserting new entries.</p>
+<p><strong>"I added a field to <code>sale.order.line</code> and the BoM Preview tab is
+now empty for every order."</strong></p>
+<p>Computed fields that touch order_line and use <code>store=False</code> recompute
+on access. If your new field's <code>@api.depends</code> chain raises, the line
+silently returns an empty value. Inspect the Odoo log for a compute-
+error stack from <code>_compute_sb_panel_rollup</code> or wherever the new field
+landed. The fix is almost always a guard against missing
+<code>product_id</code> or a missing variant attribute.</p>
+<p><strong>"I want to add a fifth pricelist tier for tradesperson and the
+auto-resolution doesn't pick it up."</strong></p>
+<p>Three places to update simultaneously:
+1. <code>res.partner.tradesperson_tier</code> selection (<code>models/res_partner.py</code>)
+   — add <code>("4", "Tier 4 (-40%)")</code>.
+2. <code>_TRADESPERSON_TIER_PRICELISTS</code> dict on <code>SaleOrder</code> (<code>models/
+   sale_order.py</code>) — add <code>"4": "southbrook_estimating.pricelist_
+   tradesperson_tier_4"</code>.
+3. <code>data/pricelists.xml</code> — add the new pricelist + item record.</p>
+<p>Forget one and the install succeeds but the resolution silently falls
+back. The dispatcher is intentionally simple (table-driven) so
+extensions are mechanical.</p>
+<p><strong>"The Shop Copy PDF crashes with <code>AttributeError: 'super' object has
+no attribute '_get_cut_constants'</code>."</strong></p>
+<p>Someone refactored <code>mrp.bom</code> and dropped the
+<code>_get_cut_constants()</code> method from <code>southbrook_estimating</code>. The
+<code>southbrook_plm.mrp_bom._get_cut_constants</code> override calls <code>super()</code>
+expecting the method to exist on the estimating addon. Per the
+<code>southbrook_plm_deploy</code> memory: this seam was restored 2026-06-11
+after exactly this regression. Re-add the method (lines ~72-89 of
+<code>models/mrp_bom.py</code>) and verify with a confirmed MO BoM compute.</p>
+<p><strong>"I added a new attribute and the view shows it but the rule that
+restricts it isn't firing."</strong></p>
+<p><code>product.config.line</code> rules in <code>data/config_rules.xml</code> are keyed on
+domain triggers. If your new attribute isn't covered by an existing
+domain, you need to add a new <code>product.config.domain</code> +
+<code>product.config.domain.line</code> pair AND a <code>product.config.line</code> record
+referencing them. Then the OCA configurator wizard will enforce it.
+The four canonical rules are: series→door (R1), box→series (R2),
+width→door_count (R3), family_subtype→soft_close (R4).</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you save a new Order Builder record, the write hits several
+layers in sequence:</p>
+<ol>
+<li><strong><code>sale.order</code> write</strong> — Odoo writes <code>partner_id</code>, <code>pricelist_id</code>
+   (already resolved by the onchange), <code>order_line</code> (with <code>zone</code>,
+   <code>zone_label</code>, <code>product_id</code>, <code>product_uom_qty</code>).</li>
+<li><strong><code>_onchange_partner_id_southbrook_pricelist</code></strong> — triggered by the
+   partner pick during entry, sets <code>pricelist_id</code>.</li>
+<li><strong><code>_compute_sb_panel_rollup</code></strong> — fires on access to
+   <code>sb_panel_count</code>, <code>sb_door_count</code>, <code>sb_width_mm</code> per line. Walks
+   variant attributes → falls back to <code>line.name</code> regex → falls back
+   to family defaults.</li>
+<li>On Confirm — <strong><code>action_confirm</code> override</strong>: calls <code>super()</code> (which
+   triggers <code>sale_mrp</code> to create <code>mrp.production</code> records), then
+   <code>Analytics.capture(order)</code> writes one
+   <code>southbrook.order.analytics</code> row.</li>
+<li>The <code>mrp.production</code> records, when their BoMs are accessed, run
+   <code>_compute_effective_produce_delay</code> which depends on
+   <code>produce_delay</code> + <code>southbrook_lead_time_extra</code> (which itself
+   depends on the variant's <code>product_template_attribute_value_ids.
+   product_attribute_value_id.lead_time_extra</code>).</li>
+</ol>
+<p>When the customer opens the 3D Kitchen Preview tab, the OWL
+component calls <code>sale.order.get_kitchen_3d_payload()</code> via JSON-RPC.
+That method loops <code>order_line</code>, looks up each line's SKU in
+<code>_SKU_DEFAULTS</code>, calls <code>mrp.bom._compute_panel_dimensions</code> per
+cabinet, then concatenates panels with per-zone X cursors (ground /
+wall / island / other) and zone-specific Y floors (wall at 1400mm,
+worktop at 762mm, etc.) into a single <code>panels</code> array with a
+<code>metadata.lines</code> lookup keyed by line id for hover tooltips.</p>
+<p>The PLM seam (<code>_get_cut_constants</code>) is what makes the math swap to
+the active cut spec when <code>southbrook_plm</code> is installed. With no PLM
+addon, the seam returns the NF14 baseline constants (BOX_TH=15.875,
+DOOR_TH=18.0, etc.) declared at module-level in <code>models/mrp_bom.py</code>.
+With PLM installed, the override returns the active
+<code>southbrook.cut.spec</code> record's <code>constants_dict()</code>. Either way, the
+same <code>_compute_panel_dimensions</code> math runs — the constants flow
+through.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> Your estimator says "I added a Zone field on the order-line
+list view and now the Subtotal at the bottom of each zone is the same
+number for every zone." What did they break, and where do you look?</p>
+<blockquote>
+<p>They turned off <code>default_group_by="zone"</code> on the embedded list
+when they edited the view, or set it incorrectly. The grouping
+behaviour comes from xpath (5) in <code>views/sale_order_views.xml</code>
+setting <code>default_group_by="zone"</code> and <code>expand="1"</code> on
+<code>//field[@name='order_line']/list</code>. The per-zone subtotal comes from
+xpath (6) which sets <code>sum="Zone Subtotal"</code> on <code>price_subtotal</code>. If
+the grouping is off, every "zone" row shows the same total
+(because there is no grouping, just one big sum).</p>
+</blockquote>
+<p><strong>2.</strong> You're extending the addon with a new "show kitchen materials
+summary" tab. Where in the inheritance graph does it go, and what's
+the load-order risk?</p>
+<blockquote>
+<p>A new <code>&lt;page&gt;</code> injected inside <code>//notebook</code> via xpath in
+<code>sale_order_views.xml</code> (mirror the pattern of the
+<code>kitchen_3d_preview</code> page injection — same xpath pattern). The
+load-order risk: if your tab references a field on <code>sale.order</code> or
+<code>sale.order.line</code> that you also add in a new module, your view
+must load AFTER the model definition AND AFTER any other view
+that the field's xpath depends on. The estimating addon's
+<code>__manifest__.py</code> data list comments are the canonical guide.</p>
+</blockquote>
+<p><strong>3.</strong> Shop Copy PDF prints but the "Originating Order" row shows the
+plain <code>mo.origin</code> string instead of the SO number-and-customer pair.
+What's going on?</p>
+<blockquote>
+<p>The MO was created without a <code>sale_line_id</code> — either a manually-
+created MO, a demo fixture, or a sale_mrp wiring failure. The Shop
+Copy template (line ~40) does <code>t-set="so" t-value="mo.sale_line_id.
+order_id"</code> and falls back to <code>mo.origin or '—'</code> when <code>so</code> is empty.
+NF25 documented this. The recovery is to set <code>sale_line_id</code> on the
+MO if you know the originating SO line, or to accept the
+degraded display for manual MOs.</p>
+</blockquote>
+<p><strong>4.</strong> A developer asks "where does <code>southbrook_lead_time_extra</code> come
+from on the BoM, and how does it become +2 weeks for maple box?"</p>
+<blockquote>
+<p>The chain: maple box's <code>product.attribute.value</code> has
+<code>lead_time_extra = 14.0</code> (set in <code>data/attributes.xml</code> per Q3).
+When a variant is materialised with maple box, the variant's
+<code>product_template_attribute_value_ids.product_attribute_value_id.
+lead_time_extra</code> is 14.0. <code>mrp.bom.southbrook_lead_time_extra</code>
+(computed, stored) sums those across all variant attributes:
+<code>bom.product_id.product_template_attribute_value_ids.mapped("...
+.lead_time_extra")</code>. <code>effective_produce_delay = produce_delay +
+southbrook_lead_time_extra</code> is what the Shop Copy displays.</p>
+</blockquote>
+<p><strong>5.</strong> Your team asks "is <code>southbrook.order.analytics</code> part of the
+custom-routine register, and can I add an aggregation method to it?"</p>
+<blockquote>
+<p>Per the docstring in <code>southbrook_order_analytics.py</code>: NF1 carve-out
+— this model does NOT count against the 7-routine custom register
+in Build Spec §4. The register lists business-logic files. The
+analytics model is a thin schema + rollup-from-existing-fields
+capture hook (no decision-making, no math beyond
+<code>Counter.most_common()</code>). If you add a method that computes
+anything beyond rollup-from-existing-fields, that's the trigger to
+revisit the boundary — file it in PUNCHLIST.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The day-to-day estimator workflow — Lesson 5.2 (intro) and lessons
+  8.2 (deep dive on the entry flow) and 8.3 (deep dive on pricing).</li>
+<li>The quote → MO handoff including the cut-spec snapshot — lesson 8.4.</li>
+<li>Report-by-report deep dive (when each is generated, what fields
+  populate what cells) — lesson 8.5.</li>
+<li>Versioning + duplication mechanics — lesson 8.6.</li>
+<li>The OCA <code>product_configurator</code> internals — its own upstream docs
+  cover that; we only extend.</li>
+<li>The companion <code>southbrook_estimating_website</code> addon (Phase 2,
+  customer-facing one-page configurator) — not yet shipped.</li>
+<li>The Hermes trade-partner platform built on top of the Order Builder
+  — <code>docs/superpowers/specs/2026-06-16-southbrook-os-and-hermes-platform-design.md</code>
+  is authoritative for that surface.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_08_order_builder_walkthrough" model="slide.slide">
+            <field name="name">Order Builder Walkthrough — Blank Quote to Confirmed-for-Engineering, Field by Field</field>
+            <field name="channel_id" ref="course_estimating_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Estimator. You build quotes every day. This lesson covers every keystroke from &quot;I have a kitchen design on my desk&quot; to &quot;the planner has an MO&quot; — including the auto-compute behaviour you can&#x27;t see and the validation gates that prevent you from shipping broken quotes downstream.</field>
+            <field name="html_content"><![CDATA[<h1 id="order-builder-walkthrough-blank-quote-to-confirmed-for-engineering-field-by-field">Order Builder Walkthrough — Blank Quote to Confirmed-for-Engineering, Field by Field</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator. You've done the basic walk-through (lesson 5.2)
+and you can build a passable quote in 20 minutes. This lesson is what
+turns that into a 12-minute quote where nothing breaks downstream —
+because you know exactly which fields are auto-computed, which are
+manual, and where the validation gates sit. Read this before your next
+kitchen.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Two entry points, same action (<code>action_order_builder</code>):</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder</strong> (top-level app drawer)
+<strong>Sales → Orders → Order Builder</strong> (Build-Spec §2.2 placement)</p>
+</blockquote>
+<p>Both open the same filtered <code>sale.order</code> list scoped to <code>state in
+('draft', 'sent')</code>. The list view shows the standard sale columns plus
+the Southbrook channel + savings columns when configured.</p>
+<p>For configuration on a per-cabinet basis:</p>
+<blockquote>
+<p><strong>(from inside a line)</strong> Configure (button injected by
+<code>product_configurator_sale</code>)</p>
+</blockquote>
+<p>For the printable PDF:</p>
+<blockquote>
+<p><strong>(from the order form)</strong> Print → Signature Spec Sheet</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The Order Builder form is <code>sale.order</code> with Southbrook xpaths from
+<code>view_order_form_southbrook</code>. Top to bottom, here's what you see and
+where it comes from:</p>
+<ul>
+<li><strong>ILLUSTRATIVE SEED banner</strong> (xpath 1) — yellow alert above the
+  sheet, gated by <code>context.get('seed_mode_canonical')</code>. You should
+  NOT see this in production. If you do, your demo context flag is
+  leaking.</li>
+<li><strong>Stat-button row</strong> (top right of the sheet) — Odoo standard stat
+  buttons, plus <strong>Duplicate as Draft</strong> (xpath 3) calling
+  <code>action_duplicate_as_draft</code>. The button shows for users in
+  <code>sales_team.group_sale_salesman</code>.</li>
+<li><strong>Customer block</strong> — <code>partner_id</code> (standard); inject after it:</li>
+<li><code>parent_order_id</code> — readonly, invisible if no parent.</li>
+<li><code>version</code> — readonly, shown only in developer mode
+    (<code>groups="base.group_no_one"</code>).</li>
+<li><strong>Pricelist</strong> — standard Odoo <code>pricelist_id</code>. Set automatically by
+  the <code>_onchange_partner_id_southbrook_pricelist</code> hook reading
+  <code>partner_id.channel</code> (and <code>tradesperson_tier</code>) through
+  <code>_resolve_channel_pricelist</code>. You CAN override it manually — but
+  read the warning in "Common mistakes" before you do.</li>
+<li><strong>Notebook → Order Lines tab</strong> (standard, with xpath additions):</li>
+<li><code>zone</code> column (xpath 4) — optional="show", default visible.</li>
+<li><code>zone_label</code> column (xpath 4) — optional="hide" by default; only
+    visible when <code>zone == 'other'</code>.</li>
+<li>Lines auto-group by <code>zone</code> (xpath 5) — <code>default_group_by="zone"</code><ul>
+<li><code>expand="1"</code> so the groups open by default.</li>
+</ul>
+</li>
+<li><code>price_subtotal</code> carries a <code>sum="Zone Subtotal"</code> aggregation
+    (xpath 6) shown in the zone group header row.</li>
+<li>Each line shows the standard <strong>Configure</strong> button from
+    <code>product_configurator_sale</code>.</li>
+<li><strong>Notebook → 3D Kitchen Preview tab</strong> (xpath 7) — 520px high panel
+  hosting the OWL <code>kitchen_viewport</code> widget. Calls
+  <code>sale.order.get_kitchen_3d_payload</code> at render time.</li>
+<li><strong>Notebook → Other Info, Customer Signature tabs</strong> — standard Odoo.</li>
+<li><strong>State pipeline (top right)</strong> — standard <code>sale.order.state</code>:
+  <code>draft</code> → <code>sent</code> → <code>sale</code> → <code>done</code>. Plus <code>cancel</code> off-pipeline. There
+  are NO Southbrook custom states. The "submitted" milestone is
+  captured separately in <code>southbrook_submitted_date</code> (Datetime).</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>The order matters. Working out of sequence is the source of 80% of
+the recoverable mistakes in this lesson.</p>
+<p><strong>1. Read the design (5 min). No keyboard yet.</strong></p>
+<p>Before opening Odoo, look at what's on your desk:
+- Cabinet count by family (Base / Wall / Tall / Vanity / Accessory /
+  Worktop).
+- Series intent (Contractor, Contemporary, Elegance, Signature).
+- Box material (White Melamine baseline, or Maple +10% +2 weeks).
+- Door style requested.
+- Finish/colour requested.
+- Hardware requests (handles, soft-close, special hinges).
+- Custom zones beyond Base Run / Wall / Tall / Island / Accessory
+  (e.g. Mudroom, Laundry, Bar).</p>
+<p>Spend 5 minutes here. The most expensive mistake is starting Odoo,
+building 18 lines, and discovering the customer wanted Maple on a
+Contractor series — which Rule 2 blocks (see lesson 8.3).</p>
+<p><strong>2. Customer pick + channel resolution (1 min).</strong></p>
+<blockquote>
+<p>Southbrook Estimating → Order Builder → Create</p>
+</blockquote>
+<ul>
+<li>Type the customer name in <code>partner_id</code>. If they exist, pick them.</li>
+<li>If they don't, click Create-and-Edit. In the partner form:</li>
+<li>Set <strong>Sales tab → Southbrook Channel</strong> (<code>channel</code> on
+    res.partner). The six values mean exactly what their labels
+    say. The default is <code>retail</code>.</li>
+<li>If channel = tradesperson, set <strong>Tradesperson Tier</strong>. The
+    <code>_onchange_channel_default_tier</code> defaults a new tradesperson
+    to Tier 3 (the entry tier). Override to 1 or 2 if known.</li>
+<li>Save the partner; return to the order.</li>
+<li>The <code>_onchange_partner_id_southbrook_pricelist</code> hook fires
+  automatically: it calls <code>_resolve_channel_pricelist(partner)</code>
+  which dispatches through <code>_CHANNEL_PRICELISTS</code> or
+  <code>_TRADESPERSON_TIER_PRICELISTS</code> and writes <code>pricelist_id</code>.</li>
+</ul>
+<p><strong>Sanity check:</strong> glance at the <strong>Pricelist</strong> field. For a Tier 3
+tradesperson, it should read "Contractor Tier 3 (-35%)". If it reads
+"Retail (List Price)", either the channel didn't save on the
+partner record, or you forgot to set it.</p>
+<p><strong>3. Order line construction (the loop, ~30 sec per line).</strong></p>
+<p>For each cabinet in the design, click <strong>Add a line</strong>:</p>
+<p>a. <strong>Product</strong> (<code>product_id</code>) — type <code>SB-</code> and pick. The 12 Q8-locked
+   anchors:
+   - <code>SB-WALL-1DR</code>, <code>SB-WALL-2DR</code>, <code>SB-BASE-1DR</code>, <code>SB-BASE-2DR</code>
+   - <code>SB-DRAWER</code>, <code>SB-SINK-BASE</code>
+   - <code>SB-TALL-PANTRY</code>, <code>SB-TALL-OVEN</code>
+   - <code>SB-CORNER</code>, <code>SB-VANITY</code>
+   - <code>SB-ACCESSORY</code> (with <code>accessory_type</code> sub-attribute:
+     end_panel/filler/cornice/pelmet/plinth)
+   - <code>SB-WORKTOP</code></p>
+<p>b. <strong>Zone</strong> (<code>zone</code>) — Selection: Base Run / Wall / Tall / Island /
+   Accessory / Other. Default <code>base_run</code>. The line will auto-group
+   under its zone in the embedded list.</p>
+<p>c. <strong>Zone Label</strong> (<code>zone_label</code>) — appears only when <code>zone == 'other'</code>
+   (the view xpath enforces <code>invisible="zone != 'other'"</code>). Free
+   text — "Laundry", "Mudroom", "Bar", "Bath 2". When you change
+   <code>zone</code> away from <code>other</code>, the <code>_onchange_zone_clear_label</code> hook
+   clears this field automatically (so a stale label doesn't ride
+   along after a zone change).</p>
+<p>d. <strong>Configure</strong> button — from <code>product_configurator_sale</code>. Click it
+   to open the OCA wizard. Walk the 11 attributes (or 13 — Family,
+   Family Subtype for corner cabinets, Width, Height, Depth, Series,
+   Box Material, Door Style, Finish, Hinge Side, Finished Sides,
+   Door Count, Handle). The wizard groups them into 4 step buckets
+   per <code>data/config_steps.xml</code>:
+   - Construction (Family, Family Subtype, Width, Height, Depth)
+   - Door &amp; Finish (Series, Door Style, Finish)
+   - Hardware (Handle, Hinge Side, Door Count)
+   - Interior (Finished Sides, Accessories)</p>
+<p>When you Finish the wizard, a <code>product.product</code> variant
+   materialises (<code>create_variant='dynamic'</code>) — or an existing one is
+   reused if you happen to pick the same combo as another line.</p>
+<p>e. <strong>Quantity</strong> (<code>product_uom_qty</code>) — usually 1 per line, but pairs
+   of identical wall cabinets are a valid case for qty=2.</p>
+<p>f. <strong>Price</strong> (<code>price_unit</code>) — recomputes automatically from the
+   resolved pricelist + the variant's <code>list_price</code> (+ any
+   <code>price_extra</code> on variant attribute values, e.g. Maple +10%).</p>
+<p>g. Watch the right side of the row: <code>sb_panel_count</code> and
+   <code>sb_door_count</code> recompute live via <code>_compute_sb_panel_rollup</code>.
+   These are NOT stored — they're live-computed every time the line
+   is accessed. If <code>sb_panel_count</code> reads 0, see the Common
+   Mistakes section.</p>
+<p>A typical mid-range kitchen has 18-25 lines. Hard ceiling is around
+50 (any more and the form gets sluggish; consider splitting into
+phased orders).</p>
+<p><strong>4. Hardware + install + accessory lines (varies).</strong></p>
+<p>Cabinets are configured. You still need:</p>
+<ul>
+<li><strong>Hardware lines</strong> — most hardware is computed per carcass from
+  <code>_compute_panel_dimensions</code> (handle_count, hinge_pair_count,
+  drawer_slide_pair_count). You add a hardware order line manually
+  ONLY when:</li>
+<li>The customer wants an upgraded handle (catalog product, e.g.
+    <code>HW-PULL-BLACK-128</code>).</li>
+<li>The customer is supplying their own appliance pulls.</li>
+<li>
+<p>A specialty hinge (corner pocket, blind-corner mechanism).</p>
+</li>
+<li>
+<p><strong>Install / service lines</strong> — service products like <code>INST-DAY</code>,
+  <code>DELIVERY-GTA</code>, <code>SITE-VISIT</code>. Not configurable; just SKU + qty.</p>
+</li>
+<li>
+<p><strong>Filler / end-panel / cornice / pelmet / plinth lines</strong> —
+  <code>SB-ACCESSORY</code> with <code>accessory_type</code> set. These render as a
+  carcass-less "end_panel" geometry in the 3D preview
+  (<code>_3d_payload_accessory</code> short-circuit).</p>
+</li>
+</ul>
+<p><strong>5. Inspect the 3D Kitchen Preview (~30 sec).</strong></p>
+<p>Open the <strong>3D Kitchen Preview</strong> tab. The OWL component calls
+<code>get_kitchen_3d_payload()</code>:</p>
+<ul>
+<li>Base Run + Tall + Accessory lines share the <strong>ground</strong> cursor
+  (advance left-to-right at Y=0).</li>
+<li>Wall lines share the <strong>wall</strong> cursor (Y=1400mm, share X range with
+  base for visual alignment).</li>
+<li>Island lines sit on their own Z plane (Z=-2500mm).</li>
+<li>Other lines tuck even further back (Z=-3000mm).</li>
+<li>Worktops always sit at Y=762mm and share the ground X cursor
+  (override).</li>
+</ul>
+<p>If your kitchen run renders weirdly (e.g. a wall cabinet floating mid-
+air over nothing because no base is under it), you've probably mis-
+zoned a line. Fix the <code>zone</code> on the line; the preview re-renders.</p>
+<p><strong>6. The Q7 smoke-test swap (~30 sec, every order).</strong></p>
+<p>This isn't a phase-1 gate exercise — do it on every real order as a
+sanity check:</p>
+<ul>
+<li>Note the order total.</li>
+<li>Open the partner field, switch to <strong>Demo Tradesperson (Tier 3)</strong>.</li>
+<li>All lines reprice via the Tier 3 pricelist. Total should drop ~35%
+  (against cost+5% floor).</li>
+<li>Switch back to your real customer.</li>
+<li>Total returns to its original value.</li>
+</ul>
+<p>If it doesn't return — i.e. a line is "stuck" — the line's
+<code>price_unit</code> was manually overridden. See Common Mistakes.</p>
+<p><strong>7. Validation gates before sending.</strong></p>
+<p>Before clicking Send or Confirm, sanity check:</p>
+<ul>
+<li><strong>Every line has a non-zero <code>sb_panel_count</code>.</strong> Open Other Info or
+  hover the line to see it. Zero = unconfigured.</li>
+<li><strong>Every Wall line is in zone=<code>wall</code>.</strong> Otherwise it'll render at
+  floor level in the 3D preview, and downstream planners will treat
+  it as a base.</li>
+<li><strong>The pricelist matches the partner's channel.</strong> Look at the
+  Pricelist field — it should match the channel label.</li>
+<li><strong><code>southbrook_submitted_date</code> is empty for orders that haven't been
+  submitted yet.</strong> This is set by the portal "Request a Price"
+  action; if it's set on a draft you just created, something's
+  wrong.</li>
+</ul>
+<p><strong>8. Send → Confirm → MO creation.</strong></p>
+<ul>
+<li>Click <strong>Send by Email</strong> with the Signature Spec Sheet attached.
+  State moves to <code>sent</code>.</li>
+<li>Customer signs.</li>
+<li>Click <strong>Confirm</strong>. <code>action_confirm</code> override runs:
+  1. <code>super().action_confirm()</code> — standard Odoo, state → <code>sale</code>,
+     creates <code>mrp.production</code> records via <code>sale_mrp</code>.
+  2. <code>Analytics.capture(order)</code> — writes one
+     <code>southbrook.order.analytics</code> row with channel, tier, dealer_id,
+     series (predominant), cabinet_count, panel_count, door_count.</li>
+<li>The planner now sees the MOs in Manufacturing.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I built 22 lines and the 3D Kitchen Preview is empty."</strong></p>
+<p>The OWL component only renders SKUs in <code>_SKU_DEFAULTS</code>. Non-SB
+products (hardware, service lines) are skipped. If your kitchen is
+all hardware lines and no cabinets, you'll see an empty scene with
+the default camera (this is the <code>cumulative_x == 0</code> branch in
+<code>get_kitchen_3d_payload</code>). Add some SB-* cabinet lines to see the
+3D render.</p>
+<p><strong>"I switched the customer and the lines didn't reprice."</strong></p>
+<p>Three possibilities:
+1. The partner has no <code>channel</code> set — defaults to <code>retail</code>. Fix
+   the partner record.
+2. A line's <code>price_unit</code> was manually overridden (you typed in the
+   price field directly). The pricelist link is broken for that
+   line. Recovery: re-trigger by changing then restoring the
+   quantity on the line, or duplicate the order and reconfigure
+   cleanly.
+3. The <code>_onchange_partner_id_southbrook_pricelist</code> hook didn't fire
+   because the partner pick happened via XML import or scripting
+   bypassing onchange. Manually set the pricelist or trigger an
+   onchange.</p>
+<p><strong>"<code>sb_panel_count</code> reads 0 on a line I configured."</strong></p>
+<p>Most often: the variant has no <code>product_template_attribute_value_ids</code>
+because the wizard was cancelled before Finish. The
+<code>_sb_derive_dimensions</code> helper then falls back to parsing
+<code>line.name</code>, and if <code>line.name</code> is just the product display name
+without a width hint (e.g. "Base 1-Door"), it falls back to
+defaults — but the <code>panel_cut_list</code> import from <code>southbrook_dims</code>
+might also have failed (it lives in <code>/srv/shared</code> via PYTHONPATH; on
+a misconfigured environment, the <code>try/except</code> returns 0). Open the
+Odoo log: if you see "ModuleNotFoundError: southbrook_dims", that's
+the env. If not, the line genuinely lacks variant data — reconfigure.</p>
+<p><strong>"Zone Label is showing on every line and I can't get rid of it."</strong></p>
+<p>The view xpath has <code>invisible="zone != 'other'"</code> — if you see it on
+every line, the view inheritance broke and the legacy view is
+rendering. Clear browser cache (developer mode → Reload Views) and
+re-open. If still broken, your local DB is missing the latest view
+update — run <code>-u southbrook_estimating</code>.</p>
+<p><strong>"I clicked Confirm but no MOs appeared."</strong></p>
+<p>Several possible causes — but the most common is that one or more
+lines lack a variant with a BoM. The <code>sale_mrp</code> bridge creates one
+<code>mrp.production</code> per line's variant; if a line has a "draft" variant
+that was never finished in the wizard, <code>sale_mrp</code> skips it. Open
+each line and check the Configure status (if the button still reads
+"Configure" rather than "Re-configure", the wizard wasn't finished).</p>
+<p>Other possibilities:
+- <code>sale_mrp</code> isn't installed. Check the modules list.
+- The product's <code>route_ids</code> don't include "Manufacture". Edit the
+  product template's Inventory tab.
+- The order confirmed but moved straight to <code>done</code> without creating
+  MOs (e.g. service products only). Verify by looking at
+  <code>order.production_ids</code> (in developer mode).</p>
+<p><strong>"I duplicated an order as draft, edited a line, and the parent
+order also changed."</strong></p>
+<p>This shouldn't happen — <code>copy()</code> deep-clones order_lines. If it did,
+one of two things:
+1. You edited a <code>product.product</code> variant directly (via the product
+   form), and that variant is shared between both orders. Variant
+   edits propagate to every line that references it. Recovery:
+   re-configure the affected line on the duplicate so a new variant
+   is materialised.
+2. You edited the partner record (e.g. changed the partner's
+   default address). Partner is shared across both orders by ID.
+   This is by design.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Every line save triggers:</p>
+<ol>
+<li><code>_compute_sb_panel_rollup</code> recompute (live, not stored).</li>
+<li>Odoo's standard pricing chain: <code>_compute_price_unit</code> on the line
+   reads the order's <code>pricelist_id</code> and the variant's <code>list_price</code> +
+   <code>price_extra</code> from variant attributes.</li>
+<li>If <code>zone == 'other'</code> and you change zone, the onchange fires
+   <code>_onchange_zone_clear_label</code> to blank <code>zone_label</code>.</li>
+</ol>
+<p>The Duplicate-as-Draft action does:</p>
+<pre><code>new_order = self.copy({
+    &quot;parent_order_id&quot;: self.id,
+    &quot;version&quot;: self.version + 1,
+    &quot;state&quot;: &quot;draft&quot;,
+})
+</code></pre>
+<p>— so the new order is in <code>draft</code>, its <code>parent_order_id</code> points back
+at this one, and its <code>version</code> is one higher. Lines copy with their
+config_session references intact.</p>
+<p>When you confirm, <code>action_confirm</code> override:</p>
+<pre><code>result = super().action_confirm()  # creates MOs via sale_mrp
+for order in self:
+    Analytics.capture(order)       # NF1 AI data spine
+return result
+</code></pre>
+<p><code>Analytics.capture</code> is idempotent — searching by <code>sale_order_id</code> and
+writing or creating. The analytics row carries <code>cabinet_count</code> =
+sum of <code>product_uom_qty</code>, <code>panel_count</code> = sum of <code>sb_panel_count</code>,
+<code>door_count</code> = sum of <code>sb_door_count</code>, plus <code>series</code> = most-common
+Series attribute via <code>Counter.most_common(1)</code>.</p>
+<p>The 3D Kitchen Preview tab calls <code>get_kitchen_3d_payload</code> which:
+- Sets up four cursors (ground / wall / island / other) at X=0.
+- Loops <code>order_line</code> in display order.
+- Per line: looks up the SKU in <code>_SKU_DEFAULTS</code>, computes panel
+  geometry via <code>_compute_panel_dimensions</code>, translates each panel
+  by <code>(x_offset, y_floor, z_offset)</code> where <code>x_offset</code> is the zone
+  cursor's current position + cabinet half-width, <code>y_floor</code> is from
+  <code>_ZONE_LAYOUT[zone][1]</code> (or 762 for worktops), and <code>z_offset</code> is
+  from <code>_ZONE_LAYOUT[zone][2]</code>.
+- Advances the cursor by the cabinet's full width.
+- Concatenates per-line panels with a <code>L{line.id}_</code> prefix.
+- Frames the camera around the widest cursor's extent.
+- Returns panels + metadata + camera + bounds.</p>
+<p>The OWL component (<code>cabinet_viewport.esm.js</code>) consumes this same
+payload shape regardless of whether it came from a single-cabinet
+wizard or the multi-cabinet order tab — dispatched by <code>resModel</code>
+internally.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You build an order with 14 lines. Eight of them are SB-BASE-2DR
+in zone=base_run. The 3D Kitchen Preview shows all eight at the same
+X=0 spot — overlapping. What did you forget?</p>
+<blockquote>
+<p>Nothing — that's the bug. Re-check: did you set <code>zone</code> on each
+line? If <code>zone</code> is blank (rare; the default is <code>base_run</code>), the
+payload uses <code>("ground", 0, 0)</code> defaults. If all eight are
+overlapping at X=0, then <code>get_kitchen_3d_payload</code> ran with a
+broken cursor advance — the cursor at line 312 of <code>sale_order.py</code>
+reads <code>cursors[cursor_name] += w</code> AFTER the panel translation
+uses <code>cursor + w/2</code> as offset. If cursors is somehow reset per
+iteration, all cabinets land at the same X. Inspect the JSON-RPC
+response in the browser dev tools — if each cabinet has the same
+<code>pos.x</code>, the cursor logic broke. Escalate.</p>
+</blockquote>
+<p><strong>2.</strong> A customer changed their mind about cabinet 7 of 18 — wants
+the door colour different. Do you re-configure that line, or
+duplicate the order?</p>
+<blockquote>
+<p>Re-configure that line. Duplicate-as-Draft is for when the customer
+wants ITERATIVE-DESIGN — multiple revisions tracked via
+parent_order_id. A single colour swap on one cabinet doesn't
+warrant a new version chain entry. Open line 7's Configure button,
+change the Finish attribute, finish the wizard, save. The new
+variant materialises (or reuses an existing one), price recomputes
+against the pricelist, and the analytics row will get updated at
+next confirm.</p>
+</blockquote>
+<p><strong>3.</strong> You add a line with <code>SB-WORKTOP</code>. In the 3D preview it sits at
+floor level, not at counter height. What's wrong?</p>
+<blockquote>
+<p>Worktops have a FAMILY-based override at line 273 of
+<code>get_kitchen_3d_payload</code>: if <code>fam == "worktop"</code>, the cursor name is
+forced to <code>_WORKTOP_CURSOR</code> ("ground") and <code>y_floor</code> is forced to
+<code>_WORKTOP_Y_FLOOR</code> (762mm). If the worktop is rendering at floor,
+either: (a) the SKU isn't <code>SB-WORKTOP</code> exactly (so the
+<code>_SKU_DEFAULTS</code> lookup fails and the family resolves to "base"); or
+(b) the line's product_id is missing. Check the line's product
+default_code in developer mode.</p>
+</blockquote>
+<p><strong>4.</strong> Your audit found a line where <code>sb_panel_count = 0</code> but the
+line is fully configured. Where do you look first?</p>
+<blockquote>
+<p>The <code>_compute_sb_panel_rollup</code> method does
+<code>from southbrook_dims import panel_cut_list</code> and on any exception
+returns 0,0,width. The most common cause is <code>southbrook_dims</code> not
+being on <code>PYTHONPATH</code> in the container (lives in <code>/srv/shared</code> per
+the in-line comment). Verify with <code>docker exec ... python -c "import
+southbrook_dims; print(southbrook_dims.__file__)"</code>. Second cause:
+the <code>panel_cut_list</code> call raised because the family or width
+derivation returned something <code>panel_cut_list</code> doesn't recognise.
+Inspect via developer mode → "View Field" on <code>sb_panel_count</code> to
+see the compute exception trail.</p>
+</blockquote>
+<p><strong>5.</strong> You confirm an order and the Manufacturing menu shows the MOs.
+But <code>southbrook.order.analytics</code> has no row for this order. What's
+broken?</p>
+<blockquote>
+<p>The <code>action_confirm</code> override expects <code>Analytics.capture(order)</code> to
+run after <code>super().action_confirm()</code>. If the analytics row is
+missing, either: (a) the override didn't fire — another module's
+<code>action_confirm</code> short-circuited via early return; (b) the
+<code>Analytics.capture</code> raised silently — check the Odoo log;
+(c) you confirmed via a script that bypassed <code>action_confirm</code>
+(direct <code>state = 'sale'</code> write). Recovery: manually call
+<code>self.env["southbrook.order.analytics"].capture(order)</code> once for
+the affected order; the method is idempotent.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The architectural map of <code>southbrook_estimating</code> — lesson 8.1.</li>
+<li>The pricing deep dive (channel resolution, dealer 50%-off math,
+  tradesperson tiers, refacing margin target) — lesson 8.3.</li>
+<li>Quote → MO handoff details, cut-spec snapshot semantics — lesson
+  8.4.</li>
+<li>Report generation timing + field mapping — lesson 8.5.</li>
+<li>Versioning and customer-changed-their-mind handling — lesson 8.6.</li>
+<li>OCA configurator wizard internals — its own upstream documentation.</li>
+<li>The customer-facing one-page configurator — Phase 2, not yet
+  shipped.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_08_pricing_zones_channels" model="slide.slide">
+            <field name="name">Pricing Deep Dive — Zones, Channels, Tradesperson Tiers, and the Resolution Dispatcher</field>
+            <field name="channel_id" ref="course_estimating_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Estimator + Sales Manager. The estimator needs to know which price gets quoted and why; the sales manager needs to know how the 50%-off dealer math actually works (and where it doesn&#x27;t), so they can explain it to a contractor on the phone without consulting code.</field>
+            <field name="html_content"><![CDATA[<h1 id="pricing-deep-dive-zones-channels-tradesperson-tiers-and-the-resolution-dispatcher">Pricing Deep Dive — Zones, Channels, Tradesperson Tiers, and the Resolution Dispatcher</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator quoting a kitchen, OR the sales manager
+explaining to a Tier 2 contractor why their cabinet number is what
+it is. Either way, you need to know:
+- What <code>channel</code> combines with what <code>tradesperson_tier</code> to drive
+  which pricelist.
+- How the dealer 50%-off math actually works — and the cases it
+  doesn't apply.
+- Per-line vs per-order discounts and when each is appropriate.
+- How taxes flow through.
+- Where <code>zone</code> enters pricing (spoiler: it doesn't, but it enters
+  reporting and grouping).</p>
+<p>This is the lesson that lets you answer "why is my number that
+number?" in real time.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The pricelists themselves:</p>
+<blockquote>
+<p><strong>Sales → Configuration → Pricelists</strong></p>
+</blockquote>
+<p>The partner side of the pricing equation:</p>
+<blockquote>
+<p><strong>Contacts → (pick partner) → Sales tab → Southbrook Channel</strong></p>
+</blockquote>
+<p>The pricelist resolution at order time:</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder → (any draft order) →
+Pricelist field</strong> (auto-resolved from <code>partner_id.channel</code> by the
+onchange)</p>
+</blockquote>
+<p>The refacing margin-target computation:</p>
+<blockquote>
+<p><strong>Sales → Configuration → Pricelists → Refacing (CTHS)</strong>
+(<code>is_refacing_margin_target</code> on pricelist items, custom routine #2)</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>In the Pricelists list view you'll see six base pricelists plus three
+tradesperson-tier sub-pricelists — nine records total:</p>
+<ol>
+<li><strong>Retail (List Price)</strong> — <code>pricelist_retail</code>. Base pricelist; no
+   item records (uses the product's <code>list_price</code> directly).</li>
+<li><strong>Dealer (-50%)</strong> — <code>pricelist_dealer</code>. One global item:
+   <code>compute_price='formula'</code>, <code>base='list_price'</code>, <code>price_discount=50</code>,
+   <code>price_round=0.01</code>.</li>
+<li><strong>Contractor (Tiered)</strong> — <code>pricelist_tradesperson</code>. Base
+   contractor pricelist with a single global "Cost x 1.05 floor"
+   item: <code>compute_price='formula'</code>, <code>base='standard_price'</code>,
+   <code>price_markup=5</code>, <code>price_round=0.01</code>.</li>
+<li><strong>Contractor Tier 1 (-25%)</strong> — <code>pricelist_tradesperson_tier_1</code>.
+   One item: <code>base='pricelist'</code>,
+   <code>base_pricelist_id=pricelist_tradesperson</code>, <code>price_discount=25</code>.
+   So tier 1 = -25% off the cost+5% floor.</li>
+<li><strong>Contractor Tier 2 (-30%)</strong> — <code>pricelist_tradesperson_tier_2</code>.
+   Same mechanic, <code>price_discount=30</code>.</li>
+<li><strong>Contractor Tier 3 (-35%)</strong> — <code>pricelist_tradesperson_tier_3</code>.
+   Same mechanic, <code>price_discount=35</code>. This is the Q7 smoke-test
+   target.</li>
+<li><strong>Central KD (Knock-Down Components)</strong> — <code>pricelist_kd</code>. One
+   global item: <code>base='list_price'</code>, <code>price_discount=54</code> (so price
+   = ~46% of retail).</li>
+<li><strong>Big-Box Wholesale</strong> — <code>pricelist_bigbox</code>. One global item:
+   <code>compute_price='fixed'</code>, <code>fixed_price=98.00</code>, <code>price_round=0.01</code>.
+   Every SKU is exactly CAD $98 regardless of list price. This is
+   the contractual wholesale agreement.</li>
+<li><strong>Refacing (CTHS)</strong> — <code>pricelist_refacing</code>. Items intentionally
+   empty in seed data; computed live by <code>_compute_refacing_price</code>
+   targeting 35% margin off <code>standard_price</code>.</li>
+</ol>
+<p>All 9 pricelists carry <code>currency_id = base.CAD</code> per the README
+("Southbrook is Canadian — Vaughan/Concord, ON").</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Pricelist resolution at order create / customer switch.</strong></p>
+<p>The chain (read top to bottom):</p>
+<p>a. You set or change <code>partner_id</code> on a <code>sale.order</code>.</p>
+<p>b. <code>_onchange_partner_id_southbrook_pricelist</code> fires (a Southbrook
+   override; the standard Odoo onchange also fires).</p>
+<p>c. It calls <code>order._resolve_channel_pricelist(partner)</code> — custom
+   routine #3.</p>
+<p>d. The dispatcher reads <code>partner.channel</code>. If channel is empty, falls
+   back to <code>_FALLBACK_PRICELIST_XML_ID</code> = <code>pricelist_retail</code>.</p>
+<p>e. If channel == "tradesperson", calls
+   <code>_resolve_tradesperson_pricelist(partner)</code> which reads
+   <code>partner.tradesperson_tier</code> and looks it up in the class-level
+   <code>_TRADESPERSON_TIER_PRICELISTS</code> dict. If tier is missing, logs a
+   <code>_logger.warning</code> (NOT an exception) and falls back to the base
+   <code>pricelist_tradesperson</code> (cost+5% floor with no tier discount).</p>
+<p>f. For any other channel, looks up the channel key in
+   <code>_CHANNEL_PRICELISTS</code> dict and <code>env.ref</code>s the xml_id.</p>
+<p>g. Returns the <code>product.pricelist</code> record and writes it to
+   <code>order.pricelist_id</code>.</p>
+<p>So the resolution is a pure table lookup: channel → xml_id, plus
+the one sub-dispatcher for tradesperson tiers. No business rules
+encoded in code — all the actual math lives in the pricelist item
+records.</p>
+<p><strong>2. How the math actually computes per line.</strong></p>
+<p>When a line's <code>price_unit</code> is computed, Odoo's standard pricelist
+mechanic runs:</p>
+<ul>
+<li>For <strong>Retail</strong>: no items, so <code>price_unit = product.list_price</code> (+
+  any <code>price_extra</code> from variant attribute values).</li>
+<li>For <strong>Dealer</strong>: the global formula item kicks in: <code>price_unit =
+  product.list_price * (1 - 0.50)</code> rounded to 0.01. Maple's
+  <code>+10%</code> price_extra is included BEFORE the discount, so a $1000
+  cabinet with Maple becomes $1100 list → $550 dealer.</li>
+<li>For <strong>Contractor Tier 3</strong>: the chained pricelist mechanic kicks
+  in:
+  1. Base pricelist (<code>pricelist_tradesperson</code>) computes
+     <code>floor_price = product.standard_price * 1.05</code>.
+  2. Tier 3 pricelist (<code>pricelist_tradesperson_tier_3</code>) does
+     <code>base='pricelist', base_pricelist_id=pricelist_tradesperson,
+     price_discount=35</code> — so <code>price_unit = floor_price * (1 - 0.35)</code>.
+  3. Net effective: <code>price_unit = standard_price * 1.05 * 0.65 =
+     standard_price * 0.6825</code>. So Tier 3 sells at 68.25% of cost
+     (margin-erosion floor protection).</li>
+<li>For <strong>KD</strong>: <code>price_unit = list_price * (1 - 0.54) = 46% of list</code>.</li>
+<li>For <strong>Big-Box</strong>: <code>price_unit = 98.00</code> regardless of product.</li>
+<li>For <strong>Refacing</strong>: <code>_compute_refacing_price(product, ...)</code> returns
+  <code>round(cost / (1 - 0.35), 2)</code> — so a $200-cost door sells at
+  $307.69, hitting exactly 35% margin
+  <code>(307.69 - 200) / 307.69 = 0.35</code>. The math: <code>price = cost / (1 -
+  margin)</code> is the standard markup-from-margin formula.</li>
+</ul>
+<p><strong>3. The Maple-box +10% interaction.</strong></p>
+<p>Maple box carries <code>price_extra = +10%</code> on the
+<code>product.attribute.value</code> (attached via the template attribute line).
+The +10% lands BEFORE the channel multiplier, because Odoo's standard
+pricelist flow computes <code>list_price + sum(price_extra)</code> as the input
+to the formula. So:</p>
+<ul>
+<li>A retail $1000 SB-BASE-2DR with Maple = $1100.</li>
+<li>Same with Dealer (-50%) = $550.</li>
+<li>Same with Tier 3 contractor: depends on <code>standard_price</code>, NOT on
+  list_price + price_extra — because Tier 3 uses <code>base='standard_price'</code>.</li>
+</ul>
+<p>This is a frequent source of confusion: <strong>the +10% Maple extra
+applies to channels that use <code>base='list_price'</code> (Retail, Dealer, KD,
+KD-derived) but NOT to channels using <code>base='standard_price'</code>
+(Contractor, all tiers)</strong>. For contractor pricing, the Maple cost
+delta has to be baked into the variant's <code>standard_price</code> (cost) —
+which it is, set seed-side. Confirm with the test fixtures in
+<code>tests/test_pricelists_routing.py</code>.</p>
+<p><strong>4. Per-line vs per-order discounts.</strong></p>
+<p>You have three discount mechanisms:</p>
+<ul>
+<li><strong>Pricelist-level</strong> — set automatically by the channel resolution.
+  This is the "discount" everyone thinks of first. Applies to
+  every line.</li>
+<li><strong>Line <code>discount</code> field</strong> — standard Odoo per-line discount. Use
+  this when you want to apply a one-off concession to a specific
+  cabinet ("$50 off this corner because of the install issue").
+  Stored on the order_line.</li>
+<li><strong>Per-order discount line</strong> — manually add a service-product line
+  with a negative price ("Goodwill discount", "Loyalty discount").
+  This affects the order total but not individual line prices.</li>
+</ul>
+<p><strong>Prefer the pricelist mechanism whenever the discount is policy-
+driven</strong> (channel, tier, volume break). Use the line <code>discount</code>
+field for one-off concessions on a single cabinet. Use a discount
+line for whole-order concessions ("First Order Discount, $200 off").
+Audit clarity follows from this convention.</p>
+<p><strong>5. How taxes flow.</strong></p>
+<p>Standard Odoo flow — no Southbrook-custom tax routing:</p>
+<ul>
+<li>Product taxes (<code>product.taxes_id</code>) → flow to line tax via
+  <code>_get_computed_taxes</code>.</li>
+<li>Partner fiscal position (<code>partner.property_account_position_id</code>)
+  → maps tax rules (e.g. "tax-exempt for out-of-province" or
+  "GST/HST swap"). Set on the partner; flows automatically to the
+  order via <code>_onchange_partner_id</code>.</li>
+<li>Tax is computed on <code>price_subtotal</code> post-pricelist, post-discount.
+  Channel pricelist mechanics run BEFORE tax calc.</li>
+</ul>
+<p>For an Ontario customer, the standard cascade is HST 13% on the
+<code>price_subtotal</code> of each line. For an out-of-province dealer with
+exemption, the fiscal position maps it to zero-rated.</p>
+<p><strong>6. Where <code>zone</code> enters pricing.</strong></p>
+<p>It doesn't. <code>zone</code> is purely for grouping in the Order Builder and
+the customer-facing PDF (Signature Spec Sheet groups by zone). No
+zone-based pricelist rule exists. If you need to price an island
+cabinet differently from a base run cabinet, that's a separate
+catalog product (or a variant-level price_extra), NOT a zone field.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I quoted a Tier 3 contractor and the price came out the same as
+retail."</strong></p>
+<p>Three suspects, in order of probability:</p>
+<ol>
+<li>The partner's <code>channel</code> is blank or set to <code>retail</code> (default).
+   Open the partner, set <code>channel = 'tradesperson'</code> AND
+   <code>tradesperson_tier = '3'</code>, save. Then switch the order's
+   <code>partner_id</code> away and back to trigger the onchange.</li>
+<li>The partner has <code>channel = 'tradesperson'</code> but no
+   <code>tradesperson_tier</code>. The <code>_resolve_tradesperson_pricelist</code> falls
+   back to <code>pricelist_tradesperson</code> (the base, cost+5% floor with NO
+   tier discount). The Odoo log shows the warning. Set the tier.</li>
+<li>The order's <code>pricelist_id</code> was manually overridden to retail.
+   Reset it to the contractor tier pricelist directly.</li>
+</ol>
+<p><strong>"I quoted a Dealer customer for a Maple cabinet and the Dealer
+discount didn't seem to apply to the Maple +10%."</strong></p>
+<p>That's the correct math. Maple +10% applies BEFORE the Dealer
+discount, so $1000 → $1100 → $550. If the customer expected $500
+(50% off the un-extra'd $1000), explain that Maple is a +10% premium
+that gets discounted alongside the base price, and Dealer pricing
+doesn't waive that premium.</p>
+<p><strong>"I quoted a Big-Box customer 22 SB-BASE-1DR cabinets, each $98.
+Customer says it was $85 last month."</strong></p>
+<p>Don't change prices unilaterally. Possible causes:
+1. The <code>fixed_price</code> on <code>pricelist_bigbox_item_global</code> was edited
+   between then and now (audit by <code>Settings → Technical → Audit
+   Trail</code> if enabled).
+2. The customer's prior order had a custom pricelist override on
+   <code>pricelist_id</code> (open the prior order, check the field).
+3. The customer remembers a non-invoice number (e.g. pallet-net,
+   per-unit-net-of-shipping).</p>
+<p>Escalate to sales management for the contractual answer. If
+approved, apply the discount via the line <code>discount</code> field or a
+separate discount line — DON'T edit the pricelist (every other
+Big-Box order would see the change).</p>
+<p><strong>"I built a refacing quote and the price seems too low."</strong></p>
+<p>The refacing pricelist computes price from <code>standard_price</code> to hit
+35% margin: <code>price = cost / (1 - 0.35) = cost * 1.538</code>. If the
+product's <code>standard_price</code> is zero (common seed data issue), the
+method falls back to <code>product.list_price</code>. Check the product's cost
+in the inventory tab. The seed data may need backfilling for
+refacing-eligible products.</p>
+<p><strong>"I want to give a one-off 5% discount on a single line."</strong></p>
+<p>Use the line's standard <code>discount</code> field (in the order_line; may
+require enabling discounts under Sales → Configuration → Settings).
+DO NOT create a new pricelist or override <code>price_unit</code> — both leave
+no audit trail. The <code>discount</code> field is logged on the line and
+flows to the QWeb reports without surgery.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The <code>_resolve_channel_pricelist</code> dispatcher is a pure dict-based
+lookup. Its critical sources of truth:</p>
+<ul>
+<li><code>_CHANNEL_PRICELISTS = {"retail": "...pricelist_retail", "dealer":
+  "...pricelist_dealer", "kd": "...pricelist_kd", "bigbox":
+  "...pricelist_bigbox", "refacing": "...pricelist_refacing"}</code></li>
+<li><code>_TRADESPERSON_TIER_PRICELISTS = {"1": "...tier_1", "2":
+  "...tier_2", "3": "...tier_3"}</code></li>
+<li><code>_FALLBACK_PRICELIST_XML_ID = "...pricelist_retail"</code></li>
+</ul>
+<p>If you add a new channel:
+1. Add the Selection value on <code>res.partner.channel</code>.
+2. Create the pricelist record in <code>data/pricelists.xml</code>.
+3. Add one row to <code>_CHANNEL_PRICELISTS</code>.</p>
+<p>Three lines of code; the dispatcher does the rest. This is
+intentional — the channel matrix is data, not logic, per Build Spec
+§6.</p>
+<p>The refacing margin-target method (custom routine #2):</p>
+<pre><code class="language-python">def _compute_refacing_price(self, product, quantity, partner=False, date=False):
+    cost = product.standard_price or 0.0
+    if cost &lt;= 0.0:
+        return product.list_price
+    return round(cost / (1.0 - REFACING_TARGET_MARGIN), 2)
+</code></pre>
+<p><code>REFACING_TARGET_MARGIN = 0.35</code>. The method is invoked by the
+pricelist engine when the pricelist item has <code>compute_price='code'</code>
+— though in the seed data the refacing pricelist's items are empty
+(the method is reserved for when CTHS reactivates as a channel; the
+template is in place).</p>
+<p>For Odoo's standard pricelist chain (<code>base='pricelist'</code> items), the
+engine recursively computes the parent pricelist's price first, then
+applies the child pricelist's discount. So Tier 3 = (cost × 1.05) ×
+(1 - 0.35). This is the contractor margin-erosion safeguard: even at
+Tier 3 (deepest discount), the contractor still pays above raw cost
+(cost × 0.6825 &gt; cost when cost &gt; 0; but Southbrook's margin
+becomes negative because cost &gt; selling price). Reality check on the
+floor: contractors near Tier 3 are unprofitable unless they're
+buying volume that justifies the loss-leader.</p>
+<p>When channel switches, <code>_onchange_partner_id_southbrook_pricelist</code>
+rewrites <code>pricelist_id</code>. The lines' <code>price_unit</code> recomputes via
+Odoo's standard <code>_compute_price_unit</code> reading the new pricelist. No
+Southbrook code in that path.</p>
+<p>Per-line dollars in the spec sheet PDF come from <code>line.price_subtotal</code>
+(post-pricelist, post-discount, pre-tax). Per-order total comes from
+<code>order.amount_total</code> (post-tax). Both are standard Odoo fields.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A Tier 2 contractor and a Tier 3 contractor both buy 10 SB-
+BASE-2DR cabinets. Tier 2 quotes $7,500, Tier 3 quotes $6,800. The
+contractors compare notes and ask "why such a small difference for
+5% extra discount?" What's the math?</p>
+<blockquote>
+<p>Both prices are off the SAME cost+5% floor. Tier 2 = floor × 0.70;
+Tier 3 = floor × 0.65. The difference is 5% of the floor, not 5%
+of retail. Example: if floor = $1,071 per cabinet (cost $1,020 ×
+1.05), Tier 2 = $750/cabinet × 10 = $7,500; Tier 3 = $696/cabinet
+× 10 = $6,963. The 5% discount delta is 5% of $1,071 = $54/cabinet,
+$540 across 10 cabinets — exactly the gap they observed (modulo
+rounding). The floor is what makes the deltas smaller than 5% of
+retail would suggest.</p>
+</blockquote>
+<p><strong>2.</strong> A dealer (50% off) is buying 8 Maple-box wall cabinets. The
+list price per wall cabinet is $700; Maple adds +10%. What does each
+line price out at, and what's the total?</p>
+<blockquote>
+<p>Per line: <code>list × (1 + 0.10) × (1 - 0.50) = 700 × 1.10 × 0.50 =
+$385</code>. Eight lines: $3,080 subtotal. The Maple +10% applies before
+the Dealer discount because both ride on the standard
+<code>list_price</code> base. Tax (HST 13% for an ON dealer with no fiscal
+position override): $400.40. Total: $3,480.40.</p>
+</blockquote>
+<p><strong>3.</strong> You change a customer from Retail to Tier 3 contractor on a
+12-line order. Eleven lines reprice. One doesn't. Why?</p>
+<blockquote>
+<p>That one line has <code>price_unit</code> manually overridden (you or someone
+typed in the price field directly), breaking the pricelist link.
+Recovery options: (a) reset the line's <code>price_unit</code> to zero, then
+change quantity to force a recompute; (b) delete and re-add the
+line; (c) duplicate the order (it'll re-resolve cleanly from the
+partner). The line's <code>discount</code> field is independent — it survives
+repricing and is the safer way to apply per-line concessions.</p>
+</blockquote>
+<p><strong>4.</strong> A refacing customer's quote is showing $0 per door. What's
+the most likely root cause?</p>
+<blockquote>
+<p>The product's <code>standard_price</code> is zero. The
+<code>_compute_refacing_price</code> method has the guard: if <code>cost &lt;= 0.0</code>,
+return <code>product.list_price</code> — so if the product's list price is
+ALSO zero, the line shows $0. Set a real <code>standard_price</code> on the
+refacing product templates (Sales Cost field on the product form,
+Inventory tab). Seed-data oversight; common on cold-installed DBs.</p>
+</blockquote>
+<p><strong>5.</strong> A sales manager asks "can we add a 'Wholesale Tier 4 at -40%'
+for our new pool-builder contractor relationship?" What do you do?</p>
+<blockquote>
+<p>Three coordinated changes (no code logic — just data):
+1. <code>models/res_partner.py</code> — add <code>("4", "Tier 4 (-40%)")</code> to
+   <code>tradesperson_tier</code> selection.
+2. <code>models/sale_order.py</code> — add <code>"4":
+   "southbrook_estimating.pricelist_tradesperson_tier_4"</code> to the
+   <code>_TRADESPERSON_TIER_PRICELISTS</code> dict.
+3. <code>data/pricelists.xml</code> — add the new <code>pricelist_tradesperson_tier_4</code>
+   record + a <code>product.pricelist.item</code> with
+   <code>base='pricelist', base_pricelist_id=pricelist_tradesperson,
+   price_discount=40</code>.
+Verify with a smoke test: create a partner at the new tier, run a
+9-line quote, confirm the total is ~40% below the cost+5% floor.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The Order Builder UI walkthrough — lesson 8.2.</li>
+<li>Where the pricing data ultimately ends up in MOs / cut specs —
+  lesson 8.4.</li>
+<li>How the PDF reports format pricing — lesson 8.5.</li>
+<li>Versioning and quote-revision pricing carryover — lesson 8.6.</li>
+<li>Standard Odoo pricelist mechanics — Odoo's own documentation.</li>
+<li>The customer-facing one-page configurator pricing display — Phase
+  2, not yet shipped.</li>
+<li>Volume-break pricing — supported by Odoo's standard
+  <code>min_quantity</code> field on pricelist items but no Southbrook seeds
+  ship today.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_08_quote_to_mo_handoff" model="slide.slide">
+            <field name="name">Quote to MO Handoff — What the Production Planner Inherits, What Gets Lost</field>
+            <field name="channel_id" ref="course_estimating_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Estimator + Production Planner. The estimator needs to know what survives Confirm and what&#x27;s an estimating-only artifact; the planner needs to know what to trust about the MO that lands in their queue.</field>
+            <field name="html_content"><![CDATA[<h1 id="quote-to-mo-handoff-what-the-production-planner-inherits-what-gets-lost">Quote to MO Handoff — What the Production Planner Inherits, What Gets Lost</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator who just clicked Confirm — and you want to know
+what the planner sees on their side. Or you're the planner who just
+got an MO in your queue from <code>SO00321</code> and want to know what
+information came across, what's reliable, and what's missing.</p>
+<p>This is the handoff lesson. The fault line between "estimating" and
+"production" runs straight through <code>action_confirm</code>, and 70% of the
+"why is my MO wrong?" tickets trace back to misunderstandings about
+this transition.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The trigger for handoff:</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder → (any draft) → Confirm</strong>
+button (top of form, calls <code>action_confirm</code>)</p>
+</blockquote>
+<p>What the planner sees post-Confirm:</p>
+<blockquote>
+<p><strong>Manufacturing → Operations → Manufacturing Orders</strong> (filter by
+<code>origin = &lt;SO name&gt;</code> or by <code>sale_line_id.order_id</code>)</p>
+</blockquote>
+<p>The cut-spec snapshot (when southbrook_plm is installed):</p>
+<blockquote>
+<p><strong>PLM → Cut Specs → (the active spec at confirm time)</strong></p>
+</blockquote>
+<p>The analytics row that captures handoff metadata:</p>
+<blockquote>
+<p><strong>Settings → Technical → Database Structure → Models →
+southbrook.order.analytics</strong> (filter <code>sale_order_id</code> by your SO)</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>When you click Confirm on a draft order, three things happen in
+sequence (covered in detail below). Visually:</p>
+<ul>
+<li>The state pipeline (top right) moves from <code>sent</code> (or <code>draft</code>) →
+  <code>sale</code>.</li>
+<li>A new statbutton labelled "Manufacturing" appears on the order
+  form showing the count of MOs created.</li>
+<li>The order's lines stay visible but become readonly.</li>
+<li>The Pricelist field becomes readonly.</li>
+<li>The <code>southbrook.order.analytics</code> row gets created (or updated if
+  this is a re-confirm).</li>
+</ul>
+<p>What you DON'T see on the order form:
+- The <code>mrp.bom</code> records the MOs reference.
+- The cut-spec snapshot (lives in <code>southbrook_plm</code> if installed —
+  Phase 1 estimating doesn't snapshot per-order).
+- The <code>sb.production.package</code> rows (Phase 4 — created by
+  <code>southbrook_kitchen_mrp</code> on MO confirm, if installed).</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Before clicking Confirm — what's about to happen.</strong></p>
+<p>Confirm is a one-way door for most purposes. Lines lock, pricing
+freezes, MOs spawn. So check first:</p>
+<ul>
+<li>Every cabinet line has been configured (no "Configure" button
+  still visible — it should read "Re-configure" post-wizard).</li>
+<li><code>sb_panel_count</code> is non-zero on every cabinet line.</li>
+<li>The Pricelist field shows the channel-appropriate name (not
+  Retail when the customer is a Tier 3 contractor).</li>
+<li>Zone is set on every line (not blank — defaults to base_run).</li>
+<li>The customer has signed the Signature Spec Sheet PDF. The signed
+  PDF should be attached to the order (chatter).</li>
+</ul>
+<p><strong>2. Click Confirm — the override fires.</strong></p>
+<p><code>models/sale_order.py:action_confirm</code> runs:</p>
+<pre><code class="language-python">def action_confirm(self):
+    result = super().action_confirm()
+    Analytics = self.env[&quot;southbrook.order.analytics&quot;]
+    for order in self:
+        Analytics.capture(order)
+    return result
+</code></pre>
+<p>Three layers fire:</p>
+<p>a. <strong><code>super().action_confirm()</code></strong> — standard Odoo's
+   <code>sale.order.action_confirm</code>. State moves to <code>sale</code>. For each
+   order_line whose product has a route through Manufacturing,
+   <code>sale_mrp.SaleOrder._create_mo_per_order_line()</code> (the bridge
+   addon) spawns one <code>mrp.production</code> record. The MO carries:
+   - <code>product_id</code> = the line's variant.
+   - <code>product_qty</code> = the line's <code>product_uom_qty</code>.
+   - <code>origin</code> = the SO name (free-text fallback link).
+   - <code>sale_line_id</code> = the originating line (M2O — the canonical
+     link).
+   - <code>bom_id</code> = resolved by Odoo's MRP engine via
+     <code>mrp.bom._bom_find()</code> against the variant.</p>
+<p>b. <strong>Bill of Materials lookup</strong> — for each MO,
+   <code>mrp.bom._bom_find(product=variant)</code> walks the BoM table looking
+   for a BoM whose <code>product_id</code> (or <code>product_tmpl_id</code>) matches the
+   variant. If found, the MO's <code>bom_id</code> is set. If not, the MO
+   spawns with <code>bom_id</code> blank — the planner gets a "no BoM" MO
+   they'll have to attach a BoM to manually.</p>
+<p>c. <strong><code>Analytics.capture(order)</code></strong> — <code>southbrook.order.analytics.capture</code>
+   either creates or updates the analytics row. The values rolled
+   up:
+   - <code>channel</code> (related to <code>partner_id.channel</code>, stored).
+   - <code>tradesperson_tier</code> (related, stored).
+   - <code>dealer_id</code> (set to <code>partner_id.id</code> when channel == <code>dealer</code>,
+     else False).
+   - <code>series</code> (most-common Series attribute value across lines via
+     <code>Counter.most_common(1)</code>).
+   - <code>quoted_at</code> (related to <code>create_date</code>, stored).
+   - <code>confirmed_at</code> (set to <code>sale_order.date_order</code>).
+   - <code>cabinet_count</code> = sum of <code>product_uom_qty</code>.
+   - <code>panel_count</code> = sum of <code>sb_panel_count</code> per line.
+   - <code>door_count</code> = sum of <code>sb_door_count</code> per line.
+   - <code>nest_yield_pct</code> = null (set later by the Phase 4 Accucutt
+     bridge).</p>
+<p><strong>3. What the MO carries — the planner's view.</strong></p>
+<p>For each MO that lands in the planner's queue, the inheritance from
+the SO line is:</p>
+<ul>
+<li><strong>Product variant</strong> — exact same variant as on the SO line.
+  <code>mo.product_id</code> = <code>sale_line.product_id</code>. So all the variant's
+  attribute values (Series, Box Material, Door Style, Finish, etc.)
+  travel along.</li>
+<li><strong>Quantity</strong> — <code>mo.product_qty</code> = <code>sale_line.product_uom_qty</code>.</li>
+<li><strong>Originating SO</strong> — <code>mo.sale_line_id.order_id</code> is the canonical
+  link (NF25). <code>mo.origin</code> is the legacy free-text fallback.</li>
+<li><strong>BoM</strong> — <code>mo.bom_id</code> populated by Odoo's MRP resolution.</li>
+<li><strong>Lead time</strong> — <code>mo.date_planned_finished</code> computed by Odoo using
+  <code>mo.bom_id.effective_produce_delay</code> (which is <code>produce_delay +
+  southbrook_lead_time_extra</code>). So Maple's +14 days flows
+  automatically into the planner's scheduled finish date.</li>
+</ul>
+<p>What the MO does NOT carry from the SO line:
+- <code>zone</code> — production doesn't care about kitchen zones. A wall
+  cabinet runs the same way as a base cabinet on the shop floor;
+  the carcass math is identical (modulo dims).
+- <code>zone_label</code> — same logic.
+- <code>price_unit</code>, <code>price_subtotal</code>, <code>discount</code> — no pricing flows to
+  production.
+- <code>sb_panel_count</code>, <code>sb_door_count</code> (the live-computed fields) —
+  the MO recomputes these from its own BoM's bom_line_ids, not from
+  the SO line's live compute. So if the SO line's compute returned
+  0 (e.g. <code>southbrook_dims</code> import failed), the MO won't
+  inherit that 0 — the BoM's actual bom_line_ids drive the cut list.</p>
+<p><strong>4. The <code>_get_cut_constants</code> seam — where the cut spec attaches.</strong></p>
+<p>This is the load-bearing PLM integration point. Read
+<code>models/mrp_bom.py</code> for the canonical method:</p>
+<pre><code class="language-python">@api.model
+def _get_cut_constants(self):
+    return {
+        &quot;box_th&quot;: BOX_TH,           # 15.875 (5/8&quot; melamine)
+        &quot;back_th&quot;: BACK_TH,         # 6.35  (1/4&quot; hardboard)
+        &quot;rabbet&quot;: RABBET,           # 6.35
+        &quot;door_th&quot;: DOOR_TH,         # 18.0  (3/4&quot;)
+        &quot;door_reveal&quot;: DOOR_REVEAL, # 3.0
+        &quot;shelf_tol&quot;: SHELF_TOL,     # 1.5
+        &quot;shelf_vent_gap&quot;: SHELF_VENT_GAP,  # 12.7 (1/2&quot;)
+        &quot;toekick_h&quot;: TOEKICK_H,     # 101.6 (4&quot;)
+    }
+</code></pre>
+<p>In a vanilla <code>southbrook_estimating</code> install, this returns the NF14
+baseline constants (frameless euro construction, melamine standard).</p>
+<p>When <code>southbrook_plm</code> is installed, it OVERRIDES the method:</p>
+<pre><code class="language-python"># southbrook_plm/models/mrp_bom.py:108-128
+spec = self.env[&quot;southbrook.cut.spec&quot;].sudo()._get_active()
+if spec:
+    return spec.constants_dict()
+return super()._get_cut_constants()
+</code></pre>
+<p>So with PLM installed AND an active cut spec, every call to
+<code>_compute_panel_dimensions</code> reads the cut spec's <code>box_th</code>,
+<code>door_th</code>, etc. — meaning an ECO that updates the cut spec (e.g.
+"door reveal is now 5mm not 3mm") propagates to every NEW MO BoM
+math automatically.</p>
+<p><strong>CRITICAL CAVEAT:</strong> the cut-spec snapshot is not stored on the SO
+or the MO. There is no <code>southbrook_cut_spec_version_id</code> field on
+<code>sale.order</code> or <code>mrp.production</code> in <code>southbrook_estimating</code> itself
+(TBD — search returns no hits in the addon). The "snapshot" is
+implicit — the BoM was computed using the cut spec active at MO
+creation time. If the cut spec changes after MO creation, the
+already-computed BoM lines DON'T update; but if a planner runs
+"recompute BoM" the new constants will apply. This is documented as
+a Phase-1 limitation in <code>southbrook_plm</code> — the per-order snapshot
+field is a planned extension, not a shipped one.</p>
+<p><strong>5. <code>sb_panel_count</code> + <code>sb_door_count</code> — computed live, on the line.</strong></p>
+<p>These are NOT stored on the MO. They're computed on the SO line by
+<code>_compute_sb_panel_rollup</code> reading:
+1. The variant's <code>product_template_attribute_value_ids</code> for Family,
+   Width, Door Count.
+2. Fallback to <code>line.name</code> regex parsing
+   (<code>_WIDTH_INCHES_RE</code>, <code>_FAMILY_RE</code>, <code>_DOOR_COUNT_RE</code>).
+3. Fallback to family defaults (<code>_SB_DEFAULT_HEIGHT_MM</code> family
+   constants).</p>
+<p>Then calls <code>southbrook_dims.panel_cut_list(W, H, D, family=..., door_count=...)</code>
+to get a shelf_count + door tuple. Returns:
+- <code>sb_panel_count = pieces * qty</code> where <code>pieces = 5 + shelf_count +
+  door_count</code> (sides + top + bottom + back + shelves + door fronts).
+- <code>sb_door_count = door_count * qty</code>.
+- <code>sb_width_mm = derived W</code>.</p>
+<p>These fields exist for two reasons: (a) display in the Order
+Builder so the estimator sees panel/door counts; (b) feed
+<code>southbrook.order.analytics</code> at confirm time. They are NOT used by
+production scheduling — the planner trusts the BoM's
+<code>bom_line_ids</code>.</p>
+<p><strong>6. What gets lost in translation.</strong></p>
+<ul>
+<li><strong>Zone</strong> — production-blind.</li>
+<li><strong>Pricing</strong> — production-blind.</li>
+<li><strong>Customer notes</strong> — production-blind unless they're on the BoM
+  or the product. Customer-facing comments on order lines DO NOT
+  flow to MO notes by default. (This catches everyone: "I told the
+  estimator I want the soft-close upgrade" — soft-close is an
+  attribute that affects the BoM hardware lines. If the estimator
+  didn't pick the soft-close attribute, the customer's note isn't
+  visible to the shop floor.)</li>
+<li><strong>Configurator-session attribute picks beyond what materialised
+  on the variant</strong> — only the variant's
+  <code>product_template_attribute_value_ids</code> survive. If the configurator
+  session captured a <code>value_custom</code> (free-text answer to an attribute),
+  that text lives on the <code>product.config.session</code> record, NOT on
+  the variant. The MO doesn't see it.</li>
+<li><strong>Pre-confirmation pricing iteration history</strong> — the prior versions
+  in the <code>parent_order_id</code> chain. The MO knows only about THIS
+  confirmed order.</li>
+</ul>
+<p>What DOES survive:
+- Variant attributes (Series, Box Material, Door Style, Finish,
+  Hinge Side, Finished Sides, Door Count, Family).
+- BoM lines (panels + hardware + edge banding scalar).
+- Lead time extras (e.g. Maple +14 days via
+  <code>effective_produce_delay</code>).
+- The link back to the SO line (<code>mo.sale_line_id</code>).
+- The link back to the customer through the SO partner.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I confirmed 8 hours ago and the planner can't find the MO."</strong></p>
+<p>Three suspects:
+1. The line products don't have <code>route_ids</code> including Manufacturing.
+   No MO spawns for products without a Manufacturing route. Open
+   the product → Inventory tab → Routes. (12 Q8 SKUs are seeded
+   correctly; catalog-expansion products may not be.)
+2. <code>sale_mrp</code> isn't installed. The manifest explicitly depends on
+   it (NF25), but a partial cold install can skip it. Verify:
+   <code>Apps → Filter: sale_mrp → Installed</code>.
+3. The MO was created but assigned to a planner's queue you're not
+   looking at. Search by <code>origin = &lt;SO name&gt;</code> across all
+   Manufacturing menus.</p>
+<p><strong>"The MO's BoM is empty — bom_line_ids is null."</strong></p>
+<p>The variant doesn't have a matching BoM. Either:
+1. No <code>mrp.bom</code> exists for this variant (the variant was
+   materialised dynamically from the configurator but no BoM was
+   created — this is a Phase-1 gap; the BoM rollup from
+   <code>product_configurator_mrp</code> should run but sometimes silently
+   fails). Recovery: create a BoM manually for the variant, run
+   <code>mrp.bom._compute_panel_dimensions</code> via the developer shell to
+   populate, attach to the MO.
+2. The BoM exists but is in <code>state = 'draft'</code>. Move to <code>confirmed</code>.</p>
+<p><strong>"Maple cabinets confirmed yesterday should have +14 days lead
+time but the planner's date_planned_finished shows the baseline."</strong></p>
+<p>Either <code>southbrook_lead_time_extra</code> didn't roll up, or
+<code>effective_produce_delay</code> didn't get read at MO scheduling. Verify:
+1. Open the BoM. Check
+   <code>bom.southbrook_lead_time_extra</code> (should be 14.0).
+2. Check <code>bom.effective_produce_delay</code> (should be <code>produce_delay +
+   14</code>).
+3. Open the MO. Check <code>mo.date_planned_finished</code>. If it doesn't
+   reflect the bump, run "Update Scheduled Dates" from the MO form.</p>
+<p>NF16 caught this exact bug at first live install: the
+<code>@api.depends</code> path used to reference <code>bom.product_id.produce_delay</code>
+which doesn't exist (<code>produce_delay</code> lives on <code>mrp.bom</code>, not on
+<code>product.template</code>/<code>product.product</code>). Fixed; if you're on an old
+install, <code>-u southbrook_estimating</code> brings the corrected compute.</p>
+<p><strong>"The MO references a cut spec that's already been superseded by
+an ECO."</strong></p>
+<p>There's no per-MO cut-spec snapshot field today. The BoM compute
+used the cut spec active at the time of MO creation; subsequent
+ECOs don't retroactively re-run the math. If the ECO is critical,
+the planner should:
+1. Cancel the affected MO.
+2. Reset to draft on the variant.
+3. Recompute the BoM (which reads the now-active cut spec).
+4. Spawn a fresh MO from the SO line (via <code>sale_mrp</code> re-trigger
+   action).</p>
+<p>The PLM-side fix for this is the planned per-order snapshot field
+(<code>southbrook_cut_spec_version_id</code> on <code>sale.order</code> — TBD; not in
+estimating addon today).</p>
+<p><strong>"I cancelled an MO and now the analytics row says the order has
+fewer panels than it did."</strong></p>
+<p><code>southbrook.order.analytics.capture</code> is idempotent — it rolls up
+fields from the order at every Confirm. It does NOT subtract on MO
+cancel. The analytics row reflects the SO state at the most recent
+Confirm (or capture call). If you need to re-roll, call
+<code>Analytics.capture(order)</code> manually after the cancellation — but
+the analytics is intended as a confirmation snapshot, not a
+real-time mirror.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The handoff sequence at Confirm, step-by-step:</p>
+<ol>
+<li>User clicks Confirm. Form posts to <code>web/dataset/call_kw</code> with
+   <code>model=sale.order, method=action_confirm</code>.</li>
+<li><code>sale.order.action_confirm</code> (Southbrook override) runs.</li>
+<li><code>super().action_confirm()</code> runs (Odoo standard +
+   <code>sale_management</code> + <code>sale_mrp</code> chained inheritance).</li>
+<li>Standard <code>sale.order.action_confirm</code> writes <code>state='sale'</code>,
+   <code>date_order=now()</code>, posts a confirmation message to chatter.</li>
+<li><code>sale_mrp.SaleOrder._action_confirm</code> extension hooks fire. For
+   each <code>order.order_line</code> whose <code>product_id.route_ids</code> includes
+   Manufacturing route:
+   - <code>mrp.production.create()</code> with <code>product_id</code>,
+     <code>product_qty</code>, <code>origin</code>, <code>sale_line_id</code>, <code>bom_id</code> (resolved).
+   - Procurement engine writes the BoM rollup via
+     <code>mrp.bom._bom_find()</code>.</li>
+<li><code>Analytics.capture(order)</code> rolls up channel/tier/series/counts
+   and creates or updates the <code>southbrook.order.analytics</code> row.</li>
+<li>Form refreshes. Stat-button counters update. Lines lock.</li>
+</ol>
+<p>Once an MO exists with a BoM, the BoM lookup chain for any panel
+geometry question goes:</p>
+<ol>
+<li><code>mrp.bom._get_cut_constants()</code> returns the constants dict.</li>
+<li>With <code>southbrook_plm</code> installed and a spec active:
+   <code>southbrook.cut.spec._get_active().constants_dict()</code> is returned
+   instead — every constant attribute (box_th, door_th, etc.) flows
+   from the spec.</li>
+<li><code>mrp.bom._compute_panel_dimensions(W, H, D, family, door_count,
+   drawer_count, finished_sides)</code> uses those constants to compute
+   side_L, side_R, top, bottom, back, shelf, door tuples + counts +
+   edge_banding scalar.</li>
+</ol>
+<p>The constants are NAMED (uppercase module-level) so when the
+canonical workbook (artifact #8 in CLAUDE.md §1) lands and changes
+e.g. BOX_TH from 15.875 to 19.05 (3/4" instead of 5/8"), the swap
+is mechanical — both cut list AND 3D geometry update because they
+share the same imports.</p>
+<p>The seam pattern is documented in the <code>southbrook_plm_deploy</code>
+memory: REMOVING <code>_get_cut_constants</code> from <code>southbrook_estimating</code>
+breaks every BoM operation in DBs with PLM installed with
+<code>AttributeError: 'super' object has no attribute '_get_cut_constants'</code>.
+Restored 2026-06-11 after a parallel session silently dropped it.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> An estimator confirms a 22-line order. The planner reports
+"only 14 MOs spawned." Where do you look first?</p>
+<blockquote>
+<p>The 8 missing lines are probably non-cabinet products (hardware,
+install, service) without a Manufacturing route. Open the
+products: Inventory tab → Routes. If "Manufacture" is absent, no
+MO spawns — that's expected for service products. If a cabinet
+line failed to spawn an MO, the variant probably has no BoM
+assigned. Inspect <code>sale_line.product_id.bom_ids</code> — if empty,
+<code>_bom_find</code> returns no match and <code>sale_mrp</code> skips. Recovery:
+create a BoM for that variant.</p>
+</blockquote>
+<p><strong>2.</strong> The shop floor receives a Shop Copy PDF that shows an old
+cut spec (door reveal 3mm) but PLM says the active spec is 5mm. The
+MO was confirmed before the ECO. What's the correct resolution?</p>
+<blockquote>
+<p>Today, the BoM was computed against the 3mm spec at MO creation.
+There's no automatic re-compute on ECO. If the ECO is binding for
+this order: cancel the MO, reset the variant, recompute the BoM
+(which now reads 5mm via <code>_get_cut_constants</code> override), re-spawn
+the MO via <code>sale_mrp</code> from the SO line. If the ECO is forward-only
+(new orders use 5mm, this one ships at 3mm): document the
+exception on the MO chatter and run as-is. Long-term fix: the
+<code>southbrook_cut_spec_version_id</code> snapshot field on <code>sale.order</code>
+(TBD — not in estimating addon today).</p>
+</blockquote>
+<p><strong>3.</strong> <code>southbrook.order.analytics</code> shows <code>cabinet_count = 18</code> for
+an order that has 22 lines. What's the discrepancy?</p>
+<blockquote>
+<p><code>cabinet_count</code> = sum of <code>product_uom_qty</code> per line. Non-cabinet
+lines (hardware, install, service products) count in this sum if
+they have qty. But the analytics rollup uses <code>int(line.
+product_uom_qty)</code> for ALL lines that have a <code>product_id</code> —
+regardless of family. So 18 means: the sum of all line qtys was
+18. Possibilities: 4 lines without product_id (free-text comments
+— skipped by the rollup); OR the cabinet lines genuinely had
+mixed qty (e.g. 4 lines at qty=1 + 14 lines at qty=1 = 18, with 4
+lines at qty=0). The rollup is "what the order said" — verify
+with the line list.</p>
+</blockquote>
+<p><strong>4.</strong> Lead time on a Maple-box MO shows the baseline 7 days when
+you expect 21 (baseline + 14 maple). Where do you debug?</p>
+<blockquote>
+<p>The chain: <code>mo.date_planned_finished</code> ← Odoo scheduling using
+<code>mo.bom_id.effective_produce_delay</code> ← <code>_compute_effective_produce_delay</code>
+(<code>@api.depends("produce_delay", "southbrook_lead_time_extra")</code>)
+← <code>southbrook_lead_time_extra</code> rolled up via
+<code>bom.product_id.product_template_attribute_value_ids.mapped(
+"product_attribute_value_id.lead_time_extra")</code>. Verify each step:
+1. Variant has Maple attribute? <code>product_template_attribute_value_ids</code>
+   on the variant.
+2. Maple <code>product.attribute.value.lead_time_extra</code> = 14.0 in the
+   seed? Check via the Attribute Values list.
+3. <code>bom.southbrook_lead_time_extra</code> = 14.0? If not, the @api.depends
+   didn't propagate — try recomputing via developer mode.
+4. <code>bom.effective_produce_delay</code> = <code>produce_delay + 14</code>?
+5. Re-run Update Scheduled Dates on the MO.
+If step 2 shows 0, the seed is wrong; if step 3 shows 0, the
+rollup didn't run (cache invalidation issue); if step 5 doesn't
+fix step 1's date_planned_finished, your Odoo scheduling has
+another override in the chain.</p>
+</blockquote>
+<p><strong>5.</strong> An estimator says "I want the planner to see my customer
+notes — should they go on the line description?" What's your
+guidance?</p>
+<blockquote>
+<p>Customer notes on order lines DO NOT flow to MOs by default. The
+MO carries <code>origin</code> (the SO name, free-text), and that's it. If
+the customer note is binding ("must have soft-close on all base
+cabinets"), it should be captured as a configured attribute
+(soft-close attribute pick) so it flows through the variant and
+the BoM. If it's a non-binding note ("customer prefers paint
+applied within 5 days of delivery"), write it on the SO chatter
+and verbally communicate. The MO chatter is the planner's first
+stop — copy the relevant SO chatter to the MO if needed. This is
+a real product gap; per Course 8 audit findings, a "shop notes"
+field that propagates SO line → MO is on the candidate list.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The Order Builder UI walkthrough — lesson 8.2.</li>
+<li>Pricing mechanics — lesson 8.3.</li>
+<li>The QWeb reports themselves (Signature Spec Sheet, Shop Copy,
+  Door Order) — lesson 8.5.</li>
+<li>Versioning / revision chains — lesson 8.6.</li>
+<li>The PLM addon internals (<code>southbrook.cut.spec</code>,
+  <code>southbrook.eco.order</code>) — Course 4 (PLM + Design).</li>
+<li>The production-side workflow (workcenters, work orders, shop
+  floor) — Course 1 (Workcenter Operators) and Course 2
+  (Production Planning).</li>
+<li>The <code>sb.kitchen.project</code> model — lives in <code>southbrook_kitchen_mrp</code>,
+  not in estimating. Covered in Lesson 2.1.</li>
+<li>The Hermes platform's interaction with confirmed orders — see
+  the Hermes spec.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_08_custom_reports" model="slide.slide">
+            <field name="name">Custom Reports — Signature Spec Sheet, Shop Copy, Door Order</field>
+            <field name="channel_id" ref="course_estimating_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Estimator + Production. The estimator generates the Signature Spec Sheet for the customer; production reads the Shop Copy at the work order; both feed downstream to the Door Order that goes to the supplier. This lesson is what each report does, when it&#x27;s generated, what fields it pulls, and how to add a field without breaking everything else.</field>
+            <field name="html_content"><![CDATA[<h1 id="custom-reports-signature-spec-sheet-shop-copy-door-order">Custom Reports — Signature Spec Sheet, Shop Copy, Door Order</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>The estimator generates the customer-signed Signature Spec Sheet.
+The production planner prints the Shop Copy with the MO. The shop
+manager batches Door Order PDFs and forwards them to the door
+supplier. You're either of those three, OR the developer who's been
+asked "can you add a field showing the customer's address on the
+Door Order?"</p>
+<p>This lesson covers all three reports — each with its own data
+binding, its own field-mapping quirks, and its own load-order
+sensitivity.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>For the customer-facing PDF:</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder → (any order) → Print →
+Signature Spec Sheet</strong></p>
+</blockquote>
+<p>The same report is also available via Send-by-Email — Odoo attaches
+the PDF to the email automatically.</p>
+<p>For the shop-floor companion (MO-bound):</p>
+<blockquote>
+<p><strong>Manufacturing → Operations → Manufacturing Orders → (any MO) →
+Print → Shop Copy</strong></p>
+</blockquote>
+<p>For the door supplier's schedule (SO-bound):</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder → (any order) → Print →
+Door Order</strong></p>
+</blockquote>
+<p>All three reports are registered via <code>ir.actions.report</code> with
+<code>binding_type=report</code> so they appear in the Print menu of their
+respective bound model.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The Signature Spec Sheet PDF:</p>
+<ul>
+<li><strong>Header strip</strong>: "Your Southbrook Kitchen" / "Signature Spec
+  Sheet" in the walnut display font + an ink-on-linen separator
+  rule.</li>
+<li><strong>Customer block</strong>: Customer name (from <code>o.partner_id.name</code>),
+  Reference (<code>o.name</code> — the SO number) with version tag
+  (<code>o.version</code>), Quote Date (<code>o.date_order</code> formatted as date).</li>
+<li><strong>Cabinets table</strong>: columns Zone (translated from the selection),
+  Cabinet (<code>line.product_id.display_name</code> falling back to
+  <code>line.name</code>), Qty (<code>line.product_uom_qty</code>), Unit Price
+  (<code>line.price_unit</code> as currency), Line Total
+  (<code>line.price_subtotal</code> as currency). Zone cells append a "/
+  zone_label" when zone=<code>other</code>.</li>
+<li><strong>Total row</strong>: <code>o.amount_total</code> as currency, anchor right.</li>
+<li><strong>Disclaimer footer</strong>: muted paragraph saying lead times and
+  adjustments will be confirmed by the assigned dealer.</li>
+<li><strong>Illustrative-seed banner</strong> (yellow): visible only when
+  <code>ir.config_parameter southbrook.seed_mode = 'illustrative'</code>. You
+  should NOT see this in production.</li>
+</ul>
+<p>The Shop Copy PDF (MO-bound):</p>
+<ul>
+<li><strong>Header strip</strong>: "Shop Copy" / MO name (<code>mo.name</code>).</li>
+<li><strong>Originating Order block</strong>: SO name + customer (resolved via the
+  NF25 chain <code>mo.sale_line_id.order_id</code> falling back to
+  <code>mo.origin</code>).</li>
+<li><strong>Product + Quantity</strong>: <code>mo.product_id.display_name</code>,
+  <code>mo.product_qty</code> + UoM.</li>
+<li><strong>Effective Lead Time</strong>: <code>mo.bom_id.effective_produce_delay</code> (with
+  a muted note showing the <code>southbrook_lead_time_extra</code> bump when
+  non-zero).</li>
+<li><strong>BoM table</strong>: each <code>bom_line_id</code> shows component name, qty, UoM.
+  Empty-state row when no BoM lines materialised.</li>
+<li><strong>Panel Cut List table</strong> (Phase 4 — only renders when
+  <code>southbrook_kitchen_mrp</code> is installed): pulls from
+  <code>sb.production.package.cutlist_id.line_ids</code>. Columns: Panel name
+  (translated), Qty, L (mm), W (mm), Thk (mm), Substrate, Grain.</li>
+<li><strong>Hardware package summary</strong> (Phase 4): one-line muted footer
+  showing hardware package name + SKU count + a pending-pricing
+  flag.</li>
+<li><strong>Disclaimer footer</strong>: muted paragraph emphasising MO-driven
+  data (no spreadsheet mirror).</li>
+</ul>
+<p>The Door Order PDF (SO-bound):</p>
+<ul>
+<li><strong>Header strip</strong>: "Door Order" / SO name / customer name.</li>
+<li><strong>Per-line door table</strong>: columns Cabinet, Series, Door Style,
+  Finish, Hinge, Doors (count), W (mm), H (mm). Series, Door Style,
+  Finish, Hinge Side are pulled from the variant's attribute values
+  via <code>product_template_attribute_value_ids.filtered(...)</code>. Width
+  uses <code>line.sb_width_mm</code>. Height is computed by a small heuristic
+  on <code>line.name</code> (wall → 760, tall/pantry → 2100, else 720). Door
+  count uses <code>line.sb_door_count</code>.</li>
+<li><strong>Doors by Series footer</strong>: aggregates total doors per Series,
+  rendered as a small table. The aggregation logic is inline
+  QWeb <code>t-set series_totals dict</code> accumulation in the template.</li>
+<li><strong>Disclaimer</strong>: per-SO scope, multi-order batched aggregation
+  deferred to a separate report.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Signature Spec Sheet — the estimator-customer interface.</strong></p>
+<p>When you generate it:</p>
+<blockquote>
+<p><strong>(order form) Print → Signature Spec Sheet</strong></p>
+</blockquote>
+<p>Or send it: <code>Send by Email</code> — Odoo attaches the PDF automatically.</p>
+<p>The PDF is generated at click time from <code>report_signature_spec_sheet_doc</code>.
+Data binding is <code>sale.order</code>, so the report sees <code>o = sale.order</code>
+record. Every field read is read from the live SO at print time —
+there's no snapshot. If you print, then edit lines, then re-print,
+you get the updated numbers.</p>
+<p>The customer signs the PDF (in-person, e-sign, or scanned
+return-fax). The signed PDF gets attached to the order's chatter as
+an audit artifact.</p>
+<p><strong>2. Shop Copy — the production-line companion.</strong></p>
+<p>The planner prints this for the work order:</p>
+<blockquote>
+<p><strong>(MO form) Print → Shop Copy</strong></p>
+</blockquote>
+<p>Data binding is <code>mrp.production</code>. The report resolves
+<code>mo.sale_line_id.order_id</code> (NF25 — the canonical chain) to get the
+SO/customer context. Falls back to <code>mo.origin</code> (free-text SO name)
+when <code>sale_line_id</code> is absent (manual MOs, demo fixtures).</p>
+<p>The Effective Lead Time field shows the cabinet's planned production
+duration including the maple +14 day extra (or any other lead-time
+extras the variant carries). The shop floor uses this to plan
+sequencing.</p>
+<p>The Panel Cut List section only renders when the planner has run
+the <code>sb.production.package.generate_from_mo()</code> action (from
+<code>southbrook_kitchen_mrp</code>). Without that, the cut list section is
+silently skipped — the QWeb uses <code>env.get('sb.production.package')</code>
+which returns None when the module isn't installed, and the t-if
+short-circuits cleanly.</p>
+<p><strong>3. Door Order — batched supplier handoff.</strong></p>
+<p>When the planner is ready to forward to the door supplier:</p>
+<blockquote>
+<p><strong>(order form) Print → Door Order</strong></p>
+</blockquote>
+<p>Data binding is <code>sale.order</code>. The report pulls per-line door specs
++ aggregates a totals-by-series footer (because the supplier's
+ordering form is organised by series — each series has its own
+door catalog).</p>
+<p>Per-SO scope is a Phase-1 simplification. Multi-order batch
+aggregation across all open SOs ("send Wednesday's batch") is a
+deferred report — file a ticket if the supplier reaches a point
+where per-SO PDFs become unwieldy.</p>
+<p><strong>4. Adding a field to one of the reports — the safe path.</strong></p>
+<p>You'll be asked. The safe sequence:</p>
+<p>a. Identify which report. Signature Spec Sheet is <code>sale.order</code>-bound;
+   Shop Copy is <code>mrp.production</code>-bound; Door Order is <code>sale.order</code>-
+   bound. The bound model determines what <code>o</code> (or <code>mo</code>) is.</p>
+<p>b. Identify the source of the data. If it's a field on the bound
+   model, simply <code>&lt;span t-out="o.field_name"/&gt;</code>. If it's on a related
+   record (e.g. partner address on Door Order), it's
+   <code>&lt;span t-out="o.partner_id.street"/&gt;</code>.</p>
+<p>c. Add the field to the template at the right place. Use the
+   existing CSS classes (<code>sb-muted</code>, <code>sb-rule</code>, <code>sb-zone-header</code>,
+   <code>sb-total-row</code>, <code>sb-right</code>) — these are defined in
+   <code>southbrook_report_styles.xml</code> and ensure visual consistency.</p>
+<p>d. Test on at least one draft and one confirmed record. Phantom
+   data (e.g. an order with no lines) should NOT crash the
+   render — guard with <code>t-if</code>.</p>
+<p>e. NEVER reorder the manifest's <code>data</code> list. The styles file MUST
+   load before the report files (xpath references depend on it).
+   If you alphabetise, you break everything.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The Signature Spec Sheet PDF crashes with a 500 error."</strong></p>
+<p>The QWeb template references a field that doesn't exist on the
+record. Open the Odoo log and find the QWeb evaluation error. Most
+common causes:
+1. A new field was added but the seed didn't backfill — the field
+   is <code>None</code> and <code>t-out</code> crashes. Fix: guard with <code>t-if</code>.
+2. The styles template wasn't loaded — the data list got
+   alphabetised. Fix: restore <code>southbrook_report_styles.xml</code> to
+   precede the report files.
+3. The order has a line with no <code>product_id</code> (a free-text
+   comment) and <code>line.product_id.display_name</code> crashes. Fix:
+   guard with <code>or line.name</code> (already in the canonical template at
+   line 72: <code>line.product_id.display_name or line.name</code>).</p>
+<p><strong>"The Shop Copy shows 'Originating Order: —' instead of the SO."</strong></p>
+<p>The MO has no <code>sale_line_id</code> AND no <code>origin</code>. Either:
+1. Manual MO created via the Manufacturing form (no SO trigger).
+   Set <code>origin</code> manually if you want it on the print, or leave it
+   if the MO is internally-scoped (e.g. shop-floor sample).
+2. <code>sale_mrp</code> failed to populate <code>sale_line_id</code> at confirm.
+   Inspect via developer mode → MO record. Recovery: manually
+   populate <code>sale_line_id</code> from the originating SO line.</p>
+<p>NF25 was caught at live install — the Odoo 19 <code>mrp.production.sale_id</code>
+shortcut was dropped, replaced with <code>sale_line_id.order_id</code>. If you
+see a template referencing <code>mo.sale_id</code>, that's pre-NF25 code; fix
+the template.</p>
+<p><strong>"The Door Order shows blank cells for Series / Door Style /
+Finish."</strong></p>
+<p>The variant has no attribute values for Series / Door Style /
+Finish. Two causes:
+1. The line was added but the Configure wizard was never run — so
+   the variant is a "default" variant with no attribute values.
+   Re-open the line, run Configure, save.
+2. The attribute is named differently than the template expects.
+   The template hardcodes attribute names:
+   <code>v.attribute_id.name == 'Series'</code> — if your install has renamed
+   the Series attribute (e.g. to "Cabinet Series"), the filter
+   misses. Either rename back or update the template.</p>
+<p><strong>"I added a field showing customer email on the Door Order, but
+some orders show 'False' in that cell."</strong></p>
+<p><code>o.partner_id.email</code> is None when unset, and QWeb's <code>t-out</code> renders
+the Python <code>False</code> string. Guard with <code>t-if="o.partner_id.email"</code>,
+or use <code>t-out="o.partner_id.email or ''"</code>.</p>
+<p><strong>"The Shop Copy Panel Cut List section is missing — the rest
+prints fine."</strong></p>
+<p><code>southbrook_kitchen_mrp</code> isn't installed or no
+<code>sb.production.package</code> exists for this MO yet. The QWeb does
+<code>env.get('sb.production.package')</code> which returns None when the
+module is absent — and the t-if short-circuits. If the module IS
+installed and a package SHOULD exist, run the package generator from
+the MO's chatter actions, then re-print.</p>
+<p><strong>"The yellow ILLUSTRATIVE SEED banner is showing in production."</strong></p>
+<p>The <code>ir.config_parameter southbrook.seed_mode</code> is set to
+<code>illustrative</code>. This should be <code>canonical</code> (or absent) in
+production. Open Settings → Technical → Parameters → System
+Parameters, find <code>southbrook.seed_mode</code>, change to <code>canonical</code>.
+Investigate how <code>illustrative</code> got set (almost certainly a demo
+data leak).</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Each report is registered via two records:</p>
+<ol>
+<li>A <code>&lt;template&gt;</code> element defining the QWeb HTML (with embedded
+   data lookups via <code>t-foreach</code>, <code>t-out</code>, <code>t-if</code>).</li>
+<li>An <code>ir.actions.report</code> record binding the template to a model
+   via <code>binding_model_id</code>.</li>
+</ol>
+<p>When the user clicks Print:</p>
+<ol>
+<li>Odoo loads the action.</li>
+<li>Resolves <code>report_name</code> to the template.</li>
+<li>Calls the template with <code>docs</code> set to the selected record(s) and
+   <code>env</code> for env access.</li>
+<li>QWeb evaluates the template against the data.</li>
+<li>wkhtmltopdf converts the rendered HTML to PDF.</li>
+<li>The result is served as a file attachment.</li>
+</ol>
+<p>The shared style template (<code>southbrook_report_styles</code>) is included
+via <code>t-call</code> at the top of each report template. The CSS variables
+(<code>--southbrook-walnut</code>, <code>-sky</code>, <code>-linen</code>, <code>-ink</code>, <code>-rule-color</code>,
+<code>-muted</code>) are currently TBD-marked per NF15 — the canonical hex
+values are gated on the Signature Series spec book PDF (artifact</p>
+<h1 id="7-when-that-lands-the-swap-is-one-files-worth-of-edits">7). When that lands, the swap is one file's worth of edits.</h1>
+<p>The reports honour the <code>southbrook.seed_mode</code> ir.config_parameter:
+when set to <code>illustrative</code>, the Signature Spec Sheet renders the
+yellow banner at top. This is for Phase-1 gate review only — the
+production deployment should have the parameter unset or set to
+<code>canonical</code>.</p>
+<p>The Door Order's series-totals footer is computed inline via QWeb's
+<code>t-set</code> and dict accumulation:</p>
+<pre><code class="language-xml">&lt;t t-set=&quot;series_totals&quot; t-value=&quot;{}&quot;/&gt;
+&lt;t t-foreach=&quot;o.order_line&quot; t-as=&quot;ln&quot;&gt;
+  &lt;t t-set=&quot;sv&quot; t-value=&quot;ln.product_id.product_template_attribute_value_ids
+       .filtered(lambda v: v.attribute_id.name == 'Series')[:1].name or 'Unknown'&quot;/&gt;
+  &lt;t t-set=&quot;cur&quot; t-value=&quot;series_totals.get(sv, 0)&quot;/&gt;
+  &lt;t t-set=&quot;series_totals&quot; t-value=&quot;dict(series_totals, **{sv: cur + (ln.sb_door_count or 0)})&quot;/&gt;
+&lt;/t&gt;
+</code></pre>
+<p>— a Python-style dict.update in QWeb's restricted Jinja-like
+syntax. This is the right place for one-off aggregations; for
+multi-report aggregations, lift to a Python method on <code>sale.order</code>.</p>
+<p>The Shop Copy's Phase 4 Panel Cut List section uses defensive
+env.get so installs without <code>southbrook_kitchen_mrp</code> don't crash:</p>
+<pre><code class="language-xml">&lt;t t-set=&quot;PkgModel&quot; t-value=&quot;env.get('sb.production.package')&quot;/&gt;
+&lt;t t-set=&quot;pkg&quot; t-value=&quot;PkgModel.sudo().search([('mo_id', '=', mo.id)],
+                                                limit=1) if PkgModel is not None else False&quot;/&gt;
+&lt;t t-if=&quot;pkg and pkg.cutlist_id&quot;&gt;
+  ... cut list rows ...
+&lt;/t&gt;
+</code></pre>
+<p>— if <code>PkgModel</code> is None or no package exists, the t-if short-
+circuits cleanly. Standard pattern for cross-module optional
+sections.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A customer asks for the spec sheet to include their delivery
+address. Where do you add it, and what do you guard against?</p>
+<blockquote>
+<p>Open <code>reports/signature_spec_sheet.xml</code>. Add inside the customer
+block (after Quote Date):
+<code>xml
+&lt;strong&gt;Delivery Address:&lt;/strong&gt;
+&lt;span t-out="o.partner_shipping_id.contact_address" t-if="o.partner_shipping_id"/&gt;</code>
+Guard: orders where partner_shipping_id is False (rare, but
+possible for walk-in orders without a separate shipping contact).
+The <code>t-if</code> skips the row cleanly.</p>
+</blockquote>
+<p><strong>2.</strong> The production planner prints a Shop Copy and the BoM table
+shows "No BoM lines materialised." The MO has product_qty = 4.
+What's wrong, and what does the message tell you?</p>
+<blockquote>
+<p>The MO's <code>bom_id</code> is set but <code>bom_line_ids</code> is empty. Either
+(a) the BoM was created but has no component lines (broken seed);
+(b) the BoM lookup picked a generic BoM that legitimately has no
+components. Inspect: open the MO, look at the BoM, check its
+<code>bom_line_ids</code>. If empty, edit the BoM to add the right
+component products (panels, hardware, edge banding). The message
+is informational — the report doesn't fail, it just tells the
+floor "your BoM is empty, fix that."</p>
+</blockquote>
+<p><strong>3.</strong> The Door Order PDF shows all lines under Series = "Unknown"
+in the totals footer. What does that mean?</p>
+<blockquote>
+<p>None of the variants carry a Series attribute value. Either:
+(a) Configurator wasn't run on any line (use the wizard); (b)
+the attribute is named differently than "Series" in this install
+(check <code>data/attributes.xml</code> — attr_series with name "Series").
+The template's filter
+<code>v.attribute_id.name == 'Series'</code> is exact-match. If the name was
+translated or changed, the filter misses everything → fallback
+"Unknown" populates.</p>
+</blockquote>
+<p><strong>4.</strong> You add a "Last Modified By" field to the Signature Spec
+Sheet (<code>o.write_uid.name</code>). It works fine on most orders but
+crashes on one. What's the cause?</p>
+<blockquote>
+<p>The order has <code>write_uid = False</code> — possible if created
+programmatically via a system user that was later deleted, or
+an order created via a script that bypassed the standard create
+hook. <code>o.write_uid.name</code> then crashes because you're accessing
+<code>.name</code> on a False / empty record. Guard:
+<code>&lt;span t-out="o.write_uid.name" t-if="o.write_uid"/&gt;</code> or
+<code>&lt;span t-out="(o.write_uid.name or 'System')"/&gt;</code>.</p>
+</blockquote>
+<p><strong>5.</strong> A developer needs to extend the Shop Copy to show a
+QR-code for the SO link. Where do they put it, and what's the
+gotcha with the binding model?</p>
+<blockquote>
+<p>Add the QR-code rendering inside the Originating Order block of
+<code>reports/shop_copy.xml</code>. Use Odoo's standard <code>barcode</code> widget via
+<code>&lt;img t-att-src="'/report/barcode/QR/' + (so.name or mo.origin
+or '')"/&gt;</code>. The gotcha: <code>o</code> in this template is <code>mrp.production</code>
+not <code>sale.order</code> — referencing <code>o.name</code> would give the MO name,
+not the SO. The SO is in the <code>so</code> variable resolved earlier by
+the t-set chain. Always check <code>t-foreach</code>'s loop variable name
+before assuming what <code>o</code> means — Shop Copy uses <code>mo</code>, the other
+two use <code>o</code>.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Order Builder UI walkthrough — lesson 8.2.</li>
+<li>Pricing mechanics — lesson 8.3.</li>
+<li>The Quote → MO handoff — lesson 8.4 (this lesson assumes the MO
+  exists).</li>
+<li>Versioning / revisions — lesson 8.6.</li>
+<li>QWeb general syntax — Odoo's own docs.</li>
+<li>wkhtmltopdf configuration / page-break behaviour — sysadmin
+  concern.</li>
+<li>The customer-facing one-page configurator PDF — Phase 2, not
+  yet shipped.</li>
+<li>The Hermes platform's conversation transcripts — separate
+  reporting surface in <code>southbrook_hermes</code>.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_08_revising_versioning" model="slide.slide">
+            <field name="name">Revising + Versioning — Quote Revisions, the parent_order_id Chain, and Customer Rejection Handling</field>
+            <field name="channel_id" ref="course_estimating_deep"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Estimator. The customer is going to change their mind. This lesson is how to handle &quot;I want to change the island&quot; without losing the audit trail of the original quote, and how to walk the chain backwards when the customer asks &quot;what was version 1 again?&quot;.</field>
+            <field name="html_content"><![CDATA[<h1 id="revising-versioning-quote-revisions-the-parent_order_id-chain-and-customer-rejection-handling">Revising + Versioning — Quote Revisions, the parent_order_id Chain, and Customer Rejection Handling</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator. The customer just emailed: "We've reconsidered
+the island — can you do a version with a 5-foot island instead of
+6-foot, and lose the pantry?" Without versioning, you'd edit the
+quote and lose the original. With versioning, you click Duplicate
+as Draft, edit the new version, and both stay traceable.</p>
+<p>This lesson is the NF6 Image Floor pattern — how to chain v1 → v2 →
+v3 → … without breaking the audit trail, what gets cloned and what
+gets reset, and how to handle the customer-rejection case (they
+walk away after v2).</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The Duplicate-as-Draft entry point:</p>
+<blockquote>
+<p><strong>(any order form) Stat Buttons → Duplicate as Draft</strong></p>
+</blockquote>
+<p>The button is injected by xpath (3) in <code>views/sale_order_views.xml</code>
+into the <code>button_box</code>, calls <code>action_duplicate_as_draft</code>, and is
+gated by <code>groups="sales_team.group_sale_salesman"</code>.</p>
+<p>The version field is invisible to most users — it lives behind
+<code>groups="base.group_no_one"</code> (developer mode only) but renders the
+Parent Order link near the customer block when present.</p>
+<p>The ancestry chain walker (used by the customer portal timeline):</p>
+<blockquote>
+<p><code>sale.order._southbrook_history_chain(max_depth=20)</code> — Python
+method, no menu surface.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>When you click Duplicate as Draft on order <code>SO00123</code> (v1):</p>
+<ol>
+<li>The form refreshes onto a new order — <code>SO00124</code> (v2).</li>
+<li>The order's name carries " (v2)" suffix in the breadcrumb (set
+   by the action's <code>name</code> field).</li>
+<li>The state shows <code>draft</code>.</li>
+<li>A "Parent Order" link appears near the customer block — readonly,
+   pointing back at <code>SO00123</code>. (Only visible when <code>parent_order_id</code>
+   is non-empty.)</li>
+<li>All order lines copied from v1 — same products, same zones, same
+   quantities, same prices. (Pricing is re-resolved at line level
+   using the current pricelist — see "Common mistakes" if a customer
+   was switched between versions.)</li>
+<li>The chatter shows "Created from SO00123" implicit via Odoo's
+   standard copy log.</li>
+<li>The <code>version</code> field reads 2 (visible only in developer mode by
+   default).</li>
+</ol>
+<p>When you walk back via the chain helper (typically from the customer
+portal timeline):</p>
+<pre><code class="language-python">order._southbrook_history_chain(max_depth=20)
+</code></pre>
+<p>Returns a list of dicts, newest first. Each dict carries: <code>id</code>,
+<code>name</code>, <code>version</code>, <code>state</code>, <code>amount_total</code>, <code>date_order</code>,
+<code>is_current</code>. The customer portal renders this as a timeline of
+"v3 (current) — $58,200 — confirmed" / "v2 — $54,100 — superseded
+draft" / "v1 — $61,500 — superseded draft".</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Customer requests a revision.</strong></p>
+<p>The customer comes back. Most common reasons:
+- Dimensions changed ("we measured again, the wall is 8 feet not
+  7 feet — add a cabinet").
+- Materials changed ("the husband wants Maple boxes throughout").
+- Scope changed ("drop the island, we don't have the floor space").
+- Pricing pushback ("can you do the contractor series on the
+  perimeter and signature only on the island?").
+- Design rethink ("we want a wider sink base + smaller pantry").</p>
+<p>If the revision is <strong>trivial</strong> (one cabinet's finish swapped),
+edit the line in place and re-print. Don't version. The version
+chain is for substantive revisions — anything where the customer
+might later ask "what was the original price?"</p>
+<p>If the revision is <strong>substantive</strong>, duplicate. The bar: "if I were
+asked in 3 months what we changed, would I want a record?"</p>
+<p><strong>2. Duplicate as Draft.</strong></p>
+<p>Open the most recent version (likely v1, the original):</p>
+<blockquote>
+<p>Stat buttons → <strong>Duplicate as Draft</strong></p>
+</blockquote>
+<p>The button calls <code>action_duplicate_as_draft</code>:</p>
+<pre><code class="language-python">new_order = self.copy({
+    &quot;parent_order_id&quot;: self.id,
+    &quot;version&quot;: self.version + 1,
+    &quot;state&quot;: &quot;draft&quot;,
+})
+return {&quot;type&quot;: &quot;ir.actions.act_window&quot;, ...}
+</code></pre>
+<p>— so:
+- <code>state</code> is forced to <code>draft</code> (even if the original was <code>sent</code> or
+  <code>sale</code>).
+- <code>parent_order_id</code> points to the original.
+- <code>version</code> is incremented (v1 → v2, v2 → v3, etc.).
+- All order_lines copy via Odoo's standard <code>_inherit_copy</code>
+  mechanism. Configurator session references on lines copy too —
+  but see Common Mistakes for the variant-sharing trap.</p>
+<p>The form auto-navigates to the new draft.</p>
+<p><strong>3. Edit the new version.</strong></p>
+<p>Walk the changes:
+- Delete lines the customer dropped.
+- Add new lines (with Configure as needed).
+- Edit existing lines (zone, qty, attribute reconfiguration).
+- Verify the pricelist still resolves correctly (if the customer
+  switched channel, the new pricelist applies; the original v1
+  retains its frozen pricelist).</p>
+<p><strong>4. Send the new version.</strong></p>
+<p>Generate the new Signature Spec Sheet PDF, send to the customer.
+The PDF shows the new version number (<code>o.version</code> is rendered next
+to the Reference) so the customer can tell v2 from v1 at a glance.</p>
+<p><strong>5. Loop back as needed.</strong></p>
+<p>If the customer comes back AGAIN, duplicate the most recent version
+(v2 → v3). The chain extends. Image Floor's observed pattern is
+v3 as the high-water mark — beyond that, the conversation has
+fundamentally drifted and someone (usually the customer's spouse)
+needs to be involved.</p>
+<p><strong>6. Confirmation — what happens to the chain.</strong></p>
+<p>When the customer signs off on v3 and you Confirm:
+- v3's state moves to <code>sale</code>. MOs spawn from v3's lines.
+- v1 and v2 remain in <code>draft</code> (or <code>cancel</code> if you canceled them
+  during the conversation — see step 7).
+- <code>southbrook.order.analytics.capture(v3)</code> writes one analytics row
+  pointing to v3.
+- v1's and v2's analytics rows (if any) are independent — they
+  weren't confirmed, they weren't captured. The analytics is per-
+  confirmed-version, not per-chain.</p>
+<p>The history chain stays walkable forever. The customer portal can
+render the full v1 → v2 → v3 timeline. Internal audit can trace
+every revision.</p>
+<p><strong>7. Customer rejection — when the chain doesn't get confirmed.</strong></p>
+<p>Customer says "we're going with another vendor" after v2. What you
+do depends on policy:
+- <strong>Best practice</strong>: leave v1 and v2 in <code>draft</code>. Both are
+  searchable in the Order Builder list with the standard state
+  filter. Their chain is preserved for post-mortem analysis ("what
+  did we quote?").
+- <strong>Tidy policy</strong>: cancel v2. State moves to <code>cancel</code>. Still
+  searchable, but excluded from the default <code>state in ('draft',
+  'sent')</code> Order Builder filter. The chain is still walkable
+  because <code>parent_order_id</code> is a Many2one not a domain filter.
+- <strong>Aggressive cleanup</strong>: cancel v1 too. Same logic — chain
+  walkable, not visible in default list.</p>
+<p>Don't delete. Deletion is destructive; the audit trail vanishes.
+Even in the rejection case, the data is worth keeping for the
+analytics model (channel rejection patterns, dropout-version
+distribution).</p>
+<p><strong>8. Walking the chain.</strong></p>
+<p>When the customer comes back 6 months later asking "what was v2's
+price again?":</p>
+<pre><code class="language-python"># Find the most recent version on this customer's account
+latest = self.env[&quot;sale.order&quot;].search(
+    [(&quot;partner_id&quot;, &quot;=&quot;, customer.id), (&quot;parent_order_id&quot;, &quot;!=&quot;, False)],
+    order=&quot;version desc&quot;,
+    limit=1,
+)
+# Walk back
+chain = latest._southbrook_history_chain(max_depth=20)
+for entry in chain:
+    print(f&quot;v{entry['version']}: {entry['name']} — &quot;
+          f&quot;${entry['amount_total']} ({entry['state']})&quot;)
+</code></pre>
+<p>The chain comes back newest first. The <code>is_current</code> flag marks the
+node corresponding to <code>latest</code>.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I duplicated v1 → v2, edited a line on v2, and v1's line also
+changed."</strong></p>
+<p><code>copy()</code> deep-clones the SO lines, so the order_line records are
+distinct. But <code>product.product</code> variants are SHARED by ID. If you
+edited the variant's attribute values via the product form (not
+via the Configure button on the line), both v1 and v2 see the
+change — they reference the same variant.</p>
+<p>Recovery: re-Configure the affected line on v2 to materialise a
+NEW variant. The new variant inherits v2's line; v1's line still
+points to the original variant (now altered) — which is an audit
+problem you'll need to handle case-by-case.</p>
+<p>Future protection: only edit attribute values through the Configure
+wizard, never through the product.product form.</p>
+<p><strong>"I duplicated and the customer was switched between versions —
+the new version's prices look weird."</strong></p>
+<p>If you change the customer on v2, the <code>_onchange_partner_id_southbrook_pricelist</code>
+fires and rewrites <code>pricelist_id</code>. Lines reprice. v1's pricing is
+NOT affected — it's frozen on v1's order, which still references
+the original customer.</p>
+<p>If you wanted v2 to carry the same customer + pricing as v1, don't
+change the customer. The customer link copies along with the
+duplicate.</p>
+<p><strong>"I duplicated v3 → v4 from v3, but the chain shows v4 → v3 → v1,
+skipping v2."</strong></p>
+<p>The duplicate command sets <code>parent_order_id = self.id</code> where <code>self</code>
+is the source. If you duplicated from v3, parent is v3. The chain
+walker reads <code>parent_order_id</code> recursively — so v4 → v3 → v3's
+parent. If v3's parent was v1 (because you duplicated v1 → v3 by
+mistake, skipping v2), the chain reflects that.</p>
+<p>Fix: open v3, set its <code>parent_order_id</code> to v2 explicitly (developer
+mode, group_no_one access). The walker re-runs cleanly. Then audit
+why v3 was duplicated from v1 — likely the rep opened the wrong
+order to duplicate.</p>
+<p><strong>"I confirmed v1, customer wants v2, I duplicated v1 → v2 → and
+v1's MOs are still in Manufacturing."</strong></p>
+<p>Right — Confirm spawns MOs. Cancelling v1 (via state → cancel)
+will cancel the MOs upstream (the standard Odoo flow). If those
+MOs have already started production, you can't cancel them — they
+need to finish, and v2 effectively becomes a separate order. The
+customer pays for both.</p>
+<p>Best practice: don't Confirm v1 if the customer is in negotiation.
+Confirm only when the customer has signed off. The <code>southbrook_submitted_date</code>
+milestone (set by the portal "Request a Price" action) is the
+"customer has submitted for pricing" timestamp; Confirm is the
+"customer has signed and we're going to build it" commitment.</p>
+<p><strong>"The chain walker returned 20 entries and then stopped."</strong></p>
+<p><code>max_depth=20</code> is a defensive limit against pathological cycles.
+If your actual chain is deeper than 20, something is wrong —
+inspect for a cycle (e.g. v3.parent = v2 AND v2.parent = v3, which
+shouldn't happen but could after a manual edit). The <code>seen</code> set
+guard inside the walker prevents infinite loops; the depth limit
+is the secondary safety net. Production never sees deeper than 5;
+20 is comfortable.</p>
+<p><strong>"I duplicated and the new version has the ILLUSTRATIVE SEED
+banner."</strong></p>
+<p>The banner is gated on <code>context.get('seed_mode_canonical', False)</code>
+— if the context is missing the flag, the banner shows. The
+duplicate action's act_window descriptor doesn't carry context
+forward by default. If you were operating under
+<code>seed_mode_canonical=True</code> context, that context drops when the
+duplicate opens. This is a UI quirk, not a data issue. Refresh the
+page or open via the menu to restore proper context.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p><code>action_duplicate_as_draft</code> uses Odoo's standard <code>copy()</code> mechanism
+with three overrides:
+- <code>parent_order_id = self.id</code> — the back-link.
+- <code>version = self.version + 1</code> — auto-increment.
+- <code>state = 'draft'</code> — force-reset so a confirmed source still
+  produces a draft target.</p>
+<p>Odoo's standard <code>copy()</code> handles deep-clone of <code>order_line</code>,
+including the variant references. Variants are NOT cloned — they're
+shared (this is the trap explained above; the safety mechanism is
+to use the Configure button on the duplicate to materialise fresh
+variants).</p>
+<p>The <code>_southbrook_history_chain</code> method is a simple iterative walker:</p>
+<pre><code class="language-python">def _southbrook_history_chain(self, max_depth=20):
+    chain = []
+    seen = set()
+    cur = self
+    while cur and cur.id not in seen and len(chain) &lt; max_depth:
+        seen.add(cur.id)
+        chain.append({...})
+        cur = cur.parent_order_id
+    return chain
+</code></pre>
+<p>The <code>seen</code> set is the cycle guard; the depth limit is the secondary
+guard. Both are belt-and-suspenders.</p>
+<p>The customer portal renders this list as a vertical timeline. The
+node with <code>is_current=True</code> is highlighted. Each node carries
+<code>amount_total</code> and <code>state</code> so the customer can compare versions
+at a glance.</p>
+<p>When a version is confirmed, <code>southbrook.order.analytics.capture</code>
+writes a row for THAT version only. The analytics model has no
+notion of "chain head" — each confirmed version is its own
+analytics row. If you query analytics for a customer, you'll see
+ONE row per confirmed version (typically just one row total because
+typically only the final version gets confirmed; but if the customer
+confirms v1, then comes back and confirms v3 instead, you'd have
+two rows for that customer).</p>
+<p>The <code>parent_order_id</code> field uses <code>ondelete='set null'</code> — if you
+delete a parent order, the child's link becomes null (the chain
+breaks at that point). This is by design — preserves the child as
+a standalone record even if the parent vanishes. But it means you
+should NEVER delete a parent if you care about chain integrity;
+cancel instead.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A customer is on v3 of a quote. v1 was $61,500, v2 was
+$54,100, v3 is $58,200. The customer rejects v3 and says "let me
+think." Two weeks later they come back wanting to confirm v2's
+spec. What do you do?</p>
+<blockquote>
+<p>Don't confirm v2 directly — its pricing is two weeks old and may
+not reflect current cost. Instead: Duplicate v2 as Draft → creates
+v4 with parent_order_id=v2. v4 inherits v2's lines but re-resolves
+the pricelist at current rates (which may have changed if cost or
+channel agreements moved). Verify v4's total matches what the
+customer was quoted on v2 (allowing for any cost drift); if not,
+explain the delta to the customer. Then send v4 for signature.
+The chain reads v4 → v2 → v1.</p>
+</blockquote>
+<p><strong>2.</strong> You duplicated v1 → v2, but on v1's product form (not via
+the configurator) you changed the Finish from Walnut to Maple to
+respond to a quick customer request. v2 was already saved. What
+happened?</p>
+<blockquote>
+<p>Both v1's line and v2's line reference the SAME variant — you
+just changed a shared variant from Walnut to Maple. Now both
+orders' Signature Spec Sheets show Maple — including v1, which
+the customer signed off on as Walnut. Audit problem.
+Recovery: re-Configure v1's line to materialise a fresh Walnut
+variant (so v1 owns its own variant going forward). Re-Configure
+v2's line if Maple was actually intended for v2; otherwise also
+revert to Walnut. Future: do not edit attribute values via the
+product form — always via the Configure wizard.</p>
+</blockquote>
+<p><strong>3.</strong> A customer's chain shows v1 → v2 → v3 in the portal. You
+expected v4 (you just duplicated). What's broken?</p>
+<blockquote>
+<p>Either (a) the duplicate failed silently — check the chatter for
+the new order's create entry; (b) you didn't end up on v4's form
+after duplicate (the action's <code>target: current</code> should land you
+there, but if your browser blocked the navigation, the new draft
+exists but you're still looking at v3); (c) <code>_southbrook_history_chain</code>
+on v3 walks v3 → v2 → v1, not v3 → v4 (forward) — the chain is
+backward-only by design. Open the Order Builder list, filter by
+customer + version desc — v4 will be there if it was created.</p>
+</blockquote>
+<p><strong>4.</strong> Customer confirms v2 (not v3). v3 still exists in draft. Six
+months later, can the customer's portal show v3 in the timeline?</p>
+<blockquote>
+<p>Yes. <code>_southbrook_history_chain</code> is parent-only, walks back from
+the current node. But if you call it from v3, you get v3 → v2 →
+v1. If you call from v2 (the confirmed one), you get v2 → v1
+only. Whether v3 appears on the customer portal depends on which
+node the portal renders FROM. If the portal renders the confirmed
+order's chain, v3 isn't included. If the portal renders all
+orders for the customer with a parent link to the chain root, v3
+can be visible. Today's customer portal renders the most recent
+order's chain — so v3 (the most recent) → v2 → v1. v2 is shown
+as the confirmed one in the timeline.</p>
+</blockquote>
+<p><strong>5.</strong> You want to add a "Why this version" note field that
+captures the customer's reason for each revision. Where do you
+add it, and what's the audit consideration?</p>
+<blockquote>
+<p>Add <code>southbrook_revision_reason</code> (Char or Text) to <code>sale.order</code>
+in <code>models/sale_order.py</code>. Add a t-set or a small field in the
+view (XPath after the version field). On Duplicate, the field
+resets to blank (Odoo's standard <code>copy()</code> defaults).
+Audit consideration: the field is per-order, not per-line. If
+the revision spans many line changes, the rep writes a summary
+("customer dropped island, requested Maple boxes throughout").
+The chatter is the source of truth for line-level audit; this
+field is the headline. Don't make it <code>readonly=False after
+creation</code> — that allows post-hoc rewrites and undermines audit.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The Order Builder UI walkthrough — lesson 8.2.</li>
+<li>Pricing mechanics across versions — lesson 8.3 (each version
+  applies its current pricelist; pricing is NOT frozen per version
+  until Confirm).</li>
+<li>The Quote → MO handoff — lesson 8.4 (relevant only when a
+  version gets confirmed).</li>
+<li>Report generation per version — lesson 8.5 (each version
+  generates its own Signature Spec Sheet with its version number).</li>
+<li>General Odoo <code>copy()</code> mechanics — Odoo's own ORM docs.</li>
+<li>Customer portal UX — Course 6 (Customer Touchpoints).</li>
+<li>The Hermes platform's recommendation flow for revisions — see
+  the Hermes spec.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

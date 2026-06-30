@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_exec_dashboard_root"
+              name="Morning Briefing"
+              sequence="1"
+              web_icon="southbrook_exec_dashboard,static/description/icon.png"
+              groups="group_southbrook_exec_dashboard_user"
+              action="action_exec_dashboard_morning"/>
+</odoo>

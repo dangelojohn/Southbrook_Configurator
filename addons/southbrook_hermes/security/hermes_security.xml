@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="group_hermes_reviewer" model="res.groups">
+        <field name="name">Fabio Reviewer</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Review, approve, reject, and apply Fabio recommendations.</field>
+    </record>
+
+    <function model="res.groups" name="write">
+        <value eval="[ref('southbrook_hermes.group_hermes_reviewer')]"/>
+        <value eval="{'name': 'Fabio Reviewer', 'comment': 'Review, approve, reject, and apply Fabio recommendations.'}"/>
+    </function>
+
+    <record id="base.group_system" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('southbrook_hermes.group_hermes_reviewer'))]"/>
+    </record>
+
+</odoo>

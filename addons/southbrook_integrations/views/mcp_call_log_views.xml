@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_mcp_call_log_list" model="ir.ui.view">
+        <field name="name">southbrook.integrations.mcp_call_log.list</field>
+        <field name="model">southbrook.integrations.mcp_call_log</field>
+        <field name="arch" type="xml">
+            <list string="MCP Call Log"
+                  decoration-success="status == 'ok'"
+                  decoration-warning="status == 'rate_limited'"
+                  decoration-danger="status == 'error'">
+                <field name="create_date"/>
+                <field name="tool_id"/>
+                <field name="caller_persona"/>
+                <field name="status"/>
+                <field name="result_size"/>
+                <field name="latency_ms"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mcp_call_log_search" model="ir.ui.view">
+        <field name="name">southbrook.integrations.mcp_call_log.search</field>
+        <field name="model">southbrook.integrations.mcp_call_log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="tool_id"/>
+                <field name="caller_persona"/>
+                <field name="status"/>
+                <filter name="ok" string="OK"
+                        domain="[('status','=','ok')]"/>
+                <filter name="error" string="Errors"
+                        domain="[('status','=','error')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mcp_call_log" model="ir.actions.act_window">
+        <field name="name">MCP Call Log</field>
+        <field name="res_model">southbrook.integrations.mcp_call_log</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

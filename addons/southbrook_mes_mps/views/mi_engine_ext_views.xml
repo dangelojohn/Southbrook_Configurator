@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_mi_tiles_form" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.mi_tiles.form</field>
+    <field name="model">southbrook.mes_mps.mi_tiles</field>
+    <field name="arch" type="xml">
+      <form string="MES/MPS Snapshot">
+        <sheet>
+          <div class="oe_title">
+            <h1><field name="label"/></h1>
+          </div>
+          <group>
+            <group string="MPS">
+              <field name="mps_weeks_planned" readonly="1"/>
+              <field name="mps_forecast_vs_actual_pct" widget="percentage" readonly="1"/>
+            </group>
+            <group string="MES">
+              <field name="current_bottleneck_workcenter" readonly="1"/>
+              <field name="current_bottleneck_load_pct" widget="percentage" readonly="1"/>
+              <field name="avg_oee_last_7d" widget="percentage" readonly="1"/>
+              <field name="workcenters_overloaded_count" readonly="1"/>
+            </group>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="view_mi_tiles_list" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.mi_tiles.list</field>
+    <field name="model">southbrook.mes_mps.mi_tiles</field>
+    <field name="arch" type="xml">
+      <list string="MES/MPS Snapshot">
+        <field name="label"/>
+        <field name="mps_weeks_planned"/>
+        <field name="current_bottleneck_workcenter"/>
+        <field name="current_bottleneck_load_pct" widget="percentage"/>
+        <field name="avg_oee_last_7d" widget="percentage"/>
+        <field name="workcenters_overloaded_count"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="action_mi_tiles" model="ir.actions.act_window">
+    <field name="name">MES Snapshot</field>
+    <field name="res_model">southbrook.mes_mps.mi_tiles</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+</odoo>

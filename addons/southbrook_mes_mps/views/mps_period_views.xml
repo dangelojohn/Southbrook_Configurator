@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_mps_period_form" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.mps_period.form</field>
+    <field name="model">southbrook.mes_mps.mps_period</field>
+    <field name="arch" type="xml">
+      <form string="MPS Period">
+        <header>
+          <button name="action_approve" type="object" string="Approve"
+                  class="btn-primary" invisible="state != 'draft'"/>
+          <button name="action_mark_executed" type="object" string="Mark Executed"
+                  invisible="state != 'approved'"/>
+          <field name="state" widget="statusbar"
+                 statusbar_visible="draft,approved,executed"/>
+        </header>
+        <sheet>
+          <div class="oe_title">
+            <h1><field name="name" readonly="1"/></h1>
+          </div>
+          <group>
+            <group>
+              <field name="product_id"/>
+              <field name="product_tmpl_id" readonly="1"/>
+              <field name="week_start"/>
+              <field name="year"/>
+              <field name="week_number"/>
+            </group>
+            <group>
+              <field name="forecast_qty"/>
+              <field name="safety_stock"/>
+              <field name="actual_demand_qty" readonly="1"/>
+              <field name="planned_supply_qty" readonly="1"/>
+              <field name="to_supply_qty" readonly="1"/>
+            </group>
+          </group>
+        </sheet>
+        <chatter/>
+      </form>
+    </field>
+  </record>
+
+  <record id="view_mps_period_list" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.mps_period.list</field>
+    <field name="model">southbrook.mes_mps.mps_period</field>
+    <field name="arch" type="xml">
+      <list string="MPS Periods" decoration-warning="to_supply_qty &gt; 0"
+            decoration-success="state == 'executed'">
+        <field name="name"/>
+        <field name="product_id"/>
+        <field name="week_start"/>
+        <field name="year"/>
+        <field name="week_number"/>
+        <field name="forecast_qty" sum="Total Forecast"/>
+        <field name="actual_demand_qty" sum="Total Actual"/>
+        <field name="planned_supply_qty" sum="Total Supply"/>
+        <field name="to_supply_qty" sum="To Supply"/>
+        <field name="state"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_mps_period_pivot" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.mps_period.pivot</field>
+    <field name="model">southbrook.mes_mps.mps_period</field>
+    <field name="arch" type="xml">
+      <pivot string="MPS Workbench (Rolling 13-Week)">
+        <field name="product_id" type="row"/>
+        <field name="week_start" type="col" interval="week"/>
+        <field name="forecast_qty" type="measure"/>
+        <field name="to_supply_qty" type="measure"/>
+      </pivot>
+    </field>
+  </record>
+
+  <record id="action_mps_period" model="ir.actions.act_window">
+    <field name="name">MPS Workbench</field>
+    <field name="res_model">southbrook.mes_mps.mps_period</field>
+    <field name="view_mode">list,form,pivot</field>
+    <field name="context">{'search_default_group_by_product': 1}</field>
+  </record>
+
+  <record id="action_mps_generate_13" model="ir.actions.server">
+    <field name="name">Generate Rolling 13 Weeks</field>
+    <field name="model_id" ref="southbrook_mes_mps.model_southbrook_mes_mps_mps_period"/>
+    <field name="binding_model_id" ref="product.model_product_product"/>
+    <field name="binding_view_types">list,form</field>
+    <field name="state">code</field>
+    <field name="code">
+if records:
+    for prod in records:
+        env['southbrook.mes_mps.mps_period'].action_generate_rolling_13_weeks(prod.id)
+    action = env.ref('southbrook_mes_mps.action_mps_period').read()[0]
+    action['domain'] = [('product_id', 'in', records.ids)]
+</field>
+  </record>
+
+</odoo>

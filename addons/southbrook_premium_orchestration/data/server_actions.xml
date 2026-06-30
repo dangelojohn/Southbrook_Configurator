@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!--
+            Server Action: Backfill Kitchen Task
+
+            Bound to sale.order list & form. Appears in the "Action" menu so an
+            estimator can manually trigger the spine-create for a sale.order
+            whose project.task wasn't generated (legacy data, pre-Phase 1
+            confirmations, or a failed cron run).
+
+            The body delegates to action_backfill_kitchen_task() on
+            sale.order, which southbrook_premium_orchestration adds (or
+            inherits) in its sale.order extension.
+        -->
+        <record id="action_server_backfill_kitchen_tasks" model="ir.actions.server">
+            <field name="name">Backfill Kitchen Task</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="binding_model_id" ref="sale.model_sale_order"/>
+            <field name="binding_view_types">list,form</field>
+            <field name="state">code</field>
+            <field name="code">records.action_backfill_kitchen_task()</field>
+        </record>
+
+        <!--
+            Server Action: Recompute Readiness Now
+
+            Bound to project.task list & form. Lets an operator force the
+            readiness-cron logic for the selected task(s) without waiting for
+            the 15-min cron tick. Useful when debugging the readiness gate or
+            after a data-fix import.
+
+            Delegates to _cron_recompute_readiness_all() on project.task,
+            which southbrook_premium_orchestration adds in its project.task
+            extension.
+        -->
+        <record id="action_server_recompute_readiness_now" model="ir.actions.server">
+            <field name="name">Recompute Readiness Now</field>
+            <field name="model_id" ref="project.model_project_task"/>
+            <field name="binding_model_id" ref="project.model_project_task"/>
+            <field name="binding_view_types">list,form</field>
+            <field name="state">code</field>
+            <field name="code">records._cron_recompute_readiness_all()</field>
+        </record>
+
+    </data>
+</odoo>

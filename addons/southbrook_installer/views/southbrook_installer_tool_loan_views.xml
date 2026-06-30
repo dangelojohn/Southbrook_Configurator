@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_installer_tool_loan_list" model="ir.ui.view">
+        <field name="name">southbrook.installer.tool.loan.list</field>
+        <field name="model">southbrook.installer.tool.loan</field>
+        <field name="arch" type="xml">
+            <list string="Tool Loans"
+                  decoration-success="returned and return_condition == 'good'"
+                  decoration-warning="returned and return_condition == 'maintenance'"
+                  decoration-danger="returned and return_condition in ('damaged','lost')"
+                  decoration-info="not returned">
+                <field name="name"/>
+                <field name="job_id"/>
+                <field name="equipment_id"/>
+                <field name="tool_type"/>
+                <field name="signed_out_by_id" optional="show"/>
+                <field name="signed_out_time"/>
+                <field name="signed_out_condition" optional="show"/>
+                <field name="returned" widget="boolean_toggle"/>
+                <field name="returned_time" optional="show"/>
+                <field name="return_condition" widget="badge" optional="show"/>
+                <field name="maintenance_request_id" optional="show"/>
+                <field name="days_on_loan" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_installer_tool_loan_form" model="ir.ui.view">
+        <field name="name">southbrook.installer.tool.loan.form</field>
+        <field name="model">southbrook.installer.tool.loan</field>
+        <field name="arch" type="xml">
+            <form string="Tool Loan">
+                <header>
+                    <button name="action_return_tool" type="object"
+                            string="↩ Return Tool" class="oe_highlight"
+                            invisible="returned"/>
+                    <button name="action_report_lost" type="object"
+                            string="🚨 Report Lost"
+                            invisible="returned"/>
+                    <field name="returned" widget="statusbar"
+                           options="{'clickable': '0'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_maintenance_request"
+                                type="object" class="oe_stat_button"
+                                icon="fa-wrench"
+                                invisible="not maintenance_request_id">
+                            <field name="maintenance_request_id"
+                                   widget="statinfo"
+                                   string="Maintenance Req."/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Loan">
+                            <field name="job_id"/>
+                            <field name="equipment_id"/>
+                            <field name="equipment_category" readonly="1"/>
+                            <field name="tool_type"/>
+                            <field name="days_on_loan" readonly="1"/>
+                        </group>
+                        <group string="Sign-Out">
+                            <field name="signed_out_by_id"/>
+                            <field name="signed_out_time"/>
+                            <field name="signed_out_condition"/>
+                        </group>
+                    </group>
+                    <group string="Sign-Out Notes"
+                           invisible="signed_out_condition != 'poor' and not signed_out_notes">
+                        <field name="signed_out_notes" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Return" name="return"
+                              invisible="not returned and not return_condition">
+                            <group>
+                                <group>
+                                    <field name="returned_by_id"
+                                           readonly="1"/>
+                                    <field name="returned_time"
+                                           readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="return_condition"/>
+                                </group>
+                            </group>
+                            <separator string="Return Notes"/>
+                            <field name="return_notes" nolabel="1"/>
+                        </page>
+                        <page string="Rental Info" name="rental"
+                              invisible="tool_type != 'rental'">
+                            <group>
+                                <group>
+                                    <field name="rental_company"/>
+                                    <field name="rental_ref"/>
+                                </group>
+                                <group>
+                                    <field name="rental_return_due"/>
+                                    <field name="rental_daily_cost"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_installer_tool_loan_search" model="ir.ui.view">
+        <field name="name">southbrook.installer.tool.loan.search</field>
+        <field name="model">southbrook.installer.tool.loan</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="job_id"/>
+                <field name="equipment_id"/>
+                <filter name="open" string="On Loan"
+                        domain="[('returned', '=', False)]"/>
+                <filter name="returned" string="Returned"
+                        domain="[('returned', '=', True)]"/>
+                <filter name="needs_maintenance" string="Needs Maintenance"
+                        domain="[('return_condition', 'in', ('maintenance','damaged'))]"/>
+                <filter name="rental" string="Rental"
+                        domain="[('tool_type', '=', 'rental')]"/>
+                <group>
+                    <filter name="g_job" string="Job"
+                            context="{'group_by': 'job_id'}"/>
+                    <filter name="g_equipment" string="Equipment"
+                            context="{'group_by': 'equipment_id'}"/>
+                    <filter name="g_type" string="Tool Type"
+                            context="{'group_by': 'tool_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_installer_tool_loan" model="ir.actions.act_window">
+        <field name="name">Tool Loans</field>
+        <field name="res_model">southbrook.installer.tool.loan</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

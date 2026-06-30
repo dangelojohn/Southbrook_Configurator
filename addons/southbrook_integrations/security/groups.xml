@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Integrations groups.
+
+  v19 dropped res.groups.category_id; we set name + implied_ids only.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="group_integrations_user" model="res.groups">
+            <field name="name">Southbrook Integrations / User</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Read Homag sessions, ASNs, MCP tool registry, label printers + logs.</field>
+        </record>
+
+        <record id="group_integrations_manager" model="res.groups">
+            <field name="name">Southbrook Integrations / Manager</field>
+            <field name="implied_ids" eval="[(4, ref('southbrook_integrations.group_integrations_user'))]"/>
+            <field name="comment">Full r/w/c/d on every integrations model; can enable/disable MCP tools.</field>
+        </record>
+    </data>
+</odoo>

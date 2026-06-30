@@ -1,0 +1,19 @@
+/* SPDX-License-Identifier: LGPL-3.0-only */
+
+.sb-training-help-dialog {
+    .sb-training-help-body {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    .sb-training-help-list {
+        margin: 0;
+        padding: 0;
+    }
+    .sb-training-help-item {
+        cursor: pointer;
+        transition: background-color 0.1s ease;
+        &:hover {
+            background-color: var(--o-list-row-hover-bg, #f5f5f5);
+        }
+    }
+}

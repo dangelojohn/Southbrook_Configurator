@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="action_report_return_manifest" model="ir.actions.report">
+        <field name="name">Return Manifest</field>
+        <field name="model">southbrook.installer.closeout</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">southbrook_installer.report_return_manifest</field>
+        <field name="report_file">southbrook_installer.report_return_manifest</field>
+        <field name="binding_model_id" ref="model_southbrook_installer_closeout"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Return Manifest %s' % (object.name)</field>
+    </record>
+
+    <template id="report_return_manifest">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="closeout">
+                <t t-call="web.external_layout">
+                    <div class="page">
+
+                        <h2>Return Manifest</h2>
+                        <h3 t-out="closeout.name"/>
+                        <table class="table table-sm" style="margin-top:1rem">
+                            <tr>
+                                <th>Job</th>
+                                <td t-out="closeout.job_id.name"/>
+                                <th>Date</th>
+                                <td t-out="closeout.completed_date or closeout.create_date"/>
+                            </tr>
+                            <tr>
+                                <th>Site</th>
+                                <td colspan="3" t-out="closeout.job_id.site_address"/>
+                            </tr>
+                            <tr>
+                                <th>Driver</th>
+                                <td>—</td>
+                                <th>Truck</th>
+                                <td>—</td>
+                            </tr>
+                        </table>
+
+                        <h4 style="margin-top:1.5rem">Materials Returning</h4>
+                        <table class="table table-sm table-bordered"
+                               t-if="closeout.material_return_ids">
+                            <thead><tr>
+                                <th>Product</th><th>Lot</th>
+                                <th>Qty</th><th>UoM</th><th>Reason</th><th>Condition</th>
+                                <th>Destination</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr t-foreach="closeout.material_return_ids" t-as="m" t-key="m.id">
+                                    <td t-out="m.product_id.display_name"/>
+                                    <td t-out="m.lot_id.name or ''"/>
+                                    <td t-out="m.qty_returning"/>
+                                    <td t-out="m.uom_id.name or ''"/>
+                                    <td t-out="m.reason"/>
+                                    <td t-out="m.condition"/>
+                                    <td t-out="m.return_location_id.complete_name or ''"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p t-if="not closeout.material_return_ids" class="text-muted">
+                            No materials returning.
+                        </p>
+
+                        <h4 style="margin-top:1.5rem">Tools Returning</h4>
+                        <table class="table table-sm table-bordered"
+                               t-if="closeout.tool_return_ids">
+                            <thead><tr>
+                                <th>Tool</th><th>Type</th>
+                                <th>Loaded on Truck</th><th>Return Condition</th><th>Notes</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr t-foreach="closeout.tool_return_ids" t-as="t" t-key="t.id">
+                                    <td t-out="t.equipment_id.name"/>
+                                    <td t-out="t.tool_type"/>
+                                    <td t-out="t.confirmed_loaded"/>
+                                    <td t-out="t.return_condition or ''"/>
+                                    <td t-out="t.notes or ''"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p t-if="not closeout.tool_return_ids" class="text-muted">
+                            No tools returning.
+                        </p>
+
+                        <h4 style="margin-top:1.5rem">Receiving Confirmation</h4>
+                        <table class="table" style="margin-top:1rem">
+                            <tr>
+                                <td style="width:50%">
+                                    <strong>Driver:</strong><br/>
+                                    Name: ______________________________<br/>
+                                    Signature: ______________________________<br/>
+                                    Date: ______________________________
+                                </td>
+                                <td>
+                                    <strong>Warehouse Receiver:</strong><br/>
+                                    Name: ______________________________<br/>
+                                    Signature: ______________________________<br/>
+                                    Date: ______________________________<br/>
+                                    Picking #:
+                                    <t t-out="closeout.return_picking_id.name or '(pending)'"/>
+                                </td>
+                            </tr>
+                        </table>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

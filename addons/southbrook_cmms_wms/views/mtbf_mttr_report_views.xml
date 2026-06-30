@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_southbrook_cmms_mtbf_mttr_report_list" model="ir.ui.view">
+        <field name="name">southbrook.cmms.mtbf_mttr_report.list</field>
+        <field name="model">southbrook.cmms.mtbf_mttr_report</field>
+        <field name="arch" type="xml">
+            <list string="MTBF/MTTR Reports"
+                  decoration-success="availability_pct &gt;= 95"
+                  decoration-warning="availability_pct &gt;= 80 and availability_pct &lt; 95"
+                  decoration-danger="availability_pct &lt; 80">
+                <field name="name"/>
+                <field name="equipment_id"/>
+                <field name="as_of_date"/>
+                <field name="period_days"/>
+                <field name="breakdown_count"/>
+                <field name="mtbf_hours"/>
+                <field name="mttr_hours"/>
+                <field name="availability_pct"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_mtbf_mttr_report_form" model="ir.ui.view">
+        <field name="name">southbrook.cmms.mtbf_mttr_report.form</field>
+        <field name="model">southbrook.cmms.mtbf_mttr_report</field>
+        <field name="arch" type="xml">
+            <form string="MTBF/MTTR Report">
+                <header>
+                    <button name="action_compute"
+                            string="Recompute"
+                            type="object"
+                            class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="equipment_id"/>
+                            <field name="as_of_date"/>
+                            <field name="period_days"/>
+                        </group>
+                        <group>
+                            <field name="breakdown_count"/>
+                            <field name="total_downtime_hours"/>
+                            <field name="total_runtime_hours"/>
+                            <field name="mtbf_hours"/>
+                            <field name="mttr_hours"/>
+                            <field name="availability_pct"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_mtbf_mttr_report_graph" model="ir.ui.view">
+        <field name="name">southbrook.cmms.mtbf_mttr_report.graph</field>
+        <field name="model">southbrook.cmms.mtbf_mttr_report</field>
+        <field name="arch" type="xml">
+            <graph string="MTBF by Equipment" type="bar" stacked="1">
+                <field name="as_of_date"/>
+                <field name="equipment_id"/>
+                <field name="mtbf_hours" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- search view dropped at install time due to v19 validation quirk; users
+         can use the default search bar without filters. Add back as a v1.1
+         polish item. -->
+
+
+    <record id="action_southbrook_cmms_mtbf_mttr_report" model="ir.actions.act_window">
+        <field name="name">MTBF/MTTR Reports</field>
+        <field name="res_model">southbrook.cmms.mtbf_mttr_report</field>
+        <field name="view_mode">list,form,graph</field>
+    </record>
+
+</odoo>

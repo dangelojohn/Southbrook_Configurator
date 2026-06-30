@@ -1,0 +1,316 @@
+/* SPDX-License-Identifier: LGPL-3.0-only */
+/* Dispatcher dashboard styling.
+   Mobile responsive: stacks below 768px. */
+
+.sbi-dashboard {
+    padding: 1rem 1.25rem;
+    background: #f7f8fa;
+    min-height: 100%;
+    font-family: var(--bs-font-sans-serif, sans-serif);
+}
+
+/* ─────────────── Header ─────────────── */
+.sbi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e3e7eb;
+    margin-bottom: 1rem;
+}
+
+.sbi-header-title h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1a2740;
+}
+
+.sbi-header-sub {
+    font-size: 0.85rem;
+    color: #647082;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sbi-live-dot {
+    display: inline-block;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+.sbi-live-on {
+    color: #29c46f;
+    animation: sbi-pulse 1.6s infinite;
+}
+
+.sbi-live-off {
+    color: #c0c5cd;
+}
+
+@keyframes sbi-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+.sbi-header-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+/* ─────────────── Tiles ─────────────── */
+.sbi-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.sbi-tile {
+    background: white;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    border-left: 4px solid #d4d8de;
+}
+
+.sbi-tile-blocked { border-left-color: #d32f2f; }
+.sbi-tile-flagged { border-left-color: #f7b500; }
+.sbi-tile-ok { border-left-color: #29c46f; }
+
+.sbi-tile-label {
+    font-size: 0.78rem;
+    color: #6b7384;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 0.25rem;
+}
+
+.sbi-tile-value {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #1a2740;
+    line-height: 1.1;
+}
+
+/* ─────────────── Board rows ─────────────── */
+.sbi-board {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sbi-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1.2fr 1.1fr 0.8fr;
+    gap: 1rem;
+    align-items: center;
+    background: white;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    border-left: 5px solid transparent;
+}
+
+.sbi-row:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.09);
+}
+
+.sbi-row-blocked {
+    border-left-color: #d32f2f;
+    background: linear-gradient(90deg, #fdecec 0%, white 25%);
+}
+
+.sbi-row-flagged {
+    border-left-color: #f7b500;
+}
+
+.sbi-row-ok {
+    border-left-color: #29c46f;
+}
+
+.sbi-row-terminal {
+    border-left-color: #b1b6c0;
+    opacity: 0.7;
+}
+
+.sbi-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.sbi-row-id {
+    font-size: 0.95rem;
+    color: #1a2740;
+}
+
+.sbi-row-id strong {
+    font-weight: 700;
+    margin-right: 0.3rem;
+}
+
+.sbi-row-project {
+    color: #6b7384;
+    font-weight: 400;
+}
+
+.sbi-row-people,
+.sbi-row-site {
+    font-size: 0.85rem;
+    color: #4d566c;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.sbi-row-people .fa,
+.sbi-row-site .fa {
+    color: #8d96a8;
+    font-size: 0.8rem;
+}
+
+/* ─────────────── Progress bar (11 segments) ─────────────── */
+.sbi-row-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.sbi-progress-segments {
+    display: grid;
+    grid-template-columns: repeat(11, 1fr);
+    gap: 2px;
+}
+
+.sbi-seg {
+    height: 12px;
+    background: #e3e7eb;
+    border-radius: 2px;
+}
+
+.sbi-seg-filled {
+    background: linear-gradient(180deg, #34c8a0 0%, #1ea584 100%);
+}
+
+.sbi-progress-label {
+    font-size: 0.75rem;
+    color: #6b7384;
+}
+
+/* ─────────────── Status badges ─────────────── */
+.sbi-row-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.sbi-stage-badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: #e3e7eb;
+    color: #1a2740;
+    white-space: nowrap;
+}
+
+.sbi-stage-scheduled      { background: #d8eaff; color: #1c4380; }
+.sbi-stage-confirm        { background: #fff3d6; color: #7c5a00; }
+.sbi-stage-received       { background: #d6f0e2; color: #1a5d3c; }
+.sbi-stage-install        { background: #c7e7d6; color: #0e4f31; }
+.sbi-stage-signoff        { background: #ffd9c2; color: #7e3b18; }
+.sbi-stage-closed         { background: #e4d8f5; color: #4a297a; }
+.sbi-stage-complete       { background: #cef3df; color: #0e4f31; }
+.sbi-stage-invoiced       { background: #d4d8de; color: #4d566c; }
+
+.sbi-flag-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.sbi-flag-open {
+    background: #fff0d6;
+    color: #7c5a00;
+}
+
+.sbi-flag-blocking {
+    background: #fdd6d6;
+    color: #921818;
+    animation: sbi-pulse 1.6s infinite;
+}
+
+.sbi-deliv-badge,
+.sbi-tools-badge {
+    font-size: 0.78rem;
+    padding: 0.2rem 0.45rem;
+    background: #f0f3f7;
+    border-radius: 12px;
+    color: #4d566c;
+}
+
+/* ─────────────── Meta ─────────────── */
+.sbi-row-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+    font-size: 0.78rem;
+    color: #6b7384;
+}
+
+.sbi-row-schedule {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.sbi-row-schedule .fa {
+    color: #8d96a8;
+}
+
+/* ─────────────── Empty / loading / error ─────────────── */
+.sbi-loading, .sbi-empty {
+    text-align: center;
+    padding: 2rem;
+    font-size: 0.95rem;
+}
+
+.sbi-error {
+    margin-bottom: 1rem;
+}
+
+/* ─────────────── Mobile responsive ─────────────── */
+@media (max-width: 1024px) {
+    .sbi-row {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .sbi-row {
+        grid-template-columns: 1fr;
+    }
+    .sbi-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .sbi-row-meta {
+        align-items: flex-start;
+    }
+}

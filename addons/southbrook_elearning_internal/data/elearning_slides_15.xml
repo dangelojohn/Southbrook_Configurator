@@ -1,0 +1,3841 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_15_mfg_module_architecture" model="slide.slide">
+            <field name="name">Manufacturing Module Architecture — What Southbrook Layers on Native MRP</field>
+            <field name="channel_id" ref="course_manufacturing_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Production Manager + developer reading the platform for the first time.</field>
+            <field name="html_content"><![CDATA[<h1 id="manufacturing-module-architecture-what-southbrook-layers-on-native-mrp">Manufacturing Module Architecture — What Southbrook Layers on Native MRP</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a production manager or developer who just got handed
+<code>southbrookcabinetry.space/odoo/manufacturing</code> and is trying to figure
+out <strong>what's Southbrook vs what's stock Odoo</strong>. Course 1, 2 and 3
+covered the daily flows; this lesson is the map underneath them — the
+five addons that touch the Manufacturing surface, what each one owns,
+and how a click on the MO form fans out across the database. If you've
+ever had to debug "why does this field show on the MO form?" or "which
+addon do I patch to add a new MI check?", start here.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>/odoo/manufacturing</strong> — Odoo native MRP module, but everything
+Southbrook layers on top is wired through five addons under
+<code>addons/</code> in <code>~/southbrook-v19cr/</code>.</p>
+</blockquote>
+<p>The Manufacturing app menu structure once everything's installed:</p>
+<blockquote>
+<p><strong>Manufacturing → Operations → Manufacturing Orders</strong>
+<strong>Manufacturing → Operations → Work Orders</strong>
+<strong>Manufacturing → Configuration → Work Centers</strong>
+<strong>Manufacturing → Configuration → Bills of Materials</strong></p>
+</blockquote>
+<p>Southbrook adds two top-level menu roots alongside these:</p>
+<blockquote>
+<p><strong>Southbrook PM</strong> (<code>menu_southbrook_pm_root</code>, sequence 70) — the
+production manager's surface (Dashboard, Family Throughput, Capacity,
+Ready Queue, In Production, Late, Floor Load, Equipment)
+<strong>Southbrook PM → MI Checks</strong> (grafted under PM root by the
+Manufacturing Intelligence addon)</p>
+</blockquote>
+<p>Plus two grafted branches under the native Manufacturing menu tree:</p>
+<blockquote>
+<p><strong>Manufacturing → Configuration → Southbrook Kitchen</strong> (Materials,
+Finishes, Operation Templates)
+<strong>Manufacturing → Operations → Southbrook Kitchen → Work Center
+Downtime</strong></p>
+</blockquote>
+<p>There is <strong>no separate "Kitchen Ops" root menu</strong> despite that name
+appearing in older brief docs — the Southbrook-custom surface lives
+under two roots: <strong>Southbrook PM</strong> (its own root) and <strong>Manufacturing
+→ Southbrook Kitchen</strong> (grafted into native MRP).</p>
+<h2 id="what-your-screen-shows-the-five-addon-stack">What your screen shows — the five-addon stack</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Addon</th>
+<th>What it owns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Foundation</td>
+<td><code>southbrook_mrp_pm</code></td>
+<td>8 + 10 seeded workcenters, equipment, cabinet families, PM menu root, KPI dashboards, capacity pivot/graph, Floor Manager portal</td>
+</tr>
+<tr>
+<td>Vocabulary</td>
+<td><code>southbrook_mrp_kitchen_workcenters</code></td>
+<td>Station type taxonomy, material/finish catalogs, 15 operation templates, downtime model, MO project linkage</td>
+</tr>
+<tr>
+<td>Tool gating</td>
+<td><code>southbrook_mrp_kitchen_tools</code></td>
+<td>Tool assets/cribs/kits, workcenter+operation tool requirements, workorder readiness state machine, tool consumption log</td>
+</tr>
+<tr>
+<td>Package model</td>
+<td><code>southbrook_kitchen_mrp</code></td>
+<td><code>sb.cutlist</code>, <code>sb.hardware.package</code>, <code>sb.production.package</code> (the per-MO artefact triple)</td>
+</tr>
+<tr>
+<td>Intelligence</td>
+<td><code>southbrook_manufacturing_intelligence</code></td>
+<td><code>southbrook.mi.engine</code>, <code>southbrook.mi.check</code> rows, the MI badge + counts + next_action on MO and on production package</td>
+</tr>
+</tbody>
+</table>
+<p>The dependency graph is bottom-up: PM is the foundation. Kitchen
+Workcenters depends on PM + MI + Kitchen MRP + Workspace. Kitchen
+Tools depends on PM + Kitchen MRP. MI depends on PM + Kitchen MRP +
+Estimating + Dealer Portal + FreeCAD Bridge.</p>
+<h2 id="what-native-mrp-gives-you-and-what-stays-untouched">What native MRP gives you (and what stays untouched)</h2>
+<p>Native Odoo 19 CE provides:</p>
+<ul>
+<li><code>mrp.production</code> — the MO. State machine <code>draft → confirmed → progress → to_close → done</code> (plus <code>cancel</code>). Southbrook does <strong>not</strong> override this state machine.</li>
+<li><code>mrp.workorder</code> — the WO. State <code>pending → waiting → ready → progress → done</code>. Southbrook hooks <code>button_start</code> only.</li>
+<li><code>mrp.bom</code> + <code>mrp.bom.line</code> — BoM definition. Southbrook adds compute fields + cut-spec methods on top; native lines stay.</li>
+<li><code>mrp.routing.workcenter</code> — operation steps in a BoM. Southbrook adds <code>x_sbk_operation_template_id</code> and <code>x_sbk_driver_override</code>.</li>
+<li><code>mrp.workcenter</code> — station. Southbrook adds <strong>35+ extension fields</strong> across four addons (see lesson 15.5).</li>
+</ul>
+<p>You can use stock MRP forms, lists, and reports unchanged. The
+Southbrook layer is additive — every custom field is prefixed
+(<code>x_sbk_*</code>, <code>southbrook_*</code>, <code>x_mi_*</code>) so you can grep your way back
+to the owner addon.</p>
+<h2 id="the-model-topology">The model topology</h2>
+<pre><code>mrp.production  ─── x_sbk_kitchen_project_id ──→ sb.kitchen.project
+       │
+       ├── x_mi_check_ids (one2many) ──────────→ southbrook.mi.check
+       ├── southbrook_tool_consumption_ids ────→ southbrook.workorder.tool.consumption
+       │
+       └── workorder_ids (native, one2many) ───→ mrp.workorder
+                                                      │
+                                                      ├── workcenter_id ──→ mrp.workcenter
+                                                      │                           │
+                                                      │                           └── x_sbk_*, southbrook_pm_*, x_mi_*, southbrook_tool_*
+                                                      │
+                                                      ├── operation_id ──→ mrp.routing.workcenter
+                                                      │                           │
+                                                      │                           └── x_sbk_operation_template_id ──→ southbrook.kitchen.operation.template
+                                                      │
+                                                      └── southbrook_tool_readiness_state, x_sbk_kitchen_expected_min, ...
+
+sb.production.package ── mo_id (M2O, required, unique-per-MO) ──→ mrp.production
+       │
+       ├── cutlist_id ─────────→ sb.cutlist
+       ├── hardware_package_id ─→ sb.hardware.package
+       └── x_mi_status, x_mi_blocker_count, x_mi_next_action, ...
+</code></pre>
+<p>The <strong>MO is the join hub</strong>. Every Southbrook artefact eventually
+back-references <code>mrp.production.id</code>. The <code>sb.production.package</code> is
+the per-MO bundle that carries the cutlist + hardware pack + MI
+verdict; lesson 15.7 unpacks that triple.</p>
+<h2 id="the-view-inheritance-graph">The view inheritance graph</h2>
+<table>
+<thead>
+<tr>
+<th>View</th>
+<th>Inherits</th>
+<th>Owner addon</th>
+<th>Adds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>view_mrp_production_form_sbk_kitchen</code></td>
+<td><code>mrp.mrp_production_form_view</code></td>
+<td>kitchen_workcenters</td>
+<td>Kitchen notebook page (project, room, cabinet code, install due, priority, complexity, totals)</td>
+</tr>
+<tr>
+<td><code>view_mrp_production_form_mi</code></td>
+<td><code>mrp.mrp_production_form_view</code></td>
+<td>manufacturing_intelligence</td>
+<td>Intelligence notebook page (recompute button, badge, checks list, blocker/warning counts, yield, waste)</td>
+</tr>
+<tr>
+<td><code>view_mrp_production_tree_sbk_kitchen</code></td>
+<td><code>mrp.mrp_production_tree_view</code></td>
+<td>kitchen_workcenters</td>
+<td>Columns: install_due, project, cabinet_code, priority_level</td>
+</tr>
+<tr>
+<td><code>view_mrp_workorder_form_inherit_kt</code></td>
+<td><code>mrp.mrp_production_workorder_form_view_inherit</code></td>
+<td>kitchen_tools</td>
+<td>Tool readiness header button + statusbar</td>
+</tr>
+<tr>
+<td><code>view_southbrook_pm_kanban_mi</code></td>
+<td><code>southbrook_mrp_pm.view_southbrook_pm_kanban</code></td>
+<td>manufacturing_intelligence</td>
+<td>MI chips on workcenter dashboard kanban</td>
+</tr>
+<tr>
+<td><code>view_sb_production_package_form_mi</code></td>
+<td><code>southbrook_kitchen_mrp.view_sb_production_package_form</code></td>
+<td>manufacturing_intelligence</td>
+<td>MI status badge + check list on production package form</td>
+</tr>
+</tbody>
+</table>
+<p>Notice no view rewrites the MO list-view colour rules or the kanban
+swimlanes. Lesson 15.6 explains why — the MO Kanban swimlanes story
+is mostly <strong>not present</strong>, and what fills the gap.</p>
+<h2 id="the-menu-surface">The menu surface</h2>
+<p>Two roots own everything Southbrook-custom on the manufacturing surface:</p>
+<p><strong>Southbrook PM</strong> (root <code>menu_southbrook_pm_root</code>, sequence 70):</p>
+<table>
+<thead>
+<tr>
+<th>Sub-menu</th>
+<th>Action</th>
+<th>Model</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dashboard</td>
+<td><code>action_pm_dashboard</code></td>
+<td><code>mrp.workcenter</code> (kanban, active=True)</td>
+</tr>
+<tr>
+<td>Family Throughput</td>
+<td><code>action_pm_family_throughput</code></td>
+<td><code>southbrook.cabinet.family</code></td>
+</tr>
+<tr>
+<td>Capacity</td>
+<td><code>action_pm_capacity</code></td>
+<td><code>mrp.workorder</code> (pivot+graph)</td>
+</tr>
+<tr>
+<td>Ready Queue</td>
+<td><code>action_pm_ready_queue</code></td>
+<td><code>mrp.production</code> (state in confirmed/progress)</td>
+</tr>
+<tr>
+<td>In Production</td>
+<td><code>action_pm_in_production</code></td>
+<td><code>mrp.production</code> (state=progress)</td>
+</tr>
+<tr>
+<td>Late Orders</td>
+<td><code>action_pm_late</code></td>
+<td><code>mrp.production</code> (date_deadline &lt; now)</td>
+</tr>
+<tr>
+<td>Floor Load</td>
+<td><code>action_pm_floor_load</code></td>
+<td><code>mrp.workcenter</code></td>
+</tr>
+<tr>
+<td>Equipment</td>
+<td><code>action_pm_equipment</code></td>
+<td><code>maintenance.equipment</code></td>
+</tr>
+<tr>
+<td><strong>MI Checks</strong></td>
+<td><code>action_southbrook_mi_checks</code></td>
+<td><code>southbrook.mi.check</code></td>
+</tr>
+<tr>
+<td><strong>MI Packages</strong></td>
+<td><code>action_southbrook_mi_packages</code></td>
+<td><code>sb.production.package</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Manufacturing → Configuration → Southbrook Kitchen</strong> (grafted):</p>
+<table>
+<thead>
+<tr>
+<th>Sub-menu</th>
+<th>Action</th>
+<th>Model</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kitchen Materials</td>
+<td><code>action_sbk_material</code></td>
+<td><code>southbrook.kitchen.material</code></td>
+</tr>
+<tr>
+<td>Kitchen Finishes</td>
+<td><code>action_sbk_finish</code></td>
+<td><code>southbrook.kitchen.finish</code></td>
+</tr>
+<tr>
+<td>Kitchen Operation Templates</td>
+<td><code>action_sbk_operation_template</code></td>
+<td><code>southbrook.kitchen.operation.template</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Manufacturing → Operations → Southbrook Kitchen → Work Center
+Downtime</strong> (grafted): <code>action_sbk_downtime</code> on
+<code>southbrook.kitchen.workcenter.downtime</code>.</p>
+<h2 id="security-groups-added">Security groups added</h2>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Owner addon</th>
+<th>Inherits</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_mrp_pm.group_floor_manager</code></td>
+<td>mrp_pm</td>
+<td><code>base.group_portal</code></td>
+<td>Tablet portal <code>/my/southbrook/floor</code> access</td>
+</tr>
+<tr>
+<td><code>southbrook_mrp_pm.group_southbrook_production_approver</code></td>
+<td>mrp_pm</td>
+<td><code>base.group_user</code></td>
+<td>Sale → MO approve/reject gate</td>
+</tr>
+<tr>
+<td><code>southbrook_mrp_kitchen_tools.group_tool_operator</code></td>
+<td>tools</td>
+<td><code>mrp.group_mrp_user</code></td>
+<td>Read tool requirements, log usage</td>
+</tr>
+<tr>
+<td><code>southbrook_mrp_kitchen_tools.group_tool_crib_manager</code></td>
+<td>tools</td>
+<td><code>group_tool_operator + stock.group_stock_user</code></td>
+<td>CRUD on assets, kits, cribs</td>
+</tr>
+<tr>
+<td><code>southbrook_mrp_kitchen_tools.group_maintenance_technician</code></td>
+<td>tools</td>
+<td>(none documented)</td>
+<td>CRUD on maintenance requests + usage</td>
+</tr>
+</tbody>
+</table>
+<p>There are <strong>no Manufacturing Intelligence-specific groups</strong>; MI rights
+follow native MRP user/manager rights and the engine runs as
+<code>base.user_root</code>.</p>
+<h2 id="your-daily-flow-as-the-production-manager">Your daily flow (as the production manager)</h2>
+<p><strong>1. Morning (10 min):</strong></p>
+<ul>
+<li>Open <strong>Southbrook PM → Dashboard</strong>. Glance the 8 + 10 workcenter
+  tiles for <code>southbrook_pm_late_count &gt; 0</code> and
+  <code>southbrook_pm_equipment_alerts &gt; 0</code>. The MI inherit also chips any
+  tile whose <code>x_mi_workcenter_warning_count &gt; 0</code> (the chip CSS is
+  <code>o_sb_mi_chip_warning</code>).</li>
+<li>Open <strong>Southbrook PM → Ready Queue</strong>. Group-by state shows
+  <code>confirmed</code> first; this is the planner's responsibility but you
+  watch for backlog.</li>
+<li>Open <strong>Southbrook PM → MI Checks</strong>, default-grouped by category
+  (cut / production / assembly / install), default-filtered to
+  <code>blockers</code>. Anything here is what the MI engine flagged last night
+  or last hour as needing your attention.</li>
+</ul>
+<p><strong>2. Per-MO dive (the loop):</strong></p>
+<ul>
+<li>Open the MO. Two notebook pages were added by the Southbrook stack:
+  <strong>Kitchen</strong> (project linkage, complexity, totals) and
+  <strong>Intelligence</strong> (MI badge, checks list, next action).</li>
+<li>The MI badge colour comes from <code>x_mi_status</code>: <code>ok</code> (green),
+  <code>review</code> (amber), <code>blocked</code> (red). Click the badge → opens the MI
+  checks for this MO.</li>
+<li>Hit <strong>Recompute MI</strong> if you've manually corrected data (e.g.
+  changed an attribute on a configured product) and want the engine
+  to re-run the gates immediately. The action dispatches to
+  <code>southbrook.mi.engine._recompute_production(self)</code>.</li>
+</ul>
+<p><strong>3. End of day (5 min):</strong></p>
+<ul>
+<li>Open <strong>Southbrook PM → Capacity</strong>. The pivot shows
+  <code>duration_expected</code> per workcenter per day. Anything above 480 min
+  on a single bottleneck is tomorrow's slip risk.</li>
+<li>Update equipment conditions if anything broke. The condition flips
+  immediately into the workcenter tile's
+  <code>southbrook_pm_equipment_alerts</code> count next page-load.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a custom field to mrp.production but it's not showing on
+the form."</strong></p>
+<p>There are TWO inherited form views (<code>view_mrp_production_form_sbk_kitchen</code>
+and <code>view_mrp_production_form_mi</code>). Your new field needs an inheriting
+view that loads AFTER both. Check <code>__manifest__.py</code> <code>data</code> order: the
+inheriting addon must depend on both <code>southbrook_mrp_kitchen_workcenters</code>
+and <code>southbrook_manufacturing_intelligence</code> so the load order is
+deterministic.</p>
+<p><strong>"The MI badge is stuck on <code>ok</code> but I know there's a blocker."</strong></p>
+<p>The engine is idempotent but it's NOT triggered on every save. It's
+triggered (a) by the explicit "Recompute" button on the MO,
+(b) overnight by <code>southbrook_premium_orchestration</code> crons (lesson 2.4),
+(c) by the <code>action_recompute_manufacturing_intelligence</code> action on
+the production package. If the badge is stale, hit the button
+manually; it writes <code>x_mi_status</code>, <code>x_mi_blocker_count</code>,
+<code>x_mi_warning_count</code>, <code>x_mi_next_action</code> synchronously.</p>
+<p><strong>"My production manager can't see the MI menu items."</strong></p>
+<p>MI menus graft onto <code>menu_southbrook_pm_root</code>. If the user lacks
+<code>mrp.group_mrp_user</code>, the root menu doesn't show. Add MRP User
+access at minimum.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The Manufacturing surface is <strong>five addons cooperating through
+ir.model inheritance</strong>, not one monolithic module. When you click
+"Recompute MI" on an MO:</p>
+<ol>
+<li>Native <code>mrp.production.write({...})</code> is NOT called — the action
+   is a manual button.</li>
+<li>The button calls
+   <code>self.env['southbrook.mi.engine']._recompute_production(self)</code>.</li>
+<li>The engine deletes existing <code>southbrook.mi.check</code> rows for this
+   MO, replays each check definition (defined in
+   <code>southbrook_manufacturing_intelligence/models/mi_check.py</code>), and
+   inserts fresh rows.</li>
+<li>Each check writes severity (<code>blocker</code>/<code>warning</code>/<code>info</code>) and a
+   <code>next_action</code> string. The engine then aggregates counts onto the
+   MO: <code>x_mi_blocker_count</code>, <code>x_mi_warning_count</code>, <code>x_mi_status</code>.</li>
+<li>The form view's reactive widgets re-paint without a page reload.</li>
+</ol>
+<p>The crons in <code>southbrook_premium_orchestration</code> (lesson 2.4) run this
+same flow nightly across every in-flight MO so dashboards are honest
+in the morning.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You're looking at the MO form and see TWO notebook pages
+("Kitchen" and "Intelligence") in addition to the stock Odoo tabs.
+Which addons added each?</p>
+<blockquote>
+<p>"Kitchen" is added by <code>southbrook_mrp_kitchen_workcenters</code> via
+<code>view_mrp_production_form_sbk_kitchen</code> (project linkage, room,
+cabinet code, install due, priority, complexity, totals).
+"Intelligence" is added by <code>southbrook_manufacturing_intelligence</code>
+via <code>view_mrp_production_form_mi</code> (badge, checks list,
+recompute button, blocker/warning counts, yield, waste).</p>
+</blockquote>
+<p><strong>2.</strong> A developer asks "where does <code>x_sbk_kitchen_project_id</code> come
+from?" What addon and what model?</p>
+<blockquote>
+<p>Field name prefix is <code>x_sbk_*</code> → owner is
+<code>southbrook_mrp_kitchen_workcenters</code>. The field is declared on
+<code>mrp.production</code> at
+<code>southbrook_mrp_kitchen_workcenters/models/mrp_production.py</code> and
+targets <code>sb.kitchen.project</code> (owned by the same addon's upstream
+dependency <code>southbrook_kitchen_workspace</code>).</p>
+</blockquote>
+<p><strong>3.</strong> Your sysadmin says "we want to remove Manufacturing
+Intelligence to simplify the stack." What breaks?</p>
+<blockquote>
+<p>The MO form loses the Intelligence notebook page. The PM kanban
+tile loses its MI chip. <code>sb.production.package</code> loses
+<code>x_mi_status</code>, <code>x_mi_blocker_count</code>, <code>x_mi_warning_count</code>,
+<code>x_mi_next_action</code>. The PM menu loses MI Checks + MI Packages.
+But the rest of the stack — PM, kitchen workcenters, kitchen
+tools, kitchen MRP — continues to work because none of them
+depend on MI.</p>
+</blockquote>
+<p><strong>4.</strong> A trainee says "I can't find a Kitchen Ops menu in the
+production-manager nav." Why not?</p>
+<blockquote>
+<p>"Kitchen Ops" is a phrase from older briefs; the actual menu
+roots are <strong>Southbrook PM</strong> (<code>menu_southbrook_pm_root</code>) and the
+grafted <strong>Manufacturing → Southbrook Kitchen</strong> branches. Operator
+daily work happens under the native <strong>Manufacturing → Operations</strong>
+tree filtered by their workcenter; planners and managers use the
+Southbrook PM root.</p>
+</blockquote>
+<p><strong>5.</strong> The MI engine writes to <code>x_mi_check_ids</code> on <code>mrp.production</code>
+AND to <code>x_mi_check_ids</code> on <code>sb.production.package</code>. Are these the
+same rows?</p>
+<blockquote>
+<p>No — they're TWO different one2many declarations targeting the
+same model (<code>southbrook.mi.check</code>) with different inverse FKs
+(<code>production_id</code> vs <code>production_package_id</code>). One check row is
+associated to either an MO or a package, not both. The engine
+writes them as separate cohorts; the same rule can fire against
+the MO directly (production / install checks) or against the
+package (cut / assembly checks via the cutlist + hardware refs).</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The mrp.production field-by-field walkthrough → lesson 15.2.</li>
+<li>The mrp.workorder + tool readiness + downtime walkthrough → lesson 15.3.</li>
+<li>BoM extensions + cut-spec seam + lead-time bumps → lesson 15.4.</li>
+<li>Workcenter form surface and alternative chain → lesson 15.5.</li>
+<li>Kanban, swimlanes, search filters → lesson 15.6.</li>
+<li>MO ↔ cutlist ↔ hardware ↔ production package linkage → lesson 15.7.</li>
+<li>The MI engine's check rules themselves → Course 3 lesson 3.1.</li>
+<li>The premium orchestration crons that fire the engine nightly → Course 2 lesson 2.4.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_15_mo_extensions" model="slide.slide">
+            <field name="name">Manufacturing Order Extensions — Every Field Southbrook Adds to mrp.production</field>
+            <field name="channel_id" ref="course_manufacturing_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Production Manager + Production Planner reading the MO form daily.</field>
+            <field name="html_content"><![CDATA[<h1 id="manufacturing-order-extensions-every-field-southbrook-adds-to-mrpproduction">Manufacturing Order Extensions — Every Field Southbrook Adds to mrp.production</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You spend half your day in front of a Manufacturing Order. The native
+Odoo MO form is the spine; Southbrook stitches in two notebook pages
+(Kitchen + Intelligence), nine <code>x_sbk_*</code> fields, eight <code>x_mi_*</code>
+fields, three <code>southbrook_tool_*</code> fields, and a fistful of computes.
+This lesson walks you through every one — what writes it, when it
+changes, and what to do when it shows the wrong value. Read this
+before you ask a developer "what's this field?"</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>/odoo/manufacturing → Manufacturing Orders → <MO number></strong></p>
+</blockquote>
+<p>Or use the Southbrook PM shortcuts:</p>
+<blockquote>
+<p><strong>Southbrook PM → Ready Queue</strong> — confirmed + progress MOs grouped by state
+<strong>Southbrook PM → In Production</strong> — state=progress only
+<strong>Southbrook PM → Late Orders</strong> — <code>date_deadline &lt; now</code>, not done/cancel</p>
+</blockquote>
+<p>All three open the same <code>mrp.production</code> form. The form has the
+native sheet on top, then a notebook with: <strong>Components</strong> (native),
+<strong>Work Orders</strong> (native), <strong>Miscellaneous</strong> (native), <strong>Kitchen</strong>
+(Southbrook), <strong>Intelligence</strong> (Southbrook), then any further native
+tabs.</p>
+<h2 id="what-your-screen-shows-the-kitchen-notebook">What your screen shows — the Kitchen notebook</h2>
+<p>Added by <code>southbrook_mrp_kitchen_workcenters</code> via
+<code>view_mrp_production_form_sbk_kitchen</code>. Two groups inside:</p>
+<p><strong>Project Linkage group:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kitchen Project</td>
+<td><code>x_sbk_kitchen_project_id</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>M2O → <code>sb.kitchen.project</code></td>
+<td>The customer's kitchen this MO is producing for. Tracked; indexed.</td>
+</tr>
+<tr>
+<td>Room / Zone</td>
+<td><code>x_sbk_kitchen_room</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Char</td>
+<td>Free-text room label (e.g. "Master Kitchen — Run A"). Tracked.</td>
+</tr>
+<tr>
+<td>Cabinet Code</td>
+<td><code>x_sbk_cabinet_code</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Char</td>
+<td>Customer-facing cabinet identifier (e.g. "B30", "W2430"). Tracked.</td>
+</tr>
+<tr>
+<td>Install Due Date</td>
+<td><code>x_sbk_install_due_date</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Date</td>
+<td>When the customer expects the install. DISTINCT from native <code>date_planned_start</code>/<code>date_deadline</code>. Tracked.</td>
+</tr>
+<tr>
+<td>Priority Level</td>
+<td><code>x_sbk_priority_level</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Selection: urgent / high / <strong>normal</strong> / low</td>
+<td>Shop-floor sort. Distinct from native <code>priority</code> (which Odoo uses for stock reservation). Tracked.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Complexity &amp; Totals group:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Complexity Factor</td>
+<td><code>x_sbk_complexity_factor</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Float(4,2), default 1.0</td>
+<td>Multiplier fed into the operation-template duration formula. 1.2 = "this MO is 20% harder than baseline."</td>
+</tr>
+<tr>
+<td>Total Estimated Min</td>
+<td><code>x_sbk_total_estimated_min</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Float(10,2), stored compute</td>
+<td>Sum of <code>workorder_ids.x_sbk_kitchen_expected_min</code></td>
+</tr>
+<tr>
+<td>Total Actual Min</td>
+<td><code>x_sbk_total_actual_min</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Float(10,2), stored compute</td>
+<td>Sum of <code>workorder_ids.duration</code></td>
+</tr>
+<tr>
+<td>Total Variance Min</td>
+<td><code>x_sbk_total_variance_min</code> (<code>mrp.production</code>, kitchen_workcenters)</td>
+<td>Float(10,2), stored compute</td>
+<td>actual − estimated</td>
+</tr>
+</tbody>
+</table>
+<p>Plus a <strong>Recalc All Workorder Durations</strong> button that fires
+<code>action_sbk_recalc_all_workorder_durations</code> — useful when you've
+changed the complexity factor mid-flight and want every WO's
+<code>x_sbk_kitchen_expected_min</code> re-derived from the operation templates.</p>
+<h2 id="what-your-screen-shows-the-intelligence-notebook">What your screen shows — the Intelligence notebook</h2>
+<p>Added by <code>southbrook_manufacturing_intelligence</code> via
+<code>view_mrp_production_form_mi</code>. The page is one big group with:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MI Status</td>
+<td><code>x_mi_status</code> (<code>mrp.production</code>, MI)</td>
+<td>Selection: <strong>ok</strong> / review / blocked</td>
+<td>The badge. Green/amber/red on the form. Driven by aggregate counts below.</td>
+</tr>
+<tr>
+<td>Blocker Count</td>
+<td><code>x_mi_blocker_count</code> (<code>mrp.production</code>, MI)</td>
+<td>Integer</td>
+<td>Number of <code>southbrook.mi.check</code> rows with <code>severity='blocker'</code>.</td>
+</tr>
+<tr>
+<td>Warning Count</td>
+<td><code>x_mi_warning_count</code> (<code>mrp.production</code>, MI)</td>
+<td>Integer</td>
+<td>Number with <code>severity='warning'</code>.</td>
+</tr>
+<tr>
+<td>Next Action</td>
+<td><code>x_mi_next_action</code> (<code>mrp.production</code>, MI)</td>
+<td>Text</td>
+<td>Human-language sentence the engine writes describing the highest-priority blocker.</td>
+</tr>
+<tr>
+<td>Yield %</td>
+<td><code>x_mi_yield_pct</code> (<code>mrp.production</code>, MI)</td>
+<td>Float</td>
+<td>Sheet yield from cutlist nesting.</td>
+</tr>
+<tr>
+<td>Waste Area m²</td>
+<td><code>x_mi_waste_area_m2</code> (<code>mrp.production</code>, MI)</td>
+<td>Float</td>
+<td>Wasted sheet area in m².</td>
+</tr>
+<tr>
+<td>MI Checks</td>
+<td><code>x_mi_check_ids</code> (<code>mrp.production</code>, MI)</td>
+<td>One2many → <code>southbrook.mi.check</code> (inverse <code>production_id</code>)</td>
+<td>The actual check rows, listed inline. Decorated red/amber/blue by severity.</td>
+</tr>
+</tbody>
+</table>
+<p>Plus a <strong>Recompute Intelligence</strong> button calling
+<code>action_recompute_manufacturing_intelligence()</code> which delegates to
+<code>southbrook.mi.engine._recompute_production(self)</code>.</p>
+<p><strong>Not exposed</strong> on the form: <code>x_mi_bottleneck_workcenter_id</code> (M2O →
+<code>mrp.workcenter</code>). The engine declares it but doesn't write it yet —
+hidden until the engine path lands.</p>
+<h2 id="what-your-screen-shows-tool-consumption-smart-button">What your screen shows — Tool Consumption (smart button)</h2>
+<p>Added by <code>southbrook_mrp_kitchen_tools</code> (no notebook page; smart
+button on the form header area when the tools addon is installed):</p>
+<table>
+<thead>
+<tr>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_tool_consumption_ids</code> (<code>mrp.production</code>, tools)</td>
+<td>One2many → <code>southbrook.workorder.tool.consumption</code></td>
+<td>All tool consumption rows across this MO's workorders, joined via <code>production_id</code> related field on the consumption model</td>
+</tr>
+<tr>
+<td><code>southbrook_tool_consumption_count</code> (<code>mrp.production</code>, tools)</td>
+<td>Integer compute</td>
+<td>Count for smart button</td>
+</tr>
+<tr>
+<td><code>southbrook_tool_consumption_cost</code> (<code>mrp.production</code>, tools)</td>
+<td>Float stored compute</td>
+<td>Sum of <code>total_cost</code> across consumption rows</td>
+</tr>
+</tbody>
+</table>
+<p>The smart button (<code>action_view_southbrook_tool_consumption</code>) opens a
+list filtered to this MO so you can see every blade-minute, bit-pass,
+and consumable spend.</p>
+<h2 id="the-list-view-extensions">The list view extensions</h2>
+<p><code>view_mrp_production_tree_sbk_kitchen</code> adds these columns to the
+default MO list:</p>
+<ul>
+<li>Install Due Date (<code>x_sbk_install_due_date</code>)</li>
+<li>Kitchen Project (<code>x_sbk_kitchen_project_id</code>)</li>
+<li>Cabinet Code (<code>x_sbk_cabinet_code</code>)</li>
+<li>Priority Level (<code>x_sbk_priority_level</code>)</li>
+</ul>
+<p>So when you're at <strong>Southbrook PM → In Production</strong>, you immediately
+see which job is for which kitchen, which cabinet, due when, at what
+priority. The native MO list doesn't carry any of that.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Triage the queue (morning, 10 min):</strong></p>
+<ul>
+<li>Open <strong>Southbrook PM → Ready Queue</strong>, default-grouped by state.</li>
+<li>The <code>confirmed</code> group is what's eligible for release. Look at
+  <code>x_mi_status</code> — anything with <code>blocked</code> shouldn't be released yet;
+  click into it and read <code>x_mi_next_action</code> for the one-sentence
+  reason.</li>
+<li>Look at the <code>progress</code> group. <code>x_mi_status = review</code> is a yellow
+  flag — open the MO, scroll to the Intelligence tab, check the
+  warning rows. Often it's "yield below 75%" or "edge bander panel
+  size near max" — neither stops production but both need a
+  follow-up note to the planner.</li>
+</ul>
+<p><strong>2. Mid-flight diagnostics (the loop):</strong></p>
+<ul>
+<li>Operator pages: "MO MO/00347 has 12 panels but I only see 11 in
+  my queue." Open MO/00347, Kitchen tab, check <code>x_sbk_kitchen_room</code>
+  and <code>x_sbk_cabinet_code</code> — the operator may be looking at the
+  wrong MO for the same kitchen. Then jump to the Intelligence tab,
+  hit Recompute MI. If the engine writes a new blocker, that's
+  your answer.</li>
+<li>Workcenter is idle: open the MO, look at
+  <code>x_sbk_total_estimated_min</code> vs <code>x_sbk_total_actual_min</code>. If
+  variance is heavily positive, the operator's running slow; if
+  near zero but the MO isn't progressing, there's a tool-readiness
+  problem (see lesson 15.3).</li>
+</ul>
+<p><strong>3. End-of-day adjustments (5 min):</strong></p>
+<ul>
+<li>Anything you change on the MO that affects timing
+  (complexity factor, priority level, install due date) — hit the
+  Recalc button so the workorder estimates stay consistent.</li>
+<li>If you've shifted an install date, update
+  <code>x_sbk_install_due_date</code> first, then update the native
+  <code>date_deadline</code> to match. They're TWO separate fields by design:
+  <code>x_sbk_install_due_date</code> is the customer's expectation;
+  <code>date_deadline</code> is what the scheduler uses. Keep them in sync or
+  document the gap in the MO's chatter.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I changed <code>x_sbk_complexity_factor</code> from 1.0 to 1.3 but the
+totals didn't move."</strong></p>
+<p>The MO-level totals are stored computes that aggregate workorder
+durations. Workorders have their OWN
+<code>x_sbk_kitchen_expected_min</code> which doesn't auto-recompute when you
+change complexity — it's set at WO creation from the operation
+template. Hit <strong>Recalc All Workorder Durations</strong> on the MO. That
+fires the operation-template formula again against the new
+complexity factor and propagates.</p>
+<p><strong>"<code>x_mi_status</code> is <code>ok</code> but I can count 2 blocker checks in the
+list below."</strong></p>
+<p>Storage drift. The MI engine writes <code>x_mi_status</code> and the count
+fields synchronously, but if you've manually deleted or re-inserted
+check rows (rare; usually only happens during data migration), the
+aggregates won't catch up until the next engine pass. Hit
+<strong>Recompute Intelligence</strong>. The engine re-aggregates as its last
+step.</p>
+<p><strong>"I set <code>x_sbk_install_due_date</code> to today, but the MO is still in
+<code>confirmed</code> and the planner says nothing's changed in their queue."</strong></p>
+<p>The Install Due Date is NOT the scheduler's deadline. The scheduler
+reads <code>date_deadline</code> (native). Update both. The Install Due Date
+field is for the dealer / install crew; the deadline is for the
+shop. Decoupling them is by design — sometimes the install is in
+two weeks but you want production done in one for slack.</p>
+<p><strong>"The MO has <code>x_mi_yield_pct = 0</code> and yield % shouldn't be zero."</strong></p>
+<p><code>x_mi_yield_pct</code> is written by the MI engine ONLY after it sees a
+nested cutlist (<code>sb.cutlist.state = 'nested'</code>). Before nesting,
+this field is 0 by default. Don't read it as "0% yield" — read it
+as "not measured yet." When the nest result lands via
+<code>sb.cutlist.from_nesting_result(payload)</code>, the engine pass fills it
+in.</p>
+<p><strong>"I want to filter MOs by which Kitchen Project they belong to but
+the native search doesn't expose project."</strong></p>
+<p>The MO list view extension adds the column but the search-filter
+inheritance for the Kitchen Project field is <strong>TBD</strong> — currently
+you have to type the project name into the global search or use
+the kitchen project's smart button to navigate the other way. File
+a ticket if this becomes routine.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The Kitchen tab fields are plain stored fields on <code>mrp.production</code>
+with tracking enabled — every change lands in the MO's chatter
+automatically, so audit trails are free. The totals
+(<code>x_sbk_total_estimated_min</code> etc) are stored computes that depend
+on <code>workorder_ids.x_sbk_kitchen_expected_min</code> and
+<code>workorder_ids.duration</code>. Saving a workorder kicks the recompute.</p>
+<p>The Intelligence tab fields are written by
+<code>southbrook.mi.engine</code> which lives in
+<code>southbrook_manufacturing_intelligence/models/mi_engine.py</code>. The
+engine:</p>
+<ol>
+<li>Iterates <code>southbrook.mi.check</code> definitions (the check catalog).</li>
+<li>For each check, runs its match function against the MO + linked
+   <code>sb.production.package</code> (if present).</li>
+<li>For each match, inserts a <code>southbrook.mi.check</code> row with
+   <code>production_id = self.id</code>, <code>severity</code>, <code>category</code>, and a
+   <code>next_action</code> string.</li>
+<li>Aggregates: <code>x_mi_blocker_count = count(severity='blocker')</code>,
+   <code>x_mi_warning_count = count(severity='warning')</code>,
+   <code>x_mi_status = 'blocked' if blockers else 'review' if warnings
+   else 'ok'</code>.</li>
+<li>Writes the highest-priority blocker's <code>next_action</code> to the MO's
+   <code>x_mi_next_action</code>.</li>
+</ol>
+<p>The engine is <strong>idempotent</strong> — it deletes all <code>southbrook.mi.check</code>
+rows for the MO before re-inserting. Don't manually edit check rows;
+they're computed state.</p>
+<p>The tool consumption smart button reads
+<code>southbrook.workorder.tool.consumption</code> filtered by the MO's
+workorders (via the consumption model's <code>production_id</code> related
+field). The total cost is rolled up nightly so the smart button is
+always cheap to render.</p>
+<h2 id="fields-that-dont-exist-tbds-and-product-gaps">Fields that DON'T exist (TBDs and product gaps)</h2>
+<p>The brief and several older docs reference these — they are NOT in
+v19 code as of writing. If you see them in a screenshot or a stale
+doc, ignore:</p>
+<table>
+<thead>
+<tr>
+<th>Referenced as</th>
+<th>Actually exists?</th>
+<th>Real story</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>x_southbrook_sale_order_id</code> (SO linkage on MO)</td>
+<td><strong>No</strong></td>
+<td>MO → SO linkage is via <code>x_sbk_kitchen_project_id → sb.kitchen.project</code> → SO. There's no direct FK from MO to SO.</td>
+</tr>
+<tr>
+<td><code>southbrook_production_release_state</code></td>
+<td><strong>No</strong></td>
+<td>The release gate state machine lives on <code>sale.order.production_approval_state</code> (added by <code>southbrook_mrp_pm</code>), not on the MO.</td>
+</tr>
+<tr>
+<td><code>southbrook_install_readiness_state</code></td>
+<td><strong>No</strong></td>
+<td>Install readiness is implied by <code>sb.production.package.state</code> (<code>draft / ready / released / done</code>), not a separate field on the MO.</td>
+</tr>
+<tr>
+<td>Cut spec snapshot fields on MO</td>
+<td><strong>No</strong></td>
+<td>The cut spec is referenced live via the BoM's <code>_get_cut_constants</code> seam (lesson 15.4). The MO carries no frozen snapshot. (Course 8 flagged this as a real gap; the design intent is "PLM is the source of truth, the MO follows.")</td>
+</tr>
+<tr>
+<td>Project task linkage on MO</td>
+<td><strong>No</strong></td>
+<td>The MO links to a <code>sb.kitchen.project</code>, which has its own <code>project.task</code> structure. No direct <code>task_id</code> on the MO.</td>
+</tr>
+<tr>
+<td><code>x_mi_edge_band_m</code> on MO</td>
+<td><strong>No</strong></td>
+<td>This field lives on <code>sb.production.package</code> (lesson 15.7), not on the MO.</td>
+</tr>
+</tbody>
+</table>
+<p>If any of these become real (filed tickets), this lesson updates.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You change <code>x_sbk_priority_level</code> from <code>normal</code> to <code>urgent</code>
+on an MO that's already <code>progress</code>. The operator's shop floor
+queue doesn't re-sort. Why?</p>
+<blockquote>
+<p>The shop floor view sorts on the WORKORDER queue, not the MO
+queue. Changing the MO's priority writes the field and tracks
+the change, but the workorders inherit their sort key from
+<code>mrp.workorder.date_planned_start</code>, not from the MO. To bump
+the workorders, the planner has to re-plan the MO (which moves
+workorder start times). Updating the priority is informational
+for managers; it does NOT physically re-order the floor.</p>
+</blockquote>
+<p><strong>2.</strong> You're triaging an MO whose <code>x_mi_status = blocked</code> and
+<code>x_mi_next_action</code> says "Edge band length exceeds workcenter
+capacity at SB-EDGE." What's the actual cause and where do you
+look?</p>
+<blockquote>
+<p>The MI engine ran the "edge band capacity" check. It compared
+the cutlist's total edge meters against SB-EDGE's hourly
+throughput against the install due date. Look at the Intelligence
+tab's <code>x_mi_check_ids</code> list — the specific check row will give
+you the calculated capacity headroom. The fix is on the planner
+side: either push the install date or split the MO across two
+days at SB-EDGE.</p>
+</blockquote>
+<p><strong>3.</strong> A developer says "I'm adding a custom field to track which
+shipping container an MO will go on. What's the right field name
+prefix?"</p>
+<blockquote>
+<p>Use <code>x_southbrook_*</code> if the field is platform-wide, <code>x_sbk_*</code> if
+it's tied to the kitchen workcenter logic, <code>x_mi_*</code> only if
+written by the MI engine. For shipping container tracking,
+<code>x_southbrook_shipping_container_id</code> is appropriate. Avoid bare
+field names — the prefix is what lets future devs trace ownership.</p>
+</blockquote>
+<p><strong>4.</strong> Your sysadmin shows you a screenshot from 2026-04 of an MO
+with a "Production Release State" field. The current MO form
+doesn't show it. What happened?</p>
+<blockquote>
+<p>The April brief proposed <code>southbrook_production_release_state</code>
+on <code>mrp.production</code> as part of the release gate. In execution,
+the release gate landed on <code>sale.order</code> instead
+(<code>production_approval_state</code> field, added by <code>southbrook_mrp_pm</code>).
+The MO doesn't carry a separate release state; "the MO exists"
+IS the release. The old screenshot was a draft.</p>
+</blockquote>
+<p><strong>5.</strong> The Total Variance Min on an MO is +245 minutes (actual &gt;
+estimated). Which addon's logic do you patch to dig in?</p>
+<blockquote>
+<p>The variance field is owned by <code>southbrook_mrp_kitchen_workcenters</code>
+(<code>x_sbk_total_variance_min</code>, stored compute). But the underlying
+per-workorder fields (<code>x_sbk_kitchen_expected_min</code> and
+<code>duration</code>) come from <code>mrp.workorder</code> and the operation-template
+formula in <code>southbrook.kitchen.operation.template</code>. Patch the
+template's <code>compute_expected_duration</code> if the estimates are
+systematically low; don't override the variance compute itself.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The workorder side (variance, tool readiness, downtime) → lesson 15.3.</li>
+<li>The cut-spec seam in the BoM that drives panel math → lesson 15.4.</li>
+<li>Workcenter form + alternative chain → lesson 15.5.</li>
+<li>MO view customization (Kanban, search filters) → lesson 15.6.</li>
+<li>MO ↔ cutlist ↔ hardware ↔ production package linkage → lesson 15.7.</li>
+<li>The actual MI engine check catalog (what rules fire when) → Course 3 lesson 3.1.</li>
+<li>The native MO state machine (<code>draft → confirmed → progress → done</code>) → Odoo native training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_15_workorder_extensions" model="slide.slide">
+            <field name="name">Work Order Extensions — Tool Readiness, Variance, Downtime</field>
+            <field name="channel_id" ref="course_manufacturing_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Operator + Planner + Production Manager working the WO surface.</field>
+            <field name="html_content"><![CDATA[<h1 id="work-order-extensions-tool-readiness-variance-downtime">Work Order Extensions — Tool Readiness, Variance, Downtime</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're at the keyboard or the touchscreen and you tap <strong>Start</strong> on a
+work order. Behind that one tap, three Southbrook systems engage:
+the <strong>tool readiness gate</strong> decides whether your machine can even
+proceed, the <strong>variance compute</strong> starts comparing your real time
+against the operation template's prediction, and any pause/resume
+gets stitched into the <strong>downtime ledger</strong>. This lesson is the field
+guide to all of it — every custom field on <code>mrp.workorder</code>, the
+state machines they drive, and how to read them when something's
+wrong.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Manufacturing → Operations → Work Orders</strong> — native list, opens the WO form
+<strong>Manufacturing → Operations → Southbrook Kitchen → Work Center Downtime</strong> — the downtime ledger
+<strong>/my/southbrook/floor</strong> — Floor Manager portal (tablet view, separate from Odoo backend)</p>
+</blockquote>
+<p>On the WO form, the Southbrook stack adds:</p>
+<ul>
+<li>A <strong>Tool Readiness</strong> statusbar widget at the top of the header
+  (added by <code>southbrook_mrp_kitchen_tools</code>).</li>
+<li>A <strong>Southbrook Tool Readiness</strong> group in the sheet (shown only
+  when the state isn't <code>not_checked</code>).</li>
+<li>A <strong>Check Tool Readiness</strong> button in the header.</li>
+<li>A handful of Southbrook fields surfaced inline (variance,
+  cost-estimate, expected-min) by the
+  <code>southbrook_mrp_kitchen_workcenters</code> addon.</li>
+</ul>
+<p>Note: the form view inheritance hits
+<code>mrp.mrp_production_workorder_form_view_inherit</code> — the <strong>planner-side
+backend form</strong>, NOT the shop-floor touchscreen view. The shop-floor
+view (the big-button OWL component) reads the same fields but renders
+its own UI. Operators see tool readiness on both surfaces; planners
+get the full field set on the backend.</p>
+<h2 id="what-your-screen-shows-fields-on-mrpworkorder">What your screen shows — fields on mrp.workorder</h2>
+<h3 id="owned-by-southbrook_mrp_kitchen_workcenters">Owned by <code>southbrook_mrp_kitchen_workcenters</code></h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>Computed from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kitchen Expected Min</td>
+<td><code>x_sbk_kitchen_expected_min</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float</td>
+<td>Written by <code>action_sbk_recalc_kitchen_duration</code> from operation template's <code>compute_expected_duration</code></td>
+</tr>
+<tr>
+<td>Variance Min</td>
+<td><code>x_sbk_variance_min</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float, stored</td>
+<td><code>duration − x_sbk_kitchen_expected_min</code></td>
+</tr>
+<tr>
+<td>Estimated Cost</td>
+<td><code>x_sbk_estimated_cost</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float (Product Price), stored</td>
+<td><code>x_sbk_kitchen_expected_min / 60 × workcenter_id.costs_hour</code></td>
+</tr>
+<tr>
+<td>Actual Cost</td>
+<td><code>x_sbk_actual_cost</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float (Product Price), stored</td>
+<td><code>duration / 60 × workcenter_id.costs_hour</code></td>
+</tr>
+<tr>
+<td>Cost Variance</td>
+<td><code>x_sbk_cost_variance</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float (Product Price), stored</td>
+<td>actual − estimated</td>
+</tr>
+<tr>
+<td>Rework Count</td>
+<td><code>x_sbk_rework_count</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Integer, NOT stored</td>
+<td>Count of <code>southbrook.mi.check</code> where <code>x_sbk_rework_workorder_id == self.id</code></td>
+</tr>
+<tr>
+<td>Rework Cost</td>
+<td><code>x_sbk_rework_cost</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float (Product Price), NOT stored</td>
+<td>Sum of rework WO duration × hourly rate</td>
+</tr>
+<tr>
+<td>Downtime Min</td>
+<td><code>x_sbk_downtime_min</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float, NOT stored</td>
+<td>Sum of linked <code>southbrook.kitchen.workcenter.downtime.duration_min</code> (active+closed)</td>
+</tr>
+<tr>
+<td>Downtime Cost</td>
+<td><code>x_sbk_downtime_cost</code> (<code>mrp.workorder</code>, kitchen_workcenters)</td>
+<td>Float (Product Price), NOT stored</td>
+<td>Sum of linked downtime <code>downtime_cost</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="owned-by-southbrook_mrp_kitchen_tools">Owned by <code>southbrook_mrp_kitchen_tools</code></h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>Computed from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tool Readiness</td>
+<td><code>southbrook_tool_readiness_state</code> (<code>mrp.workorder</code>, tools)</td>
+<td>Selection: not_checked / ready / warning / blocked</td>
+<td>Default <code>not_checked</code>; written by <code>action_check_tool_readiness</code></td>
+</tr>
+<tr>
+<td>Tool Readiness Message</td>
+<td><code>southbrook_tool_readiness_msg</code> (<code>mrp.workorder</code>, tools)</td>
+<td>Text</td>
+<td>Written alongside the state with a human-language reason</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-tool-readiness-state-machine">The tool readiness state machine</h2>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Meaning</th>
+<th>Set by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>not_checked</code></td>
+<td>Default. No one has run the readiness gate against this WO yet.</td>
+<td>Default on WO creation</td>
+</tr>
+<tr>
+<td><code>ready</code></td>
+<td>All required tools are present, sharp/calibrated/clean, none over their next-service date.</td>
+<td><code>action_check_tool_readiness</code> when all reqs satisfied</td>
+</tr>
+<tr>
+<td><code>warning</code></td>
+<td>All MANDATORY tools are present, but some non-mandatory under-stocked.</td>
+<td><code>action_check_tool_readiness</code></td>
+</tr>
+<tr>
+<td><code>blocked</code></td>
+<td>At least one mandatory tool is missing, dull, uncalibrated, or out of inventory.</td>
+<td><code>action_check_tool_readiness</code></td>
+</tr>
+</tbody>
+</table>
+<p>The constant <code>READINESS_STATE_SELECTION</code> lives at module scope in
+<code>southbrook_mrp_kitchen_tools/models/mrp_workorder.py</code> — referenced
+by the tool consumption and asset code too.</p>
+<p><strong>The gate</strong>: <code>button_start</code> (the native Odoo "Start" action on a
+WO) is overridden by the tools addon. If
+<code>southbrook_tool_readiness_state == 'blocked'</code>, the override raises
+<code>UserError("Tool readiness blocks start: &lt;msg&gt;")</code> and refuses to
+start. Operator MUST resolve the block (get the tool from the crib,
+replace a dull bit) and re-run <strong>Check Tool Readiness</strong> before
+proceeding.</p>
+<p>How the check works (the body of <code>action_check_tool_readiness</code>):</p>
+<ol>
+<li>Collect tool requirements from BOTH the workcenter
+   (<code>workcenter_id.southbrook_tool_requirement_ids</code>) AND the
+   operation (<code>operation_id.southbrook_tool_requirement_ids</code>).</li>
+<li>For each requirement, call <code>_available_asset_count(req)</code> which
+   searches <code>southbrook.tool.asset</code> filtered by <code>is_available=True</code>
+   and EXCLUDING assets flagged <code>needs_sharpening</code>,
+   <code>needs_calibration</code>, or <code>needs_cleaning</code>.</li>
+<li>Compare available vs required <code>min_quantity</code>. If short and the
+   requirement's <code>is_mandatory=True</code> → <code>blocked</code>. If short and
+   non-mandatory → <code>warning</code>. If all reqs met → <code>ready</code>.</li>
+<li>Write <code>southbrook_tool_readiness_state</code> AND
+   <code>southbrook_tool_readiness_msg</code> (the human-readable detail).</li>
+</ol>
+<h2 id="the-downtime-model">The downtime model</h2>
+<p><code>southbrook.kitchen.workcenter.downtime</code> is its own table, owned by
+<code>southbrook_mrp_kitchen_workcenters</code>. Schema:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Char</td>
+<td>Default "Downtime"</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td>Selection: <strong>draft</strong> / active / closed / cancelled</td>
+<td>Default draft, tracked, indexed</td>
+</tr>
+<tr>
+<td><code>workcenter_id</code></td>
+<td>M2O → <code>mrp.workcenter</code></td>
+<td>Required, indexed, ondelete=cascade</td>
+</tr>
+<tr>
+<td><code>workorder_id</code></td>
+<td>M2O → <code>mrp.workorder</code></td>
+<td>Optional, ondelete=set null</td>
+</tr>
+<tr>
+<td><code>production_id</code></td>
+<td>M2O → <code>mrp.production</code>, related to <code>workorder_id.production_id</code></td>
+<td>Stored related</td>
+</tr>
+<tr>
+<td><code>date_start</code></td>
+<td>Datetime</td>
+<td>Required, default now</td>
+</tr>
+<tr>
+<td><code>date_end</code></td>
+<td>Datetime</td>
+<td>Indexed</td>
+</tr>
+<tr>
+<td><code>duration_min</code></td>
+<td>Float, stored compute (editable backfill)</td>
+<td><code>date_end − date_start</code> in minutes</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>Selection (13 reasons)</td>
+<td>Required, indexed</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td>Text</td>
+<td>Free-form</td>
+</tr>
+<tr>
+<td><code>responsible_id</code></td>
+<td>M2O → <code>res.users</code></td>
+<td>Default current user</td>
+</tr>
+<tr>
+<td><code>downtime_cost</code></td>
+<td>Float, stored compute</td>
+<td><code>duration_min/60 × workcenter_id.costs_hour</code></td>
+</tr>
+</tbody>
+</table>
+<p>The 13 reasons: <code>material_not_available</code>, <code>drawing_issue</code>,
+<code>machine_breakdown</code>, <code>tool_change</code>, <code>setup_time</code>,
+<code>color_finish_changeover</code>, <code>waiting_previous_operation</code>,
+<code>waiting_quality_approval</code>, <code>rework</code>, <code>operator_unavailable</code>,
+<code>subcontract_delay</code>, <code>maintenance</code>, <code>other</code>.</p>
+<p>State machine:</p>
+<ul>
+<li><code>draft</code> → <code>active</code>: <code>action_start</code> (also stamps <code>date_start = now()</code>)</li>
+<li><code>active</code> → <code>closed</code>: <code>action_close</code> (stamps <code>date_end = now()</code>)</li>
+<li>any → <code>cancelled</code>: <code>action_cancel</code></li>
+</ul>
+<p><strong>The link back to the WO</strong>: <code>workorder_id</code> (M2O, ondelete=set null).
+The WO's <code>x_sbk_downtime_min</code> and <code>x_sbk_downtime_cost</code> compute
+fields search downtime rows where <code>workorder_id == self.id</code> AND
+<code>state IN ('active', 'closed')</code> — <code>draft</code> rows aren't counted (a
+draft hasn't actually happened yet) and <code>cancelled</code> rows are
+explicitly excluded.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Operator side — pre-start ritual:</strong></p>
+<ul>
+<li>Open the WO on your shop-floor view.</li>
+<li>Look at the tool readiness statusbar at the top. If it's
+  <code>not_checked</code> (grey), tap <strong>Check Tool Readiness</strong>. The button
+  is gated by <code>group_tool_operator</code> — every operator has this
+  group by default.</li>
+<li>If the state lands on <code>ready</code> (green), tap <strong>Start</strong>. The native
+  <code>button_start</code> runs unimpeded.</li>
+<li>If <code>warning</code> (amber), READ the message. It'll say e.g. "blade
+  set #14 below recommended stock (mandatory ok)". Decide whether
+  to proceed or fetch more before starting.</li>
+<li>If <code>blocked</code> (red), READ the message and resolve. Tap <strong>Start</strong>
+  too early and you'll see "Tool readiness blocks start: <msg>"
+  raised — Odoo won't move you to <code>progress</code>.</li>
+</ul>
+<p><strong>2. Operator side — during run:</strong></p>
+<ul>
+<li>The WO is in <code>progress</code>. The native <code>duration</code> field accumulates
+  real run time. Behind the scenes, every minute of <code>duration</code>
+  feeds into <code>x_sbk_actual_cost</code> (via the cost compute) and
+  <code>x_sbk_variance_min</code> (via the variance compute).</li>
+<li>If you have to pause for a tool change, log it as <strong>downtime</strong>
+  (lesson 1.6). The downtime row's <code>workorder_id</code> should point
+  back to YOUR WO so the cost gets attributed correctly. Otherwise
+  the pause shows up as your run-time variance.</li>
+</ul>
+<p><strong>3. Planner side — variance review:</strong></p>
+<ul>
+<li>End of day, open <strong>Southbrook PM → Capacity</strong> for the pivot or
+  filter MOs by <code>x_sbk_total_variance_min &gt; 60</code> (over an hour
+  late vs estimate).</li>
+<li>Per WO, the breakdown is in the form's Southbrook fields:
+  <code>x_sbk_kitchen_expected_min</code> (what we thought it would take),
+  <code>duration</code> (what it actually took), <code>x_sbk_variance_min</code>
+  (delta), <code>x_sbk_downtime_min</code> (how much of the delta is
+  attributable to downtime).</li>
+<li>Variance net of downtime = real overrun. If <code>variance_min ≈
+  downtime_min</code>, the operation was on plan and downtime ate the
+  buffer. If <code>variance_min &gt;&gt; downtime_min</code>, the operation itself
+  ran slow — the template estimate may be wrong, or the operator
+  needs help.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"Operator says they tapped Start and got a 'Tool readiness blocks
+start' error. They've already gone to the crib and grabbed the
+bit."</strong></p>
+<p>The state didn't auto-clear when they got the new bit. Tap <strong>Check
+Tool Readiness</strong> again. The check now sees the new asset (or the
+old asset's flag cleared because someone updated
+<code>needs_sharpening = False</code>) and the state flips to <code>ready</code>. Then
+Start works.</p>
+<p><strong>"Variance is showing +145 min but the operator's run was on
+time."</strong></p>
+<p>Two common causes:
+1. <code>x_sbk_kitchen_expected_min</code> was never written (the operation
+   template's <code>compute_expected_duration</code> wasn't called because the
+   operation lacks <code>x_sbk_operation_template_id</code>). The variance =
+   <code>duration − 0 = duration</code>. Fix: open the MO, tap <strong>Recalc All
+   Workorder Durations</strong> which fires the template formula across
+   all WOs.
+2. Downtime wasn't logged. The pause hours sit inside <code>duration</code>
+   and inflate variance. Fix: file the downtime row retroactively
+   with <code>state='closed'</code>, accurate <code>date_start</code> and <code>date_end</code>.</p>
+<p><strong>"I logged downtime but it's not showing in
+<code>x_sbk_downtime_min</code>."</strong></p>
+<p>Check the downtime row's <code>state</code> and <code>workorder_id</code>. If <code>state =
+draft</code>, the compute skips it (drafts don't count). If
+<code>workorder_id</code> is empty (the operator filed downtime against the
+workcenter but didn't pick a workorder), the compute can't
+associate it to ANY single WO — it shows up in workcenter-level
+metrics but not per-WO. Edit the row: set <code>workorder_id</code>, transition
+to <code>active</code> or <code>closed</code>.</p>
+<p><strong>"<code>southbrook_tool_readiness_state</code> is <code>ready</code> but mid-run the
+operator says the bit broke."</strong></p>
+<p>Readiness is a point-in-time gate. Once <code>ready</code> is written and
+Start has fired, no live monitoring catches a tool breaking mid-run.
+The operator logs downtime (reason: <code>tool_change</code>) and tap <strong>Check
+Tool Readiness</strong> again before resuming. The state may flip to
+<code>blocked</code> if no spare is in inventory — that's the system telling
+you to halt, not a bug.</p>
+<p><strong>"Tool consumption rows are bumping asset life faster than we
+expected — assets that should last 200 uses are flipping to
+<code>needs_sharpening</code> after 80."</strong></p>
+<p>The consumption model's <code>_apply_to_asset_life</code> bumps
+<code>asset.total_usage_qty</code> and decrements <code>asset.remaining_life_qty</code>
+on every consumption row. If consumption is being logged
+TWICE per WO (e.g. one row per panel × 5 panels instead of one row
+per WO × 5 quantity), life burns 5× faster. Audit the consumption
+list under the MO smart button.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The WO surface is <strong>two addons cooperating</strong>: kitchen_workcenters
+owns variance + cost + downtime fields, kitchen_tools owns
+readiness + consumption.</p>
+<p>The variance compute (<code>_compute_x_sbk_variance</code> in kitchen_workcenters)
+depends on <code>duration</code> and <code>x_sbk_kitchen_expected_min</code> — anytime
+either changes, variance is re-derived synchronously. Storage means
+the field is searchable for the "show me WOs with variance &gt; X"
+filter.</p>
+<p>The cost compute (<code>_compute_x_sbk_costs</code>) depends on <code>duration</code>,
+<code>x_sbk_kitchen_expected_min</code>, AND <code>workcenter_id.costs_hour</code> — so
+re-pricing a workcenter's hourly rate ripples through every WO's
+estimated and actual cost in one write.</p>
+<p>The downtime aggregation (<code>_compute_x_sbk_downtime</code>) is NOT stored
+because the downtime table is mutated heavily during a shift and
+storing would mean every downtime save triggers a write on every
+linked WO. Read on demand instead — the search domain is cheap
+(one indexed FK lookup).</p>
+<p><code>_apply_to_asset_life</code> is the side effect that makes the
+consumption model interesting. Each row creates writes to the
+linked asset: <code>total_usage_qty += quantity</code>, <code>remaining_life_qty
+-= quantity</code>, <code>last_used_date = now()</code>, <code>last_used_workorder_id =
+self.workorder_id.id</code>. When <code>remaining_life_qty</code> hits zero, the
+asset's <code>lifecycle_state</code> flips from <code>in_use</code> to
+<code>needs_sharpening</code>. The nightly <strong>Tool Asset Maintenance Sweep</strong>
+cron (cron_tool_asset_maintenance_sweep in
+<code>southbrook_mrp_kitchen_tools/data/crons.xml</code>) walks all assets
+and re-checks the <code>next_*_due_date</code> fields against today; overdue
+assets get their <code>needs_*</code> flags set so the readiness gate catches
+them.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> Operator taps Start. Native Odoo doesn't move the state to
+<code>progress</code> — instead, a UserError pops up: "Tool readiness blocks
+start: blade set #14 missing (mandatory)." Walk through what just
+happened in the database.</p>
+<blockquote>
+<p>Native <code>button_start</code> was overridden by
+<code>southbrook_mrp_kitchen_tools/models/mrp_workorder.py:button_start</code>.
+The override checks <code>self.southbrook_tool_readiness_state</code>. It's
+<code>blocked</code> because either (a) Check Readiness was never run and
+the default state is <code>not_checked</code> (but then state would be
+<code>not_checked</code> not <code>blocked</code>), or more likely (b) Check Readiness
+was run earlier, found blade set #14 short and wrote
+<code>state='blocked'</code> + <code>msg='blade set #14 missing'</code>. The override
+raises <code>UserError</code>, native Start is aborted, state stays
+<code>pending</code> (or whatever it was). Operator must resolve, re-check,
+then retry.</p>
+</blockquote>
+<p><strong>2.</strong> The variance on a WO is +250 min but the downtime sum on
+the same WO is 300 min. Is the operator slow or fast?</p>
+<blockquote>
+<p>Fast. Variance = <code>duration − expected = +250</code>. Downtime within
+that duration = 300. Run time net of downtime = <code>duration − 300
+= expected − 50</code> (50 min UNDER plan). The operator did the work
+50 min faster than estimated, but a 300 min downtime event
+dragged the WO's total <code>duration</code> over the line. The variance
+field alone is misleading without the downtime breakdown — read
+both.</p>
+</blockquote>
+<p><strong>3.</strong> A <code>southbrook.kitchen.workcenter.downtime</code> row has <code>state =
+draft</code>. The operator says "I filed that 2 hours ago — why isn't it
+counted?"</p>
+<blockquote>
+<p>Drafts don't count. The compute <code>_compute_x_sbk_downtime</code>
+filters <code>state in ('active', 'closed')</code>. The row needs to be
+transitioned via <code>action_start</code> (→ active) or <code>action_close</code>
+(→ closed) before it appears in metrics. Drafts are scratch
+space; the operator likely meant to file it but didn't tap
+Start. Open the row, tap Start, tap Close once it's filled in.</p>
+</blockquote>
+<p><strong>4.</strong> You're auditing why <code>x_sbk_actual_cost</code> on a WO is $87.60
+when the operator's run took 45 minutes. SB-EDGE is $65/h. Is the
+math right?</p>
+<blockquote>
+<p><code>45 min / 60 = 0.75 hr × $65/h = $48.75</code>. Expected actual cost
+is $48.75, not $87.60. The discrepancy means <code>duration</code> is more
+than 45 min OR the WO's <code>workcenter_id.costs_hour</code> isn't
+SB-EDGE's $65. Most likely the operator paused 35 min
+(unaccounted) and <code>duration</code> says 80 min: <code>80/60 × 65 = $86.67</code>
+close to $87.60. The fix: file the missing downtime so cost is
+attributed to downtime, not run time.</p>
+</blockquote>
+<p><strong>5.</strong> A planner wants to set up a recurring report: "WOs with
+variance &gt; 60 min in the last week." Which field do they filter
+on, and is it stored (i.e. usable in a server filter)?</p>
+<blockquote>
+<p>Filter on <code>x_sbk_variance_min &gt; 60</code> AND <code>date_finished &gt;= today
+- 7</code>. <code>x_sbk_variance_min</code> is a stored compute on
+<code>mrp.workorder</code> (depends <code>duration</code>, <code>x_sbk_kitchen_expected_min</code>).
+Storage means the filter can run in PostgreSQL — it's
+efficient. The list view inherit doesn't currently expose this
+field by default but a saved search with a domain
+<code>[('x_sbk_variance_min', '&gt;', 60), ('date_finished', '&gt;=',
+'2026-06-10')]</code> works.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The MO-side fields (<code>x_sbk_total_*</code>, Kitchen tab) → lesson 15.2.</li>
+<li>The BoM extensions that drive the operation templates → lesson 15.4.</li>
+<li>Workcenter form and the alternative chain → lesson 15.5.</li>
+<li>MO Kanban + search filters → lesson 15.6.</li>
+<li>MO ↔ cutlist / hardware / production package → lesson 15.7.</li>
+<li>Daily operator routine at each station → Course 1 lessons 1.2-1.5.</li>
+<li>Logging downtime as an operator (the touchscreen flow) → Course 1 lesson 1.6.</li>
+<li>The MI engine's check catalog → Course 3 lesson 3.1.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_15_bom_extensions" model="slide.slide">
+            <field name="name">BoM Extensions — Cut Constants, Panel Math, Lead-Time Bumps</field>
+            <field name="channel_id" ref="course_manufacturing_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">PLM engineer + Planner + Developer.</field>
+            <field name="html_content"><![CDATA[<h1 id="bom-extensions-cut-constants-panel-math-lead-time-bumps">BoM Extensions — Cut Constants, Panel Math, Lead-Time Bumps</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a PLM engineer authoring cut specs, a planner trying to
+understand why an MO landed with <code>effective_produce_delay = 28
+days</code> when the cabinet says <code>produce_delay = 14</code>, or a developer
+adding a new attribute that should affect lead time. The Southbrook
+BoM extensions are five fields and seven methods — but the methods
+are load-bearing for the entire cut-list pipeline, the cabinet 3D
+preview, the FreeCAD bridge, and the shop copy report. This lesson
+unpacks each piece and how they cooperate.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Manufacturing → Configuration → Bills of Materials → <BoM></strong></p>
+</blockquote>
+<p>The Southbrook fields show inline on the BoM form (no separate
+notebook page — they're load-bearing computes that the planner needs
+visible). The cut constants and panel math don't surface on the form
+at all — they're called by the cutlist generator at MO time.</p>
+<p>For the cut spec source-of-truth:</p>
+<blockquote>
+<p><strong>Southbrook PLM → Cut Specs</strong> (<code>southbrook.cut.spec</code> records)</p>
+</blockquote>
+<p>Exactly one cut spec is <code>active</code> at any time
+(<code>_check_single_active</code> constraint). The <code>_get_cut_constants</code> seam
+reads from the active spec.</p>
+<h2 id="what-your-screen-shows-fields-on-mrpbom">What your screen shows — fields on mrp.bom</h2>
+<h3 id="owned-by-southbrook_estimating">Owned by <code>southbrook_estimating</code></h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>Computed from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Southbrook Lead-Time Extra</td>
+<td><code>southbrook_lead_time_extra</code> (<code>mrp.bom</code>, estimating)</td>
+<td>Float, stored compute</td>
+<td>Sum of <code>lead_time_extra</code> over the variant's <code>product_template_attribute_value_ids → product_attribute_value_id.lead_time_extra</code></td>
+</tr>
+<tr>
+<td>Effective Produce Delay</td>
+<td><code>effective_produce_delay</code> (<code>mrp.bom</code>, estimating)</td>
+<td>Float, stored compute</td>
+<td><code>produce_delay + southbrook_lead_time_extra</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="owned-by-southbrook_plm">Owned by <code>southbrook_plm</code></h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it tracks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BoM Version</td>
+<td><code>southbrook_version</code> (<code>mrp.bom</code>, plm)</td>
+<td>Integer, default 1</td>
+<td>Incremented per ECO; prior version archived</td>
+</tr>
+<tr>
+<td>ECOs Raised Against</td>
+<td><code>southbrook_eco_ids</code> (<code>mrp.bom</code>, plm)</td>
+<td>One2many → <code>southbrook.eco</code> (inverse <code>bom_id</code>)</td>
+<td>ECOs that target this BoM</td>
+</tr>
+<tr>
+<td>ECO History</td>
+<td><code>southbrook_eco_history_ids</code> (<code>mrp.bom</code>, plm)</td>
+<td>One2many → <code>southbrook.eco</code> (inverse <code>new_bom_id</code>)</td>
+<td>ECOs that PRODUCED this BoM</td>
+</tr>
+<tr>
+<td>ECO Count</td>
+<td><code>southbrook_eco_count</code> (<code>mrp.bom</code>, plm)</td>
+<td>Integer, compute</td>
+<td>Union count for smart button</td>
+</tr>
+</tbody>
+</table>
+<h3 id="owned-by-product_configurator_mrp-oca-not-southbrook-custom-but-shipped-in-the-stack">Owned by <code>product_configurator_mrp</code> (OCA, not Southbrook-custom but shipped in the stack)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mrp.bom.config_ok</code></td>
+<td>Boolean (related, stored)</td>
+<td>Mirrors <code>product_tmpl_id.config_ok</code>; flags configurable BoMs</td>
+</tr>
+<tr>
+<td><code>mrp.bom.line.config_set_id</code></td>
+<td>M2O → <code>mrp.bom.line.configuration.set</code></td>
+<td>Gates the BoM line to specific attribute-value combos</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-eight-cut-constants">The eight cut constants</h2>
+<p>These are module-level floats in
+<code>southbrook_estimating/models/mrp_bom.py</code> — the <strong>baseline</strong> before
+any active cut spec overrides them. Real-world values, all mm:</p>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default (mm)</th>
+<th>Real-world</th>
+<th>Consumed by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BOX_TH</code></td>
+<td>15.875</td>
+<td>5/8" melamine carcass</td>
+<td>Side/top/bottom/shelf thickness; <code>inside_width = W − 2·BOX_TH</code></td>
+</tr>
+<tr>
+<td><code>BACK_TH</code></td>
+<td>6.35</td>
+<td>1/4" hardboard</td>
+<td>Back panel thickness; shelf depth subtractor</td>
+</tr>
+<tr>
+<td><code>RABBET</code></td>
+<td>6.35</td>
+<td>back-capture groove</td>
+<td>Back length/width inflation; shelf depth subtractor</td>
+</tr>
+<tr>
+<td><code>DOOR_TH</code></td>
+<td>18.0</td>
+<td>3/4" door slab</td>
+<td>Door thickness</td>
+</tr>
+<tr>
+<td><code>DOOR_REVEAL</code></td>
+<td>3.0</td>
+<td>uniform door gap</td>
+<td>Door L/W; 2-door split formula</td>
+</tr>
+<tr>
+<td><code>SHELF_TOL</code></td>
+<td>1.5</td>
+<td>hand clearance</td>
+<td><code>shelf_l = inside_width − SHELF_TOL</code></td>
+</tr>
+<tr>
+<td><code>SHELF_VENT_GAP</code></td>
+<td>12.7</td>
+<td>1/2" rear vent</td>
+<td><code>shelf_w = D − BACK_TH − RABBET − SHELF_VENT_GAP</code></td>
+</tr>
+<tr>
+<td><code>TOEKICK_H</code></td>
+<td>101.6</td>
+<td>4" base toe-kick height</td>
+<td>Declared but NOT consumed by current <code>_compute_panel_dimensions</code> (Phase 1 gap — toe-kick is integrated into side panels)</td>
+</tr>
+</tbody>
+</table>
+<p>Plus one set: <code>TOEKICK_FAMILIES = frozenset(['base', 'sink', 'tall',
+'vanity'])</code> — declared, not yet consumed.</p>
+<h2 id="the-plm-seam-_get_cut_constants">The PLM seam — <code>_get_cut_constants()</code></h2>
+<p>Defined in two places, with PLM overriding estimating:</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_estimating/models/mrp_bom.py:_get_cut_constants(self)</code></td>
+<td><code>@api.model</code>. Returns the dict of module-level constants: <code>{box_th, back_th, rabbet, door_th, door_reveal, shelf_tol, shelf_vent_gap, toekick_h}</code>.</td>
+</tr>
+<tr>
+<td><code>southbrook_plm/models/mrp_bom.py:_get_cut_constants(self)</code></td>
+<td>Overrides. Looks up the active <code>southbrook.cut.spec</code> via <code>self.env['southbrook.cut.spec'].sudo()._get_active()</code>. If found, returns <code>active.constants_dict()</code> (same 8 keys, loaded from the spec record). If no active spec → falls back to <code>super()</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>This is the load-bearing seam. PLM authors a cut spec, hits
+<code>Activate</code> on it, the new constants take effect on every BoM call to
+<code>_get_cut_constants()</code> from that moment on. No DB migration; no
+recompile. The constraint <code>_check_single_active</code> enforces exactly
+one active spec — see lesson 4.2 and lesson 1.7 for the PLM side.</p>
+<p><strong>Test coverage</strong>: <code>southbrook_plm/tests/test_eco_workflow.py</code>
+asserts that an ECO-applied reveal change flows through to panel
+dimensions via the seam.</p>
+<h2 id="the-math-_compute_panel_dimensions">The math — <code>_compute_panel_dimensions(...)</code></h2>
+<p>Signature:</p>
+<pre><code>@api.model
+def _compute_panel_dimensions(
+    self,
+    width_mm, height_mm, depth_mm,
+    family='base', door_count=1, drawer_count=0,
+    finished_sides='none'
+):
+</code></pre>
+<p>Returns a dict shaped like:</p>
+<pre><code>{
+    'side_L':  (L, W, T) or None,
+    'side_R':  (L, W, T) or None,
+    'top':     (L, W, T) or None,
+    'bottom':  (L, W, T) or None,
+    'back':    (L, W, T) or None,
+    'shelf':   (L, W, T) or None,
+    'door':    (L, W, T) or None,
+    'shelf_count':            int,
+    'door_count':             int,
+    'drawer_count':           int,
+    'hinge_pair_count':       int,
+    'handle_count':           int,
+    'drawer_slide_pair_count':int,
+    'edge_banding_length_mm': int,
+}
+</code></pre>
+<p>The key formulas (from the active cut constants via
+<code>_get_cut_constants()</code>):</p>
+<ul>
+<li><code>inside_width = width_mm − 2·BOX_TH</code></li>
+<li><code>back = (inside_width + 2·RABBET, height_mm − 2·BOX_TH + 2·RABBET, BACK_TH)</code></li>
+<li>Shelf-count heuristic: <code>H ≤ 600</code> → 1; <code>H ≤ 900</code> → 2; else 3.</li>
+<li>1-door: <code>door = (height_mm − 2·DOOR_REVEAL, width_mm − 2·DOOR_REVEAL, DOOR_TH)</code></li>
+<li>2-door: width is split in half minus reveals.</li>
+<li>Drawer family: <code>door_count</code> is repurposed as drawer-front count;
+  the dict's <code>drawer_count</code> mirrors <code>door_count</code> for the drawer
+  family.</li>
+</ul>
+<p><strong>Callers</strong> (where the BoM math is consumed):</p>
+<table>
+<thead>
+<tr>
+<th>Caller</th>
+<th>File</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sale order pricing</td>
+<td><code>southbrook_estimating/models/sale_order.py:293</code></td>
+<td>Computes panel area for material cost</td>
+</tr>
+<tr>
+<td>Configurator preview</td>
+<td><code>southbrook_estimating/models/product_config_line.py:99</code></td>
+<td>Feeds the 3D viewport</td>
+</tr>
+<tr>
+<td>Website kitchen planner</td>
+<td><code>southbrook_estimating_website/controllers/main.py:1935</code></td>
+<td>Live 3D update as the customer drags handles</td>
+</tr>
+<tr>
+<td>Cutlist generator</td>
+<td><code>sb.production.package.generate_from_mo</code> (lesson 15.7) calls <code>panel_cut_list(...)</code> which calls this</td>
+<td>The MO-time cutlist is written from this output</td>
+</tr>
+<tr>
+<td>FreeCAD bridge tests</td>
+<td><code>southbrook_freecad_bridge/tests/test_bom_contents.py</code></td>
+<td>Smoke tests panel geometry against expected</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-perimeter-_compute_edge_banding_length">The perimeter — <code>_compute_edge_banding_length(...)</code></h2>
+<p>Signature: <code>@api.model def _compute_edge_banding_length(self, width_mm, height_mm, depth_mm, finished_sides)</code>. Returns an int (mm).</p>
+<p>Approach: sum of side-panel perimeters <code>2·(H + D)</code> for finished
+sides ('both' → ×2, 'left' or 'right' → ×1) PLUS top + bottom
+front-edge bands (<code>2 · inside_width</code>).</p>
+<p><strong>KNOWN GAP</strong>: This function reads module-level <code>BOX_TH</code> directly,
+NOT via <code>_get_cut_constants()</code>. So an ECO-applied <code>box_th</code> change
+will NOT flow through here. If you're authoring a cut spec change
+to box thickness, log a ticket for this to be patched to route
+through the seam.</p>
+<h2 id="lead-time-extras">Lead-time extras</h2>
+<p>The chain:</p>
+<ol>
+<li><strong>Master field</strong> — <code>product.attribute.value.lead_time_extra</code>
+   (Float, default 0.0) defined in
+   <code>southbrook_estimating/models/product_attribute_value.py:59</code>. Per
+   attribute value, "this value adds N days to the BoM produce_delay
+   if selected on a variant."</li>
+<li><strong>Seed example</strong> — <code>data/attributes.xml:200</code>: maple box material
+   has <code>lead_time_extra = 14.0</code> (two weeks).</li>
+<li><strong>BoM rollup</strong> — <code>mrp.bom.southbrook_lead_time_extra</code> (stored
+   compute, depends
+   <code>product_id.product_template_attribute_value_ids.product_attribute_value_id.lead_time_extra</code>).
+   Sums across every attribute value chosen on the variant.</li>
+<li><strong>Effective delay</strong> — <code>mrp.bom.effective_produce_delay = produce_delay + southbrook_lead_time_extra</code> (stored compute).</li>
+</ol>
+<p><strong>Consumed by</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_estimating/reports/shop_copy.xml:53,56-58</code></td>
+<td>Renders effective delay on the shop copy traveler</td>
+</tr>
+<tr>
+<td><code>southbrook_estimating_website/controllers/main.py:1888-1889</code></td>
+<td>Order ETA across multi-line orders takes MAX <code>effective_produce_delay</code> across all lines</td>
+</tr>
+</tbody>
+</table>
+<p>So a customer who picks a maple box on a base 1-door cabinet (14
+days + base <code>produce_delay</code>) drives the entire order ETA, even if
+other lines are stock 7-day items. This is intentional — the
+customer's promise date has to honour the slowest line.</p>
+<h2 id="the-configurator-gated-bom-lines-oca-but-you-need-to-know">The configurator-gated BoM lines (OCA, but you need to know)</h2>
+<p><code>product_configurator_mrp</code> adds <code>mrp.bom.line.config_set_id</code>
+(M2O → <code>mrp.bom.line.configuration.set</code>). A configuration set holds
+many <code>value_ids</code> (M2M → <code>product.attribute.value</code>). At MO creation,
+the configurator wizard filters BoM lines whose <code>config_set_id</code>
+matches the chosen attribute-value combo on the variant. <strong>No Python
+inflates BoM lines from attributes</strong> — it's all declarative gating.</p>
+<p>This is why "BoM rollup of configured products" (a phrase the brief
+sometimes uses) doesn't mean dynamic line creation. It means
+<code>config_set_id</code> filtering. If a line has <code>config_set_id</code> empty, it
+always applies; if set, it applies only when the variant's
+attribute values match the set.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. PLM engineer authoring a new cut spec:</strong></p>
+<ul>
+<li>Open <strong>Southbrook PLM → Cut Specs</strong>, create new.</li>
+<li>Set the 8 constants (box_th, back_th, rabbet, door_th,
+  door_reveal, shelf_tol, shelf_vent_gap, toekick_h).</li>
+<li>Save as <code>draft</code>. Run the suite of tests
+  (<code>test_eco_workflow.py</code>) against a copy of the BoM math to
+  verify the new spec doesn't crash anything.</li>
+<li>When ready, raise an ECO referencing the old spec → new spec.
+  ECO approval transitions the new spec to <code>active</code> and the old
+  to <code>superseded</code>. From that moment, every <code>_get_cut_constants()</code>
+  call reads the new values.</li>
+</ul>
+<p><strong>2. Planner debugging an unexpected ETA:</strong></p>
+<ul>
+<li>Customer's order shows ETA of 28 days. Native produce_delay on
+  the cabinet is 14. Why 28?</li>
+<li>Open the BoM for the configured variant. Read
+  <code>southbrook_lead_time_extra</code>. If it's 14, you've found the
+  source — an attribute on that variant carries a 14-day bump.</li>
+<li>Click into the variant's
+  <code>product_template_attribute_value_ids</code>. Find which attribute
+  value has <code>lead_time_extra &gt; 0</code>. Maple box is the common
+  culprit at 14 days.</li>
+<li>Decide: educate the customer (real lead time on maple) or
+  re-quote with a different material.</li>
+</ul>
+<p><strong>3. Developer adding a new attribute that affects timing:</strong></p>
+<ul>
+<li>Open the attribute in
+  <strong>Sales → Configuration → Attributes</strong>.</li>
+<li>For the relevant attribute value (e.g. "Soft-Close Drawers"),
+  set <code>lead_time_extra</code> to the number of extra days needed.</li>
+<li>The BoM compute is reactive — every BoM whose variant uses this
+  value automatically picks up the bump on the next page-load.</li>
+<li>Add a regression test in
+  <code>southbrook_estimating/tests/test_bom_math.py</code> asserting the
+  bump appears on <code>effective_produce_delay</code>.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I activated a new cut spec but <code>_compute_edge_banding_length</code>
+is still using the old box_th."</strong></p>
+<p>KNOWN GAP. <code>_compute_edge_banding_length</code> reads module-level
+<code>BOX_TH</code> directly, not via <code>_get_cut_constants()</code>. The fix is a
+code change to route through the seam. Until then, any change to
+<code>box_th</code> in a cut spec is ignored by the edge banding calculation.
+File a ticket; work around by avoiding <code>box_th</code> changes via cut
+spec.</p>
+<p><strong>"I added <code>lead_time_extra = 7</code> on a new attribute value but the
+BoM's <code>southbrook_lead_time_extra</code> didn't update."</strong></p>
+<p>The compute depends on <code>product_template_attribute_value_ids</code> of
+the BoM's variant. If your new attribute hasn't been applied to
+any existing variant, no existing BoM's compute fires. Create or
+configure a sale order line that picks the new value — the variant
+gets created and the BoM reads the bump.</p>
+<p><strong>"Two BoM lines have the same product and same quantity, but only
+one fires at MO creation."</strong></p>
+<p><code>config_set_id</code> filtering. One line has a config set that matches
+your attribute combo; the other has a set that doesn't. Open both
+lines, inspect <code>config_set_id</code> and its <code>value_ids</code>.</p>
+<p><strong>"<code>_compute_panel_dimensions</code> returned <code>door = None</code> for a
+configured 1-door base. Where's the bug?"</strong></p>
+<p>Check the family argument. If <code>family='base'</code> and <code>door_count=1</code>,
+the door dict should be populated. If <code>door_count=0</code> (a drawer
+bank), the door is None and <code>drawer_count</code> is repurposed. Likely
+the caller passed <code>door_count=0</code> by mistake — check
+<code>sale.order.line</code> or <code>product.config.line</code> for how it derived
+<code>door_count</code> from the variant's attribute.</p>
+<p><strong>"ECO activated but BoM's <code>southbrook_version</code> didn't bump."</strong></p>
+<p>The version bump happens inside the ECO workflow, not the BoM
+form. Open the ECO, walk through its state transitions — the
+<code>southbrook.eco</code> state machine writes both the new BoM's version
+and archives the old. If the ECO is stuck in <code>draft</code>, no bump
+happens.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The BoM-side of the platform is <strong>three addons cooperating</strong>:</p>
+<ol>
+<li><code>southbrook_estimating</code> defines the base methods (<code>_get_cut_constants</code>, <code>_compute_panel_dimensions</code>, <code>_compute_edge_banding_length</code>) and the lead-time fields.</li>
+<li><code>southbrook_plm</code> overrides <code>_get_cut_constants</code> to read from active cut spec, and adds the ECO history fields.</li>
+<li><code>product_configurator_mrp</code> (OCA) adds the <code>config_ok</code> flag and the line-level <code>config_set_id</code> gating.</li>
+</ol>
+<p>The cut constants are read <strong>at call time</strong> via the seam — there's
+no startup cache, no module reload required to pick up an ECO. The
+ORM cache invalidates the active cut spec when an ECO writes it,
+and the next <code>_get_cut_constants</code> call sees the new values.</p>
+<p>The cutlist generator (lesson 15.7) is the biggest consumer. When
+<code>sb.production.package.generate_from_mo()</code> runs, it calls
+<code>panel_cut_list(...)</code> which calls <code>_compute_panel_dimensions(...)</code>
+which calls <code>_get_cut_constants()</code>. So the chain ECO → cut spec
+record → BoM math → cutlist lines is one connected pipeline.</p>
+<p>Lead-time computes use Odoo's standard <code>@api.depends</code> mechanism —
+any write to <code>product.attribute.value.lead_time_extra</code> invalidates
+the dependent BoM computes for variants using that value, on the
+next read.</p>
+<p><strong>Phase 1 limitations</strong> (documented in source comments):
+- <code>TOEKICK_H</code> declared but not consumed (toe-kick is integrated
+  into side panels by the cutlist contract — see lesson 15.7).
+- <code>_compute_edge_banding_length</code> doesn't route through the seam.
+- Cut-list lines are computed in-memory, not persisted as
+  <code>mrp.bom.line</code> rows. The Accucutt bridge (Phase 4) is where
+  persistence happens.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A customer adds a base 1-door cabinet (produce_delay = 14
+days) and picks "Maple Box Material" (lead_time_extra = 14). The
+order also has a stock 30-day shelving line. What ETA does the
+website show?</p>
+<blockquote>
+<p>ETA is taken as MAX across lines. The cabinet's
+<code>effective_produce_delay = 14 + 14 = 28</code>. The shelving line has
+<code>effective_produce_delay = 30</code>. Order ETA = 30 days. The
+customer sees the shelving lead time, but the cabinet's 28 days
+is the bottleneck if shelving is from stock.</p>
+</blockquote>
+<p><strong>2.</strong> A PLM engineer authors a new cut spec with <code>box_th = 18</code>
+(up from 15.875). They activate it. Walk through what changes
+for an MO created tomorrow.</p>
+<blockquote>
+<p>Tomorrow's MO calls <code>sb.production.package.generate_from_mo()</code>,
+which calls <code>_compute_panel_dimensions()</code>, which calls
+<code>_get_cut_constants()</code>. The PLM override resolves the active
+cut spec, returns <code>box_th=18</code>. The cutlist's <code>side_L</code>, <code>top</code>,
+<code>bottom</code>, <code>shelf</code> all use 18mm thickness instead of 15.875.
+<code>inside_width = W − 36</code> instead of <code>W − 31.75</code>. <strong>GOTCHA:</strong>
+<code>_compute_edge_banding_length</code> still uses module-level
+<code>BOX_TH=15.875</code> — known bug; edge banding will be slightly off
+for this MO. File a ticket.</p>
+</blockquote>
+<p><strong>3.</strong> Developer asks "why isn't my new attribute's lead-time bump
+showing on the BoM?" You check
+<code>product.attribute.value.lead_time_extra</code> and it's set to 7. The
+BoM's <code>southbrook_lead_time_extra</code> is still 0.</p>
+<blockquote>
+<p>The BoM's variant likely doesn't include the new attribute
+value. The compute depends on
+<code>product_id.product_template_attribute_value_ids.product_attribute_value_id.lead_time_extra</code>.
+If the variant was created BEFORE the new attribute was added,
+Odoo doesn't retroactively add it. Either configure a new
+variant via the configurator that picks the value, or rebuild
+the variant set.</p>
+</blockquote>
+<p><strong>4.</strong> Two BoM lines have the same product and config_set_id.
+One has <code>value_ids = [maple_box]</code>, the other <code>value_ids =
+[white_melamine_box]</code>. The customer configures a variant with
+melamine. Which line fires?</p>
+<blockquote>
+<p>Only the white-melamine-box line fires. The configurator wizard
+evaluates each line's <code>config_set_id.value_ids</code> against the
+variant's attribute values. The maple-box set doesn't match →
+that line is skipped. No Python inflates lines; it's pure
+declarative gating.</p>
+</blockquote>
+<p><strong>5.</strong> A test asserts toe-kick is NEVER emitted as a separate
+cutlist line. Why is this a contract, and how is it enforced in
+code?</p>
+<blockquote>
+<p>Toe-kick is INTEGRATED INTO THE SIDE PANELS by Southbrook's
+shop convention — the bottom of each side panel includes the
+toe-kick height. This is enforced at three layers:
+(a) <code>_compute_panel_dimensions()</code> returns no separate toe-kick
+key; (b) <code>sb.cutlist.generate_lines_from_panel_dict()</code> has a
+hardcoded <code>keys_to_emit</code> tuple that omits 'toe_kick' even if
+someone adds it to the dict; (c) the test
+<code>test_toe_kick_never_emitted_as_line</code> asserts the absence. The
+<code>TOEKICK_H</code> constant exists so future refactors that want to
+separate toe-kick from side panels have a defined value, but
+no current code path emits it.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>MO-side fields (Kitchen tab, Intelligence tab) → lesson 15.2.</li>
+<li>Workorder-side fields (variance, tool readiness, downtime) → lesson 15.3.</li>
+<li>Workcenter form + alternative chain → lesson 15.5.</li>
+<li>MO Kanban + search filters → lesson 15.6.</li>
+<li>Cutlist + hardware + production package model → lesson 15.7.</li>
+<li>The cut spec authoring workflow (PLM side) → Course 4 lesson 4.2.</li>
+<li>ECO state machine → Course 4 lesson 4.1.</li>
+<li>Operator reading a cut spec → Course 1 lesson 1.7.</li>
+<li>Native Odoo BoM creation → Odoo native training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_15_workcenter_mfg_surface" model="slide.slide">
+            <field name="name">Workcenter on the Manufacturing Surface — Form, Alternatives, Operation Templates, Load</field>
+            <field name="channel_id" ref="course_manufacturing_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Production Manager + Developer maintaining workcenter configuration.</field>
+            <field name="html_content"><![CDATA[<h1 id="workcenter-on-the-manufacturing-surface-form-alternatives-operation-templates-load">Workcenter on the Manufacturing Surface — Form, Alternatives, Operation Templates, Load</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the production manager (or the developer who supports them)
+maintaining the workcenter configuration on the Manufacturing surface.
+Course 1 lesson 1.1 introduced the 14 seeded workcenters; this lesson
+goes deeper on what the <strong>workcenter form view itself</strong> carries — the
+notebook page added by <code>southbrook_mrp_kitchen_workcenters</code>, the four
+non-stored KPI tiles added by <code>southbrook_mrp_pm</code>, the MI chip
+overlay, the tool-control fields, the alternative-workcenter chain
+(<code>alternative_workcenter_ids</code> for CNC swap), how operation templates
+attach to BoM routings, and the capacity pivot you use to plan the
+next 5 days.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>/odoo/manufacturing → Configuration → Work Centers → <station></strong></p>
+</blockquote>
+<p>This is the canonical workcenter form. Don't confuse it with the
+<strong>shop-floor view</strong> that the operator uses (touch buttons, big
+queue) — the shop-floor view reads the same workcenter record but
+renders a different OWL component.</p>
+<p>Also relevant:</p>
+<blockquote>
+<p><strong>Southbrook PM → Dashboard</strong> — workcenter kanban, KPI tiles
+<strong>Southbrook PM → Floor Load</strong> — same workcenter list, planner framing
+<strong>Southbrook PM → Capacity</strong> — pivot + graph on <code>mrp.workorder</code>
+<strong>Manufacturing → Configuration → Southbrook Kitchen → Kitchen Operation Templates</strong> — 15 seeded templates</p>
+</blockquote>
+<h2 id="what-your-screen-shows-the-workcenter-form">What your screen shows — the workcenter form</h2>
+<p>Native Odoo gives you Name, Code, Working Hours, Time Efficiency,
+Costs/Hour, OEE Target, Alternative Workcenters, Equipment, Maintenance
+sub-tabs. Southbrook layers in:</p>
+<h3 id="kitchen-configuration-notebook-page-kitchen_workcenters">Kitchen Configuration notebook page (kitchen_workcenters)</h3>
+<p>Added by <code>view_mrp_workcenter_view_inherit_kitchen</code> (file:
+<code>southbrook_mrp_kitchen_workcenters/views/mrp_workcenter_views.xml</code>).
+Tab name <code>sbk_kitchen</code>. Four groups:</p>
+<p><strong>Identity + Capability:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Station Type</td>
+<td><code>x_sbk_station_type</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Selection (14 values)</td>
+<td>engineering / cutting / cnc / edge_banding / drilling / sanding / finishing / countertop / assembly / hardware / quality / packing / subcontract / other</td>
+</tr>
+<tr>
+<td>Machine Brand</td>
+<td><code>x_sbk_machine_brand</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Char</td>
+<td>"SCM" / "Biesse" / "Holz-Her" / "Felder" / "Festool"</td>
+</tr>
+<tr>
+<td>Machine Code</td>
+<td><code>x_sbk_machine_code</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Char</td>
+<td>Vendor model number (e.g. "SCM Olimpic K560")</td>
+</tr>
+<tr>
+<td>Active for Kitchen</td>
+<td><code>x_sbk_active_for_kitchen</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Boolean (default True)</td>
+<td>Hides from kitchen menus without deactivating in core MRP</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Constraint Posture:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Is Bottleneck</td>
+<td><code>x_sbk_is_bottleneck</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Boolean</td>
+<td>ToC configuration flag (distinct from MO-live <code>x_mi_bottleneck_workcenter_id</code>)</td>
+</tr>
+<tr>
+<td>Allows Parallel Jobs</td>
+<td><code>x_sbk_allows_parallel_jobs</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Boolean</td>
+<td>True for stations that can run multiple WOs concurrently</td>
+</tr>
+<tr>
+<td>OEE Target</td>
+<td><code>x_sbk_oee_target</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Float (default 0.85), widget=percentage</td>
+<td>KPI tile benchmark</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Capacity Envelope:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Max Panel Length (mm)</td>
+<td><code>x_sbk_max_panel_length_mm</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Float</td>
+<td>In-feed length limit</td>
+</tr>
+<tr>
+<td>Max Panel Width (mm)</td>
+<td><code>x_sbk_max_panel_width_mm</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Float</td>
+<td>In-feed width limit</td>
+</tr>
+<tr>
+<td>Default Setup Time (min)</td>
+<td><code>x_sbk_default_setup_time_min</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Float</td>
+<td>Per-WO setup minutes; templates override</td>
+</tr>
+<tr>
+<td>Changeover Time (min)</td>
+<td><code>x_sbk_changeover_time_min</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>Float</td>
+<td>Material/finish/tool swap minutes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Capability Sets</strong> (many2many_tags widget):</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Target</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Supported Materials</td>
+<td><code>x_sbk_supported_material_ids</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>M2M → <code>southbrook.kitchen.material</code></td>
+<td>Op templates gate routing against this</td>
+</tr>
+<tr>
+<td>Supported Finishes</td>
+<td><code>x_sbk_supported_finish_ids</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>M2M → <code>southbrook.kitchen.finish</code></td>
+<td>Finish gating</td>
+</tr>
+<tr>
+<td>Required Skills</td>
+<td><code>x_sbk_required_skill_ids</code> (<code>mrp.workcenter</code>, kitchen_workcenters)</td>
+<td>M2M → <code>hr.skill</code></td>
+<td>Operator-skill cross-reference</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Notes blocks</strong> (3 free-text fields, nolabel):
+- <code>x_sbk_planning_notes</code> — scheduler-facing
+- <code>x_sbk_shop_floor_notes</code> — operator-facing (renders on traveler)
+- <code>x_sbk_quality_notes</code> — QC-facing; wired to mi.check</p>
+<h3 id="tool-control-fields-kitchen_tools-smart-buttons-inline">Tool Control fields (kitchen_tools, smart buttons / inline)</h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tool Requirements</td>
+<td><code>southbrook_tool_requirement_ids</code> (<code>mrp.workcenter</code>, tools)</td>
+<td>O2M → <code>southbrook.workcenter.tool.requirement</code></td>
+<td>Required tools at the WC</td>
+</tr>
+<tr>
+<td>Tool Requirement Count</td>
+<td><code>southbrook_tool_requirement_count</code> (<code>mrp.workcenter</code>, tools)</td>
+<td>Integer, compute</td>
+<td>Smart button count</td>
+</tr>
+<tr>
+<td>Tool Cribs</td>
+<td><code>southbrook_tool_crib_ids</code> (<code>mrp.workcenter</code>, tools)</td>
+<td>M2M → <code>southbrook.tool.crib</code> (rel <code>southbrook_tool_crib_wc_rel</code>)</td>
+<td>Cribs serving this WC</td>
+</tr>
+<tr>
+<td>Tool Assets</td>
+<td><code>southbrook_tool_asset_ids</code> (<code>mrp.workcenter</code>, tools)</td>
+<td>O2M → <code>southbrook.tool.asset</code></td>
+<td>Asset back-refs</td>
+</tr>
+<tr>
+<td>Tool Asset Count</td>
+<td><code>southbrook_tool_asset_count</code> (<code>mrp.workcenter</code>, tools)</td>
+<td>Integer, compute</td>
+<td>Smart button count</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pm-kpi-tiles-mrp_pm-only-shown-on-the-dashboard-kanban">PM KPI tiles (mrp_pm — only shown on the dashboard kanban)</h3>
+<p>These four are non-stored Integer computes (deps_context <code>uid</code>), so
+they recompute on every page-load. They don't show on the form by
+default — they're for the <strong>Southbrook PM Dashboard</strong> kanban cards.</p>
+<table>
+<thead>
+<tr>
+<th>Tile</th>
+<th>Field (model.field, owner)</th>
+<th>Source query</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>In-flight WOs</td>
+<td><code>southbrook_pm_inflight_count</code> (<code>mrp.workcenter</code>, mrp_pm)</td>
+<td><code>mrp.workorder</code> where state in (pending, waiting, ready, progress) and <code>workcenter_id == self.id</code></td>
+</tr>
+<tr>
+<td>Done Today</td>
+<td><code>southbrook_pm_throughput_today</code> (<code>mrp.workcenter</code>, mrp_pm)</td>
+<td><code>mrp.workorder</code> state=done AND date_finished ≥ today 00:00</td>
+</tr>
+<tr>
+<td>Late MOs</td>
+<td><code>southbrook_pm_late_count</code> (<code>mrp.workcenter</code>, mrp_pm)</td>
+<td><code>mrp.production</code> not done/cancel, date_deadline &lt; now, WO touches this WC</td>
+</tr>
+<tr>
+<td>Equipment Alerts</td>
+<td><code>southbrook_pm_equipment_alerts</code> (<code>mrp.workcenter</code>, mrp_pm)</td>
+<td><code>maintenance.equipment</code> where <code>southbrook_condition</code> in (fair, watch, critical, offline)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mi-chips-manufacturing_intelligence-overlay">MI chips (manufacturing_intelligence overlay)</h3>
+<p>Two more non-stored Integers added by MI, NOT shown on the form but
+shown as chips on the dashboard kanban:</p>
+<table>
+<thead>
+<tr>
+<th>Field (model.field, owner)</th>
+<th>Type</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>x_mi_workcenter_blocker_count</code> (<code>mrp.workcenter</code>, MI)</td>
+<td>Integer, NOT stored</td>
+<td>MOs not done/cancel touching WC with <code>x_mi_blocker_count &gt; 0</code></td>
+</tr>
+<tr>
+<td><code>x_mi_workcenter_warning_count</code> (<code>mrp.workcenter</code>, MI)</td>
+<td>Integer, NOT stored</td>
+<td>Sum of <code>x_mi_warning_count</code> on those MOs</td>
+</tr>
+</tbody>
+</table>
+<p>A code-comment warns: "do NOT add store=True (would deadlock the MO
+save path)" — the MO save touches MI counts, which would touch the
+workcenter, which would touch all MOs again.</p>
+<h2 id="the-alternative-workcenter-chain">The alternative-workcenter chain</h2>
+<p>Native Odoo gives <code>mrp.workcenter.alternative_workcenter_ids</code> (M2M to
+itself). Southbrook seeds the pairing <strong>at the operation-template
+level, not at the workcenter level</strong>.</p>
+<p>The only configured pair in
+<code>southbrook_mrp_kitchen_workcenters/data/mrp_workcenter_seed.xml</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Primary</th>
+<th>Backup</th>
+<th>Where wired</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SB-CNC-BORE</code> (xml_id <code>southbrook_mrp_pm.workcenter_cnc_bore</code>)</td>
+<td><code>CNC02</code> (xml_id <code>wc_cnc_router_02</code>)</td>
+<td>Reciprocal <code>alternative_workcenter_ids</code> on each</td>
+</tr>
+</tbody>
+</table>
+<p>The seed file sets the reciprocity convention: A lists B → B lists A.
+The test asserts the round-trip.</p>
+<p>For routing-time alternatives, the operation templates carry their
+own <code>alternative_workcenter_ids</code> M2M. Two templates use it:</p>
+<table>
+<thead>
+<tr>
+<th>Template code</th>
+<th>Default WC</th>
+<th>Alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CNC_ROUTING</code> (seq 40)</td>
+<td><code>SB-CNC-BORE</code></td>
+<td><code>wc_cnc_router_02</code> (= CNC02)</td>
+</tr>
+<tr>
+<td><code>DRILLING</code> (seq 60)</td>
+<td><code>SB-CNC-BORE</code></td>
+<td><code>wc_cnc_router_02</code> (= CNC02)</td>
+</tr>
+</tbody>
+</table>
+<p>The other 13 templates have no alternative — they're tied to one
+workcenter and if it goes down, MOs slip (lesson 2.3 covers the
+recovery options).</p>
+<p><strong>Why two layers?</strong> The workcenter-level pair is a <em>configuration</em>
+("these two stations are functionally equivalent"). The
+operation-template-level pair is a <em>routing decision</em> ("THIS step in
+the cabinet routing can run on either"). They're independent; you
+could have an alternative chain at the WC level that isn't used at
+template level.</p>
+<h2 id="the-operation-template-relationship">The operation-template relationship</h2>
+<p>Model <code>southbrook.kitchen.operation.template</code> (owned by
+<code>southbrook_mrp_kitchen_workcenters</code>). Full schema:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Char</td>
+<td>—</td>
+<td>Required, indexed, translate</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td>Char</td>
+<td>—</td>
+<td>Required, indexed, unique</td>
+</tr>
+<tr>
+<td><code>sequence</code></td>
+<td>Integer</td>
+<td>10</td>
+<td></td>
+</tr>
+<tr>
+<td><code>active</code></td>
+<td>Boolean</td>
+<td>True</td>
+<td></td>
+</tr>
+<tr>
+<td><code>operation_category</code></td>
+<td>Selection (14, same as STATION_TYPES)</td>
+<td>—</td>
+<td>Required, indexed</td>
+</tr>
+<tr>
+<td><code>default_workcenter_id</code></td>
+<td>M2O → <code>mrp.workcenter</code></td>
+<td>—</td>
+<td>Primary WC</td>
+</tr>
+<tr>
+<td><code>alternative_workcenter_ids</code></td>
+<td>M2M → <code>mrp.workcenter</code></td>
+<td>—</td>
+<td>Overflow targets</td>
+</tr>
+<tr>
+<td><code>default_setup_time_min</code></td>
+<td>Float</td>
+<td>0.0</td>
+<td></td>
+</tr>
+<tr>
+<td><code>default_changeover_time_min</code></td>
+<td>Float</td>
+<td>0.0</td>
+<td></td>
+</tr>
+<tr>
+<td><code>quantity_driver_type</code></td>
+<td>Selection (12: fixed / panel_count / sheet_count / edge_meters / surface_area_m2 / hole_count / hinge_count / drawer_count / hardware_count / cabinet_count / product_qty / custom)</td>
+<td>product_qty</td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>minutes_per_unit</code></td>
+<td>Float</td>
+<td>0.0</td>
+<td></td>
+</tr>
+<tr>
+<td><code>material_adjustment_factor</code></td>
+<td>Float</td>
+<td>1.0</td>
+<td>Must be &gt; 0</td>
+</tr>
+<tr>
+<td><code>finish_adjustment_factor</code></td>
+<td>Float</td>
+<td>1.0</td>
+<td>Must be &gt; 0</td>
+</tr>
+<tr>
+<td><code>complexity_factor</code></td>
+<td>Float</td>
+<td>1.0</td>
+<td>Must be &gt; 0</td>
+</tr>
+<tr>
+<td><code>required_skill_ids</code></td>
+<td>M2M → <code>hr.skill</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>supported_material_ids</code></td>
+<td>M2M → <code>southbrook.kitchen.material</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>supported_finish_ids</code></td>
+<td>M2M → <code>southbrook.kitchen.finish</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>requires_qc</code></td>
+<td>Boolean</td>
+<td>False</td>
+<td>Gates next op on mi.check record</td>
+</tr>
+<tr>
+<td><code>qc_checklist</code></td>
+<td>Text</td>
+<td>—</td>
+<td>Renders on traveler when requires_qc</td>
+</tr>
+<tr>
+<td><code>required_documents</code></td>
+<td>Text</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>shop_floor_instruction</code></td>
+<td>Text</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>creates_rework_allowed</code></td>
+<td>Boolean</td>
+<td>False</td>
+<td></td>
+</tr>
+<tr>
+<td><code>blocks_next_operation</code></td>
+<td>Boolean</td>
+<td>True</td>
+<td></td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td>Text</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The duration formula</strong> — <code>compute_expected_duration(driver_value,
+material_factor, finish_factor, complexity_factor, setup_time_min,
+changeover_time_min)</code>:</p>
+<pre><code>if fixed:
+    total = setup + changeover
+else:
+    total = setup + changeover
+          + driver_value * minutes_per_unit
+            * material_factor * finish_factor * complexity_factor
+return max(int(math.ceil(total)), 0)
+</code></pre>
+<p>All factor args fall back via <code>_safe_factor()</code> (None/0/negative →
+template default). Always rounded up via <code>math.ceil</code>. Constraints
+enforce non-negative times and strictly-positive factors.</p>
+<p><strong>The flow into workorders</strong>:</p>
+<ol>
+<li>BoM has a <code>mrp.routing.workcenter</code> row.</li>
+<li>The routing row carries <code>x_sbk_operation_template_id</code> (M2O →
+   operation template, added by kitchen_workcenters).</li>
+<li>At MO confirmation, native Odoo generates <code>mrp.workorder</code> rows
+   from the routing.</li>
+<li>The WO's <code>action_sbk_recalc_kitchen_duration</code> button calls
+   <code>template.compute_expected_duration(driver, material_factor,
+   finish_factor, complexity_factor=production_id.x_sbk_complexity_factor)</code>
+   and writes the result to <code>x_sbk_kitchen_expected_min</code>.</li>
+<li>From there, variance and cost (lesson 15.3) follow.</li>
+</ol>
+<p>Native <code>time_cycle</code> on the routing row stays untouched for A/B
+comparison.</p>
+<h2 id="the-capacity-report">The capacity report</h2>
+<p><code>southbrook_mrp_pm/views/pm_capacity.xml</code> defines <code>action_pm_capacity</code>
+on <code>mrp.workorder</code>, view_mode <code>pivot,graph,list,form</code>:</p>
+<ul>
+<li><strong>Pivot</strong> (<code>view_pm_capacity_pivot</code>): rows = <code>workcenter_id</code>,
+  columns = <code>date_start</code> (interval=day), measure = <code>duration_expected</code></li>
+<li><strong>Graph</strong> (<code>view_pm_capacity_graph</code>): bar chart, stacked,
+  <code>date_start × workcenter_id</code>, measure = <code>duration_expected</code></li>
+<li>Default domain: state in pending / waiting / ready / progress</li>
+<li>Context: <code>search_default_group_by_workcenter: 1</code></li>
+</ul>
+<p>Menu entry <code>menu_pm_capacity</code> under <code>menu_southbrook_pm_root</code>,
+sequence 7.</p>
+<p>A 480-min shift is the implicit ceiling per WC per day. There's no
+explicit "remaining hours" computed field yet (Phase 2 enhancement,
+flagged as TBD).</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. PM weekly setup (Monday morning, 20 min):</strong></p>
+<ul>
+<li><strong>Southbrook PM → Capacity</strong>, pivot view, time range = current
+  week. Look at the pivot row for each bottleneck WC. If any cell<blockquote>
+<p>480 min, that day is over-committed — push lower-priority MOs
+  to a quieter day.</p>
+</blockquote>
+</li>
+<li><strong>Southbrook PM → Dashboard</strong>, scan KPI tiles. Equipment Alerts<blockquote>
+<p>0 on a bottleneck = check the equipment record before any work
+  starts.</p>
+</blockquote>
+</li>
+<li>Open each workcenter you'll lean on this week. Read
+  <code>x_sbk_planning_notes</code> for the prior-week handoff.</li>
+</ul>
+<p><strong>2. WC config change (rare, ~monthly):</strong></p>
+<ul>
+<li>New machine arrives → add a workcenter, set
+  <code>x_sbk_station_type</code>, <code>x_sbk_machine_brand</code>, capability sets.</li>
+<li>Bottleneck flag change → update <code>x_sbk_is_bottleneck</code> ONLY after
+  a documented capacity analysis. This flag is a Theory-of-Constraints
+  call, not a "currently busy" signal. See lesson 2.3 for the
+  recovery story when you get it wrong.</li>
+<li>New alternative pair → update BOTH workcenter records'
+  <code>alternative_workcenter_ids</code> (Southbrook's reciprocity convention)
+  AND update any operation template that should fall back.</li>
+</ul>
+<p><strong>3. Op template change (when operator feedback says estimates are
+off):</strong></p>
+<ul>
+<li>Open <strong>Manufacturing → Configuration → Southbrook Kitchen → Kitchen
+  Operation Templates → <code></strong>.</li>
+<li>Adjust <code>minutes_per_unit</code> based on the actual variance data
+  (lesson 15.3 explains how to read variance).</li>
+<li>Save. New MOs created after the change pick up the new formula
+  automatically.</li>
+<li>For in-flight MOs, hit the <strong>Recalc All Workorder Durations</strong>
+  button on each affected MO (lesson 15.2) to re-derive expected
+  minutes.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I added a new workcenter but the dashboard tile doesn't show
+KPIs."</strong></p>
+<p>The four <code>southbrook_pm_*</code> fields are computes that depend on
+<code>uid</code> (page-load context), not on workcenter creation. The first
+page-load after the WC is added populates the tile. If still blank,
+check that the WC has <code>active=True</code> (the dashboard's domain
+filters <code>active=True</code>).</p>
+<p><strong>"I flipped <code>x_sbk_is_bottleneck = False</code> on SB-EDGE because we
+got a second bander, and now the planner is overloading both."</strong></p>
+<p>The flag is a Theory-of-Constraints structural decision — "never
+schedule more than this station can deliver." Flipping it False
+removes the planning safety rail. Recovery: flip it back to True.
+The right model for the second bander is ONE workcenter with
+<code>x_sbk_allows_parallel_jobs = True</code>, not two records with the
+bottleneck flag off.</p>
+<p><strong>"I changed an operation template's <code>minutes_per_unit</code> and the
+in-flight MOs didn't update."</strong></p>
+<p>Templates feed <code>x_sbk_kitchen_expected_min</code> ONLY when the recalc
+button fires. In-flight MOs keep their original estimates until you
+hit <strong>Recalc All Workorder Durations</strong> on the MO. New MOs after the
+template change pick up the new formula at confirmation time.</p>
+<p><strong>"<code>alternative_workcenter_ids</code> on SB-CNC-BORE shows CNC02 but
+CNC02's <code>alternative_workcenter_ids</code> is empty."</strong></p>
+<p>Reciprocity broke. The seed file sets both sides; if a manual edit
+removed one, the planner's reroute logic won't find the backup from
+CNC02's side. Re-add CNC02 → SB-CNC-BORE on CNC02's m2m. Test
+<code>test_m1_workcenter_fields.py</code> asserts the round-trip, so if
+you've broken it, the next CI run flags it.</p>
+<p><strong>"The Capacity pivot is empty for a workcenter that I know has
+work scheduled."</strong></p>
+<p>Domain filter is <code>state in pending / waiting / ready / progress</code>.
+Done or cancelled WOs don't show. Also, the <code>date_start</code> field
+must be populated — if your WOs are <code>confirmed</code> but unscheduled,
+they won't appear. Plan the MOs to populate <code>date_start</code>.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Workcenter is the <strong>fattest extension surface</strong> in the platform —
+35+ fields across four addons. Each addon writes to its own
+namespace (<code>x_sbk_*</code>, <code>southbrook_pm_*</code>, <code>southbrook_tool_*</code>,
+<code>x_mi_*</code>) so a <code>grep x_sbk_ addons/</code> immediately tells you which
+fields are owned by which addon.</p>
+<p>The KPI computes on <code>mrp.workcenter</code> are <strong>non-stored on purpose</strong>:
+storing them would mean every WO save, every equipment condition
+flip, every MO update triggers a write on the workcenter row, which
+in turn would cascade through other computes. Non-stored = read on
+demand; the underlying queries are cheap (one indexed FK lookup
+each).</p>
+<p>The operation-template formula is the only place math lives.
+Everything else (variance, cost, total minutes on the MO) is a
+downstream compute that depends on per-WO <code>x_sbk_kitchen_expected_min</code>.
+This is why one click on Recalc fans out cleanly: change the
+template, recalc the WO, the MO totals re-aggregate, the variance
+re-derives, the cost re-prices.</p>
+<p><strong>v19 gotcha</strong> — the operation template uses <code>_sql_constraints</code> for
+unique <code>name</code> and unique <code>code</code>. Per session memory, Odoo 19
+silently ignores legacy <code>_sql_constraints</code> lists; the constraints
+may not be reaching Postgres. There's a planned migration to
+<code>models.Constraint</code>. Until then, application-layer code is the
+guarantee — don't create two templates with the same code.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> SB-CNC-BORE goes down. The operator pages. You open the
+workcenter's <code>alternative_workcenter_ids</code> and see CNC02. Is that
+enough to reroute, or do you also need to check the operation
+template?</p>
+<blockquote>
+<p>Both. The workcenter pairing makes CNC02 a recognized
+alternative; the operation template's
+<code>alternative_workcenter_ids</code> controls whether the SPECIFIC
+routing step can run on CNC02. The CNC_ROUTING and DRILLING
+templates both list CNC02; other templates (e.g. HARDWARE_FITTING)
+don't, so those steps can't run on CNC02 even though the
+workcenters are paired. Check both layers before rerouting.</p>
+</blockquote>
+<p><strong>2.</strong> A developer asks "I want to add a 'noise level' field for
+ear-protection compliance. Where should it live and what prefix?"</p>
+<blockquote>
+<p><code>mrp.workcenter</code> is the right model. Prefix <code>x_sbk_*</code> (it's
+kitchen-shop config, not a PM KPI or MI metric). Add it to
+<code>southbrook_mrp_kitchen_workcenters/models/mrp_workcenter.py</code> as
+<code>x_sbk_noise_level_db</code> (Float). If it should drive UI behaviour
+(e.g. require a PPE check), wire it through the operation-template
+formula or a separate readiness gate — DON'T overload the
+existing tool readiness state machine.</p>
+</blockquote>
+<p><strong>3.</strong> The Capacity pivot shows SB-PAINT at 720 min on Thursday.
+A shift is 480 min. What does this mean and what do you do?</p>
+<blockquote>
+<p>The paint booth is over-committed by 240 min (4 hours).
+Since <code>x_sbk_allows_parallel_jobs = False</code> on PAINT (it can
+only spray one job at a time), you can't fix this by parallelism.
+Options: (a) overtime tonight or Wednesday, (b) push lowest-priority
+MO to Friday (look at the workorders touching PAINT on Thursday,
+sort by MO <code>x_sbk_priority_level</code>, shift the <code>low</code> ones),
+(c) subcontract door finishing for some MOs if a partner is
+approved. The MI engine will catch this and flag the affected
+MOs with a <code>capacity_blocker</code> if untouched.</p>
+</blockquote>
+<p><strong>4.</strong> You see the workcenter dashboard kanban tile for SB-EDGE
+with a red MI chip (<code>o_sb_mi_chip_blocker</code>) and the number 3.
+What's it telling you?</p>
+<blockquote>
+<p>3 MOs touch SB-EDGE that the MI engine has flagged with
+<code>x_mi_blocker_count &gt; 0</code>. Click the chip → opens the filtered MO
+list. Each MO's Intelligence tab will explain the specific
+blocker (most likely "panel exceeds max length", "edge band
+meters exceed capacity", or a material mismatch). The chip is
+from the <code>view_southbrook_pm_kanban_mi</code> view inheriting the PM
+dashboard kanban.</p>
+</blockquote>
+<p><strong>5.</strong> Operation template CARCASS_ASSEMBLY has
+<code>minutes_per_unit = 3.5</code> and <code>quantity_driver_type = panel_count</code>.
+A WO has 12 panels, complexity factor 1.0, no setup or changeover.
+What's the expected duration?</p>
+<blockquote>
+<p><code>total = 0 (setup) + 0 (changeover) + 12 (driver) * 3.5
+(min/unit) * 1.0 * 1.0 * 1.0 = 42 min</code>. Always rounded up by
+<code>math.ceil</code>, so 42 min exactly. If complexity factor were 1.2,
+total would be <code>12 * 3.5 * 1.2 = 50.4</code> rounded up to <strong>51 min</strong>.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>MO-side fields (Kitchen tab, Intelligence tab) → lesson 15.2.</li>
+<li>Workorder-side fields (variance, tool readiness, downtime) → lesson 15.3.</li>
+<li>BoM extensions + cut constants → lesson 15.4.</li>
+<li>MO Kanban + search filters → lesson 15.6.</li>
+<li>MO ↔ cutlist / hardware / production package → lesson 15.7.</li>
+<li>Workcenter orientation (the 14 seeded codes) → Course 1 lesson 1.1.</li>
+<li>Bottleneck-aware scheduling daily flow → Course 2 lesson 2.3.</li>
+<li>Native Odoo workcenter + routing → Odoo native training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_15_mo_views_kanbans" model="slide.slide">
+            <field name="name">MO Views, Kanbans, Search Filters — What&#x27;s Custom vs Native</field>
+            <field name="channel_id" ref="course_manufacturing_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Production Manager + Planner using the MO list/kanban every day.</field>
+            <field name="html_content"><![CDATA[<h1 id="mo-views-kanbans-search-filters-whats-custom-vs-native">MO Views, Kanbans, Search Filters — What's Custom vs Native</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You spend your day in the MO list, the workcenter kanban, the
+capacity pivot, or the Floor Manager portal. This lesson tells you
+which of those views are Southbrook-custom (and what to expect of
+them) vs native Odoo (where stock behaviour applies). The honest
+answer: <strong>Southbrook adds less than the brief suggests</strong> — there's
+no MO Kanban with state swimlanes, no Gantt, no color-coded due-date
+heatmap. What IS there is a workcenter kanban with KPI tiles, an MI
+chip overlay, an MO Intelligence notebook page, an MI checks list,
+and a capacity pivot/graph. This lesson maps the whole surface so
+you stop hunting for views that don't exist.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Southbrook PM → Dashboard</strong> — <code>mrp.workcenter</code> kanban with KPI tiles
+<strong>Southbrook PM → Ready Queue / In Production / Late</strong> — <code>mrp.production</code> filtered lists
+<strong>Southbrook PM → Family Throughput</strong> — <code>southbrook.cabinet.family</code> kanban
+<strong>Southbrook PM → Capacity</strong> — <code>mrp.workorder</code> pivot + graph
+<strong>Southbrook PM → MI Checks</strong> — <code>southbrook.mi.check</code> list (default filters: blockers + group-by-category)
+<strong>Southbrook PM → MI Packages</strong> — <code>sb.production.package</code> list
+<strong>/my/southbrook/floor</strong> — Floor Manager portal (separate from Odoo backend, tablet-styled)
+<strong>/odoo/manufacturing → Manufacturing Orders</strong> — native MO list (Southbrook adds 4 columns)</p>
+</blockquote>
+<h2 id="what-your-screen-shows-view-by-view-inventory">What your screen shows — view-by-view inventory</h2>
+<h3 id="1-southbrook-pm-dashboard-kanban-the-workcenter-kanban">1. Southbrook PM Dashboard kanban (the workcenter kanban)</h3>
+<p><strong>Owner</strong>: <code>southbrook_mrp_pm</code> (<code>view_southbrook_pm_kanban</code> in
+<code>pm_dashboard.xml</code>).
+<strong>Model</strong>: <code>mrp.workcenter</code>.
+<strong>Default group-by</strong>: <code>active</code> (so on/off workcenters split).
+<strong>Domain</strong>: <code>active = True</code> from the action.
+<strong>What each card shows</strong>:
+- Workcenter name + code
+- <code>southbrook_pm_inflight_count</code> (In-flight WOs — pending/waiting/ready/progress)
+- <code>southbrook_pm_throughput_today</code> (Done Today)
+- <code>southbrook_pm_late_count</code> (Late MOs)
+- <code>southbrook_pm_equipment_alerts</code> (Equipment Alerts)
+- OEE % footer (from <code>oee_target</code>)</p>
+<p><strong>MI overlay</strong>: <code>view_southbrook_pm_kanban_mi</code> (in
+<code>southbrook_manufacturing_intelligence/views/pm_kanban_inherit.xml</code>)
+inherits the above and injects chips:
+- <code>&lt;t t-if="x_mi_workcenter_blocker_count"&gt;</code> → red chip
+  (<code>o_sb_mi_chip_blocker</code>), shows blocker count
+- <code>&lt;t t-elif="x_mi_workcenter_warning_count"&gt;</code> → amber chip
+  (<code>o_sb_mi_chip_warning</code>), shows warning count
+- <code>&lt;t t-else&gt;</code> → clear chip (<code>o_sb_mi_chip_clear</code>)</p>
+<p>The CSS lives in <code>southbrook_mrp_pm/static/src/scss/dashboard.scss</code>
+(backend bundle). The chip is what tells you at a glance which
+workcenter has an MI-flagged MO running through it.</p>
+<h3 id="2-family-throughput-kanban">2. Family Throughput kanban</h3>
+<p><strong>Owner</strong>: <code>southbrook_mrp_pm</code>.
+<strong>Model</strong>: <code>southbrook.cabinet.family</code>.
+<strong>What each card shows</strong>: family name, late count footer.
+No decoration; plain card. Useful for the manager who plans by
+product family rather than workcenter.</p>
+<h3 id="3-capacity-pivot-graph">3. Capacity pivot + graph</h3>
+<p><strong>Owner</strong>: <code>southbrook_mrp_pm</code> (<code>view_pm_capacity_pivot</code>,
+<code>view_pm_capacity_graph</code> in <code>pm_capacity.xml</code>).
+<strong>Model</strong>: <code>mrp.workorder</code>.
+<strong>Pivot</strong>: rows = <code>workcenter_id</code>, columns = <code>date_start</code>
+(interval=day), measure = <code>duration_expected</code>.
+<strong>Graph</strong>: bar, stacked, <code>date_start × workcenter_id</code>, measure
+<code>duration_expected</code>.
+<strong>Default domain</strong>: state in pending / waiting / ready / progress
+<strong>Context</strong>: <code>search_default_group_by_workcenter: 1</code>
+<strong>No custom search filter</strong>.</p>
+<p>Look at this view weekly. Anything above 480 min (1 shift) per WC
+per day is over-committed. Anything above 720 min (1.5 shifts) is
+in over-time territory.</p>
+<h3 id="4-ready-queue-in-production-late-lists">4. Ready Queue / In Production / Late lists</h3>
+<p><strong>Owner</strong>: <code>southbrook_mrp_pm</code>. All three actions target
+<code>mrp.production</code> with different domains and the native list view
+(no Southbrook list inherit on those actions specifically):</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Domain</th>
+<th>Context</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>action_pm_ready_queue</code></td>
+<td><code>state in ('confirmed', 'progress')</code></td>
+<td><code>search_default_group_by_state: 1</code></td>
+</tr>
+<tr>
+<td><code>action_pm_in_production</code></td>
+<td><code>state = 'progress'</code></td>
+<td>(none)</td>
+</tr>
+<tr>
+<td><code>action_pm_late</code></td>
+<td><code>state not in ('done', 'cancel') AND date_deadline &lt; now</code></td>
+<td>(none) — domain uses <code>time.strftime</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note on the Late action</strong>: the domain evaluates
+<code>time.strftime('%Y-%m-%d %H:%M:%S')</code> at action-load time. If you've
+had Odoo running for a week without restart, the <code>now</code> cutoff
+<strong>still updates correctly</strong> because the domain string is re-eval'd
+on every action open — but this is a subtle Odoo behaviour to know.</p>
+<h3 id="5-mo-list-column-extensions">5. MO list — column extensions</h3>
+<p><strong>Owner</strong>: <code>southbrook_mrp_kitchen_workcenters</code>
+(<code>view_mrp_production_tree_sbk_kitchen</code>).
+<strong>Inherits</strong>: <code>mrp.mrp_production_tree_view</code>.
+<strong>Columns added</strong>:
+- Install Due Date (<code>x_sbk_install_due_date</code>)
+- Kitchen Project (<code>x_sbk_kitchen_project_id</code>)
+- Cabinet Code (<code>x_sbk_cabinet_code</code>)
+- Priority Level (<code>x_sbk_priority_level</code>)</p>
+<p><strong>No decoration rules</strong>. The list doesn't colour rows red for late,
+amber for at-risk, or green for on-track. Visual urgency is on YOU
+to interpret. (If you want decoration, file a ticket — it's a
+~10-line view inherit.)</p>
+<h3 id="6-mo-form-notebook-pages">6. MO form — notebook pages</h3>
+<p>Covered in detail in lesson 15.2. Summary:
+- <strong>Kitchen tab</strong> (<code>view_mrp_production_form_sbk_kitchen</code>) — project
+  linkage, complexity, totals.
+- <strong>Intelligence tab</strong> (<code>view_mrp_production_form_mi</code>) — MI badge,
+  checks list, recompute button.</p>
+<h3 id="7-mi-checks-list">7. MI Checks list</h3>
+<p><strong>Owner</strong>: <code>southbrook_manufacturing_intelligence</code>
+(<code>view_southbrook_mi_check_list</code>, <code>view_southbrook_mi_check_search</code>
+in <code>manager_dashboard_views.xml</code>).
+<strong>Model</strong>: <code>southbrook.mi.check</code>.
+<strong>Decoration</strong>:
+- <code>decoration-warning</code> when <code>severity == 'warning'</code>
+- <code>decoration-danger</code> when <code>severity == 'blocker'</code>
+- <code>decoration-info</code> when <code>severity == 'info'</code></p>
+<p><strong>Search filters</strong> (this is the ONE place rich search lives):</p>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Domain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Blockers</td>
+<td><code>severity = 'blocker'</code></td>
+</tr>
+<tr>
+<td>Warnings</td>
+<td><code>severity = 'warning'</code></td>
+</tr>
+<tr>
+<td>Category: Cut</td>
+<td><code>category = 'cut'</code></td>
+</tr>
+<tr>
+<td>Category: Production</td>
+<td><code>category = 'production'</code></td>
+</tr>
+<tr>
+<td>Category: Assembly</td>
+<td><code>category = 'assembly'</code></td>
+</tr>
+<tr>
+<td>Category: Install</td>
+<td><code>category = 'install'</code></td>
+</tr>
+<tr>
+<td>Group by Category</td>
+<td>group_by <code>category</code></td>
+</tr>
+<tr>
+<td>Group by Severity</td>
+<td>group_by <code>severity</code></td>
+</tr>
+<tr>
+<td>Group by Package</td>
+<td>group_by <code>production_package_id</code></td>
+</tr>
+</tbody>
+</table>
+<p>Default-filter is <code>blockers</code>; default group-by is <code>category</code>. So the
+first thing you see is the blocker count grouped by where in the
+flow it's hurting (cut, production, assembly, install).</p>
+<h3 id="8-mi-packages-list">8. MI Packages list</h3>
+<p><strong>Owner</strong>: <code>southbrook_manufacturing_intelligence</code>
+(<code>view_southbrook_mi_package_list</code>).
+<strong>Model</strong>: <code>sb.production.package</code>.
+<strong>Decoration</strong>:
+- <code>decoration-success</code> when <code>x_mi_status == 'ok'</code>
+- <code>decoration-warning</code> when <code>x_mi_status == 'review'</code>
+- <code>decoration-danger</code> when <code>x_mi_status == 'blocked'</code></p>
+<p>This is the green/amber/red list. The production package is the
+per-MO bundle (lesson 15.7) so seeing it red means the MO can't
+ship.</p>
+<h3 id="9-floor-manager-portal">9. Floor Manager portal</h3>
+<p><strong>Owner</strong>: <code>southbrook_mrp_pm</code>.
+<strong>Routes</strong>: <code>/my/southbrook/floor</code> and <code>/my/southbrook/floor/&lt;wc_id&gt;</code>
+(views in <code>views/floor_template.xml</code>).
+<strong>Bundle</strong>: <code>southbrook_mrp_pm/static/src/scss/floor.scss</code> (frontend
+asset bundle, touch-friendly).
+<strong>Audience</strong>: <code>group_floor_manager</code> (portal users with the Floor
+Manager group). Members can see their station's WO queue, start/finish
+WOs, and toggle equipment condition.</p>
+<p>This is the only <strong>mobile / tablet</strong> surface in the stack. Native
+Odoo doesn't render an MO Kanban for tablet; this fills the gap for
+the floor-walking manager.</p>
+<h2 id="whats-not-there-and-why-it-matters">What's NOT there (and why it matters)</h2>
+<p>These features are referenced in old briefs but DO NOT exist in
+code as of this writing:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+<th>What you do instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MO Kanban with state swimlanes</td>
+<td><strong>Not implemented</strong></td>
+<td>Use Ready Queue / In Production / Late actions; each is a filtered list grouped by state</td>
+</tr>
+<tr>
+<td>MO Gantt chart</td>
+<td><strong>Not implemented</strong></td>
+<td>Capacity pivot is the closest analogue (workorder-level, not MO-level)</td>
+</tr>
+<tr>
+<td>MO Calendar view</td>
+<td><strong>Not implemented</strong></td>
+<td>Native Odoo MO calendar works on <code>date_planned_start</code> — no Southbrook customization</td>
+</tr>
+<tr>
+<td>Color rules on MO list (overdue=red, etc.)</td>
+<td><strong>Not implemented</strong></td>
+<td>Decoration only on MI Checks + MI Packages lists</td>
+</tr>
+<tr>
+<td>Search filter for station_type</td>
+<td><strong>Not implemented</strong> on MO; only on workcenter list (group-by Station Type)</td>
+<td></td>
+</tr>
+<tr>
+<td>Search filter for bottleneck workcenter</td>
+<td><strong>Not implemented</strong></td>
+<td><code>x_mi_bottleneck_workcenter_id</code> is reserved on <code>mrp.production</code> but engine doesn't write it yet</td>
+</tr>
+<tr>
+<td>Search filter for MI status</td>
+<td><strong>Not exposed</strong> on MO list; you can filter the MO list by typing <code>x_mi_status:blocked</code> in the global search, but no saved filter exists</td>
+<td></td>
+</tr>
+<tr>
+<td>Per-workcenter MO drill-down</td>
+<td><strong>Partial</strong></td>
+<td>Click into a workcenter on the dashboard → opens its Equipment / Tool sub-views; for the MOs touching that WC, use Capacity pivot grouped by workcenter</td>
+</tr>
+<tr>
+<td>Mobile breakpoint on backend</td>
+<td><strong>Not implemented</strong></td>
+<td>Backend is desktop-only; Floor Manager portal is the tablet path</td>
+</tr>
+</tbody>
+</table>
+<p>If a feature you need is in this "not there" list, the realistic
+options are: (a) file a ticket; (b) use a saved search you create
+yourself in the global search box; (c) write a small view inherit
+yourself (Odoo studio works for non-developers for trivial cases).</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Manager morning (10 min):</strong></p>
+<ul>
+<li><strong>Southbrook PM → Dashboard</strong>. Scan the workcenter kanban for
+  red MI chips (<code>o_sb_mi_chip_blocker</code>) and high Late MO counts.
+  This is the fastest "where's the fire" read.</li>
+<li>Click the red chip on a workcenter → filters to MOs with blockers
+  at that workcenter. Open each one, read the Intelligence tab,
+  decide release vs hold.</li>
+<li><strong>Southbrook PM → MI Checks</strong> (default-filtered blockers,
+  grouped by category). Cross-check the dashboard with the
+  check-level view to make sure you haven't missed a category.</li>
+</ul>
+<p><strong>2. Mid-day planning (10 min):</strong></p>
+<ul>
+<li><strong>Southbrook PM → Capacity</strong> pivot, range = next 5 days. If
+  any workcenter × day cell &gt; 480 min, that day is over-committed.
+  Right-click → pivot drill-down to see which MOs are loading it.</li>
+<li><strong>Southbrook PM → Late Orders</strong>. Should be 0 most days.
+  Anything here means a deadline has already passed; either reset
+  the deadline (with chatter note explaining why) or expedite the
+  MO.</li>
+</ul>
+<p><strong>3. End of day (5 min):</strong></p>
+<ul>
+<li><strong>Southbrook PM → MI Packages</strong>. Anything decorated red
+  (<code>decoration-danger</code>, <code>x_mi_status='blocked'</code>) is tomorrow's
+  problem. Make sure the right person is paged before you leave.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The Ready Queue list shows nothing but I just confirmed 5
+MOs."</strong></p>
+<p>The action's domain is <code>state in ('confirmed', 'progress')</code>. If
+your MOs jumped straight to <code>done</code> (because they had no work to
+do — fully stocked, no routing), they won't appear. Check the MO's
+state in the global MO list.</p>
+<p><strong>"The MI Checks list is empty for an MO I know has blockers."</strong></p>
+<p>The MI Checks list is a flat view of all checks across all MOs. If
+one MO's checks aren't showing, either (a) the MI engine hasn't
+been run since the issue arose — hit Recompute on the MO; (b) the
+default filter <code>blockers</code> is hiding warnings — clear the filter to
+see all severities.</p>
+<p><strong>"I want to filter MOs by Kitchen Project but the search doesn't
+show that field."</strong></p>
+<p>The search-filter inherit for the MO list doesn't expose Kitchen
+Project. Workaround: open the Kitchen Project record
+(<code>sb.kitchen.project</code>), use its smart button to navigate to its
+MOs. Or build your own saved filter with domain
+<code>[('x_sbk_kitchen_project_id', '=', &lt;id&gt;)]</code>.</p>
+<p><strong>"The Capacity pivot shows an empty cell but I scheduled the WO
+for that day."</strong></p>
+<p>The pivot's row dimension is <code>date_start</code> on the workorder. If
+<code>date_start</code> is empty (the MO is <code>confirmed</code> but unscheduled), the
+WO doesn't appear in any cell. Plan the MO to populate <code>date_start</code>.</p>
+<p><strong>"The Floor Manager portal shows 0 WOs but the operator says
+they have 8."</strong></p>
+<p>The portal scopes by <code>group_floor_manager</code> membership. The
+operator and the floor manager are different people. If the
+<strong>manager</strong> isn't in the right group, the portal returns empty.
+Check <code>res.users → group_ids</code> on the manager account.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The Southbrook view surface is sparser than the brief implies
+because Odoo native MO views are already capable for most planner
+needs. The Southbrook value-add is:</p>
+<ol>
+<li><strong>The MI overlay</strong> — chips on the workcenter kanban that surface
+   per-MO MI verdicts at the workcenter level. This is the
+   highest-density signal on the platform: one glance at the
+   dashboard tells you which stations have problems.</li>
+<li><strong>The Capacity pivot</strong> — turns workorder-level data into a
+   planner-readable shift-load matrix.</li>
+<li><strong>The MI Checks list</strong> — a flat, filterable view of every check
+   the engine has written, decorated by severity. Without this, the
+   manager would have to open each MO individually to see blockers.</li>
+<li><strong>The MO column extensions</strong> — install due, kitchen project,
+   cabinet code, priority — show on the native MO list without
+   needing a separate Southbrook list view.</li>
+<li><strong>The Floor Manager portal</strong> — the only tablet-friendly path.</li>
+</ol>
+<p>What ISN'T built (no MO swimlane Kanban, no Gantt, no calendar) is
+deliberate scope rather than oversight. Native Odoo Calendar +
+Gantt (Enterprise-only feature; we're on CE) cover those use cases
+on the OOTB MO model.</p>
+<p><strong>v19 cron behaviour</strong> — none of the Southbrook MO views run their
+own crons. The MI engine pass that populates the chip values runs
+nightly + hourly via <code>southbrook_premium_orchestration</code> (lesson
+2.4) so the dashboard is honest by morning and stays fresh through
+the day.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You see a red MI chip on SB-EDGE's workcenter dashboard
+tile showing the number 2. What does this mean and what's your
+first click?</p>
+<blockquote>
+<p>2 MOs that touch SB-EDGE have <code>x_mi_blocker_count &gt; 0</code>
+(aggregate count from <code>view_southbrook_pm_kanban_mi</code>). Clicking
+the chip → opens a filtered MO list of those 2 MOs. Open the
+first MO, scroll to the Intelligence tab, read the blocker rows
+and the <code>x_mi_next_action</code> text to decide release vs hold.</p>
+</blockquote>
+<p><strong>2.</strong> A trainee says "I want a Kanban view that shows MOs in
+columns by state — Draft / Confirmed / In Progress / Done — like
+the native CRM pipeline." Does this exist on Southbrook MOs?</p>
+<blockquote>
+<p>No. There's no Southbrook-custom MO Kanban with state swimlanes.
+The closest is <strong>Southbrook PM → Ready Queue</strong> which is a LIST
+view with <code>search_default_group_by_state</code> context — visually a
+stacked grouped list, not a kanban swimlane. Filing a ticket for
+a real Kanban view is reasonable; it's ~50 lines of XML.</p>
+</blockquote>
+<p><strong>3.</strong> The MI Checks list is grouped by category by default.
+You want to see them grouped by severity instead. How?</p>
+<blockquote>
+<p>Open <strong>Southbrook PM → MI Checks</strong>, click the search/filter
+dropdown, untick "Category" group-by, tick "Severity" group-by.
+The filter <code>view_southbrook_mi_check_search</code> defines both
+<code>group_category</code> and <code>group_severity</code> — they're mutually
+exclusive at one time. The change persists for your session;
+use the favourite-search feature to save it.</p>
+</blockquote>
+<p><strong>4.</strong> The Capacity pivot shows SB-CNC-BORE at 600 min Tuesday.
+The native MRP module shows 8 MOs touching SB-CNC-BORE on
+Tuesday. Are these consistent?</p>
+<blockquote>
+<p>Maybe. 600 min / 8 MOs = 75 min per MO average. If the
+per-MO <code>duration_expected</code> on the touching workorder averages
+75 min, yes consistent. If 8 MOs but only 4 have non-zero
+<code>duration_expected</code> (the others are 0 because they don't have
+an operation template applied yet), the pivot only counts the
+4 — could be 150 min × 4. Drill into the pivot cell to see the
+contributing workorders.</p>
+</blockquote>
+<p><strong>5.</strong> Your sysadmin wants to add a calendar view showing MOs by
+<code>x_sbk_install_due_date</code>. What's the cleanest way?</p>
+<blockquote>
+<p>Write a view-inherit XML on <code>mrp.production</code> adding a
+<code>&lt;calendar&gt;</code> view with <code>date_start="x_sbk_install_due_date"</code>.
+Ship it in a small follow-up addon that depends on
+<code>southbrook_mrp_kitchen_workcenters</code> (the field's owner). Add
+a menu action under Southbrook PM → "Install Calendar". ~30
+lines of XML. Native Odoo handles the rendering — no Python
+required.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>MO field walkthrough → lesson 15.2.</li>
+<li>Workorder fields + tool readiness + downtime → lesson 15.3.</li>
+<li>BoM math + cut constants → lesson 15.4.</li>
+<li>Workcenter form + alternative chain + operation templates → lesson 15.5.</li>
+<li>MO ↔ cutlist / hardware / production package → lesson 15.7.</li>
+<li>MI engine check definitions → Course 3 lesson 3.1.</li>
+<li>Premium orchestration crons → Course 2 lesson 2.4.</li>
+<li>Floor Manager portal daily flow → Course 3 lesson 3.x (separate).</li>
+<li>Native Odoo MO list / form / kanban / search → Odoo native training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_15_mo_cutlist_hardware_linkage" model="slide.slide">
+            <field name="name">MO ↔ Cut List ↔ Hardware Package ↔ Production Package — The Per-MO Artefact Triple</field>
+            <field name="channel_id" ref="course_manufacturing_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Planner + Production Manager + Developer wiring up the dealer export pipeline.</field>
+            <field name="html_content"><![CDATA[<h1 id="mo-cut-list-hardware-package-production-package">MO ↔ Cut List ↔ Hardware Package ↔ Production Package</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're standing in front of a confirmed Manufacturing Order and
+trying to figure out where the cut list, hardware pick list, KD
+flat-pack envelope, and installation PDF actually come from. The
+answer is <strong>three first-class models</strong>: <code>sb.cutlist</code>,
+<code>sb.hardware.package</code>, <code>sb.production.package</code> — all owned by
+<code>southbrook_kitchen_mrp</code>, all M2O-linked back to <code>mrp.production</code>,
+all with their own state machines, and all decorated by
+<code>southbrook_manufacturing_intelligence</code>. This lesson is the
+load-bearing chain from "MO confirmed" to "dealer downloads the
+KD envelope JSON" — every model, every join, every state, every
+HTTP route.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>/odoo/manufacturing → Manufacturing Orders → <MO></strong> — the MO form; production package opens from a smart button
+<strong>Southbrook PM → MI Packages</strong> — <code>sb.production.package</code> list (decorated by MI verdict)
+<strong>/my/dealer/orders</strong> — Dealer Portal orders list
+<strong>/my/dealer/production-package/<int:pkg_id>/kd</strong> — KD JSON download
+<strong>/my/dealer/production-package/<int:pkg_id>/installation-pdf</strong> — installation PDF download</p>
+</blockquote>
+<p>The cutlist + hardware package don't get their own top-level menu;
+they're reached from the production package's smart buttons or by
+typing <code>sb.cutlist</code> in the global search.</p>
+<h2 id="what-your-screen-shows-the-model-triple">What your screen shows — the model triple</h2>
+<h3 id="sbcutlist"><code>sb.cutlist</code></h3>
+<p><strong>Owner</strong>: <code>southbrook_kitchen_mrp</code> (<code>models/sb_cutlist.py</code>).
+<strong>Description</strong>: Panel cut list for one MO, generated from the
+panel formulas in <code>_compute_panel_dimensions</code> (lesson 15.4).</p>
+<p>Schema:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Char</td>
+<td>Sequence <code>sb.cutlist</code></td>
+</tr>
+<tr>
+<td><code>mo_id</code></td>
+<td>M2O → <code>mrp.production</code></td>
+<td>ondelete=cascade, indexed — <strong>canonical FK</strong></td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td>Selection: <strong>draft</strong> / exported / nested / done</td>
+<td>Tracked</td>
+</tr>
+<tr>
+<td><code>line_ids</code></td>
+<td>O2M → <code>sb.cutlist.line</code> (inverse <code>cutlist_id</code>)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>line_count</code></td>
+<td>Integer</td>
+<td>Stored compute</td>
+</tr>
+<tr>
+<td><code>nesting_result_json</code></td>
+<td>Text</td>
+<td>Round-trip stash for the nest result</td>
+</tr>
+</tbody>
+</table>
+<p><code>sb.cutlist.line</code> schema:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cutlist_id</code></td>
+<td>M2O, cascade</td>
+<td></td>
+</tr>
+<tr>
+<td><code>sequence</code></td>
+<td>Integer</td>
+<td></td>
+</tr>
+<tr>
+<td><code>panel_name</code></td>
+<td>Selection <code>PANEL_NAMES</code></td>
+<td>Excludes <code>toe_kick</code> by contract</td>
+</tr>
+<tr>
+<td><code>qty</code></td>
+<td>Integer</td>
+<td></td>
+</tr>
+<tr>
+<td><code>length_mm</code> / <code>width_mm</code> / <code>thickness_mm</code></td>
+<td>Float(8,3)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>substrate</code></td>
+<td>Selection <code>SUBSTRATE_CHOICES</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>grain_dir</code></td>
+<td>Selection <code>GRAIN_DIRECTIONS</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>edge_banding_config</code></td>
+<td>Text (JSON)</td>
+<td>Per-edge tape colour and material</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sbhardwarepackage"><code>sb.hardware.package</code></h3>
+<p><strong>Owner</strong>: <code>southbrook_kitchen_mrp</code> (<code>models/sb_hardware_package.py</code>).
+<strong>Description</strong>: Resolved hardware pick list for one MO, generated
+by calling <code>env['southbrook.hardware.catalog'].resolve(...)</code>.</p>
+<p>Schema:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Char</td>
+<td>Sequence</td>
+</tr>
+<tr>
+<td><code>mo_id</code></td>
+<td>M2O → <code>mrp.production</code></td>
+<td>Cascade, indexed</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td>Selection: <strong>draft</strong> / picked / delivered</td>
+<td>Tracked</td>
+</tr>
+<tr>
+<td><code>line_ids</code></td>
+<td>O2M → <code>sb.hardware.package.line</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>line_count</code></td>
+<td>Integer</td>
+<td>Stored compute</td>
+</tr>
+<tr>
+<td><code>has_pricing_pending</code></td>
+<td>Boolean</td>
+<td>Stored compute, depends <code>line_ids.product_id.x_pricing_pending</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>sb.hardware.package.line</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>package_id</code></td>
+<td>M2O, cascade</td>
+<td></td>
+</tr>
+<tr>
+<td><code>sequence</code></td>
+<td>Integer</td>
+<td></td>
+</tr>
+<tr>
+<td><code>product_id</code></td>
+<td>M2O → <code>product.product</code></td>
+<td>Domain <code>x_hardware_category != False</code></td>
+</tr>
+<tr>
+<td><code>qty</code></td>
+<td>Float</td>
+<td></td>
+</tr>
+<tr>
+<td><code>pricing_pending</code></td>
+<td>Boolean</td>
+<td>Related, stored</td>
+</tr>
+<tr>
+<td><code>hardware_category</code></td>
+<td>Selection</td>
+<td>Related to <code>product_tmpl_id.x_hardware_category</code></td>
+</tr>
+<tr>
+<td><code>brand_id</code></td>
+<td>M2O → <code>product.brand</code></td>
+<td>Related</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sbproductionpackage"><code>sb.production.package</code></h3>
+<p><strong>Owner</strong>: <code>southbrook_kitchen_mrp</code> (<code>models/sb_production_package.py</code>)
++ extended by <code>southbrook_manufacturing_intelligence</code> and
+<code>southbrook_dealer_portal</code>.</p>
+<p>The <strong>per-MO bundle</strong> that ties cutlist + hardware package + MI
+verdict + state machine together.</p>
+<p>Base schema (from kitchen_mrp):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Char</td>
+<td>Sequence</td>
+</tr>
+<tr>
+<td><code>mo_id</code></td>
+<td>M2O → <code>mrp.production</code></td>
+<td><strong>Required</strong>, cascade, indexed, <strong>one-per-MO</strong> enforced via <code>@api.constrains</code> <code>_check_unique_mo</code> (Python-level due to v19 <code>_sql_constraints</code> deprecation)</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td>Selection: <strong>draft</strong> / ready / released / done</td>
+<td>Tracked</td>
+</tr>
+<tr>
+<td><code>cutlist_id</code></td>
+<td>M2O → <code>sb.cutlist</code></td>
+<td>ondelete=restrict</td>
+</tr>
+<tr>
+<td><code>hardware_package_id</code></td>
+<td>M2O → <code>sb.hardware.package</code></td>
+<td>ondelete=restrict</td>
+</tr>
+<tr>
+<td><code>has_pricing_pending</code></td>
+<td>Boolean</td>
+<td>Related from hardware package, stored</td>
+</tr>
+</tbody>
+</table>
+<p>MI extension schema (from <code>southbrook_manufacturing_intelligence</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>x_mi_status</code></td>
+<td>Selection: ok / review / blocked</td>
+<td>The badge</td>
+</tr>
+<tr>
+<td><code>x_mi_check_ids</code></td>
+<td>O2M → <code>southbrook.mi.check</code> (inverse <code>production_package_id</code>)</td>
+<td>Check rows for this package</td>
+</tr>
+<tr>
+<td><code>x_mi_blocker_count</code></td>
+<td>Integer</td>
+<td></td>
+</tr>
+<tr>
+<td><code>x_mi_warning_count</code></td>
+<td>Integer</td>
+<td></td>
+</tr>
+<tr>
+<td><code>x_mi_install_warning_count</code></td>
+<td>Integer</td>
+<td>Specific to install-category checks</td>
+</tr>
+<tr>
+<td><code>x_mi_next_action</code></td>
+<td>Text</td>
+<td></td>
+</tr>
+<tr>
+<td><code>x_mi_yield_pct</code></td>
+<td>Float</td>
+<td></td>
+</tr>
+<tr>
+<td><code>x_mi_waste_area_m2</code></td>
+<td>Float</td>
+<td></td>
+</tr>
+<tr>
+<td><code>x_mi_edge_band_m</code></td>
+<td>Float</td>
+<td>Total edge band metres</td>
+</tr>
+</tbody>
+</table>
+<p>Plus: <code>action_recompute_manufacturing_intelligence()</code> (calls
+<code>southbrook.mi.engine._recompute_package</code>),
+<code>_mi_install_check_lines_for_pdf()</code> (filters checks where
+<code>category='install'</code> for inclusion in the installation PDF).</p>
+<p>Dealer Portal extension schema (from <code>southbrook_dealer_portal</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>is_kd_variant</code></td>
+<td>Boolean</td>
+<td>True for KD orders</td>
+</tr>
+<tr>
+<td><code>export_kd_envelope()</code></td>
+<td>Method</td>
+<td>Returns the JSON envelope</td>
+</tr>
+<tr>
+<td><code>export_installation_pdf()</code></td>
+<td>Method</td>
+<td>Returns a ReportLab PDF</td>
+</tr>
+<tr>
+<td><code>_derive_box_dimensions()</code> / <code>_fetch_elevation_svgs()</code> / <code>_derive_predrilled_holes(panel)</code></td>
+<td>Helpers</td>
+<td>Used by the two exporters</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-fk-direction-who-points-at-whom">The FK direction — who points at whom</h2>
+<pre><code>mrp.production (MO)
+  ▲   ▲   ▲
+  │   │   │
+  │   │   └── sb.production.package.mo_id  (REQUIRED, unique-per-MO)
+  │   │                  │
+  │   │                  ├── cutlist_id ─→ sb.cutlist
+  │   │                  └── hardware_package_id ─→ sb.hardware.package
+  │   │
+  │   └── sb.hardware.package.mo_id  (multi allowed at ORM, de-facto 1)
+  │
+  └── sb.cutlist.mo_id  (multi allowed at ORM, de-facto 1)
+</code></pre>
+<p>Important: <strong>all three FKs are forward refs from the package side to
+the MO</strong>. <code>mrp.production</code> has no inverse fields declared for these
+three models in this addon's code — if you want to navigate from MO
+to package, you do <code>env['sb.production.package'].search([('mo_id',
+'=', mo.id)])</code>.</p>
+<p>The one-per-MO contract on <code>sb.production.package</code> is enforced at
+Python level via <code>@api.constrains</code> because v19 silently drops legacy
+<code>_sql_constraints</code>. Don't try to create two packages for the same MO
+— the constrain will raise.</p>
+<h2 id="state-machines">State machines</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>States</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sb.cutlist</code></td>
+<td>draft → exported → nested → done</td>
+<td><code>from_nesting_result()</code> writes <code>state='nested'</code>. <code>exported</code> and <code>done</code> transitions are TBD — not present in the current model file.</td>
+</tr>
+<tr>
+<td><code>sb.hardware.package</code></td>
+<td>draft → picked → delivered</td>
+<td>No transition methods in the model file. Set externally (TBD which addon owns the transitions).</td>
+</tr>
+<tr>
+<td><code>sb.production.package</code></td>
+<td>draft → ready → released → done</td>
+<td><code>generate_from_mo()</code> creates with <code>state='ready'</code>. <code>released</code> and <code>done</code> transitions are TBD.</td>
+</tr>
+</tbody>
+</table>
+<p>The brief and manifest doc say "draft → exported → nested → done" —
+that's the <strong>cutlist</strong> state machine, not the production package's
+(which terminates <code>released → done</code>). Don't conflate.</p>
+<h2 id="creation-lifecycle">Creation lifecycle</h2>
+<p>The orchestrator is <code>sb.production.package.generate_from_mo(mo, w,
+h, d, family, door_count, drawer_count, soft_close)</code>:</p>
+<ol>
+<li>Idempotent: deletes any prior package + lines + cutlist + hw pkg
+   for this MO.</li>
+<li>Calls <code>panel_cut_list(...)</code> (which internally calls
+   <code>_compute_panel_dimensions</code> from lesson 15.4) → returns panel
+   dict.</li>
+<li>Calls <code>sb.cutlist.generate_lines_from_panel_dict(cutlist,
+   panel_dict)</code> — skips <code>toe_kick</code> key by construction
+   (<code>keys_to_emit</code> tuple excludes it).</li>
+<li>Calls <code>env['southbrook.hardware.catalog'].resolve(cabinet_family,
+   door_count, drawer_count, shelf_count, soft_close)</code> → returns
+   <code>[(product.product, qty), ...]</code>.</li>
+<li>Calls <code>sb.hardware.package.generate_lines_from_resolution(package,
+   picks)</code> — drops qty&lt;=0 lines.</li>
+<li>Creates <code>sb.production.package</code> with <code>mo_id=mo.id, cutlist_id=...,
+   hardware_package_id=..., state='ready'</code>.</li>
+<li>Returns the package.</li>
+</ol>
+<p><strong>The MO-confirm hook</strong> — <code>shop_copy.xml</code> comment says
+"<code>generate_from_mo()</code> spawns at MO confirm" but the actual
+<code>mrp.production</code> override that calls <code>generate_from_mo()</code> is NOT in
+the addon files. TBD — this is either invoked from outside the
+addon (likely from a sale.order or product_configurator_mrp hook)
+or the wiring is still pending. Smoke test: confirm a Southbrook MO
+and check whether <code>sb.production.package</code> exists — if not, the hook
+isn't wired in your env.</p>
+<h2 id="mi-fields-per-package-greenamberred-walkthrough">MI fields per package — green/amber/red walkthrough</h2>
+<p><strong>Only <code>sb.production.package</code> carries MI fields.</strong> Cutlist and
+hardware package are not MI-decorated.</p>
+<p>When the MI engine pass runs against a package:</p>
+<ol>
+<li>Iterates check definitions in
+   <code>southbrook_manufacturing_intelligence/models/mi_check.py</code>.</li>
+<li>Runs each check against the package's cutlist + hardware package
+   + parent MO.</li>
+<li>Inserts <code>southbrook.mi.check</code> rows with
+   <code>production_package_id = self.id</code>, severity, category,
+   <code>next_action</code>.</li>
+<li>Aggregates: <code>x_mi_blocker_count</code>, <code>x_mi_warning_count</code>,
+   <code>x_mi_install_warning_count</code>.</li>
+<li>Sets <code>x_mi_status</code>: <code>'blocked'</code> if blockers, else <code>'review'</code> if
+   warnings, else <code>'ok'</code>.</li>
+<li>Writes <code>x_mi_next_action</code> (top blocker's next-action sentence).</li>
+<li>If cutlist is <code>nested</code>, reads yield + waste metadata from the
+   nest result JSON into <code>x_mi_yield_pct</code>, <code>x_mi_waste_area_m2</code>.</li>
+<li>Computes <code>x_mi_edge_band_m</code> by summing
+   <code>_compute_edge_banding_length</code> across cabinets.</li>
+</ol>
+<p>The badge appears on:
+- The package form (<code>view_sb_production_package_form_mi</code>).
+- The <strong>Southbrook PM → MI Packages</strong> list, decorated by
+  <code>decoration-success / warning / danger</code>.</p>
+<h2 id="the-accucutt-json-envelope-contract">The Accucutt JSON envelope contract</h2>
+<p><code>sb.cutlist.to_nesting_envelope()</code> returns a deterministic dict:</p>
+<pre><code>{
+  &quot;schema&quot;: &quot;southbrook.nesting.v1&quot;,
+  &quot;cutlist_id&quot;: &lt;int&gt;,
+  &quot;cutlist_name&quot;: &lt;str&gt;,
+  &quot;mo_id&quot;: &lt;int&gt;,
+  &quot;panels&quot;: [
+    {
+      &quot;panel_name&quot;: &quot;side_L&quot;,
+      &quot;qty&quot;: 2,
+      &quot;length_mm&quot;: 762.0,
+      &quot;width_mm&quot;: 590.5,
+      &quot;thickness_mm&quot;: 15.875,
+      &quot;substrate&quot;: &quot;melamine_white&quot;,
+      &quot;grain_dir&quot;: &quot;vertical&quot;,
+      &quot;edge_banding&quot;: &lt;parsed_json&gt;
+    },
+    ...
+  ]
+}
+</code></pre>
+<p><code>sb.cutlist.from_nesting_result(payload)</code> ingests:</p>
+<pre><code>{
+  &quot;schema&quot;: &quot;southbrook.nesting.v1&quot;,
+  &quot;sheets_used&quot;: &lt;int&gt;,
+  &quot;yield_pct&quot;: &lt;float&gt;,
+  &quot;waste_pct&quot;: &lt;float&gt;,
+  ...
+}
+</code></pre>
+<p>The ingester:
+- Validates <code>schema == "southbrook.nesting.v1"</code>; mismatch → raises
+  <code>UserError</code>.
+- Stores the raw payload in <code>nesting_result_json</code>.
+- Flips <code>state</code> to <code>'nested'</code>.
+- Stashes yield + waste for the MI engine to pick up on its next pass.</p>
+<p>Full payload schema validation is deferred to Phase 4 (per source
+comment). For now, the schema-name check is the only guard.</p>
+<h2 id="the-toe-kick-never-emitted-contract">The toe-kick-never-emitted contract</h2>
+<p>A Southbrook-shop convention: <strong>toe-kick is integrated into the
+side panels</strong> (the bottom of each side panel runs down to the
+floor, with a notch cut for the toe-kick). It is NEVER emitted as a
+separate cutlist line. Three layers enforce this:</p>
+<ol>
+<li><strong>Doc contract</strong> — <code>sb_cutlist.py</code> lines 9-12; docstring of
+   <code>generate_lines_from_panel_dict</code> at lines 126-131.</li>
+<li><strong>Code enforcement</strong> — <code>keys_to_emit</code> tuple in
+   <code>generate_lines_from_panel_dict</code> at <code>sb_cutlist.py:133-134</code>
+   omits <code>toe_kick</code>; the line-creation loop literally cannot emit
+   a toe-kick row.</li>
+<li><strong>Test enforcement</strong> —
+   <code>southbrook_kitchen_mrp/tests/test_cutlist_generation.py::test_toe_kick_never_emitted_as_line</code>
+   asserts no line has <code>panel_name == "toe_kick"</code>. Refactor break
+   the test, refactor fails CI.</li>
+</ol>
+<h2 id="the-dealer-portal-export-endpoints">The dealer portal export endpoints</h2>
+<p><code>southbrook_dealer_portal/controllers/main.py</code> exposes three HTTP
+routes consuming the production package:</p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Method</th>
+<th>Handler</th>
+<th>Auth</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/my/dealer/orders</code></td>
+<td>GET</td>
+<td><code>dealer_orders</code></td>
+<td>user (+ channel=dealer gate)</td>
+<td>Renders <code>portal_dealer_orders_list</code> template</td>
+</tr>
+<tr>
+<td><code>/my/dealer/production-package/&lt;int:pkg_id&gt;/kd</code></td>
+<td>GET</td>
+<td><code>kd_export</code></td>
+<td>user (+ dealer gate)</td>
+<td><code>application/json</code> attachment from <code>package.export_kd_envelope()</code> — schema <code>southbrook.kd_flatpack.v1</code>, includes panels with <code>predrilled_holes</code>, hardware with <code>marathon_sku</code></td>
+</tr>
+<tr>
+<td><code>/my/dealer/production-package/&lt;int:pkg_id&gt;/installation-pdf</code></td>
+<td>GET</td>
+<td><code>installation_pdf</code></td>
+<td>user (+ dealer gate)</td>
+<td><code>application/pdf</code> from <code>package.export_installation_pdf()</code> (ReportLab; optional FreeCAD-bridge elevation SVGs via <code>_fetch_elevation_svgs</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ACL gate</strong>: <code>_require_dealer()</code> raises <code>AccessError</code> unless
+<code>request.env.user.partner_id.channel == 'dealer'</code>. The handler
+comment flags TBD: "ACL: package's MO must trace to an SO with the
+dealer's partner... a real production deployment must wire SO ↔ MO ↔
+package linkage."</p>
+<p><strong><code>sb.hardware.package</code> is NOT directly exposed by a route</strong> — it's
+reached transitively via <code>package.hardware_package_id</code> from
+<code>sb.production.package</code>.</p>
+<p>Course 6 lesson 6.2 covers the customer-facing dealer flow. This
+lesson covers the manufacturing-side construction; the dealer
+download is the LAST step in the chain.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Planner / Manager confirming an MO:</strong></p>
+<ul>
+<li>Confirm the MO via native button. If wired, <code>generate_from_mo()</code>
+  fires and creates the production package automatically.</li>
+<li>Open the MO. Click the production package smart button (if
+  present) → opens <code>sb.production.package</code> form.</li>
+<li>Look at <code>x_mi_status</code>. If <code>blocked</code>, read <code>x_mi_next_action</code>
+  and decide. If <code>ok</code>, proceed to flip <code>state</code> to <code>released</code>.</li>
+</ul>
+<p><strong>2. Mid-flight — nest result lands:</strong></p>
+<ul>
+<li>Cut shop runs the nest, calls
+  <code>sb.cutlist.from_nesting_result(payload)</code> (via internal API).</li>
+<li>Cutlist <code>state</code> flips to <code>nested</code>, <code>nesting_result_json</code> is
+  stashed.</li>
+<li>Next MI engine pass writes <code>x_mi_yield_pct</code> and
+  <code>x_mi_waste_area_m2</code> on the package.</li>
+<li>Manager reviews on the MI Packages list — anything yielding
+  below 75% gets a warning.</li>
+</ul>
+<p><strong>3. Dealer wants the KD envelope:</strong></p>
+<ul>
+<li>Dealer logs into portal, navigates to <strong>/my/dealer/orders</strong>.</li>
+<li>Clicks the KD download link on the relevant order — routes
+  through <code>/my/dealer/production-package/&lt;pkg_id&gt;/kd</code>.</li>
+<li>Server serves the JSON attachment. Dealer's downstream system
+  (e.g. flat-pack assembly partner) ingests.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"MO confirmed but no <code>sb.production.package</code> exists."</strong></p>
+<p>The MO-confirm → <code>generate_from_mo()</code> hook isn't wired in your
+addon set. Either the addon you'd expect to wire it isn't installed
+(check whether <code>southbrook_estimating_website</code> or another orchestrator
+is present), or the hook is genuinely missing. Workaround: manually
+call <code>env['sb.production.package'].generate_from_mo(mo, w, h, d,
+family, door_count, drawer_count, soft_close)</code> from a server action.</p>
+<p><strong>"Two packages exist for the same MO."</strong></p>
+<p>Shouldn't happen — <code>_check_unique_mo</code> raises. If you see it, your
+DB pre-dates the constrain. Run a one-off cleanup script merging
+the duplicates (keep the one with the highest <code>id</code>, deactivate the
+others).</p>
+<p><strong>"Cutlist <code>state</code> is stuck at <code>draft</code> — never went to <code>exported</code> or
+<code>nested</code>."</strong></p>
+<p>The <code>exported</code> and <code>done</code> transitions are TBD (not in the model
+file). The <code>nested</code> transition only fires from
+<code>from_nesting_result()</code>. If your cut shop's nest tool doesn't call
+that API, the cutlist stays <code>draft</code>. File a ticket for the bridge.</p>
+<p><strong>"Dealer says the KD download is empty."</strong></p>
+<p>Check three things: (a) is the dealer's <code>channel = 'dealer'</code> on
+their partner? (b) is <code>is_kd_variant = True</code> on the package? (c)
+does the package's hardware pick list have lines with
+<code>marathon_sku</code> populated? <code>export_kd_envelope()</code> skips lines
+missing the SKU.</p>
+<p><strong>"Installation PDF generates but has no elevation drawings."</strong></p>
+<p><code>_fetch_elevation_svgs()</code> calls the FreeCAD bridge. If the bridge
+isn't responding, the PDF generates without the elevation section
+(graceful degradation). Check <code>southbrook_freecad_bridge</code> health.</p>
+<p><strong>"<code>x_mi_status</code> on the package says <code>ok</code> but the MO's
+<code>x_mi_status</code> says <code>blocked</code>."</strong></p>
+<p>Two separate aggregations. The MO's MI badge counts checks
+where <code>production_id == mo.id</code>. The package's MI badge counts
+checks where <code>production_package_id == pkg.id</code>. Different cohorts
+— same engine pass but different aggregations. Both can disagree
+legitimately: an MO-level data quality blocker doesn't
+automatically map to a package-level blocker, and vice versa.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The triple model is the <strong>MO's downstream artefact bundle</strong>.
+Native Odoo gives you the MO + workorders + BoM; Southbrook adds
+the cutlist (panel-level cut list with substrate, grain, edge
+banding), the hardware package (resolved hardware picks with
+brand + SKU), and the production package (the wrapper that ties
+them together with a state machine + MI verdict).</p>
+<p><strong>Why three models and not one?</strong>
+- Cutlist is consumed by the cut shop (internal cutting/nesting
+  division). It needs its own state and round-trip with the nest
+  tool.
+- Hardware package is consumed by purchasing + warehouse. It
+  needs its own state for pick/deliver.
+- Production package is consumed by the dealer portal + manager.
+  It's the wrapper carrying the MI verdict.</p>
+<p>Each model has its own audit trail, its own pull/push contracts
+with external systems (Accucutt for cutlist; PO chain for
+hardware; dealer portal for production package). Bundling them
+into one model would mean every state change on any sub-component
+triggers a write to the parent.</p>
+<p><strong>Idempotency</strong> — <code>generate_from_mo()</code> is idempotent by design.
+Re-confirming an MO (e.g. after a deliberate cancel + reconfirm)
+deletes the old package + lines + cutlist + hw pkg and rebuilds.
+Don't manually edit cutlist lines or hardware lines — they're
+computed state. If you need to override, edit the BoM math
+(lesson 15.4) or the hardware catalog rules.</p>
+<p><strong>The MI engine cohort split</strong> — one engine pass writes both
+MO-level and package-level checks. The split is by check
+definition: cut-category and assembly-category checks land on the
+package; production-category and install-category checks land on
+the MO. This is invisible to the user but matters when you're
+debugging "why is this blocker on the MO not on the package?"</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> An MO is confirmed but no production package was created.
+What's your first three checks?</p>
+<blockquote>
+<p>(a) Is <code>southbrook_kitchen_mrp</code> installed in this env?
+<code>env['ir.module.module'].search([('name','=','southbrook_kitchen_mrp'),('state','=','installed')])</code>.
+(b) Was <code>generate_from_mo()</code> called? Look in the MO's chatter
+for a creation message; if absent, the hook isn't wired.
+(c) Manually try <code>env['sb.production.package'].generate_from_mo(mo, w, h, d, family, door_count, drawer_count, soft_close)</code> —
+if it succeeds, the wiring is the only gap.</p>
+</blockquote>
+<p><strong>2.</strong> A dealer downloads the KD envelope and says "panel 7 is
+missing the <code>predrilled_holes</code> array." Where do you trace?</p>
+<blockquote>
+<p><code>_derive_predrilled_holes(panel)</code> is the helper that generates
+the holes per panel. It's defined in
+<code>southbrook_dealer_portal/models/sb_production_package.py</code>. If
+panel 7's <code>panel_name</code> isn't in the helper's mapping (a new
+panel type was added without updating the helper), holes are
+empty. Add the mapping. The KD envelope schema is
+<code>southbrook.kd_flatpack.v1</code>; bump to <code>v2</code> if the change is
+incompatible.</p>
+</blockquote>
+<p><strong>3.</strong> Cut shop runs the nest, yield is 78%, <code>from_nesting_result</code>
+writes <code>state='nested'</code> and stashes the JSON. The next MI engine
+pass should write <code>x_mi_yield_pct = 78</code> on the package. But the
+package still shows 0. Why?</p>
+<blockquote>
+<p>The MI engine pass hasn't run yet, OR the engine pass ran but
+didn't pick up the new nest result because the
+<code>nesting_result_json</code> parsing failed silently. Hit Recompute on
+the package (<code>action_recompute_manufacturing_intelligence</code>).
+If yield still 0, the JSON's <code>yield_pct</code> key is missing or
+mis-spelled. Open the cutlist's <code>nesting_result_json</code> field
+and inspect.</p>
+</blockquote>
+<p><strong>4.</strong> Why does <code>_check_unique_mo</code> run in Python (<code>@api.constrains</code>)
+instead of as a SQL UNIQUE constraint?</p>
+<blockquote>
+<p>Odoo 19 silently ignores legacy <code>_sql_constraints</code> lists (per
+session memory). Even if the model declared
+<code>_sql_constraints = [('mo_unique', 'UNIQUE(mo_id)', 'msg')]</code>,
+the constraint wouldn't reach Postgres. The team migrated to
+Python-level constrains as a stopgap. The proper v19 fix is
+<code>_name = models.Constraint('UNIQUE(mo_id)', 'msg')</code> on the model
+— file a ticket if you spot stragglers.</p>
+</blockquote>
+<p><strong>5.</strong> A test asserts <code>toe_kick</code> is never emitted as a cutlist
+line. A junior developer wants to "make toe-kick optional" by
+adding it to the <code>keys_to_emit</code> tuple. What do you tell them?</p>
+<blockquote>
+<p>No. The toe-kick-integrated-into-side-panel decision is a
+shop convention enforced at three layers (doc, code, test). The
+side panel geometry from <code>_compute_panel_dimensions()</code> ALREADY
+includes the toe-kick (the side panel's <code>length_mm</code> includes the
+toe-kick height). Adding a separate toe-kick line would
+double-count material. If the shop wants to split toe-kick into
+a separate panel in future, the engineering decision is
+upstream — change the side panel formula to exclude toe-kick
+first, THEN add the toe-kick panel emission. Don't just flip
+the tuple.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>MO field walkthrough → lesson 15.2.</li>
+<li>Workorder fields + tool readiness + downtime → lesson 15.3.</li>
+<li>BoM math + cut constants (which feed the cutlist) → lesson 15.4.</li>
+<li>Workcenter form + alternative chain → lesson 15.5.</li>
+<li>MO views + Kanbans → lesson 15.6.</li>
+<li>Dealer portal customer-facing flow → Course 6 lesson 6.2.</li>
+<li>Cut spec authoring (PLM side) → Course 4 lesson 4.2.</li>
+<li>The MI engine's check rule catalog → Course 3 lesson 3.1.</li>
+<li>Native Odoo MO confirm + procurement → Odoo native training.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

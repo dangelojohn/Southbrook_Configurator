@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="cca_class_8" model="southbrook.finance.cca_class">
+            <field name="name">Class 8</field>
+            <field name="code">CCA-8</field>
+            <field name="description">Furniture, fixtures, machinery, equipment and tools costing $500+ that don't fit another class.</field>
+            <field name="rate_pct">20.0</field>
+            <field name="half_year_rule" eval="True"/>
+            <field name="accelerated_investment_incentive" eval="True"/>
+            <field name="straight_line" eval="False"/>
+        </record>
+
+        <record id="cca_class_10" model="southbrook.finance.cca_class">
+            <field name="name">Class 10</field>
+            <field name="code">CCA-10</field>
+            <field name="description">Vehicles, computer hardware (pre-2005), general-purpose tools.</field>
+            <field name="rate_pct">30.0</field>
+            <field name="half_year_rule" eval="True"/>
+            <field name="accelerated_investment_incentive" eval="True"/>
+            <field name="straight_line" eval="False"/>
+        </record>
+
+        <record id="cca_class_10_1" model="southbrook.finance.cca_class">
+            <field name="name">Class 10.1</field>
+            <field name="code">CCA-10.1</field>
+            <field name="description">Passenger vehicles costing over the prescribed limit. Cost capped at $30,000.</field>
+            <field name="rate_pct">30.0</field>
+            <field name="half_year_rule" eval="True"/>
+            <field name="accelerated_investment_incentive" eval="True"/>
+            <field name="straight_line" eval="False"/>
+            <field name="max_capital_cost">30000.0</field>
+        </record>
+
+        <record id="cca_class_29" model="southbrook.finance.cca_class">
+            <field name="name">Class 29</field>
+            <field name="code">CCA-29</field>
+            <field name="description">Manufacturing or processing machinery (SAMI automation). Straight-line over 3 years (25/50/25 statutory, modelled here as 50/50/0 simple-form).</field>
+            <field name="rate_pct">50.0</field>
+            <field name="half_year_rule" eval="False"/>
+            <field name="accelerated_investment_incentive" eval="False"/>
+            <field name="straight_line" eval="True"/>
+            <field name="straight_line_years">3</field>
+        </record>
+
+        <record id="cca_class_43" model="southbrook.finance.cca_class">
+            <field name="name">Class 43</field>
+            <field name="code">CCA-43</field>
+            <field name="description">Manufacturing/processing machinery acquired post-1988 (general class for M&amp;E not in Class 29/53).</field>
+            <field name="rate_pct">30.0</field>
+            <field name="half_year_rule" eval="True"/>
+            <field name="accelerated_investment_incentive" eval="True"/>
+            <field name="straight_line" eval="False"/>
+        </record>
+
+        <record id="cca_class_50" model="southbrook.finance.cca_class">
+            <field name="name">Class 50</field>
+            <field name="code">CCA-50</field>
+            <field name="description">General-purpose electronic data-processing equipment (computers, servers) and system software.</field>
+            <field name="rate_pct">55.0</field>
+            <field name="half_year_rule" eval="True"/>
+            <field name="accelerated_investment_incentive" eval="True"/>
+            <field name="straight_line" eval="False"/>
+        </record>
+
+        <record id="cca_class_53" model="southbrook.finance.cca_class">
+            <field name="name">Class 53</field>
+            <field name="code">CCA-53</field>
+            <field name="description">Machinery and equipment used in the manufacturing or processing of goods, acquired 2016-2025.</field>
+            <field name="rate_pct">50.0</field>
+            <field name="half_year_rule" eval="True"/>
+            <field name="accelerated_investment_incentive" eval="True"/>
+            <field name="straight_line" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

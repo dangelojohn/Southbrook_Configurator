@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+
+    <!--
+      Namespace deliberately southbrook_hermes_bom.* — NOT
+      southbrook_hermes.*. The existing Fabio addon owns the
+      southbrook_hermes.* prefix (jwt_secret, sidecar_url,
+      sidecar_enabled). Keeping the two prefixes distinct lets either
+      addon be installed without the other and rules out a key clash
+      during install.
+    -->
+    <record id="param_hermes_api_key" model="ir.config_parameter">
+      <field name="key">southbrook_hermes_bom.api_key</field>
+      <field name="value"></field>
+    </record>
+    <!--
+      Default points at the staging mock on the host's loopback. With
+      ``noupdate="1"`` above, this value lands on FRESH installs only
+      — existing deploys keep whatever they were last set to, so prod
+      isn't silently repointed at localhost.
+
+      A fresh dev install + `docker compose -f staging/docker-compose.yml up -d`
+      → wizard works end-to-end with no further configuration.
+      Override via Settings → Technical → System Parameters when a
+      real Hermes endpoint is online.
+    -->
+    <record id="param_hermes_endpoint" model="ir.config_parameter">
+      <field name="key">southbrook_hermes_bom.endpoint</field>
+      <field name="value">http://localhost:7100/v1/research</field>
+    </record>
+    <!--
+      GC retention for hermes.research.job. Applied jobs are kept
+      forever (the audit trail). Draft/running/review/failed older
+      than retention_days are dropped nightly by the GC cron.
+      Set to 0 (or any non-positive value) to disable GC entirely.
+    -->
+    <record id="param_hermes_retention_days" model="ir.config_parameter">
+      <field name="key">southbrook_hermes_bom.retention_days</field>
+      <field name="value">180</field>
+    </record>
+
+    <!--
+      Sequence for hermes.research.job.name. The model falls back to
+      a synthesized label if the sequence is missing (e.g. a partial
+      install), so we never produce blank-named jobs.
+    -->
+    <record id="seq_hermes_research_job" model="ir.sequence">
+      <field name="name">Hermes Research Job</field>
+      <field name="code">hermes.research.job</field>
+      <field name="prefix">HRJ</field>
+      <field name="padding">5</field>
+      <field name="number_next">1</field>
+      <field name="number_increment">1</field>
+    </record>
+
+  </data>
+</odoo>

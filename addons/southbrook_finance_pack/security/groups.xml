@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Southbrook Finance Pack groups.
+
+  v19 dropped res.groups.category_id (see project memory note
+  ``odoo19_res_users_group_ids_rename``); we set name + implied_ids only.
+  v19 also renamed res.users.groups_id -> group_ids; no admin bootstrap
+  here, but use group_ids if one is added.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="group_southbrook_finance_user" model="res.groups">
+            <field name="name">Southbrook Finance Pack / User</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Read + create assets, budgets, HST returns, WIP reports.</field>
+        </record>
+
+        <record id="group_southbrook_finance_manager" model="res.groups">
+            <field name="name">Southbrook Finance Pack / Manager</field>
+            <field name="implied_ids" eval="[(4, ref('southbrook_finance_pack.group_southbrook_finance_user'))]"/>
+            <field name="comment">Full finance-pack access including master data (CCA classes), filings, and disposal.</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+#
+# Staging compose for the Hermes mock. Drop into any host that needs
+# the mock long-lived (a developer laptop, a staging VM, or alongside
+# the southbrook stack on the QNAP).
+#
+# Bring up:        docker compose up -d
+# Tail logs:       docker compose logs -f
+# Tear down:       docker compose down
+#
+# The mock binds inside the container to 0.0.0.0:7100 but is published
+# to the host on 127.0.0.1:7100 only — i.e. reachable from the same
+# host, NOT from the LAN. Flip to "7100:7100" (no IP prefix) if a
+# different machine — e.g. an Odoo container on the same docker
+# network — needs to reach it.
+
+services:
+  hermes-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: southbrook/hermes-bom-mock:dev
+    container_name: southbrook-hermes-bom-mock
+    restart: unless-stopped
+    # network_mode: host avoids creating a new docker network on the
+    # QNAP (its firewall blocks new docker0-style bridges with a
+    # dnsmasq NAT error). The mock binds inside the container, but
+    # that container shares the host's network namespace so the
+    # listen address IS the host's listen address. Bind explicitly
+    # to loopback to keep it off the LAN.
+    network_mode: host
+    environment:
+      HERMES_MOCK_HOST: "127.0.0.1"
+      HERMES_MOCK_PORT: "7100"
+      # Override before going live; rotate when leaked.
+      HERMES_MOCK_TOKEN: "${HERMES_MOCK_TOKEN:-TEST-KEY}"
+    healthcheck:
+      test:
+        - "CMD"
+        - "python3"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7100/health', timeout=2).read()"
+      interval: 15s
+      timeout: 3s
+      retries: 3

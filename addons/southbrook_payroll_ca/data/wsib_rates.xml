@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WSIB Ontario 2026 Rate Group 533 — Wood Cabinets / Furniture Mfg.
+  This file is intentionally minimal: a single rate-group record
+  exposing the default 0.95% per $100 used by the payroll engine.
+
+  Future-year update: bump the rate field after the WSIB publishes the
+  2027 schedule (typically mid-October each year).
+-->
+<odoo>
+    <data noupdate="1">
+        <!-- The WSIB rate is represented as a tax_bracket-style row
+             for visibility; the calculator reads from the Python
+             constant in cra_calc.py. -->
+        <record id="wsib_rate_group_533_2026" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">ontario</field>
+            <field name="year">2026</field>
+            <field name="threshold">0.0</field>
+            <field name="rate">0.0095</field>
+            <field name="cumulative">0.0</field>
+        </record>
+    </data>
+</odoo>

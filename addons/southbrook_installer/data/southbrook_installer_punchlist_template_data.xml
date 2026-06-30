@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    Default 24-item punchlist template across the 6 industry sections
+    from PRD §7.8. Sections A-F mirror the builder walk-through
+    checklist most GTA cabinet installers use.
+
+    noupdate="0" so the template list re-aligns on -u. Custom items
+    operators add via the back-office UI are preserved (their
+    template_id stays linked but doesn't get re-created here).
+-->
+<odoo noupdate="0">
+
+    <!-- A — Upper Cabinets -->
+    <record id="punchlist_tpl_A_01" model="southbrook.installer.punchlist.template">
+        <field name="section">A</field>
+        <field name="sequence">10</field>
+        <field name="description">Uppers level across the run (≤1mm/m)</field>
+    </record>
+    <record id="punchlist_tpl_A_02" model="southbrook.installer.punchlist.template">
+        <field name="section">A</field>
+        <field name="sequence">20</field>
+        <field name="description">Cabinets plumb to wall</field>
+    </record>
+    <record id="punchlist_tpl_A_03" model="southbrook.installer.punchlist.template">
+        <field name="section">A</field>
+        <field name="sequence">30</field>
+        <field name="description">Secure into studs (no movement when pulled)</field>
+    </record>
+    <record id="punchlist_tpl_A_04" model="southbrook.installer.punchlist.template">
+        <field name="section">A</field>
+        <field name="sequence">40</field>
+        <field name="description">Reveals consistent between adjacent uppers</field>
+    </record>
+
+    <!-- B — Base Cabinets -->
+    <record id="punchlist_tpl_B_01" model="southbrook.installer.punchlist.template">
+        <field name="section">B</field>
+        <field name="sequence">10</field>
+        <field name="description">Base run level (shim-confirmed)</field>
+    </record>
+    <record id="punchlist_tpl_B_02" model="southbrook.installer.punchlist.template">
+        <field name="section">B</field>
+        <field name="sequence">20</field>
+        <field name="description">Cabinets secured to wall and to each other</field>
+    </record>
+    <record id="punchlist_tpl_B_03" model="southbrook.installer.punchlist.template">
+        <field name="section">B</field>
+        <field name="sequence">30</field>
+        <field name="description">Sink base cutout matches spec</field>
+    </record>
+    <record id="punchlist_tpl_B_04" model="southbrook.installer.punchlist.template">
+        <field name="section">B</field>
+        <field name="sequence">40</field>
+        <field name="description">Toe-kick installed and tight to floor</field>
+    </record>
+
+    <!-- C — Tall / Pantry -->
+    <record id="punchlist_tpl_C_01" model="southbrook.installer.punchlist.template">
+        <field name="section">C</field>
+        <field name="sequence">10</field>
+        <field name="description">Tall units plumb top to bottom</field>
+    </record>
+    <record id="punchlist_tpl_C_02" model="southbrook.installer.punchlist.template">
+        <field name="section">C</field>
+        <field name="sequence">20</field>
+        <field name="description">Appliance cutouts within tolerance</field>
+    </record>
+    <record id="punchlist_tpl_C_03" model="southbrook.installer.punchlist.template">
+        <field name="section">C</field>
+        <field name="sequence">30</field>
+        <field name="description">Door swing clears adjacent fixtures</field>
+    </record>
+
+    <!-- D — Hardware -->
+    <record id="punchlist_tpl_D_01" model="southbrook.installer.punchlist.template">
+        <field name="section">D</field>
+        <field name="sequence">10</field>
+        <field name="description">Hinge alignment — doors close softly + flush</field>
+    </record>
+    <record id="punchlist_tpl_D_02" model="southbrook.installer.punchlist.template">
+        <field name="section">D</field>
+        <field name="sequence">20</field>
+        <field name="description">Drawer slides extend fully + self-close engages</field>
+    </record>
+    <record id="punchlist_tpl_D_03" model="southbrook.installer.punchlist.template">
+        <field name="section">D</field>
+        <field name="sequence">30</field>
+        <field name="description">Pulls / knobs aligned across run</field>
+    </record>
+    <record id="punchlist_tpl_D_04" model="southbrook.installer.punchlist.template">
+        <field name="section">D</field>
+        <field name="sequence">40</field>
+        <field name="description">Hardware torque finger-tight (no over-driven screws)</field>
+        <field name="require_photo_on_fail" eval="False"/>
+    </record>
+
+    <!-- E — Trim &amp; Finish -->
+    <record id="punchlist_tpl_E_01" model="southbrook.installer.punchlist.template">
+        <field name="section">E</field>
+        <field name="sequence">10</field>
+        <field name="description">Crown moulding mitres tight</field>
+    </record>
+    <record id="punchlist_tpl_E_02" model="southbrook.installer.punchlist.template">
+        <field name="section">E</field>
+        <field name="sequence">20</field>
+        <field name="description">Filler strips scribed and gap-free</field>
+    </record>
+    <record id="punchlist_tpl_E_03" model="southbrook.installer.punchlist.template">
+        <field name="section">E</field>
+        <field name="sequence">30</field>
+        <field name="description">Touch-up paint complete, no visible defects</field>
+    </record>
+    <record id="punchlist_tpl_E_04" model="southbrook.installer.punchlist.template">
+        <field name="section">E</field>
+        <field name="sequence">40</field>
+        <field name="description">Caulking lines clean and straight</field>
+    </record>
+
+    <!-- F — Cleanup -->
+    <record id="punchlist_tpl_F_01" model="southbrook.installer.punchlist.template">
+        <field name="section">F</field>
+        <field name="sequence">10</field>
+        <field name="description">Cabinet interiors vacuumed</field>
+    </record>
+    <record id="punchlist_tpl_F_02" model="southbrook.installer.punchlist.template">
+        <field name="section">F</field>
+        <field name="sequence">20</field>
+        <field name="description">Exterior surfaces wiped down</field>
+    </record>
+    <record id="punchlist_tpl_F_03" model="southbrook.installer.punchlist.template">
+        <field name="section">F</field>
+        <field name="sequence">30</field>
+        <field name="description">Floor protection removed; floor swept</field>
+    </record>
+    <record id="punchlist_tpl_F_04" model="southbrook.installer.punchlist.template">
+        <field name="section">F</field>
+        <field name="sequence">40</field>
+        <field name="description">All packaging + offcuts removed from site</field>
+    </record>
+
+</odoo>

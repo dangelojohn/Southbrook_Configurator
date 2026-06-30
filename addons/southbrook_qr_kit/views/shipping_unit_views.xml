@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+    <record id="view_shipping_unit_list" model="ir.ui.view">
+        <field name="name">southbrook.shipping.unit.list</field>
+        <field name="model">southbrook.shipping.unit</field>
+        <field name="arch" type="xml">
+            <list string="Shipping Units"
+                  decoration-info="state == 'draft'"
+                  decoration-warning="state == 'loaded'"
+                  decoration-success="state == 'delivered'"
+                  decoration-muted="state == 'returned'">
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="picking_id"/>
+                <field name="partner_id"/>
+                <field name="builder_unit_ref"/>
+                <field name="weight_kg" optional="show"/>
+                <field name="oversize" widget="boolean_toggle" optional="show"/>
+                <field name="truck_ref" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="loaded_at" optional="show"/>
+                <field name="delivered_at" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shipping_unit_form" model="ir.ui.view">
+        <field name="name">southbrook.shipping.unit.form</field>
+        <field name="model">southbrook.shipping.unit</field>
+        <field name="arch" type="xml">
+            <form string="Shipping Unit">
+                <header>
+                    <button name="action_mark_loaded" type="object"
+                            string="Mark Loaded" class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_mark_delivered" type="object"
+                            string="Mark Delivered" class="oe_highlight"
+                            invisible="state != 'loaded'"/>
+                    <button name="action_mark_returned" type="object"
+                            string="Mark Returned"
+                            invisible="state not in ('loaded','delivered')"/>
+                    <button name="action_print_qr_label" type="object"
+                            string="Print QR Label"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,loaded,delivered"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="kind"/>
+                            <field name="picking_id"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="builder_unit_ref"/>
+                            <field name="truck_ref"/>
+                        </group>
+                        <group string="Dimensions">
+                            <field name="weight_kg"/>
+                            <field name="length_mm"/>
+                            <field name="width_mm"/>
+                            <field name="height_mm"/>
+                            <field name="oversize" readonly="1"
+                                   decoration-danger="oversize"/>
+                            <field name="permit_jurisdictions"
+                                   invisible="not oversize"/>
+                        </group>
+                    </group>
+                    <group string="QR + Provenance">
+                        <field name="loaded_at" readonly="1"
+                               invisible="not loaded_at"/>
+                        <field name="loaded_by" readonly="1"
+                               invisible="not loaded_by"/>
+                        <field name="delivered_at" readonly="1"
+                               invisible="not delivered_at"/>
+                        <field name="delivered_by" readonly="1"
+                               invisible="not delivered_by"/>
+                    </group>
+                    <notebook>
+                        <page string="Contents" name="contents">
+                            <field name="product_ids" widget="many2many_tags"/>
+                        </page>
+                        <page string="POD" name="pod"
+                              invisible="state != 'delivered'">
+                            <group>
+                                <field name="delivery_signature"
+                                       widget="image" readonly="1"/>
+                                <field name="delivery_photo"
+                                       widget="image" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="QR" name="qr">
+                            <group string="Internal warehouse QR (scan-to-form)">
+                                <field name="qr_payload" readonly="1"/>
+                                <field name="qr_image_base64" readonly="1"
+                                       widget="image"/>
+                            </group>
+                            <group string="Driver POD QR (scan-to-POD-page)">
+                                <field name="pod_qr_url" readonly="1"/>
+                                <field name="pod_qr_image_base64" readonly="1"
+                                       widget="image"/>
+                                <div class="alert alert-info" colspan="2">
+                                    <strong>Driver POD:</strong> print this QR
+                                    on the pallet label. Driver scans with phone
+                                    camera → opens
+                                    <em>POD signature + photo capture page</em>
+                                    in their browser. No Odoo login required —
+                                    HMAC signature is the identity check.
+                                </div>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shipping_unit_search" model="ir.ui.view">
+        <field name="name">southbrook.shipping.unit.search</field>
+        <field name="model">southbrook.shipping.unit</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="picking_id"/>
+                <field name="partner_id"/>
+                <field name="builder_unit_ref"/>
+                <field name="truck_ref"/>
+                <filter name="draft" string="Draft"
+                        domain="[('state','=','draft')]"/>
+                <filter name="loaded" string="Loaded"
+                        domain="[('state','=','loaded')]"/>
+                <filter name="delivered" string="Delivered"
+                        domain="[('state','=','delivered')]"/>
+                <filter name="oversize" string="Oversize"
+                        domain="[('oversize','=',True)]"/>
+                <group>
+                    <filter name="g_state" string="State"
+                            context="{'group_by':'state'}"/>
+                    <filter name="g_partner" string="Customer"
+                            context="{'group_by':'partner_id'}"/>
+                    <filter name="g_truck" string="Truck"
+                            context="{'group_by':'truck_ref'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shipping_unit" model="ir.actions.act_window">
+        <field name="name">Shipping Units</field>
+        <field name="res_model">southbrook.shipping.unit</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_qr_shipping_units" name="Shipping Units"
+              parent="menu_qr_scan_log_root"
+              action="action_shipping_unit" sequence="20"/>
+</odoo>

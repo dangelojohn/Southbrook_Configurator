@@ -1,0 +1,953 @@
+// ─── Design tokens ────────────────────────────────────────────────────────────
+$sbk-black:      #111111;
+$sbk-dark:       #1A1A1A;
+$sbk-mid:        #4A4E57;
+$sbk-muted:      #888D96;
+$sbk-border:     #DDD8D0;
+$sbk-bg:         #F5F2EE;
+$sbk-white:      #FFFFFF;
+$sbk-accent:     #1866D4;
+$sbk-accent-bg:  #EEF3FF;
+$sbk-success:    #15803D;
+$sbk-warn:       #C2410C;
+$sbk-amber:      #B45309;
+
+// ─── Root wrapper ─────────────────────────────────────────────────────────────
+.o_sbk_root {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 48px);
+    background: $sbk-bg;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    color: $sbk-dark;
+}
+
+// ─── Top bar ──────────────────────────────────────────────────────────────────
+.o_sbk_topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 20px;
+    background: $sbk-white;
+    border-bottom: 1px solid $sbk-border;
+    flex-shrink: 0;
+}
+
+.o_sbk_brand_block {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.o_sbk_logo {
+    width: 34px;
+    height: 34px;
+    border: 2px solid $sbk-accent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.o_sbk_logo_inner {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid $sbk-accent;
+}
+
+.o_sbk_brand_label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: $sbk-muted;
+}
+
+.o_sbk_title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    margin: 0;
+    color: $sbk-dark;
+}
+
+// ─── Buttons ──────────────────────────────────────────────────────────────────
+.o_sbk_actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.o_sbk_btn {
+    padding: 7px 14px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.12s;
+
+    &:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    &.o_sbk_btn_ghost {
+        background: transparent;
+        color: $sbk-mid;
+        border: 1px solid $sbk-border;
+
+        &:hover:not(:disabled) {
+            background: $sbk-bg;
+            border-color: $sbk-muted;
+        }
+    }
+
+    &.o_sbk_btn_outline {
+        background: $sbk-white;
+        color: $sbk-dark;
+        border: 1px solid $sbk-border;
+
+        &:hover:not(:disabled) { background: $sbk-bg; }
+    }
+
+    &.o_sbk_btn_primary {
+        background: $sbk-dark;
+        color: $sbk-white;
+        border: 1px solid $sbk-dark;
+
+        &:hover:not(:disabled) { background: $sbk-black; }
+    }
+}
+
+// ─── Loading ──────────────────────────────────────────────────────────────────
+.o_sbk_loading {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-size: 13px;
+    color: $sbk-muted;
+}
+
+.o_sbk_spinner {
+    width: 22px;
+    height: 22px;
+    border: 2px solid $sbk-border;
+    border-top-color: $sbk-accent;
+    border-radius: 50%;
+    animation: sbk-spin 0.8s linear infinite;
+}
+
+@keyframes sbk-spin { to { transform: rotate(360deg); } }
+
+// ─── Workspace layout ─────────────────────────────────────────────────────────
+.o_sbk_workspace {
+    display: grid;
+    grid-template-columns: 210px 1fr 300px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+// ─── Left controls ────────────────────────────────────────────────────────────
+.o_sbk_controls {
+    background: $sbk-white;
+    border-right: 1px solid $sbk-border;
+    padding: 18px 16px;
+    overflow-y: auto;
+
+    h3 {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: $sbk-muted;
+        text-transform: uppercase;
+        margin: 0 0 16px;
+    }
+}
+
+.o_sbk_field {
+    display: grid;
+    gap: 5px;
+    margin-bottom: 14px;
+    font-size: 11px;
+    color: $sbk-mid;
+    cursor: default;
+
+    span { font-weight: 700; }
+
+    input {
+        width: 100%;
+        border: 1px solid $sbk-border;
+        padding: 7px 10px;
+        font-family: inherit;
+        font-size: 13px;
+        color: $sbk-dark;
+        background: $sbk-white;
+        outline: none;
+
+        &:focus { border-color: $sbk-accent; }
+    }
+}
+
+.o_sbk_input_row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+
+    input { flex: 1; }
+}
+
+.o_sbk_unit {
+    font-size: 10px;
+    color: $sbk-muted;
+    white-space: nowrap;
+}
+
+.o_sbk_divider {
+    border: none;
+    border-top: 1px solid $sbk-border;
+    margin: 16px 0;
+}
+
+.o_sbk_metric {
+    padding: 10px 0;
+    border-top: 1px solid #F0EDE8;
+    font-size: 11px;
+    color: $sbk-mid;
+
+    strong {
+        display: block;
+        font-size: 22px;
+        color: $sbk-dark;
+        line-height: 1.1;
+        margin-bottom: 2px;
+    }
+
+    &.o_sbk_metric_price strong { color: $sbk-accent; }
+}
+
+.o_sbk_remainder {
+    margin-top: 12px;
+    padding: 9px 10px;
+    background: #FEF9EC;
+    border: 1px solid #FDE68A;
+    font-size: 11px;
+    color: $sbk-amber;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.o_sbk_error {
+    margin-top: 12px;
+    padding: 9px 10px;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    font-size: 11px;
+    color: $sbk-warn;
+}
+
+// ─── 3D Scene panel ───────────────────────────────────────────────────────────
+.o_sbk_scene_panel {
+    position: relative;
+    overflow: hidden;
+    background: #ECEAE3;
+}
+
+.o_sbk_canvas3d {
+    position: absolute;
+    inset: 0;
+
+    canvas {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+// Dimension ruler overlay (HTML overlay on 3D canvas)
+.o_sbk_ruler {
+    position: absolute;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.o_sbk_mark {
+    font-size: 9px;
+    font-family: monospace;
+    color: rgba(26, 102, 212, 0.8);
+    background: rgba(255,255,255,0.75);
+    padding: 2px 5px;
+    border-radius: 2px;
+    border: 1px solid rgba(26, 102, 212, 0.3);
+}
+
+// D17 — Archetype taxonomy badge in inventory rows
+.o_sbk_arch_badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-weight: 600;
+    background: rgba(200, 155, 90, 0.15);
+    border: 1px solid rgba(200, 155, 90, 0.50);
+    color: #8a6b52;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+}
+
+// D13 — Searchable inventory + drag-and-drop
+.o_sbk_inv_head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    h3 { margin: 0; }
+}
+.o_sbk_inv_count {
+    font-size: 11px;
+    color: $sbk-muted;
+    font-variant-numeric: tabular-nums;
+}
+.o_sbk_inv_search {
+    position: relative;
+    margin: 8px 0 6px;
+}
+.o_sbk_inv_search_input {
+    width: 100%;
+    padding: 7px 32px 7px 28px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 4px;
+    background: white url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") 8px center no-repeat;
+    font-size: 13px;
+    color: $sbk-ink;
+    line-height: 1;
+    &:focus-visible {
+        outline: 2px solid rgba(26, 102, 212, 0.55);
+        outline-offset: 0;
+        border-color: rgba(26, 102, 212, 0.45);
+    }
+    &::-webkit-search-cancel-button { display: none; }
+}
+.o_sbk_inv_search_clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    border: 0;
+    background: transparent;
+    color: $sbk-muted;
+    font-size: 16px;
+    cursor: pointer;
+    line-height: 1;
+    border-radius: 4px;
+    &:hover { background: rgba(0,0,0,0.06); color: $sbk-ink; }
+}
+.o_sbk_inv_draghint {
+    margin: 0 0 8px;
+    padding: 6px 10px;
+    background: rgba(26, 102, 212, 0.06);
+    border: 1px dashed rgba(26, 102, 212, 0.30);
+    border-radius: 4px;
+    font-size: 11px;
+    color: #0f3a8a;
+    text-align: center;
+}
+.o_sbk_inv_empty {
+    padding: 14px 12px;
+    text-align: center;
+    color: $sbk-muted;
+    font-size: 12px;
+}
+.o_sbk_inv_empty_clear {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: #1866d4;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 12px;
+}
+.o_sbk_prod_draggable {
+    cursor: grab;
+    &:active { cursor: grabbing; }
+}
+// Drag-hover highlight on the scene panel.
+.o_sbk_scene_panel.is-drag-hover {
+    position: relative;
+    &::after {
+        content: "Release to add cabinet";
+        position: absolute;
+        inset: 12px;
+        border: 3px dashed rgba(26, 102, 212, 0.65);
+        border-radius: 10px;
+        background: rgba(26, 102, 212, 0.05);
+        z-index: 7;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0f3a8a;
+        font-weight: 600;
+        font-size: 14px;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    }
+}
+
+// D10 — Empty-catalog onboarding nudge (left controls, replaces raw error)
+.o_sbk_onboard {
+    margin: 10px 0;
+    padding: 12px;
+    background: rgba(26, 102, 212, 0.06);
+    border: 1px solid rgba(26, 102, 212, 0.30);
+    border-radius: 6px;
+    font-size: 12px;
+    color: #0f3a8a;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.o_sbk_onboard_title {
+    font-size: 13px;
+    color: #1a2233;
+}
+.o_sbk_onboard_body {
+    margin: 0;
+    line-height: 1.4;
+    color: #4a5568;
+}
+.o_sbk_onboard_cta {
+    margin-top: 6px;
+    padding: 7px 12px;
+    background: #1866d4;
+    color: white;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    text-align: left;
+    align-self: flex-start;
+    transition: background-color 0.12s ease;
+    &:hover { background: #0f3a8a; }
+}
+
+// D10 — BOM-missing banner in selected-cabinet drawer
+.o_sbk_bom_warn {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    background: rgba(192, 73, 47, 0.10);
+    border: 1px solid rgba(192, 73, 47, 0.35);
+    color: #c0492f;
+    border-radius: 4px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    strong { font-size: 12px; }
+}
+.o_sbk_bom_warn_btn {
+    margin-left: auto;
+    padding: 4px 10px;
+    background: #c0492f;
+    color: white;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    &:hover { background: #9c3a25; }
+}
+
+// D8 (+forward-compat D12) — layout validation warnings panel
+.o_sbk_warnings {
+    margin: 10px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.o_sbk_warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.4;
+    background: rgba(231, 206, 122, 0.20);
+    border: 1px solid rgba(231, 206, 122, 0.55);
+    color: #5a4632;
+    &.o_sbk_warning_blocking {
+        background: rgba(192, 73, 47, 0.10);
+        border-color: rgba(192, 73, 47, 0.40);
+        color: #c0492f;
+    }
+}
+.o_sbk_warning_icon { font-size: 13px; line-height: 1; }
+.o_sbk_warning_text { flex: 1; }
+
+// D7 — Filler-strategy selector + snap-hint CTA
+.o_sbk_metric_filler {
+    color: #1e9e6a;
+    font-size: 12px;
+}
+.o_sbk_remainder_strategy {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-left: 4px;
+}
+.o_sbk_snap_hint {
+    margin: 8px 0 4px;
+}
+.o_sbk_snap_btn {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    padding: 7px 10px;
+    background: rgba(30, 158, 106, 0.10);
+    border: 1px solid rgba(30, 158, 106, 0.35);
+    color: #1e9e6a;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+    &:hover { background: rgba(30, 158, 106, 0.18); }
+    &:focus-visible {
+        outline: 2px solid rgba(30, 158, 106, 0.55);
+        outline-offset: 1px;
+    }
+}
+
+// D5 — Auto-save status pill (sits left of the Save Design button)
+.o_sbk_autosave {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 11px;
+    color: #6c757d;
+    border-radius: 4px;
+    background: rgba(108, 117, 125, 0.10);
+    margin-right: 8px;
+    font-family: -apple-system, "Inter", sans-serif;
+    white-space: nowrap;
+    &.is-ok {
+        color: #1e9e6a;
+        background: rgba(30, 158, 106, 0.10);
+    }
+}
+
+// D4 — "Save as my default" link in left controls
+.o_sbk_save_default_link {
+    display: inline-block;
+    margin: 4px 0 8px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: #1866d4;
+    font-size: 11px;
+    text-decoration: underline;
+    cursor: pointer;
+    align-self: flex-start;
+    &:hover { color: #0f3a8a; }
+    &:focus-visible {
+        outline: 2px solid rgba(26, 102, 212, 0.55);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+}
+
+// D3 — Channel pricing badge (topbar, between brand and action cluster)
+.o_sbk_channel_badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    margin: 0 12px;
+    background: rgba(26, 102, 212, 0.07);
+    border: 1px solid rgba(26, 102, 212, 0.28);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f3a8a;
+    white-space: nowrap;
+    line-height: 1;
+    align-self: center;
+}
+.o_sbk_channel_dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #6c757d;
+}
+.o_sbk_channel_dot.o_sbk_ch_dealer       { background: #2f57c4; }
+.o_sbk_channel_dot.o_sbk_ch_tradesperson { background: #1e9e6a; }
+.o_sbk_channel_dot.o_sbk_ch_kd           { background: #c89b5a; }
+.o_sbk_channel_dot.o_sbk_ch_bigbox       { background: #888; }
+.o_sbk_channel_dot.o_sbk_ch_refacing     { background: #a08868; }
+.o_sbk_channel_dot.o_sbk_ch_retail       { background: #6c757d; }
+
+// D1 — View switcher toolbar (top-right of scene panel)
+.o_sbk_viewbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(26, 102, 212, 0.18);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    z-index: 8;
+}
+.o_sbk_viewbtn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 56px;
+    padding: 6px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    color: #1a2233;
+    font-family: -apple-system, "Inter", sans-serif;
+    font-size: 12px;
+    line-height: 1;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.o_sbk_viewbtn:hover {
+    background: rgba(26, 102, 212, 0.08);
+    border-color: rgba(26, 102, 212, 0.22);
+}
+.o_sbk_viewbtn.is-active {
+    background: rgba(26, 102, 212, 0.18);
+    border-color: rgba(26, 102, 212, 0.45);
+    color: #0f3a8a;
+    font-weight: 600;
+}
+.o_sbk_viewbtn:focus-visible {
+    outline: 2px solid rgba(26, 102, 212, 0.55);
+    outline-offset: 1px;
+}
+.o_sbk_viewicon {
+    font-size: 16px;
+    width: 18px;
+    text-align: center;
+}
+.o_sbk_viewkey {
+    margin-left: auto;
+    font-family: monospace;
+    font-size: 10px;
+    opacity: 0.55;
+}
+.o_sbk_viewsep {
+    height: 1px;
+    background: rgba(26, 102, 212, 0.15);
+    margin: 2px 4px;
+}
+
+.o_sbk_draghint {
+    position: absolute;
+    bottom: 12px;
+    right: 14px;
+    font-size: 9px;
+    font-family: monospace;
+    color: rgba(0,0,0,0.55);
+    background: rgba(255,255,255,0.85);
+    padding: 4px 8px;
+    border-radius: 4px;
+    z-index: 5;
+    pointer-events: none;
+    max-width: 360px;
+    text-align: right;
+}
+
+// ─── Right inventory panel ────────────────────────────────────────────────────
+.o_sbk_inventory {
+    background: $sbk-white;
+    border-left: 1px solid $sbk-border;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    h3 {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: $sbk-muted;
+        text-transform: uppercase;
+        margin: 0;
+        padding: 14px 13px 8px;
+        border-bottom: 1px solid $sbk-border;
+        flex-shrink: 0;
+    }
+}
+
+.o_sbk_inv_header {
+    display: grid;
+    grid-template-columns: 1fr 38px 36px 34px 52px;
+    padding: 5px 10px;
+    background: #F8F5F1;
+    font-size: 9px;
+    color: $sbk-muted;
+    letter-spacing: 0.6px;
+    border-bottom: 1px solid $sbk-border;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.o_sbk_product_list {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.o_sbk_product_row {
+    display: grid;
+    grid-template-columns: 36px 1fr 38px 36px 34px 52px;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border: none;
+    border-bottom: 1px solid #F5F0EA;
+    border-left: 3px solid transparent;
+    background: $sbk-white;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.1s;
+
+    &:hover  { background: #FAFAF7; }
+
+    &.is-selected {
+        background: $sbk-accent-bg;
+        border-left-color: $sbk-accent;
+    }
+}
+
+.o_sbk_prod_thumb {
+    width: 30px;
+    height: 26px;
+    background: #EAE5DC;
+    border: 1px solid #D8D2C8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+}
+
+.o_sbk_prod_info {
+    min-width: 0;
+    overflow: hidden;
+
+    strong, small { display: block; }
+    strong {
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: $sbk-dark;
+    }
+    small { font-size: 9px; color: $sbk-muted; }
+}
+
+.o_sbk_prod_sku   { font-size: 9px; color: $sbk-mid; font-family: monospace; }
+.o_sbk_prod_dim   { font-size: 10px; font-family: monospace; color: $sbk-mid; }
+.o_sbk_prod_price { font-size: 11px; font-weight: 700; text-align: right; color: $sbk-dark; }
+
+.o_sbk_prod_qty {
+    font-size: 10px;
+    font-family: monospace;
+    font-weight: 700;
+    &.ok  { color: $sbk-success; }
+    &.low { color: $sbk-warn; }
+}
+
+// ─── Selected cabinet detail ──────────────────────────────────────────────────
+.o_sbk_detail {
+    border-top: 2px solid $sbk-border;
+    padding: 13px;
+    flex-shrink: 0;
+    background: #FAFAF7;
+
+    h4 {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: $sbk-muted;
+        text-transform: uppercase;
+        margin: 0 0 10px;
+    }
+}
+
+// D2 — Inline edit-drawer styles
+.o_sbk_detail_head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 10px;
+    h4 { margin: 0; }
+}
+.o_sbk_detail_remove {
+    border: 1px solid rgba(192, 73, 47, 0.35);
+    background: transparent;
+    color: #c0492f;
+    width: 24px;
+    height: 24px;
+    line-height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: center;
+    padding: 0;
+    transition: background-color 0.12s ease;
+    &:hover { background: rgba(192, 73, 47, 0.12); }
+}
+.o_sbk_edit_grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 10px;
+    background: rgba(26, 102, 212, 0.04);
+    border: 1px solid rgba(26, 102, 212, 0.16);
+    border-radius: 6px;
+}
+.o_sbk_edit_field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    span {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: $sbk-muted;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+}
+.o_sbk_edit_select,
+.o_sbk_edit_input {
+    padding: 6px 8px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 4px;
+    background: white;
+    font-size: 13px;
+    color: $sbk-ink;
+    &:focus-visible {
+        outline: 2px solid rgba(26, 102, 212, 0.55);
+        outline-offset: 0;
+        border-color: rgba(26, 102, 212, 0.45);
+    }
+}
+.o_sbk_edit_input { font-variant-numeric: tabular-nums; }
+
+.o_sbk_detail_card {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.o_sbk_detail_img {
+    width: 72px;
+    height: 64px;
+    background: #EAE5DC;
+    border: 1px solid #D4CFC6;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+}
+
+.o_sbk_detail_img_placeholder { font-size: 26px; }
+
+.o_sbk_detail_name {
+    font-weight: 700;
+    font-size: 13px;
+    margin: 0 0 3px;
+    color: $sbk-dark;
+}
+
+.o_sbk_detail_type {
+    font-size: 10px;
+    color: $sbk-muted;
+    margin: 0;
+}
+
+.o_sbk_spec_grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    row-gap: 4px;
+    column-gap: 6px;
+    font-size: 10px;
+    margin: 0;
+
+    dt { color: $sbk-muted; }
+    dd {
+        margin: 0;
+        font-weight: 700;
+        color: $sbk-dark;
+        &.ok    { color: $sbk-success; }
+        &.low   { color: $sbk-warn; }
+        &.price { color: $sbk-accent; font-size: 13px; }
+    }
+}
+
+// ─── Responsive ───────────────────────────────────────────────────────────────
+@media (max-width: 1200px) {
+    .o_sbk_workspace {
+        grid-template-columns: 190px 1fr 270px;
+    }
+}
+
+@media (max-width: 960px) {
+    .o_sbk_workspace {
+        grid-template-columns: 1fr 240px;
+        grid-template-rows: auto 1fr;
+    }
+    .o_sbk_controls {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px;
+        border-right: none;
+        border-bottom: 1px solid $sbk-border;
+    }
+    .o_sbk_field {
+        margin-bottom: 0;
+        flex: 1;
+        min-width: 120px;
+    }
+}

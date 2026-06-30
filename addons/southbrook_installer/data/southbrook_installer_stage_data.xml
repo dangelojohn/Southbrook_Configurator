@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    The eight installer workflow stages. Each stage's gate_* flags are
+    its EXIT conditions: to advance OFF this stage, those conditions
+    must be true on the job.
+
+    Codes are stable enums — never rename. Sequence values leave
+    breathing room (10s) for future inserts.
+-->
+<odoo noupdate="0">
+
+    <record id="stage_scheduled" model="southbrook.installer.stage">
+        <field name="name">Scheduled</field>
+        <field name="code">SCHEDULED</field>
+        <field name="sequence">10</field>
+        <field name="description">Job is booked. Crew has been
+            assigned but has not yet arrived on site. Exits when the
+            crew records GPS arrival.</field>
+        <field name="color">4</field>
+    </record>
+
+    <record id="stage_pre_site_confirm" model="southbrook.installer.stage">
+        <field name="name">Pre-Site Confirm</field>
+        <field name="code">PRE_SITE_CONFIRM</field>
+        <field name="sequence">20</field>
+        <field name="description">On site. Crew is confirming the
+            kitchen kit delivery matches the manifest before unpacking.
+            Exits when the delivery manifest is fully confirmed.</field>
+        <field name="gate_require_delivery_confirmed" eval="True"/>
+        <field name="color">3</field>
+    </record>
+
+    <record id="stage_delivery_received" model="southbrook.installer.stage">
+        <field name="name">Delivery Received</field>
+        <field name="code">DELIVERY_RECEIVED</field>
+        <field name="sequence">30</field>
+        <field name="description">Delivery confirmed. Installation
+            has not yet started. Exits when the first install phase
+            is started (typically by tapping Start on Phase 01).</field>
+        <field name="color">2</field>
+    </record>
+
+    <record id="stage_installation_in_progress" model="southbrook.installer.stage">
+        <field name="name">Installation In Progress</field>
+        <field name="code">INSTALLATION_IN_PROGRESS</field>
+        <field name="sequence">40</field>
+        <field name="description">Active installation. Exits when
+            every active install phase log is in state 'done' (or
+            explicitly 'skipped').</field>
+        <field name="gate_require_all_phases_done" eval="True"/>
+        <field name="color">1</field>
+    </record>
+
+    <record id="stage_final_sign_off" model="southbrook.installer.stage">
+        <field name="name">Final Sign-Off</field>
+        <field name="code">FINAL_SIGN_OFF</field>
+        <field name="sequence">50</field>
+        <field name="description">Installation complete. Builder
+            walk-through and punch-list are in flight. Exits when the
+            builder has signed off the work.</field>
+        <field name="gate_require_sign_off" eval="True"/>
+        <field name="color">5</field>
+    </record>
+
+    <record id="stage_closed_out" model="southbrook.installer.stage">
+        <field name="name">Closed Out</field>
+        <field name="code">CLOSED_OUT</field>
+        <field name="sequence">60</field>
+        <field name="description">Sign-off received. Crew is
+            packing tools, returning leftover materials, and
+            completing the close-out checklist. Exits when the
+            checklist is submitted.</field>
+        <field name="gate_require_closeout_done" eval="True"/>
+        <field name="color">6</field>
+    </record>
+
+    <record id="stage_complete" model="southbrook.installer.stage">
+        <field name="name">Complete</field>
+        <field name="code">COMPLETE</field>
+        <field name="sequence">70</field>
+        <field name="description">All on-site work and paperwork
+            done. Finance to issue invoice.</field>
+        <field name="auto_create_invoice" eval="True"/>
+        <field name="color">10</field>
+    </record>
+
+    <record id="stage_invoiced" model="southbrook.installer.stage">
+        <field name="name">Invoiced</field>
+        <field name="code">INVOICED</field>
+        <field name="sequence">80</field>
+        <field name="description">Invoice issued. Terminal stage —
+            job is closed in the workflow.</field>
+        <field name="fold" eval="True"/>
+        <field name="is_terminal" eval="True"/>
+        <field name="color">8</field>
+    </record>
+
+</odoo>

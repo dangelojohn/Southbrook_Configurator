@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_southbrook_cmms_mi_tiles_form" model="ir.ui.view">
+        <field name="name">southbrook.cmms.mi_tiles.form</field>
+        <field name="model">southbrook.cmms.mi_tiles</field>
+        <field name="arch" type="xml">
+            <form string="CMMS / WMS Snapshot">
+                <header>
+                    <button name="action_refresh"
+                            string="Refresh"
+                            type="object"
+                            class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="label"/></h1>
+                        <div>As of: <field name="as_of" readonly="1"/></div>
+                    </div>
+                    <group>
+                        <group string="Maintenance">
+                            <field name="mtbf_avg_30d"/>
+                            <field name="mttr_avg_30d"/>
+                            <field name="open_breakdowns_count"/>
+                            <field name="service_contracts_expiring_60d_count"/>
+                        </group>
+                        <group string="Logistics">
+                            <field name="oversize_pickings_pending_count"/>
+                            <field name="landed_cost_value_30d"/>
+                            <field name="currency_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_mi_tiles_list" model="ir.ui.view">
+        <field name="name">southbrook.cmms.mi_tiles.list</field>
+        <field name="model">southbrook.cmms.mi_tiles</field>
+        <field name="arch" type="xml">
+            <list string="CMMS / WMS Snapshots">
+                <field name="label"/>
+                <field name="as_of"/>
+                <field name="open_breakdowns_count"/>
+                <field name="service_contracts_expiring_60d_count"/>
+                <field name="oversize_pickings_pending_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_southbrook_cmms_mi_tiles" model="ir.actions.act_window">
+        <field name="name">CMMS / WMS Snapshot</field>
+        <field name="res_model">southbrook.cmms.mi_tiles</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hermes_research_job_user,hermes.research.job (user — read+create only; wizard sudo's its writes),model_hermes_research_job,group_hermes_user,1,0,1,0
+access_hermes_research_job_admin,hermes.research.job (admin),model_hermes_research_job,base.group_system,1,1,1,1
+access_hermes_wizard_user,hermes.wizard (user),model_hermes_wizard,group_hermes_user,1,1,1,1
+access_hermes_wizard_admin,hermes.wizard (admin),model_hermes_wizard,base.group_system,1,1,1,1

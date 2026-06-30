@@ -1,0 +1,945 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_27_cmms_architecture" model="slide.slide">
+            <field name="name">CMMS + WMS Module — Architecture</field>
+            <field name="channel_id" ref="course_cmms_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer or admin learning southbrook_cmms_wms internals.</field>
+            <field name="html_content"><![CDATA[<h1 id="cmms-wms-module-architecture">CMMS + WMS Module — Architecture</h1>
+<h2 id="the-module-at-a-glance">The module at a glance</h2>
+<ul>
+<li>Path: <code>addons/southbrook_cmms_wms/</code></li>
+<li>Version: 19.0.1.0.0</li>
+<li>Depends on: <code>base</code>, <code>mail</code>, <code>mrp</code>, <code>maintenance</code>, <code>stock</code>,
+  <code>purchase</code>, <code>southbrook_manufacturing_intelligence</code></li>
+</ul>
+<h2 id="source-layout">Source layout</h2>
+<pre><code>addons/southbrook_cmms_wms/
+├── models/
+│   ├── breakdown_alert.py     — operational alerts from floor
+│   ├── mtbf_mttr_report.py    — capability reports
+│   ├── service_contract.py    — vendor service contracts
+│   ├── landed_cost_template.py — recurring oversize/freight templates
+│   └── mi_engine_ext.py
+├── views/
+├── security/
+└── data/
+</code></pre>
+<h2 id="what-cmms-wms">What CMMS + WMS</h2>
+<ul>
+<li><strong>CMMS</strong> = Computerized Maintenance Management System. Tracks
+  equipment, breakdowns, MTBF/MTTR.</li>
+<li><strong>WMS</strong> = Warehouse Management System. Light touch on the
+  warehouse side — oversize permit (for oversized cabinet
+  shipping) + landed cost templates for freight.</li>
+</ul>
+<p>The two are paired because:
+- They share a vendor management surface
+- Both touch the equipment + freight cost equation
+- Combining keeps install footprint small at v1</p>
+<h2 id="install">Install</h2>
+<pre><code class="language-bash">./scripts/deploy_to_qnap.sh southbrook_cmms_wms
+</code></pre>
+<p>What -i does:
+1. Creates the 5 main tables
+2. Adds 5 menus under CMMS
+3. Registers cron for MTBF/MTTR daily compute</p>
+<h2 id="cron-landscape">Cron landscape</h2>
+<table>
+<thead>
+<tr>
+<th>Cron</th>
+<th>Schedule</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cron_mtbf_mttr_compute</code></td>
+<td>daily 03:00</td>
+<td>Refreshes MTBF/MTTR for all equipment</td>
+</tr>
+</tbody>
+</table>
+<h2 id="breakdown-alert-native-maintenance-bridge">Breakdown alert + native maintenance bridge</h2>
+<p>Southbrook's <code>breakdown_alert</code> is an OPERATIONAL log (floor
+operator reports an alarm). It auto-creates a native
+<code>maintenance.request</code> when dispatched — that's where the actual
+WO time tracking lives.</p>
+<pre><code class="language-python">def action_dispatch(self):
+    &quot;&quot;&quot;Dispatch maintenance — creates native maintenance.request.&quot;&quot;&quot;
+    self.ensure_one()
+    if self.maintenance_request_id:
+        raise UserError(_(&quot;Already dispatched&quot;))
+
+    request = self.env[&quot;maintenance.request&quot;].create({
+        &quot;name&quot;: f&quot;Breakdown: {self.equipment_id.name}&quot;,
+        &quot;equipment_id&quot;: self.equipment_id.id,
+        &quot;request_date&quot;: fields.Date.today(),
+        &quot;maintenance_type&quot;: &quot;corrective&quot;,
+        &quot;priority&quot;: &quot;3&quot; if self.severity == &quot;critical&quot; else &quot;2&quot;,
+    })
+    self.maintenance_request_id = request.id
+    self.state = &quot;dispatched&quot;
+</code></pre>
+<p>This is the integration boundary. CMMS shows the operational
+alert; native shows the technician's work.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Module installed but maintenance menus disappeared"</strong> — likely
+  conflict between Southbrook + native security groups. Verify
+  group_user assignment.</li>
+<li><strong>"MTBF/MTTR all zero"</strong> — daily cron didn't run, OR no closed
+  breakdowns in the period.</li>
+<li><strong>"Breakdown alert state stuck at 'dispatched'"</strong> — <code>action_close</code>
+  not called. Maintenance request may have closed but alert
+  didn't sync.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Why combine CMMS + WMS in one module?</p>
+<blockquote>
+<p>v1 footprint efficiency. Both touch the equipment + freight
+equation; both share vendor management.</p>
+</blockquote>
+<p><strong>Q2.</strong> Breakdown alert vs maintenance.request — what's each?</p>
+<blockquote>
+<p>Alert is the operational notification (floor → maintenance lead).
+Maintenance.request is the work order with time tracking.</p>
+</blockquote>
+<p><strong>Q3.</strong> Daily cron does what?</p>
+<blockquote>
+<p>Refreshes MTBF/MTTR computed values for all active equipment.</p>
+</blockquote>
+<p><strong>Q4.</strong> What native modules depended on?</p>
+<blockquote>
+<p><code>maintenance</code>, <code>mrp</code>, <code>stock</code>, <code>purchase</code>.</p>
+</blockquote>
+<p><strong>Q5.</strong> Module deployed but <code>Breakdown Alerts</code> menu doesn't show.
+First check?</p>
+<blockquote>
+<p>User's group membership. Verify they have <code>group_user</code> AND
+nothing's excluding them.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_27_cmms_breakdown_bridge" model="slide.slide">
+            <field name="name">CMMS + WMS Module — Breakdown Alert and Maintenance Bridge</field>
+            <field name="channel_id" ref="course_cmms_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Developer working on alert/dispatch logic.</field>
+            <field name="html_content"><![CDATA[<h1 id="cmms-wms-module-breakdown-alert-and-maintenance-bridge">CMMS + WMS Module — Breakdown Alert and Maintenance Bridge</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookCmmsBreakdownAlert(models.Model):
+    _name = &quot;southbrook.cmms.breakdown_alert&quot;
+    _description = &quot;Equipment Breakdown Alert&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name             = fields.Char(default=lambda s: s._make_seq())
+equipment_id     = fields.Many2one(&quot;maintenance.equipment&quot;,
+                                   required=True, index=True)
+workcenter_id    = fields.Many2one(&quot;mrp.workcenter&quot;)
+severity         = fields.Selection([
+    (&quot;low&quot;, &quot;Low&quot;),
+    (&quot;medium&quot;, &quot;Medium&quot;),
+    (&quot;high&quot;, &quot;High&quot;),
+    (&quot;critical&quot;, &quot;Critical&quot;),
+])
+description      = fields.Text()
+reported_at      = fields.Datetime(default=fields.Datetime.now)
+reported_by      = fields.Many2one(&quot;res.users&quot;,
+                                   default=lambda s: s.env.user)
+
+state = fields.Selection([
+    (&quot;open&quot;, &quot;Open&quot;),
+    (&quot;dispatched&quot;, &quot;Dispatched&quot;),
+    (&quot;fixed&quot;, &quot;Fixed&quot;),
+], default=&quot;open&quot;)
+
+maintenance_request_id = fields.Many2one(&quot;maintenance.request&quot;)
+affected_production_ids = fields.Many2many(&quot;mrp.production&quot;)
+total_downtime_min      = fields.Integer()
+root_cause              = fields.Text()
+parts_used_ids          = fields.Many2many(&quot;product.product&quot;)
+</code></pre>
+<h2 id="state-machine">State machine</h2>
+<pre><code>open ──[Dispatch]──&gt; dispatched ──[Close]──&gt; fixed
+</code></pre>
+<h3 id="dispatch">Dispatch</h3>
+<pre><code class="language-python">def action_dispatch(self):
+    self.ensure_one()
+    if self.maintenance_request_id:
+        raise UserError(_(&quot;Already dispatched&quot;))
+
+    request = self.env[&quot;maintenance.request&quot;].create({
+        &quot;name&quot;: f&quot;Breakdown: {self.equipment_id.name}&quot;,
+        &quot;equipment_id&quot;: self.equipment_id.id,
+        &quot;request_date&quot;: fields.Date.today(),
+        &quot;maintenance_type&quot;: &quot;corrective&quot;,
+        &quot;priority&quot;: &quot;3&quot; if self.severity in (&quot;high&quot;, &quot;critical&quot;) else &quot;2&quot;,
+    })
+    self.maintenance_request_id = request.id
+    self.state = &quot;dispatched&quot;
+    self.message_post(body=_(&quot;Dispatched as %s&quot;) % request.name)
+</code></pre>
+<h3 id="close">Close</h3>
+<pre><code class="language-python">def action_close(self, total_downtime_min, root_cause, parts_used_ids):
+    self.ensure_one()
+    self.write({
+        &quot;total_downtime_min&quot;: total_downtime_min,
+        &quot;root_cause&quot;: root_cause,
+        &quot;parts_used_ids&quot;: [(6, 0, parts_used_ids)],
+        &quot;state&quot;: &quot;fixed&quot;,
+    })
+    # Native maintenance request also closes if still open
+    if self.maintenance_request_id.stage_id.done is False:
+        self.maintenance_request_id.stage_id = \
+            self.env.ref(&quot;maintenance.stage_2&quot;)  # &quot;Done&quot;
+</code></pre>
+<h2 id="block-affected-mos">Block affected MOs</h2>
+<p>Optional secondary action:</p>
+<pre><code class="language-python">def action_block_affected_mos(self):
+    self.ensure_one()
+    # Find active MOs targeting this workcenter
+    mos = self.env[&quot;mrp.production&quot;].search([
+        (&quot;state&quot;, &quot;in&quot;, (&quot;confirmed&quot;, &quot;progress&quot;)),
+    ])
+    affected = []
+    for mo in mos:
+        for wo in mo.workorder_ids:
+            if wo.workcenter_id == self.workcenter_id and \
+               wo.state in (&quot;ready&quot;, &quot;progress&quot;):
+                wo.block_reason = f&quot;Breakdown/{self.id}&quot;
+                affected.append(mo.id)
+
+    self.affected_production_ids = [(6, 0, list(set(affected)))]
+    self.message_post(body=_(&quot;Blocked %d affected MOs&quot;) % len(set(affected)))
+</code></pre>
+<h2 id="unblock-affected-mos-on-close">Unblock affected MOs (on close)</h2>
+<pre><code class="language-python">def action_unblock_affected_mos(self):
+    self.ensure_one()
+    for mo in self.affected_production_ids:
+        for wo in mo.workorder_ids:
+            if wo.block_reason == f&quot;Breakdown/{self.id}&quot;:
+                wo.block_reason = False
+</code></pre>
+<p>Called either explicitly OR on <code>action_close()</code> if you want
+automatic unblocking.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Dispatch creates duplicate maintenance.request"</strong> —
+  <code>action_dispatch</code> guard not working. Add <code>if self.maintenance_request_id</code>
+  check.</li>
+<li><strong>"Close blocked WOs still showing red"</strong> — <code>action_unblock_affected_mos</code>
+  not called. Either call it from close OR add as secondary
+  action.</li>
+<li><strong>"Multiple alerts on same equipment"</strong> — allowed but messy.
+  Close duplicates referencing the live one.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> What state can <code>action_dispatch</code> be called from?</p>
+<blockquote>
+<p><code>open</code> only (the action is <code>invisible="state != 'open'"</code> in
+view).</p>
+</blockquote>
+<p><strong>Q2.</strong> Dispatch creates a native maintenance.request. What
+priority?</p>
+<blockquote>
+<p>3 (high) for high/critical severity; 2 (medium) otherwise.</p>
+</blockquote>
+<p><strong>Q3.</strong> Close logs <code>total_downtime_min</code>. Why required?</p>
+<blockquote>
+<p>Drives MTBF/MTTR math. Without it, capability reports are wrong.</p>
+</blockquote>
+<p><strong>Q4.</strong> Affected MOs auto-unblock on close?</p>
+<blockquote>
+<p>Implementation choice. Current code requires explicit
+<code>action_unblock_affected_mos</code> call. v1.1 candidate to auto-unblock.</p>
+</blockquote>
+<p><strong>Q5.</strong> Severity = critical but priority on maintenance.request
+shows 3. Should it show 4?</p>
+<blockquote>
+<p>Native maintenance.request priority maxes at 3. Critical maps to
+3 by design.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_27_cmms_mtbf_mttr_math" model="slide.slide">
+            <field name="name">CMMS + WMS Module — MTBF and MTTR Math</field>
+            <field name="channel_id" ref="course_cmms_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Developer working on capability metrics.</field>
+            <field name="html_content"><![CDATA[<h1 id="cmms-wms-module-mtbf-and-mttr-math">CMMS + WMS Module — MTBF and MTTR Math</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookCmmsMtbfMttrReport(models.Model):
+    _name = &quot;southbrook.cmms.mtbf_mttr_report&quot;
+    _description = &quot;MTBF / MTTR Capability Report&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name              = fields.Char()
+equipment_id      = fields.Many2one(&quot;maintenance.equipment&quot;,
+                                    required=True)
+as_of_date        = fields.Date(default=fields.Date.today)
+period_days       = fields.Integer(default=90)
+
+breakdown_count       = fields.Integer(readonly=True)
+total_downtime_hours  = fields.Float(readonly=True)
+total_runtime_hours   = fields.Float(readonly=True)
+mtbf_hours            = fields.Float(readonly=True)
+mttr_hours            = fields.Float(readonly=True)
+availability_pct      = fields.Float(readonly=True)
+</code></pre>
+<h2 id="the-math">The math</h2>
+<pre><code class="language-python">def action_compute(self):
+    self.ensure_one()
+    period_start = self.as_of_date - relativedelta(days=self.period_days)
+
+    breakdowns = self.env[&quot;southbrook.cmms.breakdown_alert&quot;].search([
+        (&quot;equipment_id&quot;, &quot;=&quot;, self.equipment_id.id),
+        (&quot;state&quot;, &quot;=&quot;, &quot;fixed&quot;),
+        (&quot;reported_at&quot;, &quot;&gt;=&quot;, period_start),
+        (&quot;reported_at&quot;, &quot;&lt;=&quot;, self.as_of_date),
+    ])
+
+    count = len(breakdowns)
+    downtime_hours = sum(b.total_downtime_min for b in breakdowns) / 60
+
+    # Runtime = total hours in period - downtime
+    period_hours = self.period_days * 24
+    runtime_hours = period_hours - downtime_hours
+
+    self.write({
+        &quot;breakdown_count&quot;: count,
+        &quot;total_downtime_hours&quot;: downtime_hours,
+        &quot;total_runtime_hours&quot;: runtime_hours,
+        &quot;mtbf_hours&quot;: runtime_hours / count if count else 0,
+        &quot;mttr_hours&quot;: downtime_hours / count if count else 0,
+        &quot;availability_pct&quot;: (runtime_hours / period_hours * 100)
+                            if period_hours else 0,
+    })
+</code></pre>
+<h2 id="reading-the-metrics">Reading the metrics</h2>
+<h3 id="mtbf-mean-time-between-failures">MTBF — Mean Time Between Failures</h3>
+<p>Higher = better. Tells you how long the equipment runs without breaking.</p>
+<h3 id="mttr-mean-time-to-repair">MTTR — Mean Time To Repair</h3>
+<p>Lower = better. Tells you how fast maintenance fixes breakdowns.</p>
+<h3 id="availability">Availability %</h3>
+<p>The composite headline. &gt; 95% = healthy, &lt; 80% = concerning.</p>
+<h2 id="period-choice">Period choice</h2>
+<p>Default 90 days. Trade-off:
+- <strong>Shorter</strong> (30 days): more responsive to recent changes,
+  but noisy
+- <strong>Longer</strong> (180 days): smooth trend but lags real-time</p>
+<p>For equipment with 1-2 breakdowns/month, 90 days gives ~3-6
+data points — workable. Smaller equipment count needs longer period.</p>
+<h2 id="daily-cron">Daily cron</h2>
+<pre><code class="language-python">@api.model
+def _cron_compute_mtbf_mttr(self):
+    &quot;&quot;&quot;Refresh MTBF/MTTR for all active equipment.&quot;&quot;&quot;
+    today = fields.Date.today()
+    for equipment in self.env[&quot;maintenance.equipment&quot;].search([
+        (&quot;active&quot;, &quot;=&quot;, True),
+    ]):
+        report = self.search([
+            (&quot;equipment_id&quot;, &quot;=&quot;, equipment.id),
+            (&quot;as_of_date&quot;, &quot;=&quot;, today),
+        ], limit=1)
+        if not report:
+            report = self.create({
+                &quot;equipment_id&quot;: equipment.id,
+                &quot;as_of_date&quot;: today,
+                &quot;name&quot;: f&quot;{equipment.name} - {today}&quot;,
+            })
+        report.action_compute()
+</code></pre>
+<h2 id="historical-trend">Historical trend</h2>
+<p>Each day's report stays as a row. Trend visible via graph view
+filtered by equipment:</p>
+<pre><code class="language-python"># Last 90 reports for one equipment = ~3 months of trend
+self.search([
+    (&quot;equipment_id&quot;, &quot;=&quot;, equipment_id),
+], order=&quot;as_of_date desc&quot;, limit=90)
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"MTBF = 0"</strong> — no closed breakdowns in period. Either
+  legitimate (no breakdowns) or breakdowns weren't closed with
+  downtime data.</li>
+<li><strong>"Availability &gt; 100%"</strong> — over-reported downtime negatives
+  out. Audit recent close-outs.</li>
+<li><strong>"MTTR seems too low"</strong> — downtime under-reported. Operators
+  may close before maintenance finishes.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> 90 days, 5 breakdowns, total 12 hours downtime. MTBF?</p>
+<blockquote>
+<p>Runtime = 90×24 - 12 = 2148 hours. MTBF = 2148 / 5 = <strong>429.6 hours</strong>.</p>
+</blockquote>
+<p><strong>Q2.</strong> Same data: MTTR?</p>
+<blockquote>
+<p>12 / 5 = <strong>2.4 hours per repair</strong>.</p>
+</blockquote>
+<p><strong>Q3.</strong> Same data: availability?</p>
+<blockquote>
+<p>2148 / 2160 × 100 = <strong>99.4%</strong>. Excellent.</p>
+</blockquote>
+<p><strong>Q4.</strong> Equipment with no breakdowns in 90 days. MTBF?</p>
+<blockquote>
+<p>Undefined (divide by zero); model returns 0. Interpret as
+"all 90 days uptime, no failures to measure between."</p>
+</blockquote>
+<p><strong>Q5.</strong> Equipment goes through periodic 8-hour PM (planned).
+Does PM count as downtime?</p>
+<blockquote>
+<p>Currently no — only breakdown alerts (corrective) count.
+PM (preventive) is excluded. May want to include for full
+availability picture.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_27_cmms_service_contracts" model="slide.slide">
+            <field name="name">CMMS + WMS Module — Service Contracts</field>
+            <field name="channel_id" ref="course_cmms_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Developer working on vendor service contract logic.</field>
+            <field name="html_content"><![CDATA[<h1 id="cmms-wms-module-service-contracts">CMMS + WMS Module — Service Contracts</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookCmmsServiceContract(models.Model):
+    _name = &quot;southbrook.cmms.service_contract&quot;
+    _description = &quot;Service Contract (vendor-managed equipment)&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name           = fields.Char()
+vendor_id      = fields.Many2one(&quot;res.partner&quot;, required=True)
+equipment_ids  = fields.Many2many(&quot;maintenance.equipment&quot;)
+contract_type  = fields.Selection([
+    (&quot;full&quot;, &quot;Full Coverage&quot;),
+    (&quot;preventive_only&quot;, &quot;Preventive Only&quot;),
+    (&quot;response_only&quot;, &quot;Response Only&quot;),
+    (&quot;parts_only&quot;, &quot;Parts Only&quot;),
+])
+
+start_date     = fields.Date(required=True)
+end_date       = fields.Date(required=True)
+annual_cost    = fields.Float()
+response_time_hours = fields.Float(default=24)
+
+state          = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;active&quot;, &quot;Active&quot;),
+    (&quot;expired&quot;, &quot;Expired&quot;),
+    (&quot;renewed&quot;, &quot;Renewed&quot;),
+])
+
+renewal_reminder_days = fields.Integer(default=60)
+</code></pre>
+<h2 id="contract-types">Contract types</h2>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>What's covered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Full</strong></td>
+<td>All maintenance + parts + breakdowns</td>
+</tr>
+<tr>
+<td><strong>Preventive only</strong></td>
+<td>Scheduled PM; breakdowns billed separately</td>
+</tr>
+<tr>
+<td><strong>Response only</strong></td>
+<td>Breakdowns; PM is in-house</td>
+</tr>
+<tr>
+<td><strong>Parts only</strong></td>
+<td>Parts at discount; labour in-house</td>
+</tr>
+</tbody>
+</table>
+<p>Drives the maintenance.request routing: full + response_only get
+auto-routed to vendor; PM-only routes preventive maintenance to
+vendor.</p>
+<h2 id="renewal-reminder-cron">Renewal reminder cron</h2>
+<pre><code class="language-python">@api.model
+def _cron_check_renewals(self):
+    &quot;&quot;&quot;Daily: find contracts expiring within renewal_reminder_days.&quot;&quot;&quot;
+    today = fields.Date.today()
+    expiring = self.search([
+        (&quot;state&quot;, &quot;=&quot;, &quot;active&quot;),
+        (&quot;end_date&quot;, &quot;&lt;=&quot;, today + relativedelta(days=60)),
+        (&quot;end_date&quot;, &quot;&gt;=&quot;, today),
+    ])
+    for c in expiring:
+        days_left = (c.end_date - today).days
+        if days_left &lt;= c.renewal_reminder_days and \
+           not self._already_notified(c, days_left):
+            self._notify_renewal(c, days_left)
+</code></pre>
+<h2 id="notification">Notification</h2>
+<pre><code class="language-python">def _notify_renewal(self, contract, days_left):
+    contract.message_post(
+        body=_(&quot;Renewal due in %d days. Decide renew / negotiate / &quot;
+               &quot;cancel.&quot;) % days_left,
+        partner_ids=self.env.ref(
+            &quot;southbrook_cmms_wms.group_cmms_manager&quot;).users.partner_id.ids,
+    )
+    # Also emit MI recommendation
+    self.env[&quot;southbrook.mi.engine&quot;]._emit_recommendation(
+        subject=f&quot;Service contract {contract.name} renewal in {days_left} days&quot;,
+        body=f&quot;Vendor: {contract.vendor_id.name}, &quot;
+             f&quot;annual cost: ${contract.annual_cost}&quot;,
+        persona=&quot;ops_manager&quot;,
+    )
+</code></pre>
+<h2 id="linking-to-maintenancerequest">Linking to maintenance.request</h2>
+<p>When a breakdown is dispatched + the equipment has an active
+contract:</p>
+<pre><code class="language-python">def action_dispatch(self):
+    result = super().action_dispatch()
+    # Check for active contract
+    contract = self.env[&quot;southbrook.cmms.service_contract&quot;].search([
+        (&quot;state&quot;, &quot;=&quot;, &quot;active&quot;),
+        (&quot;equipment_ids&quot;, &quot;in&quot;, self.equipment_id.id),
+    ], limit=1)
+    if contract and contract.contract_type in (&quot;full&quot;, &quot;response_only&quot;):
+        # Route to vendor
+        self.maintenance_request_id.user_id = contract.vendor_id.user_id.id
+        # Notify vendor
+        contract.vendor_id.message_post(
+            body=_(&quot;Breakdown dispatched: %s&quot;) % self.name)
+    return result
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Contract expired but state still active"</strong> — <code>_cron_check_renewals</code>
+  may have failed. Manual: bulk-update state on expired contracts.</li>
+<li><strong>"Renewal notification fires every day until renewed"</strong> —
+  <code>_already_notified</code> check failing. Verify dedup logic.</li>
+<li><strong>"Equipment under contract but in-house tech responded"</strong> —
+  vendor routing didn't fire OR equipment's contract link missing.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Service contract <code>parts_only</code>. Breakdown happens. Vendor
+routing?</p>
+<blockquote>
+<p>No vendor routing — parts only doesn't include labour.
+Maintenance handles in-house. Parts ordered at vendor discount.</p>
+</blockquote>
+<p><strong>Q2.</strong> Contract expires Dec 31. <code>renewal_reminder_days = 60</code>.
+First reminder?</p>
+<blockquote>
+<p>~Nov 1 (60 days before).</p>
+</blockquote>
+<p><strong>Q3.</strong> Renewed via <code>action_renew()</code>. State transitions?</p>
+<blockquote>
+<p>active → renewed (or active stays + a new contract created
+covering next period).</p>
+</blockquote>
+<p><strong>Q4.</strong> Add a new contract type "advisory_only" (vendor consults
+but doesn't dispatch). Approach?</p>
+<blockquote>
+<p>Add to <code>contract_type</code> Selection. Update vendor-routing logic
+to skip dispatch for advisory_only.</p>
+</blockquote>
+<p><strong>Q5.</strong> Multi-vendor contract on same equipment. Effect?</p>
+<blockquote>
+<p>Search returns first match (limit=1). Order matters; consider
+adding <code>priority</code> field for tie-break.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_27_cmms_wms_oversize" model="slide.slide">
+            <field name="name">CMMS + WMS Module — Oversize Permit and Landed Cost Templates</field>
+            <field name="channel_id" ref="course_cmms_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer working on WMS-side features.</field>
+            <field name="html_content"><![CDATA[<h1 id="cmms-wms-module-oversize-permit-and-landed-cost-templates">CMMS + WMS Module — Oversize Permit and Landed Cost Templates</h1>
+<h2 id="the-two-wms-features">The two WMS features</h2>
+<ol>
+<li><strong>Oversize permit</strong> — tracks the permits required for shipping
+   oversize cabinets (over 12' or 8' wide depending on jurisdiction)</li>
+<li><strong>Landed cost templates</strong> — recurring freight/duty cost rules
+   that auto-apply to receipts</li>
+</ol>
+<h2 id="oversize-permit-model">Oversize permit model</h2>
+<pre><code class="language-python">class SouthbrookWmsOversizePermit(models.Model):
+    _name = &quot;southbrook.wms.oversize_permit&quot;
+    _description = &quot;Oversize Vehicle Permit&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name             = fields.Char()
+jurisdiction_id  = fields.Many2one(&quot;res.country.state&quot;)
+permit_number    = fields.Char()
+issue_date       = fields.Date()
+expiry_date      = fields.Date()
+max_length_in    = fields.Float()
+max_width_in     = fields.Float()
+max_height_in    = fields.Float()
+max_weight_lb    = fields.Float()
+
+linked_picking_ids = fields.Many2many(&quot;stock.picking&quot;)
+
+state = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;active&quot;, &quot;Active&quot;),
+    (&quot;used&quot;, &quot;Used&quot;),
+    (&quot;expired&quot;, &quot;Expired&quot;),
+])
+</code></pre>
+<h2 id="linking-to-shipments">Linking to shipments</h2>
+<p>When a picking has oversize content:</p>
+<pre><code class="language-python">class StockPicking(models.Model):
+    _inherit = &quot;stock.picking&quot;
+
+    requires_oversize_permit = fields.Boolean(
+        compute=&quot;_compute_oversize_required&quot;, store=True)
+    oversize_permit_id = fields.Many2one(
+        &quot;southbrook.wms.oversize_permit&quot;)
+
+
+@api.depends(&quot;move_ids.product_id.product_length&quot;,
+             &quot;move_ids.product_id.product_width&quot;,
+             &quot;move_ids.product_id.product_height&quot;)
+def _compute_oversize_required(self):
+    for p in self:
+        # If any product exceeds standard dimensions
+        max_dim = max(
+            move.product_id.product_length or 0
+            for move in p.move_ids
+        )
+        p.requires_oversize_permit = max_dim &gt; 96  # 8'
+</code></pre>
+<h2 id="landed-cost-templates">Landed cost templates</h2>
+<p>For recurring freight/duty patterns:</p>
+<pre><code class="language-python">class SouthbrookWmsLandedCostTemplate(models.Model):
+    _name = &quot;southbrook.wms.landed_cost_template&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name           = fields.Char()
+vendor_id      = fields.Many2one(&quot;res.partner&quot;)
+country_id     = fields.Many2one(&quot;res.country&quot;)
+cost_type      = fields.Selection([
+    (&quot;freight&quot;, &quot;Freight&quot;),
+    (&quot;duty&quot;, &quot;Customs Duty&quot;),
+    (&quot;brokerage&quot;, &quot;Brokerage Fee&quot;),
+])
+cost_formula   = fields.Char()
+# Examples: &quot;100&quot;, &quot;weight_lb * 0.5&quot;, &quot;value * 0.05&quot;
+account_id     = fields.Many2one(&quot;account.account&quot;)
+</code></pre>
+<p>When a vendor bill matches the template:</p>
+<pre><code class="language-python">def auto_apply_landed_cost(self, vendor_bill):
+    &quot;&quot;&quot;Find matching templates + create landed cost adjustments.&quot;&quot;&quot;
+    templates = self.search([
+        (&quot;vendor_id&quot;, &quot;=&quot;, vendor_bill.partner_id.id),
+    ])
+    for template in templates:
+        amount = self._evaluate_formula(template, vendor_bill)
+        if amount &gt; 0:
+            self.env[&quot;stock.landed.cost&quot;].create({
+                &quot;picking_ids&quot;: [(6, 0, vendor_bill.picking_ids.ids)],
+                &quot;cost_lines&quot;: [(0, 0, {
+                    &quot;product_id&quot;: template.product_id.id,
+                    &quot;price_unit&quot;: amount,
+                    &quot;account_id&quot;: template.account_id.id,
+                })],
+            })
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Shipment requires permit but field is False"</strong> — product
+  dimensions missing on master. Set length/width/height on
+  product.product.</li>
+<li><strong>"Permit expired, used field still active"</strong> — check the
+  daily expiry cron. Manual: bulk-update state.</li>
+<li><strong>"Landed cost not applied"</strong> — template formula evaluation
+  failed. Check logs.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Permit applies to one shipment. Re-use possible?</p>
+<blockquote>
+<p>m2m on <code>linked_picking_ids</code>. One permit can cover multiple
+shipments within its validity window.</p>
+</blockquote>
+<p><strong>Q2.</strong> Picking has a product 100" long. <code>requires_oversize_permit</code>?</p>
+<blockquote>
+<p>True (100 &gt; 96 = 8 feet threshold).</p>
+</blockquote>
+<p><strong>Q3.</strong> Landed cost template uses formula <code>weight_lb * 0.5</code>.
+What weight?</p>
+<blockquote>
+<p>Total weight of the bill's products. Computed from
+<code>product.weight × qty</code>.</p>
+</blockquote>
+<p><strong>Q4.</strong> Two templates match same vendor bill. Effect?</p>
+<blockquote>
+<p>Both apply. Stack additively. Verify this is intended (could be
+double-counting).</p>
+</blockquote>
+<p><strong>Q5.</strong> Add a new permit jurisdiction (e.g. Manitoba). Effort?</p>
+<blockquote>
+<p>No code change — just create a new permit record with
+<code>jurisdiction_id = Manitoba</code>. Permit thresholds may differ;
+adjust max_* values per jurisdiction.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_27_cmms_mi_integration" model="slide.slide">
+            <field name="name">CMMS + WMS Module — MI Engine Integration</field>
+            <field name="channel_id" ref="course_cmms_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Developer extending CMMS signals to MI engine.</field>
+            <field name="html_content"><![CDATA[<h1 id="cmms-wms-module-mi-engine-integration">CMMS + WMS Module — MI Engine Integration</h1>
+<h2 id="signals-surfaced">Signals surfaced</h2>
+<ol>
+<li><strong>Critical breakdown opened</strong> → recommendation for Plant GM</li>
+<li><strong>MTBF dropped &gt; 30% week-over-week</strong> → for maintenance lead</li>
+<li><strong>Service contract expiring in N days</strong> → for ops manager</li>
+<li><strong>Oversize permit expiring</strong> → for ops manager</li>
+</ol>
+<h2 id="hook">Hook</h2>
+<pre><code class="language-python">class MiEngineCmmsExt(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.engine&quot;
+
+    @api.model
+    def _check_cmms_signals(self):
+        self._check_critical_breakdowns()
+        self._check_mtbf_trends()
+        # Service contract + oversize handled by their own crons
+
+    def _check_critical_breakdowns(self):
+        critical = self.env[&quot;southbrook.cmms.breakdown_alert&quot;].search([
+            (&quot;state&quot;, &quot;=&quot;, &quot;open&quot;),
+            (&quot;severity&quot;, &quot;=&quot;, &quot;critical&quot;),
+        ])
+        for alert in critical:
+            self._emit_recommendation(
+                subject=f&quot;CRITICAL: {alert.equipment_id.name} down&quot;,
+                body=alert.description or &quot;&quot;,
+                affected_records=alert,
+                persona=&quot;mfg_manager&quot;,
+            )
+
+    def _check_mtbf_trends(self):
+        # Compare last 7 days' avg MTBF to prior 7 days'
+        for equip in self.env[&quot;maintenance.equipment&quot;].search([]):
+            recent_reports = self.env[&quot;southbrook.cmms.mtbf_mttr_report&quot;].search([
+                (&quot;equipment_id&quot;, &quot;=&quot;, equip.id),
+                (&quot;as_of_date&quot;, &quot;&gt;&quot;, fields.Date.today() - relativedelta(days=7)),
+            ])
+            prior_reports = self.env[&quot;southbrook.cmms.mtbf_mttr_report&quot;].search([
+                (&quot;equipment_id&quot;, &quot;=&quot;, equip.id),
+                (&quot;as_of_date&quot;, &quot;&lt;=&quot;, fields.Date.today() - relativedelta(days=7)),
+                (&quot;as_of_date&quot;, &quot;&gt;&quot;, fields.Date.today() - relativedelta(days=14)),
+            ])
+            if recent_reports and prior_reports:
+                recent_mtbf = sum(r.mtbf_hours for r in recent_reports) / len(recent_reports)
+                prior_mtbf = sum(r.mtbf_hours for r in prior_reports) / len(prior_reports)
+                if prior_mtbf &gt; 0 and (prior_mtbf - recent_mtbf) / prior_mtbf &gt; 0.30:
+                    self._emit_recommendation(
+                        subject=f&quot;{equip.name} MTBF dropping ({recent_mtbf:.0f}h vs {prior_mtbf:.0f}h)&quot;,
+                        body=&quot;MTBF has degraded &gt; 30% week-over-week. &quot;
+                             &quot;Investigate root cause; may need preventive intervention.&quot;,
+                        persona=&quot;maintenance_lead&quot;,
+                    )
+</code></pre>
+<h2 id="tile-integration">Tile integration</h2>
+<p>CMMS contributes to the Equipment Health MI tile:</p>
+<pre><code class="language-python">def get_equipment_health_tile(self):
+    open_critical = self.env[&quot;southbrook.cmms.breakdown_alert&quot;].search_count([
+        (&quot;state&quot;, &quot;in&quot;, (&quot;open&quot;, &quot;dispatched&quot;)),
+        (&quot;severity&quot;, &quot;=&quot;, &quot;critical&quot;),
+    ])
+    avg_availability = self._avg_availability_pct()
+
+    color = &quot;red&quot; if open_critical &gt; 0 \
+            else &quot;amber&quot; if avg_availability &lt; 90 \
+            else &quot;green&quot;
+
+    return {
+        &quot;title&quot;: &quot;Equipment Health&quot;,
+        &quot;value&quot;: f&quot;{open_critical} critical, {avg_availability:.0f}% avail&quot;,
+        &quot;color&quot;: color,
+    }
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Critical breakdown rec fires every day"</strong> — dedup not by
+  alert id. Same alert should produce one rec, not daily refresh.</li>
+<li><strong>"MTBF trend rec triggers for new equipment"</strong> — guard
+  <code>if prior_reports and recent_reports</code> covers this.</li>
+<li><strong>"Service contract renewal rec fires too late"</strong> — <code>cron_check_renewals</code>
+  schedule wrong, OR <code>renewal_reminder_days</code> too low.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Critical breakdown opened today. When does rec emit?</p>
+<blockquote>
+<p>Next MI engine cron tick. Subject deduped against existing
+pending_review recs.</p>
+</blockquote>
+<p><strong>Q2.</strong> MTBF trend signal — minimum data required?</p>
+<blockquote>
+<p>≥3 reports in each window (recent + prior). Avoid noise on
+single-data-point windows.</p>
+</blockquote>
+<p><strong>Q3.</strong> Equipment health tile colour green vs red?</p>
+<blockquote>
+<p>Green = no critical alerts AND avg availability ≥ 90%.
+Red = at least 1 critical OR availability &lt; 70%.
+Amber = otherwise.</p>
+</blockquote>
+<p><strong>Q4.</strong> New signal: "spare parts inventory low for high-risk
+equipment." Where?</p>
+<blockquote>
+<p>New <code>_check_*</code> method in <code>_check_cmms_signals</code>. Joins
+<code>maintenance.equipment.spare_part_ids</code> with stock levels.</p>
+</blockquote>
+<p><strong>Q5.</strong> Service contract renewal vs CMMS MI hook — different?</p>
+<blockquote>
+<p>Contract renewal has its own cron (<code>cron_check_renewals</code>).
+MI engine doesn't duplicate; both can co-exist surfacing same
+recommendation.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_27_cmms_new_equipment" model="slide.slide">
+            <field name="name">CMMS + WMS Module — Adding New Equipment Types</field>
+            <field name="channel_id" ref="course_cmms_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Developer onboarding new equipment categories.</field>
+            <field name="html_content"><![CDATA[<h1 id="cmms-wms-module-adding-new-equipment-types">CMMS + WMS Module — Adding New Equipment Types</h1>
+<h2 id="the-pattern">The pattern</h2>
+<p>New equipment doesn't usually need new models — just new records
+in existing models:</p>
+<ol>
+<li><code>maintenance.equipment</code> — the equipment record</li>
+<li><code>maintenance.equipment.category</code> — its category</li>
+<li><code>maintenance.equipment.spare_part_ids</code> — required spares</li>
+</ol>
+<h2 id="adding-a-new-equipment-record">Adding a new equipment record</h2>
+<p>Via UI: <em>Maintenance → Equipment → New</em>.</p>
+<p>Via XML:</p>
+<pre><code class="language-xml">&lt;record id=&quot;equip_homag_bao_823&quot; model=&quot;maintenance.equipment&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;HOMAG BAO 823 Edge Bander&lt;/field&gt;
+    &lt;field name=&quot;category_id&quot; ref=&quot;cat_edge_banding&quot;/&gt;
+    &lt;field name=&quot;serial_no&quot;&gt;H-823-5512&lt;/field&gt;
+    &lt;field name=&quot;assign_date&quot; eval=&quot;time.strftime('%Y-%m-%d')&quot;/&gt;
+    &lt;field name=&quot;cost&quot;&gt;120000&lt;/field&gt;
+    &lt;field name=&quot;warranty_date&quot; eval=&quot;(date.today() + relativedelta(years=2)).strftime('%Y-%m-%d')&quot;/&gt;
+    &lt;field name=&quot;period&quot;&gt;90&lt;/field&gt;  &lt;!-- PM interval in days --&gt;
+&lt;/record&gt;
+</code></pre>
+<h2 id="equipment-categories">Equipment categories</h2>
+<p>Categories group equipment for reporting + scheduled PM:</p>
+<pre><code class="language-xml">&lt;record id=&quot;cat_edge_banding&quot; model=&quot;maintenance.equipment.category&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Edge Banding Machines&lt;/field&gt;
+    &lt;field name=&quot;alias_name&quot;&gt;edge-banding-team&lt;/field&gt;
+    &lt;field name=&quot;email_from&quot;&gt;maintenance@southbrook.example&lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<p>Category-level PM scheduling auto-creates <code>maintenance.request</code>
+records.</p>
+<h2 id="spare-parts-master">Spare parts master</h2>
+<p>For each equipment, list spare parts that should be kept on hand:</p>
+<pre><code class="language-python">class MaintenanceEquipment(models.Model):
+    _inherit = &quot;maintenance.equipment&quot;
+
+    spare_part_ids = fields.Many2many(&quot;product.product&quot;)
+</code></pre>
+<p>Used by:
+- Spare parts inventory check (alerts when low)
+- Breakdown alert's <code>parts_used_ids</code> selector</p>
+<h2 id="adding-workcenter-linkage">Adding workcenter linkage</h2>
+<p>For OEE computation (Course 26), equipment needs a workcenter
+link:</p>
+<pre><code class="language-python">class MaintenanceEquipment(models.Model):
+    _inherit = &quot;maintenance.equipment&quot;
+
+    workcenter_id = fields.Many2one(&quot;mrp.workcenter&quot;,
+        help=&quot;Workcenter this equipment is part of.&quot;)
+</code></pre>
+<p>(May already be present; if not, add.)</p>
+<h2 id="auto-creating-breakdown-alert-from-native-maintenance">Auto-creating breakdown alert from native maintenance</h2>
+<p>For requests reported via the native interface (vs floor kanban):</p>
+<pre><code class="language-python">class MaintenanceRequest(models.Model):
+    _inherit = &quot;maintenance.request&quot;
+
+    def create(self, vals):
+        request = super().create(vals)
+        if request.maintenance_type == &quot;corrective&quot; and \
+           not request.equipment_id.skip_alert_sync:
+            # Create paired alert
+            self.env[&quot;southbrook.cmms.breakdown_alert&quot;].create({
+                &quot;equipment_id&quot;: request.equipment_id.id,
+                &quot;workcenter_id&quot;: request.equipment_id.workcenter_id.id,
+                &quot;severity&quot;: self._severity_from_priority(request.priority),
+                &quot;description&quot;: request.description,
+                &quot;maintenance_request_id&quot;: request.id,
+                &quot;state&quot;: &quot;dispatched&quot;,  # already dispatched at create
+            })
+        return request
+</code></pre>
+<h2 id="decommissioning-equipment">Decommissioning equipment</h2>
+<p>When equipment is sold/scrapped:</p>
+<pre><code class="language-python">def action_decommission(self):
+    self.ensure_one()
+    self.active = False
+    # Close open alerts
+    open_alerts = self.env[&quot;southbrook.cmms.breakdown_alert&quot;].search([
+        (&quot;equipment_id&quot;, &quot;=&quot;, self.id),
+        (&quot;state&quot;, &quot;in&quot;, (&quot;open&quot;, &quot;dispatched&quot;)),
+    ])
+    open_alerts.write({&quot;state&quot;: &quot;fixed&quot;, &quot;root_cause&quot;: &quot;Equipment decommissioned&quot;})
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"New equipment doesn't show in breakdown alert dropdown"</strong> —
+  <code>active = True</code> required, OR group-scoped access.</li>
+<li><strong>"PM auto-create not firing"</strong> — <code>period</code> field unset on the
+  equipment. Set the PM interval.</li>
+<li><strong>"Decommissioned equipment still in MTBF reports"</strong> — cron
+  computes for <code>active = True</code> only. Old reports persist (audit
+  retention).</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Add a new equipment via XML — required fields?</p>
+<blockquote>
+<p>name + category_id. Recommended: serial_no, assign_date,
+period (for PM).</p>
+</blockquote>
+<p><strong>Q2.</strong> Equipment without <code>workcenter_id</code> — affects OEE?</p>
+<blockquote>
+<p>Yes — OEE attribution may miss it. Set workcenter_id for all
+production equipment.</p>
+</blockquote>
+<p><strong>Q3.</strong> Multiple equipment in same workcenter. OEE computation?</p>
+<blockquote>
+<p>Native compute is per workcenter. Equipment-level OEE not
+directly computed; trace via productivity records' equipment_id.</p>
+</blockquote>
+<p><strong>Q4.</strong> Decommission equipment — prior MTBF reports?</p>
+<blockquote>
+<p>Stay (audit retention). Cron stops adding new ones.</p>
+</blockquote>
+<p><strong>Q5.</strong> PM interval 90 days. First PM created when?</p>
+<blockquote>
+<p><code>assign_date + 90 days</code>. Maintenance creates the auto-PM
+request 14 days before due (configurable).</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

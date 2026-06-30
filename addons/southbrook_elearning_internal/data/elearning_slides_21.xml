@@ -1,0 +1,878 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_21_exec_morning_briefing" model="slide.slide">
+            <field name="name">Executive — The 5-Minute Morning Briefing</field>
+            <field name="channel_id" ref="course_exec_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Owner, Plant GM, or executive doing the daily morning scan.</field>
+            <field name="html_content"><![CDATA[<h1 id="executive-the-5-minute-morning-briefing">Executive — The 5-Minute Morning Briefing</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the owner or Plant GM. You have 5 minutes in the morning before
+the rest of the day eats you. This lesson is the discipline: what to
+look at, what to skim, what to deep-dive, and what to ignore.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Exec Dashboard</strong> (root menu, <code>menu_exec_dashboard_root</code>).</p>
+<p>Lands you on the mobile-first morning briefing OWL view — a single
+page of tiles designed to be scannable on a phone over coffee.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="tile-layout-typical">Tile layout (typical)</h3>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Tiles</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Top</td>
+<td>Yesterday's revenue, today's plan, week-to-date</td>
+<td>Cash flow scan</td>
+</tr>
+<tr>
+<td>Middle</td>
+<td>Open NCRs, breakdown alerts, OEE</td>
+<td>Operational health</td>
+</tr>
+<tr>
+<td>Lower</td>
+<td>WIP, AR aged 60+, top-3 risk projects</td>
+<td>Risk surface</td>
+</tr>
+<tr>
+<td>Bottom</td>
+<td>Hermes-flagged items needing attention</td>
+<td>Inbox of executive actions</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tile-colour-coding">Tile colour coding</h3>
+<ul>
+<li><strong>Green</strong> — within target; no action needed</li>
+<li><strong>Amber</strong> — below target but expected variation; watch</li>
+<li><strong>Red</strong> — significant miss; needs attention this week</li>
+<li><strong>Grey</strong> — no data (configuration issue OR nothing happened)</li>
+</ul>
+<h2 id="the-5-minute-scan-by-minute">The 5-minute scan, by minute</h2>
+<h3 id="minute-1-cash-flow">Minute 1: Cash flow</h3>
+<ul>
+<li>Yesterday's revenue tile — within ±10% of 30-day average?</li>
+<li>Today's planned production tile — does the plan look real (no
+  empty workcenters)?</li>
+<li>Week-to-date tile — pacing toward weekly target?</li>
+</ul>
+<h3 id="minute-2-operational-health">Minute 2: Operational health</h3>
+<ul>
+<li>Open NCRs — any critical? (Critical = red bordered)</li>
+<li>Breakdown alerts — any open? Any dispatched but not closed
+  past 24h?</li>
+<li>OEE — any workcenter below its <code>oee_target</code>? Compare last 3 days
+  trend</li>
+</ul>
+<h3 id="minute-3-risk-surface">Minute 3: Risk surface</h3>
+<ul>
+<li>WIP value — within band of last week's average?</li>
+<li>AR aged 60+ — total dollar value + count of customers?</li>
+<li>Top-3 risk projects — names + the one-line reason they're risk?</li>
+</ul>
+<h3 id="minute-4-executive-actions">Minute 4: Executive actions</h3>
+<ul>
+<li>Hermes-flagged items — read each one</li>
+<li>These are typically: approval requests, exception escalations,
+  recommendations needing acknowledgment</li>
+<li>30 seconds each; decide accept / defer / reject</li>
+</ul>
+<h3 id="minute-5-quick-decisions">Minute 5: Quick decisions</h3>
+<ul>
+<li>Walk away with 1-3 things to do today</li>
+<li>Walk away with 1-3 things to delegate</li>
+<li>Walk away with 0-2 things to escalate (banker, supplier, customer)</li>
+</ul>
+<h2 id="what-all-tiles-are-reading">What ALL TILES are reading</h2>
+<p>Each tile has a <code>tile_type</code> that drives the query. The major ones:</p>
+<table>
+<thead>
+<tr>
+<th>Tile</th>
+<th>Source model</th>
+<th>Key compute</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Yesterday revenue</td>
+<td><code>account.move.line</code></td>
+<td>Sum of invoiced sales <code>invoice_date = yesterday</code></td>
+</tr>
+<tr>
+<td>Today plan</td>
+<td><code>mrp.production</code></td>
+<td>Count of work orders scheduled today</td>
+</tr>
+<tr>
+<td>Open NCRs</td>
+<td><code>southbrook.ncr</code></td>
+<td><code>state IN (open, quarantine)</code></td>
+</tr>
+<tr>
+<td>Breakdown alerts</td>
+<td><code>southbrook.cmms.breakdown_alert</code></td>
+<td><code>state IN (open, dispatched)</code></td>
+</tr>
+<tr>
+<td>OEE today</td>
+<td><code>mrp.workcenter</code></td>
+<td>Avg OEE for the day</td>
+</tr>
+<tr>
+<td>WIP</td>
+<td><code>mrp.production</code> (WIP report)</td>
+<td>Sum of <code>cost_so_far</code></td>
+</tr>
+<tr>
+<td>AR aged 60+</td>
+<td><code>account.move</code></td>
+<td>Sum of unpaid + age &gt; 60</td>
+</tr>
+<tr>
+<td>Hermes flagged</td>
+<td><code>hermes.recommendation</code></td>
+<td>State <code>pending_review</code></td>
+</tr>
+</tbody>
+</table>
+<p>Tiles refresh every 5 minutes by default (configurable per tile).</p>
+<h2 id="reading-the-trend">Reading the trend</h2>
+<p>Each tile shows current value + a sparkline of recent history. Worth
+seeing:</p>
+<ul>
+<li><strong>Trend up + amber</strong> — improving; OK</li>
+<li><strong>Trend down + green</strong> — deteriorating from a comfortable starting
+  point; watch</li>
+<li><strong>Flat + amber</strong> — sustained miss; intervene</li>
+<li><strong>Spike + red</strong> — something acute; act today</li>
+</ul>
+<h2 id="when-a-tile-is-grey">When a tile is grey</h2>
+<p>Greys often mean configuration broke, not nothing happened. Walk:</p>
+<ol>
+<li>Open the tile (most tiles drill-through to the source data)</li>
+<li>If the source has data but the tile is grey, the compute may be
+   stale (<code>southbrook_exec_dashboard.exec_tile.last_computed_at</code>)</li>
+<li>Trigger a refresh via the cog menu</li>
+<li>If still grey, escalate to sysadmin</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"I open the dashboard but it feels overwhelming."</strong> That's the
+  point on the first read. The discipline is to scan it in 5
+  minutes — speed comes with practice. If you spend 30 min in the
+  briefing, you're using it as a deep-dive tool; that's a
+  different visit.</p>
+</li>
+<li>
+<p><strong>"I see red tiles every day; I tune them out."</strong> The platform
+  is over-alerting. Coordinate with Plant GM to tighten the
+  <code>tile.threshold_*</code> configuration so red means actually red.</p>
+</li>
+<li>
+<p><strong>"Tiles look fine but my team says things are on fire."</strong> The
+  briefing aggregates; the team is dealing with specifics. Walk
+  the floor at 10am for a reality check.</p>
+</li>
+<li>
+<p><strong>"I never see the Hermes-flagged items because they don't
+  exist."</strong> Hermes only flags when its loops surface something.
+  No flags = either nothing to flag, or Hermes loops aren't
+  running. Check sysadmin status if zero flags persist for days.</p>
+</li>
+<li>
+<p><strong>"Wrong tile values."</strong> Source data may be wrong upstream;
+  drill the tile to the source list view. Often quality issues
+  (NCRs in wrong state) or accounting issues (invoices in draft).</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>OWL view</strong> renders tiles client-side from a single JSON
+  payload returned by the controller</li>
+<li><strong>Per-tile compute</strong> runs cron at 5-min interval (configurable)</li>
+<li><strong>Hermes integration</strong> subscribes to recommendation events; the
+  Hermes-flagged tile pulls live</li>
+<li><strong>Mobile-first</strong> layout — tiles re-stack vertically on
+  narrow viewports</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Yesterday's revenue tile is green and showing $52k. Your gut
+says it should be $80k. What's the first explanation?</p>
+<blockquote>
+<p>Filtering: maybe one large SO was billed across two days and
+shows on the other. Drill the tile — it lists the invoices
+contributing. If the invoices look complete, the gut may have
+been recalibrated by a recent slow week; if invoices are
+missing, accounting may have unposted drafts.</p>
+</blockquote>
+<p><strong>Q2.</strong> Breakdown alerts shows 3 dispatched, none open. Should you
+worry?</p>
+<blockquote>
+<p>Not from this scan alone. Drill the tile; check the dispatched
+alerts' age. If any are dispatched &gt; 24h, that's a flag —
+maintenance is slow OR a complex job is genuinely ongoing.
+Conversation with maintenance lead, not a panic.</p>
+</blockquote>
+<p><strong>Q3.</strong> WIP tile is grey. Source list view shows 80 active MOs.
+What's happening?</p>
+<blockquote>
+<p>Tile compute is stale. Cog menu → <em>Refresh</em>. If still grey, the
+compute cron is broken — escalate to sysadmin.</p>
+</blockquote>
+<p><strong>Q4.</strong> Hermes-flagged shows 0 every day for a week. Possible?</p>
+<blockquote>
+<p>Yes — if the operational picture is genuinely healthy AND
+Hermes' confidence thresholds are conservative. But sustained
+0 is also a sign that loops aren't running. Check the Hermes
+Console (Course 7 lesson 7.3) for loop health.</p>
+</blockquote>
+<p><strong>Q5.</strong> You have a banker meeting at 10am. The briefing shows AR
+aged 60+ in amber. Your move?</p>
+<blockquote>
+<p>Drill the tile, identify the top-3 aged customers, decide which
+are at risk + which are routine. Bring numbers to the banker, not
+just the amber colour.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Drilling into specific tiles for deeper analysis — lesson 21.2.</li>
+<li>Reading OEE + bottleneck specifically — lesson 21.3.</li>
+<li>Approving Hermes recommendations — lesson 21.4.</li>
+<li>Per-tile configuration — admin task, separate from this lesson.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_21_exec_drill_through" model="slide.slide">
+            <field name="name">Executive — Drilling Into a Tile</field>
+            <field name="channel_id" ref="course_exec_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Owner or Plant GM going beyond the 5-minute scan.</field>
+            <field name="html_content"><![CDATA[<h1 id="executive-drilling-into-a-tile">Executive — Drilling Into a Tile</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You did the 5-minute scan; one tile caught your attention. This
+lesson is the next 15 minutes — how to go from "amber" to "I
+understand what's happening + I know what to do."</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Click any tile on the Exec Dashboard to drill. Each tile has a
+drill-through target — usually the underlying list view filtered to
+the relevant data.</p>
+<h2 id="the-drill-through-pattern-by-tile-category">The drill-through pattern, by tile category</h2>
+<h3 id="sales-cash-tiles">Sales / Cash tiles</h3>
+<ul>
+<li><strong>Yesterday revenue</strong> → invoice list filtered to yesterday</li>
+<li><strong>AR aged 60+</strong> → invoice list filtered to overdue</li>
+<li>Drill question: which customers? which industries? any single
+  outlier?</li>
+</ul>
+<h3 id="production-tiles">Production tiles</h3>
+<ul>
+<li><strong>Today plan</strong> → work order list for today</li>
+<li><strong>WIP</strong> → WIP report grouped by team</li>
+<li><strong>OEE</strong> → workcenter list with OEE per</li>
+<li>Drill question: where's the bottleneck? whose workcenter? what
+  product family is heaviest?</li>
+</ul>
+<h3 id="quality-maintenance-tiles">Quality / Maintenance tiles</h3>
+<ul>
+<li><strong>Open NCRs</strong> → NCR list filtered by state + severity</li>
+<li><strong>Breakdown alerts</strong> → alert list filtered by state</li>
+<li>Drill question: what's the pattern? supplier-driven? operator
+  shift? specific equipment?</li>
+</ul>
+<h3 id="hermes-tiles">Hermes tiles</h3>
+<ul>
+<li><strong>Flagged items</strong> → recommendation list, pending review</li>
+<li>Drill question: each is a separate decision — read + decide</li>
+</ul>
+<h2 id="a-worked-example-ar-aged-60">A worked example: AR aged 60+</h2>
+<p>You see this in amber: <strong>$45k / 6 customers</strong>.</p>
+<h3 id="drill-click">Drill click</h3>
+<p>Lands you on the aged invoice list, filtered to AR &gt; 60 days.</p>
+<h3 id="step-1-sort-by-amount-descending">Step 1: Sort by amount descending</h3>
+<ul>
+<li>Top of the list is your biggest exposure</li>
+<li>Read the customer name + invoice age</li>
+</ul>
+<h3 id="step-2-read-the-chatter-on-the-top-3">Step 2: Read the chatter on the top 3</h3>
+<ul>
+<li>The chatter has the history — who's been called, who promised
+  when, who's disputing</li>
+<li>30 seconds each</li>
+</ul>
+<h3 id="step-3-categorise-mentally">Step 3: Categorise mentally</h3>
+<ul>
+<li><strong>Already promised</strong> — your team is on it</li>
+<li><strong>Disputed</strong> — need ownership decision: chase legal or write off</li>
+<li><strong>Forgotten</strong> — needs a chase today</li>
+</ul>
+<h3 id="step-4-act">Step 4: Act</h3>
+<ul>
+<li>Walk to AR clerk: "what's happening with Customer X?"</li>
+<li>Call the customer yourself if the relationship warrants it</li>
+<li>Decide on write-off thresholds with the controller</li>
+</ul>
+<h3 id="step-5-document">Step 5: Document</h3>
+<ul>
+<li>Add a chatter post to the affected invoices with your decision</li>
+<li>"Spoke to John Doe; he'll wire by Friday" — captures intent</li>
+</ul>
+<h2 id="a-worked-example-open-ncrs-critical-2">A worked example: Open NCRs (critical = 2)</h2>
+<p>You see: 2 critical NCRs.</p>
+<h3 id="drill-click_1">Drill click</h3>
+<p>NCR list filtered to <code>state = open AND severity = critical</code>.</p>
+<h3 id="what-to-look-for-in-the-form">What to look for in the form</h3>
+<ul>
+<li><code>production_id</code> — which MO?</li>
+<li><code>defect_type</code> + <code>severity</code> — what kind of defect?</li>
+<li><code>reported_at</code> — how long open?</li>
+<li><code>chatter</code> — what's happening?</li>
+</ul>
+<h3 id="the-question-to-ask-yourself">The question to ask yourself</h3>
+<ul>
+<li>Is this customer-facing?</li>
+<li>Is the cabinet en route to a delivery?</li>
+<li>Does Quality have a plan?</li>
+</ul>
+<h3 id="when-to-intervene">When to intervene</h3>
+<ul>
+<li>If the cabinet is critical-path AND Quality is overwhelmed: ask
+  who you can spare from another team to help triage</li>
+<li>If the defect points at a systemic issue (multiple cabinets,
+  pattern by workcenter): escalate to Quality manager for an ECO
+  conversation (lesson 17.10)</li>
+<li>If neither: trust Quality; check back tomorrow</li>
+</ul>
+<h2 id="a-worked-example-oee-on-sb-cnc-bore-is-amber">A worked example: OEE on SB-CNC-BORE is amber</h2>
+<p>You see: SB-CNC-BORE OEE 71% (target 85%).</p>
+<h3 id="drill-click_2">Drill click</h3>
+<p>Workcenter form for SB-CNC-BORE → OEE breakdown:
+- Availability %
+- Performance %
+- Quality %</p>
+<h3 id="the-oee-math">The OEE math</h3>
+<p>OEE = Availability × Performance × Quality</p>
+<ul>
+<li><strong>Availability &lt; target</strong> — workcenter was down (breakdown? PM?
+  setup?)</li>
+<li><strong>Performance &lt; target</strong> — running slow (operator training? tool
+  wear? wrong program?)</li>
+<li><strong>Quality &lt; target</strong> — too much scrap or rework (lesson 21.3)</li>
+</ul>
+<p>Each factor points to a different intervention.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"I drill in but don't know what I'm looking at."</strong> The list
+  view shows the underlying records. If the model isn't familiar,
+  call the relevant department lead for a 5-minute walk-through.
+  Each module has a deep-dive course (Courses 8-15 + 18-21).</p>
+</li>
+<li>
+<p><strong>"The list view shows 200 records; where do I start?"</strong> Sort</p>
+</li>
+<li>
+<p>filter. Top 10 by amount + age combination is usually right.
+  If that's not enough, ask "what's the question?" — then refine
+  the filter.</p>
+</li>
+<li>
+<p><strong>"I drill, see the data, but can't tell if it's bad."</strong>
+  Compare to last week, last month. Use the form's chatter for
+  history; use <em>Reporting → [something]</em> for trends.</p>
+</li>
+<li>
+<p><strong>"I find a problem and want to fix it myself."</strong> Generally:
+  no. Surface it to the responsible lead. Your job is direction +
+  decisions, not fixing fields. Exception: critical-path operations
+  where speed matters and you have the context.</p>
+</li>
+<li>
+<p><strong>"My drill-through gives different numbers than the tile."</strong>
+  The tile cached at 5-min; the list view is live. Refresh the
+  tile (cog menu) if the gap matters.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li>Tile click navigates to the configured <code>action_id</code> with filters
+  pre-applied</li>
+<li>The list view runs the same domain that the tile compute did</li>
+<li>No magic — just a saved filter + a tile-to-action mapping</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> AR aged 60+ tile shows $45k. Drilling, 4 customers have
+$8k each, one customer has $13k. Where do you focus?</p>
+<blockquote>
+<p>The $13k customer. Largest single exposure. Read their chatter.
+Decide chase / write-off / dispute. The 4 × $8k can be batched to
+the AR clerk.</p>
+</blockquote>
+<p><strong>Q2.</strong> OEE on SB-EDGE is 65%. Drill shows availability 75%,
+performance 92%, quality 94%. What's the root cause?</p>
+<blockquote>
+<p>Availability — the biggest deviation from target. Workcenter was
+down too much. Causes: breakdown (check CMMS), PM (planned), or
+setup time (operator issue). Walk to maintenance + edge banding
+supervisor.</p>
+</blockquote>
+<p><strong>Q3.</strong> Breakdown alert tile shows 1 open + 3 dispatched. The 1
+open is critical. Action?</p>
+<blockquote>
+<p>Drill the open alert. Read it. If maintenance lead isn't on it
+already, call them now. If they ARE on it, your tile may be
+stale — refresh.</p>
+</blockquote>
+<p><strong>Q4.</strong> Today plan tile shows "94 work orders." Drilling, 30 are
+scheduled with no assigned workcenter. What's wrong?</p>
+<blockquote>
+<p>Likely an upstream MRP run that didn't fully schedule. Walk to
+the production planner. Could be a workcenter capacity overflow
+(lesson 17.17 / 17.16) or a config issue.</p>
+</blockquote>
+<p><strong>Q5.</strong> Hermes-flagged tile has 4 items. Reading them: 2 are
+"approve this rec for X" + 2 are "ack this status alert." Time
+budget?</p>
+<blockquote>
+<p>Approvals — 2 minutes each (read context + click). Acks — 30
+seconds each (read + dismiss). Total &lt; 5 min. The day's small
+tax.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>OEE deeper math + bottleneck-specific reading — lesson 21.3.</li>
+<li>Approving Hermes recs in depth — lesson 21.4.</li>
+<li>Specific module forms (each module course covers its specifics).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_21_exec_oee_bottleneck" model="slide.slide">
+            <field name="name">Executive — OEE and Bottleneck from the Exec&#x27;s View</field>
+            <field name="channel_id" ref="course_exec_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Owner or Plant GM reading floor health from 10,000 feet.</field>
+            <field name="html_content"><![CDATA[<h1 id="executive-oee-and-bottleneck-from-the-execs-view">Executive — OEE and Bottleneck from the Exec's View</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the owner / Plant GM. Production manager handles the day-to-day
+of OEE and bottlenecks; you watch the 30,000-foot trend + make the
+capacity decisions (buy a machine? add a shift? cut customer
+commitments?). This lesson is the exec lens.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Exec Dashboard</strong> — for the daily glance.
+<strong>MES → Bottleneck Report</strong> (<code>menu_bottleneck_report</code>) — for the
+deeper read.
+<strong>Kitchen Ops → Workcenter Bottleneck</strong> (<code>menu_kitchen_ops_workcenter_bottleneck</code>) — for the operational view.</p>
+<h2 id="oee-101-the-60-second-refresher">OEE 101 (the 60-second refresher)</h2>
+<p>OEE = Overall Equipment Effectiveness = <strong>Availability × Performance × Quality</strong>.</p>
+<ul>
+<li><strong>Availability</strong> = uptime / scheduled time</li>
+<li>Affected by: breakdowns, planned PM, setup, changeovers, idle</li>
+<li><strong>Performance</strong> = actual output / theoretical output during uptime</li>
+<li>Affected by: slow running, minor stops, operator pace</li>
+<li><strong>Quality</strong> = good output / total output</li>
+<li>Affected by: scrap, rework, NCR-driven holds</li>
+</ul>
+<p>OEE is multiplicative — 90% × 90% × 90% = 73% (good). 80% × 80% × 80% = 51% (poor). World-class is 85%+; cabinet manufacturing typical is 60-75%.</p>
+<h2 id="how-the-executive-should-think-about-oee">How the executive should think about OEE</h2>
+<p>You're not trying to fix OEE — you're trying to understand where the
+<em>economics</em> live.</p>
+<ul>
+<li><strong>Low Availability</strong> = you bought capacity you can't use. Either
+  reduce breakdown rate (CMMS — lesson 17.24-17.27) or accept the
+  capacity and plan around it.</li>
+<li><strong>Low Performance</strong> = the machine is running but not at spec. Often
+  cheap to fix (operator training, tool sharpening, lubrication).
+  Usually high-ROI to improve.</li>
+<li><strong>Low Quality</strong> = waste is high. Connect to NCR rate (lesson
+  17.28). Expensive to ignore.</li>
+</ul>
+<p>A 75% OEE machine running 16 hours = 12 effective hours. A 60% OEE
+machine running 24 hours = 14.4 effective hours. Choosing between
+shifts vs improvements is the executive question.</p>
+<h2 id="reading-the-bottleneck-report">Reading the bottleneck report</h2>
+<h3 id="where-it-lives">Where it lives</h3>
+<p><strong>MES → Bottleneck Report</strong></p>
+<h3 id="what-it-shows">What it shows</h3>
+<ul>
+<li>Workcenters listed by <code>utilisation_pct = demand_hours / capacity_hours</code></li>
+<li>Decoration green / amber / red as covered in lesson 17.17</li>
+<li>Drill any row to see the demand breakdown by week</li>
+</ul>
+<h3 id="the-exec-questions">The exec questions</h3>
+<ul>
+<li><strong>Which workcenter is consistently red?</strong> That's where capex or
+  shift expansion buys you the most output.</li>
+<li><strong>What's the cost of buying a second one?</strong> Compare against the
+  margin you're leaving on the table from missed deliveries.</li>
+<li><strong>Are there non-bottleneck workcenters you can reroute work to?</strong>
+  Free flexibility before capex.</li>
+</ul>
+<h2 id="a-worked-example">A worked example</h2>
+<p>You read:
+- SB-CNC-BORE: utilisation 105% (red)
+- CNC02 (backup): utilisation 65% (green)
+- SB-EDGE: utilisation 90% (amber)
+- SB-ASSY: utilisation 70% (green)
+- SAND/PAINT/CURE: utilisation 80%/80%/80% (green)</p>
+<h3 id="reading">Reading</h3>
+<p>SB-CNC-BORE is overcommitted; CNC02 has capacity but not the boring
+head. SB-EDGE is the secondary risk.</p>
+<h3 id="decision-options">Decision options</h3>
+<ol>
+<li><strong>Reroute</strong> boring-not-required work to CNC02 — frees SB-CNC-BORE
+   for the boring jobs only. Could drop SB-CNC-BORE utilisation to
+   85%.</li>
+<li><strong>Add a shift</strong> on SB-CNC-BORE — bigger commitment; pays back on
+   sustained demand.</li>
+<li><strong>Add a second boring head</strong> to CNC02 (capex) — ~$30k, 4-6 weeks
+   delivery, durable upside.</li>
+<li><strong>Defer customer dates</strong> — short-term; loses customer trust.</li>
+</ol>
+<p>The choice depends on sustained demand outlook + cash position. The
+report gives you the data; the decision is yours.</p>
+<h2 id="bottleneck-conversations">Bottleneck conversations</h2>
+<h3 id="with-production-planner">With Production Planner</h3>
+<ul>
+<li>"What's been bottlenecked this week?"</li>
+<li>"What did you reroute?"</li>
+<li>"What dropped a customer date?"</li>
+</ul>
+<h3 id="with-plant-gm">With Plant GM</h3>
+<ul>
+<li>"Where's the chronic vs acute distinction?"</li>
+<li>"What's the capex case?"</li>
+<li>"What's the operator case (training)?"</li>
+</ul>
+<h3 id="with-sales">With Sales</h3>
+<ul>
+<li>"Are we accepting orders we can't deliver?"</li>
+<li>"Which customers are most flexible on dates?"</li>
+</ul>
+<h3 id="with-maintenance-lead">With Maintenance Lead</h3>
+<ul>
+<li>"Which workcenter's downtime is driving the bottleneck?"</li>
+<li>"What's the PM cadence trade-off?"</li>
+</ul>
+<h2 id="when-to-escalate-vs-accept">When to escalate vs accept</h2>
+<ul>
+<li><strong>Acute</strong> (a single week's spike) — accept; reroute + push dates</li>
+<li><strong>Chronic</strong> (8+ weeks of red) — capex conversation</li>
+<li><strong>Cyclical</strong> (kitchen season Q2/Q3 high) — plan ahead; add temp
+  capacity ahead of season</li>
+<li><strong>Growing</strong> (red getting deeper) — the market is telling you
+  something; respond before margin erodes</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"I bought a second CNC last year; should be fine."</strong> Capacity
+  on paper ≠ capacity in practice. Run-rate, programmer skill,
+  setup time, breakdown rate all reduce realised capacity.
+  Re-check the report on the new equipment.</p>
+</li>
+<li>
+<p><strong>"OEE is 60%; that's bad."</strong> Cabinet-shop benchmark is 60-75%.
+  Aim for improvement, not for a number that matches a textbook.</p>
+</li>
+<li>
+<p><strong>"Bottleneck looks fine but customers complain about dates."</strong>
+  Bottleneck shows utilisation, not promise quality. May indicate
+  estimating quotes too-aggressive dates; check Sales.</p>
+</li>
+<li>
+<p><strong>"Capex case for new equipment is fuzzy."</strong> Bring the
+  bottleneck report + a margin model to the conversation. The data
+  cuts through opinion.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><strong>OEE per workcenter</strong> — <code>mrp.workcenter</code> computes per shift /
+  day from <code>productivity</code> records + work order outputs</li>
+<li><strong>Bottleneck report</strong> — rolling 13-week MPS demand vs workcenter
+  capacity (see Course 17 lesson 17.17 for the planner's version)</li>
+<li><strong>Exec tile of OEE / Bottleneck</strong> — aggregated from these</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> SB-CNC-BORE OEE = 60%. Availability 70%, Performance 95%,
+Quality 90%. Where do you focus?</p>
+<blockquote>
+<p>Availability. The biggest gap. Investigate downtime causes —
+CMMS shows breakdowns; setup tracking may show transition time.
+Conversation with maintenance + production.</p>
+</blockquote>
+<p><strong>Q2.</strong> Bottleneck report shows SAND 110% utilisation for 6
+straight weeks. Decision?</p>
+<blockquote>
+<p>Capex consideration: add a second sanding station. Sustained 110%
+is dropping customer dates. Calculate margin lost and compare to
+equipment cost. Talk to production about parallel-runnability.</p>
+</blockquote>
+<p><strong>Q3.</strong> OEE on SB-DOOR dropped from 78% to 62% over two weeks. No
+single explanation jumps out. Action?</p>
+<blockquote>
+<p>Drill into the workcenter's productivity log. Two-week shift
+often = an operator change, a material change (different door
+stock), or a sneaky tool wear issue. Walk the line at 10am.</p>
+</blockquote>
+<p><strong>Q4.</strong> Two workcenters are red, but no customer date is missed
+yet. Drop the issue?</p>
+<blockquote>
+<p>Don't. Red means future dates are at risk if demand sustains. Set
+calendar item to re-review in 2 weeks. Surface in next leadership
+meeting.</p>
+</blockquote>
+<p><strong>Q5.</strong> Sales pitched a big order with delivery in 4 weeks. Read
+the bottleneck report. SB-CNC-BORE is at 100%. Accept the order?</p>
+<blockquote>
+<p>No without a plan: tell sales delivery in 6-8 weeks (real
+capacity), OR accept with reroute strategy + customer flex on
+exact date. Better to set expectations than miss them.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Detailed OEE math — Course 3 lesson 3.3.</li>
+<li>Bottleneck-scheduling specifics for the planner — Course 2 lesson
+  2.3.</li>
+<li>Setup-time reduction (SMED) — operations engineering topic.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_21_exec_hermes_approving" model="slide.slide">
+            <field name="name">Executive — Approving and Delegating via Hermes</field>
+            <field name="channel_id" ref="course_exec_persona"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Owner or Plant GM acting on Hermes recommendations.</field>
+            <field name="html_content"><![CDATA[<h1 id="executive-approving-and-delegating-via-hermes">Executive — Approving and Delegating via Hermes</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the owner / Plant GM and Hermes recommendations are landing
+in your queue. This lesson is the discipline of acting on them
+quickly + correctly without becoming the bottleneck.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p><strong>Exec Dashboard → Hermes-flagged tile</strong> — the inbox.
+<strong>(also visible at Hermes Recommendation queue when Plant GM is on
+a recommendation persona)</strong></p>
+<p>The Hermes chat panel may also surface mid-conversation
+recommendations directly.</p>
+<h2 id="what-hermes-is">What Hermes is</h2>
+<p>Hermes is the trade-partner-facing AI assistant + an internal
+recommendation engine. Three persona models:</p>
+<ul>
+<li><strong>trade_partner</strong> — external; partners chat about their orders</li>
+<li><strong>sales_rep</strong> — internal sales-facing</li>
+<li><strong>mfg_manager</strong> — internal manufacturing-facing (you live here)</li>
+</ul>
+<p>Tools the engine has access to are tiered:</p>
+<ul>
+<li><strong>T0</strong> — read only (status, lookup)</li>
+<li><strong>T1</strong> — small writes (add a note, schedule a follow-up)</li>
+<li><strong>T2</strong> — proposed actions (recommendations) requiring human
+  approval</li>
+</ul>
+<p>You see <strong>T2 proposed recommendations</strong> in your queue. T0/T1 happen
+without you.</p>
+<h2 id="where-this-lives-on-the-site-specific">Where this lives on the site (specific)</h2>
+<p><strong>Hermes Console</strong> queue (external) for full ops.
+<strong>Exec Dashboard</strong> Hermes-flagged tile for the daily exec lens.</p>
+<p>The Console is what sysadmin uses; the dashboard tile is your
+filtered view.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="hermes-flagged-tile-drill-through">Hermes-flagged tile (drill-through)</h3>
+<ul>
+<li>List view of <code>hermes.recommendation</code> records</li>
+<li>Filtered to <code>state = pending_review</code> AND your persona</li>
+<li>Columns: <code>subject</code>, <code>recommended_action</code>, <code>confidence</code>,
+  <code>created_at</code>, <code>requested_by</code></li>
+</ul>
+<h3 id="recommendation-form-view">Recommendation form view</h3>
+<ul>
+<li><code>subject</code> — one-line summary</li>
+<li><code>recommendation_body</code> — full text with context</li>
+<li><code>recommended_action</code> — what Hermes proposes</li>
+<li><code>confidence</code> — Hermes' self-assessed (0-100)</li>
+<li><code>affected_records</code> — links to the SOs, MOs, etc. involved</li>
+<li><em>Apply</em> / <em>Reject</em> / <em>Modify</em> action buttons</li>
+</ul>
+<h2 id="the-triage-decision-tree">The triage decision tree</h2>
+<p>For each recommendation, in order:</p>
+<h3 id="1-read-the-subject-3-seconds">1. Read the subject (3 seconds)</h3>
+<ul>
+<li>Reject if obviously wrong / not applicable</li>
+<li>Continue if it's worth thinking about</li>
+</ul>
+<h3 id="2-read-the-body-30-60-seconds">2. Read the body (30-60 seconds)</h3>
+<ul>
+<li>Get the context — Hermes lays out the situation</li>
+<li>Note any links to records — open one if needed for context</li>
+</ul>
+<h3 id="3-check-confidence">3. Check confidence</h3>
+<ul>
+<li>High (&gt;80%): Hermes is sure; usually fine to apply</li>
+<li>Medium (50-80%): worth your own check</li>
+<li>Low (&lt;50%): Hermes is unsure — investigate before applying</li>
+</ul>
+<h3 id="4-decide">4. Decide</h3>
+<ul>
+<li><strong>Apply</strong> — execute as proposed. Audit log captures who applied.</li>
+<li><strong>Modify + Apply</strong> — tweak the proposal then execute (e.g.
+  different threshold, different recipient)</li>
+<li><strong>Reject</strong> — don't execute. Captures why in chatter.</li>
+<li><strong>Defer</strong> — assign to someone else or schedule a re-review</li>
+</ul>
+<h3 id="5-document">5. Document</h3>
+<ul>
+<li>Apply / Reject decisions auto-log</li>
+<li>Modify writes the modifications + reason to the chatter</li>
+</ul>
+<h2 id="when-to-delegate-vs-decide-yourself">When to delegate vs decide yourself</h2>
+<p>Some recommendations are obvious; some need your judgment.</p>
+<h3 id="delegate-when">Delegate when</h3>
+<ul>
+<li>Operational impact is clear AND the operational lead is the right
+  decision-maker</li>
+<li>The recommendation is below a financial threshold</li>
+<li>Pattern: recurring recommendations of the same kind go to the same
+  delegate</li>
+</ul>
+<h3 id="decide-yourself-when">Decide yourself when</h3>
+<ul>
+<li>Recommendation affects multiple departments</li>
+<li>Customer-facing trade-off</li>
+<li>Above a financial threshold</li>
+<li>Strategic or precedential (others will follow this decision)</li>
+</ul>
+<h2 id="a-worked-example-push-delivery-date-for-order-1234-by-5-days">A worked example: "Push delivery date for Order #1234 by 5 days"</h2>
+<p>You see the recommendation in your queue.</p>
+<h3 id="read-body">Read body</h3>
+<p>"SB-CNC-BORE is overcommitted week of June 28 (lesson 17.17).
+Customer for Order #1234 has historically been flexible on dates.
+Pushing #1234 by 5 days frees 8 cabinet-equivalent hours, allowing
+Order #1257 (newer, premium customer) to ship on time. Confidence
+72%."</p>
+<h3 id="check">Check</h3>
+<ul>
+<li>Customer chatter on #1234: yes, they've been flexible</li>
+<li>Order #1257 customer: top-10 by margin</li>
+<li>Bottleneck report confirms overcommitment</li>
+</ul>
+<h3 id="decision">Decision</h3>
+<p>Apply. Hermes will email Order #1234 customer (template ready),
+re-MO with new dates, notify production.</p>
+<h3 id="audit">Audit</h3>
+<p>Log captures: applied by [you] at [time], reason "trading flexibility
+for customer relationship priority."</p>
+<h2 id="what-not-to-do">What NOT to do</h2>
+<ul>
+<li><strong>Don't apply blindly.</strong> Hermes can be wrong; the queue is for
+  your judgment.</li>
+<li><strong>Don't reject without context.</strong> Document why so the engine
+  learns.</li>
+<li><strong>Don't sit on recommendations.</strong> Daily queue work is part of the
+  job.</li>
+<li><strong>Don't make Hermes the decision-maker.</strong> It surfaces options;
+  you decide.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li>
+<p><strong>"Applied a rec; result was wrong."</strong> All actions are auditable.
+  Reverse the action manually if possible; if not, document the
+  consequences. The platform learns from these.</p>
+</li>
+<li>
+<p><strong>"Queue keeps growing; I can't keep up."</strong> Triage. Reject the
+  obvious ones fast; delegate the operational ones; reserve the
+  judgment ones for yourself. Aim for inbox-zero on the queue
+  daily.</p>
+</li>
+<li>
+<p><strong>"Hermes recommends something against my strategy."</strong> Reject
+  with a reason. The engine should learn over time. If it keeps
+  recommending the same thing, the underlying loop may need tuning
+  (sysadmin task).</p>
+</li>
+<li>
+<p><strong>"Recommendation has no context links."</strong> Hermes failed to
+  surface the affected records. Reject; ask sysadmin to investigate
+  why the linking failed.</p>
+</li>
+<li>
+<p><strong>"Other staff thinks Hermes is making decisions."</strong> Coach them
+  on the recommendation model. Hermes proposes; humans apply.
+  Reinforce by visibly applying or rejecting, not by silently
+  letting the queue manage itself.</p>
+</li>
+</ul>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<ul>
+<li><code>hermes.recommendation</code> records — created by background loops
+  via various tools</li>
+<li>Persona resolution — sysadmin's persona is the auditor; yours is
+  approver</li>
+<li>Apply executes the <code>recommended_action</code> via the appropriate tool
+  call</li>
+<li>Reject + Modify post to chatter; the engine indexes for future
+  learning</li>
+<li>All actions audit-logged to <code>mail.thread</code> on the recommendation</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>Q1.</strong> Recommendation: "Pay supplier early for 2% discount on
+$50k invoice." Confidence 65%. Action?</p>
+<blockquote>
+<p>Drill — check cash position + the discount math. $50k × 2% =
+$1,000 saved. If cash is tight, reject + note. If cash is fine,
+apply.</p>
+</blockquote>
+<p><strong>Q2.</strong> Recommendation: "Decline new order from Customer X due to
+bad payment history." Confidence 88%. Action?</p>
+<blockquote>
+<p>Check Customer X's AR history. If confirmed, reject the
+recommendation (let sales handle the conversation directly).
+Hermes shouldn't be the one declining orders unilaterally; you
++ sales decide.</p>
+</blockquote>
+<p><strong>Q3.</strong> Same recommendation as Q1, but your queue has 30 items
+to process today. Speed?</p>
+<blockquote>
+<p>~2 minutes per rec for triage. For low-confidence + low-impact,
+faster reject. For high-confidence + high-impact, more time. 30
+recs at average 2 min = 60 minutes. Plan accordingly.</p>
+</blockquote>
+<p><strong>Q4.</strong> Recommendation: "Promote Mary from junior to senior CNC
+operator." How does this get here?</p>
+<blockquote>
+<p>It shouldn't — that's an HR decision, not a Hermes loop. Reject;
+flag to sysadmin that the engine is over-reaching. Document.</p>
+</blockquote>
+<p><strong>Q5.</strong> You modify a rec ("push delivery 3 days instead of 5") and
+apply. Customer was emailed with the original 5-day date by the
+auto-template. Now what?</p>
+<blockquote>
+<p>Manual recovery: email the customer the corrected 3-day date.
+Apologise for the confusion. Document on the order chatter.
+Configuration issue: Modify should re-run the template; flag to
+sysadmin for fix.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Hermes architecture + tool registration — Course 13 (Fabio
+  Module deep-dive).</li>
+<li>The trade-partner-facing chat experience — Course 6 lesson 6.3.</li>
+<li>Sysadmin recommendation queue — Course 7 lesson 7.3.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

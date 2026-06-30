@@ -1,0 +1,1133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_23_payroll_architecture" model="slide.slide">
+            <field name="name">Payroll CA Module — Architecture and Install</field>
+            <field name="channel_id" ref="course_payroll_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer or admin learning southbrook_payroll_ca internals.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-ca-module-architecture-and-install">Payroll CA Module — Architecture and Install</h1>
+<h2 id="the-module-at-a-glance">The module at a glance</h2>
+<ul>
+<li>Path: <code>addons/southbrook_payroll_ca/</code></li>
+<li>Version: 19.0.1.0.0</li>
+<li>License: LGPL-3</li>
+<li>Depends on: <code>base</code>, <code>mail</code>, <code>hr</code>, <code>hr_payroll</code>, <code>hr_contract</code>,
+  <code>account</code>, <code>southbrook_manufacturing_intelligence</code></li>
+</ul>
+<h2 id="source-layout">Source layout</h2>
+<pre><code>addons/southbrook_payroll_ca/
+├── models/
+│   ├── payroll_run.py          — extends hr.payslip.run
+│   ├── tax_bracket.py          — CRA 2026 brackets
+│   ├── salary_rules.py         — CPP, EI, income tax rules
+│   ├── t4_slip.py              — year-end T4
+│   ├── roe.py                  — Record of Employment
+│   ├── certification.py        — employee certifications
+│   └── eft_generator.py        — bank file generation
+├── views/                       — 8 view files
+├── security/
+└── data/
+    ├── tax_brackets_2026.xml    — CRA 2026 federal + provincial
+    ├── salary_rules.xml         — RRSP, garnishment, manual, etc.
+    └── sequence_data.xml
+</code></pre>
+<h2 id="install">Install</h2>
+<pre><code class="language-bash">./scripts/deploy_to_qnap.sh southbrook_payroll_ca
+</code></pre>
+<p>Native <code>hr_payroll</code> is required first; it's not in CE by default
+(was EE-only historically). Verify with:</p>
+<pre><code class="language-sql">SELECT name, state FROM ir_module_module WHERE name = 'hr_payroll';
+</code></pre>
+<p>If <code>hr_payroll</code> is missing, install it first via Apps. As of
+Odoo 19, the community version of payroll is available; the
+Southbrook layer extends it.</p>
+<h2 id="what-i-does">What -i does</h2>
+<ol>
+<li>Creates Southbrook-specific tables</li>
+<li>Loads 2026 CRA tax brackets (federal 5 + Ontario 5 + others
+   per province)</li>
+<li>Loads salary rules (CPP, EI, income tax, RRSP, garnishment,
+   benefit, manual)</li>
+<li>Adds the 7 menus under Payroll</li>
+<li>Registers a cron at 00:30 to roll YTD totals into new payslips</li>
+</ol>
+<h2 id="v19-install-gotchas">v19 install gotchas</h2>
+<p>Three traps the module dodges:</p>
+<ol>
+<li><strong><code>numbercall</code> + <code>doall</code> on ir.cron removed</strong> — module uses the
+   new <code>ir.cron</code> schema (interval_type, interval_number,
+   nextcall, lastcall only).</li>
+<li><strong><code>hr_payroll_account</code> mixing</strong> — native + Southbrook journal
+   configuration is fragile; module declares its own journal
+   defaults explicitly.</li>
+<li><strong>Selection field extensions need ondelete</strong> — done correctly
+   throughout.</li>
+</ol>
+<h2 id="cron-landscape">Cron landscape</h2>
+<table>
+<thead>
+<tr>
+<th>Cron</th>
+<th>Schedule</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cron_roll_ytd_totals</code></td>
+<td>00:30 daily</td>
+<td>Updates YTD CPP / EI / income tax per employee</td>
+</tr>
+</tbody>
+</table>
+<h2 id="cra-bracket-data">CRA bracket data</h2>
+<p><code>southbrook.payroll.tax_bracket</code> holds:</p>
+<pre><code class="language-python">effective_year = fields.Integer(required=True, index=True)
+jurisdiction   = fields.Selection([
+    (&quot;federal&quot;, &quot;Federal&quot;),
+    (&quot;ON&quot;, &quot;Ontario&quot;),
+    (&quot;AB&quot;, &quot;Alberta&quot;),
+    (&quot;BC&quot;, &quot;British Columbia&quot;),
+    # ... + others as needed
+])
+bracket_low    = fields.Float()
+bracket_high   = fields.Float()
+rate           = fields.Float(digits=(8, 4))
+</code></pre>
+<p>For 2026 Ontario:
+- $0 to $52,886: 5.05%
+- $52,886 to $105,775: 9.15%
+- $105,775 to $150,000: 11.16%
+- $150,000 to $220,000: 12.16%
+- $220,000+: 13.16%</p>
+<p>(Verify exact values for the year you're computing; CRA indexes
+annually.)</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"hr_payroll not installed"</strong> — install from Apps before this
+  module.</li>
+<li><strong>"Tax brackets missing for 2027"</strong> — data XML only loaded for
+  2026. v1.1 will ship an automated CRA-import script; for now,
+  data XML for each year.</li>
+<li><strong>"Native + Southbrook computing different income tax"</strong> —
+  conflict between native <code>hr_payroll</code> rules and Southbrook
+  rules. Make sure Southbrook rules sequence higher (run later)
+  to take precedence.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> What native module must be installed first?</p>
+<blockquote>
+<p><code>hr_payroll</code>.</p>
+</blockquote>
+<p><strong>Q2.</strong> Where are CRA 2026 brackets stored?</p>
+<blockquote>
+<p><code>southbrook.payroll.tax_bracket</code> records, seeded from
+<code>data/tax_brackets_2026.xml</code>.</p>
+</blockquote>
+<p><strong>Q3.</strong> What's the cron schedule for YTD rollup?</p>
+<blockquote>
+<p>00:30 daily (<code>cron_roll_ytd_totals</code>).</p>
+</blockquote>
+<p><strong>Q4.</strong> v19 ir.cron schema dropped which fields?</p>
+<blockquote>
+<p><code>numbercall</code> and <code>doall</code>. Use <code>interval_type</code>,
+<code>interval_number</code>, <code>nextcall</code>, <code>lastcall</code> instead.</p>
+</blockquote>
+<p><strong>Q5.</strong> For a year other than 2026, what's needed?</p>
+<blockquote>
+<p>A new data file with that year's brackets. Until v1.1 auto-import.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_23_payroll_salary_rules" model="slide.slide">
+            <field name="name">Payroll CA Module — The Salary Rule Chain</field>
+            <field name="channel_id" ref="course_payroll_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Developer extending salary rules or debugging payroll compute.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-ca-module-the-salary-rule-chain">Payroll CA Module — The Salary Rule Chain</h1>
+<h2 id="where-rules-live">Where rules live</h2>
+<p>Two homes:</p>
+<ol>
+<li><strong>Native <code>hr.salary.rule</code></strong> — the base records (RRSP, benefits,
+   garnishments, etc.). Stored in DB; configured via Salary
+   Structure.</li>
+<li><strong>Southbrook code</strong> — <code>salary_rules.py</code> overrides the
+   computation methods for CPP / EI / income tax specifically.</li>
+</ol>
+<h2 id="rule-execution-order">Rule execution order</h2>
+<p>When <code>hr.payslip.compute_sheet()</code> runs:</p>
+<ol>
+<li>Loads the employee's <code>hr.contract.struct_id</code> (salary structure)</li>
+<li>Loads rules in <code>struct_id.rule_ids</code> ordered by <code>sequence</code></li>
+<li>For each rule, evaluates <code>condition_python</code> (skip if False)</li>
+<li>Evaluates <code>amount_compute</code> to produce a <code>hr.payslip.line</code></li>
+<li>Updates <code>localdict</code> with the result (visible to subsequent rules)</li>
+</ol>
+<h2 id="order-matters">Order matters</h2>
+<p>Southbrook structure:</p>
+<pre><code>Sequence 10  — Basic (gross from hours × rate or salary)
+Sequence 20  — Overtime
+Sequence 25  — Holiday pay
+Sequence 30  — RRSP (pre-tax; reduces taxable income)
+Sequence 40  — Pensionable Earnings (computed)
+Sequence 41  — Insurable Earnings (computed)
+Sequence 50  — CPP
+Sequence 60  — EI
+Sequence 70  — Federal Income Tax
+Sequence 71  — Provincial Income Tax
+Sequence 80  — Benefit deductions
+Sequence 90  — Garnishments
+Sequence 95  — Manual adjustments
+Sequence 100 — Net Pay
+</code></pre>
+<p>If you add a rule, place it correctly in the sequence:
+- Before CPP/EI/tax if it affects taxable/pensionable/insurable
+  earnings
+- After tax if it's a post-tax deduction</p>
+<h2 id="cpp-rule-example-sequence-50">CPP rule example (sequence 50)</h2>
+<pre><code class="language-python"># In salary_rules.py
+class HrSalaryRule(models.Model):
+    _inherit = &quot;hr.salary.rule&quot;
+
+    @api.model
+    def _compute_cpp_2026(self, payslip, localdict):
+        &quot;&quot;&quot;CPP for 2026. Respects YMPE + YTD cap.&quot;&quot;&quot;
+        ytd_cpp = self._get_ytd(&quot;cpp&quot;, payslip.employee_id, 2026)
+        max_cpp = (71300 - 3500) * 0.0595  # YMPE - exemption × rate
+        remaining_cap = max(0, max_cpp - ytd_cpp)
+
+        pensionable = localdict.get(&quot;PENSIONABLE&quot;, 0)
+        period_exemption = 3500 / 26  # bi-weekly proration
+        cpp_amount = max(0,
+            (pensionable - period_exemption) * 0.0595)
+
+        # Don't exceed YTD cap
+        return min(cpp_amount, remaining_cap)
+</code></pre>
+<p>YTD lookup is via the <code>cron_roll_ytd_totals</code> cron-maintained
+snapshot.</p>
+<h2 id="income-tax-federal-provincial">Income tax (federal + provincial)</h2>
+<pre><code class="language-python">def _compute_federal_tax(self, payslip, localdict):
+    taxable = localdict.get(&quot;GROSS&quot;, 0) - localdict.get(&quot;RRSP&quot;, 0)
+    annualised = taxable * 26
+
+    # Apply TD1 credits
+    td1 = payslip.employee_id.tax_credit_amount
+    taxable_after_credits = max(0, annualised - td1)
+
+    # Bracket lookup
+    brackets = self.env[&quot;southbrook.payroll.tax_bracket&quot;].search([
+        (&quot;effective_year&quot;, &quot;=&quot;, 2026),
+        (&quot;jurisdiction&quot;, &quot;=&quot;, &quot;federal&quot;),
+    ], order=&quot;bracket_low&quot;)
+
+    annual_tax = 0
+    for b in brackets:
+        if taxable_after_credits &lt;= b.bracket_low:
+            break
+        bracket_taxable = min(taxable_after_credits, b.bracket_high) - b.bracket_low
+        annual_tax += bracket_taxable * b.rate
+
+    return annual_tax / 26  # Per-period
+</code></pre>
+<p>Provincial follows the same pattern with <code>jurisdiction = company's province</code>.</p>
+<h2 id="adding-a-new-salary-rule">Adding a new salary rule</h2>
+<p>To add a Charitable Giving deduction (pre-tax):</p>
+<h3 id="step-1-xml">Step 1: XML</h3>
+<pre><code class="language-xml">&lt;record id=&quot;rule_charitable_giving&quot; model=&quot;hr.salary.rule&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Charitable Giving (Pre-Tax)&lt;/field&gt;
+    &lt;field name=&quot;code&quot;&gt;CHARITY&lt;/field&gt;
+    &lt;field name=&quot;sequence&quot;&gt;35&lt;/field&gt;  &lt;!-- between RRSP and CPP --&gt;
+    &lt;field name=&quot;category_id&quot; ref=&quot;hr_payroll.DED&quot;/&gt;
+    &lt;field name=&quot;condition_select&quot;&gt;python&lt;/field&gt;
+    &lt;field name=&quot;condition_python&quot;&gt;
+        contract.charitable_giving_amount &gt; 0
+    &lt;/field&gt;
+    &lt;field name=&quot;amount_select&quot;&gt;code&lt;/field&gt;
+    &lt;field name=&quot;amount_python_compute&quot;&gt;
+        result = -contract.charitable_giving_amount
+    &lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<h3 id="step-2-add-the-contract-field">Step 2: Add the contract field</h3>
+<pre><code class="language-python">class HrContract(models.Model):
+    _inherit = &quot;hr.contract&quot;
+
+    charitable_giving_amount = fields.Float()
+</code></pre>
+<h3 id="step-3-wire-to-taxable-income-reduction">Step 3: Wire to taxable income reduction</h3>
+<p>If charitable giving should reduce taxable income, add to the
+<code>taxable</code> calc in <code>_compute_federal_tax</code>.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"New rule didn't apply"</strong> — <code>condition_python</code> evaluated False
+  for that employee. Check the contract field has a value.</li>
+<li><strong>"Rule computed wrong amount"</strong> — <code>localdict</code> access. Make sure
+  you're reading the right key (the available keys depend on
+  rules that ran before).</li>
+<li><strong>"Custom rule broke CPP / EI"</strong> — likely sequence issue. CPP/EI
+  expect specific keys (PENSIONABLE, INSURABLE) set by earlier
+  rules. Don't move them.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> A pre-tax deduction at sequence 25 (before RRSP at 30).
+Effect on taxable income?</p>
+<blockquote>
+<p>Reduces it — anything before tax rules at 70/71 reduces taxable.
+Sequence 25 vs 30 doesn't matter for income tax math; both
+reduce.</p>
+</blockquote>
+<p><strong>Q2.</strong> Rule at sequence 60 (EI) reads <code>localdict["INSURABLE"]</code>.
+What was set that key?</p>
+<blockquote>
+<p>Rule at sequence 41 (Insurable Earnings). If that rule didn't
+fire (condition False), EI gets KeyError. Defensive code uses
+<code>localdict.get("INSURABLE", 0)</code>.</p>
+</blockquote>
+<p><strong>Q3.</strong> Year-over-year: 2027 brackets needed. Add via?</p>
+<blockquote>
+<p>New data XML file (<code>tax_brackets_2027.xml</code>) with the bracket
+records. v1.1 will auto-import; manual until then.</p>
+</blockquote>
+<p><strong>Q4.</strong> CPP YTD cap was reached mid-period. Math returns?</p>
+<blockquote>
+<p><code>min(period_cpp, remaining_cap) = remaining_cap</code>. CPP slowly
+reduces to 0 across cycles, never exceeding the annual max.</p>
+</blockquote>
+<p><strong>Q5.</strong> Add a new earning (e.g. shift differential). Sequence?</p>
+<blockquote>
+<p>Before sequence 30 (RRSP). It should be part of gross /
+taxable income. Probably sequence 15-20.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_23_payroll_eft_formats" model="slide.slide">
+            <field name="name">Payroll CA Module — EFT Format Support and Bank Adapters</field>
+            <field name="channel_id" ref="course_payroll_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Developer adding a new bank format or debugging EFT generation.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-ca-module-eft-format-support-and-bank-adapters">Payroll CA Module — EFT Format Support and Bank Adapters</h1>
+<h2 id="the-eft-generator">The EFT generator</h2>
+<p><code>eft_generator.py</code> produces the bank-specific file format. The
+strategy pattern lets multiple formats coexist.</p>
+<h2 id="supported-formats">Supported formats</h2>
+<table>
+<thead>
+<tr>
+<th>Bank</th>
+<th>Format</th>
+<th>Extension</th>
+<th>Adapter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RBC</td>
+<td>ACH 80-byte</td>
+<td><code>.aba</code></td>
+<td><code>_format_rbc_ach()</code></td>
+</tr>
+<tr>
+<td>TD</td>
+<td>EFT</td>
+<td><code>.efx</code></td>
+<td><code>_format_td_efx()</code></td>
+</tr>
+<tr>
+<td>BMO</td>
+<td>Direct Deposit</td>
+<td><code>.txt</code></td>
+<td><code>_format_bmo_dd()</code></td>
+</tr>
+<tr>
+<td>Scotiabank</td>
+<td>eDeposit CSV</td>
+<td><code>.csv</code></td>
+<td><code>_format_scotia_csv()</code></td>
+</tr>
+<tr>
+<td>CIBC</td>
+<td>ACH</td>
+<td><code>.dat</code></td>
+<td><code>_format_cibc_ach()</code></td>
+</tr>
+<tr>
+<td>National</td>
+<td>EFT</td>
+<td><code>.txt</code></td>
+<td><code>_format_nbc_eft()</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="top-level-method">Top-level method</h2>
+<pre><code class="language-python">def generate_eft_file(self, run_id):
+    run = self.env[&quot;hr.payslip.run&quot;].browse(run_id)
+    bank_format = run.company_id.eft_format  # selection field
+
+    if bank_format == &quot;rbc&quot;:
+        content = self._format_rbc_ach(run)
+        ext = &quot;aba&quot;
+    elif bank_format == &quot;td&quot;:
+        content = self._format_td_efx(run)
+        ext = &quot;efx&quot;
+    # ... etc.
+    else:
+        raise UserError(_(&quot;Unsupported EFT format: %s&quot;) % bank_format)
+
+    attachment = self.env[&quot;ir.attachment&quot;].create({
+        &quot;name&quot;: f&quot;southbrook_payroll_{run.pay_date}_{bank_format}.{ext}&quot;,
+        &quot;type&quot;: &quot;binary&quot;,
+        &quot;res_model&quot;: &quot;hr.payslip.run&quot;,
+        &quot;res_id&quot;: run.id,
+        &quot;datas&quot;: base64.b64encode(content.encode(&quot;utf-8&quot;)),
+    })
+    return attachment
+</code></pre>
+<h2 id="rbc-ach-80-format">RBC ACH 80 format</h2>
+<p>Fixed-width 80-character lines, three record types:</p>
+<pre><code>Header (record type &quot;A&quot;)
+  Position 1:1       = &quot;A&quot;
+  Position 2:10      = originator transit
+  Position 11:18     = file creation date YYYYMMDD
+  ...
+
+Detail (record type &quot;D&quot;), one per recipient
+  Position 1:1       = &quot;D&quot;
+  Position 2:10      = recipient transit
+  Position 11:23     = recipient account number
+  Position 24:33     = amount (10 digits, no decimal — cents)
+  ...
+
+Trailer (record type &quot;Z&quot;)
+  Position 1:1       = &quot;Z&quot;
+  Position 2:11      = control total
+  Position 12:18     = record count
+  ...
+</code></pre>
+<h2 id="adding-a-new-format">Adding a new format</h2>
+<p>To add HSBC support:</p>
+<h3 id="step-1-adapter-method">Step 1: Adapter method</h3>
+<pre><code class="language-python">def _format_hsbc(self, run):
+    &quot;&quot;&quot;Generate HSBC EFT file.&quot;&quot;&quot;
+    lines = []
+    # Header
+    lines.append(self._build_hsbc_header(run))
+    # Details
+    for slip in run.slip_ids.filtered(lambda s: s.net_wage &gt; 0):
+        emp_bank = slip.employee_id.bank_account_id
+        if not emp_bank:
+            raise UserError(_(&quot;Employee %s missing bank info&quot;) %
+                            slip.employee_id.name)
+        lines.append(self._build_hsbc_detail(slip, emp_bank))
+    # Trailer
+    lines.append(self._build_hsbc_trailer(run))
+    return &quot;\n&quot;.join(lines)
+</code></pre>
+<h3 id="step-2-wire-into-the-selection">Step 2: Wire into the selection</h3>
+<pre><code class="language-python">class ResCompany(models.Model):
+    _inherit = &quot;res.company&quot;
+
+    eft_format = fields.Selection(
+        selection_add=[(&quot;hsbc&quot;, &quot;HSBC EFT&quot;)],
+        ondelete={&quot;hsbc&quot;: &quot;set default&quot;},
+    )
+</code></pre>
+<h3 id="step-3-wire-into-top-level-dispatch">Step 3: Wire into top-level dispatch</h3>
+<p>Add the <code>elif bank_format == "hsbc"</code> branch.</p>
+<h3 id="step-4-test-with-a-known-input">Step 4: Test with a known input</h3>
+<p>HSBC's spec doc has sample files. Run the generator with a known
+input + compare output byte-by-byte.</p>
+<h2 id="recovery-format">Recovery format</h2>
+<p>The summary CSV is generated alongside every bank file:</p>
+<pre><code class="language-python">def _format_summary_csv(self, run):
+    &quot;&quot;&quot;Always-emitted summary for the controller's records.&quot;&quot;&quot;
+    rows = [[&quot;employee&quot;, &quot;transit&quot;, &quot;account&quot;, &quot;amount&quot;, &quot;method&quot;]]
+    for slip in run.slip_ids:
+        bank = slip.employee_id.bank_account_id
+        method = &quot;EFT&quot; if bank else &quot;CHEQUE&quot;
+        rows.append([
+            slip.employee_id.name,
+            bank.transit if bank else &quot;&quot;,
+            bank.acc_number if bank else &quot;&quot;,
+            slip.net_wage,
+            method,
+        ])
+    return self._csv_format(rows)
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Bank rejected: invalid format"</strong> — wrong format selected on
+  company. Verify <code>res.company.eft_format</code> matches your bank.</li>
+<li><strong>"Bank rejected: posting date in past"</strong> — <code>run.pay_date</code> was
+  past the bank's accept-by date. Reschedule the pay date,
+  regenerate.</li>
+<li><strong>"One recipient missing from file"</strong> — that employee has no
+  <code>bank_account_id</code>. They get a cheque (in the summary CSV)
+  instead.</li>
+<li><strong>"Amount format wrong (decimal vs cents)"</strong> — different banks
+  use different conventions. RBC uses cents (no decimal); some
+  others use dollars.dd. Bug in the adapter.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Why ship a summary CSV alongside every bank file?</p>
+<blockquote>
+<p>The CSV is human-readable for the controller's records, and
+includes employees on cheque (no EFT). Audit trail.</p>
+</blockquote>
+<p><strong>Q2.</strong> Adapter raised UserError for missing bank info. What
+should happen?</p>
+<blockquote>
+<p>File generation should NOT abort. Mark the employee as cheque,
+proceed with the remainder. Currently <code>_format_rbc_ach()</code>
+raises; should be enhanced to skip + warn.</p>
+</blockquote>
+<p><strong>Q3.</strong> Bank format on company changes mid-run. Effect?</p>
+<blockquote>
+<p>Regenerate fires the new format. Previous file (if attached) is
+stale; discard.</p>
+</blockquote>
+<p><strong>Q4.</strong> Adding a 7th bank format: where minimum?</p>
+<blockquote>
+<p>3 places: adapter method, ResCompany selection_add, top-level
+dispatch elif.</p>
+</blockquote>
+<p><strong>Q5.</strong> Output file is encoded UTF-8 but the bank requires
+ASCII-only. Effect?</p>
+<blockquote>
+<p>May or may not work depending on the bank's parser. Test
+first. If failing, add <code>content.encode("ascii", "replace")</code>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_23_payroll_t4_generation" model="slide.slide">
+            <field name="name">Payroll CA Module — T4 Generation Internals</field>
+            <field name="channel_id" ref="course_payroll_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Developer working on year-end T4 generation.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-ca-module-t4-generation-internals">Payroll CA Module — T4 Generation Internals</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookPayrollT4(models.Model):
+    _name = &quot;southbrook.payroll.t4&quot;
+    _description = &quot;T4 Slip&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields (matching CRA T4 boxes):</p>
+<pre><code class="language-python">employee_id = fields.Many2one(&quot;hr.employee&quot;, required=True)
+year        = fields.Integer(required=True)
+
+# Box 14: Employment income
+box_14_employment_income = fields.Float()
+# Box 16: CPP contributions
+box_16_cpp = fields.Float()
+# Box 18: EI premiums
+box_18_ei = fields.Float()
+# Box 22: Income tax deducted
+box_22_income_tax = fields.Float()
+# Box 24: EI insurable earnings
+box_24_ei_insurable = fields.Float()
+# Box 26: CPP pensionable earnings
+box_26_cpp_pensionable = fields.Float()
+# ... + boxes 44, 46, 52, 55, etc.
+
+state = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;generated&quot;, &quot;Generated&quot;),
+    (&quot;filed&quot;, &quot;Filed&quot;),
+], default=&quot;draft&quot;)
+
+amended_id = fields.Many2one(&quot;southbrook.payroll.t4&quot;)
+# ↑ links to original if this is an amended T4
+</code></pre>
+<h2 id="generation-algorithm">Generation algorithm</h2>
+<pre><code class="language-python">@api.model
+def generate_t4s_for_year(self, year):
+    &quot;&quot;&quot;Create one T4 per employee active in `year`.&quot;&quot;&quot;
+    employees = self.env[&quot;hr.employee&quot;].search([
+        (&quot;active&quot;, &quot;=&quot;, True),
+        # ... or terminated this year
+    ])
+
+    for emp in employees:
+        # Skip if T4 already exists for this year + employee
+        if self.search_count([
+            (&quot;employee_id&quot;, &quot;=&quot;, emp.id),
+            (&quot;year&quot;, &quot;=&quot;, year),
+            (&quot;amended_id&quot;, &quot;=&quot;, False),
+        ]):
+            continue
+
+        slips = self.env[&quot;hr.payslip&quot;].search([
+            (&quot;employee_id&quot;, &quot;=&quot;, emp.id),
+            (&quot;date_to&quot;, &quot;&gt;=&quot;, f&quot;{year}-01-01&quot;),
+            (&quot;date_from&quot;, &quot;&lt;=&quot;, f&quot;{year}-12-31&quot;),
+            (&quot;state&quot;, &quot;=&quot;, &quot;done&quot;),
+        ])
+
+        vals = {
+            &quot;employee_id&quot;: emp.id,
+            &quot;year&quot;: year,
+            &quot;box_14_employment_income&quot;: sum(s.gross_wage for s in slips),
+            &quot;box_16_cpp&quot;: sum(
+                line.amount for s in slips for line in s.line_ids
+                if line.code == &quot;CPP&quot;),
+            &quot;box_18_ei&quot;: sum(...),
+            &quot;box_22_income_tax&quot;: sum(...),
+            &quot;box_24_ei_insurable&quot;: sum(...),
+            &quot;box_26_cpp_pensionable&quot;: sum(...),
+            # ... etc.
+        }
+        self.create(vals)
+</code></pre>
+<p>The wizard <code>southbrook.payroll.t4.generate_wizard</code> is the UI
+entry point.</p>
+<h2 id="what-box-14-includes">What box 14 includes</h2>
+<p>Box 14 (employment income) = all taxable employment income in the
+year. From salary rules, this is:</p>
+<ul>
+<li>Regular wages</li>
+<li>Overtime</li>
+<li>Bonuses</li>
+<li>Vacation pay</li>
+<li>Holiday pay</li>
+<li>Taxable benefits (e.g. employer-paid life insurance over $25k)</li>
+</ul>
+<p>EXCLUDES:
+- Non-taxable benefits (e.g. health benefits to a limit)
+- RRSP contributions deducted from gross (those reduce box 14)
+- Pension contributions if to a registered pension plan</p>
+<p>The salary rule's <code>category_id</code> drives inclusion. Rules in
+category "Gross" + <code>parent_rule_id</code> chain to taxable income are
+included.</p>
+<h2 id="xml-envelope-for-cra-filing">XML envelope for CRA filing</h2>
+<p>The <code>Export XML</code> button generates the CRA-compliant envelope:</p>
+<pre><code class="language-python">def action_export_xml(self):
+    &quot;&quot;&quot;Generate CRA T4 Internet File Transfer XML envelope.&quot;&quot;&quot;
+    root = ET.Element(&quot;T619&quot;)
+    root.set(&quot;xmlns&quot;, &quot;http://www.cra-arc.gc.ca/...&quot;)
+
+    # T4Summary section
+    summary = ET.SubElement(root, &quot;T4Summary&quot;)
+    # ... fields from T4 Summary record
+
+    # One T4Slip per employee
+    for t4 in self:
+        slip = ET.SubElement(root, &quot;T4Slip&quot;)
+        ET.SubElement(slip, &quot;sin&quot;).text = t4.employee_id.sin
+        ET.SubElement(slip, &quot;name&quot;).text = t4.employee_id.name
+        ET.SubElement(slip, &quot;EMPLYR_NM&quot;).text = self.env.company.name
+        ET.SubElement(slip, &quot;EMPLYR_BN&quot;).text = self.env.company.cra_bn
+        # ... etc.
+
+    return ET.tostring(root, encoding=&quot;utf-8&quot;, xml_declaration=True)
+</code></pre>
+<p>The XML is uploaded to CRA's T4 Internet File Transfer portal.</p>
+<h2 id="amendments">Amendments</h2>
+<p>If you need to correct a T4 after filing:</p>
+<ol>
+<li>Create a NEW T4 record (don't edit the original)</li>
+<li>Set <code>amended_id</code> = original T4</li>
+<li>Generate the file with corrected values + a "T4A" marker</li>
+<li>CRA reconciles based on amended_id linkage</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Box 14 doesn't match GL wages account"</strong> — GL may include
+  benefits not in box 14. Reconcile via the T4 Summary audit pack
+  (compare salary_rule categories to GL account postings).</li>
+<li><strong>"Box 24/26 maxed for high earners"</strong> — correct; annual CPP +
+  EI maximums. Don't manually edit.</li>
+<li><strong>"Bonus paid in January went on wrong year's T4"</strong> — payslips
+  with <code>pay_date IN year</code> count for that year. A December-period
+  bonus paid in January is on next year's T4.</li>
+<li><strong>"Amended T4 isn't reaching CRA"</strong> — verify the
+  <code>amended_id</code> link + the file type. CRA expects T4A as a
+  separate file in some cases.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Employee on RRSP contribution all year. Effect on box 14?</p>
+<blockquote>
+<p>RRSP at sequence &lt; 30 (pre-tax) reduces box 14. RRSP at
+sequence &gt; 80 (post-tax) does not. Verify salary rule
+configuration.</p>
+</blockquote>
+<p><strong>Q2.</strong> Box 26 (CPP pensionable) — what's included?</p>
+<blockquote>
+<p>Gross income minus non-pensionable benefits. Per CRA's
+definition; the platform tracks per-payslip and sums for box 26.</p>
+</blockquote>
+<p><strong>Q3.</strong> December-period bonus paid in January. T4 year?</p>
+<blockquote>
+<p>Next year (the year of <code>pay_date</code>). Even if the bonus was
+"for" December.</p>
+</blockquote>
+<p><strong>Q4.</strong> T4 generated; need to correct. How?</p>
+<blockquote>
+<p>New T4 record with <code>amended_id</code> set to original. Don't edit the
+original (audit retention).</p>
+</blockquote>
+<p><strong>Q5.</strong> Where's the CRA XML envelope generated?</p>
+<blockquote>
+<p><code>action_export_xml()</code> on <code>southbrook.payroll.t4</code>. Reads from
+the T4 records + company info to produce the file.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_23_payroll_roe_math" model="slide.slide">
+            <field name="name">Payroll CA Module — ROE Math and Filing</field>
+            <field name="channel_id" ref="course_payroll_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer working on Record of Employment generation.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-ca-module-roe-math-and-filing">Payroll CA Module — ROE Math and Filing</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookPayrollRoe(models.Model):
+    _name = &quot;southbrook.payroll.roe&quot;
+    _description = &quot;Record of Employment&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields (matching Service Canada ROE blocks):</p>
+<pre><code class="language-python">employee_id = fields.Many2one(&quot;hr.employee&quot;, required=True)
+reason_code = fields.Selection([
+    (&quot;A&quot;, &quot;A - Shortage of work / layoff&quot;),
+    (&quot;D&quot;, &quot;D - Illness or injury&quot;),
+    (&quot;E&quot;, &quot;E - Quit&quot;),
+    (&quot;K&quot;, &quot;K - Other&quot;),
+    (&quot;M&quot;, &quot;M - Dismissal&quot;),
+    (&quot;N&quot;, &quot;N - Leave of absence&quot;),
+    # ... ~15 more
+], required=True)
+
+last_day_worked       = fields.Date(required=True)
+final_pay_period_end  = fields.Date(required=True)
+expected_return_date  = fields.Date()  # blank for terminations
+
+# Block 15A — Total insurable hours
+total_insurable_hours = fields.Float(compute=&quot;_compute_block_15a&quot;)
+# Block 15B — Total insurable earnings
+total_insurable_earnings = fields.Float(compute=&quot;_compute_block_15b&quot;)
+# Block 15C — Per-period breakdown (last 27 weeks)
+breakdown_lines = fields.One2many(&quot;southbrook.payroll.roe.line&quot;, &quot;roe_id&quot;)
+
+state = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;ready&quot;, &quot;Ready to File&quot;),
+    (&quot;filed&quot;, &quot;Filed with Service Canada&quot;),
+], default=&quot;draft&quot;)
+</code></pre>
+<h2 id="block-15a-total-insurable-hours">Block 15A: Total insurable hours</h2>
+<pre><code class="language-python">@api.depends(&quot;employee_id&quot;, &quot;last_day_worked&quot;)
+def _compute_block_15a(self):
+    for roe in self:
+        lookback = self._roe_lookback_window(roe)
+        slips = self.env[&quot;hr.payslip&quot;].search([
+            (&quot;employee_id&quot;, &quot;=&quot;, roe.employee_id.id),
+            (&quot;date_to&quot;, &quot;&gt;=&quot;, lookback),
+            (&quot;date_to&quot;, &quot;&lt;=&quot;, roe.last_day_worked),
+            (&quot;state&quot;, &quot;=&quot;, &quot;done&quot;),
+        ])
+        roe.total_insurable_hours = sum(s.worked_hours_total for s in slips)
+</code></pre>
+<p>The lookback is <strong>53 weeks back from last_day_worked</strong> for hours
+purposes (per Service Canada rules).</p>
+<h2 id="block-15b-total-insurable-earnings">Block 15B: Total insurable earnings</h2>
+<p>Same query; sum <code>gross_wage</code> filtered to EI-insurable earnings.</p>
+<pre><code class="language-python">def _compute_block_15b(self):
+    for roe in self:
+        lookback = self._roe_lookback_window(roe)
+        slips = self.env[&quot;hr.payslip&quot;].search([
+            (&quot;employee_id&quot;, &quot;=&quot;, roe.employee_id.id),
+            (&quot;date_to&quot;, &quot;&gt;=&quot;, lookback),
+            (&quot;date_to&quot;, &quot;&lt;=&quot;, roe.last_day_worked),
+            (&quot;state&quot;, &quot;=&quot;, &quot;done&quot;),
+        ])
+        # Insurable = gross minus non-insurable benefits
+        roe.total_insurable_earnings = sum(
+            line.amount for s in slips for line in s.line_ids
+            if line.category_id.code == &quot;INSURABLE&quot;)
+</code></pre>
+<h2 id="block-15c-per-period-breakdown">Block 15C: Per-period breakdown</h2>
+<p>Last 27 pay periods (bi-weekly = 54 weeks; weekly = 27 weeks).
+Per-period breakdown enables Service Canada to compute EI weekly
+amount.</p>
+<pre><code class="language-python">class SouthbrookPayrollRoeLine(models.Model):
+    _name = &quot;southbrook.payroll.roe.line&quot;
+
+    roe_id = fields.Many2one(&quot;southbrook.payroll.roe&quot;)
+    period_number = fields.Integer()  # 1 = most recent
+    period_start = fields.Date()
+    period_end = fields.Date()
+    insurable_earnings = fields.Float()
+</code></pre>
+<p>Auto-populated from payslips.</p>
+<h2 id="roe-web-service-canada-xml">ROE Web (Service Canada XML)</h2>
+<p>The <code>Export XML</code> action generates the ROE Web file:</p>
+<pre><code class="language-python">def action_export_xml(self):
+    root = ET.Element(&quot;ROEWeb&quot;)
+    # ... Service Canada's prescribed schema
+    return ET.tostring(root)
+</code></pre>
+<p>Upload to ROE Web portal.</p>
+<h2 id="reason-code-consequences">Reason code consequences</h2>
+<p>Reason code drives the employee's EI eligibility:</p>
+<ul>
+<li><strong>A (layoff)</strong> — eligible; wait period applies</li>
+<li><strong>D (illness)</strong> — sickness benefits, separate from regular EI</li>
+<li><strong>E (quit)</strong> — NOT eligible (unless quit with cause)</li>
+<li><strong>K (other)</strong> — Service Canada reviews case-by-case</li>
+<li><strong>M (dismissal)</strong> — eligibility depends on circumstances</li>
+</ul>
+<p>Wrong code = wrong eligibility = employee unfairly denied benefits.
+Worth getting right.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Reason code A used for what was actually E"</strong> — employee
+  applies for EI, gets initial approval, Service Canada
+  investigates, denies. Issue an amended ROE with correct code.</li>
+<li><strong>"Insurable earnings look low"</strong> — vacation pay paid out at
+  termination may have been booked to wrong period; cross-check.</li>
+<li><strong>"Period breakdown missing weeks"</strong> — gap in payslips (e.g.
+  unpaid leave). Insurable hours = 0 for that period; correct.</li>
+<li><strong>"ROE Web rejects the XML"</strong> — schema mismatch; CRA periodically
+  updates the schema. Test files first with their validation tool.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Last_day_worked = 2026-06-15. Lookback window for hours?</p>
+<blockquote>
+<p>53 weeks back from 2026-06-15 ≈ 2025-06-09. All payslips with
+<code>date_to</code> between 2025-06-09 and 2026-06-15.</p>
+</blockquote>
+<p><strong>Q2.</strong> Reason code wrong; ROE already filed. Recovery?</p>
+<blockquote>
+<p>Issue an AMENDED ROE with correct reason code. Service Canada
+tracks the amendment via <code>amended_id</code>.</p>
+</blockquote>
+<p><strong>Q3.</strong> Block 15B = 0 but employee was paid. Cause?</p>
+<blockquote>
+<p>The <code>category_id.code == "INSURABLE"</code> filter caught nothing.
+Salary rules' categories may not be set correctly. Check.</p>
+</blockquote>
+<p><strong>Q4.</strong> Bi-weekly pay; 27 periods in block 15C means how many
+weeks of history?</p>
+<blockquote>
+<p>27 × 2 = 54 weeks ≈ 1 year. Matches Service Canada's window.</p>
+</blockquote>
+<p><strong>Q5.</strong> Employee terminated; final pay was vacation payout 2
+weeks AFTER last day worked. Last_day_worked field?</p>
+<blockquote>
+<p>The last regular working day (before vacation payout). Vacation
+payout is included in earnings but doesn't extend <code>last_day_worked</code>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_23_payroll_hr_integration" model="slide.slide">
+            <field name="name">Payroll CA Module — Integration with Native hr.payslip</field>
+            <field name="channel_id" ref="course_payroll_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Developer building or debugging the Southbrook ↔ native HR boundary.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-ca-module-integration-with-native-hrpayslip">Payroll CA Module — Integration with Native hr.payslip</h1>
+<h2 id="the-relationship">The relationship</h2>
+<p>Southbrook doesn't replace <code>hr.payslip</code> — it extends it. The
+native model:
+- Stores per-employee slip data
+- Houses the <code>compute_sheet()</code> machinery
+- Holds the <code>state</code> machine (draft → done → cancel)
+- Owns the journal entry posting</p>
+<p>Southbrook adds:
+- Canadian-specific salary rules (CPP, EI, federal+provincial tax)
+- YTD tracking (<code>_get_ytd()</code> helper)
+- T4 + ROE source data
+- EFT file generation entry point</p>
+<h2 id="where-the-extensions-live">Where the extensions live</h2>
+<pre><code class="language-python"># In southbrook_payroll_ca/models/payroll_run.py
+class HrPayslipRun(models.Model):
+    _inherit = &quot;hr.payslip.run&quot;
+
+    eft_attachment_id = fields.Many2one(&quot;ir.attachment&quot;, string=&quot;EFT File&quot;)
+    pay_date = fields.Date()  # for EFT posting date
+
+    def action_generate_eft(self):
+        attachment = self.env[&quot;southbrook.payroll.eft_generator&quot;]\
+            .generate_eft_file(self.id)
+        self.eft_attachment_id = attachment
+</code></pre>
+<pre><code class="language-python">class HrPayslip(models.Model):
+    _inherit = &quot;hr.payslip&quot;
+
+    is_manual_override = fields.Boolean()  # per-slip override flag
+    ytd_snapshot = fields.Json()           # for YTD math
+
+    def compute_sheet(self):
+        result = super().compute_sheet()
+        # post-compute: snapshot YTD for box 24/26 / next slip math
+        self._snapshot_ytd()
+        return result
+</code></pre>
+<h2 id="ytd-math-interaction">YTD math interaction</h2>
+<p>Native compute doesn't know YTD caps. Southbrook injects this via
+the salary rule helper:</p>
+<pre><code class="language-python">@api.model
+def _get_ytd(self, code, employee_id, year):
+    &quot;&quot;&quot;Return YTD amount for code (CPP, EI, FED_TAX, etc.) up to
+    NOW for the given employee in the given year.&quot;&quot;&quot;
+    prior = self.env[&quot;hr.payslip&quot;].search([
+        (&quot;employee_id&quot;, &quot;=&quot;, employee_id),
+        (&quot;state&quot;, &quot;=&quot;, &quot;done&quot;),
+        (&quot;date_to&quot;, &quot;&lt;&quot;, fields.Date.today()),
+        (&quot;date_from&quot;, &quot;&gt;=&quot;, f&quot;{year}-01-01&quot;),
+    ])
+    total = 0
+    for slip in prior:
+        for line in slip.line_ids:
+            if line.code == code:
+                total += line.amount
+    return abs(total)  # deductions are negative
+</code></pre>
+<p>This is called by every CPP / EI / income tax rule.</p>
+<h2 id="override-semantics">Override semantics</h2>
+<p>When an admin uses <code>manual_override</code>:</p>
+<pre><code class="language-python">def write(self, vals):
+    &quot;&quot;&quot;Allow overrides; track in chatter.&quot;&quot;&quot;
+    if &quot;amount&quot; in vals and self.manual_override:
+        self.message_post(
+            body=_(&quot;Manual override: %s changed from %s to %s&quot;) % (
+                self.code, self.amount, vals[&quot;amount&quot;]))
+    return super().write(vals)
+</code></pre>
+<p>The override flag preserves the value through <code>compute_sheet()</code>
+re-runs.</p>
+<h2 id="recompute-behavior">Recompute behavior</h2>
+<p>If you click <em>Compute</em> twice:
+- Manual overrides are PRESERVED (not recomputed)
+- Auto-computed lines are RECOMPUTED from current data
+- YTD snapshot updates if intermediate slips were posted</p>
+<p>This is intentional. Allows admin to override one line + recompute
+others without losing the override.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Override didn't stick across recompute"</strong> — flag wasn't set.
+  Always tick <code>manual_override = True</code> before editing the amount.</li>
+<li><strong>"YTD totals look wrong"</strong> — prior slips may not be <code>state =
+  done</code>. Only done slips count in YTD.</li>
+<li><strong>"Native hr.payslip wizard conflicts with Southbrook flow"</strong> —
+  the Southbrook flow is via <code>hr.payslip.run</code>. Don't use the
+  native single-slip wizard for Canadian payroll.</li>
+<li><strong>"Journal entry posts twice"</strong> — native + Southbrook both
+  posting. Verify only one is configured to post (via
+  <code>salary_structure.journal_id</code>).</li>
+</ul>
+<h2 id="extension-hooks">Extension hooks</h2>
+<p>Three useful hooks for downstream:</p>
+<h3 id="pre-compute-hook">Pre-compute hook</h3>
+<pre><code class="language-python">class HrPayslip(models.Model):
+    _inherit = &quot;hr.payslip&quot;
+
+    def compute_sheet(self):
+        self._pre_compute_hook()  # YOUR custom logic here
+        result = super().compute_sheet()
+        return result
+
+    def _pre_compute_hook(self):
+        &quot;&quot;&quot;Override to add custom data before salary rules run.&quot;&quot;&quot;
+        pass
+</code></pre>
+<h3 id="post-compute-hook">Post-compute hook</h3>
+<pre><code class="language-python">    def compute_sheet(self):
+        result = super().compute_sheet()
+        self._post_compute_hook()  # AFTER rules
+        return result
+</code></pre>
+<h3 id="per-line-audit">Per-line audit</h3>
+<pre><code class="language-python">    def _create_payslip_line(self, line_vals):
+        line = super()._create_payslip_line(line_vals)
+        # YOUR custom logging here
+        return line
+</code></pre>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> YTD math reads from <code>hr.payslip.line</code>. Why filter to
+<code>state = done</code>?</p>
+<blockquote>
+<p>Draft slips might still be edited; their amounts don't count
+toward YTD until posted. Filtering ensures the YTD reflects
+approved + paid history.</p>
+</blockquote>
+<p><strong>Q2.</strong> Manual override flag dropped between save + recompute.
+Effect?</p>
+<blockquote>
+<p>Recompute overwrites the manual value with the auto-computed
+one. Flag persistence is critical. Bug if it's not persisting.</p>
+</blockquote>
+<p><strong>Q3.</strong> Same employee gets two payslips in same period (e.g.
+correction). YTD math?</p>
+<blockquote>
+<p>Both posted → both count. CPP/EI cap math might
+double-deduct then. Don't post two slips for the same period;
+use override on the first instead.</p>
+</blockquote>
+<p><strong>Q4.</strong> Native hr.payslip wizard creates a slip outside a run.
+What's missing?</p>
+<blockquote>
+<p>The Southbrook layer's <code>eft_generation</code> link, the <code>pay_date</code>
+field, the YTD snapshot wiring. Use runs, not individual slips.</p>
+</blockquote>
+<p><strong>Q5.</strong> New salary rule needs to access total CPP YTD. Best path?</p>
+<blockquote>
+<p>Use <code>self._get_ytd("CPP", employee_id, year)</code> inside the rule's
+<code>amount_python_compute</code>. The helper handles the query.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_23_payroll_customisation" model="slide.slide">
+            <field name="name">Payroll CA Module — Customisation Patterns</field>
+            <field name="channel_id" ref="course_payroll_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Developer extending payroll for new scenarios.</field>
+            <field name="html_content"><![CDATA[<h1 id="payroll-ca-module-customisation-patterns">Payroll CA Module — Customisation Patterns</h1>
+<h2 id="the-four-most-common-customisations">The four most common customisations</h2>
+<ol>
+<li>New salary rule (lesson 23.2)</li>
+<li>New EFT format (lesson 23.3)</li>
+<li>New jurisdiction (e.g. Quebec QPP instead of CPP)</li>
+<li>New benefit type (e.g. health spending account)</li>
+</ol>
+<h2 id="new-jurisdiction-quebec">New jurisdiction: Quebec</h2>
+<p>Quebec uses QPP instead of CPP. To add:</p>
+<h3 id="step-1-add-jurisdiction-to-tax_bracket">Step 1: Add jurisdiction to tax_bracket</h3>
+<pre><code class="language-python">class SouthbrookPayrollTaxBracket(models.Model):
+    _inherit = &quot;southbrook.payroll.tax_bracket&quot;
+
+    jurisdiction = fields.Selection(
+        selection_add=[(&quot;QC&quot;, &quot;Quebec&quot;)],
+        ondelete={&quot;QC&quot;: &quot;set default&quot;},
+    )
+</code></pre>
+<h3 id="step-2-add-qpp-rule">Step 2: Add QPP rule</h3>
+<p>QPP differs from CPP:
+- Different rate (6.4% as of 2026)
+- Different YMPE
+- Different exemption</p>
+<p>Add rule in a custom addon:</p>
+<pre><code class="language-xml">&lt;record id=&quot;rule_qpp_2026&quot; model=&quot;hr.salary.rule&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;QPP (Quebec)&lt;/field&gt;
+    &lt;field name=&quot;code&quot;&gt;QPP&lt;/field&gt;
+    &lt;field name=&quot;sequence&quot;&gt;50&lt;/field&gt;  &lt;!-- same as CPP --&gt;
+    &lt;field name=&quot;condition_python&quot;&gt;
+        contract.company_id.partner_id.state_id.code == 'QC'
+    &lt;/field&gt;
+    &lt;field name=&quot;amount_python_compute&quot;&gt;
+        ytd = self._get_ytd('QPP', payslip.employee_id.id, 2026)
+        max_qpp = (74900 - 3500) * 0.064  # QC YMPE - exemption × rate
+        # ... etc.
+    &lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<h3 id="step-3-disable-cpp-for-quebec-employees">Step 3: Disable CPP for Quebec employees</h3>
+<pre><code class="language-xml">&lt;record id=&quot;rule_cpp_2026&quot; model=&quot;hr.salary.rule&quot;&gt;
+    &lt;field name=&quot;condition_python&quot;&gt;
+        contract.company_id.partner_id.state_id.code != 'QC'
+    &lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<p>Now CPP fires for non-QC employees; QPP fires for QC employees.</p>
+<h2 id="new-benefit-type-health-spending-account-hsa">New benefit type: Health Spending Account (HSA)</h2>
+<p>HSA is an employer-paid health benefit that's:
+- Non-taxable to the employee (in most provinces)
+- Pre-tax for box 14 calculation</p>
+<h3 id="step-1-contract-field">Step 1: Contract field</h3>
+<pre><code class="language-python">class HrContract(models.Model):
+    _inherit = &quot;hr.contract&quot;
+
+    hsa_amount_per_period = fields.Float(string=&quot;HSA Contribution / Period&quot;)
+</code></pre>
+<h3 id="step-2-salary-rule">Step 2: Salary rule</h3>
+<pre><code class="language-xml">&lt;record id=&quot;rule_hsa&quot; model=&quot;hr.salary.rule&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;HSA Contribution&lt;/field&gt;
+    &lt;field name=&quot;code&quot;&gt;HSA&lt;/field&gt;
+    &lt;field name=&quot;sequence&quot;&gt;25&lt;/field&gt;  &lt;!-- before tax calc --&gt;
+    &lt;field name=&quot;category_id&quot; ref=&quot;hr_payroll.BENEFITS&quot;/&gt;
+    &lt;field name=&quot;amount_python_compute&quot;&gt;
+        result = contract.hsa_amount_per_period
+    &lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<h3 id="step-3-tax-exemption">Step 3: Tax exemption</h3>
+<p>The salary rule alone doesn't reduce box 14 unless it's in a
+non-taxable category. Verify the category configuration.</p>
+<h2 id="new-report-pay-summary-letter">New report: pay summary letter</h2>
+<p>Goal: a per-employee PDF summarizing the pay period for HR
+distribution.</p>
+<h3 id="step-1-report-record">Step 1: Report record</h3>
+<pre><code class="language-xml">&lt;report id=&quot;action_report_pay_summary&quot;
+        string=&quot;Pay Summary Letter&quot;
+        model=&quot;hr.payslip&quot;
+        report_type=&quot;qweb-pdf&quot;
+        file=&quot;southbrook_payroll_extensions.report_pay_summary&quot;
+        name=&quot;southbrook_payroll_extensions.pay_summary_template&quot;/&gt;
+</code></pre>
+<h3 id="step-2-qweb-template">Step 2: QWeb template</h3>
+<pre><code class="language-xml">&lt;template id=&quot;pay_summary_template&quot;&gt;
+    &lt;t t-call=&quot;web.html_container&quot;&gt;
+        &lt;t t-foreach=&quot;docs&quot; t-as=&quot;o&quot;&gt;
+            &lt;div class=&quot;page&quot;&gt;
+                &lt;h2&gt;Pay Summary for &lt;t t-esc=&quot;o.employee_id.name&quot;/&gt;&lt;/h2&gt;
+                &lt;p&gt;Period: &lt;t t-esc=&quot;o.date_from&quot;/&gt; to &lt;t t-esc=&quot;o.date_to&quot;/&gt;&lt;/p&gt;
+                &lt;table&gt;
+                    &lt;tr&gt;&lt;td&gt;Gross&lt;/td&gt;&lt;td&gt;&lt;t t-esc=&quot;o.gross_wage&quot;/&gt;&lt;/td&gt;&lt;/tr&gt;
+                    &lt;tr&gt;&lt;td&gt;Net&lt;/td&gt;&lt;td&gt;&lt;t t-esc=&quot;o.net_wage&quot;/&gt;&lt;/td&gt;&lt;/tr&gt;
+                &lt;/table&gt;
+            &lt;/div&gt;
+        &lt;/t&gt;
+    &lt;/t&gt;
+&lt;/template&gt;
+</code></pre>
+<h3 id="step-3-wire-button-on-payslip-form">Step 3: Wire button on payslip form</h3>
+<p>Available in the form's <em>Print</em> dropdown automatically.</p>
+<h2 id="what-to-avoid">What to avoid</h2>
+<ul>
+<li>Don't modify <code>tax_brackets_2026.xml</code> after install — the rates
+  are seeded with <code>noupdate="1"</code>. Add a NEW year's data file
+  instead.</li>
+<li>Don't override CPP/EI rule code directly — fork into a custom
+  addon and extend via condition.</li>
+<li>Don't bypass salary rule chain for "simple" calculations. The
+  chain is the audit trail.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> New jurisdiction Manitoba. Add brackets via?</p>
+<blockquote>
+<p>Custom data XML for Manitoba in a separate addon. Include MB
+code in <code>jurisdiction</code> selection.</p>
+</blockquote>
+<p><strong>Q2.</strong> HSA payment to employee. Box 14 effect?</p>
+<blockquote>
+<p>Non-taxable → reduces box 14 if classified in a non-taxable
+category. Verify with <code>salary_rule.category_id</code>.</p>
+</blockquote>
+<p><strong>Q3.</strong> QPP and CPP both fire for same employee. Why?</p>
+<blockquote>
+<p>Condition_python on rules conflicts; one shouldn't fire. Check
+the conditions. Should be mutually exclusive on
+<code>state_id.code == 'QC'</code>.</p>
+</blockquote>
+<p><strong>Q4.</strong> Custom report works in test DB but fails in prod. Why?</p>
+<blockquote>
+<p>ir.actions.report record not loaded. Verify the addon was
+deployed + the data XML was loaded.</p>
+</blockquote>
+<p><strong>Q5.</strong> New benefit type stops T4 box 14 from matching GL.
+Recovery?</p>
+<blockquote>
+<p>Verify the benefit's category. Some non-taxable benefits still
+hit GL wages account (in which case GL &gt; box 14). May be
+correct; document the gap.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

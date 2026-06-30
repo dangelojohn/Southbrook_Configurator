@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_hermes_recommendation_search" model="ir.ui.view">
+        <field name="name">southbrook.hermes.recommendation.search</field>
+        <field name="model">southbrook.hermes.recommendation</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="summary"/>
+                <field name="agent_run_id"/>
+                <field name="model_provider"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="ready" string="Ready" domain="[('state', '=', 'ready')]"/>
+                <filter name="approved" string="Approved" domain="[('state', '=', 'approved')]"/>
+                <filter name="open" string="Open" domain="[('state', 'in', ['draft', 'ready', 'approved'])]"/>
+                <separator/>
+                <filter name="task" string="Tasks" domain="[('recommendation_type', '=', 'task')]"/>
+                <filter name="high_priority" string="High Priority" domain="[('priority', 'in', ['high', 'blocker'])]"/>
+                <group name="group_by">
+                    <filter name="grp_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="grp_type" string="Type" context="{'group_by': 'recommendation_type'}"/>
+                    <filter name="grp_priority" string="Priority" context="{'group_by': 'priority'}"/>
+                    <filter name="grp_provider" string="Provider" context="{'group_by': 'model_provider'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_hermes_recommendation_list" model="ir.ui.view">
+        <field name="name">southbrook.hermes.recommendation.list</field>
+        <field name="model">southbrook.hermes.recommendation</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state == 'applied'" decoration-danger="priority == 'blocker'" decoration-muted="state == 'rejected'">
+                <field name="name"/>
+                <field name="recommendation_type"/>
+                <field name="priority"/>
+                <field name="agent_partner_id" widget="many2one_avatar"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'applied'"
+                       decoration-warning="state in ('ready', 'approved')"
+                       decoration-danger="state == 'rejected'"/>
+                <field name="agent_run_id"/>
+                <field name="model_provider"/>
+                <field name="model_name"/>
+                <field name="reviewer_id" widget="many2one_avatar_user"/>
+                <field name="reviewed_date"/>
+                <field name="applied_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hermes_recommendation_form" model="ir.ui.view">
+        <field name="name">southbrook.hermes.recommendation.form</field>
+        <field name="model">southbrook.hermes.recommendation</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_mark_ready" type="object" string="Mark Ready"
+                            class="btn-primary" invisible="state != 'draft'"
+                            groups="southbrook_hermes.group_hermes_reviewer"/>
+                    <button name="action_approve" type="object" string="Approve"
+                            class="btn-primary" invisible="state not in ('draft', 'ready')"
+                            groups="southbrook_hermes.group_hermes_reviewer"/>
+                    <button name="action_reject" type="object" string="Reject"
+                            invisible="state == 'applied'"
+                            groups="southbrook_hermes.group_hermes_reviewer"/>
+                    <button name="action_apply" type="object" string="Apply"
+                            class="btn-primary" invisible="state != 'approved'"
+                            groups="southbrook_hermes.group_hermes_reviewer"
+                            confirm="Apply this Fabio recommendation? This creates only the approved v1 target record."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,ready,approved,applied"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(project.action_view_task)d" type="action"
+                                class="oe_stat_button" icon="fa-tasks"
+                                invisible="not created_task_id"
+                                context="{'search_default_id': created_task_id}">
+                            <field name="created_task_id" widget="statinfo" string="Task"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Rejected" bg_color="text-bg-danger"
+                            invisible="state != 'rejected'"/>
+                    <widget name="web_ribbon" title="Applied"
+                            invisible="state != 'applied'"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="recommendation_type"/>
+                            <field name="priority"/>
+                            <field name="agent_partner_id" widget="many2one_avatar"/>
+                            <field name="source_model"/>
+                            <field name="source_res_id"/>
+                        </group>
+                        <group>
+                            <field name="agent_run_id"/>
+                            <field name="model_provider"/>
+                            <field name="model_name"/>
+                            <field name="reviewer_id"/>
+                            <field name="reviewed_date"/>
+                            <field name="applied_date"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Recommendation" name="recommendation">
+                            <group>
+                                <field name="summary"/>
+                                <field name="proposed_action"/>
+                                <field name="rationale"/>
+                            </group>
+                        </page>
+                        <page string="Payload" name="payload">
+                            <field name="payload_json" widget="text"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hermes_recommendation" model="ir.actions.act_window">
+        <field name="name">Fabio Recommendations</field>
+        <field name="res_model">southbrook.hermes.recommendation</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hermes_recommendation_search"/>
+        <field name="context">{'search_default_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No Fabio recommendations yet</p>
+            <p>Draft recommendations from the Fabio sidecar will appear here for human review.</p>
+        </field>
+    </record>
+
+</odoo>

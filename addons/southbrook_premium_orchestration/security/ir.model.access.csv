@@ -1,0 +1,15 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cut_spec_override_user,southbrook.cut.spec.override user,model_southbrook_cut_spec_override,base.group_user,1,1,1,0
+access_cut_spec_override_mfg,southbrook.cut.spec.override mfg,model_southbrook_cut_spec_override,mrp.group_mrp_user,1,1,1,1
+access_test_user_archive_wizard,test.user.archive.wizard,model_test_user_archive_wizard,base.group_system,1,1,1,1
+access_gemini_activation_wizard,gemini.activation.wizard,model_gemini_activation_wizard,base.group_system,1,1,1,1
+access_freecad_activation_wizard,freecad.activation.wizard,model_freecad_activation_wizard,base.group_system,1,1,1,1
+access_gemini_activator_system,southbrook.gemini.activator system,model_southbrook_gemini_activator,base.group_system,1,1,1,1
+access_gemini_activator_user_read,southbrook.gemini.activator read,model_southbrook_gemini_activator,base.group_user,1,0,0,0
+access_freecad_activator_system,southbrook.freecad.activator system,model_southbrook_freecad_activator,base.group_system,1,1,1,1
+access_freecad_activator_user_read,southbrook.freecad.activator read,model_southbrook_freecad_activator,base.group_user,1,0,0,0
+access_mi_engine_state_system,southbrook.mi.engine.state system,model_southbrook_mi_engine_state,base.group_system,1,1,1,1
+access_mi_engine_state_user_read,southbrook.mi.engine.state read,model_southbrook_mi_engine_state,base.group_user,1,0,0,0
+access_kitchen_ops_dashboard_user,southbrook.kitchen.ops.dashboard user,model_southbrook_kitchen_ops_dashboard,base.group_user,1,1,1,1
+access_ops_event_user_read,southbrook.ops.event read,model_southbrook_ops_event,base.group_user,1,0,0,0
+access_ops_event_system_all,southbrook.ops.event system,model_southbrook_ops_event,base.group_system,1,1,1,1
