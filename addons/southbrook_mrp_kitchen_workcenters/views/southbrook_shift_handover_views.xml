@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_southbrook_shift_handover_list" model="ir.ui.view">
+        <field name="name">southbrook.shift.handover.list</field>
+        <field name="model">southbrook.shift.handover</field>
+        <field name="arch" type="xml">
+            <list string="Shift Handovers"
+                  decoration-muted="state == 'cancelled'"
+                  decoration-info="state == 'draft'"
+                  decoration-warning="state == 'submitted'"
+                  decoration-success="state == 'acknowledged'">
+                <field name="name"/>
+                <field name="shift_date"/>
+                <field name="shift"/>
+                <field name="from_user_id"/>
+                <field name="to_user_id"/>
+                <!-- W087 — triage at-a-glance badges -->
+                <field name="q_anything_broken"
+                       optional="show"
+                       string="Broken?"/>
+                <field name="q_material_low"
+                       optional="show"
+                       string="Material Low?"/>
+                <field name="q_safety_concern"
+                       optional="show"
+                       string="Safety?"
+                       decoration-danger="q_safety_concern == True"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_shift_handover_form" model="ir.ui.view">
+        <field name="name">southbrook.shift.handover.form</field>
+        <field name="model">southbrook.shift.handover</field>
+        <field name="arch" type="xml">
+            <form string="Shift Handover">
+                <header>
+                    <button name="action_submit" type="object"
+                            string="Submit Handover" class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_acknowledge" type="object"
+                            string="Acknowledge" class="oe_highlight"
+                            invisible="state != 'submitted'"/>
+                    <button name="action_cancel" type="object"
+                            string="Cancel"
+                            invisible="state in ('acknowledged','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,acknowledged"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Shift">
+                            <field name="shift_date"
+                                   readonly="state != 'draft'"/>
+                            <field name="shift"
+                                   readonly="state != 'draft'"/>
+                        </group>
+                        <group string="People">
+                            <field name="from_user_id"
+                                   readonly="state != 'draft'"/>
+                            <field name="to_user_id"
+                                   readonly="state != 'draft'"/>
+                            <field name="submitted_at" readonly="1"
+                                   invisible="not submitted_at"/>
+                            <field name="acknowledged_at" readonly="1"
+                                   invisible="not acknowledged_at"/>
+                            <field name="acknowledged_by" readonly="1"
+                                   invisible="not acknowledged_by"/>
+                        </group>
+                    </group>
+                    <group string="Workcenters">
+                        <field name="workcenter_ids" nolabel="1"
+                               widget="many2many_tags"
+                               readonly="state != 'draft'"/>
+                    </group>
+                    <!-- W087 — three structured triage questions
+                         BEFORE the legacy free-text page. Default
+                         placement is the form sheet body (not a
+                         notebook tab) so the outgoing lead cannot
+                         skip them on the way to Submit. -->
+                    <group string="Shift Triage (Required)">
+                        <group>
+                            <field name="q_anything_broken"
+                                   readonly="state not in ('draft','submitted')"/>
+                            <field name="q_material_low"
+                                   readonly="state not in ('draft','submitted')"/>
+                            <field name="q_safety_concern"
+                                   readonly="state not in ('draft','submitted')"/>
+                        </group>
+                        <group>
+                            <field name="q_extra_notes" nolabel="1"
+                                   placeholder="Extra notes (optional)..."
+                                   readonly="state not in ('draft','submitted')"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description (Legacy)" name="summary">
+                            <field name="summary" nolabel="1"
+                                   placeholder="Pre-W087 free-text summary. Use the triage questions above for new handovers."
+                                   readonly="state not in ('draft','submitted')"/>
+                        </page>
+                        <page string="Attachments" name="attachments">
+                            <field name="attachment_ids" widget="many2many_binary"
+                                   readonly="state not in ('draft','submitted')"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_shift_handover_search" model="ir.ui.view">
+        <field name="name">southbrook.shift.handover.search</field>
+        <field name="model">southbrook.shift.handover</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="from_user_id"/>
+                <field name="to_user_id"/>
+                <field name="workcenter_ids"/>
+                <filter name="my_handovers" string="My Handovers"
+                        domain="['|',('from_user_id','=',uid),('to_user_id','=',uid)]"/>
+                <filter name="awaiting_ack" string="Awaiting Ack"
+                        domain="[('state','=','submitted')]"/>
+                <filter name="today" string="Today"
+                        domain="[('shift_date','=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter name="group_shift" string="Shift"
+                            context="{'group_by':'shift'}"/>
+                    <filter name="group_state" string="State"
+                            context="{'group_by':'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_southbrook_shift_handover" model="ir.actions.act_window">
+        <field name="name">Shift Handovers</field>
+        <field name="res_model">southbrook.shift.handover</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_awaiting_ack': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No shift handovers yet.
+            </p>
+            <p>
+                At change-of-shift, the outgoing lead creates a handover,
+                lists the workcenters under their watch, writes a summary
+                of what's open/stuck/incoming, and submits. The incoming
+                lead acknowledges. Both names + timestamps land as
+                immutable audit trail.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_sbk_ops_shift_handover"
+              name="Shift Handovers"
+              parent="menu_sbk_ops_root"
+              action="action_southbrook_shift_handover"
+              sequence="60"/>
+
+</odoo>

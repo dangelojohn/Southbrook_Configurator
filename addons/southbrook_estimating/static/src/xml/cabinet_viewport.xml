@@ -8,13 +8,48 @@
                 <button class="btn btn-sm btn-outline-secondary o_cv_btn"
                         t-on-click="onToggleMode"
                         t-att-disabled="!state.threeLoaded">
-                    <t t-if="state.mode === 'solid'">Blueline</t>
-                    <t t-else="">Solid</t>
+                    <t t-if="state.mode === 'solid'">Blueprint view</t>
+                    <t t-else="">Realistic view</t>
                 </button>
                 <button class="btn btn-sm btn-outline-secondary o_cv_btn"
-                        title="Refresh"
+                        title="Reset camera to the default 3/4 view"
+                        t-on-click="onResetCamera"
+                        t-att-disabled="!state.threeLoaded">⟲ View</button>
+                <div class="o_cv_preset_group btn-group btn-group-sm"
+                     role="group" aria-label="Preset camera angles">
+                    <button class="btn btn-outline-secondary o_cv_btn"
+                            title="Front view"
+                            t-on-click="onPresetFront"
+                            t-att-disabled="!state.threeLoaded">Front</button>
+                    <button class="btn btn-outline-secondary o_cv_btn"
+                            title="3/4 view"
+                            t-on-click="onPresetThreeQuarter"
+                            t-att-disabled="!state.threeLoaded">3/4</button>
+                    <button class="btn btn-outline-secondary o_cv_btn"
+                            title="Top view"
+                            t-on-click="onPresetTop"
+                            t-att-disabled="!state.threeLoaded">Top</button>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary o_cv_btn"
+                        title="Refresh the rendered cabinet from the latest configuration"
                         t-on-click="onRefresh"
                         t-att-disabled="!state.threeLoaded">↻</button>
+                <button class="btn btn-sm btn-outline-secondary o_cv_btn"
+                        title="Download a PNG snapshot of the current view"
+                        t-on-click="onDownloadSnapshot"
+                        t-att-disabled="!state.threeLoaded">⤓ PNG</button>
+                <span class="o_cv_sku badge bg-secondary"
+                      t-if="state.templateCode"
+                      title="Template SKU prefix"
+                      t-esc="state.templateCode"/>
+                <span class="o_cv_dims badge bg-light text-dark"
+                      t-if="state.dimsLabel"
+                      title="Cabinet dimensions (W × H × D)"
+                      t-esc="state.dimsLabel"/>
+                <span class="o_cv_price badge bg-light text-dark fw-semibold"
+                      t-if="state.priceLabel"
+                      t-att-title="state.priceTooltip"
+                      t-esc="state.priceLabel"/>
                 <span class="o_cv_status flex-grow-1" t-if="state.loading">
                     Loading…
                 </span>

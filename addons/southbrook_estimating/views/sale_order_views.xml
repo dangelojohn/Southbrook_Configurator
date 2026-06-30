@@ -151,18 +151,36 @@
   <!-- discoverability without losing the Build-Spec placement.       -->
   <!-- ============================================================== -->
 
-  <!-- Top-level entry in the main app drawer. -->
+  <!--
+    Top-level entry in the main app drawer.
+
+    REG-C2 (2026-06-18): Carries action="action_order_builder" so the
+    app-drawer tile lands users on the Order Builder grid, not on the
+    first child menu's action. Without an explicit action, Odoo's app
+    drawer navigates to whichever child menuitem has the lowest
+    sequence — and `menu_southbrook_launch_3d` (sequence=5, defined in
+    launch_3d_menu.xml) was winning over Order Builder (sequence=10),
+    so the launcher was popping the SB-BASE-1DR configurator wizard
+    instead of opening the Estimating app. Caught by Claude Chrome
+    end-to-end Run 2 report (finding C2).
+  -->
   <menuitem id="menu_southbrook_root"
             name="Southbrook Estimating"
             web_icon="southbrook_estimating,static/description/icon.png"
+            action="action_order_builder"
             sequence="20"/>
 
-  <!-- Order Builder as the default landing item under the top-level root. -->
+  <!--
+    Order Builder as a named sibling under the root so users always
+    see an explicit "Order Builder" entry next to "Launch 3D
+    Configurator". sequence=4 keeps it FIRST in the dropdown even if
+    the top-level action didn't fire (defence in depth — see REG-C2).
+  -->
   <menuitem id="menu_southbrook_order_builder_top"
             name="Order Builder"
             parent="menu_southbrook_root"
             action="action_order_builder"
-            sequence="10"/>
+            sequence="4"/>
 
   <!-- Legacy placement under Sales → Orders — preserved per Build Spec §2.2. -->
   <menuitem id="menu_southbrook_order_builder"

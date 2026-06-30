@@ -40,7 +40,7 @@ analysis. Layered build:
       M17 Floor Manager access group
       M20 ECO → in-flight MO notification rule
 """,
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.12.2",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -82,6 +82,10 @@ analysis. Layered build:
         # with Ready Queue / In Production / Late / Floor Load /
         # Equipment actions.
         "views/pm_menus.xml",
+        # W019 — Today's Plan planner-home view. Must load AFTER
+        # pm_menus.xml so it can hang its menuitem under the
+        # menu_southbrook_pm_root parent declared above.
+        "views/pm_today_plan.xml",
         # Layer 2 commit 2 — M13 — equipment condition field
         # surfaced on the maintenance.equipment form + list views.
         "views/equipment_views.xml",
@@ -101,6 +105,24 @@ analysis. Layered build:
         # in the DB without a tracked file; re-shipping properly so
         # the model + view stay in sync.
         "views/sale_order_production_approval.xml",
+        # 2026-06-22 — MRP Production kanban UX redesign. Inherit-
+        # only; pipeline columns by state + restructured card. See
+        # the file's header docstring for the full design rationale
+        # (audit asks 1-7).
+        "views/mrp_production_kanban.xml",
+        # W057 (MFG-REVIEW-R7.6) — daily cron trimming done
+        # mail.activity rows older than 90 days. Garbage collection
+        # only; never touches open activities.
+        "data/activity_retention_cron.xml",
+        # W048 (R7.4, 2026-06-27) — pre-aggregated daily shop snapshot
+        # for the GM month-end actual-vs-plan rollup. Cron loads here;
+        # the pivot/graph/list views + menu under PM root load next.
+        "data/shop_daily_cron.xml",
+        "views/shop_daily_views.xml",
+        # W068 (R3.12, 2026-06-27) — Plan Delta inherit-views over
+        # mrp.production. Loads AFTER pm_menus.xml so it can hang its
+        # menuitem under menu_southbrook_pm_root.
+        "views/pm_plan_delta.xml",
     ],
     "assets": {
         "web.assets_frontend": [
@@ -112,6 +134,10 @@ analysis. Layered build:
             # M10 — PM KPI dashboard kanban styling. Backend bundle
             # because the dashboard is an internal-user view.
             "southbrook_mrp_pm/static/src/scss/dashboard.scss",
+            # 2026-06-22 — MRP Production kanban card styling.
+            # Scoped to .o_sb_mo_kanban so it can't leak into
+            # other backend kanban views.
+            "southbrook_mrp_pm/static/src/scss/mrp_production_kanban.scss",
         ],
     },
     "installable": True,

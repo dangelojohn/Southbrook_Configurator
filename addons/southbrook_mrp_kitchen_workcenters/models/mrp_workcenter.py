@@ -19,7 +19,7 @@ useful: the planner consults `x_sbk_is_bottleneck` to know which
 stations she should never overload at scheduling; the dashboard
 reads `x_mi_bottleneck_workcenter_id` to see where today's queue is.
 """
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 STATION_TYPES = [
@@ -129,6 +129,59 @@ class MrpWorkcenter(models.Model):
              "mrp.production, which is the LIVE bottleneck for a "
              "specific MO at a moment in time.",
     )
+
+    # SAMI PRD MES-08 (2026-06-26) — real-time bottleneck signal.
+    # Auto-computed from workorder_ids.state. Stored so dashboards +
+    # read_group queries don't trigger N+1 recomputes.
+    x_sbk_pending_wo_count = fields.Integer(
+        string="Pending WOs",
+        compute="_compute_x_sbk_pending_load",
+        store=True,
+        help="Number of WOs at this workcenter currently in 'ready', "
+             "'waiting', or 'pending' state. Auto-refreshes on every "
+             "WO state transition.",
+    )
+    x_sbk_congestion_level = fields.Selection(
+        [("clear", "Clear"),
+         ("warn", "Backing Up"),
+         ("alert", "Bottleneck")],
+        string="Congestion",
+        compute="_compute_x_sbk_pending_load",
+        store=True,
+        help="Live congestion signal derived from x_sbk_pending_wo_count. "
+             "Thresholds tunable via ir.config_parameter "
+             "`southbrook.bottleneck.warn_threshold` (default 3) and "
+             "`southbrook.bottleneck.alert_threshold` (default 5).",
+    )
+
+    @api.depends("order_ids.state")
+    def _compute_x_sbk_pending_load(self):
+        # Native mrp.workcenter inverse one2many to mrp.workorder is
+        # 'order_ids', not 'workorder_ids' (caught 2026-06-26 when the
+        # broken @api.depends silently corrupted the registry and
+        # blocked all subsequent module upgrades on this DB).
+        Param = self.env["ir.config_parameter"].sudo()
+        try:
+            warn_t = int(Param.get_param(
+                "southbrook.bottleneck.warn_threshold", "3"))
+        except (TypeError, ValueError):
+            warn_t = 3
+        try:
+            alert_t = int(Param.get_param(
+                "southbrook.bottleneck.alert_threshold", "5"))
+        except (TypeError, ValueError):
+            alert_t = 5
+        for wc in self:
+            pending = wc.order_ids.filtered(
+                lambda w: w.state in ("ready", "waiting", "pending"))
+            count = len(pending)
+            wc.x_sbk_pending_wo_count = count
+            if count >= alert_t:
+                wc.x_sbk_congestion_level = "alert"
+            elif count >= warn_t:
+                wc.x_sbk_congestion_level = "warn"
+            else:
+                wc.x_sbk_congestion_level = "clear"
     x_sbk_oee_target = fields.Float(
         string="OEE Target",
         default=0.85,

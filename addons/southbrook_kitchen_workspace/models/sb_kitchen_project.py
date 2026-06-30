@@ -91,6 +91,16 @@ class SbKitchenProject(models.Model):
     # Outbound links.
     sale_order_id = fields.Many2one("sale.order", string="Quote / Sale Order")
 
+    # Room bridge — Phase A. A project draws its floor plan from the
+    # first room of its sale_order. The room is created lazily by
+    # action_open_room_layout when the designer first asks for the plan.
+    room_id = fields.Many2one(
+        "southbrook.room",
+        compute="_compute_room_id", store=False,
+        string="Active Room",
+    )
+    room_count = fields.Integer(compute="_compute_room_id", store=False)
+
     notes = fields.Html()
 
     @api.depends("design_option_ids.is_selected")
@@ -98,6 +108,13 @@ class SbKitchenProject(models.Model):
         for project in self:
             selected = project.design_option_ids.filtered("is_selected")
             project.selected_design_option_id = selected[:1]
+
+    @api.depends("sale_order_id.room_ids")
+    def _compute_room_id(self):
+        for project in self:
+            rooms = project.sale_order_id.room_ids if project.sale_order_id else False
+            project.room_id = rooms[:1] if rooms else False
+            project.room_count = len(rooms) if rooms else 0
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -206,6 +223,43 @@ class SbKitchenProject(models.Model):
     # ------------------------------------------------------------------
     # AI-analysis confirmation gate (init-doc GAP-02 / Module 6)
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Room Layout bridge
+    # ------------------------------------------------------------------
+    def action_open_room_layout(self):
+        """Open the Order Builder's Room Layout tab for this project's
+        room. Lazily provisions a draft sale.order + a default kitchen
+        room if either is missing — the designer never has to
+        pre-create those by hand.
+        """
+        self.ensure_one()
+        # 1. Ensure sale.order
+        order = self.sale_order_id
+        if not order:
+            order = self.env["sale.order"].create({
+                "partner_id": self.partner_id.id,
+                "origin": self.code or self.name,
+            })
+            self.sale_order_id = order
+        # 2. Ensure at least one room
+        room = order.room_ids[:1]
+        if not room:
+            room = self.env["southbrook.room"].create({
+                "name": self.name or "Main Kitchen",
+                "order_id": order.id,
+                "room_type": "kitchen",
+            })
+        # 3. Open the Order Builder form scrolled to Room Layout
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Room Layout",
+            "res_model": "sale.order",
+            "res_id": order.id,
+            "view_mode": "form",
+            "target": "current",
+            "context": {"default_sb_active_tab": "room_layout"},
+        }
+
     def is_ready_for_config_engine(self) -> bool:
         """The configuration engine MUST refuse to run unless every
         dimensional input is human-confirmed. Returns True only when the

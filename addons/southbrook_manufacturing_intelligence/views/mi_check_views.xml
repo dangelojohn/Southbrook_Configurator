@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- W012 — extend the existing southbrook.mi.check form (declared in
+     manager_dashboard_views.xml) with a deviation-waiver header button
+     + a smart button + the status bar. Inheritance keeps us from
+     forking the form. -->
+<odoo>
+    <!-- W024 — bulk Auto-Fix server action. Surfaces under "Action"
+         dropdown on the MI Checks list view; runs action_auto_fix on
+         every auto_fixable check in the selection, no-ops on the rest. -->
+    <record id="action_server_mi_check_bulk_auto_fix" model="ir.actions.server">
+        <field name="name">Auto-Fix All Auto-Fixable</field>
+        <field name="model_id" ref="model_southbrook_mi_check"/>
+        <field name="binding_model_id" ref="model_southbrook_mi_check"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_auto_fix_all_selected()</field>
+    </record>
+
+    <!-- W024 — augment the existing standalone MI Checks list view
+         with an Auto-Fix button per row. column_invisible keeps the
+         auto_fixable column out of the visible columns but ensures
+         it's fetched so the button's invisible expression can read it. -->
+    <record id="view_southbrook_mi_check_list_w024" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.list.auto_fix</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="inherit_id"
+               ref="southbrook_manufacturing_intelligence.view_southbrook_mi_check_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list/field[@name='image']" position="after">
+                <field name="auto_fixable" column_invisible="1"/>
+                <button name="action_auto_fix" type="object"
+                        string="Fix" class="btn-link"
+                        icon="fa-magic"
+                        invisible="not auto_fixable"
+                        help="Run the deterministic auto-fix for this
+                              check (W024). Idempotent."/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_southbrook_mi_check_form_w012" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.form.deviation</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="inherit_id"
+               ref="southbrook_manufacturing_intelligence.view_southbrook_mi_check_form"/>
+        <field name="arch" type="xml">
+            <!-- Add header above the sheet for the action button +
+                 statusbar. The base form has no <header>, so we inject
+                 one immediately before <sheet>. -->
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="action_approve_deviation"
+                            string="Ship with Deviation"
+                            type="object" class="btn-warning"
+                            invisible="state == 'ship_with_deviation' or category == 'fai'"/>
+                    <!-- W025 — FAI pass/fail buttons. Only visible on
+                         category='fai' checks (the auto-created sign-off
+                         row). Pass clears the BOM's fai_required flag +
+                         retires the check; Fail bumps severity to blocker
+                         so the MO stays gated until rework or waiver. -->
+                    <button name="action_fai_pass"
+                            string="FAI Pass"
+                            type="object" class="btn-success"
+                            invisible="category != 'fai' or not active"
+                            help="Sign off the First Article Inspection
+                                  (W025). Flips the BOM's fai_required
+                                  flag to False so subsequent MOs against
+                                  this BOM unlock automatically. Cannot
+                                  be the same user who created the BOM
+                                  (segregation of duties)."/>
+                    <button name="action_fai_fail"
+                            string="FAI Fail"
+                            type="object" class="btn-danger"
+                            invisible="category != 'fai' or not active"
+                            help="Mark the FAI as failed — MO stays
+                                  blocked until either rework completes
+                                  OR a deviation waiver is approved
+                                  (W012 flow)."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,pending_deviation_approval,ship_with_deviation"
+                           invisible="category == 'fai'"/>
+                </header>
+            </xpath>
+            <!-- Add the smart button box at the top of the sheet so it
+                 renders above the oe_title. The base form has no
+                 button_box; we create one. -->
+            <xpath expr="//sheet/div[hasclass('oe_title')]" position="before">
+                <div class="oe_button_box" name="button_box">
+                    <button name="action_open_deviation_waiver"
+                            type="object" class="oe_stat_button"
+                            icon="fa-file-text-o"
+                            invisible="deviation_waiver_count == 0">
+                        <field name="deviation_waiver_count"
+                               widget="statinfo"
+                               string="Waiver"/>
+                    </button>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

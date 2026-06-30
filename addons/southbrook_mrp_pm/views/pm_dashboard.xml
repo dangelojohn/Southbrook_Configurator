@@ -37,31 +37,44 @@
                     <field name="name"/>
                   </span>
                 </header>
+                <!-- W051 (R7.6): each tile is now a clickable button
+                     that opens the relevant drill-down (kanban global
+                     click would open the workcenter form; per-tile
+                     buttons let the PM jump straight to the slice
+                     they care about). Equipment alerts cross-link to
+                     impacted MOs via the existing M14 smart button on
+                     each equipment record. -->
                 <div class="o_sb_pm_dash_metrics">
-                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_inflight">
+                  <button name="action_view_inflight_workorders"
+                          type="object"
+                          class="o_sb_pm_dash_metric o_sb_pm_dash_inflight oe_kanban_action oe_kanban_action_a">
                     <div class="o_sb_pm_dash_label">In Queue</div>
                     <div class="o_sb_pm_dash_value">
                       <field name="southbrook_pm_inflight_count"/>
                     </div>
-                  </div>
+                  </button>
                   <div class="o_sb_pm_dash_metric o_sb_pm_dash_done">
                     <div class="o_sb_pm_dash_label">Done Today</div>
                     <div class="o_sb_pm_dash_value">
                       <field name="southbrook_pm_throughput_today"/>
                     </div>
                   </div>
-                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_late">
+                  <button name="action_view_impacted_productions"
+                          type="object"
+                          class="o_sb_pm_dash_metric o_sb_pm_dash_late oe_kanban_action oe_kanban_action_a">
                     <div class="o_sb_pm_dash_label">Late</div>
                     <div class="o_sb_pm_dash_value">
                       <field name="southbrook_pm_late_count"/>
                     </div>
-                  </div>
-                  <div class="o_sb_pm_dash_metric o_sb_pm_dash_alerts">
+                  </button>
+                  <button name="action_view_equipment_alerts"
+                          type="object"
+                          class="o_sb_pm_dash_metric o_sb_pm_dash_alerts oe_kanban_action oe_kanban_action_a">
                     <div class="o_sb_pm_dash_label">Equipment</div>
                     <div class="o_sb_pm_dash_value">
                       <field name="southbrook_pm_equipment_alerts"/>
                     </div>
-                  </div>
+                  </button>
                 </div>
                 <footer class="o_sb_pm_dash_card_f">
                   <span>OEE Target</span>

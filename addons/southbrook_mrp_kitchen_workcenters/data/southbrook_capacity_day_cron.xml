@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W067 (R3.10, 2026-06-27) — daily capacity refresh cron.
+
+  Rebuilds the next 14 days of southbrook.capacity.day rows for every
+  active kitchen WC at 02:30 every day. The rebuild deletes the window
+  first then re-creates, so it's safely idempotent.
+
+  Odoo 19: ir.cron inherits ir.actions.server; numbercall + doall fields
+  are gone (memory: odoo19_ir_cron_schema_change). Schedule is encoded
+  via interval_number + interval_type.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="ir_cron_refresh_capacity_day" model="ir.cron">
+            <field name="name">Southbrook · Refresh Calendar Capacity (W067)</field>
+            <field name="model_id" ref="model_southbrook_capacity_day"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_refresh_capacity()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

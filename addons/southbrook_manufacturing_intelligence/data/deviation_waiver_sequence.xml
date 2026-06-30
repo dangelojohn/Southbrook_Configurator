@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- W012 — sequence for southbrook.deviation.waiver records.
+     Format: WV-YYYY-NNNN. Year is implied by Odoo's %(year)s padding
+     token; the 4-digit counter rolls per-year (use_date_range=True). -->
+<odoo>
+    <data noupdate="1">
+        <record id="seq_southbrook_deviation_waiver" model="ir.sequence">
+            <field name="name">Engineering Deviation Waiver</field>
+            <field name="code">southbrook.deviation.waiver</field>
+            <field name="prefix">WV-%(year)s-</field>
+            <field name="padding">4</field>
+            <field name="number_increment">1</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="implementation">standard</field>
+        </record>
+    </data>
+</odoo>

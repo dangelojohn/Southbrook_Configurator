@@ -65,6 +65,36 @@ class TestQualityCheckExtension(TransactionCase):
                 f"x_sbk_result={result!r} should yield rework={expected}",
             )
 
+    def test_w041_all_defect_types_have_default_workcenter(self):
+        """W041 (R5, 2026-06-27) — every defect type in the selection
+        must resolve to a rework workcenter via the onchange. The
+        original mapping covered 10 of 14 types; this test now asserts
+        full coverage including the four formerly-undefaulted types:
+        label_error, missing_component, packaging_issue, other.
+        """
+        check = self.Check.new({
+            "name": "W041 mapping smoke",
+            "message": "test",
+            "category": "production",
+        })
+        sel = dict(self.Check._fields["x_sbk_defect_type"].selection)
+        # Sanity: the four W041 types are in the selection.
+        for required in (
+                "label_error", "missing_component",
+                "packaging_issue", "other"):
+            self.assertIn(
+                required, sel,
+                f"defect_type selection missing {required!r}",
+            )
+        for defect_key in sel.keys():
+            check.x_sbk_defect_type = defect_key
+            check._onchange_defect_type_suggests_rework_workcenter()
+            self.assertTrue(
+                check.x_sbk_rework_workcenter_id,
+                f"defect type {defect_key!r} did not resolve to a "
+                f"default rework workcenter — W041 regression",
+            )
+
 
 @tagged("post_install", "-at_install", "southbrook", "sbk_kitchen", "m3")
 class TestDowntimeModel(TransactionCase):

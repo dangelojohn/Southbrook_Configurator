@@ -1,7 +1,8 @@
 /** @odoo-module **/
-// Bundle hash bump 2026-06-02T11:50Z — filter v2: single-row tab bar
-// (underline-active, superscript counts, horizontal-scroll on overflow)
-// + alternative <select> dropdown behind state.filterMode flag.
+// Bundle hash bump 2026-06-22 — UX bugfix pass: poll no longer wipes
+// transient UI state ("Loading order…" only on initial load + payload
+// hash + modal-open pause); CatalogPicker defaults to Base; Add button
+// gets a synchronous lock + a confirmation toast (single-add only).
 /*
  * SPDX-License-Identifier: LGPL-3.0-only
  *
@@ -31,8 +32,10 @@
  *     },
  *   };
  */
-import { Component, mount, markup, onMounted, onWillUnmount, useState, xml } from "@odoo/owl";
+import { Component, mount, markup, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
+import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
+import { RoomLayoutTab, AssignToWallModal, GapRecommendModal } from "@southbrook_estimating_website/js/room_layout.esm";
 
 // ----------------------------------------------------------------------
 // USD currency formatter — shared between OrderBuilder (probe) + the
@@ -54,7 +57,7 @@ function fmtUsd(value) {
 // service registry isn't available.
 // ----------------------------------------------------------------------
 
-async function rpcJsonCall(url, params = {}) {
+export async function rpcJsonCall(url, params = {}) {
     const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,6 +149,16 @@ class OrderTitlebar extends Component {
                 <t t-if="props.order.state">
                     · <t t-esc="_stateLabel(props.order.state)"/>
                 </t>
+                <!-- 2026-06-27 — last-saved stamp (FE P3#13). Renders
+                     relative ("2 min ago"); the order's write_date
+                     advances on every line edit, attribute change, or
+                     header field write, so this is the canonical
+                     "your edits landed" signal. -->
+                <div t-if="props.order.write_date"
+                     class="o_owl_titlebar_saved mono"
+                     t-att-title="props.order.write_date">
+                    saved <t t-esc="_relativeTime(props.order.write_date)"/>
+                </div>
             </div>
         </div>
     `;
@@ -163,6 +176,23 @@ class OrderTitlebar extends Component {
             cancel: "Cancelled",
         };
         return labels[state] || state;
+    }
+
+    // 2026-06-27 — compact relative-time formatter for the
+    // saved-stamp. Server returns ISO 8601 (UTC) so Date.parse handles
+    // it consistently. "just now" / "Ns ago" / "Nm ago" / "Nh ago" /
+    // date string. Bounded at 1d so a long-idle order doesn't show
+    // "saved 47 days ago" which reads as a stale-data warning.
+    _relativeTime(iso) {
+        const t = Date.parse(iso);
+        if (!t || Number.isNaN(t)) return "";
+        const delta = Math.max(0, (Date.now() - t) / 1000);
+        if (delta < 5)    return "just now";
+        if (delta < 60)   return `${Math.floor(delta)}s ago`;
+        if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
+        if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+        const d = new Date(t);
+        return d.toLocaleDateString();
     }
 }
 
@@ -190,7 +220,7 @@ class OrderTitlebar extends Component {
 class StagePipeline extends Component {
     static template = xml`
         <div class="o_owl_stages">
-            <t t-foreach="_stages" t-as="stage" t-key="stage_index">
+            <t t-foreach="_stages" t-as="stage" t-key="stage.label">
                 <div class="o_owl_stage"
                      t-att-class="{
                          'o_owl_stage_done':    stage_index &lt; currentIdx,
@@ -294,7 +324,7 @@ class FooterActions extends Component {
                      (after Send-to-Manufacturing fires). The server
                      returns no_mo when no MO is tied, and the OWL
                      component shows the message inline. -->
-                <button t-if="props.mode !== 'customer' and props.order?.state === 'sale'"
+                <button t-if="props.mode !== 'customer' &amp;&amp; props.order &amp;&amp; props.order.state === 'sale'"
                         class="o_owl_btn o_owl_btn_secondary"
                         t-on-click="() => props.onAction('print_shop_copy')"
                         t-att-disabled="props.busy">
@@ -343,7 +373,7 @@ class FooterActions extends Component {
                      manufacturing-ish has happened yet). -->
                 <button class="o_owl_btn o_owl_btn_primary"
                         t-on-click="_onConfirmClick"
-                        t-att-disabled="props.busy or !_canConfirm()">
+                        t-att-disabled="props.busy || !_canConfirm()">
                     <t t-if="!_canConfirm()">
                         <t t-if="props.mode === 'customer'">
                             Submitted (<t t-esc="props.order.state"/>)
@@ -382,6 +412,68 @@ class FooterActions extends Component {
                  variant-BoM snapshot fields, this modal will also
                  show the cut spec + BoM versions per line. For now
                  it shows what's already in the payload. -->
+            <!-- 2026-06-27 — Send-to-Manufacturing review modal.
+                 Parallel to the Send-to-Production modal below; shows
+                 MO preview + blockers fetched on click via the parent's
+                 loadPreflight. Replaces a tab-blocking window.confirm. -->
+            <div t-if="state.confirmingMfg" class="o_owl_modal_backdrop"
+                 t-on-click="_onCancelMfg">
+                <div class="o_owl_modal"
+                     t-on-click="(ev) => ev.stopPropagation()"
+                     role="dialog"
+                     aria-modal="true"
+                     aria-label="Send to Manufacturing — review">
+                    <header class="o_owl_modal_head">
+                        <h2 class="o_owl_modal_title">Send to Manufacturing?</h2>
+                        <p class="o_owl_modal_sub">
+                            This creates a Manufacturing Order for every
+                            cabinet line with a resolvable BoM. Existing
+                            MOs (from a prior send) are reused — nothing
+                            is duplicated.
+                        </p>
+                    </header>
+                    <dl class="o_owl_modal_review">
+                        <dt>Order</dt>
+                        <dd t-esc="props.order.name"/>
+                        <dt>Lines</dt>
+                        <dd><t t-esc="props.order.line_count"/> cabinets</dd>
+                        <dt t-if="state.mfgPreview">MOs to create</dt>
+                        <dd t-if="state.mfgPreview">
+                            <strong class="mono"
+                                    t-esc="state.mfgPreview.mo_total"/>
+                            <t t-if="state.mfgPreview.mo_preview &amp;&amp; state.mfgPreview.mo_preview.length">
+                                ·
+                                <t t-foreach="state.mfgPreview.mo_preview"
+                                   t-as="grp" t-key="grp.family">
+                                    <span class="o_owl_approval_preview_chip">
+                                        <strong t-esc="grp.count"/>&#160;<t t-esc="grp.family"/>
+                                    </span><t t-if="!grp_last">, </t>
+                                </t>
+                            </t>
+                        </dd>
+                    </dl>
+                    <ul t-if="state.mfgPreview &amp;&amp; state.mfgPreview.blockers &amp;&amp; state.mfgPreview.blockers.length"
+                        class="o_owl_approval_blockers">
+                        <li t-foreach="state.mfgPreview.blockers"
+                            t-as="b" t-key="b.code">
+                            ⚠ <t t-esc="b.message"/>
+                        </li>
+                    </ul>
+                    <footer class="o_owl_modal_foot">
+                        <button class="o_owl_btn o_owl_btn_secondary"
+                                t-on-click="_onCancelMfg"
+                                t-att-disabled="props.busy">
+                            Cancel
+                        </button>
+                        <button class="o_owl_btn o_owl_btn_primary"
+                                t-on-click="_onApproveMfg"
+                                t-att-disabled="props.busy">
+                            Send to Manufacturing
+                        </button>
+                    </footer>
+                </div>
+            </div>
+
             <div t-if="state.confirming" class="o_owl_modal_backdrop"
                  t-on-click="_onCancelConfirm">
                 <div class="o_owl_modal"
@@ -437,6 +529,10 @@ class FooterActions extends Component {
         onAction: Function,
         busy: { type: Boolean, optional: true },
         mode: { type: String, optional: true },
+        // 2026-06-27 — used by the Send-to-Mfg review modal to fetch
+        // MO preview + blockers before the irreversible commit. Optional
+        // for forward-compat with parents that don't wire it.
+        loadPreflight: { type: Function, optional: true },
     };
 
     setup() {
@@ -446,6 +542,12 @@ class FooterActions extends Component {
             // toggled false on Cancel, on Confirm-Send, or on
             // backdrop click. Customer mode never opens this modal.
             confirming: false,
+            // 2026-06-27 — Send-to-Manufacturing review modal (replaces
+            // the legacy window.confirm). Same UX shape as the Send-to-
+            // Production modal so users see a consistent review pattern.
+            confirmingMfg: false,
+            // Lazy-loaded preflight payload populated by _onSendToMfgClick.
+            mfgPreview: null,
         });
     }
 
@@ -485,16 +587,31 @@ class FooterActions extends Component {
         return this.props.order?.state === "sale";
     }
 
-    _onSendToMfgClick = () => {
+    // 2026-06-27 — Send-to-Mfg now uses the same inline review modal as
+    // Send-to-Production. window.confirm is a tab-blocking native prompt
+    // with zero context; the modal shows MO preview + blocker list so
+    // the user sees what they're committing to. Pre-fetches the preview
+    // before opening so the modal renders with data.
+    _onSendToMfgClick = async () => {
         if (!this._canSendToMfg()) return;
-        const msg = "Send all cabinets in this order to manufacturing? "
-                  + "This creates an MO for every cabinet line with a "
-                  + "BoM. Existing MOs (e.g. from a prior Send) are "
-                  + "reused — nothing is duplicated.";
-        if (typeof window !== "undefined" && window.confirm
-            && !window.confirm(msg)) {
-            return;
+        if (this.props.loadPreflight) {
+            this.state.mfgPreview = null;
+            this.state.confirmingMfg = true;
+            const res = await this.props.loadPreflight();
+            if (res && res.ok) this.state.mfgPreview = res;
+        } else {
+            // Forward-compat: parent didn't wire loadPreflight (older
+            // template). Open the modal anyway with no preview block.
+            this.state.confirmingMfg = true;
         }
+    };
+
+    _onCancelMfg = () => {
+        this.state.confirmingMfg = false;
+    };
+
+    _onApproveMfg = () => {
+        this.state.confirmingMfg = false;
         this.props.onAction("send_to_manufacturing");
     };
 
@@ -725,7 +842,7 @@ class ValidationStrip extends Component {
             </t>
             <t t-else="">
                 <ul class="o_owl_validation_list">
-                    <t t-foreach="props.issues" t-as="issue" t-key="issue_index">
+                    <t t-foreach="props.issues" t-as="issue" t-key="issue.severity + '::' + issue.message">
                         <li class="o_owl_validation_item"
                             t-att-class="'o_owl_validation_' + issue.severity">
                             <span class="o_owl_validation_sev mono">
@@ -886,17 +1003,44 @@ class ConfigDrawer extends Component {
                         <label t-attf-for="attr_field_{{attr.attribute_id}}">
                             <t t-esc="attr.name"/>
                         </label>
+                        <!-- 2026-06-27 L2 — combobox: allowed values
+                             first, rule-blocked values grouped at the
+                             bottom with disabled state + reason tooltip.
+                             Browser-native type-ahead still works
+                             ("type s" jumps to "Shaker"). Eliminates the
+                             surprise of picking a value the server
+                             would reject — the user can see upfront
+                             that "Maple" is blocked when Contractor is
+                             selected. -->
                         <select t-attf-id="attr_field_{{attr.attribute_id}}"
                                 class="o_owl_attr_select"
                                 t-att-disabled="state.attrSaving"
                                 t-on-change="(ev) => this._onAttrChange(attr.attribute_id, ev.target.value)">
                             <option value="">— pick —</option>
-                            <option t-foreach="attr.values"
-                                    t-as="v"
-                                    t-key="v.value_id"
-                                    t-att-value="v.value_id"
-                                    t-att-selected="v.current ? 'selected' : null"
-                                    t-esc="v.name"/>
+                            <!-- Allowed values (or values w/o allowed
+                                 flag, e.g. older backend versions). -->
+                            <t t-foreach="attr.values" t-as="v" t-key="v.value_id">
+                                <option t-if="v.allowed !== false"
+                                        t-att-value="v.value_id"
+                                        t-att-selected="v.current ? 'selected' : null"
+                                        t-esc="v.name"/>
+                            </t>
+                            <!-- Blocked group. Rendered after the
+                                 allowed values so users naturally see
+                                 the legitimate picks first; the
+                                 disabled attr + title tooltip explain
+                                 why they can't pick the rest. -->
+                            <t t-if="_hasBlockedValues(attr)">
+                                <optgroup label="── Blocked by current selection ──">
+                                    <t t-foreach="attr.values" t-as="v" t-key="v.value_id">
+                                        <option t-if="v.allowed === false"
+                                                t-att-value="v.value_id"
+                                                disabled="disabled"
+                                                t-att-title="v.reason || 'Blocked by current selection'"
+                                                t-esc="v.name + ' (blocked)'"/>
+                                    </t>
+                                </optgroup>
+                            </t>
                         </select>
                     </div>
                 </div>
@@ -918,7 +1062,7 @@ class ConfigDrawer extends Component {
                 </div>
                 <ul class="o_owl_drawer_validation_list">
                     <li t-foreach="props.lineIssues || []"
-                        t-as="iss" t-key="iss_index"
+                        t-as="iss" t-key="iss.severity + '::' + iss.message"
                         t-att-class="'o_owl_drawer_validation_item o_owl_dv_' + iss.severity">
                         <span class="o_owl_dv_sev mono"
                               t-esc="iss.severity.toUpperCase()"/>
@@ -965,6 +1109,16 @@ class ConfigDrawer extends Component {
     // ------------------------------------------------------------------
     // G15 — attribute picker.
     // ------------------------------------------------------------------
+
+    // 2026-06-27 L2 — helper for the blocked-values optgroup; the
+    // group only renders when the backend marked at least one value
+    // as not allowed. Old backend versions (pre-L2) don't ship the
+    // `allowed` flag at all — in that case every value is treated as
+    // allowed and the optgroup stays hidden.
+    _hasBlockedValues(attr) {
+        if (!attr || !attr.values) return false;
+        return attr.values.some((v) => v.allowed === false);
+    }
 
     async _loadAttributes() {
         this.state.attrsLoading = true;
@@ -1084,8 +1238,29 @@ class ConfigDrawer extends Component {
 class OrderLine extends Component {
     static template = xml`
         <div class="o_owl_line"
-             t-att-class="{ 'o_owl_line_selected': props.isSelected }"
-             t-on-click="() => props.onSelect(props.line.id)">
+             role="button"
+             tabindex="0"
+             t-att-aria-pressed="props.isSelected ? 'true' : 'false'"
+             t-att-aria-label="'Line ' + props.line.sequence + ': ' + props.line.product_name + (props.line.spec_summary ? ' — ' + props.line.spec_summary : '')"
+             t-att-class="{
+                 'o_owl_line_selected': props.isSelected,
+                 'o_owl_line_bulk_checked': props.isBulkChecked
+             }"
+             t-on-click="() => props.onSelect(props.line.id)"
+             t-on-keydown="_onKeydown">
+            <!-- 2026-06-27 L1 — bulk-edit checkbox column. Optional so
+                 customer-view mounts can omit. stopPropagation so the
+                 row click (open drawer) doesn't fire when toggling. -->
+            <div t-if="props.onBulkToggle"
+                 class="o_owl_line_bulk_cell"
+                 t-on-click.stop=""
+                 t-on-keydown.stop="">
+                <input type="checkbox"
+                       class="o_owl_line_bulk_check"
+                       t-att-checked="props.isBulkChecked ? 'checked' : ''"
+                       t-on-change="_onBulkToggle"
+                       t-att-aria-label="'Select line ' + props.line.sequence + ' for bulk edit'"/>
+            </div>
             <div class="o_owl_lineno" t-esc="props.line.sequence"/>
             <div class="o_owl_line_tpl">
                 <t t-esc="props.line.product_name"/>
@@ -1109,21 +1284,200 @@ class OrderLine extends Component {
                       class="o_owl_badge o_owl_badge_rule">
                     RULE
                 </span>
+                <!-- 2026-06-27 — per-line lead time chip. Highlights as
+                     'long' when this line exceeds the order's base lead
+                     time (14d shop default), making the schedule-driving
+                     cabinet visible at a glance. -->
+                <span t-if="props.line.lead_time_days > 14"
+                      class="o_owl_badge o_owl_badge_lead"
+                      t-att-title="'Lead time: ' + props.line.lead_time_days + ' days'">
+                    +<t t-esc="props.line.lead_time_days - 14"/>d
+                </span>
+                <!-- 2026-06-27 — ECO/PLM revision drift chip (MFG #1.5).
+                     Visible on confirmed lines when the live cut spec
+                     or BoM version has moved past the snapshot taken
+                     at confirm. Tells the user "what you quoted is no
+                     longer what we'd build today — re-quote?" -->
+                <span t-if="props.line.revision_drift"
+                      class="o_owl_badge o_owl_badge_drift"
+                      t-att-title="_driftTitle(props.line)">
+                    ⚠ rev drift
+                </span>
             </div>
-            <div class="o_owl_line_qty mono" t-esc="props.line.qty"/>
+            <!-- 2026-06-27 — inline qty stepper. Edits autosave on blur
+                 or Enter via the parent's onQtyChange handler; no need
+                 to expand the ConfigDrawer for a qty bump. Click is
+                 stopped from bubbling to the row so the drawer doesn't
+                 toggle when the user means to edit qty. -->
+            <div class="o_owl_line_qty"
+                 t-on-click.stop=""
+                 t-on-keydown.stop="">
+                <input t-if="props.onQtyChange"
+                       type="number"
+                       class="o_owl_line_qty_input mono"
+                       min="0"
+                       max="999"
+                       step="1"
+                       t-att-value="state.localQty"
+                       t-on-input="_onQtyInput"
+                       t-on-blur="_commitQty"
+                       t-on-keydown="_onQtyKeydown"
+                       t-att-aria-label="'Quantity for line ' + props.line.sequence"
+                       t-att-disabled="state.qtyBusy ? 'disabled' : ''"/>
+                <span t-else="" class="mono" t-esc="props.line.qty"/>
+            </div>
             <div class="o_owl_line_price o_owl_line_retail mono"
                  t-esc="fmtUsd(props.line.retail_price)"/>
             <div class="o_owl_line_price mono"
                  t-esc="fmtUsd(props.line.channel_price)"/>
-            <div class="o_owl_line_menu">⋯</div>
+            <div class="o_owl_line_menu">
+                <!-- 2026-06-27 — explicit delete affordance. Trash icon
+                     with stopPropagation so the row-click (open drawer)
+                     doesn't fire. onDelete is optional so customer-view
+                     mounts that don't want delete-by-default can omit it. -->
+                <button t-if="props.onDelete"
+                        type="button"
+                        class="o_owl_line_delete"
+                        t-att-aria-label="'Remove line ' + props.line.sequence + ': ' + props.line.product_name"
+                        t-on-click.stop="_onDeleteClick"
+                        t-on-keydown.stop="_onDeleteKeydown">
+                    🗑
+                </button>
+                <span t-else="" aria-hidden="true">⋯</span>
+            </div>
         </div>
     `;
     static props = {
         line: Object,
         isSelected: { type: Boolean, optional: true },
         onSelect: Function,
+        onDelete: { type: Function, optional: true },
+        // 2026-06-27 — inline qty stepper. Optional so customer-view
+        // mounts that want qty-locked can omit and the cell renders
+        // read-only.
+        onQtyChange: { type: Function, optional: true },
+        // 2026-06-27 L1 — bulk-edit checkbox. Optional; when both are
+        // present, the row renders the checkbox cell and propagates
+        // checkbox toggles up to the parent via onBulkToggle(line_id).
+        isBulkChecked: { type: Boolean, optional: true },
+        onBulkToggle: { type: Function, optional: true },
     };
     fmtUsd = fmtUsd;
+
+    setup() {
+        // Local qty buffer so typing doesn't fight an in-flight server
+        // round-trip. Reconciled to props.line.qty on every patch when
+        // the user isn't actively editing.
+        this.state = useState({
+            localQty: String(this.props.line.qty || 0),
+            qtyBusy: false,
+            qtyDirty: false,
+        });
+        onWillUpdateProps((next) => {
+            // Only refresh the buffer when the user isn't mid-edit.
+            // Otherwise their keystrokes would race with the server.
+            if (!this.state.qtyDirty) {
+                this.state.localQty = String(next.line.qty || 0);
+            }
+        });
+    }
+
+    // 2026-06-27 a11y: keyboard-only sales reps can now Enter/Space-toggle
+    // a line (matching the click handler). Without this, keyboard users
+    // couldn't open the ConfigDrawer at all.
+    _onKeydown(ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this.props.onSelect(this.props.line.id);
+        }
+    }
+
+    _onDeleteClick(ev) {
+        ev.preventDefault();
+        if (this.props.onDelete) {
+            this.props.onDelete(this.props.line.id);
+        }
+    }
+
+    _onDeleteKeydown(ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            if (this.props.onDelete) {
+                this.props.onDelete(this.props.line.id);
+            }
+        }
+    }
+
+    // 2026-06-27 L1 — toggle bulk-selection state for this line.
+    _onBulkToggle(ev) {
+        if (this.props.onBulkToggle) {
+            this.props.onBulkToggle(
+                this.props.line.id, !!(ev && ev.target && ev.target.checked),
+            );
+        }
+    }
+
+    _onQtyInput(ev) {
+        this.state.localQty = ev.target.value;
+        this.state.qtyDirty = true;
+    }
+
+    _onQtyKeydown(ev) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            ev.target.blur();
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this.state.localQty = String(this.props.line.qty || 0);
+            this.state.qtyDirty = false;
+            ev.target.blur();
+        }
+    }
+
+    // 2026-06-27 — assemble the drift-chip tooltip from the per-line
+    // snapshot vs current fields. Either cut_spec or bom can drift
+    // independently; show both when both apply.
+    _driftTitle(line) {
+        const bits = [];
+        if (line.cut_spec_drift) {
+            bits.push(
+                "Cut spec: " + (line.cut_spec_snap_name || "snapshot")
+                + " → live " + (line.cut_spec_current_name || "")
+            );
+        }
+        if (line.bom_drift) {
+            bits.push(
+                "BoM: v" + line.bom_snap_ver
+                + " → live v" + line.bom_current_ver
+            );
+        }
+        return bits.join("\n");
+    }
+
+    async _commitQty() {
+        if (!this.state.qtyDirty) return;
+        const next = Number(this.state.localQty);
+        if (!Number.isFinite(next) || next < 0 || next > 999) {
+            // Revert on invalid input. Clamps + bounds-check is also done
+            // server-side (qty<0 / qty>999 → invalid_qty), but bouncing
+            // here gives instant feedback.
+            this.state.localQty = String(this.props.line.qty || 0);
+            this.state.qtyDirty = false;
+            return;
+        }
+        if (next === Number(this.props.line.qty)) {
+            // No-op (user blurred without changing). Just drop the dirty flag.
+            this.state.qtyDirty = false;
+            return;
+        }
+        this.state.qtyBusy = true;
+        try {
+            await this.props.onQtyChange(this.props.line.id, next);
+        } finally {
+            this.state.qtyBusy = false;
+            this.state.qtyDirty = false;
+        }
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -1167,9 +1521,24 @@ class ZoneGroup extends Component {
                     <div/>
                 </div>
                 <t t-foreach="props.lines" t-as="line" t-key="line.id">
+                    <!-- Phase 3.D — per-line status chip. Hidden when no
+                         room is configured (chipStatus returns null). The
+                         OrderLine row hosts its own grid; the chip sits
+                         to its left as a sibling so click targets stay
+                         clean. -->
+                    <t t-set="chipStatus" t-value="_lineStatus(line)"/>
+                    <small t-if="chipStatus"
+                           class="sb-room-chip-status"
+                           t-att-class="'sb-room-chip-status--' + chipStatus"
+                           t-att-title="_chipTitle(chipStatus)"
+                           t-esc="_chipDot(chipStatus)"/>
                     <OrderLine line="line"
                                isSelected="line.id === props.selectedLineId"
-                               onSelect="props.onSelectLine"/>
+                               onSelect="props.onSelectLine"
+                               onDelete="props.onDeleteLine"
+                               onQtyChange="props.onLineQtyChange"
+                               isBulkChecked="props.bulkChecked &amp;&amp; props.bulkChecked.includes(line.id)"
+                               onBulkToggle="props.onBulkToggle"/>
                     <!-- T2C10 — ConfigDrawer expands below the selected line,
                          spanning all 8 columns of the parent grid. -->
                     <ConfigDrawer t-if="line.id === props.selectedLineId"
@@ -1189,6 +1558,26 @@ class ZoneGroup extends Component {
                         + Add to <t t-esc="props.zone.label"/>
                     </button>
                 </div>
+                <!-- Phase 3.D — per-zone wall-summary footer. Only
+                     renders when every line in the zone points at the
+                     same wall (single-wall zone); otherwise stays
+                     silent so multi-wall zones aren't misrepresented.
+                     Phase 4 — length labels flip through _humanLen so
+                     they honour the room's unit_preference toggle. -->
+                <t t-set="wallSummary" t-value="_singleWallSummary()"/>
+                <div t-if="wallSummary"
+                     class="sb-room-zone-wall-summary">
+                    <span class="sb-room-zone-wall-name">
+                        Wall: <t t-esc="wallSummary.name"/>
+                    </span>
+                    <span class="sb-room-zone-wall-cap mono">
+                        <t t-esc="_humanLen(wallSummary.used_mm)"/> / <t t-esc="_humanLen(wallSummary.length_mm)"/> used
+                    </span>
+                    <span class="sb-room-zone-wall-rem mono"
+                          t-att-class="wallSummary.remaining_mm &lt; 0 ? 'sb-room-zone-wall-rem--over' : ''">
+                        <t t-esc="_humanLen(wallSummary.remaining_mm)"/> left
+                    </span>
+                </div>
             </div>
         </div>
     `;
@@ -1200,9 +1589,34 @@ class ZoneGroup extends Component {
         onSelectLine: Function,
         onLineSaved: Function,
         onAddToZone: Function,
+        // 2026-06-27 — explicit per-line delete (trash icon).
+        // Optional so customer-view mounts can omit and the line just
+        // renders the legacy "⋯" placeholder. The OrderBuilder passes
+        // a bound handler that confirms + RPCs + reloads.
+        onDeleteLine: { type: Function, optional: true },
+        // 2026-06-27 — inline qty stepper handler. Same optionality:
+        // omit and the line renders read-only qty.
+        onLineQtyChange: { type: Function, optional: true },
+        // 2026-06-27 L1 — bulk-edit plumbing. bulkChecked is an Array
+        // of line ids currently selected for bulk action; onBulkToggle
+        // receives (line_id, checked) when a row checkbox flips. Both
+        // optional so customer-view mounts can stay simple.
+        bulkChecked: { type: Array, optional: true },
+        onBulkToggle: { type: Function, optional: true },
         // Phase 3 Sprint C2 — issuesForLine(line_id) -> Array of
         // validation issues filtered to the given line.
         issuesForLine: Function,
+        // Phase 3.D — the order's room payload (mirror of state.room on
+        // the parent OrderBuilder). Null when no room is configured;
+        // in that case _lineStatus returns null and chips don't render
+        // and the wall-summary footer stays silent.
+        room: { type: [Object, { value: null }], optional: true },
+        // Phase 4 — unit preference forwarded from OrderBuilder so the
+        // wall-summary footer renders mm or ft/in consistently with the
+        // rest of the Room Setup surface. Mirrored locally on the
+        // ZoneGroup so _humanLen here doesn't have to reach back into a
+        // parent reference. Defaults to "mm".
+        unitPreference: { type: String, optional: true },
     };
 
     setup() {
@@ -1212,6 +1626,67 @@ class ZoneGroup extends Component {
     _toggle = () => {
         this.state.collapsed = !this.state.collapsed;
     };
+
+    // Phase 4 — mm → ft/in conversion mirror of OrderBuilder._imperialFromMm.
+    // Kept identical (small + pure) so the wall-summary footer can call it
+    // without a prop-method round-trip. Reads unitPreference from props so
+    // the parent can flip the toggle and OWL re-renders this group.
+    _imperialFromMm(mm) {
+        const inches = Math.round((Number(mm) || 0) / 25.4);
+        const feet = Math.floor(inches / 12);
+        const remIn = inches - feet * 12;
+        if (feet === 0) return `${remIn}"`;
+        if (remIn === 0) return `${feet}'`;
+        return `${feet}' ${remIn}"`;
+    }
+
+    _humanLen(mm) {
+        if (!mm && mm !== 0) return "—";
+        const pref = this.props.unitPreference || "mm";
+        if (pref === "imperial") return this._imperialFromMm(mm);
+        return `${Math.round(Number(mm) || 0)} mm`;
+    }
+
+    // Phase 3.D — derive the chip status for one line. Pure function
+    // of (line, props.room); no new state, recomputes per render so
+    // OWL handles reactivity naturally.
+    _lineStatus(line) {
+        if (!this.props.room) return null;
+        if (!line.wall_id) return "unplaced";
+        const walls = this.props.room.walls || [];
+        const wall = walls.find((w) => w.id === line.wall_id);
+        if (wall && wall.has_conflicts) return "conflict";
+        return "placed";
+    }
+
+    _chipDot(status) {
+        // U+25CF (BLACK CIRCLE) — accessible to screen readers via the
+        // title attribute; visual colour is handled by the SCSS variant.
+        return "●";
+    }
+
+    _chipTitle(status) {
+        return {
+            placed:   "Placed on a wall",
+            unplaced: "Not yet placed on a wall",
+            conflict: "Wall has a placement conflict",
+        }[status] || "";
+    }
+
+    // Phase 3.D — collapse-to-summary when every line in the zone
+    // points at the same wall. Returns the wall dict or null.
+    _singleWallSummary() {
+        if (!this.props.room) return null;
+        const lines = this.props.lines || [];
+        if (!lines.length) return null;
+        const firstId = lines[0].wall_id;
+        if (!firstId) return null;
+        for (const l of lines) {
+            if (l.wall_id !== firstId) return null;
+        }
+        const walls = this.props.room.walls || [];
+        return walls.find((w) => w.id === firstId) || null;
+    }
 
     fmtUsd = fmtUsd;
 }
@@ -1249,7 +1724,7 @@ class TabBar extends Component {
                         t-att-id="'o_owl_tab_' + tab.code"
                         t-on-click.stop="() => props.onTabChange(tab.code)">
                     <t t-esc="tab.label"/>
-                    <span t-if="tab.count !== null and tab.count !== undefined"
+                    <span t-if="tab.count !== null &amp;&amp; tab.count !== undefined"
                           class="o_owl_tab_count"
                           t-esc="tab.count"/>
                 </button>
@@ -1298,6 +1773,148 @@ class TabBar extends Component {
 }
 
 // ----------------------------------------------------------------------
+// ProductionApprovalStrip — 2026-06-27.
+//
+// Surfaces production_approval_state inline so a dealer can advance the
+// order without bouncing into the backend form. Renders nothing when the
+// payload omits production_approval_state (forward-compat with installs
+// where southbrook_mrp_pm isn't present).
+//
+// State copy:
+//   • none       — "Approval not requested" + Request button (only when
+//                  order.state == 'sale')
+//   • pending    — "Awaiting approval (requested by X)" + MO preview
+//   • approved   — "✓ Approved by X" + link/count of MOs created
+//   • rejected   — "✗ Rejected: <reason>" + Request-again button
+//
+// MO preview is fetched lazily on mount via /preflight-confirm so we
+// don't pay the BoM-resolve loop on every poll. Refetched when the
+// state field flips.
+// ----------------------------------------------------------------------
+
+class ProductionApprovalStrip extends Component {
+    static template = xml`
+        <div t-if="props.order &amp;&amp; props.order.production_approval_state"
+             class="o_owl_approval_strip"
+             t-att-class="'o_owl_approval_' + props.order.production_approval_state">
+
+            <div class="o_owl_approval_main">
+                <span class="o_owl_approval_label">Production Approval:</span>
+                <span class="o_owl_approval_state"
+                      t-att-class="'o_owl_approval_state_' + props.order.production_approval_state">
+                    <t t-if="props.order.production_approval_state === 'none'">Not requested</t>
+                    <t t-elif="props.order.production_approval_state === 'pending'">⏳ Pending</t>
+                    <t t-elif="props.order.production_approval_state === 'approved'">✓ Approved</t>
+                    <t t-elif="props.order.production_approval_state === 'rejected'">✗ Rejected</t>
+                </span>
+                <span t-if="props.order.production_approval_state === 'pending' &amp;&amp; props.order.production_requested_by_name"
+                      class="o_owl_approval_who">
+                    by <t t-esc="props.order.production_requested_by_name"/>
+                </span>
+                <span t-if="props.order.production_approval_state === 'approved' &amp;&amp; props.order.production_approved_by_name"
+                      class="o_owl_approval_who">
+                    by <t t-esc="props.order.production_approved_by_name"/>
+                </span>
+                <button t-if="_canRequest()"
+                        type="button"
+                        class="o_owl_approval_btn"
+                        t-att-disabled="state.busy ? 'disabled' : ''"
+                        t-on-click="_onRequest">
+                    <t t-if="state.busy">Requesting…</t>
+                    <t t-elif="props.order.production_approval_state === 'rejected'">Re-request Approval</t>
+                    <t t-else="">Request Production Approval</t>
+                </button>
+            </div>
+
+            <!-- MO preview: visible while in 'none' / 'pending' / 'rejected'
+                 so the user always knows what's about to be created. Hidden
+                 when state is 'approved' (the MOs already exist). -->
+            <div t-if="state.preview &amp;&amp; props.order.production_approval_state !== 'approved'"
+                 class="o_owl_approval_preview">
+                <span class="o_owl_approval_preview_label">Would create</span>
+                <strong class="o_owl_approval_preview_n mono"
+                        t-esc="state.preview.mo_total"/>
+                <span>MO<t t-if="state.preview.mo_total !== 1">s</t></span>
+                <span t-if="state.preview.mo_preview &amp;&amp; state.preview.mo_preview.length"
+                      class="o_owl_approval_preview_breakdown">
+                    (<t t-foreach="state.preview.mo_preview" t-as="grp" t-key="grp.family">
+                        <span class="o_owl_approval_preview_chip">
+                            <strong t-esc="grp.count"/>&#160;<t t-esc="grp.family"/>
+                        </span><t t-if="!grp_last">, </t>
+                    </t>)
+                </span>
+            </div>
+
+            <!-- Rejected: surface reason inline so the user knows what to fix. -->
+            <div t-if="props.order.production_approval_state === 'rejected' &amp;&amp; props.order.production_reject_reason"
+                 class="o_owl_approval_reject_reason">
+                <strong>Reason:</strong>
+                <t t-esc="props.order.production_reject_reason"/>
+            </div>
+
+            <!-- Blockers (e.g. validation issues that would fail the gate). -->
+            <ul t-if="state.preview &amp;&amp; state.preview.blockers &amp;&amp; state.preview.blockers.length"
+                class="o_owl_approval_blockers">
+                <li t-foreach="state.preview.blockers" t-as="b" t-key="b.code">
+                    ⚠ <t t-esc="b.message"/>
+                </li>
+            </ul>
+        </div>
+    `;
+    static props = {
+        order: Object,
+        onRequestApproval: Function,
+        loadPreflight: Function,
+    };
+
+    setup() {
+        this.state = useState({ busy: false, preview: null });
+        onMounted(() => this._refreshPreview());
+        onWillUpdateProps((next) => {
+            // Refetch preview when the approval state shifts so the
+            // banner copy doesn't drift.
+            const oldState = (this.props.order || {}).production_approval_state;
+            const newState = (next.order || {}).production_approval_state;
+            if (oldState !== newState) {
+                this._refreshPreview();
+            }
+        });
+    }
+
+    async _refreshPreview() {
+        try {
+            const res = await this.props.loadPreflight();
+            if (res && res.ok) {
+                this.state.preview = res;
+            }
+        } catch (e) {
+            // Silent — the chip still renders, only the preview hides.
+        }
+    }
+
+    _canRequest() {
+        const o = this.props.order || {};
+        const st = o.production_approval_state;
+        // Only confirmed (sale state) orders can request approval per
+        // action_request_production's own guard. Drafts must be Confirmed
+        // first (Send-to-Manufacturing path).
+        return o.state === "sale" && (st === "none" || st === "rejected");
+    }
+
+    async _onRequest() {
+        this.state.busy = true;
+        try {
+            const res = await this.props.onRequestApproval();
+            if (res && res.ok) {
+                await this._refreshPreview();
+            }
+        } finally {
+            this.state.busy = false;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
 // HeaderStrip — T2C6.
 //
 // The 5-cell row at the top of the OrderBuilder (per mockup §HeaderStrip):
@@ -1323,9 +1940,28 @@ class HeaderStrip extends Component {
                     </span>
                 </div>
                 <span class="o_owl_channel_badge"
-                      t-att-class="'o_owl_channel_' + props.order.channel_css">
+                      t-att-class="'o_owl_channel_' + props.order.channel_css"
+                      t-att-title="'Pricelist: ' + (props.order.pricelist_name || '')">
                     <t t-esc="props.order.channel_label"/>
                 </span>
+                <div t-if="props.order.discount_pct > 0"
+                     class="o_owl_hs_discount mono">
+                    −<t t-esc="props.order.discount_pct"/>% applied
+                </div>
+            </div>
+            <div t-if="props.familyCounts &amp;&amp; props.familyCounts.length"
+                 class="o_owl_hs_cell o_owl_hs_mix">
+                <div class="o_owl_hs_label">Cabinet Mix</div>
+                <div class="o_owl_hs_value o_owl_hs_mix_value">
+                    <t t-foreach="props.familyCounts" t-as="fc" t-key="fc.code">
+                        <span class="o_owl_hs_mix_chip">
+                            <span class="o_owl_hs_mix_n mono"
+                                  t-esc="fc.count"/>
+                            <span class="o_owl_hs_mix_lbl"
+                                  t-esc="fc.label"/>
+                        </span>
+                    </t>
+                </div>
             </div>
             <div class="o_owl_hs_cell">
                 <div class="o_owl_hs_label">Retail Subtotal</div>
@@ -1342,6 +1978,20 @@ class HeaderStrip extends Component {
                 <div class="o_owl_hs_value mono"
                      t-esc="fmtUsd(props.order.savings)"/>
             </div>
+            <!-- 2026-06-27 — channel margin chip (MFG JTBD: don't
+                 ship under cost). Hidden when cost_subtotal is 0
+                 (no standard_price set — refacing pricelist case)
+                 to avoid showing a misleading 100% margin. -->
+            <div t-if="props.order.cost_subtotal > 0"
+                 class="o_owl_hs_cell o_owl_hs_margin"
+                 t-att-class="_marginClass()">
+                <div class="o_owl_hs_label">Margin</div>
+                <div class="o_owl_hs_value mono">
+                    <t t-esc="props.order.margin_pct"/>%
+                </div>
+                <div class="o_owl_hs_sub mono"
+                     t-esc="fmtUsd(props.order.margin_total)"/>
+            </div>
             <div class="o_owl_hs_cell">
                 <div class="o_owl_hs_label">Lead Time</div>
                 <div class="o_owl_hs_value">
@@ -1356,6 +2006,7 @@ class HeaderStrip extends Component {
     `;
     static props = {
         order: Object,
+        familyCounts: { type: Array, optional: true },
     };
 
     // Expose the shared formatter on the component instance so the
@@ -1363,6 +2014,18 @@ class HeaderStrip extends Component {
     // resolve identifiers against `this`, so a named arrow assignment
     // works without import shenanigans.
     fmtUsd = fmtUsd;
+
+    // 2026-06-27 — channel margin colour gate. Red below 10%, amber
+    // 10-15%, green ≥ 15%. Thresholds match the 35% target margin
+    // mentioned in CLAUDE.md §6 — anything below 10% is well below
+    // any channel's target and should pull the eye hard.
+    _marginClass() {
+        const m = this.props.order.margin_pct;
+        if (m === undefined || m === null) return "";
+        if (m < 10) return "o_owl_hs_margin_red";
+        if (m < 15) return "o_owl_hs_margin_amber";
+        return "o_owl_hs_margin_green";
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -1509,8 +2172,31 @@ class CatalogPicker extends Component {
                     <h3 class="o_owl_modal_title">
                         Add a cabinet to your order
                     </h3>
-                    <button class="o_owl_modal_close"
-                            t-on-click="props.onClose"
+                    <!-- P1 / UX 2026-06-22: persistent cart counter in
+                         the modal header. Updates live as _onPickCabinet
+                         finishes and the parent's _loadOrder mutates
+                         state.lines. Singular/plural handled inline. -->
+                    <span class="o_owl_modal_cart_count"
+                          t-if="props.cartCount !== null">
+                        <strong t-esc="props.cartCount"/>
+                        <t t-if="props.cartCount === 1"> cabinet</t>
+                        <t t-else=""> cabinets</t>
+                        on order
+                    </span>
+                    <!-- 2026-06-27 — Keep-open toggle for bulk-add. Default
+                         (off) closes the modal ~1.5s after a successful add
+                         so SKU-known single-adds are 1 click. Power users
+                         doing 30 cabinets tick this and stay open. -->
+                    <label t-if="props.onKeepOpenChange"
+                           class="o_owl_modal_keep_open">
+                        <input type="checkbox"
+                               t-att-checked="props.keepOpen ? 'checked' : ''"
+                               t-on-change="_onKeepOpenChange"
+                               aria-label="Keep catalog open after each add"/>
+                        Keep open
+                    </label>
+                    <button type="button" class="o_owl_modal_close"
+                            t-on-click="_onCloseClick"
                             aria-label="Close">×</button>
                 </div>
 
@@ -1698,7 +2384,7 @@ class CatalogPicker extends Component {
                                              aria-label="Quantity">
                                             <button type="button"
                                                     class="o_owl_catalog_qty_btn"
-                                                    t-att-disabled="props.busy or getQty(item.sku) &lt;= 1"
+                                                    t-att-disabled="props.busy || getQty(item.sku) &lt;= 1"
                                                     t-on-click="() => this._decQty(item.sku)"
                                                     aria-label="Decrease quantity">−</button>
                                             <input type="number" min="1"
@@ -1715,7 +2401,7 @@ class CatalogPicker extends Component {
                                         <button type="button"
                                                 class="o_owl_catalog_add_btn"
                                                 t-att-class="state.lastAddedSku === item.sku ? 'o_owl_catalog_add_btn_added' : ''"
-                                                t-att-disabled="props.busy"
+                                                t-att-disabled="props.busy || state.addingSku || state.lastAddedSku === item.sku"
                                                 t-on-click="() => this._addItem(item)">
                                             <t t-if="state.lastAddedSku === item.sku">
                                                 <svg viewBox="0 0 24 24"
@@ -1729,6 +2415,7 @@ class CatalogPicker extends Component {
                                                 </svg>
                                                 Added
                                             </t>
+                                            <t t-elif="state.addingSku === item.sku">Adding…</t>
                                             <t t-else="">Add</t>
                                         </button>
                                     </div>
@@ -1761,6 +2448,18 @@ class CatalogPicker extends Component {
         zoneFilter: {
             type: [String, { value: null }], optional: true,
         },
+        // UX 2026-06-22 — live count of cabinets already on the order,
+        // surfaced in the modal header so the user knows when their
+        // click actually added a line. null hides the chip.
+        cartCount: {
+            type: [Number, { value: null }], optional: true,
+        },
+        // 2026-06-27 — Keep-open toggle. False = default = single Add
+        // auto-closes the modal ~1.5s after success. True = stays open
+        // for bulk-add. Owned by the parent so the preference can
+        // survive close/reopen cycles within the same tab.
+        keepOpen: { type: Boolean, optional: true },
+        onKeepOpenChange: { type: Function, optional: true },
     };
 
     // Module-level helpers exposed as instance fields so the template
@@ -1807,7 +2506,13 @@ class CatalogPicker extends Component {
         this.state = useState({
             // 2026-06-02 redesign — reactive filter + view state.
             searchQuery: "",
-            activeCategory: "All",
+            // UX 2026-06-22: default to "Base" — base cabinets are the
+            // most common starting point of a kitchen order, so opening
+            // the catalog already on that filter gets the trade user
+            // straight to the cards they want. zoneFilter (from a
+            // "+ Add to <zone>" entry point) still wins over this in
+            // setup() below; the "All" tab remains one click away.
+            activeCategory: "Base",
             viewMode: "grid",          // 'grid' | 'list'
             // 2026-06-02 filter v2 — UI variant for the category
             // filter. 'tabs' renders the underlined single-row tab
@@ -1818,6 +2523,14 @@ class CatalogPicker extends Component {
             // initial value here to "select".
             filterMode: "tabs",        // 'tabs' | 'select'
             qtyBySku: {},              // sku -> integer qty (default 1)
+            // UX bugfix 2026-06-23: track which SKU is mid-add (replaces
+            // the old non-reactive this._adding). Reactive so the button
+            // can both visually feedback ("Adding…") and be t-att-disabled
+            // through the entire click→server→render window — the lag
+            // between server response and parent state.lines refresh
+            // was tricking users into double-clicking and creating
+            // duplicate sale.order.line rows.
+            addingSku: null,
             lastAddedSku: null,        // briefly set after successful add
         });
         // Pre-bind handlers passed by plain reference (same pattern as
@@ -1826,14 +2539,35 @@ class CatalogPicker extends Component {
         this._onBackdropClick = this._onBackdropClick.bind(this);
         this._onSearch = this._onSearch.bind(this);
         this._resetFilters = this._resetFilters.bind(this);
+        // P2 bugfix 2026-06-22: a pre-bound close handler we own (rather
+        // than passing `props.onClose` straight to the template's
+        // t-on-click) so the click hits a stable function reference
+        // across re-renders. Also lets us gate on `props.busy` here
+        // before forwarding — that ensures the × never opens-then-
+        // -immediately-closes mid-add.
+        this._onCloseClick = this._onCloseClick.bind(this);
+        this._onKeydown = this._onKeydown.bind(this);
 
         // Phase 3 Sprint C1 — react to zoneFilter prop changes.
         // When OrderBuilder opens the picker with a zone pre-filter
         // (e.g. user clicked "+ Add to Wall"), pre-select the matching
         // category tab so the first cards the user sees are wall
-        // cabinets. Falls back to "All" for unknown / null zones.
+        // cabinets. Falls back to "Base" (UX 2026-06-22 default) for
+        // unknown / null zones.
         const initial = this._zoneToCategory(this.props.zoneFilter);
         if (initial) this.state.activeCategory = initial;
+
+        // P2 bugfix 2026-06-22 — Escape-key handler attached at the
+        // document level so it works regardless of which child element
+        // currently has focus. Single global listener for the whole
+        // lifetime of the component; the `props.open` guard inside
+        // _onKeydown makes it a no-op when the modal is closed.
+        onMounted(() => {
+            document.addEventListener("keydown", this._onKeydown);
+        });
+        onWillUnmount(() => {
+            document.removeEventListener("keydown", this._onKeydown);
+        });
     }
 
     /** Phase 3 Sprint C1 — map a zone code to a CatalogPicker category
@@ -1946,7 +2680,15 @@ class CatalogPicker extends Component {
         // Fast path: no criteria → return the list unchanged.
         if (!category && !q) return items;
         return items.filter((item) => {
-            if (category) {
+            // UX bugfix 2026-06-23: when a search query is active,
+            // ignore the category filter so users searching "SB-TALL"
+            // find tall cabinets even when the Wall tab is selected.
+            // Previously search was AND-ed with the category → users
+            // hit "No cabinets match" and didn't realize the result
+            // was hiding behind a tab they hadn't selected. The
+            // category state is preserved; clearing the search returns
+            // the user to their category view.
+            if (category && !q) {
                 const c = item.category || "Extras";
                 if (c !== category) return false;
             }
@@ -1974,6 +2716,38 @@ class CatalogPicker extends Component {
 
     _onBackdropClick() {
         if (!this.props.busy) {
+            this.props.onClose();
+        }
+    }
+
+    // 2026-06-27 — Keep-open toggle change handler. Bubbles the boolean
+    // up to the parent OrderBuilder so the preference is owned at the
+    // session level (a power user who reopens the catalog gets their
+    // toggle state back).
+    _onKeepOpenChange(ev) {
+        if (this.props.onKeepOpenChange) {
+            this.props.onKeepOpenChange(!!(ev && ev.target && ev.target.checked));
+        }
+    }
+
+    // P2 bugfix 2026-06-22: stable × handler. Important: stop event
+    // propagation so it doesn't bubble to the backdrop and double-fire
+    // (some browsers fire both with overlapping z-stacks), and prevent
+    // default so any wrapping form/anchor doesn't navigate.
+    _onCloseClick(ev) {
+        if (ev) {
+            ev.stopPropagation();
+            ev.preventDefault();
+        }
+        if (this.props.busy) return;
+        this.props.onClose();
+    }
+
+    // P2 bugfix 2026-06-22: Escape key closes the modal. Wired via the
+    // global document keydown listener attached only while the modal is
+    // open (see onPatched / onMounted below).
+    _onKeydown(ev) {
+        if (ev.key === "Escape" && this.props.open && !this.props.busy) {
             this.props.onClose();
         }
     }
@@ -2038,25 +2812,41 @@ class CatalogPicker extends Component {
     }
 
     async _addItem(item) {
-        if (this.props.busy) return;
+        // UX bugfix 2026-06-23: reactive addingSku replaces the old
+        // non-reactive this._adding. The previous guard was reset as
+        // soon as props.onPick resolved, but parent state.lines didn't
+        // refresh until the next render tick — during that gap, a user
+        // who clicked again (because the UI showed no change) hit a
+        // re-armed guard. Result: duplicate lines (e.g. two qty=2 lines
+        // for the same cabinet, totalling qty 4). Tying the guard to
+        // the same 1500ms timeout that clears the "Added" badge means
+        // the button stays disabled + showing visual feedback through
+        // the parent re-render, eliminating the race.
+        if (this.props.busy || this.state.addingSku) return;
+        this.state.addingSku = item.sku;
         const qty = this.getQty(item.sku);
         // Reuses the parent's existing add-line path — onPick now
-        // accepts an optional second qty arg (parent passes it
-        // through to /southbrook/api/order/<id>/add-line). The
-        // ORIGINAL contract — onPick(templateId) — still works
-        // because the qty arg is optional on both sides.
+        // accepts (templateId, qty, label). The original 1- and 2-arg
+        // call shapes still work because the new args are optional on
+        // both sides.
         try {
-            await this.props.onPick(item.id, qty);
+            await this.props.onPick(item.id, qty, item.name || item.sku);
             this.state.lastAddedSku = item.sku;
-            // Clear the 'Added' indicator after 1.5s so the user can
-            // re-add the same cabinet if they want a second one of it.
+            // Clear both the 'Added' indicator AND the in-flight lock
+            // after 1.5s — single timer keeps the visual feedback
+            // window and the click guard in lockstep.
             setTimeout(() => {
                 if (this.state.lastAddedSku === item.sku) {
                     this.state.lastAddedSku = null;
                 }
+                if (this.state.addingSku === item.sku) {
+                    this.state.addingSku = null;
+                }
             }, 1500);
         } catch (e) {
-            // Parent surfaces the error via state.error.
+            // Reset immediately on error so the user can retry. Parent
+            // surfaces the message via state.error + toast.
+            this.state.addingSku = null;
         }
     }
 }
@@ -2068,6 +2858,195 @@ class CatalogPicker extends Component {
 
 const TEMPLATE = xml`
     <div class="o_southbrook_owl_root">
+
+        <!-- P1 / UX 2026-06-22: toast stack. Lives outside the
+             loading/error/loaded t-if chain so a confirmation that fires
+             during a background re-render stays mounted. role=status +
+             aria-live=polite so screen readers announce each toast
+             without stealing focus. -->
+        <div class="o_owl_toast_stack" role="status" aria-live="polite"
+             t-if="state.toasts.length">
+            <div t-foreach="state.toasts" t-as="toast" t-key="toast.id"
+                 t-attf-class="o_owl_toast o_owl_toast_{{ toast.kind }}">
+                <span class="o_owl_toast_text" t-esc="toast.text"/>
+                <button type="button" class="o_owl_toast_close"
+                        t-on-click="() => this._dismissToast(toast.id)"
+                        aria-label="Dismiss">×</button>
+            </div>
+        </div>
+
+        <!-- 2026-06-27 L1 — sticky bulk-action toolbar. Renders only
+             when at least one line is checked. Position: fixed at the
+             bottom of the viewport so it doesn't push page layout.
+             Actions: delete, move-zone, set-attribute, clear. -->
+        <div t-if="state.ui.bulk_checked.length"
+             class="o_owl_bulk_toolbar"
+             role="toolbar"
+             aria-label="Bulk line actions">
+            <div class="o_owl_bulk_toolbar_count">
+                <strong t-esc="state.ui.bulk_checked.length"/>
+                <t t-if="state.ui.bulk_checked.length === 1"> line</t>
+                <t t-else=""> lines</t>
+                selected
+            </div>
+            <div class="o_owl_bulk_toolbar_actions">
+                <button type="button"
+                        class="o_owl_bulk_btn"
+                        t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                        t-on-click="() => _openBulkModal('set_attribute')">
+                    Apply attribute…
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn"
+                        t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                        t-on-click="() => _openBulkModal('move_zone')">
+                    Move to zone…
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn o_owl_bulk_btn_danger"
+                        t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                        t-on-click="_onBulkDelete">
+                    Delete
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn o_owl_bulk_btn_link"
+                        t-on-click="_selectAllLines">
+                    Select all
+                </button>
+                <button type="button"
+                        class="o_owl_bulk_btn o_owl_bulk_btn_link"
+                        t-on-click="_clearBulkSelection">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- L1 bulk modal — kind switches between set_attribute and
+             move_zone. Shares the same modal chrome. -->
+        <div t-if="state.ui.bulk_modal"
+             class="o_owl_modal_backdrop"
+             t-on-click="_closeBulkModal">
+            <div class="o_owl_modal o_owl_bulk_modal"
+                 t-on-click="(ev) => ev.stopPropagation()"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Bulk edit">
+                <header class="o_owl_modal_head">
+                    <h2 class="o_owl_modal_title">
+                        <t t-if="state.ui.bulk_modal === 'set_attribute'">
+                            Apply attribute to <t t-esc="state.ui.bulk_checked.length"/> lines
+                        </t>
+                        <t t-elif="state.ui.bulk_modal === 'move_zone'">
+                            Move <t t-esc="state.ui.bulk_checked.length"/> lines to zone
+                        </t>
+                    </h2>
+                    <p class="o_owl_modal_sub">
+                        <t t-if="state.ui.bulk_modal === 'set_attribute'">
+                            Lines whose template doesn't expose this attribute will be skipped.
+                            Attribute catalog is taken from the first selected line.
+                        </t>
+                        <t t-elif="state.ui.bulk_modal === 'move_zone'">
+                            Re-zones every selected line. Useful when a wall
+                            cabinet was added to the base run by mistake.
+                        </t>
+                    </p>
+                </header>
+
+                <div t-if="state.ui.bulk_modal === 'set_attribute'"
+                     class="o_owl_bulk_modal_body">
+                    <label class="o_owl_bulk_modal_label">Attribute</label>
+                    <select class="o_owl_bulk_modal_select"
+                            t-on-change="_onBulkAttrSelect"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''">
+                        <option value="">— pick an attribute —</option>
+                        <t t-foreach="_bulkAttrOptions()" t-as="attr"
+                           t-key="attr.attribute_id">
+                            <option t-att-value="attr.attribute_id"
+                                    t-att-selected="state.ui.bulk_set_attr_id === attr.attribute_id ? 'selected' : ''"
+                                    t-esc="attr.name"/>
+                        </t>
+                    </select>
+
+                    <label class="o_owl_bulk_modal_label"
+                           t-if="state.ui.bulk_set_attr_id">Value</label>
+                    <select t-if="state.ui.bulk_set_attr_id"
+                            class="o_owl_bulk_modal_select"
+                            t-on-change="_onBulkValueSelect"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''">
+                        <option value="">— pick a value —</option>
+                        <t t-foreach="_bulkValueOptions()" t-as="val"
+                           t-key="val.value_id">
+                            <option t-att-value="val.value_id"
+                                    t-att-selected="state.ui.bulk_set_value_id === val.value_id ? 'selected' : ''"
+                                    t-esc="val.name"/>
+                        </t>
+                    </select>
+                </div>
+
+                <div t-if="state.ui.bulk_modal === 'move_zone'"
+                     class="o_owl_bulk_modal_body">
+                    <label class="o_owl_bulk_modal_label">Target zone</label>
+                    <select class="o_owl_bulk_modal_select"
+                            t-on-change="_onBulkZoneSelect"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''">
+                        <option value="base_run">Base Run</option>
+                        <option value="wall">Wall</option>
+                        <option value="tall">Tall</option>
+                        <option value="island">Island</option>
+                        <option value="accessory">Accessory</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <footer class="o_owl_modal_foot">
+                    <button class="o_owl_btn o_owl_btn_secondary"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                            t-on-click="_closeBulkModal">
+                        Cancel
+                    </button>
+                    <button t-if="state.ui.bulk_modal === 'set_attribute'"
+                            class="o_owl_btn o_owl_btn_primary"
+                            t-att-disabled="state.ui.bulk_busy || !state.ui.bulk_set_attr_id || !state.ui.bulk_set_value_id ? 'disabled' : ''"
+                            t-on-click="_onBulkSetAttributeConfirm">
+                        Apply to <t t-esc="state.ui.bulk_checked.length"/> lines
+                    </button>
+                    <button t-if="state.ui.bulk_modal === 'move_zone'"
+                            class="o_owl_btn o_owl_btn_primary"
+                            t-att-disabled="state.ui.bulk_busy ? 'disabled' : ''"
+                            t-on-click="_onBulkMoveZoneConfirm">
+                        Move <t t-esc="state.ui.bulk_checked.length"/> lines
+                    </button>
+                </footer>
+            </div>
+        </div>
+
+        <!-- 2026-06-27 — keyboard shortcut help dialog (triggered by ?).
+             Lives at the top so it overlays all tab content. Escape
+             closes via the global keydown handler. -->
+        <div t-if="state.ui.shortcut_help_open"
+             class="o_owl_modal_backdrop"
+             t-on-click="() => state.ui.shortcut_help_open = false">
+            <div class="o_owl_modal_panel o_owl_shortcut_help_panel"
+                 t-on-click.stop=""
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Keyboard shortcuts">
+                <div class="o_owl_modal_header">
+                    <h3 class="o_owl_modal_title">Keyboard shortcuts</h3>
+                    <button type="button" class="o_owl_modal_close"
+                            t-on-click="() => state.ui.shortcut_help_open = false"
+                            aria-label="Close">×</button>
+                </div>
+                <ul class="o_owl_shortcut_list">
+                    <li><kbd>1</kbd>–<kbd>9</kbd> — switch tab</li>
+                    <li><kbd>n</kbd> — open catalog</li>
+                    <li><kbd>/</kbd> — focus catalog search (opens if needed)</li>
+                    <li><kbd>?</kbd> — show this help</li>
+                    <li><kbd>Esc</kbd> — close modals</li>
+                    <li><kbd>Enter</kbd> / <kbd>Space</kbd> — open the focused line</li>
+                </ul>
+            </div>
+        </div>
 
         <!-- Loading -->
         <div t-if="state.loading" class="o_owl_loading_card">
@@ -2114,26 +3093,220 @@ const TEMPLATE = xml`
                            busy="state.catalog_busy"
                            channelLabel="state.channel_label"
                            zoneFilter="state.ui.catalog_zone_filter"
+                           cartCount="state.lines.length"
+                           keepOpen="state.ui.catalog_keep_open"
+                           onKeepOpenChange="_setCatalogKeepOpen"
                            onClose="_closeCatalog"
                            onPick="_onPickCabinet"/>
 
-            <!-- Chrome (T2C7) — banner + titlebar + stages. -->
-            <IllustrativeBanner show="true"/>
+            <!-- Chrome (T2C7) — banner + titlebar + stages.
+                 2026-06-27 — banner now reads server-side seed_mode (default
+                 'canonical' = hidden) so live customers don't see "ILLUSTRATIVE
+                 SEED · Demo numbers" on their real quote. Toggle via
+                 ir.config_parameter southbrook.seed_mode='illustrative' for
+                 dev/staging databases. -->
+            <IllustrativeBanner show="state.order.seed_mode === 'illustrative'"/>
             <OrderTitlebar order="state.order"
                            mode="props.mode || 'dealer'"/>
             <StagePipeline order="state.order"
                            mode="props.mode || 'dealer'"/>
 
-            <!-- HeaderStrip (T2C6) — reads order header from state. -->
-            <HeaderStrip order="state.order"/>
+            <!-- 2026-06-27 — production-approval strip. Renders nothing
+                 when mrp_pm isn't installed (payload omits the field).
+                 When present, surfaces approval state + Request button
+                 + MO preview inline so the dealer doesn't need to bounce
+                 into the backend form. -->
+            <ProductionApprovalStrip order="state.order"
+                                     onRequestApproval="_onRequestApproval"
+                                     loadPreflight="_loadPreflight"/>
+
+            <!-- HeaderStrip (T2C6) — reads order header from state.
+                 2026-06-27 — also takes family_counts for the new
+                 Cabinet Mix glance cell. -->
+            <HeaderStrip order="state.order"
+                         familyCounts="state.family_counts"/>
 
             <!-- TabBar (T2C8) — client-side panel switch. -->
             <TabBar tabs="_tabs"
                     activeTab="state.ui.current_tab"
                     onTabChange.bind="_setActiveTab"/>
 
-            <!-- Tab panels. T2C9 fills Lines. T2C10-11 fill the rest. -->
-            <div t-if="state.ui.current_tab === 'lines'"
+            <!-- Tab panels. T2C9 fills Lines. T2C10-11 fill the rest.
+                 Phase 2.B prepends the Room Setup panel as the chain
+                 head; lines/3D/etc are downstream t-elif siblings. -->
+            <div t-if="state.ui.current_tab === 'room_setup'"
+                 class="o_owl_tab_panel sb-room-setup-panel"
+                 role="tabpanel" aria-labelledby="o_owl_tab_room_setup"
+                 tabindex="0">
+                <t t-if="state.room">
+                    <!-- Phase 4 — Room Setup panel header bar. Hosts the
+                         persistent unit toggle (mm | ft/in). The toggle
+                         POSTs /room/<rid>/update and on success refreshes
+                         state.room so every length label re-renders in
+                         the new unit. -->
+                    <div class="sb-room-panel-header">
+                        <div class="sb-room-unit-toggle"
+                             role="group"
+                             aria-label="Length units">
+                            <span class="sb-room-unit-toggle-label">Units:</span>
+                            <button type="button"
+                                    class="sb-room-unit-toggle-btn"
+                                    t-att-class="(state.room.unit_preference || 'mm') === 'mm' ? 'sb-room-unit-toggle-btn--active' : ''"
+                                    t-att-aria-pressed="(state.room.unit_preference || 'mm') === 'mm' ? 'true' : 'false'"
+                                    t-att-disabled="state.unit_saving"
+                                    t-on-click="() => this._onUnitToggle('mm')">
+                                mm
+                            </button>
+                            <button type="button"
+                                    class="sb-room-unit-toggle-btn"
+                                    t-att-class="(state.room.unit_preference || 'mm') === 'imperial' ? 'sb-room-unit-toggle-btn--active' : ''"
+                                    t-att-aria-pressed="(state.room.unit_preference || 'mm') === 'imperial' ? 'true' : 'false'"
+                                    t-att-disabled="state.unit_saving"
+                                    t-on-click="() => this._onUnitToggle('imperial')">
+                                ft/in
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Phase 4 — celebratory state when all 5 steps
+                         complete. Replaces the checklist so the user has
+                         a clear "you can move on" signal. -->
+                    <t t-if="_allStepsComplete()">
+                        <div class="sb-room-complete-card">
+                            <div class="sb-room-complete-icon" aria-hidden="true">✓</div>
+                            <div class="sb-room-complete-body">
+                                <h3 class="sb-room-complete-title">Room Complete</h3>
+                                <p class="sb-room-complete-text">
+                                    Your room is fully set up — all
+                                    cabinets placed, no conflicts.
+                                </p>
+                            </div>
+                            <button type="button"
+                                    class="sb-room-complete-cta"
+                                    t-on-click="() => this._setActiveTab('lines')">
+                                Continue to Order Lines →
+                            </button>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <!-- Phase 4 — 5-step progress checklist. Each
+                             step shows ✓ when complete, an empty bubble
+                             otherwise, plus a → CTA link on incomplete
+                             steps that dispatches via
+                             _onProgressStepClick(step.key). -->
+                        <ol class="sb-room-progress" aria-label="Room setup progress">
+                            <li t-foreach="_progressSteps()"
+                                t-as="step"
+                                t-key="step.key"
+                                class="sb-room-progress-step"
+                                t-att-class="step.complete ? 'sb-room-progress-step--done' : (step.optional ? 'sb-room-progress-step--optional' : 'sb-room-progress-step--todo')">
+                                <span class="sb-room-progress-bubble" aria-hidden="true">
+                                    <t t-if="step.complete">✓</t>
+                                    <t t-else=""></t>
+                                </span>
+                                <span class="sb-room-progress-label" t-esc="step.label"/>
+                                <button t-if="!step.complete"
+                                        type="button"
+                                        class="sb-room-progress-cta"
+                                        t-att-aria-label="step.hint"
+                                        t-on-click="() => this._onProgressStepClick(step.key)">→</button>
+                            </li>
+                        </ol>
+                    </t>
+
+                    <!-- Summary card + per-wall cards -->
+                    <div class="sb-room-summary">
+                        <h2 class="sb-room-title">
+                            <t t-esc="state.room.name"/>
+                        </h2>
+                        <div class="sb-room-meta">
+                            <span class="sb-room-shape">
+                                <t t-esc="_humanShape(state.room.layout_shape)"/>
+                            </span>
+                            <span class="sb-room-linear">
+                                <t t-esc="_humanLen(state.room.total_linear_mm)"/> linear
+                            </span>
+                            <span class="sb-room-walls">
+                                <t t-esc="state.room.walls.length"/> wall(s)
+                            </span>
+                            <span t-if="state.room.has_plumbing"
+                                  class="sb-room-plumbing-flag">Plumbing</span>
+                        </div>
+                    </div>
+                    <div class="sb-room-walls-grid">
+                        <t t-foreach="state.room.walls" t-as="wall" t-key="wall.id">
+                            <div class="sb-room-wall-card"
+                                 t-att-class="wall.has_conflicts ? 'sb-room-wall-card--conflict' : ''">
+                                <header>
+                                    <strong t-esc="wall.name"/>
+                                    <span class="sb-room-wall-len">
+                                        <t t-esc="_humanLen(wall.length_mm)"/>
+                                    </span>
+                                </header>
+                                <div class="sb-room-wall-bar"
+                                     t-att-title="_humanLen(wall.used_mm) + ' / ' + _humanLen(wall.length_mm) + ' used'">
+                                    <div class="sb-room-wall-bar-fill"
+                                         t-att-style="'width:' + _capPct(wall) + '%'"></div>
+                                </div>
+                                <footer class="sb-room-wall-cap">
+                                    <span><t t-esc="_humanLen(wall.used_mm)"/> used</span>
+                                    <span class="sb-room-wall-rem"
+                                          t-att-class="wall.remaining_mm &lt; 0 ? 'sb-room-wall-rem--over' : ''">
+                                        <t t-esc="_humanLen(wall.remaining_mm)"/> left
+                                    </span>
+                                </footer>
+                                <ul t-if="wall.constraints.length" class="sb-room-constraint-chips">
+                                    <li t-foreach="wall.constraints" t-as="c" t-key="c.id"
+                                        class="sb-room-chip"
+                                        t-att-data-type="c.constraint_type">
+                                        <t t-esc="_humanConstraint(c.constraint_type)"/>
+                                        <small>@ <t t-esc="_humanLen(c.distance_from_left_mm)"/></small>
+                                    </li>
+                                </ul>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="sb-room-empty">
+                        <h2>No room configured yet</h2>
+                        <p>
+                            Add room dimensions, walls, and constraints to anchor
+                            this order to a physical space. Cabinets you add can
+                            then be placed against walls with live conflict
+                            detection.
+                        </p>
+                        <button class="o_owl_add_cabinet_btn sb-room-setup-cta"
+                                t-on-click="_openRoomSetupWizard">
+                            Set Up Room
+                        </button>
+                        <p class="sb-room-empty-note">
+                            <small>You can still add cabinets and design without
+                                   setting up a room — it just unlocks the Room
+                                   Layout tab in Phase 3.</small>
+                        </p>
+                    </div>
+                </t>
+            </div>
+            <!-- Phase 3.B — Room Layout tab. Top-down floor plan.
+                 Phase 3.C.2a adds three click affordances via the
+                 callbacks below; drag (3.C.2b) + elevation (3.C.2c)
+                 remain deferred. -->
+            <div t-elif="state.ui.current_tab === 'room_layout'"
+                 class="o_owl_tab_panel sb-room-plan-panel"
+                 role="tabpanel" aria-labelledby="o_owl_tab_room_layout"
+                 tabindex="0">
+                <RoomLayoutTab room="state.room"
+                               lines="state.lines"
+                               unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"
+                               onCabinetClick="_onPlanCabinetClick"
+                               onGapClick="_onPlanGapClick"
+                               onAssignFromSidebar="_onPlanAssignClick"
+                               onCabinetDragEnd="_onPlanCabinetDragEnd"
+                               onWallResizeEnd="_onPlanWallResizeEnd"
+                               onConstraintCreate="_onPlanConstraintCreate"/>
+            </div>
+            <div t-elif="state.ui.current_tab === 'lines'"
                  class="o_owl_tab_panel o_owl_panel_lines"
                  role="tabpanel" aria-labelledby="o_owl_tab_lines"
                  tabindex="0">
@@ -2167,6 +3340,39 @@ const TEMPLATE = xml`
                             on this order
                         </span>
                     </div>
+
+                    <!-- Phase 3.D — collapsible warning banner. Renders
+                         only when _warnings() returns at least one entry.
+                         Headline shows the count; expand/collapse toggles
+                         the bullet list. Each bullet stays static text in
+                         3.D; 3.C will wire click → zone/wall focus. -->
+                    <t t-set="warnings" t-value="_warnings()"/>
+                    <div t-if="warnings.length"
+                         class="sb-room-warn-banner"
+                         t-att-class="state.ui.warnings_expanded ? 'sb-room-warn-banner--open' : ''">
+                        <button type="button"
+                                class="sb-room-warn-banner-head"
+                                t-on-click="_toggleWarnings"
+                                t-att-aria-expanded="state.ui.warnings_expanded ? 'true' : 'false'">
+                            <span class="sb-room-warn-icon" aria-hidden="true">⚠</span>
+                            <span class="sb-room-warn-headline">
+                                <t t-esc="warnings.length"/>
+                                <t t-if="warnings.length === 1"> issue found</t>
+                                <t t-else=""> issues found</t>
+                            </span>
+                            <span class="sb-room-warn-chevron" aria-hidden="true">
+                                <t t-if="state.ui.warnings_expanded">▾</t>
+                                <t t-else="">▸</t>
+                            </span>
+                        </button>
+                        <ul t-if="state.ui.warnings_expanded"
+                            class="sb-room-warn-list">
+                            <li t-foreach="warnings" t-as="w" t-key="w"
+                                class="sb-room-warn-item"
+                                t-esc="w"/>
+                        </ul>
+                    </div>
+
                     <!-- onSelectLine / onLineSaved are pre-bound in
                          setup() so plain-reference props carry 'this'
                          correctly. -->
@@ -2179,7 +3385,13 @@ const TEMPLATE = xml`
                                onSelectLine="_setSelectedLine"
                                onLineSaved="_onLineSaved"
                                onAddToZone="_onAddToZone"
-                               issuesForLine="_issuesForLine"/>
+                               onDeleteLine="_onDeleteLine"
+                               onLineQtyChange="_onLineQtyChange"
+                               bulkChecked="state.ui.bulk_checked"
+                               onBulkToggle="_onBulkToggle"
+                               issuesForLine="_issuesForLine"
+                               room="state.room"
+                               unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"/>
                 </t>
             </div>
             <div t-elif="state.ui.current_tab === 'kitchen3d'"
@@ -2264,11 +3476,15 @@ const TEMPLATE = xml`
                 </p>
             </div>
 
-            <!-- T2C12 — FooterActions row -->
+            <!-- T2C12 — FooterActions row.
+                 2026-06-27 — passes loadPreflight so the Send-to-Mfg
+                 review modal can show MO preview + blockers before the
+                 irreversible commit. -->
             <FooterActions order="state.order"
                            onAction.bind="_onFooterAction"
                            busy="state.action_busy"
-                           mode="props.mode || 'dealer'"/>
+                           mode="props.mode || 'dealer'"
+                           loadPreflight="_loadPreflight"/>
 
             <div t-if="state.action_message" class="o_owl_action_msg"
                  t-esc="state.action_message"/>
@@ -2278,6 +3494,40 @@ const TEMPLATE = xml`
                 Commit 13 lands the customer-mode toggle; commit 14
                 is the gate review with John.
             </p>
+
+            <!-- Phase 2.C — Room Setup wizard overlay. Renders only
+                 when the user clicks the "Set Up Room" CTA on the
+                 Room Setup tab. Self-mounts as a fullscreen modal
+                 above all OrderBuilder chrome. -->
+            <RoomSetupWizard t-if="state.ui.wizard === 'room_setup'"
+                             orderId="props.orderId"
+                             onClose="_closeRoomSetupWizard"
+                             onSubmitted="_onRoomSubmitted"/>
+
+            <!-- Phase 3.C.2a — AssignToWallModal. Opened from the
+                 Room Layout sidebar Assign... button. The line lookup
+                 returns null when the line is gone (race after a
+                 concurrent delete) — the t-if guard then hides the
+                 modal cleanly. -->
+            <AssignToWallModal t-if="state.ui.assigning &amp;&amp; _lineById(state.ui.assigning) &amp;&amp; state.room"
+                               line="_lineById(state.ui.assigning)"
+                               room="state.room"
+                               unitPreference="(state.room &amp;&amp; state.room.unit_preference) || 'mm'"
+                               onAssign="(wallId, posMm) => this._onAssignSubmit(state.ui.assigning, wallId, posMm)"
+                               onCancel="_onAssignCancel"/>
+
+            <!-- Phase 6.1 — GapRecommendModal. Opened from a gap-click
+                 on the Room Layout floor plan. Shows top-3 cabinet
+                 recommendations + a "Browse all" escape to the full
+                 catalog. The catalog-fallback path inside
+                 _onPlanGapClick covers RPC failures so the user is
+                 never stranded if the recommend endpoint misbehaves. -->
+            <GapRecommendModal t-if="state.ui.gapRecommend"
+                               gapInfo="state.ui.gapRecommend"
+                               recommendations="state.ui.gapRecommend.recommendations"
+                               onPick="_onGapPickTemplate"
+                               onBrowseAll="_onGapBrowseAll"
+                               onCancel="_onGapCancel"/>
         </div>
     </div>
 `;
@@ -2288,6 +3538,7 @@ class OrderBuilder extends Component {
         IllustrativeBanner,
         OrderTitlebar,
         StagePipeline,
+        ProductionApprovalStrip,
         HeaderStrip,
         TabBar,
         ZoneGroup,
@@ -2296,6 +3547,17 @@ class OrderBuilder extends Component {
         FooterActions,
         KitchenViewport,
         CatalogPicker,
+        RoomSetupWizard,
+        RoomLayoutTab,
+        // Phase 3.C.2a — fullscreen overlay opened by the Room Layout
+        // sidebar's Assign... button. Mounted at OrderBuilder level so
+        // it floats above the tab chrome (and survives a tab switch
+        // mid-pick).
+        AssignToWallModal,
+        // Phase 6.1 — fullscreen overlay opened by Room Layout gap-
+        // click; replaces the 3.C.2a direct-to-catalog flow with a top-
+        // 3 recommendation list + Browse all fallback.
+        GapRecommendModal,
     };
     static props = {
         orderId: { type: String, optional: true },
@@ -2310,11 +3572,35 @@ class OrderBuilder extends Component {
 
     setup() {
         this.state = useState({
+            // P0 bugfix 2026-06-22: split "first-page-paint loading" from
+            // "background poll loading". `loading` only flips true on the
+            // very first _loadOrder(); the 5-second poll updates state in
+            // place without ever showing the "Loading order…" card, so
+            // CatalogPicker and other children keep their transient UI
+            // state (search query, active category, scroll, modal-open).
             loading: false,
+            initial_load: true,
+            // Stable hash of the order payload — when an unchanged poll
+            // response comes back, we skip the state write entirely so
+            // OWL doesn't even reconcile (avoids any chance of resetting
+            // child reactivity on a no-op).
+            payload_hash: "",
+            // 2026-06-27 — server-issued ETag, sent back on each poll
+            // for sub-5ms unchanged-response short-circuit. Empty on
+            // first paint so the initial fetch always returns the
+            // full payload + the first ETag.
+            payload_etag: "",
             error: null,
             order: null,
             lines: [],
             zones: [],
+            // 2026-06-27 — cabinet-class summary for HeaderStrip glance
+            // check. Empty list hides the cell until first payload arrives.
+            family_counts: [],
+            // P1 bugfix 2026-06-22: confirmation toasts. Each toast is
+            // {id, text, kind: 'success'|'error'}; renders top-right and
+            // auto-dismisses after ~3s via setTimeout.
+            toasts: [],
             // T2C11 — BoM rollup + validation issues. Both populated
             // by /api/order/<id>. Default rollup matches the empty
             // shape so the BoMPreview component never sees undefined
@@ -2332,6 +3618,10 @@ class OrderBuilder extends Component {
             // shows a brief inline message while an RPC is in flight.
             action_busy: false,
             action_message: null,
+            // Phase 4 — in-flight flag for the Room Setup unit toggle.
+            // Disables both segmented buttons while the POST is pending
+            // so a rapid double-click doesn't queue two flips.
+            unit_saving: false,
             // P25C4 — monotonically increasing counter bumped on every
             // successful _loadOrder. KitchenViewport watches this to
             // refetch its 3D payload when the order changes underneath
@@ -2349,18 +3639,78 @@ class OrderBuilder extends Component {
             // ("Dealer (-50%)", "Contractor Tier 3 (-35%)", etc.).
             // Drives the channel badge on each catalog card.
             channel_label: "",
+            // Phase 2.B — Room Setup tab payload. Mirrors the shape
+            // returned by /southbrook/api/order/<id>/room/get
+            // (Phase 2.A controller). Null until the background fetch
+            // resolves; the room_setup tab renders the empty-state CTA
+            // while it's null. Non-blocking: initial render does NOT
+            // wait on this.
+            room: null,
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
                 // G11 — modal visibility.
                 catalog_open: false,
+                // 2026-06-27 — when false (default), single Add auto-closes
+                // the modal ~1.5s after success. When true (user toggled
+                // "Keep open for bulk-add"), the modal stays open and the
+                // user closes it manually. The toggle is sticky for the
+                // tab lifetime so a power user doing 30 cabinets isn't
+                // forced to re-tick it on every modal open.
+                catalog_keep_open: false,
                 // Phase 3 Sprint C1 — when the user clicks "+ Add to
                 // <zone>", we stash the zone code here so the
                 // CatalogPicker can pre-filter to the matching
                 // family group. Cleared by the top-level Browse
                 // Catalog button so it shows everything.
                 catalog_zone_filter: null,
+                // Phase 2.C — fullscreen wizard slot. null when no
+                // wizard is open; "room_setup" when the Room Setup
+                // wizard is mounted. Future wizards (e.g. cabinet
+                // bulk-edit) can reuse this slot.
+                wizard: null,
+                // Phase 3.D — collapsible warning banner above the
+                // Order Lines list. Starts collapsed; the headline
+                // ("⚠ N issues found") is always visible; bullet
+                // list appears only when expanded.
+                warnings_expanded: false,
+                // 2026-06-27 — keyboard shortcut help dialog. Triggered
+                // by `?` and closed by Esc or click-on-backdrop.
+                shortcut_help_open: false,
+                // 2026-06-27 L1 — bulk-edit state. `bulk_checked` is an
+                // array of line ids currently selected for bulk action.
+                // `bulk_modal` is null / "set_attribute" / "move_zone"
+                // depending on which modal flow is active.
+                bulk_checked: [],
+                bulk_modal: null,
+                bulk_busy: false,
+                bulk_set_attr_id: null,
+                bulk_set_value_id: null,
+                bulk_move_zone: "base_run",
+                // Phase 3.C.2a — line id of the cabinet currently
+                // being assigned to a wall via the AssignToWallModal.
+                // null when the modal is closed. The render block
+                // mounts <AssignToWallModal/> when this is non-null.
+                assigning: null,
+                // Phase 6.1 — gap-click recommendation modal state.
+                // null when no recommend modal is open; otherwise:
+                //   { gapMm, position, wallId, recommendations: [...] }
+                // Set by _onPlanGapClick after the recommend RPC
+                // resolves; cleared by _onGapPickTemplate (on success),
+                // _onGapBrowseAll (escape to full catalog), or
+                // _onGapCancel (× / Cancel).
+                gapRecommend: null,
             },
+            // Phase 3.C.2a — gap-click stash. When the user taps a gap
+            // rect on the Room Layout, we record the wall+position here
+            // and open the catalog modal; after the picker creates a
+            // new line, _onPickCabinet checks this flag and fires the
+            // /place-on-wall RPC to auto-place the new cabinet at the
+            // gap. Cleared after the place call (success OR failure)
+            // so a subsequent normal Add doesn't accidentally inherit
+            // the placement. Kept at the top level (NOT under .ui)
+            // because it's a data-flow flag, not a UI visibility flag.
+            pendingGapPlacement: null,
         });
         // Pre-bind handler methods to this. OWL's template compiler
         // doesn't preserve 'this' when methods are referenced as
@@ -2376,13 +3726,129 @@ class OrderBuilder extends Component {
         this._onPickCabinet = this._onPickCabinet.bind(this);
         this._setSelectedLine = this._setSelectedLine.bind(this);
         this._onLineSaved = this._onLineSaved.bind(this);
+        this._onDeleteLine = this._onDeleteLine.bind(this);
+        this._onLineQtyChange = this._onLineQtyChange.bind(this);
+        this._onBulkToggle = this._onBulkToggle.bind(this);
+
+        // P1 bugfix: synchronous lock prevents double-add on rapid clicks
+        // (the reactive `state.catalog_busy` flag flips inside an async
+        // function, so OWL's re-render-driven disabled-attribute update
+        // arrives after a fast second click. The instance flag is set
+        // before the first `await` so re-entry is impossible).
+        this._addInFlight = false;
+        // Counter for unique toast ids — useState array keys.
+        this._toastSeq = 0;
 
         onMounted(() => {
             this._loadOrder();
             this._loadCatalog();
+            // Phase 2.B — fire-and-forget room fetch. The Room Setup tab
+            // pre-renders with state.room=null (empty-state CTA) so we
+            // do NOT await this; if the fetch fails the tab just shows
+            // the empty state, which is the correct fallback.
+            this._refreshRoomState();
             this._startRealtimeSync();
+            // 2026-06-27 — global keyboard shortcuts. Bound on document
+            // so they fire anywhere on the page except inside an input.
+            // Removed cleanly on unmount.
+            this._onGlobalKeydown = this._onGlobalKeydown.bind(this);
+            document.addEventListener("keydown", this._onGlobalKeydown);
         });
-        onWillUnmount(() => this._stopRealtimeSync());
+        onWillUnmount(() => {
+            this._stopRealtimeSync();
+            if (this._onGlobalKeydown) {
+                document.removeEventListener("keydown", this._onGlobalKeydown);
+            }
+        });
+    }
+
+    // 2026-06-27 — keyboard shortcuts for power users. Gated on:
+    //   • no input/textarea/select/contentEditable has focus
+    //   • no ctrl/meta/alt modifier (shift is OK for `?`)
+    //   • catalog modal isn't in a busy add (Esc still passes through
+    //     to the modal's own handler)
+    _onGlobalKeydown(ev) {
+        // Don't intercept typed input.
+        const tgt = ev.target;
+        if (tgt && (
+            tgt.tagName === "INPUT"
+            || tgt.tagName === "TEXTAREA"
+            || tgt.tagName === "SELECT"
+            || tgt.isContentEditable
+        )) {
+            return;
+        }
+        if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+
+        // ? = open shortcut help
+        if (ev.key === "?" || (ev.shiftKey && ev.key === "/")) {
+            ev.preventDefault();
+            this.state.ui.shortcut_help_open = true;
+            return;
+        }
+        // Esc = close shortcut help (the catalog modal has its own
+        // Esc listener for its own close path).
+        if (ev.key === "Escape" && this.state.ui.shortcut_help_open) {
+            ev.preventDefault();
+            this.state.ui.shortcut_help_open = false;
+            return;
+        }
+        // n = open the catalog (only when no modal is already open).
+        if (ev.key === "n" && !this.state.ui.catalog_open
+            && !this.state.ui.shortcut_help_open
+            && !this.state.ui.wizard) {
+            ev.preventDefault();
+            this._openCatalog();
+            return;
+        }
+        // / = focus the catalog search input (open the catalog first
+        //     if it's not already open).
+        if (ev.key === "/" && !ev.shiftKey) {
+            ev.preventDefault();
+            if (!this.state.ui.catalog_open) {
+                this._openCatalog();
+            }
+            // Wait one frame so the input exists in the DOM.
+            requestAnimationFrame(() => {
+                const input = document.querySelector(".o_owl_catalog_search");
+                if (input) input.focus();
+            });
+            return;
+        }
+        // 1..9 = jump to the Nth tab. Gated on no modal active so the
+        // catalog's own keyhandlers aren't shadowed.
+        if (/^[1-9]$/.test(ev.key)
+            && !this.state.ui.catalog_open
+            && !this.state.ui.shortcut_help_open
+            && !this.state.ui.wizard) {
+            const idx = Number(ev.key) - 1;
+            const tabs = this._tabs;
+            if (idx >= 0 && idx < tabs.length) {
+                ev.preventDefault();
+                this._setActiveTab(tabs[idx].code);
+            }
+            return;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // P1 bugfix 2026-06-22 — toast helpers. _pushToast spawns a transient
+    // status banner that disappears after `ttl` ms (default 3s); the
+    // template renders them in a fixed-position stack.
+    // ------------------------------------------------------------------
+    _pushToast(text, kind = "success", ttl = 3000) {
+        this._toastSeq += 1;
+        const id = this._toastSeq;
+        this.state.toasts.push({ id, text, kind });
+        setTimeout(() => {
+            const idx = this.state.toasts.findIndex((t) => t.id === id);
+            if (idx >= 0) this.state.toasts.splice(idx, 1);
+        }, ttl);
+    }
+
+    _dismissToast(id) {
+        const idx = this.state.toasts.findIndex((t) => t.id === id);
+        if (idx >= 0) this.state.toasts.splice(idx, 1);
     }
 
     // ------------------------------------------------------------------
@@ -2417,6 +3883,13 @@ class OrderBuilder extends Component {
             if (this.state.loading || this.state.action_busy) {
                 return;
             }
+            // P0 bugfix 2026-06-22: pause the poll while the user is in
+            // the middle of an interaction. The catalog modal is the big
+            // one (a re-render that wipes filter state mid-browse is the
+            // worst UX hit), but also skip during an in-flight add so
+            // the optimistic UI doesn't fight an interleaved refresh.
+            if (this.state.ui.catalog_open) return;
+            if (this._addInFlight) return;
             this._loadOrder();
         };
         this._realtimeTimer = setInterval(tick, POLL_MS);
@@ -2476,18 +3949,55 @@ class OrderBuilder extends Component {
         this.state.ui.catalog_open = true;
     };
 
+    // 2026-06-27 — Keep-open preference owner. The CatalogPicker bubbles
+    // its checkbox state up here so it survives a close/reopen cycle.
+    _setCatalogKeepOpen = (next) => {
+        this.state.ui.catalog_keep_open = !!next;
+    };
+
     _closeCatalog() {
         if (!this.state.catalog_busy) {
             this.state.ui.catalog_open = false;
+            // Phase 3.C.2a — drop any stashed gap-placement intent so
+            // the NEXT "+ Add Another Cabinet" click doesn't
+            // accidentally inherit a placement from a cancelled gap
+            // flow. _onPickCabinet success path already clears it on
+            // the happy path; this covers the "user closed the modal
+            // without picking" case.
+            this.state.pendingGapPlacement = null;
         }
     }
 
-    async _onPickCabinet(productTmplId, qty) {
+    async _onPickCabinet(productTmplId, qty, label) {
         if (!this.state.order) return;
+        // P1 bugfix 2026-06-22: synchronous re-entry guard. The reactive
+        // `catalog_busy` flag below still drives the visual disabled
+        // state on the button, but OWL re-render is async, so a fast
+        // second click can sneak through before the DOM attribute
+        // updates. Setting `_addInFlight` before the first `await`
+        // closes that race window — re-entry returns immediately.
+        if (this._addInFlight) return;
+        this._addInFlight = true;
         this.state.catalog_busy = true;
         const qtyArg = (typeof qty === "number" && qty > 0)
             ? Math.floor(qty)
             : 1;
+        // UX bugfix 2026-06-23: optimistic counter bump. The "N
+        // cabinets" counter reads state.order.line_count which is
+        // server-side `len(sale.order.line[])` — i.e. count of LINES,
+        // not sum of qty. So we bump by 1 per click regardless of qty.
+        // With Option B merge enabled (server-side at /add-line), a
+        // duplicate-template add merges into the existing line — the
+        // optimistic +1 over-shoots by 1 briefly, but _loadOrder()
+        // after the server response reconciles to truth. The catch
+        // path reverts on failure. Grand total is intentionally NOT
+        // optimistic — pricelist/channel discounts make a naive
+        // qtyArg * list_price wrong; the toast confirms the add and
+        // the total catches up on reload.
+        const _optimisticBump = 1;
+        if (this.state.order && typeof this.state.order.line_count === "number") {
+            this.state.order.line_count += _optimisticBump;
+        }
         try {
             const result = await rpcJsonCall(
                 `/southbrook/api/order/${encodeURIComponent(this.state.order.id)}/add-line`,
@@ -2497,9 +4007,18 @@ class OrderBuilder extends Component {
                     // Endpoint accepts and validates; defaults to 1
                     // when omitted, so old callers stay correct.
                     qty: qtyArg,
+                    // 2026-06-27 — when the user opened the catalog via
+                    // "+ Add to <zone>", forward the zone so the new
+                    // line lands there instead of the family-derived
+                    // default. Backend resolver also accepts no value
+                    // and derives from the SKU's family.
+                    zone: this.state.ui.catalog_zone_filter || undefined,
                 },
             );
             if (result && result.ok) {
+                // Force the next _loadOrder to apply (the add changed
+                // server state in a way the hash MUST observe).
+                this._invalidatePayloadCache();
                 // Refresh the order so the new line appears + totals
                 // re-compute. Bumps payload_version, which makes the
                 // KitchenViewport refetch its 3D payload as a bonus.
@@ -2511,24 +4030,130 @@ class OrderBuilder extends Component {
                 // when done. The error path still surfaces via
                 // state.error and skips the success-state pulse.
                 await this._loadOrder();
+                // Phase 3.C.2a — gap-click auto-place. When the catalog
+                // modal was opened by a tap on an empty wall gap (vs the
+                // top-level "+ Add Another Cabinet" button), we POST a
+                // /place-on-wall RPC against the freshly-created line so
+                // it lands at the gap's position. The flag is cleared
+                // unconditionally — a placement failure leaves the
+                // cabinet on the order but unplaced, which the sidebar
+                // surfaces so the user can resolve via Assign...
+                const stash = this.state.pendingGapPlacement;
+                const newLineId = result.line_id;
+                if (stash && newLineId) {
+                    try {
+                        const placeRes = await rpcJsonCall(
+                            "/southbrook/api/order/"
+                            + encodeURIComponent(this.state.order.id)
+                            + "/line/" + encodeURIComponent(newLineId)
+                            + "/place-on-wall",
+                            {
+                                wall_id: stash.wallId,
+                                position_from_left_mm: stash.position,
+                            },
+                        );
+                        if (placeRes && placeRes.ok) {
+                            await this._refreshRoomState();
+                            this._invalidatePayloadCache();
+                            await this._loadOrder();
+                            this._pushToast("Cabinet placed on wall", "success");
+                        } else {
+                            // Don't block the catalog flow — the line
+                            // was added, just not placed. Surface a
+                            // soft warning so the user knows to assign
+                            // it via the sidebar.
+                            this._pushToast(
+                                "Cabinet added but could not auto-place — assign it from the Room Layout sidebar.",
+                                "error",
+                                5000,
+                            );
+                        }
+                    } catch (placeErr) {
+                        this._pushToast(
+                            "Cabinet added but auto-place failed: "
+                            + (placeErr && placeErr.message ? placeErr.message : String(placeErr)),
+                            "error",
+                            5000,
+                        );
+                    } finally {
+                        this.state.pendingGapPlacement = null;
+                    }
+                }
+                // P1 bugfix 2026-06-22: visible confirmation toast.
+                // Quantity prefix only when qty>1 to keep the common
+                // case short. `label` comes from the catalog card so
+                // the user sees what they actually picked.
+                const qtyPrefix = qtyArg > 1 ? `${qtyArg} × ` : "";
+                this._pushToast(
+                    `Added ${qtyPrefix}${label || "cabinet"}`,
+                    "success",
+                );
+                // 2026-06-27 — auto-close after a single add unless the
+                // user toggled "Keep open for bulk-add". 1.5s delay lets
+                // the toast and the per-card success pulse register before
+                // the modal dismisses. Skip when a gap-placement was in
+                // flight (the user already implicitly committed to one
+                // specific add) — that path's own toast covers it.
+                if (!this.state.ui.catalog_keep_open
+                    && !this.state.pendingGapPlacement) {
+                    setTimeout(() => {
+                        // Re-check at fire time so a fast user opening
+                        // a new modal mid-timeout doesn't get bounced.
+                        if (this.state.ui.catalog_open
+                            && !this.state.catalog_busy
+                            && !this._addInFlight
+                            && !this.state.ui.catalog_keep_open) {
+                            this._closeCatalog();
+                        }
+                    }, 1500);
+                }
             } else {
                 this.state.error = (
                     result?.error === "order_locked"
                     ? `Cannot add cabinets — this order is ${result.state}.`
                     : result?.error || "Could not add the cabinet."
                 );
+                this._pushToast(this.state.error, "error", 5000);
                 throw new Error(this.state.error);
             }
         } catch (e) {
+            // UX bugfix 2026-06-23: revert the optimistic counter bump
+            // when the add failed. (_loadOrder did NOT run, so the
+            // counter would otherwise stay artificially high until the
+            // next refresh.) Floored at 0 in case the optimistic state
+            // got further corrupted somehow.
+            if (this.state.order && typeof this.state.order.line_count === "number") {
+                this.state.order.line_count = Math.max(
+                    0, this.state.order.line_count - _optimisticBump,
+                );
+            }
             // If the error was already set by the !ok branch above,
             // don't overwrite it with a generic message.
             if (!this.state.error) {
                 this.state.error = e?.message || String(e);
+                this._pushToast(this.state.error, "error", 5000);
             }
             throw e;
         } finally {
             this.state.catalog_busy = false;
+            this._addInFlight = false;
         }
+    }
+
+    // 2026-06-27 — single point of invalidation for the poll-skip hash.
+    // Server-state-mutating actions must call this BEFORE the followup
+    // _loadOrder() so the hash bail-out cannot mask the change. Five
+    // call sites previously inlined `state.payload_hash = ""` with no
+    // shared name; one missed reset = stale UI bug. Keep the call
+    // adjacent to the await that mutates server state.
+    _invalidatePayloadCache() {
+        this.state.payload_hash = "";
+        // 2026-06-27 — also clear the server ETag so the next _loadOrder
+        // hits the full payload path. The server's signature would catch
+        // the change on its own (line write_date moved), but clearing
+        // here means we don't pay the round-trip-to-discover-unchanged
+        // for a poll we already know is stale.
+        this.state.payload_etag = "";
     }
 
     async _loadOrder() {
@@ -2536,27 +4161,81 @@ class OrderBuilder extends Component {
         if (!orderId) {
             // No id in URL → render the empty-state card. Not an error.
             this.state.loading = false;
+            this.state.initial_load = false;
             return;
         }
-        this.state.loading = true;
-        this.state.error = null;
+        const isInitial = this.state.initial_load;
+        // P0 bugfix 2026-06-22: only flip the global loading card on the
+        // initial paint. Background polls update reactive state in place
+        // — OWL reconciles the DOM, child components (CatalogPicker)
+        // keep their setup() state, and the "Loading order…" branch
+        // (which tears down the entire loaded subtree) never appears.
+        if (isInitial) {
+            this.state.loading = true;
+            this.state.error = null;
+        }
         try {
+            // 2026-06-27 — send the server-issued ETag so the backend can
+            // short-circuit unchanged polls in <5ms (skips the ~80-SQL
+            // payload rebuild + BoM-search-per-line loop). Backstops the
+            // client-side payload_hash below: if the server says
+            // "unchanged", we trust it and do nothing.
             const payload = await rpcJsonCall(
                 `/southbrook/api/order/${encodeURIComponent(orderId)}`,
+                this.state.payload_etag
+                    ? { client_etag: this.state.payload_etag }
+                    : {},
             );
-            if (payload && payload.error) {
-                this.state.error = (
-                    payload.error === "forbidden"
-                        ? "Access denied. This order is not visible to your account."
-                        : payload.error === "not_found"
-                        ? "Order not found."
-                        : payload.error
-                );
+            if (payload && payload.unchanged) {
+                // Server confirms nothing changed since last fetch — skip
+                // the state write entirely so OWL doesn't reconcile.
+                // Update the etag in case the server upgraded its hash
+                // shape between fetches (no-op normally).
+                if (payload.etag) {
+                    this.state.payload_etag = payload.etag;
+                }
                 return;
             }
+            if (payload && payload.error) {
+                // Only surface a structured error on the initial paint.
+                // Background polls swallow it (network blip / 401 from
+                // a stale session would otherwise blank the UI mid-edit).
+                if (isInitial) {
+                    this.state.error = (
+                        payload.error === "forbidden"
+                            ? "Access denied. This order is not visible to your account."
+                            : payload.error === "not_found"
+                            ? "Order not found."
+                            : payload.error
+                    );
+                }
+                return;
+            }
+            // P0 bugfix 2026-06-22: compute a stable hash of the payload
+            // slice that the UI actually reads, and bail before writing
+            // to reactive state when nothing changed. Avoids a no-op OWL
+            // reconcile that — in some browser frames — interleaves with
+            // an in-flight user gesture and momentarily clears focus or
+            // selection. Hash covers everything that drives visible
+            // pixels: order header version+state+totals, line count +
+            // per-line id/qty/price triplets, validation count.
+            const newHash = this._computePayloadHash(payload);
+            if (!isInitial && newHash === this.state.payload_hash) {
+                return;
+            }
+            this.state.payload_hash = newHash;
+            // 2026-06-27 — stash the server-issued ETag for the next
+            // poll's If-None-Match. Forward-compat with older backends
+            // that don't return etag: fall back to empty (next poll
+            // gets a full payload, no harm done).
+            this.state.payload_etag = payload.etag || "";
             this.state.order = payload.order;
             this.state.lines = payload.lines || [];
             this.state.zones = payload.zones || [];
+            // 2026-06-27 — cabinet-class summary for the header glance.
+            // Backend may omit (forward-compat); default empty list keeps
+            // the HeaderStrip cell hidden in that case.
+            this.state.family_counts = payload.family_counts || [];
             // T2C11 — keep the default shape when the payload omits
             // the key (forward-compat with older backend versions).
             if (payload.bom_rollup) {
@@ -2567,10 +4246,55 @@ class OrderBuilder extends Component {
             // (KitchenViewport) re-fetch their slice.
             this.state.payload_version = (this.state.payload_version || 0) + 1;
         } catch (e) {
-            this.state.error = e?.message || String(e);
+            // P0 bugfix: only surface the error on the initial paint;
+            // background-poll exceptions are silent (a transient network
+            // hiccup must not blow away the user's open modal). Errors
+            // raised by the user-driven _onPickCabinet / _onFooterAction
+            // paths reach state.error / state.action_message via their
+            // own try/catch blocks.
+            if (isInitial) {
+                this.state.error = e?.message || String(e);
+            }
         } finally {
-            this.state.loading = false;
+            if (isInitial) {
+                this.state.loading = false;
+                this.state.initial_load = false;
+            }
         }
+    }
+
+    // P0 bugfix 2026-06-22 — payload hash for the unchanged-poll fast
+    // path. JSON.stringify of the load-bearing fields only; the entire
+    // payload is too noisy (timestamps drift, derived fields jitter).
+    _computePayloadHash(payload) {
+        const o = (payload && payload.order) || {};
+        const lines = payload && payload.lines ? payload.lines : [];
+        // Line fingerprint must mirror the field names emitted by the
+        // /southbrook/api/order/<id> controller (main.py around line
+        // 1789): id, product_id, qty (NOT product_uom_qty — the
+        // controller exposes the user-facing alias), price_unit,
+        // price_subtotal. Mismatching the names here would silently
+        // produce a constant hash and we'd never refresh the lines
+        // grid on qty/price edits.
+        const lineFingerprints = lines.map((l) => [
+            l.id,
+            l.product_id,
+            l.qty,
+            l.price_unit,
+            l.price_subtotal,
+        ]);
+        return JSON.stringify([
+            o.id,
+            o.state,
+            o.version,
+            o.line_count,
+            o.channel_total,
+            o.retail_subtotal,
+            o.savings,
+            o.lead_time_days,
+            lineFingerprints,
+            (payload.validation || []).length,
+        ]);
     }
 
     async _onRetry() {
@@ -2595,6 +4319,29 @@ class OrderBuilder extends Component {
     get _tabs() {
         const order = this.state.order || {};
         const all = [
+            // Phase 2.B — Room Setup is the first tab. Badge:
+            //   ✓ when a room is configured AND layout_complete is true
+            //   ⚠ when a room exists but is not yet complete
+            //   null when no room (badge hidden)
+            // Customer mode includes this tab — room measurement is a
+            // customer concern (see customerCodes below).
+            {
+                code: "room_setup",
+                label: "Room Setup",
+                count: this.state.room
+                    ? (this.state.room.layout_complete ? "✓" : "⚠")
+                    : null,
+            },
+            // Phase 3.B — Room Layout. Position 1 (after Room Setup,
+            // before Order Lines). Badge: unplaced cabinet count when
+            // a room exists, null otherwise (badge hidden).
+            {
+                code: "room_layout",
+                label: "Room Layout",
+                count: this.state.room
+                    ? (this.state.lines.filter((l) => !l.wall_id).length || null)
+                    : null,
+            },
             {
                 code: "lines",
                 label: "Order Lines",
@@ -2634,7 +4381,11 @@ class OrderBuilder extends Component {
         // commit 1 added 3D Kitchen to the customer-visible set —
         // it's a presentation surface, not a power-user tool.
         if (this.props.mode === "customer") {
-            const customerCodes = new Set(["lines", "kitchen3d", "print"]);
+            // Phase 2.B — "room_setup" is customer-visible (room
+            // measurement is a customer concern, not a power-user tool).
+            const customerCodes = new Set([
+                "room_setup", "room_layout", "lines", "kitchen3d", "print",
+            ]);
             return all.filter((t) => customerCodes.has(t.code));
         }
         return all;
@@ -2646,6 +4397,251 @@ class OrderBuilder extends Component {
     _setActiveTab = (code) => {
         this.state.ui.current_tab = code;
     };
+
+    // ------------------------------------------------------------------
+    // Phase 2.B — Room Setup helpers.
+    //
+    // _humanShape / _humanConstraint translate the server's enum codes
+    // (snake_case selection values from Phase 1 models) into customer-
+    // readable labels for the summary card and constraint chips.
+    //
+    // _capPct returns the wall-utilisation percentage (0-100) for the
+    // capacity bar; clamped so an over-used wall renders at 100% with
+    // the negative `remaining_mm` surfacing via the `--over` modifier.
+    //
+    // _openRoomSetupWizard mounts the 3-step wizard component (Phase
+    // 2.C) by flipping state.ui.wizard. _closeRoomSetupWizard +
+    // _onRoomSubmitted are the lifecycle callbacks the wizard invokes.
+    //
+    // _refreshRoomState wraps the /room/get endpoint from Phase 2.A.
+    // Reuses the module-level rpcJsonCall helper (line 58) — must NOT
+    // introduce a parallel fetch path. Failure is swallowed so the
+    // tab degrades to the empty-state CTA rather than blocking the
+    // initial render.
+    // ------------------------------------------------------------------
+
+    _humanShape(code) {
+        return {
+            straight: "Straight",
+            l_shape: "L-Shape",
+            u_shape: "U-Shape",
+            galley: "Galley",
+            g_shape: "G-Shape",
+            island: "Island",
+            peninsula: "Peninsula",
+            custom: "Custom",
+        }[code] || code || "—";
+    }
+
+    _humanConstraint(code) {
+        return {
+            window: "Window",
+            door: "Door",
+            sink: "Sink",
+            cooktop: "Cooktop",
+            oven: "Oven",
+            dishwasher: "Dishwasher",
+            rangehood: "Rangehood",
+            fridge_space: "Fridge Space",
+            power_outlet: "Power Outlet",
+            structural_post: "Structural Post",
+            other: "Other",
+        }[code] || code;
+    }
+
+    _capPct(wall) {
+        const len = wall.length_mm || 1;
+        const used = Math.max(0, wall.used_mm);
+        return Math.min(100, Math.round((used / len) * 100));
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 4 — mm ↔ ft/in conversion helpers.
+    //
+    // Storage layer is always mm; the toggle on the Room Setup header
+    // flips state.room.unit_preference between "mm" and "imperial". Every
+    // length label that reads off the room payload calls _humanLen so the
+    // re-render flips cleanly without round-tripping to the server.
+    //
+    // ZoneGroup, RoomLayoutTab, FloorPlanSVG and AssignToWallModal each
+    // carry mirror copies of these helpers (they're 5 lines of pure
+    // arithmetic) — extracting to a module would just move the import
+    // weight without simplifying anything.
+    // ------------------------------------------------------------------
+
+    _imperialFromMm(mm) {
+        const inches = Math.round((Number(mm) || 0) / 25.4);
+        const feet = Math.floor(inches / 12);
+        const remIn = inches - feet * 12;
+        if (feet === 0) return `${remIn}"`;
+        if (remIn === 0) return `${feet}'`;
+        return `${feet}' ${remIn}"`;
+    }
+
+    _humanLen(mm) {
+        if (!mm && mm !== 0) return "—";
+        const pref = (this.state.room && this.state.room.unit_preference) || "mm";
+        if (pref === "imperial") return this._imperialFromMm(mm);
+        return `${Math.round(Number(mm) || 0)} mm`;
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 4 — Unit toggle handler. POSTs the new preference to the
+    // /room/<rid>/update endpoint (Phase 2.A — already supports a
+    // partial-update body with unit_preference); on success refreshes
+    // state.room so every length label re-renders in the new unit.
+    // Failure is non-fatal: we restore the previous preference visually
+    // and log to console.
+    // ------------------------------------------------------------------
+
+    _onUnitToggle = async (unit) => {
+        if (!this.state.room) return;
+        const current = this.state.room.unit_preference || "mm";
+        if (current === unit) return;
+        if (this.state.unit_saving) return;
+        this.state.unit_saving = true;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/"
+                + encodeURIComponent(this.state.room.id)
+                + "/update",
+                { unit_preference: unit },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+            } else {
+                console.warn("[OrderBuilder] unit toggle rejected:", r);
+            }
+        } catch (e) {
+            console.warn("[OrderBuilder] unit toggle failed:", e);
+        } finally {
+            this.state.unit_saving = false;
+        }
+    };
+
+    // ------------------------------------------------------------------
+    // Phase 4 — 5-step progress checklist for the Room Setup panel.
+    //
+    // _progressSteps() returns an array of {key, label, complete, hint,
+    // optional} entries. _allStepsComplete() reads the same list and
+    // returns true when every step's complete === true; the panel
+    // template swaps to the celebratory card in that case.
+    //
+    // _onProgressStepClick(key) dispatches the per-step CTA: steps
+    // 1-3 reopen the wizard (where the user authored the data),
+    // steps 4-5 jump to the Room Layout tab (where placement and
+    // conflicts are visualised).
+    // ------------------------------------------------------------------
+
+    _progressSteps() {
+        const room = this.state.room;
+        if (!room) return [];
+        const walls = room.walls || [];
+        const constraints = room.constraints || [];
+        const allWallsHaveLen = walls.length > 0
+            && walls.every((w) => (w.length_mm || 0) > 0);
+        const lines = this.state.lines || [];
+        const allLinesPlaced = lines.length === 0
+            || lines.every((l) => !!l.wall_id);
+        const noConflicts = walls.every((w) => !w.has_conflicts);
+        return [
+            {
+                key: "room_shape",
+                label: "Room type & shape selected",
+                complete: !!room.layout_shape,
+                hint: "Open Room Setup wizard",
+            },
+            {
+                key: "wall_dimensions",
+                label: "Wall dimensions entered",
+                complete: allWallsHaveLen,
+                hint: "Open Room Setup wizard",
+            },
+            {
+                key: "constraints",
+                label: "Fixed constraints mapped (optional)",
+                complete: constraints.length > 0,
+                hint: "Open Room Setup wizard",
+                optional: true,
+            },
+            {
+                key: "cabinets_assigned",
+                label: "All cabinets assigned to walls",
+                complete: allLinesPlaced,
+                hint: "Open Room Layout tab",
+            },
+            {
+                key: "no_conflicts",
+                label: "No conflicts detected",
+                complete: noConflicts,
+                hint: "Open Room Layout tab",
+            },
+        ];
+    }
+
+    _allStepsComplete() {
+        const steps = this._progressSteps();
+        if (steps.length === 0) return false;
+        return steps.every((s) => s.complete === true);
+    }
+
+    _onProgressStepClick(stepKey) {
+        if (stepKey === "room_shape"
+            || stepKey === "wall_dimensions"
+            || stepKey === "constraints") {
+            this._openRoomSetupWizard();
+            return;
+        }
+        if (stepKey === "cabinets_assigned" || stepKey === "no_conflicts") {
+            this._setActiveTab("room_layout");
+            return;
+        }
+    }
+
+    // Phase 2.C — wired. Mounts the RoomSetupWizard overlay; the
+    // template renders it conditional on state.ui.wizard === "room_setup".
+    _openRoomSetupWizard() {
+        this.state.ui.wizard = "room_setup";
+    }
+
+    // Phase 2.C — callbacks the RoomSetupWizard fires via its props.
+    // _closeRoomSetupWizard is the cancel / × path. _onRoomSubmitted
+    // receives the room dict returned by /room/create and caches it on
+    // state.room (so the Room Setup tab re-renders without a round-trip)
+    // then switches to the room_setup tab so the user lands on the
+    // summary card from Phase 2.B.
+    _closeRoomSetupWizard = () => {
+        this.state.ui.wizard = null;
+    };
+
+    _onRoomSubmitted = (room) => {
+        if (room) {
+            this.state.room = room;
+        }
+        this.state.ui.wizard = null;
+        this.state.ui.current_tab = "room_setup";
+    };
+
+    async _refreshRoomState() {
+        const orderId = this.props.orderId;
+        if (!orderId) {
+            return;
+        }
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/" + encodeURIComponent(orderId) + "/room/get",
+                {});
+            if (r && r.ok) {
+                this.state.room = r.room;
+            }
+        } catch (e) {
+            // Tab still works in empty state — room fetch failure is
+            // non-fatal. Log for ops visibility.
+            console.warn("[OrderBuilder] room fetch failed:", e);
+        }
+    }
 
     // ------------------------------------------------------------------
     // T2C9 — line grouping + selection
@@ -2672,11 +4668,435 @@ class OrderBuilder extends Component {
             .filter((iss) => iss && iss.line_id === lineId);
     };
 
+    // ------------------------------------------------------------------
+    // Phase 3.D — smart inline warnings on the Order Lines tab.
+    //
+    // _lineStatus / _warnings are the data side of the same UX surface:
+    //   • _lineStatus(line)  → "placed" / "unplaced" / "conflict" / null.
+    //     Passed by ZoneGroup itself (each ZoneGroup gets state.room as
+    //     a prop) — kept on the parent ONLY so dealer-facing scripts /
+    //     future test hooks have a single canonical implementation to
+    //     reach for. The ZoneGroup template hosts its own _lineStatus
+    //     mirror for perf (avoids one prop-callback per row × render).
+    //   • _warnings()         → array of human-readable warning strings
+    //     used to populate the collapsible banner. Pulls from:
+    //       - per-wall: wall.remaining_mm < 0 → over capacity by N mm
+    //       - per-wall: wall.has_conflicts    → placement conflict
+    //       - per-order: lines with no wall_id when a room exists
+    //
+    // Returns [] (not null) when there's nothing to warn about so the
+    // template's t-if check is a simple .length read.
+    // ------------------------------------------------------------------
+
+    _lineStatus(line) {
+        const room = this.state.room;
+        if (!room) return null;
+        if (!line.wall_id) return "unplaced";
+        const walls = room.walls || [];
+        const wall = walls.find((w) => w.id === line.wall_id);
+        if (wall && wall.has_conflicts) return "conflict";
+        return "placed";
+    }
+
+    _warnings() {
+        const out = [];
+        const room = this.state.room;
+        if (!room) return out;
+        const walls = room.walls || [];
+
+        // Over-capacity walls (one bullet each).
+        for (const w of walls) {
+            if (typeof w.remaining_mm === "number" && w.remaining_mm < 0) {
+                const over = -w.remaining_mm;
+                out.push(
+                    "Wall " + (w.name || "?") + " is over capacity by "
+                    + over + "mm",
+                );
+            }
+        }
+
+        // Wall conflicts (one bullet per wall, not per line).
+        const conflictWalls = walls.filter((w) => w.has_conflicts);
+        if (conflictWalls.length === 1) {
+            const w = conflictWalls[0];
+            out.push(
+                "Wall " + (w.name || "?") + " has a placement conflict",
+            );
+        } else if (conflictWalls.length > 1) {
+            const names = conflictWalls
+                .map((w) => w.name || "?")
+                .join(", ");
+            out.push(
+                conflictWalls.length + " walls have placement conflicts ("
+                + names + ")",
+            );
+        }
+
+        // Unplaced cabinets (one rolled-up bullet).
+        const unplaced = (this.state.lines || [])
+            .filter((l) => !l.wall_id).length;
+        if (unplaced > 0) {
+            out.push(
+                unplaced + " "
+                + (unplaced === 1 ? "cabinet has" : "cabinets have")
+                + " no wall assigned",
+            );
+        }
+
+        return out;
+    }
+
+    _toggleWarnings = () => {
+        this.state.ui.warnings_expanded = !this.state.ui.warnings_expanded;
+    };
+
     _setSelectedLine = (lineId) => {
         // Toggle: clicking the already-selected line clears the
         // selection. Matches the mockup's "click to deselect" UX.
         this.state.ui.selected_line_id =
             this.state.ui.selected_line_id === lineId ? null : lineId;
+    };
+
+    // 2026-06-27 — production-approval handlers. _loadPreflight is
+    // called by the ProductionApprovalStrip on mount + on state-change
+    // to fetch the MO preview + blockers without paying the cost on
+    // every poll. _onRequestApproval wraps the new portal endpoint
+    // (which delegates to mrp_pm's action_request_production).
+    _loadPreflight = async () => {
+        if (!this.state.order) return null;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/preflight-confirm",
+                {},
+            );
+            return res;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    _onRequestApproval = async () => {
+        if (!this.state.order) return null;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/request-production-approval",
+                {},
+            );
+            if (res && res.ok) {
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast("Production approval requested.", "success");
+            } else {
+                this._pushToast(
+                    "Could not request approval: "
+                        + ((res && (res.message || res.error)) || "unknown"),
+                    "error",
+                    5000,
+                );
+            }
+            return res;
+        } catch (err) {
+            this._pushToast(
+                "Could not request approval: " + (err && err.message || err),
+                "error",
+                5000,
+            );
+            return null;
+        }
+    };
+
+    // 2026-06-27 — inline qty change handler. The OrderLine commits on
+    // blur / Enter; this method does the RPC + reload. qty=0 triggers
+    // the delete branch server-side (the /update endpoint accepts it
+    // as a delete-equivalent), so the line vanishes naturally.
+    _onLineQtyChange = async (lineId, nextQty) => {
+        try {
+            const result = await rpcJsonCall(
+                "/southbrook/api/line/" + encodeURIComponent(lineId) + "/update",
+                { qty: nextQty },
+            );
+            if (result && result.ok) {
+                this._invalidatePayloadCache();
+                if (result.deleted
+                    && this.state.ui.selected_line_id === lineId) {
+                    this.state.ui.selected_line_id = null;
+                }
+                await this._loadOrder();
+                if (result.deleted) {
+                    this._pushToast("Line removed", "success");
+                }
+            } else {
+                this._pushToast(
+                    "Could not update qty: "
+                        + ((result && result.error) || "unknown"),
+                    "error",
+                );
+            }
+        } catch (err) {
+            this._pushToast(
+                "Could not update qty: " + (err && err.message || err),
+                "error",
+            );
+        }
+    };
+
+    // ──────────────────────────────────────────────────────────────────
+    // 2026-06-27 L1 — bulk-edit handlers.
+    // ──────────────────────────────────────────────────────────────────
+    _onBulkToggle = (lineId, checked) => {
+        const cur = this.state.ui.bulk_checked;
+        const idx = cur.indexOf(lineId);
+        if (checked && idx < 0) {
+            cur.push(lineId);
+        } else if (!checked && idx >= 0) {
+            cur.splice(idx, 1);
+        }
+    };
+
+    _clearBulkSelection = () => {
+        this.state.ui.bulk_checked.splice(0);
+    };
+
+    _selectAllLines = () => {
+        const cur = this.state.ui.bulk_checked;
+        cur.splice(0);
+        for (const l of this.state.lines || []) {
+            cur.push(l.id);
+        }
+    };
+
+    _openBulkModal = (modalKind) => {
+        this.state.ui.bulk_set_attr_id = null;
+        this.state.ui.bulk_set_value_id = null;
+        this.state.ui.bulk_modal = modalKind;
+    };
+
+    _closeBulkModal = () => {
+        this.state.ui.bulk_modal = null;
+    };
+
+    _onBulkDelete = async () => {
+        const ids = [...this.state.ui.bulk_checked];
+        if (!ids.length) return;
+        const label = ids.length === 1
+            ? "1 line"
+            : ids.length + " lines";
+        if (!window.confirm("Remove " + label + " from this order?")) {
+            return;
+        }
+        this.state.ui.bulk_busy = true;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/lines/bulk-delete",
+                { line_ids: ids },
+            );
+            if (res && res.ok) {
+                this._clearBulkSelection();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast(
+                    "Removed " + (res.total_deleted || 0) + " lines",
+                    "success",
+                );
+            } else {
+                this._pushToast(
+                    "Bulk delete failed: "
+                        + ((res && res.error) || "unknown"),
+                    "error", 5000,
+                );
+            }
+        } finally {
+            this.state.ui.bulk_busy = false;
+        }
+    };
+
+    _onBulkMoveZoneConfirm = async () => {
+        const ids = [...this.state.ui.bulk_checked];
+        const zone = this.state.ui.bulk_move_zone;
+        if (!ids.length || !zone) return;
+        this.state.ui.bulk_busy = true;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/lines/bulk-move-zone",
+                { line_ids: ids, zone: zone },
+            );
+            if (res && res.ok) {
+                this._closeBulkModal();
+                this._clearBulkSelection();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast(
+                    "Moved " + (res.total_moved || 0) + " lines to "
+                        + zone, "success",
+                );
+            } else {
+                this._pushToast(
+                    "Bulk move failed: "
+                        + ((res && res.error) || "unknown"),
+                    "error", 5000,
+                );
+            }
+        } finally {
+            this.state.ui.bulk_busy = false;
+        }
+    };
+
+    _onBulkSetAttributeConfirm = async () => {
+        const ids = [...this.state.ui.bulk_checked];
+        const attrId = this.state.ui.bulk_set_attr_id;
+        const valId = this.state.ui.bulk_set_value_id;
+        if (!ids.length || !attrId || !valId) return;
+        this.state.ui.bulk_busy = true;
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.state.order.id)
+                + "/lines/bulk-set-attribute",
+                {
+                    line_ids: ids,
+                    attribute_id: attrId,
+                    value_id: valId,
+                },
+            );
+            if (res && res.ok) {
+                this._closeBulkModal();
+                this._clearBulkSelection();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                const upd = res.total_updated || 0;
+                const skp = res.total_skipped || 0;
+                const msg = "Updated " + upd + " lines"
+                    + (skp ? " (" + skp + " skipped — attr not on template)" : "");
+                this._pushToast(msg, "success", 4000);
+            } else {
+                this._pushToast(
+                    "Bulk set-attribute failed: "
+                        + ((res && res.error) || "unknown"),
+                    "error", 5000,
+                );
+            }
+        } finally {
+            this.state.ui.bulk_busy = false;
+        }
+    };
+
+    // For the bulk-set-attribute modal: derive the attribute UNION
+    // across the currently-selected lines' templates. We pull from
+    // each line's already-fetched attribute lines via the existing
+    // /attributes endpoint cache; if not cached, we fetch on demand.
+    // Simple v1: just gather distinct (attribute_id, name, values)
+    // across the selection. Per-template availability is enforced
+    // server-side (skipped with reason if a target template doesn't
+    // expose the value).
+    _bulkSelectedLines() {
+        const ids = new Set(this.state.ui.bulk_checked);
+        return (this.state.lines || []).filter((l) => ids.has(l.id));
+    }
+
+    _onBulkAttrSelect = (ev) => {
+        this.state.ui.bulk_set_attr_id = ev.target.value
+            ? Number(ev.target.value) : null;
+        this.state.ui.bulk_set_value_id = null;
+        // Lazy-fetch the attribute catalog if we don't have it.
+        if (this.state.ui.bulk_set_attr_id && !this._bulkAttrCache) {
+            this._loadBulkAttrCatalog();
+        }
+    };
+
+    _onBulkValueSelect = (ev) => {
+        this.state.ui.bulk_set_value_id = ev.target.value
+            ? Number(ev.target.value) : null;
+    };
+
+    _onBulkZoneSelect = (ev) => {
+        this.state.ui.bulk_move_zone = ev.target.value;
+    };
+
+    // Lazy load the attribute catalog for the bulk modal. Uses the
+    // first selected line's template as the basis (good enough for
+    // the common "all base cabinets" case; mixed-template bulks
+    // fall through to server-side skip).
+    async _loadBulkAttrCatalog() {
+        const sel = this._bulkSelectedLines();
+        if (!sel.length) return;
+        const firstLine = sel[0];
+        try {
+            const res = await rpcJsonCall(
+                "/southbrook/api/line/"
+                + encodeURIComponent(firstLine.id)
+                + "/attributes",
+                {},
+            );
+            if (res && res.ok && Array.isArray(res.attributes)) {
+                this._bulkAttrCache = res.attributes;
+                // Trigger re-render by touching state.
+                this.state.ui.bulk_modal = this.state.ui.bulk_modal;
+            }
+        } catch (e) {
+            // Silent fail — modal still shows the attr <select> with
+            // empty options; user can close + try again.
+        }
+    }
+
+    _bulkAttrOptions() {
+        return this._bulkAttrCache || [];
+    }
+
+    _bulkValueOptions() {
+        const attrId = this.state.ui.bulk_set_attr_id;
+        if (!attrId || !this._bulkAttrCache) return [];
+        const a = this._bulkAttrCache.find(
+            (x) => x.attribute_id === attrId
+        );
+        return a && a.values ? a.values : [];
+    }
+
+    // 2026-06-27 — line delete handler bound at setup() per the same
+    // pattern as _setSelectedLine / _onLineSaved. Confirms before
+    // unlinking (a single misclick on the trash icon would be costly).
+    // After success, clears the selection if the deleted line was open
+    // in the drawer, invalidates the poll-hash, and reloads the order.
+    _onDeleteLine = async (lineId) => {
+        const line = (this.state.lines || []).find((l) => l.id === lineId);
+        if (!line) return;
+        const label = line.product_name
+            + (line.spec_summary ? " — " + line.spec_summary : "");
+        if (!window.confirm("Remove this line?\n\n" + label)) {
+            return;
+        }
+        try {
+            const result = await rpcJsonCall(
+                "/southbrook/api/line/" + encodeURIComponent(lineId) + "/delete",
+                {},
+            );
+            if (result && result.ok) {
+                if (this.state.ui.selected_line_id === lineId) {
+                    this.state.ui.selected_line_id = null;
+                }
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this._pushToast("Line removed", "success");
+            } else {
+                this._pushToast(
+                    "Could not remove line: "
+                        + ((result && result.error) || "unknown"),
+                    "error",
+                );
+            }
+        } catch (err) {
+            this._pushToast(
+                "Could not remove line: " + (err && err.message || err),
+                "error",
+            );
+        }
     };
 
     // T2C10 — invoked by ConfigDrawer after a successful autosave.
@@ -2768,6 +5188,324 @@ class OrderBuilder extends Component {
     _onKitchen3dLineSelected = (lineId) => {
         this.state.ui.current_tab = "lines";
         this.state.ui.selected_line_id = lineId;
+        this._scrollSelectedLineIntoView();
+    };
+
+    // After cross-tab line selection (3D Kitchen tap, Room Layout tap),
+    // the highlighted row may be below the fold — scroll it into view so
+    // the user actually sees the result of their click. Defer past the
+    // OWL render tick via requestAnimationFrame so the DOM has the new
+    // .o_owl_line_selected class before we query for it.
+    _scrollSelectedLineIntoView = () => {
+        requestAnimationFrame(() => {
+            const el = document.querySelector(".o_owl_line_selected");
+            if (el && typeof el.scrollIntoView === "function") {
+                el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            }
+        });
+    };
+
+    // ------------------------------------------------------------------
+    // Phase 3.C.2a — Room Layout tap interactivity.
+    //
+    // Three callbacks threaded into <RoomLayoutTab/>:
+    //   _onPlanCabinetClick(lineId)         — placed-cabinet tap
+    //   _onPlanGapClick(wallId, gap, posMm) — empty-gap tap (opens
+    //                                          catalog + stashes intent)
+    //   _onPlanAssignClick(lineId)          — sidebar Assign... button
+    //
+    // Plus two modal-driven handlers:
+    //   _onAssignSubmit(lineId, wallId, posMm) — modal Assign click
+    //   _onAssignCancel()                       — modal × / Cancel
+    //
+    // And one helper for the modal mount:
+    //   _lineById(id) — lookup by id, returns null if not found
+    //
+    // The line-creation auto-place path lives inside _onPickCabinet
+    // (search for "pendingGapPlacement" in this file).
+    // ------------------------------------------------------------------
+
+    _onPlanCabinetClick = (lineId) => {
+        // Mirror _onKitchen3dLineSelected — same UX (jump to Lines tab,
+        // select + scroll the row into view).
+        this.state.ui.current_tab = "lines";
+        this.state.ui.selected_line_id = lineId;
+        this._scrollSelectedLineIntoView();
+    };
+
+    _onPlanGapClick = async (wallId, gapMm, position) => {
+        // Phase 3.C.2a stashed the placement intent and opened the
+        // catalog directly. Phase 6.1 inserts a recommend step: fetch
+        // top-3 cabinet templates that fit the gap, open the
+        // GapRecommendModal with them, and let the user pick (or hit
+        // Browse all to fall through to the catalog). Stashing is
+        // unchanged — the existing auto-place block at the tail of
+        // _onPickCabinet handles placement regardless of which entry
+        // point created the line.
+        //
+        // Fallback: ANY recommend failure (network, endpoint not
+        // deployed yet on the live worker pool, malformed response)
+        // falls through to the direct-to-catalog path so the user is
+        // never blocked. This preserves the 3.C.2a behaviour as a
+        // safety net.
+        this.state.pendingGapPlacement = {
+            wallId: wallId,
+            position: position,
+            gapMm: gapMm,
+        };
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/" + encodeURIComponent((this.state.room && this.state.room.id) || 0)
+                + "/wall/" + encodeURIComponent(wallId)
+                + "/recommend",
+                {
+                    gap_mm: gapMm,
+                    position_from_left_mm: position,
+                },
+            );
+            if (r && r.ok) {
+                this.state.ui.gapRecommend = {
+                    gapMm: gapMm,
+                    position: position,
+                    wallId: wallId,
+                    recommendations: r.recommendations || [],
+                };
+                return;
+            }
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn("[OrderBuilder] recommend fetch failed:", e);
+        }
+        // Fallback: open the catalog directly (3.C.2a behaviour).
+        this._openCatalog();
+    };
+
+    // Phase 6.1 — user picked a recommended cabinet from the
+    // GapRecommendModal. Close the modal and route through the EXISTING
+    // _onPickCabinet pipeline: that fires /add-line, then the auto-
+    // place block at the tail of _onPickCabinet sees pendingGapPlacement
+    // is still set and POSTs /place-on-wall. We deliberately do NOT add
+    // a parallel placement call here — see CLAUDE.md "Critical guard-
+    // rails: Don't double-place".
+    _onGapPickTemplate = async (templateId) => {
+        const rec = (
+            this.state.ui.gapRecommend
+            && (this.state.ui.gapRecommend.recommendations || []).find(
+                (x) => x.template_id === templateId,
+            )
+        );
+        const label = rec ? (rec.name || rec.default_code || "cabinet") : null;
+        // Close the recommend modal BEFORE the await so the user sees
+        // the catalog-busy state on the order tabs (not on the modal).
+        this.state.ui.gapRecommend = null;
+        try {
+            await this._onPickCabinet(templateId, 1, label);
+        } catch (e) {
+            // _onPickCabinet already surfaces the error via toast.
+            // Swallow here so the modal's await doesn't propagate to
+            // an unhandled rejection.
+            // eslint-disable-next-line no-console
+            console.warn("[OrderBuilder] gap-pick add failed:", e);
+        }
+    };
+
+    // Phase 6.1 — Browse all fallback. Close the recommend modal,
+    // open the full catalog. pendingGapPlacement is preserved so the
+    // auto-place tail still fires once a template is picked from the
+    // catalog.
+    _onGapBrowseAll = () => {
+        this.state.ui.gapRecommend = null;
+        this._openCatalog();
+    };
+
+    // Phase 6.1 — × / Cancel. Drop both the modal state AND the
+    // pendingGapPlacement stash so a subsequent normal "+ Add Another
+    // Cabinet" doesn't inherit the cancelled gap's placement intent.
+    _onGapCancel = () => {
+        this.state.ui.gapRecommend = null;
+        this.state.pendingGapPlacement = null;
+    };
+
+    _onPlanAssignClick = (lineId) => {
+        // Guard: the modal needs walls to populate its dropdown — opening
+        // it with no walls would let the user submit a no-op assign that
+        // the endpoint rejects as a 400. Better to short-circuit with a
+        // friendly note pointing at Room Setup.
+        const walls = (this.state.room && this.state.room.walls) || [];
+        if (walls.length === 0) {
+            alert(
+                "No walls configured yet — add walls in the Room Setup "
+                + "tab before assigning cabinets.",
+            );
+            return;
+        }
+        this.state.ui.assigning = lineId;
+    };
+
+    _onAssignSubmit = async (lineId, wallId, positionMm) => {
+        // Parent owns the RPC so the modal stays presentation-only.
+        // On success we refresh state.room (used_mm + remaining_mm on
+        // the picked wall) AND _loadOrder so the line's wall_id flows
+        // into state.lines (the sidebar's "unplaced" filter reads it).
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/" + encodeURIComponent(this.props.orderId)
+                + "/line/" + encodeURIComponent(lineId) + "/place-on-wall",
+                {
+                    wall_id: wallId,
+                    position_from_left_mm: positionMm,
+                },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                // Force the next _loadOrder to take (the hash-skip path
+                // would otherwise no-op on an unchanged-looking poll).
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+                this.state.ui.assigning = null;
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                // Surface to the user — same channel the other action
+                // failures use (alert is intentionally coarse here; the
+                // modal's own state.error captures it from the throw).
+                throw new Error("Could not assign cabinet: " + detail);
+            }
+        } catch (e) {
+            // Re-throw so the modal's own try/catch picks it up and
+            // shows the inline error band (parent doesn't double-toast).
+            throw e;
+        }
+    };
+
+    _onAssignCancel = () => {
+        this.state.ui.assigning = null;
+    };
+
+    // Phase 3.C.2b — drag-along-wall + touch ± shifter end handler.
+    // Fired by FloorPlanSVG with a 25mm-snapped position_from_left_mm
+    // for the dragged cabinet. Reuses /place-on-wall (3.A endpoint)
+    // since this is just a position update on the SAME wall — cross-
+    // wall drag is intentionally out of scope (AssignToWallModal
+    // still owns that flow). Mirrors _onAssignSubmit's success path
+    // (refresh room + load order + bust payload hash).
+    _onPlanCabinetDragEnd = async (lineId, positionMm) => {
+        const line = this._lineById(lineId);
+        if (!line || !line.wall_id) return;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/" + encodeURIComponent(this.props.orderId)
+                + "/line/" + encodeURIComponent(lineId) + "/place-on-wall",
+                {
+                    wall_id: line.wall_id,
+                    position_from_left_mm: positionMm,
+                },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                // Force the next _loadOrder to take (hash-skip path
+                // would otherwise no-op on a same-looking poll).
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+            } else if (r && r.error === "out_of_bounds") {
+                // 25mm snap + JS-side clamp should make this
+                // unreachable; defensive surfacing if the server
+                // disagrees (e.g. wall length changed mid-drag).
+                alert(
+                    "Could not move cabinet: "
+                    + (r.detail || "position out of bounds"),
+                );
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                alert("Could not move cabinet: " + detail);
+            }
+        } catch (e) {
+            alert(
+                "Could not move cabinet: "
+                + ((e && e.message) ? e.message : String(e)),
+            );
+        }
+    };
+
+    // Phase 3.C.2d — interactive wall resize end handler. Fired by
+    // RoomLayoutTab in two cases:
+    //   - SVG handle drag drop on a single-wall topology (straight |
+    //     island). Pre-snapped to 25mm, min-clamped to 200mm by the
+    //     FloorPlanSVG before reaching us.
+    //   - Sidebar ± 100mm button click on any shape (the only resize
+    //     affordance multi-wall shapes get in v1 — SVG handles for
+    //     l_shape / u_shape / galley / g_shape are deferred).
+    //
+    // Reuses /room/<rid>/update (Phase 2.A endpoint) — that already
+    // accepts `walls: [{id, length_mm}]` for partial wall upserts.
+    // Refreshes room + bumps payload_hash so the next _loadOrder()
+    // takes (the hash-skip path would otherwise no-op on an
+    // unchanged-looking poll). Cabinets that no longer fit surface
+    // via the existing Phase 3.D warning banner — no server-side
+    // cabinet mutation here.
+    // Stage C (2026-06-28) — AppliancePalette drop-to-create handler.
+    // Fired by RoomLayoutTab._onTemplateDrop. The payload already
+    // carries wall_id + computed distance_from_left_mm (stage-C v0
+    // picks the first wall's midpoint; Stage D will replace that with
+    // a closest-wall + projected-offset heuristic). Re-uses the existing
+    // /constraint/add endpoint extended with Stage A optional fields.
+    _onPlanConstraintCreate = async (payload) => {
+        if (!this.state.room || !payload || !payload.wall_id) return;
+        try {
+            const url =
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/" + encodeURIComponent(this.state.room.id)
+                + "/wall/" + encodeURIComponent(payload.wall_id)
+                + "/constraint/add";
+            const r = await rpcJsonCall(url, payload);
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                alert("Could not place item: " + detail);
+            }
+        } catch (e) {
+            alert(
+                "Could not place item: "
+                + ((e && e.message) ? e.message : String(e)),
+            );
+        }
+    };
+
+    _onPlanWallResizeEnd = async (wallId, newLengthMm) => {
+        if (!this.state.room) return;
+        try {
+            const r = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/"
+                + encodeURIComponent(this.state.room.id)
+                + "/update",
+                { walls: [{ id: wallId, length_mm: newLengthMm }] },
+            );
+            if (r && r.ok) {
+                await this._refreshRoomState();
+                this._invalidatePayloadCache();
+                await this._loadOrder();
+            } else {
+                const detail = (r && (r.detail || r.error)) || "unknown error";
+                alert("Could not resize wall: " + detail);
+            }
+        } catch (e) {
+            alert(
+                "Could not resize wall: "
+                + ((e && e.message) ? e.message : String(e)),
+            );
+        }
+    };
+
+    _lineById = (id) => {
+        if (id === null || id === undefined) return null;
+        return (this.state.lines || []).find((l) => l.id === id) || null;
     };
 
     // T2C11 — total BoM items used as the BoM tab badge count.

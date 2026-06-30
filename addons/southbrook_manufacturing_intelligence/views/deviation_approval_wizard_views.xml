@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!-- W012 — QC-side wizard for drafting a deviation waiver from the
+     mi.check form. -->
+<odoo>
+    <record id="view_southbrook_deviation_approval_wizard_form" model="ir.ui.view">
+        <field name="name">southbrook.deviation.approval.wizard.form</field>
+        <field name="model">southbrook.deviation.approval.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Request Engineering Deviation Approval">
+                <group>
+                    <group string="Source">
+                        <field name="mi_check_id" readonly="1"/>
+                        <field name="production_id" readonly="1"/>
+                        <field name="cabinet_serial" readonly="1"/>
+                        <field name="customer_id"/>
+                    </group>
+                </group>
+                <group string="Defect">
+                    <field name="defect_summary"
+                           placeholder="What is the customer being asked to accept? Plain English."/>
+                    <field name="engineering_rationale"
+                           placeholder="Optional — if engineering already weighed in, summarise here."/>
+                </group>
+                <group string="Customer Acknowledgement">
+                    <field name="customer_acknowledged"/>
+                    <field name="customer_acknowledgment_method"
+                           invisible="not customer_acknowledged"/>
+                    <field name="customer_acknowledgment_ref"
+                           invisible="not customer_acknowledged"
+                           placeholder="Email subject, call note ID, PO amendment number, …"/>
+                </group>
+                <p class="text-muted">
+                    After submit, attach the customer-ack artefact
+                    (email PDF, signed PO amendment, call-log
+                    screenshot) to the waiver's chatter — that's where
+                    warranty will look 3 years from now.
+                </p>
+                <footer>
+                    <button name="action_submit" string="Submit for Eng Review"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

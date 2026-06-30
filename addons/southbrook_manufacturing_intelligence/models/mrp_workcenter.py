@@ -16,6 +16,16 @@ class MrpWorkcenter(models.Model):
         help="Total MI warnings on manufacturing orders touching this workcenter.",
     )
 
+    # Non-stored snapshot — depends_context('uid') so the values are
+    # re-aggregated on every form/kanban open by the requesting user.
+    # We deliberately do NOT store these because the field is an
+    # aggregate over a large MRP graph that changes constantly; storing
+    # would require depends on every MI/MO state transition, which is
+    # heavier than just re-aggregating at view time. Trade-off: kanban
+    # cards opened mid-shift won't tick down until the user reloads
+    # the view. Document this on both fields so a future maintainer
+    # doesn't "fix" it by adding store=True (which would deadlock the
+    # MO save path during high-throughput shifts).
     @api.depends_context("uid")
     def _compute_southbrook_mi_kpis(self):
         for workcenter in self:

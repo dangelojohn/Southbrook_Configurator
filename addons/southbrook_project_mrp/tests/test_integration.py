@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from odoo import fields
+from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -79,8 +80,10 @@ class TestProjectMrpIntegration(TransactionCase):
                                    "product_uom_qty": 1.0})],
         })
         so.action_confirm()
-        self.assertFalse(self.env["project.task"].search(
-            [("x_southbrook_sale_order_id", "=", so.id)]),
+        self.assertFalse(self.env["project.task"].search([
+            ("x_southbrook_sale_order_id", "=", so.id),
+            ("project_id", "=", self.project.id),
+        ]),
             "a sale with no BoM-able product should not create a job")
 
     # --- MO back-links to an existing job on create -------------------------
@@ -235,8 +238,8 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertEqual(self.project.southbrook_active_mo_count, 1)
         self.assertEqual(self.project.southbrook_unscheduled_wo_count, 1)
         self.assertEqual(self.project.southbrook_crew_gap_count, 1)
-        self.assertEqual(self.project.southbrook_intelligence_severity, "warning")
-        self.assertIn("planned start", self.project.southbrook_intelligence_prompt)
+        self.assertEqual(self.project.southbrook_intelligence_severity, "danger")
+        self.assertIn("material shortfall", self.project.southbrook_intelligence_prompt)
 
     def test_project_kanban_has_mission_control_fields(self):
         view = self.env.ref(
@@ -286,6 +289,30 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("not scheduled", task.manufacturing_blocker_summary)
         self.assertIn("Scheduling", task.manufacturing_waterfall_summary)
 
+    def test_blocked_kitchen_job_cannot_move_to_production_stage(self):
+        so = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {"product_id": self.fp.id,
+                                   "product_uom_qty": 1.0})],
+        })
+        task = self.env["project.task"].create({
+            "name": "Blocked Kitchen Job",
+            "project_id": self.project.id,
+            "x_southbrook_sale_order_id": so.id,
+        })
+        cutting = self.env["project.task.type"].create({
+            "name": "Cutting & Machining",
+            "sequence": 20,
+            "project_ids": [(4, self.project.id)],
+        })
+        task.invalidate_recordset()
+        self.assertEqual(task.manufacturing_readiness_state, "blocked")
+
+        with self.assertRaises(UserError):
+            task.stage_id = cutting.id
+
+        self.assertNotEqual(task.stage_id, cutting)
+
     def test_project_task_form_has_manufacturing_readiness_panel(self):
         view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
         arch = view.arch_db
@@ -310,6 +337,20 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertIn("risk_level", list_view.arch_db)
         self.assertIn("top_blocker", list_view.arch_db)
         self.assertIn("next_best_action", list_view.arch_db)
+
+    def test_readiness_groupby_fields_are_stored(self):
+        Task = self.env["project.task"]
+        for field_name in (
+            "readiness_decision",
+            "manufacturing_readiness_state",
+            "southbrook_production_release_state",
+            "southbrook_install_readiness_state",
+        ):
+            self.assertTrue(
+                Task._fields[field_name].store,
+                "%s is used by dashboard group-by filters and must be stored"
+                % field_name,
+            )
 
     def test_project_task_form_has_phase1_command_center_fields(self):
         view = self.env.ref("southbrook_project_mrp.project_task_form_mrp")
@@ -361,7 +402,7 @@ class TestProjectMrpIntegration(TransactionCase):
         self.assertEqual(task.current_bottleneck_workcenter_id, wc)
         self.assertEqual(task.readiness_decision, task.manufacturing_readiness_state)
         self.assertEqual(task.readiness_score, task.manufacturing_readiness_score)
-        self.assertIn("Confirmed", task.manufacturing_reality)
+        self.assertIn("Draft", task.manufacturing_reality)
         self.assertIn("1 WOs / 1 not scheduled", task.manufacturing_reality)
         self.assertIn("base", task.cabinet_family_summary.lower())
 
@@ -582,10 +623,15 @@ class TestProjectMrpIntegration(TransactionCase):
             self.assertTrue(wo.southbrook_can_start_today)
             self.assertEqual(wo.southbrook_start_blocker, "")
 
-        wo.date_start = False
-        wo.invalidate_recordset()
-        self.assertFalse(wo.southbrook_can_start_today)
-        self.assertIn("scheduled", wo.southbrook_start_blocker.lower())
+        unscheduled_wo = self.env["mrp.workorder"].create({
+            "name": "Unscheduled cut",
+            "production_id": mo.id,
+            "workcenter_id": wc.id,
+            "duration_expected": 12.0,
+        })
+        unscheduled_wo.invalidate_recordset()
+        self.assertFalse(unscheduled_wo.southbrook_can_start_today)
+        self.assertIn("scheduled", unscheduled_wo.southbrook_start_blocker.lower())
 
     def test_phase4_project_action_opens_work_that_can_start_today(self):
         task = self.env["project.task"].create({
@@ -1156,3 +1202,70 @@ class TestProjectMrpIntegration(TransactionCase):
             "action_southbrook_open_executive_queue",
         ):
             self.assertIn(token, project_form.arch_db)
+
+    # --- W029 (R3.W5) — Cross-project bottleneck contention view -----------
+    def test_w029_bottleneck_contention_action_is_grouped_by_workcenter(self):
+        """The Bottleneck Contention action must point at project.task and
+        default-group by the current_bottleneck_workcenter_id so the planner
+        sees 'N projects bottlenecked here' at a glance."""
+        action = self.env.ref(
+            "southbrook_project_mrp.action_southbrook_bottleneck_contention")
+        self.assertEqual(action.res_model, "project.task")
+        # Domain must scope to tasks with MOs AND a resolved bottleneck WC
+        # (otherwise the empty-state row dominates the view).
+        self.assertIn("production_count", action.domain)
+        self.assertIn("current_bottleneck_workcenter_id", action.domain)
+        self.assertIn(
+            "search_default_group_current_bottleneck_workcenter",
+            action.context,
+        )
+
+    def test_w029_bottleneck_contention_search_view_exposes_group_by(self):
+        """The inherited search view must expose the group_by filter the
+        action's context references — otherwise the default group is silently
+        dropped and the planner sees a flat list."""
+        search_view = self.env.ref(
+            "southbrook_project_mrp.project_task_search_readiness")
+        self.assertIn(
+            "group_current_bottleneck_workcenter", search_view.arch_db)
+        self.assertIn(
+            "current_bottleneck_workcenter_id", search_view.arch_db)
+
+    def test_w029_contention_surfaces_three_jobs_on_one_workcenter(self):
+        """End-to-end: three customer jobs, all bottlenecked on the same
+        WC, must all appear in the action's filtered set (which the planner
+        will then group by WC to see the contention)."""
+        wc_edge = self.env["mrp.workcenter"].create({"name": "Edge Bander"})
+        tasks = self.env["project.task"]
+        for i in range(3):
+            task = self.env["project.task"].create({
+                "name": "Customer Job %d" % i,
+                "project_id": self.project.id,
+            })
+            mo = self._make_mo()
+            mo.project_task_id = task.id
+            self.env["mrp.workorder"].create({
+                "name": "Edge Band",
+                "production_id": mo.id,
+                "workcenter_id": wc_edge.id,
+                "duration_expected": 60.0,
+            })
+            task.invalidate_recordset()
+            # Force recompute so current_bottleneck_workcenter_id is populated.
+            _ = task.current_bottleneck_workcenter_id
+            tasks |= task
+        # All three tasks should resolve the same bottleneck WC.
+        self.assertEqual(
+            set(tasks.mapped("current_bottleneck_workcenter_id.id")),
+            {wc_edge.id},
+        )
+        # The action's domain must include all three.
+        action = self.env.ref(
+            "southbrook_project_mrp.action_southbrook_bottleneck_contention")
+        domain = action._get_eval_context() and action.domain or action.domain
+        # Evaluate the domain manually (it's a literal string).
+        from ast import literal_eval
+        matched = self.env["project.task"].search(literal_eval(domain))
+        for t in tasks:
+            self.assertIn(t, matched,
+                          "task %s should show up in contention view" % t.name)

@@ -6,6 +6,200 @@
         Recalc button.
     -->
 
+    <!--
+        W014 — Tablet kanban for the operator (MFG-REVIEW R2.1 / R8.13).
+
+        A big-touch sibling kanban for `mrp.workorder`, kept separate
+        from the native `workcenter_line_kanban` (which is a 28px-control
+        desktop view). Targets the `action_sbk_tablet_wo_queue` action
+        below; the native action keeps the native kanban so we don't
+        break planners' existing flows.
+
+        Card layout — one card per WO, glove-grade hit targets:
+          * Cabinet code + room (top-line, 1.8rem bold) when present;
+            falls back to MO name when the kitchen fields are empty
+          * Product + Qty + Start time (1.4rem body)
+          * Three primary buttons (Start / Pause / Done) at >=80px
+            height; visibility gated on `state`
+
+        All buttons call EXISTING `mrp.workorder` methods
+        (`button_start`, `button_pending`, `button_finish`). No new
+        Python actions.
+    -->
+    <record id="view_mrp_workorder_kanban_sbk_tablet" model="ir.ui.view">
+        <field name="name">mrp.workorder.kanban.sbk.tablet</field>
+        <field name="model">mrp.workorder</field>
+        <!-- Higher priority than native (which has no priority set,
+             defaulting to 16). We sit BELOW the native kanban for the
+             native action by leaving priority default, but the tablet
+             action references this view explicitly so priority is moot
+             there. Setting priority=100 keeps us out of the way for
+             any action that does NOT pin a view_id. -->
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_sb_tablet o_kanban_mobile"
+                    records_draggable="0"
+                    create="0"
+                    sample="1">
+                <field name="state"/>
+                <field name="workcenter_id"/>
+                <field name="production_id"/>
+                <field name="product_id"/>
+                <field name="qty_production"/>
+                <field name="qty_producing"/>
+                <field name="date_start"/>
+                <field name="name"/>
+                <field name="x_sbk_cabinet_code"/>
+                <field name="x_sbk_kitchen_room"/>
+                <!-- W054 (R2.12) — per-viewer "my time today" badge.
+                     Compute is depends_context=uid so the value here
+                     belongs to the operator looking at the card. -->
+                <field name="x_sbk_my_time_today_min"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card sb-tablet-card">
+                            <div class="sb-tablet-header">
+                                <span class="sb-cabinet-code">
+                                    <field name="x_sbk_cabinet_code"/>
+                                    <t t-if="record.x_sbk_kitchen_room.raw_value">
+                                        — <field name="x_sbk_kitchen_room"/>
+                                    </t>
+                                </span>
+                                <span class="sb-mo-name">
+                                    <field name="production_id"/>
+                                </span>
+                            </div>
+                            <div class="sb-tablet-body">
+                                <div class="sb-product"><field name="product_id"/></div>
+                                <div class="sb-op-name"><field name="name"/></div>
+                                <div class="sb-meta">
+                                    <span>Qty: <field name="qty_production"/></span>
+                                    <span t-if="record.date_start.raw_value">
+                                        Start: <field name="date_start" widget="datetime"/>
+                                    </span>
+                                    <!-- W054 — operator-visible per-WO
+                                         self-credit. Suppressed when 0
+                                         so a fresh card doesn't carry
+                                         a noisy "0h 0m" stripe. -->
+                                    <span class="sb-my-time-today badge text-bg-primary"
+                                          t-if="record.x_sbk_my_time_today_min.raw_value">
+                                        My time today:
+                                        <field name="x_sbk_my_time_today_min" widget="float_time"/>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="sb-tablet-actions">
+                                <button name="button_start"
+                                        type="object"
+                                        class="btn btn-primary btn-lg sb-tablet-btn"
+                                        invisible="state != 'ready'">START</button>
+                                <button name="button_pending"
+                                        type="object"
+                                        class="btn btn-secondary btn-lg sb-tablet-btn"
+                                        invisible="state != 'progress'">PAUSE</button>
+                                <button name="button_finish"
+                                        type="object"
+                                        class="btn btn-success btn-lg sb-tablet-btn"
+                                        invisible="state != 'progress'">DONE</button>
+                                <button name="button_unblock"
+                                        type="object"
+                                        class="btn btn-warning btn-lg sb-tablet-btn"
+                                        invisible="state != 'blocked'">UNBLOCK</button>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!--
+        W014 — Hidden surfaces for the tablet kanban needs.
+
+        The kanban references `x_sbk_cabinet_code` + `x_sbk_kitchen_room`
+        as fields on `mrp.workorder` so they render inline. Those fields
+        live on `mrp.production` (the MO); we surface them on the WO via
+        related fields in the model layer (see
+        `models/mrp_workorder.py`). The two fields are declared there
+        so view validation can see them at install time.
+    -->
+
+    <!--
+        W014 — Tablet WO queue action.
+
+        Domain: workcenter == active_id, state in ready / progress / blocked.
+        The `active_id` comes from the menu / button that launches the
+        action — set by the workcenter form button or by the per-workcenter
+        sub-menu. Defaults the kanban view; list + form remain available
+        as a fallback for the supervisor.
+    -->
+    <record id="action_sbk_tablet_wo_queue" model="ir.actions.act_window">
+        <field name="name">Tablet Queue</field>
+        <field name="res_model">mrp.workorder</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="view_mrp_workorder_kanban_sbk_tablet"/>
+        <field name="domain">
+            [('state', 'in', ('ready', 'progress', 'blocked')),
+             ('workcenter_id', '=', active_id)]
+        </field>
+        <field name="context">{
+            'default_workcenter_id': active_id,
+            'search_default_groupby_state': 0,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nothing in your queue right now.
+            </p>
+            <p>
+                This is your tablet view — ready / in-progress / blocked
+                work orders for this workcenter, with big-touch
+                Start / Pause / Done buttons. Tap a card's action button
+                to drive the WO without opening the dense desktop form.
+            </p>
+        </field>
+    </record>
+
+    <!--
+        W054 (R2.12, 2026-06-27) — operator-visible "My Time" tab.
+
+        Native mrp.workorder form has a "Time Tracking" tab gated by
+        mrp.group_mrp_manager — operators can't see it. We add a
+        sibling tab with the SAME productivity model but filtered to
+        the current user's rows via the x_sbk_my_time_ids One2many
+        compute. No group restriction — every internal user sees the
+        tab and reads only their own rows.
+
+        Placed inside the existing notebook via xpath against the
+        native "time_tracking" page (it always exists, even when
+        invisible to the user) so the operator surface sits adjacent
+        to where a planner would find the unrestricted version.
+    -->
+    <record id="view_mrp_workorder_form_sbk_my_time" model="ir.ui.view">
+        <field name="name">mrp.production.workorder.form.sbk.my_time</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_form_view_inherit"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='time_tracking']" position="after">
+                <page string="My Time" name="sbk_my_time">
+                    <div class="alert alert-info" role="status">
+                        <strong>Your time today on this WO:</strong>
+                        <field name="x_sbk_my_time_today_min" widget="float_time" readonly="1"/>
+                    </div>
+                    <field name="x_sbk_my_time_ids" nolabel="1" readonly="1">
+                        <list create="0" edit="0" delete="0">
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="duration" widget="float_time"/>
+                            <field name="loss_id" string="Productivity"/>
+                            <field name="description" optional="hide"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
     <record id="view_mrp_workorder_form_sbk_kitchen" model="ir.ui.view">
         <field name="name">mrp.production.workorder.form.sbk.kitchen</field>
         <field name="model">mrp.workorder</field>
@@ -19,6 +213,11 @@
                         <field name="x_sbk_estimated_cost" readonly="1"/>
                         <field name="x_sbk_actual_cost" readonly="1"/>
                         <field name="x_sbk_cost_variance" readonly="1"/>
+                        <!-- W049 (R7.5) — shift bucket derived from
+                             date_start. Read-only signal for KPI
+                             reviews; boundary ICPs live in
+                             Settings -> Technical -> System Params. -->
+                        <field name="x_sb_shift" readonly="1"/>
                     </group>
                     <group>
                         <field name="x_sbk_rework_count" readonly="1"/>
@@ -29,6 +228,35 @@
                                 type="object"
                                 string="Recalc Kitchen Duration"
                                 class="oe_highlight"/>
+                        <button name="action_open_scrap_wizard"
+                                type="object"
+                                string="Record Scrap"
+                                class="btn-warning"
+                                help="Open the stock.scrap wizard prefilled with this WO + MO. Auto-debits inventory."/>
+                        <!-- W040 (R2.4, 2026-06-27) — single-screen
+                             Report-a-Problem wizard. Logs scrap +
+                             defect + downtime in one transaction. -->
+                        <button name="action_sbk_open_report_problem_wizard"
+                                type="object"
+                                string="Report a Problem"
+                                class="btn-warning"
+                                help="One screen: scrap + defect + downtime. Atomic — all three land together or none do."/>
+                        <!-- W034 (R4.W5, 2026-06-27) — raise an ECO
+                             from this WO with photo + WO context. -->
+                        <button name="action_sbk_raise_eco_wizard"
+                                type="object"
+                                string="Report Engineering Issue"
+                                class="btn-secondary"
+                                help="Open the W034 wizard — photo + description → draft ECO with full WO context."/>
+                        <!-- W066 (R3.9, 2026-06-27) — divert this WO
+                             to a qualified subcontractor when its
+                             workcenter is over capacity. Per-MO
+                             only; canonical BOM routing untouched. -->
+                        <button name="action_sbk_subcontract_decision_wizard"
+                                type="object"
+                                string="Divert to Subcontractor"
+                                class="btn-secondary"
+                                help="Open the W066 wizard — fuses W067 capacity + W031 AVL + W078 subcontract RFQ into a 3-click divert."/>
                     </group>
                 </group>
             </xpath>

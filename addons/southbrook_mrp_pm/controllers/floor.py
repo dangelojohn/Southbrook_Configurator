@@ -306,27 +306,15 @@ class SouthbrookFloorPortal(CustomerPortal):
             },
         )
 
-    @http.route(
-        "/my/southbrook/floor/<int:workcenter_id>",
-        type="http",
-        auth="user",
-        website=True,
-    )
-    def southbrook_floor_workcenter(self, workcenter_id, **kw):
-        if not self._floor_user_authorized():
-            return request.redirect("/my")
-
-        Wc = request.env["mrp.workcenter"].sudo()
+    # ------------------------------------------------------------------
+    # W056 — shared per-workcenter queue snapshot
+    # ------------------------------------------------------------------
+    # Builds the dict consumed by BOTH the HTML render and the JSON
+    # poll endpoint, so they cannot drift out of sync.
+    def _floor_wc_snapshot(self, wc):
+        """Return {wc, wo_groups, equipment} for a single workcenter."""
         Wo = request.env["mrp.workorder"].sudo()
         Equip = request.env["maintenance.equipment"].sudo()
-
-        wc = Wc.browse(workcenter_id).exists()
-        if not wc:
-            return request.redirect("/my/southbrook/floor")
-
-        # In-flight work orders at this station — sorted by parent
-        # MO date_deadline so the most-urgent station queue floats
-        # to the top.
         wos = Wo.search(
             [
                 ("workcenter_id", "=", wc.id),
@@ -334,7 +322,6 @@ class SouthbrookFloorPortal(CustomerPortal):
             ],
             order="production_id, sequence",
         )
-        # Group rows by MO so the operator sees per-cabinet context.
         wo_groups = {}
         for wo in wos:
             mo = wo.production_id
@@ -358,18 +345,11 @@ class SouthbrookFloorPortal(CustomerPortal):
                 "sequence": wo.sequence,
                 "duration_expected": wo.duration_expected,
             })
-
-        # Sort groups by MO deadline ASC (None last).
         ordered_groups = sorted(
             wo_groups.values(),
             key=lambda r: (r["deadline"] is None, r["deadline"]),
         )
-
-        # Equipment attached to this workcenter — list with the
-        # M13 condition pill values.
-        equipment = Equip.search([
-            ("workcenter_id", "=", wc.id),
-        ])
+        equipment = Equip.search([("workcenter_id", "=", wc.id)])
         equipment_rows = [
             {
                 "id": eq.id,
@@ -379,10 +359,7 @@ class SouthbrookFloorPortal(CustomerPortal):
             }
             for eq in equipment
         ]
-
-        values = self._prepare_portal_layout_values()
-        values.update({
-            "page_name": "southbrook_floor_wc",
+        return {
             "wc": {
                 "id": wc.id,
                 "code": wc.code or "",
@@ -391,7 +368,87 @@ class SouthbrookFloorPortal(CustomerPortal):
             },
             "wo_groups": ordered_groups,
             "equipment": equipment_rows,
+        }
+
+    @http.route(
+        "/my/southbrook/floor/<int:workcenter_id>",
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def southbrook_floor_workcenter(self, workcenter_id, **kw):
+        if not self._floor_user_authorized():
+            return request.redirect("/my")
+
+        Wc = request.env["mrp.workcenter"].sudo()
+        wc = Wc.browse(workcenter_id).exists()
+        if not wc:
+            return request.redirect("/my/southbrook/floor")
+
+        snapshot = self._floor_wc_snapshot(wc)
+        values = self._prepare_portal_layout_values()
+        values.update({
+            "page_name": "southbrook_floor_wc",
+            **snapshot,
         })
         return request.render(
             "southbrook_mrp_pm.portal_floor_workcenter", values,
+        )
+
+    # ------------------------------------------------------------------
+    # W056 / R1.11 — lighter JSON polling endpoint
+    # ------------------------------------------------------------------
+    # The floor portal previously did a full-page reload every 30s via
+    # <meta http-equiv="refresh">. The full reload flushed the operator's
+    # mid-interaction scroll position and re-shipped portal chrome on
+    # every poll. This endpoint returns just the queue snapshot as JSON;
+    # the template-side setInterval() updates the DOM in place.
+    #
+    # The meta-refresh tag is RETAINED in the template as the JS-off
+    # fallback — if scripts are disabled (or fail to load), the page
+    # still refreshes every 30s the old way. The JS path runs the same
+    # 30s interval and supersedes by virtue of running first.
+    @http.route(
+        "/my/southbrook/floor/<int:workcenter_id>/queue.json",
+        type="http",
+        auth="user",
+        methods=["GET"],
+        csrf=False,
+    )
+    def southbrook_floor_workcenter_queue_json(self, workcenter_id, **kw):
+        """Return the per-workcenter queue snapshot as JSON.
+
+        Auth: same _floor_user_authorized() gate as the HTML route.
+        Unauthorized → 403 with an empty body (the poller stops on 403).
+        """
+        import json
+        if not self._floor_user_authorized():
+            return request.make_response(
+                json.dumps({"ok": False, "error": "forbidden"}),
+                headers=[("Content-Type", "application/json")],
+                status=403,
+            )
+        Wc = request.env["mrp.workcenter"].sudo()
+        wc = Wc.browse(workcenter_id).exists()
+        if not wc:
+            return request.make_response(
+                json.dumps({"ok": False, "error": "workcenter not found"}),
+                headers=[("Content-Type", "application/json")],
+                status=404,
+            )
+        snapshot = self._floor_wc_snapshot(wc)
+        # Datetime → ISO string for JSON serialization.
+        for grp in snapshot["wo_groups"]:
+            if grp.get("deadline"):
+                grp["deadline"] = fields.Datetime.to_string(grp["deadline"])
+        for eq in snapshot["equipment"]:
+            if eq.get("last_updated"):
+                eq["last_updated"] = fields.Datetime.to_string(
+                    eq["last_updated"])
+        return request.make_response(
+            json.dumps({"ok": True, **snapshot}),
+            headers=[
+                ("Content-Type", "application/json"),
+                ("Cache-Control", "no-store"),
+            ],
         )

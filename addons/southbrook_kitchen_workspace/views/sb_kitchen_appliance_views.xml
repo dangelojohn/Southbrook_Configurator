@@ -4,8 +4,9 @@
         <field name="name">sb.kitchen.appliance.list</field>
         <field name="model">sb.kitchen.appliance</field>
         <field name="arch" type="xml">
-            <list>
+            <list class="o_sb_kitchen_workspace_scroll">
                 <field name="project_id"/>
+                <field name="product_id" optional="show"/>
                 <field name="name"/>
                 <field name="appliance_type"/>
                 <field name="width_mm"/>

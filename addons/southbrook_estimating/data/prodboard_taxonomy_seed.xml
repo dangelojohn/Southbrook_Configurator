@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A1 — Prodboard cabinet-archetype taxonomy seed.
+
+  Fires the seed_from_json() helper on install / -u. Idempotent — the
+  external_id field is the per-archetype key, so re-running this data
+  file updates existing rows rather than duplicating. The JSON source
+  lives at data/prodboard_taxonomy_source.json (223 archetypes).
+-->
+<odoo noupdate="0">
+  <function model="southbrook.estimating.prodboard_taxonomy"
+            name="seed_from_json"/>
+</odoo>

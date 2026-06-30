@@ -180,6 +180,138 @@ class TestCustomerFlowEndpoints(TransactionCase):
                 f"the 1-value filter (e.g. Family) should have dropped it",
             )
 
+    def test_g15_attributes_pre_selects_line_width_via_sb_width_mm(self):
+        """Bug fix 2026-06-23: SB-BASE-1DR lines added via the /add-line
+        fast path have no PTAVs but carry sb_width_mm. The configurator
+        must (a) pre-select the matching '<N> in' value, and (b) inject
+        it into the options list even when the template's attribute_line
+        doesn't include it (e.g. SB-BASE-1DR's Width is locked to
+        9-21 in by the 1-door business rule but real lines may carry
+        24 in)."""
+        # Default fast-path variant — guaranteed no PTAVs.
+        variant = self.tmpl_base_1dr.product_variant_ids[:1]
+        if not variant:
+            variant = self.env["product.product"].create({
+                "product_tmpl_id": self.tmpl_base_1dr.id,
+            })
+        # 600 mm ≈ 24 in (round(600/25.4) == 24). Matches the demo seed
+        # pattern: all live SB-BASE-1DR lines on prod carry sb_width_mm=600.
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "product_id": variant.id,
+            "product_uom_qty": 1,
+            "sb_width_mm": 600.0,
+        })
+        # Precondition: variant has no PTAVs (the fast-path case).
+        self.assertEqual(
+            len(variant.product_template_attribute_value_ids), 0,
+            "Default fast-path variant must have no PTAVs for this test",
+        )
+        # Precondition: template's attribute_line for Width does NOT
+        # include 24 in — so the fix's union path is what makes 24 in
+        # appear. If this asserts fails the data has shifted (e.g.
+        # the 1-door width band was widened) and the test needs an
+        # out-of-template scenario using a different cabinet.
+        width_attr = self.env.ref("southbrook_estimating.attr_width")
+        template_width_names = []
+        for al in self.tmpl_base_1dr.attribute_line_ids:
+            if al.attribute_id.id == width_attr.id:
+                template_width_names = al.value_ids.mapped("name")
+                break
+        self.assertNotIn(
+            "24 in", template_width_names,
+            "SB-BASE-1DR should not template-allow 24 in (1-door rule).",
+        )
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_line = lambda _id: line
+        with stubbed_request(self.env):
+            result = controller.southbrook_api_line_attributes(line.id)
+        self.assertTrue(result.get("ok"))
+        # Find the Width attribute in the response.
+        width_dict = None
+        for a in result["attributes"]:
+            if a["attribute_id"] == width_attr.id:
+                width_dict = a
+                break
+        self.assertIsNotNone(
+            width_dict, "Width attribute missing from response",
+        )
+        names = [v["name"] for v in width_dict["values"]]
+        # (a) 24 in must be in the options list (union with sb_width_mm).
+        self.assertIn(
+            "24 in", names,
+            "24 in not in Width options %r — union with line.sb_width_mm "
+            "didn't inject the effective current value." % names,
+        )
+        # (b) 24 in must be marked current so the OWL select pre-selects.
+        v24 = next(v for v in width_dict["values"] if v["name"] == "24 in")
+        self.assertTrue(
+            v24["current"],
+            "24 in is in the options but not marked current — the picker "
+            "would default to '— pick —' instead of '24 in'.",
+        )
+        # (c) Ordering: 24 in must appear AFTER 21 in (sequence sort).
+        self.assertGreater(
+            names.index("24 in"), names.index("21 in"),
+            "24 in must come after 21 in in the dropdown; got %r" % names,
+        )
+
+    def test_add_line_merges_identical_configurations_into_one_line(self):
+        """Bug fix 2026-06-23 (user-chosen Option B): two /add-line
+        calls for the same template (default variant, no attribute
+        config yet) must produce ONE line with summed qty, not two
+        duplicate lines. This is the server-side guarantee that
+        backstops the client-side debounce — if the JS race ever lets
+        a second click through, the server still de-duplicates.
+
+        Identity for merge = same product_id (the variant). Odoo
+        encodes attribute combination into variant identity, so
+        configured lines (specific variant) won't merge with
+        default-variant adds (the template's product_variant_ids[:1])
+        — preserving the user's intent that a configured line is
+        distinct from a fresh add."""
+        # Use a fresh order so other tests' lines don't interfere.
+        order = self.env["sale.order"].create({
+            "partner_id": self.partner_customer.id,
+        })
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._southbrook_resolve_order = lambda _id: order
+        tmpl_id = self.tmpl_base_1dr.id
+
+        with stubbed_request(self.env):
+            r1 = controller.southbrook_api_order_add_line(
+                order.id, product_tmpl_id=tmpl_id, qty=2,
+            )
+            r2 = controller.southbrook_api_order_add_line(
+                order.id, product_tmpl_id=tmpl_id, qty=3,
+            )
+
+        self.assertTrue(r1.get("ok"), "first add should succeed: %r" % r1)
+        self.assertTrue(r2.get("ok"), "second add should succeed: %r" % r2)
+        # The second call should report merged=True and reference the
+        # same line_id as the first.
+        self.assertEqual(
+            r1.get("line_id"), r2.get("line_id"),
+            "second add must merge into the first line, not create a new one",
+        )
+        self.assertTrue(
+            r2.get("merged"), "merged flag missing on second add: %r" % r2,
+        )
+        # Exactly ONE line should exist on the order, with qty 2+3=5.
+        lines = self.env["sale.order.line"].search(
+            [("order_id", "=", order.id)],
+        )
+        self.assertEqual(
+            len(lines), 1,
+            "expected one merged line, got %d: %r"
+            % (len(lines), [(l.id, l.product_id.display_name, l.product_uom_qty)
+                            for l in lines]),
+        )
+        self.assertEqual(
+            lines.product_uom_qty, 5.0,
+            "merged line qty should be 2+3=5, got %s" % lines.product_uom_qty,
+        )
+
     def test_g15_set_attribute_swaps_variant_with_new_combination(self):
         # Reuse the template's existing default variant (one is auto-
         # created on template install). Creating a second variant with

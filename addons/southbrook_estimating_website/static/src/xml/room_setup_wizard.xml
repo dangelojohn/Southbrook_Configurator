@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Phase 2.C — Room Setup wizard templates.
+
+    Five components mounted into web.assets_frontend via the addon
+    manifest. OWL tokenizer rules followed throughout:
+
+      * t-if / t-att-* expressions use ||, &&, ! (never Python or/and/not)
+      * `<` is encoded as &lt; inside expressions
+      * SVG sub-trees are plain XML — OWL handles the namespace
+
+    Templates intentionally lean on the CSS layer (.sb-room-wizard-*)
+    rather than inline style attributes so the Phase 3 theme rebind
+    re-skins this surface without template edits.
+-->
+<templates xml:space="preserve">
+
+    <!-- ============================================================
+         RoomSetupWizard — parent shell.
+         Fullscreen overlay (backdrop + centred card), 3 steps + a
+         live SVG preview. Footer carries Back / Next / Save.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.RoomSetupWizard">
+        <div class="sb-room-wizard-backdrop"
+             t-on-click="_close">
+            <div class="sb-room-wizard-card"
+                 role="dialog"
+                 aria-labelledby="sb-room-wizard-title"
+                 t-on-click.stop="">
+
+                <!-- Header: title + step indicator + close -->
+                <header class="sb-room-wizard-head">
+                    <div class="sb-room-wizard-head-text">
+                        <h2 id="sb-room-wizard-title"
+                            class="sb-room-wizard-title">
+                            Set Up Your Room
+                        </h2>
+                        <ol class="sb-room-wizard-steps"
+                            t-if="_isNumberStep()">
+                            <li t-foreach="[1, 2, 3]"
+                                t-as="n"
+                                t-key="n"
+                                class="sb-room-wizard-step"
+                                t-att-class="{
+                                    'sb-room-wizard-step--active': state.step === n,
+                                    'sb-room-wizard-step--done': state.step &gt; n,
+                                }">
+                                <span class="sb-room-wizard-step-num"
+                                      t-esc="n"/>
+                                <span class="sb-room-wizard-step-label"
+                                      t-esc="_stepLabel(n)"/>
+                            </li>
+                        </ol>
+                    </div>
+                    <button type="button"
+                            class="sb-room-wizard-close"
+                            aria-label="Close wizard"
+                            t-on-click="_close">×</button>
+                </header>
+
+                <!-- Body: split — left = step content, right = preview. -->
+                <div class="sb-room-wizard-body">
+
+                    <div class="sb-room-wizard-step-pane">
+                        <RoomTypeShapeStep t-if="_isStep(1)"
+                                           room="state.room"
+                                           onRoomTypePicked="_onRoomTypePicked"
+                                           onShapePicked="_onShapePicked"
+                                           onNameChanged="_onNameChanged"
+                                           templates="state.templates"
+                                           onApplyTemplate.bind="_onApplyTemplate"/>
+
+                        <WallDimensionsStep t-if="_isStep(2)"
+                                            room="state.room"
+                                            walls="state.walls"
+                                            onWallLengthChanged="_onWallLengthChanged"
+                                            onWallNameChanged="_onWallNameChanged"
+                                            onCeilingChanged="_onCeilingChanged"
+                                            onUnitChanged="_onUnitChanged"
+                                            appliedTemplateName="state.appliedTemplateName"/>
+
+                        <ConstraintsStep t-if="_isStep(3)"
+                                         walls="state.walls"
+                                         constraints="state.constraints"
+                                         onAddConstraint="_onAddConstraint"
+                                         onRemoveConstraint="_onRemoveConstraint"/>
+
+                        <div t-if="state.step === 'submitting'"
+                             class="sb-room-wizard-status">
+                            <div class="sb-room-wizard-spinner"
+                                 aria-hidden="true"></div>
+                            <p>Saving your room…</p>
+                        </div>
+
+                        <div t-if="state.step === 'done'"
+                             class="sb-room-wizard-status sb-room-wizard-status--ok">
+                            <p><strong>Room saved.</strong> Closing…</p>
+                        </div>
+
+                        <div t-if="state.step === 'error'"
+                             class="sb-room-wizard-status sb-room-wizard-status--error">
+                            <p><strong>Could not save the room.</strong></p>
+                            <p class="sb-room-wizard-err-detail"
+                               t-esc="state.errorMessage"/>
+                            <button class="sb-room-wizard-btn sb-room-wizard-btn--secondary"
+                                    t-on-click="_back">
+                                Back to Constraints
+                            </button>
+                        </div>
+                    </div>
+
+                    <aside class="sb-room-wizard-preview-pane">
+                        <RoomOutlinePreview shape="state.room.layout_shape"
+                                            walls="state.walls"/>
+                    </aside>
+                </div>
+
+                <!-- Footer: back / next / save. Hidden on the submit
+                     spinner + done states so the user can't double-fire. -->
+                <footer class="sb-room-wizard-foot"
+                        t-if="_isNumberStep()">
+                    <button type="button"
+                            class="sb-room-wizard-btn sb-room-wizard-btn--ghost"
+                            t-on-click="_close">
+                        Cancel
+                    </button>
+                    <div class="sb-room-wizard-foot-spacer"></div>
+                    <button type="button"
+                            class="sb-room-wizard-btn sb-room-wizard-btn--secondary"
+                            t-att-disabled="state.step === 1"
+                            t-on-click="_back">
+                        Back
+                    </button>
+                    <button type="button"
+                            class="sb-room-wizard-btn sb-room-wizard-btn--primary"
+                            t-att-disabled="!_canAdvance()"
+                            t-on-click="_next">
+                        <t t-esc="_nextLabel()"/>
+                    </button>
+                </footer>
+            </div>
+        </div>
+    </t>
+
+    <!-- ============================================================
+         RoomTypeShapeStep — Step 1.
+         Room name field + 7 room-type tiles + 8 layout-shape tiles.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.RoomTypeShapeStep">
+        <div class="sb-room-wizard-step-1">
+            <!-- Phase 6.2 — Room Templates library. One-click clone of a
+                 pre-configured room into the wizard state. Hidden when
+                 the templates fetch returned an empty list (silent-fail
+                 UX — the custom-shape picker below still works). -->
+            <div class="sb-room-wizard-templates"
+                 t-if="props.templates &amp;&amp; props.templates.length">
+                <h4 class="sb-room-wizard-templates-title">Start from a template</h4>
+                <div class="sb-room-wizard-templates-grid">
+                    <button type="button"
+                            t-foreach="props.templates" t-as="t" t-key="t.id"
+                            class="sb-room-wizard-template-tile"
+                            t-on-click="() => props.onApplyTemplate(t)">
+                        <div class="sb-room-wizard-template-tile-name" t-esc="t.name"/>
+                        <div class="sb-room-wizard-template-tile-desc" t-esc="t.description || ''"/>
+                        <div class="sb-room-wizard-template-tile-meta">
+                            <t t-esc="t.walls.length"/> wall(s),
+                            <t t-esc="t.constraints.length"/> constraint(s)
+                        </div>
+                    </button>
+                </div>
+                <div class="sb-room-wizard-templates-or">&#8212; or pick a custom shape below &#8212;</div>
+            </div>
+
+            <label class="sb-room-wizard-label">
+                Room Name
+                <input type="text"
+                       class="sb-room-wizard-input"
+                       t-att-value="props.room.name"
+                       t-on-input="props.onNameChanged"/>
+            </label>
+
+            <h3 class="sb-room-wizard-heading">Room Type</h3>
+            <div class="sb-room-wizard-tile-grid">
+                <button t-foreach="_roomTypes"
+                        t-as="t"
+                        t-key="t.code"
+                        type="button"
+                        class="sb-room-wizard-tile"
+                        t-att-class="{
+                            'sb-room-wizard-tile--selected': props.room.room_type === t.code,
+                        }"
+                        t-on-click="() => props.onRoomTypePicked(t.code)">
+                    <div class="sb-room-wizard-tile-label" t-esc="t.label"/>
+                    <div class="sb-room-wizard-tile-blurb" t-esc="t.blurb"/>
+                </button>
+            </div>
+
+            <h3 class="sb-room-wizard-heading">Layout Shape</h3>
+            <div class="sb-room-wizard-tile-grid sb-room-wizard-tile-grid--shape">
+                <button t-foreach="_layoutShapes"
+                        t-as="s"
+                        t-key="s.code"
+                        type="button"
+                        class="sb-room-wizard-tile sb-room-wizard-tile--shape"
+                        t-att-class="{
+                            'sb-room-wizard-tile--selected': props.room.layout_shape === s.code,
+                        }"
+                        t-on-click="() => props.onShapePicked(s.code)">
+                    <div class="sb-room-wizard-tile-sketch" t-esc="s.sketch"/>
+                    <div class="sb-room-wizard-tile-label" t-esc="s.label"/>
+                    <div class="sb-room-wizard-tile-blurb">
+                        <t t-esc="s.walls"/> wall(s)
+                    </div>
+                </button>
+            </div>
+        </div>
+    </t>
+
+    <!-- ============================================================
+         WallDimensionsStep — Step 2.
+         N inputs (one per wall), unit toggle, shared ceiling height.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.WallDimensionsStep">
+        <div class="sb-room-wizard-step-2">
+            <!-- Phase 6.2 — applied-template breadcrumb. Surfaces only
+                 when Step 1 applied a Room Template; tells the user the
+                 form was pre-populated and what was cloned. -->
+            <div class="sb-room-wizard-applied-template"
+                 t-if="props.appliedTemplateName">
+                <small>Applied template: <strong t-esc="props.appliedTemplateName"/> &#8212; edit anything below.</small>
+            </div>
+            <div class="sb-room-wizard-row">
+                <h3 class="sb-room-wizard-heading">Wall Dimensions</h3>
+                <div class="sb-room-wizard-unit-toggle"
+                     role="group"
+                     aria-label="Unit toggle">
+                    <button type="button"
+                            class="sb-room-wizard-unit-btn"
+                            t-att-class="{
+                                'sb-room-wizard-unit-btn--active':
+                                    props.room.unit_preference === 'mm',
+                            }"
+                            t-on-click="() => props.onUnitChanged('mm')">
+                        mm
+                    </button>
+                    <button type="button"
+                            class="sb-room-wizard-unit-btn"
+                            t-att-class="{
+                                'sb-room-wizard-unit-btn--active':
+                                    props.room.unit_preference === 'imperial',
+                            }"
+                            t-on-click="() => props.onUnitChanged('imperial')">
+                        in
+                    </button>
+                </div>
+            </div>
+
+            <p t-if="!props.walls.length"
+               class="sb-room-wizard-help">
+                Pick a layout shape on the previous step to seed the
+                walls list.
+            </p>
+
+            <table class="sb-room-wizard-walls-table"
+                   t-if="props.walls.length">
+                <thead>
+                    <tr>
+                        <th>Wall</th>
+                        <th>Name</th>
+                        <th class="sb-room-wizard-th-right">
+                            Length (<t t-esc="_unitLabel()"/>)
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="props.walls"
+                        t-as="w"
+                        t-key="w_index">
+                        <td class="sb-room-wizard-walls-pos mono">
+                            <t t-esc="String.fromCharCode(65 + w_index)"/>
+                        </td>
+                        <td>
+                            <input type="text"
+                                   class="sb-room-wizard-input"
+                                   t-att-value="w.name"
+                                   t-on-input="(ev) => this._onNameInput(w_index, ev)"/>
+                        </td>
+                        <td class="sb-room-wizard-th-right">
+                            <input type="number"
+                                   min="0"
+                                   step="1"
+                                   class="sb-room-wizard-input sb-room-wizard-input--num mono"
+                                   t-att-value="_toDisplay(w.length_mm)"
+                                   t-on-input="(ev) => this._onLenInput(w_index, ev)"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <label class="sb-room-wizard-label sb-room-wizard-label--ceiling">
+                Ceiling Height (<t t-esc="_unitLabel()"/>)
+                <input type="number"
+                       min="0"
+                       step="1"
+                       class="sb-room-wizard-input sb-room-wizard-input--num mono"
+                       t-att-value="_toDisplay(props.room.ceiling_height_mm)"
+                       t-on-input="_onCeilingInput"/>
+            </label>
+        </div>
+    </t>
+
+    <!-- ============================================================
+         ConstraintsStep — Step 3 (skippable).
+         Type chips + per-constraint inline form + accumulated list.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.ConstraintsStep">
+        <div class="sb-room-wizard-step-3">
+            <h3 class="sb-room-wizard-heading">
+                Fixed Constraints
+                <span class="sb-room-wizard-step-opt">(optional)</span>
+            </h3>
+            <p class="sb-room-wizard-help">
+                Mark windows, doors, sinks, and appliances anchored to
+                walls. Cabinets you add later avoid these positions.
+            </p>
+
+            <ul t-if="props.constraints.length"
+                class="sb-room-wizard-constraint-list">
+                <li t-foreach="props.constraints"
+                    t-as="c"
+                    t-key="c_index"
+                    class="sb-room-wizard-constraint-item">
+                    <span class="sb-room-wizard-constraint-pill">
+                        <t t-esc="_humanType(c.constraint_type)"/>
+                    </span>
+                    <span class="sb-room-wizard-constraint-wall">
+                        on <t t-esc="_wallLabel(c.wall_index)"/>
+                    </span>
+                    <span class="sb-room-wizard-constraint-pos mono">
+                        @ <t t-esc="c.distance_from_left_mm"/> mm
+                        · <t t-esc="c.width_mm"/> mm wide
+                    </span>
+                    <button type="button"
+                            class="sb-room-wizard-constraint-remove"
+                            aria-label="Remove"
+                            t-on-click="() => props.onRemoveConstraint(c_index)">
+                        ×
+                    </button>
+                </li>
+            </ul>
+
+            <div class="sb-room-wizard-constraint-form">
+                <div class="sb-room-wizard-chip-row">
+                    <button t-foreach="_constraintTypes"
+                            t-as="t"
+                            t-key="t.code"
+                            type="button"
+                            class="sb-room-wizard-chip"
+                            t-att-class="{
+                                'sb-room-wizard-chip--active': draft.constraint_type === t.code,
+                            }"
+                            t-on-click="() => this._onPickType(t.code)">
+                        <t t-esc="t.label"/>
+                    </button>
+                </div>
+
+                <div class="sb-room-wizard-constraint-fields">
+                    <label class="sb-room-wizard-label">
+                        Wall
+                        <select class="sb-room-wizard-input"
+                                t-on-change="_onWallSelect">
+                            <option t-foreach="props.walls"
+                                    t-as="w"
+                                    t-key="w_index"
+                                    t-att-value="w_index"
+                                    t-att-selected="w_index === draft.wall_index ? 'selected' : null">
+                                <t t-esc="w.name"/>
+                            </option>
+                        </select>
+                    </label>
+                    <label class="sb-room-wizard-label">
+                        Distance from left (mm)
+                        <input type="number"
+                               min="0"
+                               step="10"
+                               class="sb-room-wizard-input sb-room-wizard-input--num mono"
+                               t-att-value="draft.distance_from_left_mm"
+                               t-on-input="_onDistanceInput"/>
+                    </label>
+                    <label class="sb-room-wizard-label">
+                        Width (mm)
+                        <input type="number"
+                               min="0"
+                               step="10"
+                               class="sb-room-wizard-input sb-room-wizard-input--num mono"
+                               t-att-value="draft.width_mm"
+                               t-on-input="_onWidthInput"/>
+                    </label>
+                    <button type="button"
+                            class="sb-room-wizard-btn sb-room-wizard-btn--secondary"
+                            t-att-disabled="!props.walls.length"
+                            t-on-click="_add">
+                        + Add Constraint
+                    </button>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <!-- ============================================================
+         RoomOutlinePreview — live floor-plan SVG.
+         720x540 viewBox; the polyline is recomputed from the
+         current shape + wall lengths on every render (OWL reactivity
+         batches the recompute within a tick, so no debounce needed).
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.RoomOutlinePreview">
+        <div class="sb-room-wizard-preview">
+            <div class="sb-room-wizard-preview-head">
+                <span class="sb-room-wizard-preview-label">Live Preview</span>
+                <span class="sb-room-wizard-preview-shape"
+                      t-esc="_shapeLabel"/>
+            </div>
+            <svg class="sb-room-wizard-svg"
+                 t-att-viewBox="_viewBox"
+                 xmlns="http://www.w3.org/2000/svg"
+                 role="img"
+                 aria-label="Room outline preview">
+                <rect x="0" y="0" width="720" height="540"
+                      class="sb-room-wizard-svg-bg"/>
+
+                <!-- Supported shape: render a polyline. -->
+                <polyline t-if="_supportsShape &amp;&amp; _polylinePoints"
+                          t-att-points="_polylinePoints"
+                          class="sb-room-wizard-svg-poly"
+                          fill="none"/>
+
+                <!-- Fallback: labelled rectangle + note. -->
+                <g t-if="!_supportsShape">
+                    <rect t-att-x="_fallbackBox.x"
+                          t-att-y="_fallbackBox.y"
+                          t-att-width="_fallbackBox.w"
+                          t-att-height="_fallbackBox.h"
+                          class="sb-room-wizard-svg-fallback-rect"
+                          fill="none"/>
+                    <text x="360" y="240"
+                          class="sb-room-wizard-svg-fallback-label"
+                          text-anchor="middle">
+                        <t t-esc="_shapeLabel"/>
+                    </text>
+                    <text x="360" y="270"
+                          class="sb-room-wizard-svg-fallback-note"
+                          text-anchor="middle">
+                        Preview not yet rendered for this shape.
+                    </text>
+                </g>
+
+                <!-- Linear total caption (always visible). -->
+                <text x="40" y="510"
+                      class="sb-room-wizard-svg-caption">
+                    Total linear: <t t-esc="_totalLinear"/> mm
+                </text>
+            </svg>
+        </div>
+    </t>
+
+</templates>

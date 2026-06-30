@@ -54,6 +54,12 @@ export class CabinetViewport extends Component {
             // T1C8 — per-line hover state (kitchen view only).
             hoveredLineId: null,
             hoveredLineInfo: null,
+            // Phase 3 (2026-06-25) — live configured price summary +
+            // dim summary chip + template SKU prefix chip.
+            priceLabel: null,
+            priceTooltip: null,
+            dimsLabel: null,
+            templateCode: null,
         });
 
         // Three.js scene handles — populated in _initThreeScene().
@@ -131,6 +137,12 @@ export class CabinetViewport extends Component {
             canvas,
             antialias: true,
             alpha: false,
+            // 2026-06-25 — preserveDrawingBuffer keeps the rendered
+            // framebuffer addressable for onDownloadSnapshot's
+            // canvas.toDataURL() call. Slight perf hit on continuous
+            // re-rendering (the GPU can't ditch the buffer between
+            // composites), negligible for a single-cabinet scene.
+            preserveDrawingBuffer: true,
         });
         if (THREE.SRGBColorSpace) {
             this._renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -154,10 +166,20 @@ export class CabinetViewport extends Component {
         this._camera = new THREE.PerspectiveCamera(35, 1, 10, 10000);
         this._camera.position.set(1200, 900, 1500);
 
-        // Lights — 2 directional + 1 hemi (Phase 1 simplification of the
-        // 6-light setup from PRODBOARD_MANIFEST §10; full set lands in
-        // Phase 3 polish).
-        const hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbf, 0.5);
+        // Lights — 3 directional + 1 hemi. 2026-06-24 retry of Phase 1:
+        // first pass added a PMREM env map and broke the viewport in a
+        // way I couldn't diagnose from CLI (canvas blank, root cause
+        // unknown without browser console). This version is DEFENSIVE:
+        // lighting changes are zero-risk and shipped unconditionally;
+        // the PMREM env map below is wrapped in try/catch so a failure
+        // there logs a warning instead of taking down the canvas.
+        // Net effect: worst case is "lighting improved, no env map";
+        // best case is the full Phase 1 win.
+        //
+        // HemisphereLight intensity dropped slightly to leave headroom
+        // for the (best-case) env map. Front-fill addresses the
+        // "front face crushed to black" complaint either way.
+        const hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbf, 0.4);
         this._scene.add(hemi);
         const dirA = new THREE.DirectionalLight(0xffffff, 0.9);
         dirA.position.set(800, 1200, 600);
@@ -179,9 +201,67 @@ export class CabinetViewport extends Component {
         // own panels self-shadow with stripey artifacts.
         dirA.shadow.bias = -0.0005;
         this._scene.add(dirA);
-        const dirB = new THREE.DirectionalLight(0xffffff, 0.3);
+        const dirB = new THREE.DirectionalLight(0xffffff, 0.4);
         dirB.position.set(-500, 500, 800);
         this._scene.add(dirB);
+        // Front-fill — directly in front of the cabinet (camera-side),
+        // slightly above. dirA (upper-right key) only grazes the front
+        // face; this light hits it head-on. No shadows so we keep
+        // dirA's shadow as the only grounding shadow source.
+        const dirFront = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirFront.position.set(0, 800, 2000);
+        this._scene.add(dirFront);
+
+        // Phase 1 best-case: PMREM-baked env map for PBR reflections.
+        // Wrapped in try/catch — if any step fails (older bundled
+        // Three.js without PMREM, sigma-arg mismatch, GPU env quirk),
+        // we log + continue. The lighting above stands on its own; the
+        // env map is a bonus when it works.
+        try {
+            const pmrem = new THREE.PMREMGenerator(this._renderer);
+            const envScene = new THREE.Scene();
+            const envColors = {
+                ceiling: 0xfff5e6,   // warm white — sun bounce
+                walls:   0xe8e2d5,   // neutral warm — wall bounce
+                floor:   0x6b5a48,   // medium walnut — floor bounce
+            };
+            const envPlane = (color) => new THREE.Mesh(
+                new THREE.PlaneGeometry(2, 2),
+                new THREE.MeshBasicMaterial({
+                    color, side: THREE.DoubleSide,
+                }),
+            );
+            const ceil = envPlane(envColors.ceiling);
+            ceil.position.y = 1; ceil.rotation.x = Math.PI / 2;
+            envScene.add(ceil);
+            const envFloor = envPlane(envColors.floor);
+            envFloor.position.y = -1; envFloor.rotation.x = -Math.PI / 2;
+            envScene.add(envFloor);
+            for (const [x, ry] of [[-1, Math.PI / 2], [1, -Math.PI / 2]]) {
+                const w = envPlane(envColors.walls);
+                w.position.x = x; w.rotation.y = ry;
+                envScene.add(w);
+            }
+            for (const [z, ry] of [[-1, 0], [1, Math.PI]]) {
+                const w = envPlane(envColors.walls);
+                w.position.z = z; w.rotation.y = ry;
+                envScene.add(w);
+            }
+            const rt = pmrem.fromScene(envScene, 0.04);
+            this._envTexture = rt.texture;
+            this._scene.environment = this._envTexture;
+            pmrem.dispose();
+        } catch (e) {
+            // Non-fatal — viewport still renders with the lighting rig
+            // above, just without the env-map specular reflections.
+            // Surface so DevTools shows it but don't block.
+            // eslint-disable-next-line no-console
+            console.warn(
+                "[CabinetViewport] PMREM env map setup failed; rendering "
+                + "with lighting-only. Error:", e,
+            );
+            this._envTexture = null;
+        }
 
         // T1C4: floor plane — receives the cabinet's shadow.
         // 20m × 20m so OrbitControls panning never reveals an edge;
@@ -233,8 +313,26 @@ export class CabinetViewport extends Component {
             carcass: new THREE.MeshStandardMaterial({
                 color: 0xc89e85, roughness: 0.85, metalness: 0.0,
             }),
+            // Generic "door" = walnut default (back-compat with every
+            // panel emitted before the Phase 2 Round 4 finish split).
             door: new THREE.MeshStandardMaterial({
                 color: 0x6b3f2a, roughness: 0.7, metalness: 0.05,
+            }),
+            // Phase 2 Round 4 (2026-06-24) — Finish-driven door
+            // materials. Color + roughness tuned per finish family.
+            // Painted (white) reads matte-cool; stained woods read
+            // satin-warm with grain-tight roughness.
+            door_white: new THREE.MeshStandardMaterial({
+                color: 0xfafafa, roughness: 0.50, metalness: 0.02,
+            }),
+            door_maple_stain: new THREE.MeshStandardMaterial({
+                color: 0xd9bb86, roughness: 0.60, metalness: 0.05,
+            }),
+            door_cherry_stain: new THREE.MeshStandardMaterial({
+                color: 0x8b4a2f, roughness: 0.55, metalness: 0.05,
+            }),
+            door_walnut_stain: new THREE.MeshStandardMaterial({
+                color: 0x4d2f1f, roughness: 0.65, metalness: 0.05,
             }),
             back: new THREE.MeshStandardMaterial({
                 color: 0xa68872, roughness: 0.9, metalness: 0.0,
@@ -253,6 +351,39 @@ export class CabinetViewport extends Component {
             // butcher-block vs marble), this becomes attribute-driven.
             worktop: new THREE.MeshStandardMaterial({
                 color: 0xb5b0a8, roughness: 0.4, metalness: 0.05,
+            }),
+            // Phase 2 Round 2.5 (2026-06-24) — Pull Finish-driven
+            // hardware materials. 8 known finishes pre-registered
+            // with color + roughness + metalness tuned per family.
+            // "hardware" (the generic) stays as brushed-nickel default
+            // so panels emitted without a finish pick (or with an
+            // unknown finish) still render correctly.
+            hardware: new THREE.MeshStandardMaterial({
+                color: 0xa6a8ad, roughness: 0.35, metalness: 0.85,
+            }),
+            hardware_polished_nickel: new THREE.MeshStandardMaterial({
+                color: 0xc8cad0, roughness: 0.15, metalness: 0.95,
+            }),
+            hardware_brushed_nickel: new THREE.MeshStandardMaterial({
+                color: 0xa6a8ad, roughness: 0.40, metalness: 0.85,
+            }),
+            hardware_matte_black: new THREE.MeshStandardMaterial({
+                color: 0x1a1a1a, roughness: 0.60, metalness: 0.20,
+            }),
+            hardware_antique_bronze: new THREE.MeshStandardMaterial({
+                color: 0x6e4a2c, roughness: 0.50, metalness: 0.70,
+            }),
+            hardware_brushed_brass: new THREE.MeshStandardMaterial({
+                color: 0xc9a64a, roughness: 0.35, metalness: 0.90,
+            }),
+            hardware_polished_chrome: new THREE.MeshStandardMaterial({
+                color: 0xd8dade, roughness: 0.05, metalness: 1.00,
+            }),
+            hardware_oil_rubbed_bronze: new THREE.MeshStandardMaterial({
+                color: 0x3a2618, roughness: 0.55, metalness: 0.40,
+            }),
+            hardware_champagne_bronze: new THREE.MeshStandardMaterial({
+                color: 0xb09575, roughness: 0.40, metalness: 0.75,
             }),
             blueline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b, wireframe: true,
@@ -339,6 +470,10 @@ export class CabinetViewport extends Component {
         // material swap doesn't touch the floor).
         if (this._floorGeom) this._floorGeom.dispose();
         if (this._floorMat) this._floorMat.dispose();
+        // 2026-06-24 Phase 1 retry: env map cleanup. Null-guard
+        // because the PMREM block is try/catch'd — _envTexture stays
+        // null on failure.
+        if (this._envTexture) this._envTexture.dispose();
         // T1C5: dimension overlay — clears all line geometries, sprite
         // textures, sprite materials, and the shared line material.
         this._clearDimensionGroup();
@@ -547,18 +682,135 @@ export class CabinetViewport extends Component {
         this.state.hoveredLineId = null;
         this.state.hoveredLineInfo = null;
 
+        // Phase 3 (2026-06-25) — live price + dimension summary in the
+        // toolbar. get_3d_payload embeds price + breakdown + currency;
+        // format once here so OWL can just t-esc state.priceLabel.
+        const meta = payload.metadata || {};
+        const fmtPrice = (n) => {
+            const symbol = meta.currency_symbol || "$";
+            const before = meta.currency_position !== "after";
+            const formatted = n.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            return before ? `${symbol}${formatted}` : `${formatted} ${symbol}`;
+        };
+        if (typeof meta.price === "number" && !Number.isNaN(meta.price)) {
+            this.state.priceLabel = fmtPrice(meta.price);
+            // Tooltip: only show breakdown when there's a non-zero extra
+            // (otherwise the tooltip would say "Base $545 = $545" which
+            // adds nothing). Pricelist name appended if present —
+            // critical UX disclosure for the dealer flow.
+            const extras = meta.extras_sum;
+            let tooltip;
+            if (typeof extras === "number" && extras > 0
+                && typeof meta.list_price === "number") {
+                tooltip =
+                    `Base ${fmtPrice(meta.list_price)} `
+                    + `+ Options ${fmtPrice(extras)} `
+                    + `= ${fmtPrice(meta.price)}`;
+            } else {
+                tooltip = "Configured price";
+            }
+            if (meta.pricelist_name) {
+                tooltip += `\n(${meta.pricelist_name})`;
+            }
+            this.state.priceTooltip = tooltip;
+        } else {
+            this.state.priceLabel = null;
+            this.state.priceTooltip = null;
+        }
+        // Dimension chip: W × H × D mm. These are integer mm, no need
+        // for locale formatting. Skip if any axis is missing/zero
+        // (worktop short-circuit, accessory).
+        if (meta.width_mm > 0 && meta.height_mm > 0 && meta.depth_mm > 0) {
+            this.state.dimsLabel =
+                `${Math.round(meta.width_mm)} × `
+                + `${Math.round(meta.height_mm)} × `
+                + `${Math.round(meta.depth_mm)} mm`;
+        } else {
+            this.state.dimsLabel = null;
+        }
+        // Template SKU chip: shown only when the template carries a
+        // default_code (every Q8 template does, every accessory variant
+        // does as of A5).
+        this.state.templateCode = meta.template_code || null;
+
         // Build each panel.
         for (const p of payload.panels) {
             const d = p.dims;
             if (!d || d.width <= 0 || d.height <= 0 || d.depth <= 0) continue;
-            const geom = new THREE.BoxGeometry(d.width, d.height, d.depth);
+            // 2026-06-24 Phase 2 Round 2 — shape dispatcher.
+            // Defaults to box (back-compat with every panel emitted by
+            // server-side code before today). Cylinder + sphere are
+            // wrapped in try/catch + fall through to BoxGeometry so a
+            // malformed shape hint never blanks the canvas.
+            let geom;
+            const shape = p.shape || "box";
+            try {
+                if (shape === "cylinder") {
+                    // axis: "y" (default — vertical cylinder, length=height)
+                    //       "x" (horizontal X — bar pull on a drawer)
+                    //       "z" (horizontal Z — rare)
+                    const axis = p.axis || "y";
+                    const segments = 18;
+                    let len, rad;
+                    if (axis === "x") {
+                        len = d.width;
+                        rad = Math.min(d.height, d.depth) / 2;
+                    } else if (axis === "z") {
+                        len = d.depth;
+                        rad = Math.min(d.width, d.height) / 2;
+                    } else {
+                        len = d.height;
+                        rad = Math.min(d.width, d.depth) / 2;
+                    }
+                    geom = new THREE.CylinderGeometry(rad, rad, len, segments);
+                    // CylinderGeometry's default axis is Y. Rotate to
+                    // align with the requested axis at mesh-build time
+                    // (below, via mesh.rotation).
+                } else if (shape === "sphere") {
+                    const radius = Math.min(d.width, d.height, d.depth) / 2;
+                    geom = new THREE.SphereGeometry(radius, 24, 16);
+                } else {
+                    geom = new THREE.BoxGeometry(d.width, d.height, d.depth);
+                }
+            } catch (e) {
+                // Defensive: malformed shape hint or vendored Three.js
+                // missing the geometry class → fall back to box and
+                // log once. Cabinet renders something, the user does
+                // not see a blank canvas.
+                // eslint-disable-next-line no-console
+                console.warn(
+                    "[CabinetViewport] geometry build failed for "
+                    + "shape '" + shape + "'; falling back to box. Error:", e,
+                );
+                geom = new THREE.BoxGeometry(d.width, d.height, d.depth);
+            }
             const matName =
                 this.state.mode === "blueline" ? "blueline" : (p.material || "carcass");
-            const material = this._materials[matName] || this._materials.carcass;
+            // Material lookup with family fallback:
+            //   hardware_<finish>  → hardware → carcass
+            //   door_<finish>      → door     → carcass
+            let material = this._materials[matName];
+            if (!material && matName.startsWith("hardware_")) {
+                material = this._materials.hardware;
+            }
+            if (!material && matName.startsWith("door_")) {
+                material = this._materials.door;
+            }
+            if (!material) material = this._materials.carcass;
             const mesh = new THREE.Mesh(geom, material);
             mesh.position.set(p.pos.x, p.pos.y, p.pos.z);
             if (p.rot) {
                 mesh.rotation.set(p.rot.x || 0, p.rot.y || 0, p.rot.z || 0);
+            } else if (shape === "cylinder" && p.axis === "x") {
+                // Default cylinder axis is Y; rotate 90° around Z to lay
+                // it along X. (No explicit rot needed for axis=y.)
+                mesh.rotation.set(0, 0, Math.PI / 2);
+            } else if (shape === "cylinder" && p.axis === "z") {
+                // Rotate 90° around X to lay it along Z.
+                mesh.rotation.set(Math.PI / 2, 0, 0);
             }
             // T1C4: every panel casts AND receives shadows. Cast =
             // floor shadow grounding. Receive = inter-panel shadows
@@ -589,6 +841,18 @@ export class CabinetViewport extends Component {
             } else {
                 this._camera.lookAt(new THREE.Vector3(...tgt));
             }
+            // 2026-06-24 Phase 3 polish — stash the payload's framing
+            // so onResetCamera can snap back. Stored as plain arrays
+            // so a later config change overwrites cleanly.
+            this._defaultCameraPosition = [...payload.camera.position];
+            this._defaultCameraTarget = [...tgt];
+        }
+        // 2026-06-25 — stash payload bounds for preset camera angles.
+        if (payload.bounds) {
+            this._payloadBounds = {
+                min: [...payload.bounds.min],
+                max: [...payload.bounds.max],
+            };
         }
     }
 
@@ -614,6 +878,90 @@ export class CabinetViewport extends Component {
         // toggle is just a visibility flip — no rebuild needed.
         if (this._dimensionGroup) {
             this._dimensionGroup.visible = this.state.mode === "blueline";
+        }
+    }
+
+    // 2026-06-24 Phase 3 polish — Reset Camera toolbar action.
+    // Snaps back to the framing the last payload requested (the 3/4
+    // view set in get_3d_payload). No-op until first payload lands;
+    // OrbitControls drag positions reset cleanly.
+    onResetCamera() {
+        if (!this._defaultCameraPosition || !this._camera) return;
+        this._camera.position.set(...this._defaultCameraPosition);
+        if (this._controls && this._defaultCameraTarget) {
+            this._controls.target.set(...this._defaultCameraTarget);
+            this._controls.update();
+        }
+    }
+
+    // 2026-06-25 — Preset camera angles derived from payload bounds.
+    // Center of the cabinet on the floor footprint; distance scaled to
+    // the cabinet's largest dimension so different families frame
+    // consistently (a wall cabinet doesn't sit lost in a tall-cabinet
+    // shot).
+    _presetCamera(view) {
+        if (!this._camera || !this._payloadBounds) return;
+        const min = this._payloadBounds.min;
+        const max = this._payloadBounds.max;
+        const w = Math.max(1, max[0] - min[0]);
+        const h = Math.max(1, max[1] - min[1]);
+        const d = Math.max(1, max[2] - min[2]);
+        // Target = center of the bounding box.
+        const cx = (min[0] + max[0]) / 2;
+        const cy = (min[1] + max[1]) / 2;
+        const cz = (min[2] + max[2]) / 2;
+        // Distance heuristic: ~2.5x the largest in-frame dim.
+        const span = Math.max(w, h, d);
+        let pos;
+        if (view === "front") {
+            pos = [cx, cy, cz + span * 2.5];
+        } else if (view === "top") {
+            pos = [cx, cy + span * 2.5, cz + 0.01];
+        } else {
+            // "three_quarter" — match the get_3d_payload default vibe.
+            pos = [cx + w * 1.4, cy + h * 0.6, cz + d * 1.8];
+        }
+        this._camera.position.set(...pos);
+        if (this._controls) {
+            this._controls.target.set(cx, cy, cz);
+            this._controls.update();
+        } else {
+            this._camera.lookAt(new THREE.Vector3(cx, cy, cz));
+        }
+    }
+
+    onPresetFront() { this._presetCamera("front"); }
+    onPresetThreeQuarter() { this._presetCamera("three_quarter"); }
+    onPresetTop() { this._presetCamera("top"); }
+
+    // 2026-06-25 — Snapshot. Renders one fresh frame then exports
+    // the canvas as a downloadable PNG. Sales reps can grab a hero
+    // shot of the current spec without taking an OS screenshot.
+    // File name embeds the cabinet's dim summary if available (the
+    // toolbar formats it; we reuse the same value).
+    onDownloadSnapshot() {
+        const canvas = this.canvasRef.el;
+        if (!canvas || !this._renderer || !this._scene || !this._camera) return;
+        try {
+            // Force a fresh render — the animation loop may have left
+            // a stale framebuffer if the page tab was throttled.
+            this._renderer.render(this._scene, this._camera);
+            const data = canvas.toDataURL("image/png");
+            const dimsTag = (this.state.dimsLabel || "cabinet")
+                .replace(/[^\w×x]/g, "_");
+            const a = document.createElement("a");
+            a.href = data;
+            a.download = `southbrook_${dimsTag}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn(
+                "[CabinetViewport] snapshot failed; canvas may be tainted "
+                + "(cross-origin texture?) or the renderer is mid-mount.",
+                e,
+            );
         }
     }
 

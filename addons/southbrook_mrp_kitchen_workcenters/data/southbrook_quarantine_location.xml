@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only
+
+     Quarantine stock location (SAMI PRD INV-06). Internal child of
+     WH/Stock so it's a natural sibling for inventory moves out of
+     saleable stock. noupdate="1" so a later upgrade can't bulldoze
+     this once it has quants attached.
+
+     2026-06-26 — second cut. First cut failed to parse on prod with
+     ParseError at line 14; root cause was likely the parent xml_id
+     (stock.stock_location_locations is a view category, not a real
+     parent). Switched to stock.stock_location_stock (WH/Stock) which
+     is a real location and always present after stock module loads.
+     Also dropped scrap_location and active (defaults are correct)
+     and the verbose comment (which carried newlines that the
+     convert.parser was choking on).
+-->
+<odoo noupdate="1">
+
+    <record id="stock_location_southbrook_quarantine" model="stock.location">
+        <field name="name">Southbrook Quarantine</field>
+        <field name="usage">internal</field>
+        <field name="location_id" ref="stock.stock_location_stock"/>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+
+</odoo>

@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.2.6.0",
+    "version": "19.0.24.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -29,6 +29,8 @@
         "views/kitchen_planner_template.xml",
         # G1 + G2 (2026-06-01) — public Southbrook homepage at /.
         "views/homepage_template.xml",
+        # 2026-06-15 — public commercial Odoo Projects landing page.
+        "views/commercial_template.xml",
         # G4 + G5 + G6 + G8 (2026-06-01) — branded auth pages
         # (login/signup chrome) + project-name field on signup.
         "views/auth_template.xml",
@@ -37,6 +39,10 @@
         # potentially non-singleton pricelist recordset. Override
         # swaps to website.currency_id (singleton, always available).
         "views/shop_configurator_currency_fix.xml",
+        # 2026-06-26 Stage 3a — anti-FOUC inline <script> for the
+        # design system theme toggle. MUST inline in <head> per the
+        # brief (asset bundle JS loads too late to prevent flash).
+        "views/design_system_chrome.xml",
     ],
     # Dedicated asset bundle (charter Q4 answer) so the OWL portal
     # components only load on the Order Builder route. Other portal
@@ -62,7 +68,29 @@
             # southbrook_estimating Track 1. Same vendored r160 bundle.
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
+            # 2026-06-22 — Tier-1 cabinet GLB pipeline (see
+            # static/lib/cabinets/README.md). The GLTFLoader entry is
+            # COMMENTED until the vendor lib is dropped at
+            # static/lib/three/GLTFLoader.js. The loader module stays
+            # registered either way — it degrades to a console.warn +
+            # BoxGeometry fallback when GLTFLoader is missing.
+            #
+            # "southbrook_estimating/static/lib/three/GLTFLoader.js",
+            "southbrook_estimating/static/src/js/cabinet_glb_loader.esm.js",
             "southbrook_estimating_website/static/src/scss/portal_root.scss",
+            # 2026-06-26 Stage 3c — cascade-tie resolver. MUST load
+            # AFTER portal_root.scss so equal-specificity .sb-* rules
+            # win the source-order tie against legacy .o_owl_* rules.
+            # Without this, the modal Send-to-Production primary, the
+            # ILLUSTRATIVE SEED banner border/radius, and the order-
+            # lines table header (hardcoded #faf4e8) stay on the old
+            # palette.
+            "southbrook_estimating_website/static/src/scss/_southbrook_design_overrides.scss",
+            # Phase 2.B (2026-06-27) — Room Setup tab styles. Loaded
+            # after portal_root.scss so the --sb-* tokens are bound to
+            # the active theme; sb-room-* classes only attach inside
+            # the new tab panel, no other surface is affected.
+            "southbrook_estimating_website/static/src/scss/room_layout.scss",
             # G1 + G2 (2026-06-01) — homepage hero + features SCSS.
             "southbrook_estimating_website/static/src/scss/homepage.scss",
             # Phase 2 commit 1 — kitchen-planner three-pane SCSS.
@@ -73,12 +101,46 @@
             # portal_boot, so it must load first.
             "southbrook_estimating_website/static/src/js/kitchen_viewport.esm.js",
             "southbrook_estimating_website/static/src/js/portal_boot.esm.js",
+            # Phase 2.C (2026-06-27) — Room Setup wizard. Loaded AFTER
+            # portal_boot.esm.js so the rpcJsonCall export resolves; the
+            # XML template ships in the same bundle so OWL can find the
+            # registered templates at component instantiation.
+            # Phase 3.B (2026-06-27) — room_geometry.esm.js is the shared
+            # shape→walls helper consumed by both RoomOutlinePreview
+            # (wizard) and FloorPlanSVG (Room Layout tab). Loads BEFORE
+            # both consumers.
+            "southbrook_estimating_website/static/src/js/room_geometry.esm.js",
+            # Stage B (2026-06-28) — architectural symbol library
+            # consumed by FloorPlanSVG to render per-type top-down
+            # symbols inside constraint polygons. Loads BEFORE
+            # room_layout.esm.js so the import resolves at first
+            # FloorPlanSVG mount.
+            "southbrook_estimating_website/static/src/js/architectural_symbols.esm.js",
+            # Stage C (2026-06-28) — AppliancePalette docked sidebar +
+            # drag-and-drop. Loads BEFORE room_layout.esm.js so the
+            # import resolves at RoomLayoutTab mount.
+            "southbrook_estimating_website/static/src/js/appliance_palette.esm.js",
+            "southbrook_estimating_website/static/src/xml/appliance_palette.xml",
+            "southbrook_estimating_website/static/src/js/room_setup_wizard.esm.js",
+            "southbrook_estimating_website/static/src/xml/room_setup_wizard.xml",
+            # Phase 3.B (2026-06-27) — Room Layout tab. Read-only top-
+            # down floor plan SVG + per-wall metrics + unplaced cabinet
+            # sidebar. Click handlers, drag, and the elevation toggle
+            # are Phase 3.C. Stage B (2026-06-28) — type-specific
+            # architectural symbols replace the labeled rectangles.
+            "southbrook_estimating_website/static/src/js/room_layout.esm.js",
+            "southbrook_estimating_website/static/src/xml/room_layout.xml",
             # Phase 2 commit 2 — OWL <KitchenPlanner/> boot for
             # /kitchen-planner customer route. Independent of
             # portal_boot.esm.js (each bootstrap finds its own
             # mount-point div and returns early if absent on the
             # current page).
             "southbrook_estimating_website/static/src/js/planner_boot.esm.js",
+            # 2026-06-26 Stage 3a — design-system theme toggle button
+            # (creates the fixed-position top-right toggle on every
+            # portal page; pairs with views/design_system_chrome.xml
+            # which inlines the anti-FOUC guard).
+            "southbrook_estimating_website/static/src/js/sb_theme_toggle.esm.js",
         ],
     },
     "installable": True,

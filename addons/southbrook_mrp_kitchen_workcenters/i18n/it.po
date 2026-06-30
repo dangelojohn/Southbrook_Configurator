@@ -1,0 +1,289 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* southbrook_mrp_kitchen_workcenters
+#
+# W070 (R8.9, 2026-06-27) — Italian (it_IT) translations for
+# kitchen-shop operator surfaces: tablet WO kanban, WO form, WO traveler,
+# NCR/rework, shift handover, capacity pivot. Sibling to es.po —
+# same msgid coverage, Italian variant.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: 2026-06-27 12:00+0000\n"
+"Last-Translator: Southbrook / OdooIQ\n"
+"Language-Team: it_IT\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "START"
+msgstr "AVVIA"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "PAUSE"
+msgstr "PAUSA"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "DONE"
+msgstr "FATTO"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "SCAN TO OPEN"
+msgstr "SCANSIONA PER APRIRE"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Scan to Advance"
+msgstr "Scansiona per avanzare"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Workcenter"
+msgstr "Centro di lavoro"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Operation"
+msgstr "Operazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Operator Instructions"
+msgstr "Istruzioni per l'operatore"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Cabinet"
+msgstr "Mobile"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Code"
+msgstr "Codice"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Hinge"
+msgstr "Cerniera"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Install Due"
+msgstr "Installazione prevista"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Job Context"
+msgstr "Contesto lavoro"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Kitchen Project"
+msgstr "Progetto cucina"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Portrait"
+msgstr "Verticale"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "WO Traveler"
+msgstr "Foglio OL"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Record Scrap"
+msgstr "Registra scarto"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Open Tablet Queue"
+msgstr "Apri coda tablet"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Recalc Kitchen Duration"
+msgstr "Ricalcola durata cucina"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Recalc All Kitchen Durations"
+msgstr "Ricalcola tutte le durate cucina"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Station Type"
+msgstr "Tipo stazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Bottlenecks"
+msgstr "Colli di bottiglia"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Live Bottlenecks (alert)"
+msgstr "Colli di bottiglia in tempo reale (allerta)"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Backing Up (warn+alert)"
+msgstr "Accumulo in corso (avviso e allerta)"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Planning Notes"
+msgstr "Note di pianificazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Shop-Floor Notes"
+msgstr "Note di reparto"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Quality Notes"
+msgstr "Note di qualità"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Kitchen Active"
+msgstr "Attivo per cucina"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Capacity Envelope"
+msgstr "Inviluppo di capacità"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Capability Sets"
+msgstr "Set di capacità"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "MI Triage"
+msgstr "Triage MI"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "NCR / Quality Check"
+msgstr "NCR / Controllo qualità"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "NCRs / Rework Queue"
+msgstr "NCR / Coda rilavorazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "NCR Pareto"
+msgstr "Pareto NCR"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "NCR Analysis"
+msgstr "Analisi NCR"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Defect Type"
+msgstr "Tipo di difetto"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Defect Detail"
+msgstr "Dettaglio difetto"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Findings"
+msgstr "Rilievi"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Critical defect"
+msgstr "Difetto critico"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Quarantine"
+msgstr "Quarantena"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Quarantine Batch"
+msgstr "Lotto in quarantena"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Open Quarantine Transfer"
+msgstr "Apri trasferimento in quarantena"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Rework"
+msgstr "Rilavorazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Create Rework WO"
+msgstr "Crea OL di rilavorazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Open Rework WO"
+msgstr "Apri OL di rilavorazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Rework WO spawned"
+msgstr "OL di rilavorazione generata"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Awaiting rework WO"
+msgstr "In attesa di OL di rilavorazione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Re-Inspection"
+msgstr "Ri-ispezione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Shift"
+msgstr "Turno"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Shift Handover"
+msgstr "Cambio turno"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Shift Handovers"
+msgstr "Cambi turno"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "My Handovers"
+msgstr "I miei cambi turno"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Submit Handover"
+msgstr "Invia cambio turno"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Acknowledge"
+msgstr "Conferma ricezione"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Awaiting Ack"
+msgstr "In attesa di conferma"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Calendar-Aware Capacity"
+msgstr "Capacità da calendario"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Capacity Utilization"
+msgstr "Utilizzo capacità"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Capacity"
+msgstr "Capacità"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Over Committed"
+msgstr "Sovraimpegnato"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Non-Working Day"
+msgstr "Giorno non lavorativo"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Next 7 Days"
+msgstr "Prossimi 7 giorni"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Day"
+msgstr "Giorno"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Group By"
+msgstr "Raggruppa per"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Attachments"
+msgstr "Allegati"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Notes"
+msgstr "Note"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "State"
+msgstr "Stato"
+
+#. module: southbrook_mrp_kitchen_workcenters
+msgid "Stage"
+msgstr "Fase"

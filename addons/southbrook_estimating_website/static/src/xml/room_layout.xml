@@ -1,0 +1,904 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Phase 3.B — Room Layout tab templates (2026-06-27).
+    Phase 3.C.2a — tap interactivity layer (2026-06-27).
+    Phase 3.C.2c — Floor ↔ Elevation view toggle (2026-06-27).
+
+    Components mounted into web.assets_frontend via the addon manifest.
+    OWL tokenizer rules followed throughout:
+
+      * t-if / t-att-* expressions use ||, &&, ! (never Python or/and/not)
+      * `<` encoded as &lt; inside attribute expressions where needed
+      * SVG sub-trees are plain XML — OWL handles the namespace
+
+    Three click affordances in 3.C.2a:
+      - cabinet polygon click → onCabinetClick(lineId)
+      - gap rect click        → onGapClick(wallId, gapMm, positionMm)
+      - sidebar Assign... btn → onAssignFromSidebar(lineId)
+
+    Drag layer added 3.C.2b; elevation toggle added 3.C.2c.
+-->
+<templates xml:space="preserve">
+
+    <!-- ============================================================
+         RoomLayoutTab — parent shell.
+
+         Layout:
+             ┌────────────────────────────────┬──────────┐
+             │                                │ Walls    │
+             │     <FloorPlanSVG/>            │ table    │
+             │                                ├──────────┤
+             │                                │ Unplaced │
+             │                                │ list     │
+             └────────────────────────────────┴──────────┘
+
+         Empty states:
+             - no room      → "Set up a room…" pointer
+             - room/no walls → "Add walls…" pointer
+             - room+walls/no lines → render the room outline only
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.RoomLayoutTab">
+        <div class="sb-room-plan-tab">
+
+            <!-- Empty state #1: no room configured. -->
+            <div t-if="!_hasRoom" class="sb-room-plan-empty">
+                <h2>No room configured yet</h2>
+                <p>
+                    Go to the <strong>Room Setup</strong> tab to add a
+                    room. Once it has at least one wall, the floor
+                    plan will render here with every cabinet you
+                    place.
+                </p>
+            </div>
+
+            <!-- Empty state #2: room exists, no walls yet. -->
+            <div t-elif="!_hasWalls" class="sb-room-plan-empty">
+                <h2>Room has no walls yet</h2>
+                <p>
+                    Add walls via the <strong>Room Setup</strong>
+                    tab. The floor plan needs at least one wall to
+                    render.
+                </p>
+            </div>
+
+            <!-- Populated: render the SVG + metrics + sidebar. -->
+            <div t-else=""
+                 class="sb-room-plan-layout">
+
+                <div class="sb-room-plan-canvas">
+
+                    <!-- Phase 3.C.2c — view toggle + wall picker.
+                         "Floor" stays the default; switching to
+                         "Elevation" auto-picks the first wall (handled
+                         in _setViewMode). The wall picker appears only
+                         in elevation mode. -->
+                    <div class="sb-room-plan-toolbar" t-if="props.room">
+                        <div class="sb-room-plan-view-toggle" role="tablist">
+                            <button type="button"
+                                    class="sb-room-plan-view-toggle-opt"
+                                    t-att-class="state.viewMode === 'floor' ? 'sb-room-plan-view-toggle-opt--active' : ''"
+                                    t-on-click="() => this._setViewMode('floor')">
+                                Floor
+                            </button>
+                            <button type="button"
+                                    class="sb-room-plan-view-toggle-opt"
+                                    t-att-class="state.viewMode === 'elevation' ? 'sb-room-plan-view-toggle-opt--active' : ''"
+                                    t-on-click="() => this._setViewMode('elevation')">
+                                Elevation
+                            </button>
+                        </div>
+                        <div class="sb-room-plan-wall-picker"
+                             t-if="state.viewMode === 'elevation'">
+                            <label>Wall:</label>
+                            <select t-on-change="(ev) => this._setSelectedWall(parseInt(ev.target.value, 10))">
+                                <t t-foreach="props.room.walls"
+                                   t-as="w"
+                                   t-key="w.id">
+                                    <option t-att-value="w.id"
+                                            t-att-selected="(_selectedWall &amp;&amp; _selectedWall.id === w.id) ? 'selected' : null">
+                                        <t t-esc="w.name"/>
+                                        —
+                                        <t t-esc="_humanLen(w.length_mm)"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <t t-if="state.viewMode === 'floor'">
+                        <FloorPlanSVG room="props.room"
+                                      lines="props.lines"
+                                      unitPreference="props.unitPreference || 'mm'"
+                                      onCabinetClick="props.onCabinetClick"
+                                      onGapClick="props.onGapClick"
+                                      onCabinetDragEnd="props.onCabinetDragEnd"
+                                      onWallResizeEnd="props.onWallResizeEnd"
+                                      api="floorPlanApi"/>
+                    </t>
+                    <t t-if="state.viewMode === 'elevation'">
+                        <WallElevationSVG room="props.room"
+                                          wall="_selectedWall"
+                                          lines="props.lines"
+                                          unitPreference="props.unitPreference || 'mm'"/>
+                    </t>
+                </div>
+
+                <aside class="sb-room-plan-sidebar">
+
+                    <!-- Per-wall metrics -->
+                    <section class="sb-room-plan-walls">
+                        <h3 class="sb-room-plan-section-title">
+                            Walls
+                        </h3>
+                        <table class="sb-room-plan-walls-table">
+                            <thead>
+                                <tr>
+                                    <th>Wall</th>
+                                    <th class="sb-room-plan-num">Total</th>
+                                    <th class="sb-room-plan-num">Used</th>
+                                    <th class="sb-room-plan-num">Left</th>
+                                    <th class="sb-room-plan-num">Conflicts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="_wallMetrics"
+                                    t-as="m"
+                                    t-key="m.id"
+                                    class="sb-room-plan-wall-row"
+                                    t-att-class="{
+                                        'sb-room-plan-wall-row--conflict': m.has_conflicts,
+                                    }">
+                                    <td t-esc="m.name"/>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_humanLen(m.length_mm)"/>
+                                        <!-- Phase 3.C.2d — ± 100mm
+                                             length shifter. Visible
+                                             on every shape so multi-
+                                             wall topologies (l_shape,
+                                             u_shape, galley, g_shape)
+                                             have a path to resize
+                                             until the SVG-handle
+                                             support catches up. Min
+                                             200mm clamp lives in the
+                                             RoomLayoutTab._onWallShift
+                                             helper so the template
+                                             stays declarative. -->
+                                        <span t-if="props.onWallResizeEnd"
+                                              class="sb-room-plan-wall-len-shifter">
+                                            <button type="button"
+                                                    t-on-click="() => this._onWallShift(m.id, m.length_mm, -100)"
+                                                    t-att-aria-label="'Shrink ' + m.name + ' by 100 mm'">−</button>
+                                            <button type="button"
+                                                    t-on-click="() => this._onWallShift(m.id, m.length_mm, 100)"
+                                                    t-att-aria-label="'Grow ' + m.name + ' by 100 mm'">+</button>
+                                        </span>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_humanLen(m.used_mm)"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono"
+                                        t-att-class="{
+                                            'sb-room-plan-over': m.remaining_mm &lt; 0,
+                                        }">
+                                        <t t-esc="_humanLen(m.remaining_mm)"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="m.conflict_count"/>
+                                    </td>
+                                </tr>
+                                <tr class="sb-room-plan-wall-total">
+                                    <td><strong>Total</strong></td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_humanLen(_wallTotals.length_mm)"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_humanLen(_wallTotals.used_mm)"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">
+                                        <t t-esc="_humanLen(_wallTotals.remaining_mm)"/>
+                                    </td>
+                                    <td class="sb-room-plan-num mono">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <!-- Unplaced cabinets list -->
+                    <section class="sb-room-plan-unplaced">
+                        <h3 class="sb-room-plan-section-title">
+                            Unplaced (<t t-esc="_unplacedCount"/>)
+                        </h3>
+                        <p t-if="_unplacedCount === 0"
+                           class="sb-room-plan-unplaced-empty">
+                            All cabinets placed.
+                        </p>
+                        <ul t-else=""
+                            class="sb-room-plan-unplaced-list">
+                            <li t-foreach="_unplacedLines"
+                                t-as="line"
+                                t-key="line.id"
+                                class="sb-room-plan-unplaced-item">
+                                <span class="sb-room-plan-unplaced-name"
+                                      t-esc="line.name"/>
+                                <span class="sb-room-plan-unplaced-width mono">
+                                    <t t-esc="_humanLen(line.sb_width_mm || 0)"/>
+                                </span>
+                                <!-- Phase 3.C.2a — Assign... opens the
+                                     AssignToWallModal at the parent
+                                     OrderBuilder level. Button hidden
+                                     when no callback was wired so the
+                                     read-only mount (e.g. preview pane)
+                                     stays clean. -->
+                                <button t-if="props.onAssignFromSidebar"
+                                        type="button"
+                                        class="sb-room-plan-unplaced-assign"
+                                        t-on-click="() => this._onAssignClick(line.id)"
+                                        t-att-aria-label="'Assign ' + line.name + ' to a wall'">
+                                    Assign…
+                                </button>
+                            </li>
+                        </ul>
+                        <p t-if="!_hasLines &amp;&amp; _hasWalls"
+                           class="sb-room-plan-unplaced-empty">
+                            No cabinets in this order yet.
+                        </p>
+                    </section>
+
+                    <!-- Stage C (2026-06-28) — AppliancePalette. Docked
+                         drag-able catalog of kitchen appliances + standard
+                         window/door sizes. Drop onto FloorPlanSVG creates
+                         a constraint via the parent OrderBuilder. Renders
+                         only when the parent wired onConstraintCreate (the
+                         RPC layer the palette depends on). -->
+                    <!-- Stage D4 — missing-essential checklist. Renders
+                         above the AppliancePalette so designers see at
+                         a glance whether sink + cooktop + fridge +
+                         dishwasher are placed. Pure read-out; clicking
+                         is Stage E follow-up. -->
+                    <section t-if="props.onConstraintCreate"
+                             class="sb-essentials">
+                        <h3 class="sb-room-plan-section-title">
+                            Essentials
+                        </h3>
+                        <ul class="sb-essentials-list">
+                            <li t-foreach="_missingEssentials"
+                                t-as="e"
+                                t-key="e.role"
+                                class="sb-essentials-item"
+                                t-att-class="e.present ? 'sb-essentials-item--present' : 'sb-essentials-item--missing'">
+                                <span class="sb-essentials-mark"
+                                      t-esc="e.present ? '✓' : '⚠'"/>
+                                <span class="sb-essentials-label"
+                                      t-esc="e.label"/>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <AppliancePalette t-if="props.onConstraintCreate"
+                                      roomId="(props.room &amp;&amp; props.room.id) || false"
+                                      unitPreference="props.unitPreference || 'mm'"
+                                      onTemplateDrop="_onTemplateDrop"
+                                      getDropTarget="_getDropTarget"/>
+                </aside>
+            </div>
+        </div>
+    </t>
+
+    <!-- ============================================================
+         FloorPlanSVG — pure-render top-down inline SVG.
+
+         Layers, painter's order (back → front):
+           1. Background floor rect (subtle linen)
+           2. Wall lines (thick walnut strokes)
+           3. Constraints (type-coloured polygons + labels)
+           4. Gap markers (dashed rect + mm label)
+           5. Cabinet polygons (zone fill, conflict border)
+           6. Cabinet labels (short SKU, centred)
+           7. Wall name labels (text on the OUTSIDE of each wall)
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.FloorPlanSVG">
+        <svg class="sb-room-plan-svg"
+             t-ref="svgRoot"
+             t-att-viewBox="_viewBox"
+             xmlns="http://www.w3.org/2000/svg"
+             role="img"
+             aria-label="Room floor plan">
+
+            <!-- Background floor rect — only when we have walls. -->
+            <rect t-if="_bgRect"
+                  class="sb-room-plan-floor"
+                  t-att-x="_bgRect.x"
+                  t-att-y="_bgRect.y"
+                  t-att-width="_bgRect.w"
+                  t-att-height="_bgRect.h"/>
+
+            <!-- Wall lines. Conflict walls get the alert stroke. -->
+            <g class="sb-room-plan-walls-g">
+                <line t-foreach="_wallLines"
+                      t-as="w"
+                      t-key="w.key"
+                      class="sb-room-plan-wall-line"
+                      t-att-class="{
+                          'sb-room-plan-wall-line--conflict': w.hasConflicts,
+                      }"
+                      t-att-x1="w.x1"
+                      t-att-y1="w.y1"
+                      t-att-x2="w.x2"
+                      t-att-y2="w.y2"/>
+            </g>
+
+            <!-- Constraint polygons + architectural symbols + labels.
+                 Stage B: the polygon stays as the (transparent) hit target
+                 and per-type background tint; the architectural symbol
+                 renders inside a translate+rotate group so each constraint
+                 type reads as a top-down floor-plan drawing rather than a
+                 labeled box. The label is kept as a fallback when the
+                 symbol is too small to identify visually. -->
+            <g class="sb-room-plan-constraints-g">
+                <t t-foreach="_constraintPolys"
+                   t-as="c"
+                   t-key="c.key">
+                    <polygon class="sb-room-plan-constraint"
+                             t-att-class="'sb-room-plan-constraint--' + c.type + ' sb-room-plan-constraint--arch'"
+                             t-att-points="c.points"/>
+                    <g class="sb-room-plan-constraint-symbol"
+                       t-att-transform="c.transform">
+                        <t t-out="c.symbol"/>
+                    </g>
+                    <text class="sb-room-plan-constraint-label"
+                          t-att-x="c.cx"
+                          t-att-y="c.cy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="c.label"/>
+                    </text>
+                </t>
+            </g>
+
+            <!-- Gap markers — dashed rect, no fill. Phase 3.C.2a wires
+                 the click handler so a tap opens the catalog modal with
+                 a stashed pendingGapPlacement. Cursor flips to pointer
+                 only when a click handler is wired (props.onGapClick on
+                 the FloorPlanSVG, threaded down by RoomLayoutTab from
+                 the OrderBuilder). -->
+
+            <!-- Stage D3 — kitchen work-triangle hints. Dotted lines
+                 between sink + cooktop/range + fridge centers. Edges
+                 render only when 2+ of the three roles have been placed
+                 (so an empty room stays clean). NKBA-violating legs
+                 (over 9 ft or under 4 ft) get the warn modifier for
+                 red dashed strokes; in-range legs stay neutral grey. -->
+            <g class="sb-room-plan-triangle-g"
+               t-if="_workTriangleEdges.length">
+                <t t-foreach="_workTriangleEdges"
+                   t-as="edge"
+                   t-key="edge.key">
+                    <line t-att-class="edge.violation ? 'sb-room-plan-triangle sb-room-plan-triangle--warn' : 'sb-room-plan-triangle'"
+                          t-att-x1="edge.x1" t-att-y1="edge.y1"
+                          t-att-x2="edge.x2" t-att-y2="edge.y2"/>
+                    <text class="sb-room-plan-triangle-label"
+                          t-att-class="edge.violation ? 'sb-room-plan-triangle-label sb-room-plan-triangle-label--warn' : 'sb-room-plan-triangle-label'"
+                          t-att-x="edge.midX"
+                          t-att-y="edge.midY"
+                          text-anchor="middle"
+                          dominant-baseline="central"
+                          t-esc="edge.label"/>
+                </t>
+            </g>
+
+            <g class="sb-room-plan-gaps-g">
+                <t t-foreach="_gapMarkers"
+                   t-as="g"
+                   t-key="g.key">
+                    <polygon class="sb-room-plan-gap"
+                             t-att-class="props.onGapClick ? 'sb-room-plan-gap sb-room-plan-gap--clickable' : 'sb-room-plan-gap'"
+                             t-att-points="g.points"
+                             t-on-click="() => this._onGapClick(g.wallId, g.gapMm, g.positionMm)"/>
+                    <text t-if="g.showLabel"
+                          class="sb-room-plan-gap-label"
+                          t-att-x="g.cx"
+                          t-att-y="g.cy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="g.label"/>
+                    </text>
+                </t>
+            </g>
+
+            <!-- Cabinet polygons + (conditional) labels. Phase 3.C.2a
+                 wires the click handler so tapping a cabinet jumps to
+                 the Order Lines tab + selects the row (parent owns the
+                 state mutation via onCabinetClick).
+
+                 Phase 3.C.2b adds drag-along-wall via pointer events.
+                 During drag (after the 5px threshold trips) we render
+                 TWO polygons per cabinet: a low-opacity ghost at the
+                 ORIGINAL position + a semi-opaque preview at the
+                 cursor's projected mm. The shifter <g> sibling exposes
+                 ± 25mm buttons that are only visible on coarse-pointer
+                 devices (CSS-gated). -->
+            <g class="sb-room-plan-cabs-g">
+                <t t-foreach="_cabinetPolys"
+                   t-as="cab"
+                   t-key="cab.key">
+
+                    <!-- Original/static polygon. When this cabinet is
+                         mid-drag (isDragging) we drop opacity via the
+                         ghost class so the user sees where it came
+                         from while the preview rides the cursor. -->
+                    <polygon t-att-class="(cab.conflict
+                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
+                                           : cab.zoneClass)
+                                          + (props.onCabinetDragEnd ? ' sb-room-plan-cab--clickable' : (props.onCabinetClick ? ' sb-room-plan-cab--clickable' : ''))
+                                          + (cab.isDragging ? ' sb-room-plan-cab--drag-ghost' : '')"
+                             t-att-points="cab.points"
+                             t-on-pointerdown="(ev) => this._onCabinetPointerDown(cab.lineRef, ev)"
+                             t-on-click="() => this._onCabinetClick(cab.lineId)"/>
+
+                    <text t-if="cab.showLabel &amp;&amp; !cab.isDragging"
+                          class="sb-room-plan-cab-label"
+                          t-att-x="cab.cx"
+                          t-att-y="cab.cy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="cab.label"/>
+                    </text>
+
+                    <!-- Phase 3.C.2b — drag preview. Semi-opaque polygon
+                         + label that rides at dragState.currentMm.
+                         pointer-events disabled so the cursor still
+                         interacts with the original polygon under it. -->
+                    <polygon t-if="cab.isDragging"
+                             t-att-class="(cab.conflict
+                                           ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
+                                           : cab.zoneClass)
+                                          + ' sb-room-plan-cab--dragging'"
+                             t-att-points="cab.dragPoints"/>
+                    <text t-if="cab.isDragging &amp;&amp; cab.showLabel"
+                          class="sb-room-plan-cab-label"
+                          t-att-x="cab.dragCx"
+                          t-att-y="cab.dragCy"
+                          text-anchor="middle"
+                          dominant-baseline="central">
+                        <t t-esc="cab.label"/>
+                    </text>
+
+                    <!-- Phase 3.C.2b: touch shifter (plus/minus 25mm).
+                         Visible only on coarse pointers (CSS @media).
+                         Rendered as a sibling group so the :hover
+                         sibling-combinator on the clickable cabinet
+                         class picks it up on hover for desktop too. -->
+                    <g t-if="props.onCabinetDragEnd &amp;&amp; !cab.isDragging"
+                       class="sb-room-plan-shifter">
+                        <rect class="sb-room-plan-shifter-btn"
+                              t-att-x="cab.cx - 26"
+                              t-att-y="cab.cy + 14"
+                              width="22"
+                              height="18"
+                              rx="3"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, -25)"/>
+                        <text class="sb-room-plan-shifter-glyph"
+                              t-att-x="cab.cx - 15"
+                              t-att-y="cab.cy + 23"
+                              text-anchor="middle"
+                              dominant-baseline="central"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, -25)">−</text>
+                        <rect class="sb-room-plan-shifter-btn"
+                              t-att-x="cab.cx + 4"
+                              t-att-y="cab.cy + 14"
+                              width="22"
+                              height="18"
+                              rx="3"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, 25)"/>
+                        <text class="sb-room-plan-shifter-glyph"
+                              t-att-x="cab.cx + 15"
+                              t-att-y="cab.cy + 23"
+                              text-anchor="middle"
+                              dominant-baseline="central"
+                              t-on-click="() => this._onCabinetShift(cab.lineRef, 25)">+</text>
+                    </g>
+                </t>
+            </g>
+
+            <!-- Wall name labels — drawn LAST so they sit on top. -->
+            <g class="sb-room-plan-wall-labels-g">
+                <text t-foreach="_wallLabels"
+                      t-as="lbl"
+                      t-key="lbl.key"
+                      class="sb-room-plan-wall-label"
+                      t-att-x="lbl.x"
+                      t-att-y="lbl.y"
+                      text-anchor="middle"
+                      dominant-baseline="central">
+                    <t t-esc="lbl.name"/>
+                </text>
+            </g>
+
+            <!-- Phase 3.C.2d — wall-resize ghost preview line. Drawn
+                 BEFORE the handles so the handle circles stay on top
+                 of the dashed preview during a drag. Only renders
+                 while a wall drag is active AND has crossed the 5px
+                 threshold (per _wallDragPreview). -->
+            <line t-if="_wallDragPreview"
+                  class="sb-room-plan-wall-ghost"
+                  t-att-x1="_wallDragPreview.x1"
+                  t-att-y1="_wallDragPreview.y1"
+                  t-att-x2="_wallDragPreview.x2"
+                  t-att-y2="_wallDragPreview.y2"
+                  stroke-dasharray="6 4"/>
+
+            <!-- Phase 3.C.2d — outer-endpoint resize handles. Rendered
+                 LAST (after labels + ghost) so they hit-test before
+                 the wall lines + background. V1 scope: only single-
+                 wall topologies (straight | island) — multi-wall
+                 shapes get the sidebar ± buttons instead. -->
+            <g class="sb-room-plan-wall-handles-g">
+                <circle t-foreach="_resizableWalls"
+                        t-as="wh"
+                        t-key="wh.wall.id"
+                        class="sb-room-plan-wall-handle"
+                        t-att-class="wallDragState.wallId === wh.wall.id ? 'sb-room-plan-wall-handle sb-room-plan-wall-handle--active' : 'sb-room-plan-wall-handle'"
+                        t-att-cx="wh.cx"
+                        t-att-cy="wh.cy"
+                        r="7"
+                        t-on-pointerdown="(ev) => this._onWallPointerDown(wh.wall, ev)"/>
+            </g>
+
+        </svg>
+    </t>
+
+    <!-- ============================================================
+         AssignToWallModal — Phase 3.C.2a.
+
+         Fullscreen overlay launched when the user clicks "Assign..."
+         next to an unplaced cabinet in the Room Layout sidebar. Wall
+         dropdown (length + remaining) + position input + Cancel /
+         Assign. Parent OrderBuilder owns the RPC; this template just
+         drives the form.
+
+         Backdrop click does NOT close (a misclick mid-pick would lose
+         the form state). Use the × button or Cancel.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.AssignToWallModal">
+        <div class="sb-room-plan-modal-backdrop">
+            <div class="sb-room-plan-modal"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="sb-room-plan-modal-title">
+                <header class="sb-room-plan-modal-head">
+                    <h2 id="sb-room-plan-modal-title"
+                        class="sb-room-plan-modal-title">
+                        Assign cabinet to a wall
+                    </h2>
+                    <button type="button"
+                            class="sb-room-plan-modal-close"
+                            aria-label="Cancel"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.submitting">×</button>
+                </header>
+
+                <div class="sb-room-plan-modal-body">
+                    <p class="sb-room-plan-modal-cabinet">
+                        <strong t-esc="props.line.name || 'Cabinet'"/>
+                        <span t-if="_cabinetWidthMm"
+                              class="sb-room-plan-modal-width mono">
+                            <t t-esc="_humanLen(_cabinetWidthMm)"/> wide
+                        </span>
+                    </p>
+
+                    <label class="sb-room-plan-modal-label"
+                           for="sb-room-plan-modal-wall">
+                        Wall
+                    </label>
+                    <select id="sb-room-plan-modal-wall"
+                            class="sb-room-plan-modal-select"
+                            t-att-value="state.wallId"
+                            t-on-change="_onWallChange"
+                            t-att-disabled="state.submitting">
+                        <option t-foreach="_wallOptions"
+                                t-as="opt"
+                                t-key="opt.id"
+                                t-att-value="opt.id"
+                                t-att-selected="String(opt.id) === String(state.wallId) ? 'selected' : null">
+                            <t t-esc="opt.name"/>
+                            ·
+                            <t t-esc="_humanLen(opt.length_mm)"/>
+                            ·
+                            <t t-esc="_humanLen(opt.remaining_mm)"/> left
+                        </option>
+                    </select>
+
+                    <label class="sb-room-plan-modal-label"
+                           for="sb-room-plan-modal-pos">
+                        Position from left (mm)
+                        <small t-if="(props.unitPreference || 'mm') === 'imperial'"
+                               class="sb-room-plan-modal-hint">
+                            — input stays in mm; toggle is display-only
+                        </small>
+                    </label>
+                    <input id="sb-room-plan-modal-pos"
+                           type="number"
+                           min="0"
+                           step="10"
+                           class="sb-room-plan-modal-input mono"
+                           t-att-value="state.positionMm"
+                           t-on-input="_onPositionInput"
+                           t-att-disabled="state.submitting"/>
+
+                    <p t-if="state.error"
+                       class="sb-room-plan-modal-error"
+                       t-esc="state.error"/>
+                </div>
+
+                <footer class="sb-room-plan-modal-foot">
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--secondary"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.submitting">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--primary"
+                            t-on-click="_onAssignClick"
+                            t-att-disabled="state.submitting">
+                        <t t-if="state.submitting">Assigning…</t>
+                        <t t-else="">Assign</t>
+                    </button>
+                </footer>
+            </div>
+        </div>
+    </t>
+
+    <!-- ============================================================
+         WallElevationSVG — Phase 3.C.2c.
+
+         Side-on cross-section of one wall. Read-only — no click /
+         drag handlers (those stay on the floor plan).
+
+         Layers, painter's order (back → front):
+           1. Background rect (paper)
+           2. Floor / ceiling / worktop reference lines
+           3. Constraint cutouts (window/door rect, outlet badge)
+           4. Cabinet front-face rectangles (zone-coloured)
+           5. Cabinet labels + Y-axis tick labels
+
+         Empty cases:
+           - props.wall null  → "Pick a wall" placeholder
+           - no cabinets       → outline + constraints only (no skip)
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.WallElevationSVG">
+        <svg class="sb-room-plan-svg sb-room-plan-elev-svg"
+             t-att-viewBox="_viewBox"
+             xmlns="http://www.w3.org/2000/svg"
+             role="img"
+             aria-label="Wall elevation">
+
+            <t t-if="!props.wall">
+                <rect x="0" y="0" width="1024" height="600"
+                      fill="#FAF7EE"/>
+                <text x="512" y="300"
+                      text-anchor="middle"
+                      dominant-baseline="central"
+                      class="sb-room-plan-elev-axis-label">
+                    Pick a wall
+                </text>
+            </t>
+
+            <t t-else="">
+                <!-- Background (linen). -->
+                <rect x="0" y="0"
+                      width="1024" height="600"
+                      fill="#FAF7EE"/>
+
+                <!-- Floor line (solid walnut). -->
+                <line x1="0"
+                      t-att-y1="_floorY"
+                      x2="1024"
+                      t-att-y2="_floorY"
+                      stroke="#5B4A3A"
+                      stroke-width="2"/>
+
+                <!-- Ceiling line (solid walnut) — only when room has
+                     a positive ceiling height. -->
+                <line t-if="props.room.ceiling_height_mm"
+                      x1="0"
+                      t-att-y1="_ceilingY"
+                      x2="1024"
+                      t-att-y2="_ceilingY"
+                      stroke="#5B4A3A"
+                      stroke-width="2"/>
+
+                <!-- Worktop reference (dashed). -->
+                <line x1="0"
+                      t-att-y1="_worktopY"
+                      x2="1024"
+                      t-att-y2="_worktopY"
+                      stroke="#776B5C"
+                      stroke-width="1"
+                      stroke-dasharray="4 3"/>
+
+                <!-- Wall span label (right of top-right corner). -->
+                <text t-if="_wallEnds"
+                      t-att-x="_wallEnds.rightX + 6"
+                      t-att-y="_ceilingY - 4"
+                      class="sb-room-plan-elev-axis-label"
+                      text-anchor="start">
+                    <t t-esc="_wallEnds.label"/>
+                </text>
+
+                <!-- Constraint rectangles + icon badges. -->
+                <g class="sb-room-plan-elev-constraints-g">
+                    <t t-foreach="_constraintRects"
+                       t-as="c"
+                       t-key="c.key">
+                        <rect class="sb-room-plan-constraint"
+                              t-att-class="'sb-room-plan-constraint--' + c.type"
+                              t-att-x="c.x"
+                              t-att-y="c.y"
+                              t-att-width="c.w"
+                              t-att-height="c.h"/>
+                        <text t-if="!c.isIcon"
+                              class="sb-room-plan-constraint-label"
+                              t-att-x="c.cx"
+                              t-att-y="c.cy"
+                              text-anchor="middle"
+                              dominant-baseline="central">
+                            <t t-esc="c.label"/>
+                        </text>
+                    </t>
+                </g>
+
+                <!-- Cabinet front-face rectangles. -->
+                <g class="sb-room-plan-elev-cabs-g">
+                    <t t-foreach="_cabinetRects"
+                       t-as="cab"
+                       t-key="cab.key">
+                        <rect class="sb-room-plan-elev-cabinet"
+                              t-att-class="cab.isConflict
+                                            ? (cab.zoneClass + ' sb-room-plan-cab--conflict')
+                                            : cab.zoneClass"
+                              t-att-x="cab.x"
+                              t-att-y="cab.y"
+                              t-att-width="cab.w"
+                              t-att-height="cab.h"/>
+                        <text t-if="cab.showLabel"
+                              class="sb-room-plan-cab-label"
+                              t-att-x="cab.cx"
+                              t-att-y="cab.cy"
+                              text-anchor="middle"
+                              dominant-baseline="central">
+                            <t t-esc="cab.label"/>
+                        </text>
+                    </t>
+                </g>
+
+                <!-- Y-axis labels — floor / worktop / ceiling. -->
+                <g class="sb-room-plan-elev-axis-g">
+                    <text t-foreach="_axisLabels"
+                          t-as="ax"
+                          t-key="ax.key"
+                          class="sb-room-plan-elev-axis-label"
+                          t-att-x="ax.x"
+                          t-att-y="ax.y"
+                          text-anchor="end"
+                          dominant-baseline="central">
+                        <t t-esc="ax.text"/>
+                    </text>
+                </g>
+            </t>
+        </svg>
+    </t>
+
+    <!-- ============================================================
+         GapRecommendModal — Phase 6.1.
+
+         Opened when the user taps an empty wall gap on the Room
+         Layout floor plan. Shows the top-3 recommended cabinet
+         templates (returned by the recommend endpoint) as a stacked
+         card list, plus a "Browse all cabinets…" button that escapes
+         to the full catalog modal.
+
+         Empty-state branch (recommendations.length === 0) hides the
+         card list and shows the gap_too_small note — still surfaces
+         Browse all so the user has a path forward.
+
+         Visual chrome shares the sb-room-plan-modal-* base classes
+         with AssignToWallModal (mirrors the wizard backdrop). Card-
+         specific styles live under sb-room-plan-recommend-*.
+         ============================================================ -->
+    <t t-name="southbrook_estimating_website.GapRecommendModal">
+        <div class="sb-room-plan-modal-backdrop">
+            <div class="sb-room-plan-modal sb-room-plan-recommend-modal"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="sb-room-plan-recommend-title">
+                <header class="sb-room-plan-modal-head">
+                    <h2 id="sb-room-plan-recommend-title"
+                        class="sb-room-plan-modal-title">
+                        Recommended for this gap
+                    </h2>
+                    <button type="button"
+                            class="sb-room-plan-modal-close"
+                            aria-label="Cancel"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.pickingTemplateId !== null">×</button>
+                </header>
+
+                <div class="sb-room-plan-modal-body sb-room-plan-recommend-body">
+                    <p class="sb-room-plan-recommend-gap">
+                        <span class="sb-room-plan-recommend-gap-label">Gap width</span>
+                        <strong class="mono"><t t-esc="_formatMm(_gapMm)"/></strong>
+                    </p>
+
+                    <t t-if="props.recommendations.length === 0">
+                        <p class="sb-room-plan-recommend-empty">
+                            This gap is too small for any cabinet in
+                            the catalog. Pick from the full catalog if
+                            you want a custom width.
+                        </p>
+                    </t>
+                    <t t-else="">
+                        <ul class="sb-room-plan-recommend-list">
+                            <t t-foreach="props.recommendations"
+                               t-as="rec"
+                               t-key="rec.template_id">
+                                <li class="sb-room-plan-recommend-card">
+                                    <div class="sb-room-plan-recommend-card-head">
+                                        <span class="sb-room-plan-recommend-card-name"
+                                              t-esc="rec.name"/>
+                                        <span t-if="rec.default_code"
+                                              class="sb-room-plan-recommend-card-code mono"
+                                              t-esc="rec.default_code"/>
+                                    </div>
+                                    <div class="sb-room-plan-recommend-card-meta">
+                                        <span class="sb-room-plan-recommend-chip sb-room-plan-recommend-chip--best mono">
+                                            Best fit <t t-esc="_formatMm(rec.best_width_mm)"/>
+                                            (<t t-esc="_pctOfGap(rec.best_width_mm)"/> of gap)
+                                        </span>
+                                        <t t-if="rec.fitting_widths_mm.length > 1">
+                                            <span class="sb-room-plan-recommend-widths-label">
+                                                Other fitting widths:
+                                            </span>
+                                            <t t-foreach="rec.fitting_widths_mm"
+                                               t-as="w"
+                                               t-key="w">
+                                                <span t-if="w !== rec.best_width_mm"
+                                                      class="sb-room-plan-recommend-chip mono"
+                                                      t-esc="_formatMm(w)"/>
+                                            </t>
+                                        </t>
+                                    </div>
+                                    <div class="sb-room-plan-recommend-card-actions">
+                                        <button type="button"
+                                                class="sb-room-plan-modal-btn sb-room-plan-modal-btn--primary"
+                                                t-on-click="() => this._onPickClick(rec.template_id)"
+                                                t-att-disabled="state.pickingTemplateId !== null">
+                                            <t t-if="state.pickingTemplateId === rec.template_id">Adding…</t>
+                                            <t t-else="">Add this cabinet</t>
+                                        </button>
+                                    </div>
+                                </li>
+                            </t>
+                        </ul>
+                    </t>
+                </div>
+
+                <footer class="sb-room-plan-modal-foot">
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--secondary"
+                            t-on-click="_onCancelClick"
+                            t-att-disabled="state.pickingTemplateId !== null">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            class="sb-room-plan-modal-btn sb-room-plan-modal-btn--secondary"
+                            t-on-click="_onBrowseAllClick"
+                            t-att-disabled="state.pickingTemplateId !== null">
+                        Browse all cabinets…
+                    </button>
+                </footer>
+            </div>
+        </div>
+    </t>
+
+</templates>

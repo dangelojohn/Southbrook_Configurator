@@ -41,19 +41,37 @@ contract, GAP-05 / SYN-02):
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.1.0",
+    "version": "19.0.1.4.1",
     "depends": [
         "mrp",
+        "sale",
         "southbrook_estimating",
         "southbrook_hardware_catalog",
         "southbrook_freecad_bridge",
+        # QR foundation — qr.mixin for cutlist + hardware package.
+        "southbrook_qr_kit",
+        # MO form redesign (19.0.1.0.0): hard depend ONLY on the
+        # base mrp form. southbrook_mrp_kitchen_workcenters /
+        # southbrook_manufacturing_intelligence transitively depend
+        # on this addon already, so declaring them here creates a
+        # dependency loop and the upgrade is skipped silently. The
+        # redesign inherits only mrp.mrp_production_form_view; the
+        # x_sbk_* and x_mi_* fields are present on mrp.production
+        # at runtime because those addons are installed on prod.
     ],
+    "external_dependencies": {
+        # Cabinet manufacturing label embeds a QR PNG via qrcode +
+        # Pillow. Pre-installed on the Odoo 19 Debian image.
+        "python": ["qrcode"],
+    },
     "data": [
         "security/ir.model.access.csv",
         "views/sb_cutlist_views.xml",
         "views/sb_hardware_package_views.xml",
         "views/sb_production_package_views.xml",
         "views/southbrook_kitchen_mrp_menus.xml",
+        "views/mrp_production_form_redesign.xml",
+        "reports/cabinet_label_report.xml",
     ],
     "installable": True,
     "application": False,

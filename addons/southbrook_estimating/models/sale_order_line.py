@@ -79,6 +79,31 @@ class SaleOrderLine(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # Room-First UX Phase 1.2 — optional wall placement.
+    #
+    # Both fields are copy=False so NF6 version-chain duplication does
+    # not propagate stale placements onto the cloned order. is_positioned
+    # is a derived boolean used by the Room Layout tab to filter unplaced
+    # cabinets into the sidebar list. Per design note: position 0 (the
+    # wall's left corner) IS a valid placement, so positioning is gated
+    # on wall_id alone — not on a position > 0 sentinel.
+    # ------------------------------------------------------------------
+    wall_id = fields.Many2one(
+        "southbrook.room.wall", string="Wall",
+        copy=False, ondelete="set null", index=True,
+        help="The wall this cabinet sits against. Optional.")
+    position_from_left_mm = fields.Integer(
+        string="Position From Left (mm)", copy=False,
+        help="Cabinet's left edge distance from the wall's left corner.")
+    is_positioned = fields.Boolean(
+        compute="_compute_is_positioned", store=True)
+
+    @api.depends("wall_id")
+    def _compute_is_positioned(self):
+        for rec in self:
+            rec.is_positioned = bool(rec.wall_id)
+
+    # ------------------------------------------------------------------
     # Phase 3 Sprint B2 — live-compute BoM rollup (option (b) from
     # docs/PHASE_3_PLAN.md). The demo seed creates variants without a
     # product.config.session, so the panel/door numbers can't be read

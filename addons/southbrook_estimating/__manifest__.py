@@ -56,7 +56,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.2.3.0",
+    "version": "19.0.7.0.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -92,6 +92,8 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "account",
         "contacts",
         "crm",
+        # QR foundation — qr.mixin + scan controller for builder PO intake.
+        "southbrook_qr_kit",
     ],
     # ------------------------------------------------------------------
     # Python external dependencies.
@@ -114,6 +116,10 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "views/res_partner_views.xml",
         # Commit 3 — configurator attribute vocabulary
         "data/attributes.xml",
+        # 19.0.4.2.0 (2026-06-18) — Product Configurator/MRP
+        # BoM-line Configuration Sets. These seed reusable manufacturing
+        # conditions but intentionally do not attach to BoM lines yet.
+        "data/configuration_sets.xml",
         # Commit 4 — 6 channel pricelists + 3 tradesperson sub-tiers
         "data/pricelists.xml",
         # Commit 7 — 12 cabinet templates + 132 attribute_lines
@@ -144,6 +150,16 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "data/cabinet_catalog_metadata.xml",
         # Commit 9 — Order Builder views, user-prefs view, menu
         "views/sale_order_views.xml",
+        # Room-First UX Phase 1.3 — southbrook.room backend views, SO smart button.
+        # MUST load AFTER sale_order_views.xml: inherits the SO form view
+        # which is augmented there, and registers the menu under
+        # menu_southbrook_root (defined in sale_order_views.xml).
+        "views/southbrook_room_views.xml",
+        # Phase 6.2 (2026-06-27) — Room Templates library seed.
+        # MUST load AFTER security (ACL must exist) and AFTER the room
+        # views block (model registration order, conventional).
+        # noupdate="0" so seed updates propagate on -u.
+        "data/room_templates.xml",
         "views/res_users_views.xml",
         # Commit 10 — QWeb reports (routine #6 partial)
         # Styles MUST load before the report templates that reference them
@@ -161,6 +177,27 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # Southbrook Estimating. Bypasses the product form button entirely.
         # MUST load AFTER sale_order_views.xml (which defines menu_southbrook_root).
         "views/launch_3d_menu.xml",
+        # Bug #4 (2026-06-22) — wizard Next→Confirm on the final step.
+        # Inherits product_configurator.product_configurator_form so it
+        # must load after that addon is installed (depends list already
+        # guarantees this).
+        "views/product_configurator_wizard_view.xml",
+        # A1 (2026-06-18) — Prodboard cabinet-archetype taxonomy seed.
+        # Loads after security so the access rules exist when the seed
+        # creates archetype records. Idempotent.
+        "data/prodboard_taxonomy_seed.xml",
+        # A5 (2026-06-18) — Type-encoded SB-* default_code assignment
+        # on the Q8 Southbrook templates. Idempotent; never overwrites
+        # an existing default_code. Must load AFTER product_templates.xml
+        # so the xml_id targets exist.
+        "data/template_code_assign.xml",
+        # Prodboard catalogue mapping — assigns cloned archetype refs to
+        # the locked 12 Q8 templates. Must load after product templates
+        # and after the taxonomy seed has upserted archetypes.
+        "data/template_archetype_assign.xml",
+        # Builder PO intake stub (SAMI PRD #16, 2026-06-26).
+        "data/builder_po_intake_seed.xml",
+        "views/builder_po_intake_views.xml",
     ],
     # ------------------------------------------------------------------
     # Asset bundles — Track 1 (3D cabinet viewport).
@@ -180,6 +217,17 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
             "southbrook_estimating/static/src/scss/_southbrook_design_tokens.scss",
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
+            # 2026-06-22 — Tier-1 cabinet GLB pipeline. The GLTFLoader
+            # entry is COMMENTED until the vendor lib is dropped at
+            # static/lib/three/GLTFLoader.js (see
+            # static/lib/cabinets/README.md "Vendoring THREE.GLTFLoader"
+            # for the one-line curl command). The loader module below
+            # is safe to ship even when GLTFLoader is absent — it
+            # console.warn's once and returns null from loadCabinet so
+            # every cabinet falls back to BoxGeometry.
+            #
+            # "southbrook_estimating/static/lib/three/GLTFLoader.js",
+            "southbrook_estimating/static/src/js/cabinet_glb_loader.esm.js",
             "southbrook_estimating/static/src/scss/cabinet_viewport.scss",
             "southbrook_estimating/static/src/js/cabinet_viewport.esm.js",
             "southbrook_estimating/static/src/xml/cabinet_viewport.xml",
@@ -221,6 +269,12 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         "demo/southbrook_demo_variants.xml",
         "demo/southbrook_demo_orders.xml",
     ],
+    # REG-C1 (2026-06-18) — heal companies missing a default Sales journal.
+    # See _ensure_sales_journal in __init__.py for the why; runs on
+    # -i AND -u so live DBs upgrade-heal automatically.
+    # Combined hook (chains _ensure_sales_journal + _configure_southbrook_report_branding).
+    # See __init__.py for the why; both steps are independent and idempotent.
+    "post_init_hook": "_southbrook_estimating_post_init",
     "installable": True,
     "application": True,
     "auto_install": False,

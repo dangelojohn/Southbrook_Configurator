@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    Cabinet Manufacturing Label — Avery 9421 (2-up, 3.9 × 3.0 in).
+
+    REPLACES the prior Avery Presta 94215 strip layout (8 × 3 in
+    landscape single strip, 2 cells per strip). The runtime patch on
+    2026-06-27 switched to Avery 9421 (full 8.5 × 11 in portrait
+    sheet, 2 labels per row × multiple rows per sheet). This source
+    file is the sync-back so `-u southbrook_kitchen_mrp` no longer
+    wipes the runtime fix.
+
+    Per-label layout — left side QR, right side logo + contact, then
+    a data grid, then a Code/Hinge/Fin footer:
+
+      ┌──────────────────────────────────────────────────────────┐
+      │ [QR code]   │   SOUTHBROOK CABINETRY LOGO                │
+      │             │   www.southbrookcabinetry.com  905-761-9801│
+      ├──────────────────────────────────────────────────────────┤
+      │ Customer:  | JOHN DEANGELO                                │
+      │ PO #:      |                                              │
+      │ TAG:       | JOHN DEANGELO                                │
+      │ Door Name: | NAPLES                                       │
+      │ Door Color:| SNOW WHITE                                   │
+      │ Interior   | White: [X]   Maple: [ ]                      │
+      ├────────────────────────┬───────────┬────────────────────┤
+      │         Code           │   Hinge   │        Fin         │
+      │         B3D24          │           │                    │
+      └────────────────────────┴───────────┴────────────────────┘
+
+    Three gotchas the runtime patch surfaced — see memory note
+    `southbrook_cabinet_label_qweb_gotchas.md`:
+
+    1. Logo must be `/web/image/res.company/1/logo` (DB-attachment
+       URL). Static asset paths like
+       `/southbrook_kitchen_mrp/static/src/img/sb_label_logo.png`
+       fail to render under wkhtmltopdf.
+
+    2. QR field `sbk_label_qr_image` is `fields.Binary()` and
+       arrives as bytes in server-side QWeb — must call
+       `.decode('ascii')`. (Sibling `qr_image_base64` is a str
+       and `.decode()` errors.)
+
+    3. The two-label-per-row container needs explicit
+       `flex-direction: row` — wkhtmltopdf's Chromium fork sometimes
+       lays children column-wise with just `display: flex`.
+
+    Multi-MO selection on the list view: action_report still calls
+    render once per record and concatenates pages, so a batch of N
+    cabinets yields an N-page PDF.
+-->
+<odoo>
+
+    <record id="paperformat_avery_presta_94215" model="report.paperformat">
+        <!-- XML id retained for back-compat with the original Presta
+             94215 commits (75ff53e + 29917e7); name + dimensions
+             swapped to Avery 9421 to match runtime patch 2026-06-27. -->
+        <field name="name">Avery 9421 (2-up, 3.9x3.0 in)</field>
+        <field name="format">custom</field>
+        <!-- Full 8.5 × 11 in portrait sheet. Two 3.9 × 3.0 in labels
+             per row × ~3 rows per sheet (with vertical gutters between
+             rows). v19 paperformat fields are integer mm. -->
+        <field name="page_width">216</field>      <!-- 8.5 in -->
+        <field name="page_height">279</field>     <!-- 11 in -->
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">13</field>       <!-- 0.5 in -->
+        <field name="margin_bottom">13</field>
+        <field name="margin_left">5</field>       <!-- 0.188 in -->
+        <field name="margin_right">5</field>
+        <field name="header_line">0</field>
+        <field name="header_spacing">0</field>
+        <field name="disable_shrinking" eval="True"/>
+        <field name="dpi">300</field>
+    </record>
+
+    <record id="action_report_cabinet_label" model="ir.actions.report">
+        <field name="name">Cabinet Label (Avery 9421)</field>
+        <field name="model">mrp.production</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">southbrook_kitchen_mrp.report_cabinet_label</field>
+        <field name="report_file">southbrook_kitchen_mrp.report_cabinet_label</field>
+        <field name="paperformat_id" ref="paperformat_avery_presta_94215"/>
+        <field name="binding_model_id" ref="mrp.model_mrp_production"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Cabinet Label %s' % (object.name)</field>
+    </record>
+
+    <!--
+        Main report — one page per MO with two identical labels
+        side-by-side on the first row of the Avery 9421 sheet. The
+        operator gets two stickers per cabinet (one for the cabinet
+        itself, one for the shop traveller).
+    -->
+    <template id="report_cabinet_label">
+        <t t-call="web.html_container">
+            <style>
+                @page {
+                    size: 8.5in 11in;
+                    margin: 0.5in 0.188in;
+                }
+                body {
+                    margin: 0;
+                    padding: 0;
+                    font-family: Arial, Helvetica, sans-serif;
+                }
+                /* wkhtmltopdf 0.12.6 has unreliable flexbox + WebP
+                   rendering. Layout uses tables (always-renders) and
+                   the logo is inlined as base64-PNG (sbk_company_logo_b64
+                   field, transcoded via PIL). See memory note
+                   southbrook_cabinet_label_qweb_gotchas.md. */
+                .sbk-label-page {
+                    width: 8.124in;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                    page-break-after: always;
+                    margin: 0;
+                    padding: 0;
+                }
+                .sbk-label-page td.sbk-label-cell {
+                    width: 3.9in;
+                    padding: 0;
+                    vertical-align: top;
+                }
+                .sbk-label-page td.sbk-label-gutter {
+                    width: 0.125in;
+                    padding: 0;
+                }
+                .sbk-label {
+                    width: 3.9in;
+                    height: 3.0in;
+                    border: 1px solid #000;
+                    box-sizing: border-box;
+                    padding: 4px 5px;
+                    overflow: hidden;
+                    color: #000;
+                }
+                .sbk-label-header {
+                    width: 100%;
+                    border-bottom: 1.5px solid #000;
+                    padding-bottom: 3px;
+                    margin-bottom: 3px;
+                    border-collapse: collapse;
+                }
+                .sbk-label-header td.sbk-label-qr-cell {
+                    width: 0.75in;
+                    vertical-align: top;
+                    padding: 0;
+                }
+                .sbk-label-qr img {
+                    width: 0.65in;
+                    height: 0.65in;
+                    display: block;
+                }
+                .sbk-label-header td.sbk-label-brand-cell {
+                    vertical-align: middle;
+                    text-align: right;
+                    padding: 0 0 0 6px;
+                }
+                .sbk-label-brand img {
+                    max-width: 1.6in;
+                    max-height: 0.5in;
+                    display: inline-block;
+                }
+                .sbk-label-contact {
+                    font-size: 6.5pt;
+                    color: #333;
+                    text-align: right;
+                    margin-top: 2px;
+                }
+                .sbk-data-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 7.5pt;
+                    flex: 1;
+                }
+                .sbk-data-table td {
+                    border: 0.5px solid #555;
+                    padding: 1.5px 3px;
+                    vertical-align: middle;
+                    line-height: 1.2;
+                }
+                .sbk-data-table .lbl {
+                    font-weight: bold;
+                    white-space: nowrap;
+                    width: 0.7in;
+                    background-color: #f2f2f2;
+                }
+                .sbk-data-table .val {
+                    font-weight: bold;
+                    text-transform: uppercase;
+                }
+                .sbk-interior-row td {
+                    padding: 1px 3px;
+                }
+                .sbk-checkbox-cell {
+                    width: 0.12in;
+                    text-align: center;
+                    font-size: 9pt;
+                    font-weight: bold;
+                }
+                .sbk-footer-row td {
+                    text-align: center;
+                    font-size: 8pt;
+                    font-weight: bold;
+                    background-color: #f2f2f2;
+                }
+                /* W007 — engineering revision footer (only renders when
+                   mrp.production.pg_revision_code is stamped). Tight
+                   one-line cell so the rev never wraps the label. */
+                .sbk-rev-row td {
+                    text-align: center;
+                    font-size: 7pt;
+                    font-weight: bold;
+                    color: #000;
+                    background-color: #fff;
+                    border-top: 0.5px solid #555;
+                    padding: 1px 3px;
+                    letter-spacing: 0.3px;
+                    white-space: nowrap;
+                }
+            </style>
+            <t t-foreach="docs" t-as="mo">
+                <table class="sbk-label-page">
+                    <tr>
+                        <td class="sbk-label-cell">
+                            <t t-call="southbrook_kitchen_mrp.report_cabinet_label_one">
+                                <t t-set="o" t-value="mo"/>
+                            </t>
+                        </td>
+                        <td class="sbk-label-gutter"></td>
+                        <td class="sbk-label-cell">
+                            <t t-call="southbrook_kitchen_mrp.report_cabinet_label_one">
+                                <t t-set="o" t-value="mo"/>
+                            </t>
+                        </td>
+                    </tr>
+                </table>
+            </t>
+        </t>
+    </template>
+
+    <!--
+        Single-label inner template — the actual label markup.
+        Called twice from the main report. The calling site sets
+        `o` via `<t t-set="o" t-value="mo"/>` so the inner can
+        reference `o.<field>` regardless of the outer's loop var.
+
+        Layout per the runtime patch: QR LEFT, logo+contact RIGHT.
+        (The previous Avery Presta 94215 source had QR RIGHT,
+        logo LEFT; the 2026-06-27 patch swapped them.)
+    -->
+    <template id="report_cabinet_label_one">
+        <div class="sbk-label">
+            <!-- Header: QR left, logo + contact right.
+                 wkhtmltopdf 0.12.6 can't reliably render display:flex
+                 OR fetch /web/image (especially WebP); we use a table
+                 + inline base64-PNG via sbk_company_logo_b64. -->
+            <table class="sbk-label-header">
+                <tr>
+                    <td class="sbk-label-qr-cell">
+                        <div class="sbk-label-qr">
+                            <img t-if="o.sbk_label_qr_image"
+                                 t-att-src="'data:image/png;base64,' + o.sbk_label_qr_image.decode('ascii')"
+                                 alt="QR Code"/>
+                        </div>
+                    </td>
+                    <td class="sbk-label-brand-cell">
+                        <div class="sbk-label-brand">
+                            <img t-if="o.sbk_company_logo_b64"
+                                 t-att-src="'data:image/png;base64,' + o.sbk_company_logo_b64"
+                                 alt="Southbrook Cabinetry"/>
+                            <div class="sbk-label-contact">
+                                www.southbrookcabinetry.com &#160;&#160; 905-761-9801
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Data grid -->
+            <table class="sbk-data-table">
+                <tr>
+                    <td class="lbl">Customer:</td>
+                    <td class="val" colspan="3" t-out="o.sbk_label_customer_name or ''"/>
+                </tr>
+                <tr>
+                    <td class="lbl">PO #:</td>
+                    <td class="val" colspan="3" t-out="o.sbk_label_po_ref or ''"/>
+                </tr>
+                <tr>
+                    <td class="lbl">TAG:</td>
+                    <td class="val" colspan="3" t-out="o.sbk_label_tag or ''"/>
+                </tr>
+                <tr>
+                    <td class="lbl">Door Name:</td>
+                    <td class="val" colspan="3" t-out="o.sbk_label_door_name or ''"/>
+                </tr>
+                <tr>
+                    <td class="lbl">Door Color:</td>
+                    <td class="val" colspan="3" t-out="o.sbk_label_door_color or ''"/>
+                </tr>
+                <tr class="sbk-interior-row">
+                    <td class="lbl">Interior:</td>
+                    <td style="white-space:nowrap; font-size:7pt; font-weight:bold;">White:</td>
+                    <td class="sbk-checkbox-cell">
+                        <t t-if="o.sbk_label_interior_is_white">&#10003;</t>
+                    </td>
+                    <td style="white-space:nowrap; font-size:7pt; font-weight:bold; padding-left:6px;">Maple:</td>
+                    <td class="sbk-checkbox-cell">
+                        <t t-if="o.sbk_label_interior_is_maple">&#10003;</t>
+                    </td>
+                </tr>
+                <tr class="sbk-footer-row">
+                    <td style="width:50%;">Code</td>
+                    <td colspan="2" style="width:25%;">Hinge</td>
+                    <td style="width:25%;">Fin</td>
+                </tr>
+                <tr>
+                    <td class="val" style="text-align:center; font-size:10pt;" t-out="o.sbk_label_code or ''"/>
+                    <td class="val" colspan="2" style="text-align:center;" t-out="o.sbk_label_hinge or ''"/>
+                    <td class="val" style="text-align:center;" t-out="o.sbk_label_fin or ''"/>
+                </tr>
+                <!-- W007 — engineering revision row. Conditional on
+                     pg_revision_code being non-empty so MOs that pre-date
+                     the PG-112 traceability stamp render unchanged.
+                     `pg_revision_code` is a related field added by the
+                     sibling product_graph_release addon; on databases
+                     where that addon isn't installed `hasattr(o, ...)`
+                     short-circuits to False and the row is omitted. -->
+                <tr class="sbk-rev-row" t-if="hasattr(o, 'pg_revision_code') and o.pg_revision_code">
+                    <td colspan="4">Rev: <span t-out="o.pg_revision_code"/></td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <!-- Smart button on the MO form -->
+    <record id="view_mrp_production_form_sbk_label" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_label_btn</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_print_cabinet_label"
+                        type="object"
+                        string="🏷 Print Cabinet Label"
+                        groups="mrp.group_mrp_user"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

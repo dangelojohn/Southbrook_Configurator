@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from . import test_res_partner_channel
 from . import test_attribute_seed
+from . import test_configuration_sets_seed
 from . import test_pricelist_resolution
 from . import test_config_rule_domains
 from . import test_analytics_capture
@@ -14,3 +15,14 @@ from . import test_demo_data
 from . import test_phase1_smoke
 from . import test_catalog_metadata_seed
 from . import test_audit_phase2
+from . import test_a1_prodboard_taxonomy
+from . import test_a4_image_uuid
+from . import test_a5_template_code
+from . import test_prodboard_asset_importer
+from . import test_template_archetype_mapping
+from . import test_t2_door_area
+from . import test_sales_journal_hook
+from . import test_variant_sku_cost
+from . import test_3d_payload_phase2
+from . import test_southbrook_room
+from . import test_room_wall_assignment

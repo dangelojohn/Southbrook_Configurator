@@ -33,6 +33,13 @@ import {
     useState,
     xml,
 } from "@odoo/owl";
+// 2026-06-22: Tier-1 cabinet GLB loader (see cabinet_glb_loader.esm.js).
+// When a designer drops a `.glb` into static/lib/cabinets/ and adds an
+// entry to cabinets.json, the corresponding cabinet renders as the
+// vendor mesh INSTEAD of the per-panel BoxGeometry below. With an
+// empty manifest (initial state) or a missing GLTFLoader vendor lib,
+// every findGlbUrlFor() returns null and we render boxes as before.
+import { GlbRegistry } from "@southbrook_estimating/js/cabinet_glb_loader.esm";
 
 async function rpcCall(url, params = {}) {
     const res = await fetch(url, {
@@ -253,6 +260,33 @@ export class KitchenViewport extends Component {
             door: new THREE.MeshStandardMaterial({
                 color: 0x6b3f2a, roughness: 0.7, metalness: 0.05,
             }),
+            // Per-finish door materials. The backend payload emits
+            // material names like "door_white" / "door_maple_stain"
+            // when product_config_session resolves the customer's
+            // Finish attribute. Unknown finishes fall back to the
+            // generic `door` material above. Added 2026-06-25.
+            door_white: new THREE.MeshStandardMaterial({
+                color: 0xf0ebe3, roughness: 0.45, metalness: 0.05,
+            }),
+            // The 3 stained finishes carry a procedural wood-grain
+            // CanvasTexture in `map` + a base color tint. Texture
+            // builder is _buildWoodGrainTexture below. White stays
+            // map-less — it's paint, not wood.
+            door_maple_stain: new THREE.MeshStandardMaterial({
+                color: 0xc89e76,
+                ...this._buildWoodMaterialMaps(0xc89e76, 0x8c6a48),
+                roughness: 0.70, metalness: 0.05,
+            }),
+            door_cherry_stain: new THREE.MeshStandardMaterial({
+                color: 0x6b2e1a,
+                ...this._buildWoodMaterialMaps(0x6b2e1a, 0x401a0d),
+                roughness: 0.65, metalness: 0.05,
+            }),
+            door_walnut_stain: new THREE.MeshStandardMaterial({
+                color: 0x3d2817,
+                ...this._buildWoodMaterialMaps(0x3d2817, 0x1f130a),
+                roughness: 0.70, metalness: 0.05,
+            }),
             back: new THREE.MeshStandardMaterial({
                 color: 0xa68872, roughness: 0.9, metalness: 0.0,
             }),
@@ -264,6 +298,12 @@ export class KitchenViewport extends Component {
             }),
             worktop: new THREE.MeshStandardMaterial({
                 color: 0xb5b0a8, roughness: 0.4, metalness: 0.05,
+            }),
+            // Drawer slides + other metal hardware bodies. Gunmetal /
+            // zinc — added 2026-06-25 alongside the base-feet + drawer-
+            // rails geometry. Feet reuse `toekick` (matte black plastic).
+            hardware: new THREE.MeshStandardMaterial({
+                color: 0x8a8a8e, roughness: 0.35, metalness: 0.85,
             }),
             // P25C2 — blueline wireframe overlay.
             blueline: new THREE.MeshBasicMaterial({
@@ -347,6 +387,209 @@ export class KitchenViewport extends Component {
      * surfaces; not appropriate for shiny metalwork. (Hardware finish
      * pass in Sprint B will revisit.)
      */
+    /**
+     * Phase 3 Sprint B (2026-06-25) — procedural wood-grain texture.
+     *
+     * Returns a Three.js CanvasTexture seeded from `baseHex`/`grainHex`
+     * suitable for use as `map` on a MeshStandardMaterial. The texture
+     * is a vertical grain pattern with 12 broad bands and ~60 fine
+     * striations of `grainHex` painted at varying opacity over a
+     * `baseHex` fill. Deterministic seed → same input pair always
+     * produces the same pattern (no per-frame jitter).
+     *
+     * Why procedural instead of bundled JPGs:
+     *   - air-gapped (no asset CDN dependency)
+     *   - no licensing concerns
+     *   - tiny code, no static-file weight per finish
+     *   - matches the precedent set by _installStudioEnvironment
+     *
+     * Texture is 256x512 (vertical grain orientation), repeat
+     * (2, 1.5) so a 600mm door doesn't show one stretched pattern.
+     */
+    _buildWoodGrainTexture(baseHex, grainHex) {
+        // Legacy single-map helper — kept for callers that don't
+        // want the normal map. New door materials use
+        // _buildWoodMaterialMaps below.
+        return this._buildWoodMaterialMaps(baseHex, grainHex).map;
+    }
+
+    /**
+     * Phase 3.5 (2026-06-26) — procedural wood grain with normal map.
+     *
+     * Returns { map, normalMap } for a Three.js MeshStandardMaterial.
+     * The albedo map carries the color + grain. The normal map gives
+     * tactile depth so the studio rig's 6-light setup catches every
+     * pore + ring instead of rendering it as a flat decal.
+     *
+     * Grain pattern:
+     *   - 4-6 organic annular rings (vertical sine-distorted curves)
+     *   - 80 fine grain striations with ±2px x-jitter
+     *   - ~180 pore speckles (1-2px dark dots, simulate wood pores)
+     *   - 1-2 small knot blemishes per texture
+     *
+     * Normal map is derived from the albedo: brighter areas (base
+     * color) → flat normal (128, 128, 255); darker areas (grain) →
+     * subtle indentation. Computed as grayscale gradient sampled
+     * from a slightly-blurred copy of the albedo.
+     *
+     * Resolution: 512×1024 (2x prior). Anisotropic filter at 8x.
+     */
+    _buildWoodMaterialMaps(baseHex, grainHex) {
+        const THREE = this._THREE;
+        if (!THREE) return {};
+        const w = 512, h = 1024;
+        const albedo = this._drawWoodAlbedoCanvas(w, h, baseHex, grainHex);
+        const normal = this._deriveNormalMapCanvas(albedo, w, h);
+
+        const map = new THREE.CanvasTexture(albedo);
+        if (THREE.SRGBColorSpace) map.colorSpace = THREE.SRGBColorSpace;
+        map.wrapS = THREE.RepeatWrapping;
+        map.wrapT = THREE.RepeatWrapping;
+        map.repeat.set(1.5, 1.0);
+        map.anisotropy = 8;
+
+        const normalMap = new THREE.CanvasTexture(normal);
+        // Normal maps are LINEAR data, NOT sRGB. Setting colorSpace
+        // to sRGB on a normal map double-applies gamma + breaks the
+        // shader. Three.js defaults to NoColorSpace for non-color
+        // data, which is correct.
+        normalMap.wrapS = THREE.RepeatWrapping;
+        normalMap.wrapT = THREE.RepeatWrapping;
+        normalMap.repeat.set(1.5, 1.0);
+        normalMap.anisotropy = 8;
+
+        return { map, normalMap };
+    }
+
+    /**
+     * Draw the albedo (color) canvas. Organic wood-grain look using
+     * deterministic PRNG so the same finish always renders identically.
+     */
+    _drawWoodAlbedoCanvas(w, h, baseHex, grainHex) {
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        const toHex = (n) => "#" + n.toString(16).padStart(6, "0");
+        const baseStr = toHex(baseHex);
+        const grainStr = toHex(grainHex);
+        // Slightly-darker shade for shadows under grain peaks.
+        const shadowHex = (
+            ((((baseHex >> 16) & 0xff) * 0.85) << 16) |
+            ((((baseHex >> 8) & 0xff) * 0.85) << 8) |
+            (((baseHex & 0xff) * 0.85))
+        ) | 0;
+        const shadowStr = toHex(shadowHex);
+        // Base fill.
+        ctx.fillStyle = baseStr;
+        ctx.fillRect(0, 0, w, h);
+        // Deterministic PRNG seeded from baseHex.
+        let seed = (baseHex ^ 0x9e3779b9) >>> 0;
+        const prng = () => {
+            seed = (seed * 1103515245 + 12345) >>> 0;
+            return (seed & 0x7fffffff) / 0x7fffffff;
+        };
+        // ---- Annular rings: 5 broad sine-distorted vertical bands ----
+        // These read as growth rings on a quarter-sawn cabinet door.
+        ctx.strokeStyle = grainStr;
+        for (let i = 0; i < 5; i++) {
+            const baseX = prng() * w;
+            const ringW = 18 + prng() * 30;
+            const phase = prng() * Math.PI * 2;
+            const amp = 6 + prng() * 14;
+            const period = 200 + prng() * 200;
+            ctx.globalAlpha = 0.14 + prng() * 0.10;
+            ctx.lineWidth = ringW;
+            ctx.beginPath();
+            ctx.moveTo(baseX, 0);
+            for (let y = 0; y <= h; y += 4) {
+                const x = baseX + amp * Math.sin((y / period) * Math.PI * 2 + phase);
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+        // ---- Fine grain striations: 80 thin lines with x-jitter ----
+        ctx.strokeStyle = grainStr;
+        for (let i = 0; i < 80; i++) {
+            const x = prng() * w;
+            const lw = 0.4 + prng() * 1.2;
+            ctx.globalAlpha = 0.06 + prng() * 0.18;
+            ctx.lineWidth = lw;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            const segs = 12;
+            for (let s = 1; s <= segs; s++) {
+                const sy = (s / segs) * h;
+                const sx = x + (prng() - 0.5) * 5;
+                ctx.lineTo(sx, sy);
+            }
+            ctx.stroke();
+        }
+        // ---- Pore speckles: ~180 small dark dots ----
+        ctx.fillStyle = grainStr;
+        for (let i = 0; i < 180; i++) {
+            const px = prng() * w;
+            const py = prng() * h;
+            const pr = 0.5 + prng() * 1.5;
+            ctx.globalAlpha = 0.18 + prng() * 0.20;
+            ctx.beginPath();
+            ctx.arc(px, py, pr, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // ---- Knot blemishes: 1-2 small dark elliptical knots ----
+        const knotCount = 1 + Math.floor(prng() * 2);
+        for (let i = 0; i < knotCount; i++) {
+            const kx = prng() * w;
+            const ky = (0.2 + prng() * 0.6) * h;
+            const krx = 4 + prng() * 8;
+            const kry = 6 + prng() * 12;
+            const grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, kry);
+            grad.addColorStop(0.0, shadowStr);
+            grad.addColorStop(0.6, grainStr);
+            grad.addColorStop(1.0, baseStr);
+            ctx.fillStyle = grad;
+            ctx.globalAlpha = 0.45;
+            ctx.beginPath();
+            ctx.ellipse(kx, ky, krx, kry, prng() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        return canvas;
+    }
+
+    /**
+     * Derive a tangent-space normal map from the albedo canvas via
+     * a Sobel-like edge gradient on the luminance channel. Brighter
+     * pixels = surface peaks; darker pixels = pores/rings. The shader
+     * uses this to perturb lighting normals, giving tactile depth.
+     */
+    _deriveNormalMapCanvas(albedoCanvas, w, h) {
+        const src = albedoCanvas.getContext("2d").getImageData(0, 0, w, h);
+        const out = document.createElement("canvas");
+        out.width = w; out.height = h;
+        const dst = out.getContext("2d").createImageData(w, h);
+        const lum = (i) => 0.299 * src.data[i] + 0.587 * src.data[i + 1] + 0.114 * src.data[i + 2];
+        const strength = 2.5;  // Normal-map intensity multiplier
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const xl = (x === 0) ? 0 : x - 1;
+                const xr = (x === w - 1) ? w - 1 : x + 1;
+                const yu = (y === 0) ? 0 : y - 1;
+                const yd = (y === h - 1) ? h - 1 : y + 1;
+                const dx = lum((y * w + xr) * 4) - lum((y * w + xl) * 4);
+                const dy = lum((yd * w + x) * 4) - lum((yu * w + x) * 4);
+                const i = (y * w + x) * 4;
+                // Pack the gradient as a tangent-space normal vector.
+                // R = +X (right of center 128), G = +Y, B = +Z (always up).
+                dst.data[i] = Math.max(0, Math.min(255, 128 + dx * strength));
+                dst.data[i + 1] = Math.max(0, Math.min(255, 128 - dy * strength));
+                dst.data[i + 2] = 255;
+                dst.data[i + 3] = 255;
+            }
+        }
+        out.getContext("2d").putImageData(dst, 0, 0);
+        return out;
+    }
+
     _installStudioEnvironment() {
         if (!this._renderer || !this._scene) return;
         try {
@@ -440,6 +683,10 @@ export class KitchenViewport extends Component {
             this._cabinetGroup.remove(child);
             if (child.geometry) child.geometry.dispose();
         }
+        // Track per-line bounding boxes as we go so the async GLB pass
+        // below can position vendor models without re-walking panels.
+        // {<lineId>: {minX, maxX, minY, maxY, minZ, maxZ}}
+        const lineBounds = {};
 
         if (!payload || !Array.isArray(payload.panels)) return;
 
@@ -468,9 +715,48 @@ export class KitchenViewport extends Component {
             // get_kitchen_3d_payload backend prefixes each panel name
             // with L{id}_ — so /^L(\d+)_/ pulls the id reliably.
             const m = (p.name || "").match(/^L(\d+)_/);
-            if (m) mesh.userData.lineId = m[1];
+            if (m) {
+                mesh.userData.lineId = m[1];
+                // Accumulate the line's axis-aligned bounding box from
+                // panel centres + half-extents. Used by the Tier-1 GLB
+                // pass to place the vendor mesh at the cabinet's
+                // bottom-front-left corner (matches the asset-
+                // authoring origin in static/lib/cabinets/README.md).
+                const id = m[1];
+                const hx = d.width / 2;
+                const hy = d.height / 2;
+                const hz = d.depth / 2;
+                const b = lineBounds[id] || (lineBounds[id] = {
+                    minX:  Infinity, maxX: -Infinity,
+                    minY:  Infinity, maxY: -Infinity,
+                    minZ:  Infinity, maxZ: -Infinity,
+                });
+                if (p.pos.x - hx < b.minX) b.minX = p.pos.x - hx;
+                if (p.pos.x + hx > b.maxX) b.maxX = p.pos.x + hx;
+                if (p.pos.y - hy < b.minY) b.minY = p.pos.y - hy;
+                if (p.pos.y + hy > b.maxY) b.maxY = p.pos.y + hy;
+                if (p.pos.z - hz < b.minZ) b.minZ = p.pos.z - hz;
+                if (p.pos.z + hz > b.maxZ) b.maxZ = p.pos.z + hz;
+            }
             this._cabinetGroup.add(mesh);
         }
+
+        // 2026-06-22 — Tier-1 cabinet GLB pass.
+        //
+        // The per-panel BoxGeometry loop above is the always-on
+        // fallback. AFTER it runs, kick off an async pass that asks
+        // GlbRegistry for a vendor GLB per line and — for any line
+        // that has one — removes the per-panel boxes for that line
+        // and adds the GLB scene in their place. With an empty
+        // cabinets.json (initial state), or a missing GLTFLoader,
+        // every lookup returns null and this is a silent no-op.
+        //
+        // Build-sequence guard prevents an in-flight load from
+        // attaching to a now-cleared scene (rapid prop changes / a
+        // new _build call). Each _build bumps the counter; the async
+        // attach checks it before mutating _cabinetGroup.
+        this._buildSeq = (this._buildSeq || 0) + 1;
+        this._attachTier1GlbsAsync(this._buildSeq, lineBounds);
 
         // P25C2 — rebuild dimension chains for the new bounds.
         this._buildDimensionLines(payload);
@@ -485,6 +771,74 @@ export class KitchenViewport extends Component {
             } else {
                 this._camera.lookAt(new THREE.Vector3(...tgt));
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 2026-06-22 — Tier-1 cabinet GLB attach pass.
+    //
+    // Fires AFTER _build's per-panel BoxGeometry loop. For each line
+    // with a registered GLB, removes that line's per-panel meshes and
+    // places the vendor model at the cabinet's bottom-front-left
+    // corner (computed in _build via lineBounds). Lines with no
+    // registered GLB keep their box meshes.
+    //
+    // Build-sequence guard: if another _build call has fired during
+    // our await, mySeq !== this._buildSeq and we drop the work — the
+    // newer _build is mid-flight against a freshly-cleared scene.
+    //
+    // Mode swap: when the user toggles blueline mode, _build is NOT
+    // re-run (onToggleMode just swaps materials in place). Tier-1 GLBs
+    // therefore stay solid even in blueline mode for now — a real
+    // shader swap is a Phase-3 polish item, not part of this scaffold.
+    // ------------------------------------------------------------------
+    async _attachTier1GlbsAsync(mySeq, lineBounds) {
+        const THREE = this._THREE;
+        if (!THREE || !this._cabinetGroup) return;
+        if (!lineBounds || !Object.keys(lineBounds).length) return;
+        await GlbRegistry.load();
+        if (mySeq !== this._buildSeq || !this._cabinetGroup) return;
+
+        for (const lineId of Object.keys(lineBounds)) {
+            const lineInfo = this._linesIndex[lineId];
+            if (!lineInfo || !lineInfo.sku) continue;
+            const url = GlbRegistry.findGlbUrlFor(lineInfo.sku);
+            if (!url) continue;
+            const scene = await GlbRegistry.loadCabinet(THREE, url);
+            // Re-check the seq after every await — a newer _build may
+            // have invalidated our scene.
+            if (mySeq !== this._buildSeq || !this._cabinetGroup) return;
+            if (!scene) continue;
+
+            // Remove the per-panel box meshes for this line. Iterate a
+            // shallow copy because removing from the underlying
+            // children array mid-loop would skip elements.
+            const stale = this._cabinetGroup.children.filter(
+                (c) => c.userData && c.userData.lineId === lineId,
+            );
+            for (const c of stale) {
+                this._cabinetGroup.remove(c);
+                if (c.geometry) c.geometry.dispose();
+            }
+
+            // Place the GLB at the cabinet's bottom-front-left corner.
+            // SketchUp-authored origin convention is documented in
+            // static/lib/cabinets/README.md: X = width, Y = height,
+            // Z = depth toward the viewer (+Z front). The +X span
+            // is minX..maxX, +Y is 0..maxY (floor), +Z is minZ..maxZ.
+            const b = lineBounds[lineId];
+            scene.position.set(b.minX, b.minY, b.maxZ);
+            scene.userData.lineId = lineId;
+            // Tag every child mesh too so the existing hover/raycast
+            // path (which reads mesh.userData.lineId) keeps working.
+            scene.traverse((obj) => {
+                if (obj.isMesh) {
+                    obj.userData.lineId = lineId;
+                    obj.castShadow = true;
+                    obj.receiveShadow = true;
+                }
+            });
+            this._cabinetGroup.add(scene);
         }
     }
 

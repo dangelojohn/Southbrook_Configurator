@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 from collections import Counter
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 # project.task.stage names (lowercased) that imply production has begun / finished.
@@ -39,6 +39,57 @@ def _first_meaningful_line(*texts):
 
 class ProjectTask(models.Model):
     _inherit = "project.task"
+
+    def write(self, vals):
+        self._southbrook_check_readiness_stage_gate(vals)
+        return super().write(vals)
+
+    def _southbrook_check_readiness_stage_gate(self, vals):
+        """Block kitchen jobs from entering production stages before ready."""
+        if self.env.context.get("southbrook_skip_readiness_stage_gate"):
+            return
+        if "stage_id" not in vals or not vals.get("stage_id"):
+            return
+        stage = self.env["project.task.type"].browse(vals["stage_id"]).exists()
+        if not stage:
+            return
+        stage_name = (stage.name or "").lower()
+        production_stage = any(
+            hint in stage_name
+            for hint in (_STARTED_STAGE_HINTS + _DELIVERY_STAGE_HINTS)
+        )
+        if not production_stage:
+            return
+        for task in self:
+            if not task._southbrook_is_kitchen_job():
+                continue
+            if task.manufacturing_readiness_state == "ready":
+                continue
+            reason = (
+                _first_meaningful_line(
+                    task.manufacturing_blocker_summary,
+                    task.southbrook_production_release_reason,
+                    task.manufacturing_warning_summary,
+                )
+                or "Manufacturing readiness is not ready."
+            )
+            raise UserError(_(
+                "Cannot move '%(task)s' to '%(stage)s' while readiness is "
+                "%(state)s. %(reason)s"
+            ) % {
+                "task": task.display_name,
+                "stage": stage.display_name,
+                "state": task.manufacturing_readiness_state or "unknown",
+                "reason": reason,
+            })
+
+    def _southbrook_is_kitchen_job(self):
+        self.ensure_one()
+        if self.production_ids:
+            return True
+        if "x_southbrook_sale_order_id" in self._fields:
+            return bool(self.x_southbrook_sale_order_id)
+        return False
 
     # --- B1: a real person owns the job -------------------------------------
     pm_id = fields.Many2one(
@@ -151,6 +202,7 @@ class ProjectTask(models.Model):
         ],
         string="Readiness Decision",
         compute="_compute_phase1_operational_context",
+        store=True,
         readonly=True,
     )
     readiness_score = fields.Integer(
@@ -318,6 +370,7 @@ class ProjectTask(models.Model):
         ],
         string="Production Release",
         compute="_compute_southbrook_production_release",
+        store=True,
         search="_search_southbrook_production_release_state",
         readonly=True,
     )
@@ -432,6 +485,7 @@ class ProjectTask(models.Model):
         ],
         string="Install Readiness",
         compute="_compute_southbrook_install_readiness",
+        store=True,
         search="_search_southbrook_install_readiness_state",
         readonly=True,
     )
@@ -556,6 +610,7 @@ class ProjectTask(models.Model):
         [("ready", "Ready"), ("review", "Review"), ("blocked", "Blocked")],
         string="Readiness Decision",
         compute="_compute_manufacturing_readiness",
+        store=True,
         search="_search_manufacturing_readiness_state")
     manufacturing_waterfall_summary = fields.Text(
         string="Waterfall Readiness",
@@ -2083,7 +2138,14 @@ class ProjectTask(models.Model):
                     unavailable += 1
                 lines.append("%s: %s" % (mo.name, label))
 
-            po_lines = PurchaseLine.search([("production_id", "in", mos.ids)])
+            # Odoo 19 removed the direct `production_id` field from
+            # purchase.order.line. The linkage is now indirect via
+            # stock.move: po_line.move_dest_ids → mo.move_raw_ids.
+            # The move-based lookup below already covers what the old
+            # `[("production_id", "in", mos.ids)]` search would return,
+            # so start from an empty recordset and let the move path
+            # populate it.
+            po_lines = PurchaseLine.browse()
             raw_moves = mos.mapped("move_raw_ids")
             if raw_moves:
                 po_lines |= raw_moves.mapped("created_purchase_line_ids")

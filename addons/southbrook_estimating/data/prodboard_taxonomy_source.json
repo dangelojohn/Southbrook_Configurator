@@ -1,0 +1,5132 @@
+{
+  "metadata": {
+    "source": "planner.prodboard.com/betterkitchens/kitchen",
+    "generated": "2026-06-18T14:20:37.598Z",
+    "description": "BetterKitchens Prodboard product catalog - all products with image URLs"
+  },
+  "classic_collection": {
+    "description": "Traditional kitchen cabinets - compatible with all door styles",
+    "total": 160,
+    "products": [
+      {
+        "id": 152503,
+        "code": "CC-BHL1DR",
+        "name": "Single Highline Base Unit",
+        "width_default": 400,
+        "width_available": [
+          150,
+          200,
+          250,
+          260,
+          300,
+          350,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c3d44b09-2933-46d2-9f1e-4a6c8b8b838d/500mm Highline Base Unit.png"
+      },
+      {
+        "id": 152512,
+        "code": "CC-BCV{S}",
+        "name": "Curved Base Unit - 300 x 300mm",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/85fc294d-3361-4f38-adfb-8b043805a8a6/Curved Base Unit - 300 x 300mm - (Right End).png"
+      },
+      {
+        "id": 152563,
+        "code": "CC-CHL{S}",
+        "name": "Highline Corner Base Unit",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/30ed9d24-fb1c-4528-b9f3-8375b9977964/900mm Highline Corner Base Unit - 450mm LH Hand Door (All Post Types).png"
+      },
+      {
+        "id": 157334,
+        "code": "CC-CCL",
+        "name": "L-Shape Corner Base Unit",
+        "width_default": 910,
+        "width_available": [
+          910
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 910,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/75a0ed5d-0a99-4333-9f6d-519e5221b8bc/900 x 900mm L-Shape Corner Base Unit.png"
+      },
+      {
+        "id": 157360,
+        "code": "CC-CCD",
+        "name": "Diagonal Corner Base Unit",
+        "width_default": 910,
+        "width_available": [
+          910
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 910,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f8852e21-f256-416b-9db3-1cfd6f560999/900 x 900mm Diagonal Corner Base Unit (1).png"
+      },
+      {
+        "id": 157371,
+        "code": "CC-WC{H}{S}",
+        "name": "Standard Corner Wall Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          700,
+          800,
+          900
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a6d25baf-fa1c-4285-85db-b24c3cc2723e/600mm Standard Corner Wall Unit - 300mm LH Door (Medium) (All Post Types).png"
+      },
+      {
+        "id": 157372,
+        "code": "CC-WL{H}",
+        "name": "L-Shape Corner Wall Unit",
+        "width_default": 630,
+        "width_available": [
+          630
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 630,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/13bbaafa-ac1b-4979-9ebd-b8d22498deb0/620 x 620mm L-Shape Corner Wall Unit (Medium).png"
+      },
+      {
+        "id": 157373,
+        "code": "CC-WD{H}1DR",
+        "name": "Single Wall Unit",
+        "width_default": 400,
+        "width_available": [
+          150,
+          200,
+          260,
+          300,
+          350,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8953df29-92d3-43c8-88af-41c45c1d036e/500mm Single Wall Unit (Medium).png"
+      },
+      {
+        "id": 157374,
+        "code": "CC-WCVM{S}",
+        "name": "Curved Wall Unit - 300 x 300mm",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/143ab07e-1e59-4faf-b2b8-514ffcb5ed0f/Curved Wall Unit -  Right End.png"
+      },
+      {
+        "id": 157375,
+        "code": "CC-WDC{H}",
+        "name": "Diagonal Corner Wall Unit",
+        "width_default": 630,
+        "width_available": [
+          630
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 630,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/43b9c8c7-8f1e-4f0b-9263-e2e9d42afe37/600 x 600mm Diagonal Corner Wall Unit (Medium).png"
+      },
+      {
+        "id": 157376,
+        "code": "CC-WSPLY{H}{S}",
+        "name": "Splay End Wall Unit",
+        "width_default": 360,
+        "width_available": [
+          360
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b61b955f-373f-4a79-a167-15d32706b061/300mm Open End Wall Unit - RH (Medium).png"
+      },
+      {
+        "id": 157377,
+        "code": "CC-WOE{H}{S}",
+        "name": "Open End Wall Unit",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/68753a4b-e73d-4f01-8b21-20bcf796ab1f/300mm Open End Wall Unit - RH (Medium).png"
+      },
+      {
+        "id": 157378,
+        "code": "CC-BHS1DR",
+        "name": "Single Highline Sink Base Unit",
+        "width_default": 600,
+        "width_available": [
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3cf4a647-7fe6-4171-bf31-60a469f78680/600mm Highline Sink Base Unit.png"
+      },
+      {
+        "id": 158996,
+        "code": "CC-BOE{S}",
+        "name": "Open End Base Unit - Angled",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e960bc47-b833-4bcb-9206-daee9bd62ce2/300mm Open End Base Unit - Angled (Right End).png"
+      },
+      {
+        "id": 158997,
+        "code": "CC-BSPLY{S}",
+        "name": "Splay End Base Unit",
+        "width_default": 360,
+        "width_available": [
+          360
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c180afb4-4686-4ce0-9bc9-534a8dfb9704/370mm Splay End Base Unit (Right End).png"
+      },
+      {
+        "id": 159015,
+        "code": "CC-BBN1",
+        "name": "Bin Store Highline Base Unit 1 (1 x 44L)",
+        "width_default": 400,
+        "width_available": [
+          400
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8fedd4b5-d89c-43d1-a5d7-9a91b210c89e/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 159016,
+        "code": "CC-BBN2[32&1.2]",
+        "name": "Bin Store Highline Base Unit 2  (1 x 32L & 1 x 1.2L)",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c4fe5ffb-e867-438c-802d-32870fd40239/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 159017,
+        "code": "CC-BBN3",
+        "name": "Bin Store Highline Base Unit 3 (2 x 32L & 1 x 21L)",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/07bca28c-ec82-4c7f-8dd1-74c60bdebb69/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 159018,
+        "code": "CC-BBS1DR",
+        "name": "Belfast Sink Base Unit with Door",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 455,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/273b827f-67fd-4dfd-b972-a399630d7be1/изображение_2026-01-06_102733389.png"
+      },
+      {
+        "id": 159019,
+        "code": "CC-BBS1DW",
+        "name": "Belfast Sink Base Unit with 1 Drawer",
+        "width_default": 800,
+        "width_available": [
+          800
+        ],
+        "height_default": 500,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4356fe84-8bba-4fa8-a718-74ace16eafdc/изображение_2026-01-06_102802824.png"
+      },
+      {
+        "id": 159020,
+        "code": "CC-BBS2DW",
+        "name": "Belfast Sink Base Unit with 2 Doors",
+        "width_default": 800,
+        "width_available": [
+          800
+        ],
+        "height_default": 500,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/32b4a219-da3d-44fd-b138-c48080dfd45a/CC-BBS2DW"
+      },
+      {
+        "id": 159021,
+        "code": "CC-BDL1DW",
+        "name": "Drawerline (Single Drawer) Base Unit",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          450,
+          500,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8f3c99a6-b18a-4f34-a817-04c3beec92e7/изображение_2026-01-14_145911260.png"
+      },
+      {
+        "id": 159022,
+        "code": "CC-BDL2DW",
+        "name": "Double Drawerline Base Unit",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f580e849-ec18-40ba-9579-0d54ad8a4ed6/800mm Drawerline Base Unit (2).png"
+      },
+      {
+        "id": 159023,
+        "code": "CC-BDO1DW",
+        "name": "Open Base Unit with Drawer",
+        "width_default": 300,
+        "width_available": [
+          300,
+          350,
+          400,
+          450,
+          500,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e4a917dd-141b-4f30-a638-eddfd74c075b/500mm Open Base Unit with Top Drawer.png"
+      },
+      {
+        "id": 159024,
+        "code": "CC-BDS0/1DW",
+        "name": "Dummy Single Drawerline Sink Base Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/bfb38bc4-0c95-4cef-a1c8-24d3a9754fd5/600mm Single Dummy Drawerline Sink Base Unit.png"
+      },
+      {
+        "id": 159025,
+        "code": "CC-BDS0/2DW",
+        "name": "Dummy Double Drawerline Sink Base Unit",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/cf198949-682e-41c4-86c6-81a0a5f19ee0/800mm Dummy Drawerline Sink Base Unit.png"
+      },
+      {
+        "id": 159026,
+        "code": "CC-BHH",
+        "name": "Half Height Pan Drawer Base Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 360,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d5863f9a-fe39-47cf-8f28-316eba44abc7/900mm Half Height Pan Drawer Base Unit.png"
+      },
+      {
+        "id": 159027,
+        "code": "CC-BHL2DR",
+        "name": "Double Highline Base Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          700,
+          800,
+          900,
+          1000,
+          1100
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/741456b0-9322-4f50-b443-554670d255ef/900mm Highline Base Unit.png"
+      },
+      {
+        "id": 159028,
+        "code": "CC-BHS2DR",
+        "name": "Double Highline Sink Base Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          700,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/fcad055a-377d-4186-ac6e-f54050ecab72/900mm Highline Sink Base Unit.png"
+      },
+      {
+        "id": 159029,
+        "code": "CC-BMD2+1DW",
+        "name": "2 Standard & 1 Pan Drawer Base Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/bd67337d-3cdc-4ff2-a9c5-609abc55c7b4/600mm 2+1 Pan Drawer Base Unit.png"
+      },
+      {
+        "id": 159030,
+        "code": "CC-BMD2DRi",
+        "name": "2 Drawer Base Unit + 1 Internal",
+        "width_default": 600,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/279536d5-2111-4ad5-9a11-0da1cd118e74/900mm 2 Drawer Base Unit + 1 Internal.png"
+      },
+      {
+        "id": 159031,
+        "code": "CC-BMD2DW",
+        "name": "2 Drawer Base Unit",
+        "width_default": 600,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/2185dca7-33ec-4c3d-888e-7b412c39962c/900mm 2 Drawer Base Unit.png"
+      },
+      {
+        "id": 159032,
+        "code": "CC-BMD3+1DW",
+        "name": "3 Standard & 1 Pan Drawer Base Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7734a263-296b-44f5-abb2-fd4ba8e78f48/900mm 3+1 Pan Drawer Base Unit.png"
+      },
+      {
+        "id": 159033,
+        "code": "CC-BMD3DW",
+        "name": "3 Drawer Base Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0f08d07d-77f4-471c-af02-6ba6527f844b/900mm 3 Drawer Base Unit.png"
+      },
+      {
+        "id": 159034,
+        "code": "CC-BMD4DW",
+        "name": "4 Drawer Base Unit",
+        "width_default": 500,
+        "width_available": [
+          400,
+          500,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f096ea15-c917-416e-bc4d-70b95d96dc8f/600mm 4 Drawer Base Unit.png"
+      },
+      {
+        "id": 159035,
+        "code": "CC-BMD5DW",
+        "name": "5 Drawer Base Unit",
+        "width_default": 500,
+        "width_available": [
+          300,
+          400,
+          450,
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/96a6a5f1-18f2-48aa-8e8b-b662b11623e5/900mm 5 Drawer Base Unit.png"
+      },
+      {
+        "id": 159036,
+        "code": "CC-BOP",
+        "name": "Open Base Unit",
+        "width_default": 300,
+        "width_available": [
+          100,
+          125,
+          150,
+          200,
+          260,
+          300,
+          350,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/47284617-918c-4462-afbe-3d8e3f7003c4/500mm Open Base Unit.png"
+      },
+      {
+        "id": 159037,
+        "code": "CC-BOP[D300]",
+        "name": "Open Base Unit",
+        "width_default": 300,
+        "width_available": [
+          250,
+          260,
+          300,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/391c0fdd-6f26-4118-8008-4e96cc0a22f1/изображение_2025-12-11_155520193.png"
+      },
+      {
+        "id": 159038,
+        "code": "CC-BPOA",
+        "name": "Pull Out Base Unit - Anthracite Mechanism",
+        "width_default": 150,
+        "width_available": [
+          150,
+          200,
+          300,
+          400
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/18dc38e3-2151-490e-8e0b-7f1a67939afa/300mm Pull Out Base Unit - Anthracite.png"
+      },
+      {
+        "id": 159039,
+        "code": "CC-BPOC",
+        "name": "Pull Out Base Unit - Chrome Mechanism",
+        "width_default": 150,
+        "width_available": [
+          150,
+          200,
+          300,
+          400
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b824596c-99f3-4611-9597-382591356fca/300mm Pull Out Base Unit - Chrome.png"
+      },
+      {
+        "id": 159040,
+        "code": "CC-BPOT",
+        "name": "Pull Out Towel Rail Base Unit",
+        "width_default": 150,
+        "width_available": [
+          150
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7987d274-a008-4e11-b086-3bc510f341bd/150mm Pull Out Towel Rail Base Unit.png"
+      },
+      {
+        "id": 159041,
+        "code": "CC-BTS",
+        "name": "Tray Space",
+        "width_default": 100,
+        "width_available": [
+          100,
+          200,
+          300,
+          400
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/ee830553-3f68-4c89-b2cc-e1c012ddb039/200mm Tray Space.png"
+      },
+      {
+        "id": 159042,
+        "code": "CC-BUO",
+        "name": "Built Under Oven Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/37eba7dc-29ff-4cb5-b5aa-773f13a96b3c/600mm Built Under Oven Housing.png"
+      },
+      {
+        "id": 159043,
+        "code": "CC-BUO1DW",
+        "name": "Built Under Oven Housing with 1 x Drawer",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/40f137c1-c943-4008-994b-2c47b5c29694/600mm Built Under Oven Housing with 1 x Drawer.png"
+      },
+      {
+        "id": 159044,
+        "code": "CC-BUOLM1DW",
+        "name": "Built Under Microwave Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/39ca5b33-990e-4864-8960-08337539f600/изображение_2025-12-11_162545974.png"
+      },
+      {
+        "id": 159045,
+        "code": "CC-BUOSM1DW",
+        "name": "Built Under Microwave Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/16ac49da-24a4-4938-afa5-9eb60de5e251/изображение_2025-12-11_162610758.png"
+      },
+      {
+        "id": 159046,
+        "code": "CC-BWO",
+        "name": "Open Base Wine Rack",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f3d3b10d-f66f-4358-856b-3202a77b5953/400mm Open Base Wine Rack.png"
+      },
+      {
+        "id": 159047,
+        "code": "CC-BWP",
+        "name": "Wine Base Unit",
+        "width_default": 300,
+        "width_available": [
+          125,
+          150,
+          250,
+          300
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/47ee3f9c-6fb3-4267-8a01-9f4459df038b/300mm Wine Base Unit - (Carcase material).png"
+      },
+      {
+        "id": 159048,
+        "code": "CC-CDL{S}",
+        "name": "Drawerline Corner Base Unit",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/ee4d4d61-58f0-4563-9bf5-3ad826b31596/900mm Drawerline Corner Base Unit - 450mm LH Hand Door (All Posst Types).png"
+      },
+      {
+        "id": 159049,
+        "code": "CC-CHL{S}BCO",
+        "name": "HCBU - Blind Corner Optimiser",
+        "width_default": 1000,
+        "width_available": [
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e209433f-6bbb-4456-adb8-53493d64fffb/900mm Highline Corner Base Unit - BCO - 450 LH do.png"
+      },
+      {
+        "id": 159050,
+        "code": "CC-CHL{S}CPOS",
+        "name": "HCBU - Corner Pull Out Shelving",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/6b02598c-0054-4e74-b052-67f2bc9102e9/1000mm Highline Corner Base Unit - Corner Pull 600mm LH Hand Door.png"
+      },
+      {
+        "id": 159051,
+        "code": "CC-CHLL{S}VCPOS",
+        "name": "HCBU - LAVA Corner Pull Out Shelving",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4fd3c34b-e5ee-4971-b73f-21cf73479175/1000mm Highline Corner Base Unit - LAVA POS - 500 LH door.png"
+      },
+      {
+        "id": 159052,
+        "code": "CC-CHL{S}MC",
+        "name": "HCBU - Magic Corner",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a484c991-c124-49df-831d-08024e7085a6/CC-CHL{S}MC"
+      },
+      {
+        "id": 159053,
+        "code": "CC-CHL{S}PBCO",
+        "name": "HCBU - Planero Blind Corner Optimiser",
+        "width_default": 900,
+        "width_available": [
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/cb48df49-5af5-4e6a-bfb3-cab097746eb5/1000mm Highline Corner Base Unit - P UBCO - 500 LH door.png"
+      },
+      {
+        "id": 159054,
+        "code": "CC-CHL{S}PSOC",
+        "name": "HCBU - Planero Swing Out Corner",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b2b955b7-236f-4916-9828-229cc842fc88/CC-CHL{S}PSOC"
+      },
+      {
+        "id": 159351,
+        "code": "CC-BPB2DW",
+        "name": "Pastry Bench",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 145,
+        "height_range": null,
+        "depth_default": 470,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/11833ef0-2721-4332-992f-c7f768c3e362/Pastry Bench 900mm Drawer Set.png"
+      },
+      {
+        "id": 159352,
+        "code": "CC-DG{H}1DW",
+        "name": "Worktop Dresser with 1 x Drawer D300",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 1060,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/47235fd5-68d3-48b7-94e2-37a1a5b35b63/CC-DG{H}1DW"
+      },
+      {
+        "id": 159353,
+        "code": "CC-DGH2DW",
+        "name": "Worktop Dresser with 2 x Drawers Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 1390,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/6886add7-24ac-4144-9026-92593ed4ad6d/CC-DGH2DW"
+      },
+      {
+        "id": 159354,
+        "code": "CC-DGMNF1DW",
+        "name": "Worktop Glass Dresser (Narrow Frame)",
+        "width_default": 500,
+        "width_available": [
+          500
+        ],
+        "height_default": 1210,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": null
+      },
+      {
+        "id": 159355,
+        "code": "CC-DL{H}1DR1DW",
+        "name": "Worktop Larder Dresser Unit with 1 x Drawer",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1210,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/58da6986-f873-49aa-8209-5c72bd749c62/600mm Worktop Larder Dresser Unit to suit 25-40mm Worktops (Medium) -.png"
+      },
+      {
+        "id": 159356,
+        "code": "CC-DLL1DR",
+        "name": "Worktop Larder Dresser Unit",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1060,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5c8cc460-23ae-4300-ae38-794139f96838/600mm Worktop Larder Dresser Unit to suit 25-40mm Worktops (Low).png"
+      },
+      {
+        "id": 159357,
+        "code": "CC-DOM1DW",
+        "name": "Worktop Open Dresser",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 1210,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c449ff67-5560-49f6-b532-741a64dd1ae2/600mm Open Worktop Dresser with 1 x Drawer Unit.png"
+      },
+      {
+        "id": 159358,
+        "code": "CC-DTM",
+        "name": "Worktop Tambour Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 1060,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": null
+      },
+      {
+        "id": 159359,
+        "code": "CC-DWU1DR",
+        "name": "Single Door Larder Wall Unit",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          450,
+          500,
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/50896575-13dd-4afc-bbcc-1410d03b477c/600mm Single Door Larder Wall Unit.png"
+      },
+      {
+        "id": 159360,
+        "code": "CC-WA{H}",
+        "name": "Wall Microwave Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3b523128-5029-4320-bd3a-94a07e330e26/600mm Wall Microwave Housing (Medium) V2.png"
+      },
+      {
+        "id": 159361,
+        "code": "CC-WB{H}",
+        "name": "Bridging Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 290,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/bb038fc2-429f-4ecb-8ad6-2e357ebef0a7/900mm Bridging Unit - 300mm Deep (290H) V2.png"
+      },
+      {
+        "id": 159362,
+        "code": "CC-WBOILER{H}",
+        "name": "Boiler Housing Wall Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0bde21ed-cbcc-43e5-9f79-73d4302472dc/500mm Boiler Housing Wall Unit (Medium).png"
+      },
+      {
+        "id": 159363,
+        "code": "CC-WD{H}2DR",
+        "name": "Double Wall Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          700,
+          800,
+          900,
+          1000,
+          1100
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7ee74ba4-b770-436e-b36f-a2d30b603007/900mm Double Wall Unit (Medium).png"
+      },
+      {
+        "id": 159364,
+        "code": "CC-WG{H}NF",
+        "name": "Glass Door Wall Unit - Narrow Frame",
+        "width_default": 500,
+        "width_available": [
+          500
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": null
+      },
+      {
+        "id": 159365,
+        "code": "CC-WG{H}PL",
+        "name": "Glass Door Wall Unit",
+        "width_default": 400,
+        "width_available": [
+          400,
+          500,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/24f8baf1-f665-43dc-a31f-06fd417ff014/500mm Glass Door Wall Unit (Medium).png"
+      },
+      {
+        "id": 159366,
+        "code": "CC-WGMALUR",
+        "name": "Aluminium Framed Smoked Reeded Glass Door Wall Unit",
+        "width_default": 500,
+        "width_available": [
+          500
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/561841a6-1da8-4964-80be-bc89f9b609bd/CC-WGMALUR"
+      },
+      {
+        "id": 159367,
+        "code": "CC-WGMALUS",
+        "name": "Aluminium Framed Smoked Glass Door Wall Unit",
+        "width_default": 500,
+        "width_available": [
+          500
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/17c0e230-e6d9-4bb2-89ce-71ebc39e4442/CC-WGMALUS"
+      },
+      {
+        "id": 159368,
+        "code": "CC-WGMMF",
+        "name": "Moderna (On-Trend) Glass Door Wall Unit (Medium)",
+        "width_default": 500,
+        "width_available": [
+          500
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7790c060-fff1-448d-b3a3-ba65c023baf3/CC-WGMMF"
+      },
+      {
+        "id": 159369,
+        "code": "CC-WHZ{H}",
+        "name": "Horizontal Single Bi-Fold Wall Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          800
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d9d28b89-56f1-48d4-8387-32452d26b44d/600mm Horizontal Double Bi-Fold Wall Unit (Medium).png"
+      },
+      {
+        "id": 159370,
+        "code": "CC-WOD{H}",
+        "name": "Wall Open Display Unit",
+        "width_default": 300,
+        "width_available": [
+          100,
+          125,
+          150,
+          200,
+          260,
+          300,
+          400,
+          450,
+          500,
+          600,
+          700,
+          800
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a058147a-a64b-47f6-9169-c3485ccab23f/450mm Wall Open Display Unit (Medium).png"
+      },
+      {
+        "id": 159371,
+        "code": "CC-WOFS",
+        "name": "Frame Shelf Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          900
+        ],
+        "height_default": 300,
+        "height_range": null,
+        "depth_default": 250,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/6991ca6a-b8f5-418d-894a-573eb05835c0/CC-WOFS"
+      },
+      {
+        "id": 159372,
+        "code": "CC-WTB{H}",
+        "name": "Top Box Unit",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 495,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d92d99af-62a0-4625-a5fa-85beaca31799/600mm Top Box Unit - 495mm Height.png"
+      },
+      {
+        "id": 159373,
+        "code": "CC-WVBFM",
+        "name": "Vertical Bi-Fold Wall Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/1d2d2250-1cb9-4f6c-a922-02428088f92f/800mm Vertical Bi-Fold Wall Unit (Medium).png"
+      },
+      {
+        "id": 159374,
+        "code": "CC-WWINE{H}",
+        "name": "Wine Wall Unit",
+        "width_default": 150,
+        "width_available": [
+          125,
+          150,
+          250,
+          300
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f959b259-bfb0-4c63-9e25-ee6767255acb/300mm Wine Wall Unit (Medium).png"
+      },
+      {
+        "id": 159375,
+        "code": "CC-TA{H}2SO1DW",
+        "name": "Tall 2 x Single Ovens Housing with 1 x Drawer",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d71bc06d-abf2-4efe-8cda-9e3e3a7fb30f/Tall 2 x Single Oven Housing With 1 x Drawers (Medium).png"
+      },
+      {
+        "id": 159376,
+        "code": "CC-TA{H}DO2DR",
+        "name": "Tall Double Oven Housing with Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3881e93f-a297-4a9e-bba1-16caf44f43d7/600mm Tall Double Oven Housing with Doors (Medium).png"
+      },
+      {
+        "id": 159377,
+        "code": "CC-TA{H}DO2DW",
+        "name": "Tall Double Oven Housing with 2 x Drawers",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5fdfd34a-0cdc-488c-96d0-aa1987c51257/600mm Tall Double Oven Housing with 2 x Drawers (Medium).png"
+      },
+      {
+        "id": 159378,
+        "code": "CC-TA{H}DOM1DW",
+        "name": "Tall Double Oven & Mic Housing with 1 x Drawer",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e2d16eab-9f61-47aa-b48a-55d095d72197/600mm Tall Double Oven & Mic Housing with 1 x Drawer (Medium) (1).png"
+      },
+      {
+        "id": 159379,
+        "code": "CC-TA{H}MO2DR1DW",
+        "name": "Tall Microwave Housing with Drawer & Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/dbdc0886-4f01-4fb2-aa67-c50c80f27afd/600mm Tall Microwave Housing with Doors (Medium).png"
+      },
+      {
+        "id": 159380,
+        "code": "CC-TA{H}SO2DW",
+        "name": "Tall Single Oven Housing with 2 x Drawers",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5fd5f9e9-8b27-4219-8d51-2eb2c77f791b/600mm Tall Single Oven Housing with 2 x Drawers (Medium).png"
+      },
+      {
+        "id": 159381,
+        "code": "CC-TA{H}SO3DW",
+        "name": "Tall Single Oven Housing with 3 x Drawers",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/75193c0c-98e0-42e3-8274-11e26ac3eaf2/600mm Tall Single Oven Housing with 3 x Drawers (Medium).png"
+      },
+      {
+        "id": 159382,
+        "code": "CC-TA{H}SODRS",
+        "name": "Tall Single Oven Housing with Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8ed9d9d6-1ad1-4469-92c8-3962b6ed716b/600mm Tall Single Oven Housing with Doors (Medium).png"
+      },
+      {
+        "id": 159383,
+        "code": "CC-TA{H}SOM2DW",
+        "name": "Tall Single Oven & Mic Housing with 2 x Drawers",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4d256389-325b-4e3a-919f-f46bd957c666/600mm Tall Single Oven & Mic Housing with 2 x Drawers (Medium) (283mm Top Door).png"
+      },
+      {
+        "id": 159384,
+        "code": "CC-TA{H}SOMDRS",
+        "name": "Tall Single Oven & Mic Housing with Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/65770528-71cb-4eb3-af64-55bd5e88eb50/600mm Tall Single Oven & Mic Housing with Doors (Medium).png"
+      },
+      {
+        "id": 159385,
+        "code": "CC-TASDO1DW",
+        "name": "Midi Double Oven Housing with 1 x Pan Drawer",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3648621f-5b3d-40f3-a8e8-cd17d1036341/600mm Midi Double Oven Housing with 1 x Pan Drawer.png"
+      },
+      {
+        "id": 159386,
+        "code": "CC-TASMO2DW",
+        "name": "Midi Microwave Oven Housing with 2 x Pan Drawers",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/6e6636d5-52e1-491e-a30b-573d97146aff/600mm Midi Microwave Oven Housing with 2 x Pan Drawers.png"
+      },
+      {
+        "id": 159387,
+        "code": "CC-TASMODR",
+        "name": "Midi Microwave Oven Housing with Door",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/21da5df5-b5db-4455-9852-2e70ace655e1/600mm Midi Microwave Oven Housing with Door.png"
+      },
+      {
+        "id": 159388,
+        "code": "CC-TASSO2DW",
+        "name": "Midi Single Oven Housing with 2 x Drawers",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b09c4e3e-6dfa-40f8-887a-c966a35800e0/600mm Midi Single Oven Housing with 2 x Drawers.png"
+      },
+      {
+        "id": 159389,
+        "code": "CC-TASSODR",
+        "name": "Midi Single Oven Housing with Door",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/90e75bc4-b6d1-4435-83fd-f9c20ef7e30e/600mm Midi Single Oven Housing with Door.png"
+      },
+      {
+        "id": 159390,
+        "code": "CC-TCLM{S}",
+        "name": "Tall Larder Corner Unit - Small Lower Door",
+        "width_default": 1000,
+        "width_available": [
+          1000
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/98470948-ec73-4968-a531-c6cdcaf144a7/1000mm Tall Larder Unit - 720mm Top Door (Medium).png"
+      },
+      {
+        "id": 159391,
+        "code": "CC-TD{H}B",
+        "name": "Diagonal Corner Larder - Small Lower Door",
+        "width_default": 910,
+        "width_available": [
+          910
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 910,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/91c7b05f-bd58-4e6e-b619-1fd176e8b267/Diagonal Corner Larder - Medium (715 Low).png.png"
+      },
+      {
+        "id": 159392,
+        "code": "CC-TD{H}T",
+        "name": "Diagonal Corner Larder - Small Top Door",
+        "width_default": 910,
+        "width_available": [
+          910
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 910,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/308ac5c1-86c4-4c3d-b943-76dbf7048aaf/Diagonal Corner Larder - Medium (715 Top).png.png"
+      },
+      {
+        "id": 159393,
+        "code": "CC-TDS",
+        "name": "910 x 910mm Diagonal Corner Midi Unit",
+        "width_default": 910,
+        "width_available": [
+          910
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 910,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4fdd70ab-ed38-414b-b32a-1b0256529334/900 x 900mm Diagonal Corner Midi Unit.png"
+      },
+      {
+        "id": 159394,
+        "code": "CC-TF{H}5050",
+        "name": "50/50 Fridge Freezer Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3e61f4b4-5e89-4d57-ae89-c47437145ee4/600mm Tall 50-50 Fridge Freezer Housing (Medium).png"
+      },
+      {
+        "id": 159395,
+        "code": "CC-TF{H}7030",
+        "name": "70/30 Fridge Freezer Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f7cc7e94-0434-49b2-af55-1e91ba927e10/600mm Tall 70-30 Fridge Freezer Housing (Medium).png"
+      },
+      {
+        "id": 159396,
+        "code": "CC-TFHD",
+        "name": "Single door Tall Larder Unit - Full Height Door",
+        "width_default": 600,
+        "width_available": [
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b8b8a818-7b8b-400c-b6a2-4b8863f0e767/600mm Larder Unit - Full Height Door - (Medium) (1).png"
+      },
+      {
+        "id": 159397,
+        "code": "CC-TFL",
+        "name": "Tall Fridge or Freezer Housing (Low)",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1825,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/80fae336-96bf-4344-8c87-78c88dabd5da/300mm Tall Fridge Freezer Housing (Low).png"
+      },
+      {
+        "id": 159398,
+        "code": "CC-Ti{H}4DW",
+        "name": "Single Tall Larder Unit with 4 x Internal Drawers",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/9a0fed4a-188a-4bba-91f5-d49f81cbafce/600mm Tall Larder Unit with 4 x Internal Drawers (Medium).png"
+      },
+      {
+        "id": 159399,
+        "code": "CC-TiS4DW",
+        "name": "Midi Unit with 4 x Internal Drawers",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/cc2cf872-2cb6-48cb-896e-51cfc8ce6070/600mm Midi Unit with 4 x Internal Drawers.png"
+      },
+      {
+        "id": 159400,
+        "code": "CC-TL{H}{h}B",
+        "name": "Single door Tall Larder Unit - Small Lower Door",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c758c3b0-700b-438e-be3c-d8b0bcb8a346/600mm Tall Larder Unit - 720mm Lower Door (Medium).png"
+      },
+      {
+        "id": 159401,
+        "code": "CC-TL{H}{h}B[2d]",
+        "name": "Double door Tall Larder Unit - Small Lower Door",
+        "width_default": 800,
+        "width_available": [
+          800,
+          1000
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d0db447d-225f-4f63-b512-2f84f45c6657/1000mm Tall Larder Unit - 720mm Lower Door (Medium).png"
+      },
+      {
+        "id": 159402,
+        "code": "CC-TL{H}{h}T",
+        "name": "Single door Tall Larder Unit - Small Top Door",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3346bfec-3e13-4d2f-b1c0-4b2d91d39f11/600mm Tall Larder Unit - 720mm Top Door (Medium).png"
+      },
+      {
+        "id": 159403,
+        "code": "CC-TL{H}{h}T[2d]",
+        "name": "Double door Tall Larder Unit - Small Top Door",
+        "width_default": 800,
+        "width_available": [
+          800,
+          1000
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a37be1de-f253-4c0f-9d77-ec540f4a407c/1000mm Tall Larder Unit - 720mm Top Door (Medium).png"
+      },
+      {
+        "id": 159404,
+        "code": "CC-TLL5T",
+        "name": "Single door Tall Larder Unit - Small Top Door",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1825,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": null
+      },
+      {
+        "id": 159405,
+        "code": "CC-TLM5050",
+        "name": "Medium Larder 50/50 Split Door",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": null
+      },
+      {
+        "id": 159406,
+        "code": "CC-TLMFHD",
+        "name": "Single door Tall Larder Unit - Full Height Door",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/df55c21b-015b-4c61-b912-7141f8e15097/600mm Larder Unit - Full Height Door - (Medium) (1).png"
+      },
+      {
+        "id": 159407,
+        "code": "CC-TLP{H}",
+        "name": "Larder Pantry",
+        "width_default": 1000,
+        "width_available": [
+          1000
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5ab831c6-2d9d-432d-9948-f68e8bc58c7e/1000mm Pantry Larder Render.png"
+      },
+      {
+        "id": 159408,
+        "code": "CC-TLS1DR",
+        "name": "Midi Single Larder Unit",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/06697daa-04e1-44b5-9974-05ac9568a5cb/600mm Midi Single Larder Unit.png"
+      },
+      {
+        "id": 159409,
+        "code": "CC-TLS1DR[W450]",
+        "name": "Midi Single Larder Unit",
+        "width_default": 450,
+        "width_available": [
+          450
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d10e7eec-c273-473e-a59d-4c0867bc0c62/600mm Midi Single Larder Unit.png"
+      },
+      {
+        "id": 159410,
+        "code": "CC-TLS2DR",
+        "name": "Midi Double Larder Unit",
+        "width_default": 800,
+        "width_available": [
+          800,
+          1000,
+          1200
+        ],
+        "height_default": 1250,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/130a58a5-5296-4c33-a58b-42368d493549/1000mm Midi Single Larder Unit.png"
+      },
+      {
+        "id": 159411,
+        "code": "CC-TO{H}",
+        "name": "Open Larder Unit",
+        "width_default": 400,
+        "width_available": [
+          200,
+          300,
+          400,
+          450,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/9c798508-b136-4780-bcde-343edbdcc9c3/600mm Open Larder (High).png"
+      },
+      {
+        "id": 159412,
+        "code": "CC-TP{H}PL{h}B",
+        "name": "Planero Pull Out Larder Unit - Small Lower Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/ac6700ab-a307-4ce0-8d11-e5c90a8e48d5/400mm Tall Planero Pull Out - 720 Lower Door (Medium).png"
+      },
+      {
+        "id": 159413,
+        "code": "CC-TP{H}PL{h}T",
+        "name": "Planero Pull Out Larder Unit - Small Top Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/377e60de-494a-4500-af0e-fde9cefcab85/400mm Tall Planero Pull Out - 720 Top Door (Medium).png"
+      },
+      {
+        "id": 159414,
+        "code": "CC-TP{H}ST{h}B",
+        "name": "Tall Pull Out Larder Unit - Small Lower Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4764de0b-2f65-4ac1-9e16-c834acbf2886/400mm Tall Pull Out Larder Unit - 720mm Lower Door (Medium).png"
+      },
+      {
+        "id": 159415,
+        "code": "CC-TP{H}ST{h}T",
+        "name": "Tall Pull Out Larder Unit - Small Top Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c37682f6-41e8-449a-8e49-96ad0c0de0bf/400mm Tall Pull Out Larder Unit - 720mm Top Door (Medium).png"
+      },
+      {
+        "id": 159416,
+        "code": "CC-TS{H}PL{h}B",
+        "name": "Tall Planero Swing Out Larder Unit - Small Lower Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/65a99593-76a9-4e9e-9c4e-865581efeb6c/600mm Tall Planero Swing - 720mm Lower Door (Medium).png"
+      },
+      {
+        "id": 159417,
+        "code": "CC-TS{H}PL{h}T",
+        "name": "Tall Planero Swing Out Larder Unit - Small Top Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/357c32ec-f8e5-479d-81c1-8b3c20dc248b/600mm Tall Planero Swing - 720mm Top Door (Medium).png"
+      },
+      {
+        "id": 159418,
+        "code": "CC-TS{H}ST{h}B",
+        "name": "Tall Swing Out Larder Unit - Small Lower Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/bda61864-690f-4f1b-90d8-7ada1081d017/600mm Tall Swing Out Larder Unit - 720mm Lower Door (Medium).png"
+      },
+      {
+        "id": 159419,
+        "code": "CC-TS{H}ST{h}T",
+        "name": "Tall Swing Out Larder Unit - Small Top Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0df982a8-3706-4b6a-81f6-1487f4294361/600mm Tall Swing Out Larder Unit - 720mm Top Door (Medium).png"
+      },
+      {
+        "id": 159420,
+        "code": "CC-TWINE{H}",
+        "name": "Tall Wine Unit",
+        "width_default": 150,
+        "width_available": [
+          150,
+          300
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a6e628b0-d5a0-452b-9135-8203712d26ee/260mm Tall Wine Rack - 300mm Deep - (High).png"
+      },
+      {
+        "id": 159421,
+        "code": "CC-TWKCL{H}",
+        "name": "Walk-In Corner Larder",
+        "width_default": 1154,
+        "width_available": [
+          1154
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 1154,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3cc812b5-5782-4bb2-8785-89bdc4b803b9/Walk-In Corner Larder (Medium).png"
+      },
+      {
+        "id": 165906,
+        "code": "BF",
+        "name": "Base Filer",
+        "width_default": 50,
+        "width_available": [
+          20,
+          50,
+          100,
+          150
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/03a00d72-4923-4ee2-84c2-98fe044a93b5/base_filer"
+      },
+      {
+        "id": 165908,
+        "code": "TF",
+        "name": "Tall Filer",
+        "width_default": 50,
+        "width_available": [
+          20,
+          50,
+          100,
+          150
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8e36952a-1e22-44b3-88f4-27de16a00217/tall_filer"
+      },
+      {
+        "id": 165910,
+        "code": "WF",
+        "name": "Wall Filer",
+        "width_default": 50,
+        "width_available": [
+          20,
+          50,
+          100,
+          150
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/aa1c3857-6d98-493b-b103-7d84f9074bdd/wall_filer"
+      },
+      {
+        "id": 165911,
+        "code": "SBEP",
+        "name": "Standard Base End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 600,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/2582b5be-faf0-47e9-8390-d8c6fa14780b/SBEP"
+      },
+      {
+        "id": 165912,
+        "code": "WEP",
+        "name": "Wall End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/036a7964-4060-4983-816b-f845658e1f04/wall_end"
+      },
+      {
+        "id": 165913,
+        "code": "ITEP",
+        "name": "Inline Tall End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3d5659a5-652c-4deb-a17d-9c45a0118ead/ITEP"
+      },
+      {
+        "id": 165944,
+        "code": "IBEP",
+        "name": "Inline Base End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 600,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e9af8ad0-d9c1-44b1-b445-68bbd2584570/IBEP"
+      },
+      {
+        "id": 165945,
+        "code": "STEP",
+        "name": "Standard Tall End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/171c605b-702c-4e51-a94a-0c07fd361289/STEP"
+      },
+      {
+        "id": 165946,
+        "code": "T&G-SBEP",
+        "name": "T&G Standard Base End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 600,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/98b25dea-5eab-474b-a467-fd0feed599d7/T&G-SBEP"
+      },
+      {
+        "id": 165947,
+        "code": "T&G-IBEP",
+        "name": "T&G Inline Base End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 600,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f6e8129b-e7ff-418a-b371-048b3751e5ec/T&G-IBEP"
+      },
+      {
+        "id": 165948,
+        "code": "T&G-STEP",
+        "name": "T&G Standard Tall End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e9b117c4-b53b-4242-b7a3-422cbec70a2f/T&G-STEP"
+      },
+      {
+        "id": 165949,
+        "code": "T&G-ITEP",
+        "name": "T&G Inline Tall End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e7cd4b0f-9ebf-4df1-9e9a-f00fbea9cae0/T&G-ITEP"
+      },
+      {
+        "id": 165950,
+        "code": "T&G-WEP",
+        "name": "T&G-Wall End Panel Sizes",
+        "width_default": 0,
+        "width_available": [
+          0
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f3b67bf9-dc91-44e9-81d9-ac8f3268b0c4/T&G-WEP"
+      },
+      {
+        "id": 169278,
+        "code": "CC-BDL1DW2DR",
+        "name": "Drawerline Base Unit (Single Drawer)",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0d4c8261-8942-4db6-b05f-5d0c03898bc3/800mm Drawerline Base Unit (Single Drawer).png"
+      },
+      {
+        "id": 171186,
+        "code": "CC-BBN2[32*2]",
+        "name": "Bin Store Highline Base Unit 2  (2 x 32L)",
+        "width_default": 450,
+        "width_available": [
+          450,
+          500
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b9be7d12-15c3-476e-a90b-4041a2061a17/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 171187,
+        "code": "CC-BBN2[44*2]",
+        "name": "Bin Store Highline Base Unit 2  (2 x 44L)",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7f8a3bd7-4183-49b9-8998-c411026263c2/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 171200,
+        "code": "WEAR",
+        "name": "Wall Radius End Panel",
+        "width_default": 60,
+        "width_available": [
+          50,
+          60,
+          80
+        ],
+        "height_default": 720,
+        "height_range": [
+          290,
+          1000
+        ],
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8edbcb59-ad4a-4382-870f-5996d99f62a1/CH-WEAR"
+      },
+      {
+        "id": 171314,
+        "code": "TEAR",
+        "name": "Tall Radius End Panel",
+        "width_default": 60,
+        "width_available": [
+          50,
+          60,
+          80
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0f57c7a3-f698-4bbe-a106-ae5286895c8e/CH-TEAR"
+      },
+      {
+        "id": 171575,
+        "code": "IDW",
+        "name": "Integrated Dish Washer",
+        "width_default": 600,
+        "width_available": [
+          450,
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/ce6c0632-41fc-460c-b177-3acf3258f0ad/IDW"
+      },
+      {
+        "id": 172919,
+        "code": "BREP",
+        "name": "Base Radius End Panel",
+        "width_default": 60,
+        "width_available": [
+          50,
+          60,
+          80
+        ],
+        "height_default": 720,
+        "height_range": [
+          290,
+          1000
+        ],
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a6661e93-43f3-4511-a0f2-a609d4fcd94b/BREP"
+      },
+      {
+        "id": 172921,
+        "code": "BSEP",
+        "name": "Base Square End Panel",
+        "width_default": 50,
+        "width_available": [
+          50
+        ],
+        "height_default": 720,
+        "height_range": [
+          290,
+          1000
+        ],
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/27dc977d-786e-45a3-a35c-ce2965e2872e/BSEP"
+      },
+      {
+        "id": 172923,
+        "code": "WSEP",
+        "name": "Wall Square End Panel",
+        "width_default": 50,
+        "width_available": [
+          50
+        ],
+        "height_default": 720,
+        "height_range": [
+          290,
+          1000
+        ],
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a422bacf-dc5b-43a9-ae2d-fbd2d23a0ff9/WSEP"
+      },
+      {
+        "id": 172924,
+        "code": "TSEP",
+        "name": "Tall Square End Panel",
+        "width_default": 50,
+        "width_available": [
+          50
+        ],
+        "height_default": 1970,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a7ae0295-062e-415d-b6a1-d31d7fcdbf32/TSEP"
+      },
+      {
+        "id": 172925,
+        "code": "BBBPS",
+        "name": "Breakfast Bar Back Panel Sizes",
+        "width_default": 900,
+        "width_available": [
+          330,
+          600,
+          900,
+          1200,
+          1800,
+          2100,
+          2400
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 0,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d55ecf6a-44a0-4272-ba4f-15a1b7112827/BBBPS"
+      },
+      {
+        "id": 174313,
+        "code": "IA",
+        "name": "Integrated Appliances",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5f9b3f06-83c0-47a1-a4db-c80acef25f29/IA"
+      },
+      {
+        "id": 174314,
+        "code": "UCF",
+        "name": "Under Counter Fridge",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "height_range": null,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/522fefd3-068f-463c-9a1e-fe7ac9c00d91/UCF"
+      },
+      {
+        "id": 174659,
+        "code": "BBBPS[u]",
+        "name": "Breakfast Bar Back Panel Sizes",
+        "width_default": 100,
+        "width_available": [
+          100
+        ],
+        "height_default": 100,
+        "height_range": [
+          0,
+          10000
+        ],
+        "depth_default": 20,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/bc5ee63e-f7f9-45b8-a565-f874e69f66bf/BBBPS[u]"
+      },
+      {
+        "id": 174660,
+        "code": "SBEP[u]",
+        "name": "Standard Base End Panel Sizes",
+        "width_default": 100,
+        "width_available": [
+          100
+        ],
+        "height_default": 100,
+        "height_range": [
+          0,
+          10000
+        ],
+        "depth_default": 20,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/ceb522bf-1933-45d3-baad-caf3e1de95ca/SBEP[u]"
+      },
+      {
+        "id": 174661,
+        "code": "T&G-SBEP[u]",
+        "name": "T&G Standard Base End Panel Sizes",
+        "width_default": 100,
+        "width_available": [
+          100
+        ],
+        "height_default": 100,
+        "height_range": [
+          0,
+          10000
+        ],
+        "depth_default": 20,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0eb80122-1bd7-4689-8f99-39833f6c0c39/T&G-SBEP[u]"
+      },
+      {
+        "id": 174662,
+        "code": "STEP[u]",
+        "name": "Standard Tall End Panel Sizes",
+        "width_default": 100,
+        "width_available": [
+          100
+        ],
+        "height_default": 100,
+        "height_range": [
+          0,
+          10000
+        ],
+        "depth_default": 20,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8aeb351d-d4db-455f-967b-b0f03c1fee66/STEP[u]"
+      },
+      {
+        "id": 174663,
+        "code": "T&G-STEP[u]",
+        "name": "T&G Standard Tall End Panel Sizes",
+        "width_default": 100,
+        "width_available": [
+          100
+        ],
+        "height_default": 100,
+        "height_range": [
+          0,
+          10000
+        ],
+        "depth_default": 20,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4f5bb0a0-aa08-4a12-8d4e-f34de5740b31/T&G-STEP[u]"
+      },
+      {
+        "id": 174664,
+        "code": "T&G-WEP[u]",
+        "name": "T&G-Wall End Panel Sizes",
+        "width_default": 100,
+        "width_available": [
+          100
+        ],
+        "height_default": 100,
+        "height_range": [
+          0,
+          10000
+        ],
+        "depth_default": 20,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/9e31f500-bf78-40e0-b163-56900da162d8/T&G-WEP[u]"
+      },
+      {
+        "id": 174665,
+        "code": "WEP[u]",
+        "name": "Wall End Panel Sizes",
+        "width_default": 100,
+        "width_available": [
+          100
+        ],
+        "height_default": 100,
+        "height_range": [
+          0,
+          10000
+        ],
+        "depth_default": 20,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d1e57ea5-c4ce-4ae7-9c51-bd4230334a5b/WEAR[u]"
+      },
+      {
+        "id": 178047,
+        "code": "EX",
+        "name": "Intergrated Extractor Door",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 490,
+        "height_range": null,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b0b56ba6-78d7-4f52-b5f3-aedbdfe578fb/18914.png"
+      }
+    ]
+  },
+  "true_handleless": {
+    "description": "Integrated handle profile kitchen cabinets - modern/handleless doors only",
+    "total": 63,
+    "products": [
+      {
+        "id": 162792,
+        "code": "TH-TA{H}{S}2SO1DW",
+        "name": "Tall 2 x Single Ovens Housing with 1 x Drawer",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/20e5f4f6-e924-404b-8b6e-7c961de15d48/TH-TA{H}{S}2SO1DW"
+      },
+      {
+        "id": 162793,
+        "code": "TH-TA{H}{S}DO2DR",
+        "name": "Tall Double Oven Housing with Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/10a66fbe-6bb0-43c1-996b-01985b6ef940/TH-TA{H}{S}DO2DR"
+      },
+      {
+        "id": 162794,
+        "code": "TH-TA{H}{S}DOM1DW",
+        "name": "Tall Double Oven & Mic Housing with 1 x Drawer",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c30daedb-2449-4a72-96cc-1c84a409406e/TH-TA{H}{S}DOM1DW"
+      },
+      {
+        "id": 162795,
+        "code": "TH-TA{H}{S}MO2DR1DW",
+        "name": "Tall Microwave Housing with Drawer & Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4dc31938-3d58-4667-a0d8-7ea31b5f02cf/TH-TA{H}{S}MO2DR1DW"
+      },
+      {
+        "id": 162796,
+        "code": "TH-TA{H}{S}SODRS",
+        "name": "Tall Single Oven Housing with Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3848bb19-4967-4761-bddd-42f1a65837c7/TH-TA{H}{S}SODRS"
+      },
+      {
+        "id": 162797,
+        "code": "TH-TA{H}{S}SOMDRS",
+        "name": "Tall Single Oven & Mic Housing with Doors",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b18f94ff-730a-4852-9fca-4b52e7bbf5de/TH-TA{H}{S}SOMDRS"
+      },
+      {
+        "id": 162798,
+        "code": "TH-TF{H}{S}5050",
+        "name": "50/50 Fridge Freezer Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e1af7180-f8cb-4de9-a99b-b5a99242d580/TH-TF{H}{S}5050"
+      },
+      {
+        "id": 162799,
+        "code": "TH-TF{H}{S}7030",
+        "name": "70/30 Fridge Freezer Housing",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/01b792a0-c4dc-4cec-bb9d-2a8756548472/TH-TF{H}{S}7030"
+      },
+      {
+        "id": 162800,
+        "code": "TH-Ti{H}{S}4DW",
+        "name": "Single Tall Larder Unit with 4 x Internal Drawers",
+        "width_default": 400,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3d811082-0183-4176-87f6-57ea75b60669/TH-Ti{H}{S}4DW"
+      },
+      {
+        "id": 162801,
+        "code": "TH-TL{H}{S}{h}B",
+        "name": "Single door Tall Larder Unit - Small Lower Door",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/336a0130-2172-4b35-a11d-a46eba5cf8d3/TH-TL{H}{S}{h}B"
+      },
+      {
+        "id": 162802,
+        "code": "TH-TL{H}{S}{h}T",
+        "name": "Single door Tall Larder Unit - Small Top Door",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/91a59550-a4d6-48df-998a-027be20681ae/TH-TL{H}{S}{h}T"
+      },
+      {
+        "id": 162803,
+        "code": "TH-TP{H}{S}PL{h}B",
+        "name": "Planero Pull Out Larder Unit - Small Lower Door",
+        "width_default": 400,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c3071f17-5766-41f7-b156-842e955c8e79/TH-TP{H}{S}PL{h}B"
+      },
+      {
+        "id": 162804,
+        "code": "TH-TP{H}{S}PL{h}T",
+        "name": "Planero Pull Out Larder Unit - Small Top Door",
+        "width_default": 400,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/bebc2e14-46a9-460c-8728-9509e08c0dd8/TH-TP{H}{S}PL{h}T"
+      },
+      {
+        "id": 162805,
+        "code": "TH-TP{H}{S}ST{h}B",
+        "name": "Tall Pull Out Larder Unit - Small Lower Door",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/9510e2be-ead6-4a01-9745-0253eb842587/TH-TP{H}{S}ST{h}B"
+      },
+      {
+        "id": 162806,
+        "code": "TH-TS{H}{S}ST{h}B",
+        "name": "Tall Swing Out Larder Unit - Small Lower Door",
+        "width_default": 400,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0f8d5508-26e2-4a13-b141-f7514874e20d/TH-TS{H}{S}ST{h}B"
+      },
+      {
+        "id": 162807,
+        "code": "TH-TS{H}{S}ST{h}T",
+        "name": "Tall Swing Out Larder Unit - Small Top Door",
+        "width_default": 400,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b865c046-c146-4a73-b9ce-559ec4efaf2c/TH-TS{H}{S}ST{h}T"
+      },
+      {
+        "id": 162808,
+        "code": "TH-TWINE{H}",
+        "name": "Tall Wine Unit",
+        "width_default": 300,
+        "width_available": [
+          150,
+          300
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/1c7634c9-8803-44f2-ac14-f839751d2bf9/TH-TWINE{H}"
+      },
+      {
+        "id": 162809,
+        "code": "TH-TAM{S}DO2DW",
+        "name": "Tall Double Oven Housing with 2 x Drawers",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 1970,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/6b29f925-d67e-4427-91c2-58bf45ce62c3/TH-TAM{S}DO2DW"
+      },
+      {
+        "id": 162810,
+        "code": "TH-TLL{S}1DR5B",
+        "name": "Single door Tall Larder Unit - Small Lower Door",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 300,
+        "image_url": null
+      },
+      {
+        "id": 162811,
+        "code": "TH-TLL{S}1DR5T",
+        "name": "Single door Tall Larder Unit - Small Top Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 2150,
+        "depth_default": 300,
+        "image_url": null
+      },
+      {
+        "id": 162812,
+        "code": "TH-TLM{S}FHD",
+        "name": "Single door Tall Larder Unit - Full Height Door",
+        "width_default": 600,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1970,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3c6e7470-48e7-4d59-ad14-6b68f2e686e0/TH-TLM{S}FHD"
+      },
+      {
+        "id": 162813,
+        "code": "TH-TPM{S}ST7T",
+        "name": "Tall Pull Out Larder Unit - Small Top Door",
+        "width_default": 400,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 1970,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d94e4710-68d2-46f5-b647-75b85ea605ed/TH-TPM{S}ST7T"
+      },
+      {
+        "id": 162814,
+        "code": "TH-TSHLP{S}9B",
+        "name": "Tall Planero Swing Out Larder Unit - Small Lower Door",
+        "width_default": 500,
+        "width_available": [
+          500
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3182d6df-01c9-40df-9dde-b18bf1371c31/TH-TSHLP{S}9B"
+      },
+      {
+        "id": 162815,
+        "code": "TH-TSHLP{S}9T",
+        "name": "Tall Planero Swing Out Larder Unit - Small Top Door",
+        "width_default": 500,
+        "width_available": [
+          500
+        ],
+        "height_default": 2150,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/bc90805b-d864-4418-a313-78dd7c818795/TH-TSHLP{S}9T"
+      },
+      {
+        "id": 162816,
+        "code": "TH-TSM{S}STFHD",
+        "name": "Tall Swing Out Larder Unit - Full Height Door",
+        "width_default": 300,
+        "width_available": [
+          300,
+          500
+        ],
+        "height_default": 1970,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e891fc0d-5dc5-445f-9732-d12557c8716e/TH-TSM{S}STFHD"
+      },
+      {
+        "id": 162817,
+        "code": "TH-TSS{S}1DR",
+        "name": "Midi Single Larder Unit",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400,
+          500,
+          600
+        ],
+        "height_default": 1250,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/6267d710-feea-491b-9ffa-e40d653e79d0/TH-TSS{S}1DR"
+      },
+      {
+        "id": 162818,
+        "code": "TH-BBN1",
+        "name": "Bin Store Highline Base Unit 1 (1 x 44L)",
+        "width_default": 400,
+        "width_available": [
+          400
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/ce751a97-521f-4f08-8602-e0492bd93c25/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 162819,
+        "code": "TH-BBN2[44*2]",
+        "name": "Bin Store Highline Base Unit 2  (2 x 44L)",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5d7fa483-cb27-47ad-903c-f3de5309c6eb/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 162820,
+        "code": "TH-BBN3",
+        "name": "Bin Store Highline Base Unit 3 (2 x 32L & 1 x 21L)",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3e04e55f-687d-48d2-bc21-1553f233a631/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 162821,
+        "code": "TH-BHL1DR",
+        "name": "Single Highline Base Unit",
+        "width_default": 400,
+        "width_available": [
+          150,
+          200,
+          300,
+          350,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/2c891301-2e2d-4474-b081-567ffdcefe26/изображение_2026-01-06_103306435.png"
+      },
+      {
+        "id": 162822,
+        "code": "TH-BHL2DR",
+        "name": "Double Highline Base Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          700,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/11695cd9-0b55-47eb-9cf5-a99d78f815cd/изображение_2026-01-06_103336052.png"
+      },
+      {
+        "id": 162823,
+        "code": "TH-BHS",
+        "name": "Single Highline Sink Base Unit",
+        "width_default": 600,
+        "width_available": [
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/022bbf6a-2d29-42b2-8a9d-4516d15617e9/изображение_2026-01-06_103438542.png"
+      },
+      {
+        "id": 162824,
+        "code": "TH-BMD2+1DW",
+        "name": "2 Top & 1 Pan Drawer Base Unit",
+        "width_default": 600,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/24e5612c-4b7f-4033-a384-5c02cc7c39f4/изображение_2026-01-06_103601119.png"
+      },
+      {
+        "id": 162825,
+        "code": "TH-BMD2DW",
+        "name": "2 Drawer Base Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5e46734e-3081-4c9d-b530-6cc7fea44170/изображение_2026-01-06_103516386.png"
+      },
+      {
+        "id": 162826,
+        "code": "TH-BMDi",
+        "name": "2 Drawer Base Unit + 1 Internal",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e56806b6-3249-41fd-afef-ea953325fac3/изображение_2026-01-06_103636557.png"
+      },
+      {
+        "id": 162827,
+        "code": "TH-BOP",
+        "name": "Open Base Unit",
+        "width_default": 300,
+        "width_available": [
+          100,
+          125,
+          150,
+          200,
+          250,
+          260,
+          300,
+          350,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/82a8133f-0bbf-486c-a0be-81f75348ea29/TH-BOP"
+      },
+      {
+        "id": 162828,
+        "code": "TH-BOP[D300]",
+        "name": "Open Base Unit",
+        "width_default": 250,
+        "width_available": [
+          250,
+          260,
+          300,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3071476c-b566-43af-bf24-6c4292951411/TH-BOP[D300]"
+      },
+      {
+        "id": 162829,
+        "code": "TH-BPOA",
+        "name": "Pull Out Base Unit - Anthracite Mechanism",
+        "width_default": 150,
+        "width_available": [
+          150,
+          200,
+          300,
+          400
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/784c1ed8-ce86-4ca4-afd1-86d333fb0494/TH-BPOA"
+      },
+      {
+        "id": 162830,
+        "code": "TH-BPOC",
+        "name": "Pull Out Base Unit - Chrome Mechanism",
+        "width_default": 150,
+        "width_available": [
+          150,
+          200,
+          300,
+          400
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c8289184-8808-4cb6-ab22-34cc85fa8372/TH-BPOC"
+      },
+      {
+        "id": 162831,
+        "code": "TH-BPOT",
+        "name": "Pull Out Towel Rail Base Unit",
+        "width_default": 150,
+        "width_available": [
+          150
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/83b4b3c5-0426-4d35-8c8d-c05f483e2e68/TH-BPOT"
+      },
+      {
+        "id": 162832,
+        "code": "TH-BWO",
+        "name": "Open Base Wine Rack",
+        "width_default": 400,
+        "width_available": [
+          400
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/2be5b1e6-c357-4441-bd76-9fb415ae6282/TH-BWO"
+      },
+      {
+        "id": 162833,
+        "code": "TH-BWP",
+        "name": "Wine Base Unit",
+        "width_default": 300,
+        "width_available": [
+          125,
+          150,
+          250,
+          300
+        ],
+        "height_default": 720,
+        "depth_default": 300,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0beae9cc-30b0-4c97-b2cc-0279e3aa08cc/TH-BWP"
+      },
+      {
+        "id": 162834,
+        "code": "TH-BOE{S}",
+        "name": "Open End Base Unit - Angled",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f9f0f751-214b-4fe3-920b-f43a3812c858/TH-BOE{S}"
+      },
+      {
+        "id": 162835,
+        "code": "TH-CCL",
+        "name": "L-Shape Corner Base Unit",
+        "width_default": 910,
+        "width_available": [
+          910
+        ],
+        "height_default": 720,
+        "depth_default": 910,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/0a4afab5-615c-43f0-839a-78ed8f65bd80/TH-CCL"
+      },
+      {
+        "id": 162836,
+        "code": "TH-CHLBCO{S}",
+        "name": "HCBU - Blind Corner Optimiser",
+        "width_default": 1000,
+        "width_available": [
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d28d1dab-b0a5-4eaf-a36c-7fba88647202/TH-CHLBCO{S}"
+      },
+      {
+        "id": 162837,
+        "code": "TH-CHLCPO{S}",
+        "name": "HCBU - Corner Pull Out Shelving",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/2cec5468-49e7-4636-b3b1-a30103b06230/TH-CHLCPO{S}"
+      },
+      {
+        "id": 162838,
+        "code": "TH-CHL{S}",
+        "name": "Highline Corner Base Unit",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/352d5eb0-41d5-476c-936c-b5704de3d3af/TH-CHL{S}"
+      },
+      {
+        "id": 162839,
+        "code": "TH-CHLLVCPO{S}",
+        "name": "HCBU - LAVA Corner Pull Out Shelving",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d009e662-0907-4f64-beee-4d8acad8232d/TH-CHLLVCPO{S}"
+      },
+      {
+        "id": 162840,
+        "code": "TH-CHLMC{S}",
+        "name": "HCBU - Magic Corner",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8d698e71-d422-467a-a3aa-d5940893e0f4/TH-CHLMC{S}"
+      },
+      {
+        "id": 162841,
+        "code": "TH-CHLPLBCO{S}",
+        "name": "HCBU - Planero Blind Corner Optimiser",
+        "width_default": 900,
+        "width_available": [
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/aeb7d47e-992b-4fc5-9ee4-e08ef4b90f26/TH-CHLPLBCO{S}"
+      },
+      {
+        "id": 162842,
+        "code": "TH-CHLPLSOC{S}",
+        "name": "HCBU - Planero Swing Out Corner",
+        "width_default": 800,
+        "width_available": [
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c715802c-ce62-4dcf-b7f4-4abe5f8028d0/TH-CHLPLSOC{S}"
+      },
+      {
+        "id": 162843,
+        "code": "TH-WB{H}",
+        "name": "Bridging Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 290,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b40225cd-7624-4c49-8a1e-dd905fc26476/TH-WB{H}"
+      },
+      {
+        "id": 162844,
+        "code": "TH-WC{H}{S}",
+        "name": "Standard Corner Wall Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          800
+        ],
+        "height_default": 720,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/974478f6-ff7a-4590-aa60-bfeb09d39ca1/TH-WC{H}{S}"
+      },
+      {
+        "id": 162845,
+        "code": "TH-WD{H}1DR",
+        "name": "Single Wall Unit",
+        "width_default": 300,
+        "width_available": [
+          150,
+          260,
+          300,
+          350,
+          400,
+          450,
+          500,
+          550,
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e835417a-f063-43cd-bef6-172ed7f68f30/TH-WD{H}1DR"
+      },
+      {
+        "id": 162846,
+        "code": "TH-WD{H}2DR",
+        "name": "Double Wall Unit",
+        "width_default": 600,
+        "width_available": [
+          600,
+          700,
+          800,
+          900,
+          1000,
+          1100
+        ],
+        "height_default": 720,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4906e9d7-50cc-4f26-a0d7-a115e8020bb2/TH-WD{H}2DR"
+      },
+      {
+        "id": 162847,
+        "code": "TH-WG{H}PL",
+        "name": "Glass Door Wall Unit",
+        "width_default": 400,
+        "width_available": [
+          400,
+          500,
+          600
+        ],
+        "height_default": 720,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/31c742eb-70d7-4cc9-8315-2e43aa468198/TH-WG{H}PL"
+      },
+      {
+        "id": 162848,
+        "code": "TH-WL{H}",
+        "name": "L-Shape Corner Wall Unit",
+        "width_default": 630,
+        "width_available": [
+          630
+        ],
+        "height_default": 720,
+        "depth_default": 630,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b75dc61c-32ab-476a-b34d-45fc0678388f/TH-WL{H}"
+      },
+      {
+        "id": 162849,
+        "code": "TH-WOE{H}{S}",
+        "name": "Open End Wall Unit",
+        "width_default": 300,
+        "width_available": [
+          300
+        ],
+        "height_default": 720,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/2ba47eaf-0306-476b-bab3-03f6e58940f4/TH-WOE{H}{S}"
+      },
+      {
+        "id": 162850,
+        "code": "TH-WTB{H}",
+        "name": "Top Box Unit",
+        "width_default": 600,
+        "width_available": [
+          600
+        ],
+        "height_default": 455,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b4431aff-979f-4915-83ab-c36b1ada60dc/TH-WTB{H}"
+      },
+      {
+        "id": 162851,
+        "code": "TH-WVBFM",
+        "name": "Vertical Bi-Fold Wall Unit",
+        "width_default": 500,
+        "width_available": [
+          500,
+          600,
+          800,
+          900,
+          1000
+        ],
+        "height_default": 720,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4652899a-ad8a-47bd-a41f-5e3356571955/TH-WVBFM"
+      },
+      {
+        "id": 162852,
+        "code": "TH-WWINE{H}",
+        "name": "Wine Wall Unit",
+        "width_default": 125,
+        "width_available": [
+          125,
+          150,
+          250,
+          300
+        ],
+        "height_default": 720,
+        "depth_default": 330,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8be3cae5-ff4c-4685-970c-364fe8d5510f/TH-WWINE{H}"
+      },
+      {
+        "id": 171582,
+        "code": "TH-BBN2[32&1.2]",
+        "name": "Bin Store Highline Base Unit 2  (1 x 32L & 1 x 1.2L)",
+        "width_default": 300,
+        "width_available": [
+          300,
+          400
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4061f5e1-e9a0-498c-ac75-8f70cc0c62b5/600mm Highline Bin Store Unit - Triple Bin.png"
+      },
+      {
+        "id": 171583,
+        "code": "TH-BBN2[32*2]",
+        "name": "Bin Store Highline Base Unit 2  (2 x 32L)",
+        "width_default": 450,
+        "width_available": [
+          450,
+          500
+        ],
+        "height_default": 720,
+        "depth_default": 570,
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/5595bf7e-f777-440c-99c5-af5c03119ed9/600mm Highline Bin Store Unit - Triple Bin.png"
+      }
+    ]
+  },
+  "door_styles": {
+    "modern": [
+      {
+        "id": 159473,
+        "code": "Camden",
+        "name": "Camden",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4e096706-4fd1-4da9-8e63-8a63e0e0cd6c/Camden (Premium Colours) .png"
+      },
+      {
+        "id": 159474,
+        "code": "Dewsbury",
+        "name": "Dewsbury",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7eeea866-637b-4420-8cfc-dc33ee328ab3/Dewsbury Smooth Matt.png"
+      },
+      {
+        "id": 159475,
+        "code": "Fairwood",
+        "name": "Fairwood",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7ddf587b-f680-4822-8df1-b213bfd70798/Fairwood (On-Trend Colours).png"
+      },
+      {
+        "id": 159476,
+        "code": "Helmsley",
+        "name": "Helmsley",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4b13b822-e0bc-4292-8fda-be6663b6feee/Helmsley Smooth Matt.jpg"
+      },
+      {
+        "id": 159477,
+        "code": "Larkwood",
+        "name": "Larkwood",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/72f1779c-e365-49b4-8531-ee9ce3c70c49/Larwood(On-Trend Colours).jpg"
+      },
+      {
+        "id": 159478,
+        "code": "Richmond",
+        "name": "Richmond",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f761b516-c8f8-490b-9fa4-1a9861990748/Richmond (Premium Colours).png"
+      }
+    ],
+    "shaker": [
+      {
+        "id": 159481,
+        "code": "Beadwood",
+        "name": "Beadwood",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/fe3be814-c65e-4f9b-a215-40c11051abac/Beadwood (Premuim Colours).jpg"
+      },
+      {
+        "id": 159482,
+        "code": "Seaton",
+        "name": "Seaton",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4e759b7d-e46a-483e-9a47-66677c9b4f5c/Seaton.jpg"
+      },
+      {
+        "id": 159483,
+        "code": "St Ives",
+        "name": "St Ives",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/da28208d-cf8f-4430-9acb-57b7f563ce1c/St. Ives Smooth Matt.jpg"
+      },
+      {
+        "id": 159484,
+        "code": "Tamar",
+        "name": "Tamar",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/cb0fa605-1296-414f-81d3-f0e1f4680f3e/Tamar Smooth Matt.jpg"
+      }
+    ],
+    "traditional_inframe": [
+      {
+        "id": 159485,
+        "code": "Ashford (Painted)",
+        "name": "Ashford (Painted)",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/1976d632-0c96-4d15-bfd3-09a96508157d/Ashford.jpg"
+      },
+      {
+        "id": 159486,
+        "code": "Darlington",
+        "name": "Darlington",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/973ec18d-8594-42df-870c-03d5bc82780f/Darlington Smooth Matt.jpg"
+      },
+      {
+        "id": 159487,
+        "code": "Elsworthy",
+        "name": "Elsworthy",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/736b973f-0d0f-43ed-8f95-95150039c0ed/Elsworthy Smooth Matt.jpg"
+      },
+      {
+        "id": 159488,
+        "code": "Hembury",
+        "name": "Hembury",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/8201dc67-0afb-4164-ab95-42232764f3ec/Hembury Smooth Matt.jpg"
+      },
+      {
+        "id": 159489,
+        "code": "Kelworth",
+        "name": "Kelworth",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/06650875-2590-4177-ac3c-f0c4938b5aa9/Kelworth.jpg"
+      },
+      {
+        "id": 159490,
+        "code": "Lynton",
+        "name": "Lynton (Painted)",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e1ee8761-29e7-434f-8870-834f1756beeb/Lynton (On-Trend).png"
+      },
+      {
+        "id": 159491,
+        "code": "Norwood",
+        "name": "Norwood",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/10a56262-d07d-45fd-a6fa-d7c633148789/Norwood (Premium Colours).png"
+      },
+      {
+        "id": 159492,
+        "code": "Rivermoor",
+        "name": "Rivermoor",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/86cfc393-c803-4034-a061-58de12e70224/Rivermoor (On-Trend).jpg"
+      },
+      {
+        "id": 159493,
+        "code": "Tenby",
+        "name": "Tenby",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/85484ac0-11f9-44c4-b805-3cb7cefff815/Tenby Smooth Matt.jpg"
+      },
+      {
+        "id": 159494,
+        "code": "Wrenwood",
+        "name": "Wrenwood",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/f115fe30-c24e-4c81-b467-afa73427707d/Wrenwood (On-Trend Colours).jpg"
+      },
+      {
+        "id": 171185,
+        "code": "Lynton (Woodgrain Effect)",
+        "name": "Lynton (Woodgrain Effect)",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/c0ece950-1e15-4dae-8c57-fd74ec71b7c6/Untitled.png"
+      },
+      {
+        "id": 171308,
+        "code": "Ashford (Woodgrain Effect)",
+        "name": "Ashford (Woodgrain Effect)",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/6dd3cace-9a17-47a9-8406-349e9db1351f/Ashford (1).jpg"
+      }
+    ],
+    "handleless_contemporary": [
+      {
+        "id": 159495,
+        "code": "Cortona",
+        "name": "Cortona",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/e1c7cfa4-5613-48bc-9554-8b485fa1e32a/Corntona.jpg"
+      },
+      {
+        "id": 159496,
+        "code": "Denia",
+        "name": "Denia",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/45cbcf1a-a5e2-4bff-bad8-46fb43ae3d10/Denia (Premium Colours).jpg"
+      },
+      {
+        "id": 159497,
+        "code": "Fino",
+        "name": "Fino",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/95285c1f-313d-49c6-ba5d-8df219d341f1/Fino.jpg"
+      },
+      {
+        "id": 159498,
+        "code": "Henley",
+        "name": "Henley",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/50134094-9d4e-4c4b-8d4b-0794d55d816b/Henley Smooth Matt.jpg"
+      },
+      {
+        "id": 159499,
+        "code": "Liscio",
+        "name": "Liscio",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b3c8d1ec-5793-40d1-9389-91243c837600/Liscio.jpg"
+      },
+      {
+        "id": 159500,
+        "code": "Lucca",
+        "name": "Lucca",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/07260398-062f-450e-ad49-dc15b1eadb16/LUcca.jpg"
+      },
+      {
+        "id": 159501,
+        "code": "Primo Colour",
+        "name": "Primo Colour",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d9faa558-a6c5-4bee-a9d9-8a39a623b46d/primo color.png"
+      },
+      {
+        "id": 171305,
+        "code": "Primo Concrete",
+        "name": "Primo Concrete",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/7cbb0136-9ce4-4fe2-9f1f-659d8c60968d/primo concr.png"
+      },
+      {
+        "id": 171306,
+        "code": "Primo Painted Oak",
+        "name": "Primo Painted Oak",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4e4fdc5d-6636-46d8-a4ea-1cef5bf1e3c3/primo oaint.png"
+      },
+      {
+        "id": 171307,
+        "code": "Primo Woodgrain",
+        "name": "Primo Woodgrain",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/4fa55e3f-9b63-42b1-b8c8-1855a2eabcd7/primo woodgrain.png"
+      }
+    ],
+    "vento": [
+      {
+        "id": 158982,
+        "code": "Vento Colour",
+        "name": "Vento Colour",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/73c063f9-ab04-40ce-9b73-d5c6d18b2322/Vento Colour.jpg"
+      },
+      {
+        "id": 171309,
+        "code": "Vento Concrete",
+        "name": "Vento Concrete",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/3a9896cc-7989-4638-b754-88b2770fd4a4/vento concr.png"
+      },
+      {
+        "id": 171310,
+        "code": "Vento Painted Oak",
+        "name": "Vento Painted Oak",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/be1d4851-6025-4314-873f-3b88bcdb1af5/vento paint.png"
+      },
+      {
+        "id": 171311,
+        "code": "Vento Woodgrain",
+        "name": "Vento Woodgrain",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/d0cffc14-7609-47e2-a86b-68d9acdf0a0f/vento woodgrain.png"
+      }
+    ]
+  },
+  "door_colours": [
+    {
+      "id": 86031,
+      "code": "ABYB",
+      "name": "Alby Blue (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/70bfd8ee-11aa-49d4-bd82-0dc0fcc8ae6e/изображение_2026-01-14_104802589.png"
+    },
+    {
+      "id": 86032,
+      "code": "ALSM",
+      "name": "Alabaster (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/1abecb5d-2dce-4640-a6cc-99c36eb9db22/icon.webp"
+    },
+    {
+      "id": 86033,
+      "code": "AMZG",
+      "name": "Amazon Green",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/87641733-746d-46a1-9c4e-ee876c7aae55/icon.webp"
+    },
+    {
+      "id": 86034,
+      "code": "ANGL",
+      "name": "Anthracite Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/22a0675d-b684-4627-a21d-9afa461bc42b/icon.webp"
+    },
+    {
+      "id": 86035,
+      "code": "ANRS",
+      "name": "Antique Rose (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/d49b29c7-c797-4ac1-b50b-40d5fad5de74/icon.webp"
+    },
+    {
+      "id": 86036,
+      "code": "ANTH",
+      "name": "Anthracite",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/22fbdf56-191b-4bac-aad1-d4a88e3d2f98/icon.webp"
+    },
+    {
+      "id": 86037,
+      "code": "BKHG",
+      "name": "Black High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/7f15ef76-420c-4113-866a-b5f9c023e6f5/icon.webp"
+    },
+    {
+      "id": 86038,
+      "code": "BLAK",
+      "name": "Black",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b8a11f11-4c94-45a6-be22-57a7f295a932/icon.webp"
+    },
+    {
+      "id": 86039,
+      "code": "BLGL",
+      "name": "Black High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b1d35e69-cef8-4b03-adb4-f6ba4d387b15/icon.webp"
+    },
+    {
+      "id": 86040,
+      "code": "BLSM",
+      "name": "Black (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/06c21281-f19f-4671-a5fd-bbdf0c280ce1/icon.webp"
+    },
+    {
+      "id": 86041,
+      "code": "CAGL",
+      "name": "Cashmere",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/0c55c388-11ba-48f1-a091-a4e78638a1d6/icon.webp"
+    },
+    {
+      "id": 86042,
+      "code": "CASH",
+      "name": "Cashmere",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/8814b4c9-4aba-484c-a4d2-bae6b5eeadca/icon.webp"
+    },
+    {
+      "id": 86043,
+      "code": "CBTG",
+      "name": "Cobalt Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/61c0c0ae-07e8-48d9-a11e-fe9c18b4ecc8/icon.webp"
+    },
+    {
+      "id": 86044,
+      "code": "CHAL",
+      "name": "Chalkstone",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/1149e2f2-8b60-4d33-ba8e-930c4d0c83bd/icon.webp"
+    },
+    {
+      "id": 86045,
+      "code": "CMHG",
+      "name": "Cashmere High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/3448a3f8-f056-4a52-b1c6-82d36e53ba51/icon.webp"
+    },
+    {
+      "id": 86046,
+      "code": "CRGL",
+      "name": "Cream",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/486e825a-bdec-45f3-838c-e5bd4be5bf30/icon.webp"
+    },
+    {
+      "id": 86047,
+      "code": "CRHG",
+      "name": "Cream High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/e129bd64-02fc-44d3-a7ca-abee7daaca09/icon.webp"
+    },
+    {
+      "id": 86048,
+      "code": "CRNF",
+      "name": "Cornflower",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/baf85eb0-ebe6-48a5-9d49-00e69a3c6948/icon.webp"
+    },
+    {
+      "id": 86049,
+      "code": "DAKA",
+      "name": "Dakar",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/d99217a8-8c26-4a74-aeec-f02545a2dd9f/icon.webp"
+    },
+    {
+      "id": 86050,
+      "code": "DEGL",
+      "name": "Denim High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/6976569a-f8b5-4e12-a590-80c48f80ca50/icon.webp"
+    },
+    {
+      "id": 86051,
+      "code": "DENI",
+      "name": "Denim",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/1ec99e9a-90e4-4dc4-b762-ecd1c622ad60/icon.webp"
+    },
+    {
+      "id": 86052,
+      "code": "DESM",
+      "name": "Denim (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/144939e6-55b4-48ce-a7a7-112c967d5cde/icon.webp"
+    },
+    {
+      "id": 86054,
+      "code": "DUGG",
+      "name": "Dust Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/7e37e27c-c6d8-4f8d-b7f4-2d7a0db9a7ac/icon.webp"
+    },
+    {
+      "id": 86055,
+      "code": "DUGR",
+      "name": "Dust Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/d8178e0e-fea7-47a0-acdc-5b2c4cfd818b/icon.webp"
+    },
+    {
+      "id": 86056,
+      "code": "DUGS",
+      "name": "Dust Grey (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/5209d5b4-a7c2-43d7-bcbd-6a603d318b85/icon.webp"
+    },
+    {
+      "id": 86057,
+      "code": "EVER",
+      "name": "Evergreen",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/54eba89c-6a2b-40a5-9cb4-d80057588f53/icon.webp"
+    },
+    {
+      "id": 86058,
+      "code": "FIGR",
+      "name": "Fir Green",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/cf0ecc40-6234-48f5-856d-959a0b870e16/icon.webp"
+    },
+    {
+      "id": 86059,
+      "code": "FJHG",
+      "name": "Fjord High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b700be5c-a29d-43ed-9238-f79d888c9260/icon.webp"
+    },
+    {
+      "id": 86060,
+      "code": "FJOR",
+      "name": "Fjord",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/ca11fa12-fdd3-4447-b149-2eeda1a3a412/icon.webp"
+    },
+    {
+      "id": 86061,
+      "code": "FRGR",
+      "name": "French Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/f7f9a217-7168-473f-8752-15da5dcf1e55/icon.webp"
+    },
+    {
+      "id": 86062,
+      "code": "GMHG",
+      "name": "Gun Metal High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/1bec797a-d957-41af-89e5-4c90fc7abc56/icon.webp"
+    },
+    {
+      "id": 86063,
+      "code": "GRAP",
+      "name": "Graphite",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/071bf998-deff-43dd-9ad0-ca092a11f2a2/icon.webp"
+    },
+    {
+      "id": 86064,
+      "code": "GRSM",
+      "name": "Graphite (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/95de446a-f534-45dd-8b40-975874b25b9f/icon.webp"
+    },
+    {
+      "id": 86065,
+      "code": "HEGS",
+      "name": "Heritage Green (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/a4545be7-106e-450e-b45b-d396a55103ce/icon.webp"
+    },
+    {
+      "id": 86066,
+      "code": "INBL",
+      "name": "Indigo Blue",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/1e29d111-a7aa-4805-b83b-9afced6f2b11/icon.webp"
+    },
+    {
+      "id": 86067,
+      "code": "INBS",
+      "name": "Indigo (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/090d5e42-7435-483e-b860-cdb4d51e009f/icon.webp"
+    },
+    {
+      "id": 86068,
+      "code": "IVGL",
+      "name": "Ivory",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/44828071-2198-4e6e-a5b4-d456ae0c332f/icon.webp"
+    },
+    {
+      "id": 86069,
+      "code": "IVOR",
+      "name": "Ivory",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/98138123-cb8e-4ceb-b600-2101b2949803/icon.webp"
+    },
+    {
+      "id": 86070,
+      "code": "KASM",
+      "name": "Kashmir (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b5fde202-1832-4af7-abd1-56e9d0894d44/icon.webp"
+    },
+    {
+      "id": 86071,
+      "code": "KGHG",
+      "name": "Khaki Grey High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/31e74e23-c33a-4e70-bbfe-8ff54a003337/icon.webp"
+    },
+    {
+      "id": 86072,
+      "code": "LAVA",
+      "name": "Lava",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/2dcc44b1-5508-4671-a2d8-9f8f86a2627b/icon.webp"
+    },
+    {
+      "id": 86073,
+      "code": "LGHG",
+      "name": "Light Grey High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/079eec75-c7f0-4e84-a070-39cc23d4fd0a/icon.webp"
+    },
+    {
+      "id": 86074,
+      "code": "LIGG",
+      "name": "Light Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/f6188f9e-3cbf-4d90-8a08-75d6466c9b61/icon.webp"
+    },
+    {
+      "id": 86075,
+      "code": "LIGS",
+      "name": "Light Grey (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/3ae24629-79bb-409d-8bc1-3e0fdf201b18/icon.webp"
+    },
+    {
+      "id": 86076,
+      "code": "LIGY",
+      "name": "Light Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/108cc1bc-308a-44d3-8c92-334b4597a58f/icon.webp"
+    },
+    {
+      "id": 86077,
+      "code": "LNEN",
+      "name": "Linen (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/86a19cbf-39ee-43e1-a970-b83ec234362e/icon.webp"
+    },
+    {
+      "id": 86078,
+      "code": "MARI",
+      "name": "Marine",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/36e3b0ab-fefe-4797-aa5b-cfe32c82ed7d/icon.webp"
+    },
+    {
+      "id": 86079,
+      "code": "MASM",
+      "name": "Marine (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/489209ca-8b97-48cd-a167-18eb714a6518/icon.webp"
+    },
+    {
+      "id": 86080,
+      "code": "MBHG",
+      "name": "Metallic Blue High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/f9282cb2-08cb-4899-9828-a02c7d494d94/icon.webp"
+    },
+    {
+      "id": 86081,
+      "code": "MDNB",
+      "name": "Midnight Blue",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/dbcf20f7-3e72-4b46-93e3-574ae3c66e5e/icon.webp"
+    },
+    {
+      "id": 86082,
+      "code": "MUSS",
+      "name": "Mussel",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/710f3f30-6eeb-4a22-aeeb-d58d2f273ac6/icon.webp"
+    },
+    {
+      "id": 86083,
+      "code": "ONGY",
+      "name": "Onyx Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/a229f626-fde1-4ef3-9bb1-5132ce929089/icon.webp"
+    },
+    {
+      "id": 86084,
+      "code": "PEBB",
+      "name": "Pebble",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/7ddf9c1d-d650-46f8-a49e-98f975c22d6a/icon.webp"
+    },
+    {
+      "id": 86085,
+      "code": "PESM",
+      "name": "Pebble (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b134aa94-9398-4d07-9227-ce07d0e60239/icon.webp"
+    },
+    {
+      "id": 86086,
+      "code": "PORC",
+      "name": "Porcelain",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/5bfce3e0-f59f-41d2-bfe9-2f5339532416/icon.webp"
+    },
+    {
+      "id": 86087,
+      "code": "POSM",
+      "name": "Porcelain (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/97d29230-1afd-4b67-85b6-9e230bf84a31/icon.webp"
+    },
+    {
+      "id": 86088,
+      "code": "PRBL",
+      "name": "Parisian Blue",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/df5f3168-f6a0-4574-af7e-b3ec44f184dc/icon.webp"
+    },
+    {
+      "id": 86089,
+      "code": "RDHG",
+      "name": "Red High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/f1c74358-3bb8-472a-a690-66501121b554/icon.webp"
+    },
+    {
+      "id": 86090,
+      "code": "REGR",
+      "name": "Reed Green",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/f8a2e2b5-759c-4bdd-9aac-2eb2b30550a2/icon.webp"
+    },
+    {
+      "id": 86091,
+      "code": "REGS",
+      "name": "Reed Green (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/d43bcc19-6513-465b-969d-3f9890dd3474/icon.webp"
+    },
+    {
+      "id": 86092,
+      "code": "SAGR",
+      "name": "Sage Green",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/fd41bb81-92e9-464b-9147-30acd61027ab/icon.webp"
+    },
+    {
+      "id": 86093,
+      "code": "SIGR",
+      "name": "Silver Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/8ab0a1e8-0eb7-4073-a748-6df97193f041/icon.webp"
+    },
+    {
+      "id": 86094,
+      "code": "SMKB",
+      "name": "Smoke Blue",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/0326374f-0882-4cd0-9be7-aa1120cc7ff5/icon.webp"
+    },
+    {
+      "id": 86095,
+      "code": "SPHB",
+      "name": "Sapphire Blue",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/6b786507-6d94-44ce-94e9-08d023382cd1/icon.webp"
+    },
+    {
+      "id": 86096,
+      "code": "STGR",
+      "name": "Stone Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/399915c9-b923-4488-ba7d-0717e6a49b61/icon.webp"
+    },
+    {
+      "id": 86097,
+      "code": "STGS",
+      "name": "Stone Grey (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/5fb8ecab-8bfe-4f11-a45c-2389664a3d3f/icon.webp"
+    },
+    {
+      "id": 86098,
+      "code": "STON",
+      "name": "Stone",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/4bc38be8-a450-47cd-a0bd-40bbc3fede1a/icon.webp"
+    },
+    {
+      "id": 86099,
+      "code": "SUWH",
+      "name": "Super White",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b47bb68c-589c-49a0-8b69-1d4750f6013c/icon.webp"
+    },
+    {
+      "id": 86100,
+      "code": "TASM",
+      "name": "Taupe (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/ccd4186f-abe9-4b18-82d6-51f2a0ff358a/icon.webp"
+    },
+    {
+      "id": 86101,
+      "code": "TAUP",
+      "name": "Taupe",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/adb8aa13-1d9b-418f-b644-de5ea46452fc/icon.webp"
+    },
+    {
+      "id": 86102,
+      "code": "TURS",
+      "name": "Tuscan Red (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/ecc8160e-9c1c-476c-8fd0-a4dbb22029f1/icon.webp"
+    },
+    {
+      "id": 86103,
+      "code": "VIRI",
+      "name": "Viridian",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/078cbb37-90ef-4efc-996a-46c6fd4a71fb/icon.webp"
+    },
+    {
+      "id": 86104,
+      "code": "WHGL",
+      "name": "White",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/26c6589e-5a94-4807-8adb-9b5fa93ab35a/icon.webp"
+    },
+    {
+      "id": 86105,
+      "code": "WHGR",
+      "name": "White Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/6d8b1cf1-e8ae-4760-b6e6-ddf365c800bb/icon.webp"
+    },
+    {
+      "id": 86106,
+      "code": "WHGS",
+      "name": "White Grey (SM)",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/8c3d40ae-61b0-48ea-ba9e-85369a5644e7/icon.webp"
+    },
+    {
+      "id": 86107,
+      "code": "WHIT",
+      "name": "White",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/acf05c08-19fc-4961-938b-28cb5e4531b0/icon.webp"
+    },
+    {
+      "id": 86108,
+      "code": "WTHG",
+      "name": "White High Gloss",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/882945fa-176b-460e-b6e4-6536a57ddfc3/icon.webp"
+    },
+    {
+      "id": 86134,
+      "code": "CNCF",
+      "name": "Concrete Flow",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/61eaec10-d747-4482-b3d5-5ab852cc2870/icon.webp"
+    },
+    {
+      "id": 86135,
+      "code": "CRCF",
+      "name": "Charcoal Flow",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/dd334d0c-331d-469e-b120-7084d86ecadf/icon.webp"
+    },
+    {
+      "id": 86136,
+      "code": "CSTO",
+      "name": "Coast Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/37ffd43d-48d1-4b3b-8074-1a6fd710a66a/icon.webp"
+    },
+    {
+      "id": 86137,
+      "code": "DRKA",
+      "name": "Dark Atelier",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/53d36b9d-f0f9-4746-a894-8d61352661e0/icon.webp"
+    },
+    {
+      "id": 86138,
+      "code": "HAZO",
+      "name": "Hazel Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/f7c27408-835b-415b-af5e-e2d7809c3d79/icon.webp"
+    },
+    {
+      "id": 86139,
+      "code": "HRBO",
+      "name": "Gold Harbour Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/008dfac7-8437-4597-93a9-112bbd477ffd/icon.webp"
+    },
+    {
+      "id": 86140,
+      "code": "IRNF",
+      "name": "Iron Flow",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/74a5f096-d38f-48b7-83cd-7c489ce17dae/icon.webp"
+    },
+    {
+      "id": 86141,
+      "code": "LAOA",
+      "name": "Lacquered Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/3abd65e4-df0a-4218-9c30-872e3f971b27/icon.webp"
+    },
+    {
+      "id": 86142,
+      "code": "LSAO",
+      "name": "Lissa Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b49fd6ff-d094-4c10-b052-38bad7363a13/icon.webp"
+    },
+    {
+      "id": 86143,
+      "code": "MRCO",
+      "name": "Marone Casella Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/cfb1606a-cd2b-45dd-a906-af45aac6f53c/icon.webp"
+    },
+    {
+      "id": 86144,
+      "code": "NAHO",
+      "name": "Natural Halifax Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/847d2680-65de-42ff-a4c4-9f47d924b38d/icon.webp"
+    },
+    {
+      "id": 86145,
+      "code": "RSTO",
+      "name": "Risteretto Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/49ef0dac-3c22-426b-8e4e-cbce465d87d4/icon.webp"
+    },
+    {
+      "id": 86146,
+      "code": "SLKF",
+      "name": "Silk Flow",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/cdb13ba2-058a-4660-aab1-0d4bd9f3c5f8/icon.webp"
+    },
+    {
+      "id": 86147,
+      "code": "SOOA",
+      "name": "Sonoma Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/09bb973b-6335-4d83-822c-b67289e5e5d6/icon.webp"
+    },
+    {
+      "id": 86148,
+      "code": "URBO",
+      "name": "Urban Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/4ef22f14-4edf-4f4c-a2b0-9c8ee0f1d6c3/icon.webp"
+    },
+    {
+      "id": 86149,
+      "code": "WHHO",
+      "name": "White Halifax Oak",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/77a95c8e-8321-42be-bcf1-a40b30cbaf0a/icon.webp"
+    },
+    {
+      "id": 88068,
+      "code": "PBGR",
+      "name": "Pebble Grey",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/d9ee61b8-1625-418f-ab8e-b44a93b1a5ec/изображение_2026-01-14_114712356.png"
+    },
+    {
+      "id": 88078,
+      "code": "ROSE",
+      "name": "Rose",
+      "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/5fa88f9e-79e1-489d-82c5-995dfe96a53d/изображение_2026-01-14_130742779.png"
+    }
+  ],
+  "handles": {
+    "types": [
+      {
+        "id": 174758,
+        "code": "cup_handle_64",
+        "name": "AURORA Linear Cup",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/2bff4b7e-0f49-460c-ad96-85670643b2a9/cup_handle_64"
+      },
+      {
+        "id": 174759,
+        "code": "round_knob",
+        "name": "AURORA Large Round Knob",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/93e21574-9706-4581-8347-535ec5cba8b1/round_knob"
+      },
+      {
+        "id": 174760,
+        "code": "square_handle_160",
+        "name": "AURORA Slim Square 160mm",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/a5bd5001-abc1-4aa9-a0ce-467d2bb03594/square_handle_160"
+      },
+      {
+        "id": 174761,
+        "code": "d_handle_160",
+        "name": "AURORA D Handle",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/08dc95a5-e815-4056-9809-a18609fe0e75/d_handle_160"
+      },
+      {
+        "id": 174762,
+        "code": "square_handle_320",
+        "name": "AURORA Slim Square 320mm",
+        "image_url": "https://blobs.prodboard.com/betterkitchens/icon/b645b1a7-b799-4ed0-a5b0-d739f9af929e/square_handle_320"
+      }
+    ],
+    "finishes": [
+      {
+        "id": 83355,
+        "code": "chrome",
+        "name": "Chrome",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/b6ba7e5f-6e8e-4531-bdef-d076c5ddcf98/chrome"
+      },
+      {
+        "id": 83356,
+        "code": "gold",
+        "name": "Gold",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/e65d8d04-22a3-40ef-a097-8d71421ce6ff/gold"
+      },
+      {
+        "id": 90198,
+        "code": "Matt Black",
+        "name": "Matt Black",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/aff8b7d6-72aa-4fb9-b1c9-aff0103e946f/Matt Black"
+      },
+      {
+        "id": 90200,
+        "code": "Brushed Satin",
+        "name": "Brushed Satin",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/1c03ca15-e274-4515-b514-36b958e87906/Brushed Satin"
+      },
+      {
+        "id": 90201,
+        "code": "Brass",
+        "name": "Brass",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/0c804206-c2f5-44c6-8d73-57dad1cf66b3/Brass"
+      },
+      {
+        "id": 90202,
+        "code": "Copper",
+        "name": "Copper",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/c5aaec5a-42a8-446c-8bbc-90f1a0f321bd/Copper"
+      },
+      {
+        "id": 90203,
+        "code": "Pewter",
+        "name": "Pewter",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/4b500246-2f23-463e-8f1e-fabdf0132f67/Pewter"
+      },
+      {
+        "id": 90204,
+        "code": "Antique Brass",
+        "name": "Antique Brass",
+        "swatch_url": "https://blobs.prodboard.com/betterkitchens/icon/7bc0e0ac-ae34-43d0-972a-9b1236972fba/Antique Brass"
+      }
+    ]
+  },
+  "appliances": {
+    "refrigerators": [
+      {
+        "id": 132588,
+        "code": "Fridge 1 Metric",
+        "name": "CoolMaster Pro",
+        "w": 600,
+        "h": 1800,
+        "d": 580,
+        "image_url": "https://blobs.prodboard.com/library/icon/24dc1624-3c2a-4b2b-807d-0799903cbd02/Fridge 1"
+      },
+      {
+        "id": 132589,
+        "code": "Fridge 2 Metric",
+        "name": "FrostElite Series",
+        "w": 1000,
+        "h": 1800,
+        "d": 580,
+        "image_url": "https://blobs.prodboard.com/library/icon/2011d164-8956-4d69-9bec-1a114e389992/Fridge 2"
+      },
+      {
+        "id": 132590,
+        "code": "Fridge 3 Metric",
+        "name": "IceFlow Deluxe",
+        "w": 950,
+        "h": 1800,
+        "d": 605,
+        "image_url": "https://blobs.prodboard.com/library/icon/f7734241-5be0-48cf-b753-c6540583378c/Fridge 3"
+      },
+      {
+        "id": 132591,
+        "code": "Fridge 4 Metric",
+        "name": "SubZero Masterpiece",
+        "w": 950,
+        "h": 1800,
+        "d": 582,
+        "image_url": "https://blobs.prodboard.com/library/icon/1f2933cf-afa5-48ae-b352-fec6a160fc3e/Fridge 4"
+      },
+      {
+        "id": 132592,
+        "code": "Fridge 5 Metric",
+        "name": "ArcticBlast Ultra",
+        "w": 680,
+        "h": 1800,
+        "d": 570,
+        "image_url": "https://blobs.prodboard.com/library/icon/5f7d01d9-0f62-45f4-815a-bea1485bf1a6/Fridge 5"
+      },
+      {
+        "id": 132593,
+        "code": "Fridge 6 Metric",
+        "name": "FrigidFusion Elite",
+        "w": 560,
+        "h": 1800,
+        "d": 590,
+        "image_url": "https://blobs.prodboard.com/library/icon/a7336bad-9a9b-4c37-8546-276f393556fe/Fridge 6"
+      },
+      {
+        "id": 132594,
+        "code": "Fridge 7 Metric",
+        "name": "PolarZone Signature",
+        "w": 900,
+        "h": 1800,
+        "d": 680,
+        "image_url": "https://blobs.prodboard.com/library/icon/5d18bf50-ab8d-4d3a-9aa3-614982417f4a/Fridge 7"
+      },
+      {
+        "id": 132595,
+        "code": "Fridge 8 Metric",
+        "name": "ArcticVault Luxury",
+        "w": 850,
+        "h": 1800,
+        "d": 680,
+        "image_url": "https://blobs.prodboard.com/library/icon/66a1b4c1-f985-4754-8ec4-cd025f6c09b1/Fridge 8"
+      },
+      {
+        "id": 132596,
+        "code": "Fridge 9 Metric",
+        "name": "FreezeTech Grandeur",
+        "w": 1000,
+        "h": 1800,
+        "d": 580,
+        "image_url": "https://blobs.prodboard.com/library/icon/2f338c0c-9d26-4636-ab40-eb06198f08f4/Fridge 9"
+      },
+      {
+        "id": 132597,
+        "code": "Fridge 10 Metric",
+        "name": "FrostGuard Elite",
+        "w": 900,
+        "h": 1800,
+        "d": 620,
+        "image_url": "https://blobs.prodboard.com/library/icon/3747cf43-7ddf-4715-8c02-f3733a601adc/Fridge 10"
+      },
+      {
+        "id": 132598,
+        "code": "Fridge 11 Metric",
+        "name": "CrystalCool Master",
+        "w": 650,
+        "h": 1800,
+        "d": 640,
+        "image_url": "https://blobs.prodboard.com/library/icon/8dc5e78c-ded7-41f0-b8ce-4946a9b36aa2/Fridge 11"
+      },
+      {
+        "id": 132599,
+        "code": "Fridge 12 Metric",
+        "name": "EliteFreeze Heritage",
+        "w": 650,
+        "h": 1800,
+        "d": 630,
+        "image_url": "https://blobs.prodboard.com/library/icon/bcd01f64-3965-434a-81b4-e40bd414dbb3/Fridge 12"
+      },
+      {
+        "id": 132600,
+        "code": "Fridge 13 Metric",
+        "name": "FrostCraft Grand",
+        "w": 600,
+        "h": 1800,
+        "d": 680,
+        "image_url": "https://blobs.prodboard.com/library/icon/276572ad-0001-49d0-b539-b916acf063b7/Fridge 13"
+      },
+      {
+        "id": 132601,
+        "code": "Fridge 14 Metric",
+        "name": "IcyBreeze Prestige",
+        "w": 650,
+        "h": 1800,
+        "d": 600,
+        "image_url": "https://blobs.prodboard.com/library/icon/3f06d097-161d-4352-9804-fffb11d36c9c/Fridge 14"
+      },
+      {
+        "id": 132602,
+        "code": "Fridge 15 Metric",
+        "name": "CoolWave Elegance",
+        "w": 600,
+        "h": 1800,
+        "d": 620,
+        "image_url": "https://blobs.prodboard.com/library/icon/7d1ddece-95b9-4a53-9971-432f2535e17a/Fridge 15"
+      },
+      {
+        "id": 132603,
+        "code": "Fridge 17 Metric",
+        "name": "ArcticAura Signature",
+        "w": 850,
+        "h": 1800,
+        "d": 600,
+        "image_url": "https://blobs.prodboard.com/library/icon/dc5250db-5164-4adc-9edf-18d6326f7e8e/Fridge 17"
+      },
+      {
+        "id": 132604,
+        "code": "Fridge 18 Metric",
+        "name": "FreezeMaster Prime",
+        "w": 850,
+        "h": 1800,
+        "d": 610,
+        "image_url": "https://blobs.prodboard.com/library/icon/d7db9f59-cf1b-4ba4-af59-78652d24282b/Fridge 18"
+      },
+      {
+        "id": 132605,
+        "code": "Fridge 19 Metric",
+        "name": "ChillSculpt Heritage",
+        "w": 850,
+        "h": 1800,
+        "d": 640,
+        "image_url": "https://blobs.prodboard.com/library/icon/85f0a014-c3de-4dc9-aaa4-181eeb9e30dc/Fridge 19"
+      },
+      {
+        "id": 132606,
+        "code": "Fridge 20 Metric",
+        "name": "PrestigeFrost Iconic",
+        "w": 850,
+        "h": 1800,
+        "d": 660,
+        "image_url": "https://blobs.prodboard.com/library/icon/e79f15dc-28dd-47aa-9c10-c03c95277d1b/Fridge 20"
+      },
+      {
+        "id": 132607,
+        "code": "Fridge 21 Metric",
+        "name": "FrigidElegance Grand",
+        "w": 1000,
+        "h": 1800,
+        "d": 580,
+        "image_url": "https://blobs.prodboard.com/library/icon/d35b0a0a-7c10-43b0-ad9c-8aad05cba96d/Fridge 21"
+      }
+    ],
+    "hoods_hobs": [
+      {
+        "id": 132608,
+        "code": "Hob 1 Metric",
+        "name": "TurboAir Range Hood",
+        "w": 600,
+        "h": 500,
+        "d": 350,
+        "image_url": "https://blobs.prodboard.com/library/icon/1946f316-93cd-47f5-9cd9-16509021fefc/Hob 1"
+      },
+      {
+        "id": 132609,
+        "code": "Hob 2 Metric",
+        "name": "Broan Elite Series",
+        "w": 600,
+        "h": 620,
+        "d": 300,
+        "image_url": "https://blobs.prodboard.com/library/icon/c3052976-fa7e-4a74-adba-ce668213d663/Hob 2"
+      },
+      {
+        "id": 132610,
+        "code": "Hob 3 Metric",
+        "name": "Nutone Allure Range Hood",
+        "w": 250,
+        "h": 560,
+        "d": 220,
+        "image_url": "https://blobs.prodboard.com/library/icon/82dfc37f-d6f4-494a-b187-21730ec5c90b/Hob 3"
+      },
+      {
+        "id": 132611,
+        "code": "Hob 4 Metric",
+        "name": "Smart Insert Range Hood",
+        "w": 600,
+        "h": 550,
+        "d": 380,
+        "image_url": "https://blobs.prodboard.com/library/icon/887ec857-099a-46db-8520-39989aeabaaa/Hob 4"
+      },
+      {
+        "id": 132612,
+        "code": "Hob 7 Metric",
+        "name": "Elica Aspire Series Hood",
+        "w": 1000,
+        "h": 700,
+        "d": 520,
+        "image_url": "https://blobs.prodboard.com/library/icon/2ea2e8c6-a050-4eff-9c9a-80ea9d2daccf/Hob 7"
+      },
+      {
+        "id": 132613,
+        "code": "Hob 8 Metric",
+        "name": "Sirius SUT958",
+        "w": 1000,
+        "h": 900,
+        "d": 470,
+        "image_url": "https://blobs.prodboard.com/library/icon/2fd92087-6288-4cee-94ba-bcba5555fbbb/Hob 8"
+      },
+      {
+        "id": 132614,
+        "code": "Hob 10 Metric",
+        "name": "Bosch Benchmark Series",
+        "w": 900,
+        "h": 1050,
+        "d": 500,
+        "image_url": "https://blobs.prodboard.com/library/icon/5da09790-4a39-42e1-b50b-d9ba92f30e3d/Hob 10"
+      },
+      {
+        "id": 132615,
+        "code": "Hob 11 Metric",
+        "name": "Bosch 800 Series Chimney",
+        "w": 900,
+        "h": 1050,
+        "d": 500,
+        "image_url": "https://blobs.prodboard.com/library/icon/2f40b9b0-248c-4580-99c7-8fc1b05b7d6d/Hob 11"
+      },
+      {
+        "id": 132667,
+        "code": "Hob 6 Metric",
+        "name": "Cooker hood",
+        "w": 600,
+        "h": 513,
+        "d": 305,
+        "image_url": "https://blobs.prodboard.com/library/icon/f09cd215-f5a1-4ba5-afd2-a3ae89b82337/Hob 6"
+      },
+      {
+        "id": 132668,
+        "code": "hood 1 Metric",
+        "name": "Bosch Serie 2 DHL555BGB",
+        "w": 900,
+        "h": 720,
+        "d": 500,
+        "image_url": "https://blobs.prodboard.com/library/icon/da3d4634-dcec-49fc-89a8-2ae473d93b4c/hood 1"
+      },
+      {
+        "id": 132669,
+        "code": "hood 10 Metric",
+        "name": "Bosch Serie 4 DHL575CGB",
+        "w": 900,
+        "h": 720,
+        "d": 500,
+        "image_url": "https://blobs.prodboard.com/library/icon/7f684f00-0bbf-45c8-980f-234d44da87fd/hood 10"
+      },
+      {
+        "id": 132670,
+        "code": "hood 11 Metric",
+        "name": "Bosch Serie 6 DWK97JQ60B",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/7f598b93-fe22-48a0-9666-3700e1e6cda3/hood 11"
+      },
+      {
+        "id": 132671,
+        "code": "hood 13 Metric",
+        "name": "Siemens iQ500",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/95b37aaa-2e3c-4979-abc7-c9b640aa55a9/hood 13"
+      },
+      {
+        "id": 132672,
+        "code": "hood 14 (MIDEA) Metric",
+        "name": "Midea FreshAir Vent",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/433dd489-2b0f-4a80-be46-61d69a347c22/hood 14 (MIDEA)"
+      },
+      {
+        "id": 132673,
+        "code": "hood 15 (MIDEA) Metric",
+        "name": "Midea AeroForce Extractor",
+        "w": 800,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/49d29051-cb15-483a-9303-a084ebf3b08a/hood 15 (MIDEA)"
+      },
+      {
+        "id": 132674,
+        "code": "hood 18 Metric",
+        "name": "Siemens LF21BA582",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/4da6e586-6e16-41ca-9998-fe8d3e985d4e/hood 18"
+      },
+      {
+        "id": 132675,
+        "code": "hood 19 Metric",
+        "name": "Siemens iQ700",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/d44ce30e-9e69-492c-a63a-5624f9ede462/hood 19"
+      },
+      {
+        "id": 132676,
+        "code": "hood 2 Metric",
+        "name": "Bosch Serie 8 DHL785CGB",
+        "w": 900,
+        "h": 720,
+        "d": 500,
+        "image_url": "https://blobs.prodboard.com/library/icon/d6cd6d6e-60ad-4305-b2fe-48684e2b7ea9/hood 2"
+      },
+      {
+        "id": 132677,
+        "code": "hood 20 Metric",
+        "name": "Siemens LI97RA560",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/f89b6eaa-3b5d-4541-b6d4-a810a4c285c5/hood 20"
+      },
+      {
+        "id": 132678,
+        "code": "hood 21 Metric",
+        "name": "Siemens LC67PBC60B",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/e088ff7b-b192-452d-9d70-e0e0a33ae7eb/hood 21"
+      },
+      {
+        "id": 132679,
+        "code": "hood 22 (SIEMENS) Metric",
+        "name": "Siemens LF91BB582B",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/a974e2b0-d022-48c0-bd00-1319e859f3ee/hood 22 (SIEMENS)"
+      },
+      {
+        "id": 132680,
+        "code": "hood 26 Metric",
+        "name": "AEG DBB5960HM",
+        "w": 900,
+        "h": 820,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/af0d6c61-c267-44c0-b345-80cf2030d621/hood 26"
+      },
+      {
+        "id": 132681,
+        "code": "hood 28 (ELICA) Metric",
+        "name": "Elica Sleek",
+        "w": 600,
+        "h": 820,
+        "d": 400,
+        "image_url": "https://blobs.prodboard.com/library/icon/9ffcab72-723e-496c-baad-a985cd191982/hood 28 (ELICA)"
+      },
+      {
+        "id": 132682,
+        "code": "hood 29 (SIEMENS) Metric",
+        "name": "Siemens LC98GB542B",
+        "w": 900,
+        "h": 820,
+        "d": 400,
+        "image_url": "https://blobs.prodboard.com/library/icon/2f486fe4-e259-4d41-802e-fd4f7dd7dce0/hood 29 (SIEMENS)"
+      },
+      {
+        "id": 132683,
+        "code": "hood 3 Metric",
+        "name": "Smeg DKB4650M",
+        "w": 400,
+        "h": 820,
+        "d": 400,
+        "image_url": "https://blobs.prodboard.com/library/icon/b7901331-db0e-4f47-b8c0-ca573a34389f/hood 3"
+      },
+      {
+        "id": 132684,
+        "code": "hood 30 (SIEMENS) Metric",
+        "name": "Siemens LI67RA540",
+        "w": 900,
+        "h": 820,
+        "d": 400,
+        "image_url": "https://blobs.prodboard.com/library/icon/813e94ea-cb71-47cf-a32a-28a8655e02ab/hood 30 (SIEMENS)"
+      },
+      {
+        "id": 132685,
+        "code": "hood 32 (SIEMENS) Metric",
+        "name": "Siemens LC67GB532B",
+        "w": 900,
+        "h": 820,
+        "d": 400,
+        "image_url": "https://blobs.prodboard.com/library/icon/8bc1502e-6e41-47bb-a8d1-b490dd179fac/hood 32 (SIEMENS)"
+      },
+      {
+        "id": 132686,
+        "code": "hood 33 (SIEMENS) Metric",
+        "name": "Siemens LB57574GB",
+        "w": 600,
+        "h": 720,
+        "d": 400,
+        "image_url": "https://blobs.prodboard.com/library/icon/61d77a97-68b6-4bb1-846e-477b2678bf05/hood 33 (SIEMENS)"
+      },
+      {
+        "id": 132687,
+        "code": "hood 34 (SIEMENS) Metric",
+        "name": "Siemens LC91KWP60B",
+        "w": 600,
+        "h": 720,
+        "d": 300,
+        "image_url": "https://blobs.prodboard.com/library/icon/e556dd96-b92b-4430-bfa6-a012e03d3e1d/hood 34 (SIEMENS)"
+      },
+      {
+        "id": 132688,
+        "code": "hood 4 Metric",
+        "name": "Smeg DVB5560B",
+        "w": 400,
+        "h": 900,
+        "d": 400,
+        "image_url": "https://blobs.prodboard.com/library/icon/af82d525-a569-40c3-a50e-d8ea8e2f5d4f/hood 4"
+      },
+      {
+        "id": 132689,
+        "code": "hood 5 Metric",
+        "name": "AEG DGE5861HM",
+        "w": 900,
+        "h": 800,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/a8627314-c91d-4645-829f-fd889d136670/hood 5"
+      },
+      {
+        "id": 132690,
+        "code": "hood 6 Metric",
+        "name": "AEG DGE3861HM",
+        "w": 600,
+        "h": 700,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/0223ad7d-ca81-4e41-a279-e2f8d0becfda/hood 6"
+      },
+      {
+        "id": 132692,
+        "code": "hood 8 Metric",
+        "name": "Bosch Serie 8 DWP64BC50B",
+        "w": 900,
+        "h": 820,
+        "d": 500,
+        "image_url": "https://blobs.prodboard.com/library/icon/6803a564-0435-495f-9cba-e8ba6bf30b19/hood 8"
+      },
+      {
+        "id": 132693,
+        "code": "hood 9 Metric",
+        "name": "Bosch Serie 8 DFM064W50B",
+        "w": 900,
+        "h": 720,
+        "d": 450,
+        "image_url": "https://blobs.prodboard.com/library/icon/a1a79ab4-9b79-490b-b02e-d16c15326702/hood 9"
+      }
+    ],
+    "coffee_machines": [
+      {
+        "id": 132616,
+        "code": "Coffee machine 1",
+        "name": "Keurig K-Elite Single Serve",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/d54a2109-dc68-4388-85af-2330c0fb6ee0/Coffee machine 1"
+      },
+      {
+        "id": 132617,
+        "code": "Coffee machine 6",
+        "name": "Kalita Wave 185 Dripper",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/d154af50-3953-4217-8b4e-03c2fb680eb7/Coffee machine 6"
+      },
+      {
+        "id": 132618,
+        "code": "Coffee machine 7",
+        "name": "Nespresso VertuoPlus",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/f98ddcce-faa7-4044-992a-181e706df117/Coffee machine 7"
+      },
+      {
+        "id": 132619,
+        "code": "Coffee machine 8",
+        "name": "Express Espresso Machine",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/b50fe13d-b639-40b1-a7c2-ee4393e260a4/Coffee machine 8"
+      },
+      {
+        "id": 132620,
+        "code": "Coffee machine 9",
+        "name": "Cuisinart DCC-3200",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/2a4dab30-ff27-4545-b644-8c82b41fbca5/Coffee machine 9"
+      },
+      {
+        "id": 132621,
+        "code": "Coffee machine 10",
+        "name": "Jura E8 Automatic Coffee Machine",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/bca1b8b9-3c78-40dc-85b9-3449a89d9fd9/Coffee machine 10"
+      },
+      {
+        "id": 132622,
+        "code": "Coffee machine 11",
+        "name": "Technivorm Moccamaster Coffee Brewer",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/61dbc003-2faf-48cc-8c2f-23ccf1284de8/Coffee machine 11"
+      },
+      {
+        "id": 132623,
+        "code": "Coffee machine 12",
+        "name": "Gaggia Classic Pro",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/92bf0fc9-55dc-4fa8-816e-011f3e90e830/Coffee machine 12"
+      },
+      {
+        "id": 132624,
+        "code": "Coffee machine 13",
+        "name": "Bunn Speed Brew Classic",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/ab976b39-ee7e-4846-8072-7fbda9c1860e/Coffee machine 13"
+      },
+      {
+        "id": 132625,
+        "code": "Coffee machine 14",
+        "name": "Moccamaster KBG",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/cd2187b5-b232-4a55-98d0-464ede41d29c/Coffee machine 14"
+      },
+      {
+        "id": 132626,
+        "code": "Coffee machine 15",
+        "name": "Philips 3200 Series",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/61c3ecb9-a88c-4a55-a2e0-20aeeeda3d18/Coffee machine 15"
+      },
+      {
+        "id": 132627,
+        "code": "Coffee machine 16",
+        "name": "Capresso EC100",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/b39c6c54-2103-4fd0-a084-0bb5db611469/Coffee machine 16"
+      },
+      {
+        "id": 132628,
+        "code": "Coffee machine 17",
+        "name": "Auto-Start Coffee Maker",
+        "w": 280,
+        "h": 395,
+        "d": 278,
+        "image_url": "https://blobs.prodboard.com/library/icon/696a21dc-9559-4d68-b332-9e666e5d6771/Coffee machine 17"
+      },
+      {
+        "id": 132629,
+        "code": "Coffee machine 18",
+        "name": "Stovetop Espresso Maker",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/8e90eb5f-e76e-4a30-ae0e-772c793db18d/Coffee machine 18"
+      },
+      {
+        "id": 132630,
+        "code": "Coffee machine 19",
+        "name": "Hario V60 Electric",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/44d07ec8-e021-4b34-8f62-c6064c6546a4/Coffee machine 19"
+      },
+      {
+        "id": 132631,
+        "code": "Coffee machine 20",
+        "name": "La Pavoni Europiccola",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/16d32968-8081-4441-a0a7-e0483ffe6323/Coffee machine 20"
+      },
+      {
+        "id": 132632,
+        "code": "Coffee machine 21",
+        "name": "Melitta Caffeo Solo E950-103",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/3d65e527-36f7-46d2-b298-cf5a43cf58dd/Coffee machine 21"
+      }
+    ],
+    "blenders": [
+      {
+        "id": 132633,
+        "code": "Blender 1",
+        "name": "SmoothBlend Pro",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/af66a8c3-7b38-49b0-b76f-3bde4335be28/Blender 1"
+      },
+      {
+        "id": 132634,
+        "code": "Blender 2",
+        "name": "PowerMix Elite",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/7b4c54ef-a605-45ed-a7c6-49892a20a60b/Blender 2"
+      },
+      {
+        "id": 132635,
+        "code": "Blender 3",
+        "name": "BlendMaster 3000",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/814e5a02-a205-4c6a-ae6d-6f501b6bc5d0/Blender 3"
+      },
+      {
+        "id": 132636,
+        "code": "Blender 4",
+        "name": "TurboFusion X",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/51f30776-b67d-4b0a-b626-2a38ca487534/Blender 4"
+      },
+      {
+        "id": 132637,
+        "code": "Blender 5",
+        "name": "PureBlend Precision",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/3acb42fc-a652-4477-8643-533c8cab6a18/Blender 5"
+      },
+      {
+        "id": 132638,
+        "code": "Blender 6",
+        "name": "OptiBlend Ultra",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/4f00752d-69bc-43cc-9df0-90c190bc368b/Blender 6"
+      },
+      {
+        "id": 132639,
+        "code": "Blender 7",
+        "name": "MegaMix Plus",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/3ebeca60-477c-42e4-8985-e970c6e48b6e/Blender 7"
+      },
+      {
+        "id": 132640,
+        "code": "Blender 8",
+        "name": "ProFusion Blender",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/4a3b1bfa-d5d3-43c5-b3c3-fedcde047a2a/Blender 8"
+      },
+      {
+        "id": 132641,
+        "code": "Blender 9",
+        "name": "HighSpeedBlend Elite",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/08f8976c-1511-4c0b-803b-032cb3de74dc/Blender 9"
+      },
+      {
+        "id": 132642,
+        "code": "Blender 10",
+        "name": "SmartBlend Tech",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/d35eef07-be8b-4c2c-b401-d597f6b94ed1/Blender 10"
+      },
+      {
+        "id": 132643,
+        "code": "Blender 11",
+        "name": "TurboChop Pro",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/87f9f90e-0605-4d86-b143-7860ca0b76d1/Blender 11"
+      },
+      {
+        "id": 132644,
+        "code": "Blender 12",
+        "name": "OptimalBlend X",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/5825c445-778b-4086-9027-b0dedfa8f1e5/Blender 12"
+      }
+    ],
+    "food_processors": [
+      {
+        "id": 132646,
+        "code": "Cook 1",
+        "name": "FoodPro Multifunction",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/968c7233-c041-482e-8720-ae823e9e977f/Cook 1"
+      },
+      {
+        "id": 132647,
+        "code": "Cook 2",
+        "name": "ChefMate Ultimate",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/98e9db3b-22f5-42b4-bb47-7b3810b10abb/Cook 2"
+      },
+      {
+        "id": 132648,
+        "code": "Cook 4",
+        "name": "CulinaryBlend Fusion",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/cd7b4cab-8964-4439-9e6f-b75ae9b50ad7/Cook 4"
+      },
+      {
+        "id": 132654,
+        "code": "Mixer 1",
+        "name": "MixMaster Pro",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/f941e435-c709-46a7-a86c-1bd8cd8ce45d/Mixer 1"
+      },
+      {
+        "id": 132655,
+        "code": "Mixer 2",
+        "name": "BlendCraft Precision Mixer",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/299e0568-aed8-4965-9816-32354fbfbc6d/Mixer 2"
+      },
+      {
+        "id": 132656,
+        "code": "Ice-Cream 1",
+        "name": "Ice-Cream Machine",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/e84a2890-1dec-420d-bb04-248150692120/Ice-Cream 1"
+      },
+      {
+        "id": 132657,
+        "code": "Meat cuter 1",
+        "name": "MeatGrind Master",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/185fc0fc-2130-4010-9a49-e9cb5ba613e1/Meat cuter 1"
+      },
+      {
+        "id": 132665,
+        "code": "Waffle Maker 1",
+        "name": "Waffle Maker",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/ffdaf62c-f35d-4b3c-8485-a0bd589518bf/Waffle Maker 1"
+      },
+      {
+        "id": 132666,
+        "code": "Waffle Maker 2",
+        "name": "Waffle Iron",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/3441fb7b-1fa8-4f27-9116-6bb522e617d2/Waffle Maker 2"
+      },
+      {
+        "id": 132805,
+        "code": "hlebo",
+        "name": "OptiHeat Toast",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/abc2abc4-1c50-451c-86ed-197423a78164/hlebo"
+      }
+    ],
+    "kettles": [
+      {
+        "id": 132649,
+        "code": "Kettle 1",
+        "name": "RapidBoil Pro",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/2626aac6-0783-4166-a18d-c6af19fb3de1/Kettle 1"
+      },
+      {
+        "id": 132650,
+        "code": "Kettle 2",
+        "name": "PowerHeat Kettle",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/afbbfd42-d88f-45b3-a7b5-3b0432e92283/Kettle 2"
+      },
+      {
+        "id": 132651,
+        "code": "Kettle 3",
+        "name": "PrecisionPour Electric Pot",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/f0aab9b4-98f6-445f-abff-6455a70a9c34/Kettle 3"
+      },
+      {
+        "id": 132652,
+        "code": "Kettle 4",
+        "name": "SwiftHeat Water Boiler",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/1ee97a97-4adf-4ee1-a99d-2567241f1a5c/Kettle 4"
+      },
+      {
+        "id": 132653,
+        "code": "Kettle 5",
+        "name": "QuickBrew Elite",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/0ce6ff6b-67f1-4539-b404-2efd091f8c61/Kettle 5"
+      }
+    ],
+    "toasters": [
+      {
+        "id": 132658,
+        "code": "Toster 01",
+        "name": "ToastTech Pro",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/05f495ee-8aba-430f-a0a0-cbb5b40e7663/Toster 01"
+      },
+      {
+        "id": 132659,
+        "code": "Toster 02",
+        "name": "QuickToast Elite",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/7ce538fd-4d4c-4a72-a84c-b919f00a919e/Toster 02"
+      },
+      {
+        "id": 132660,
+        "code": "Toster 03",
+        "name": "GoldenSlice Toaster",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/a068c402-b84b-4a8a-8b77-b6589db8dd86/Toster 03"
+      },
+      {
+        "id": 132661,
+        "code": "Toster 04",
+        "name": "ToastRapid Express",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/99a58b92-26bd-424b-950f-eb397d7b2807/Toster 04"
+      },
+      {
+        "id": 132662,
+        "code": "Toster 05",
+        "name": "TurboBake Toaster",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/fa0b427f-f93e-42b7-8764-233423df413e/Toster 05"
+      },
+      {
+        "id": 132663,
+        "code": "Toster 06",
+        "name": "QuickCrisp Master",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/1bca8e00-bba2-4a80-9cbe-9bef3474fb4b/Toster 06"
+      },
+      {
+        "id": 132664,
+        "code": "Toster 07",
+        "name": "OptiHeat Toast",
+        "w": 200,
+        "h": 200,
+        "d": 200,
+        "image_url": "https://blobs.prodboard.com/library/icon/d4030be1-0375-45fb-9b59-df200b031099/Toster 07"
+      }
+    ],
+    "stoves_microwaves": [
+      {
+        "id": 132694,
+        "code": "dyh 15 Metric",
+        "name": "Stove",
+        "w": 600,
+        "h": 860,
+        "d": 620,
+        "image_url": "https://blobs.prodboard.com/library/icon/d9122b62-bb90-4cbb-85f3-3ed41c62ce72/dyh 15"
+      },
+      {
+        "id": 132695,
+        "code": "micro 11 Metric",
+        "name": "Microwave",
+        "w": 524,
+        "h": 332,
+        "d": 406,
+        "image_url": "https://blobs.prodboard.com/library/icon/e33a7f3e-607d-45af-9885-69e0db7a4bc9/micro 11"
+      }
+    ],
+    "washing_machines": [
+      {
+        "id": 132700,
+        "code": "W11 Metric",
+        "name": "Wash machine",
+        "w": 600,
+        "h": 850,
+        "d": 488,
+        "image_url": "https://blobs.prodboard.com/library/icon/efffe23d-177d-4fa7-aa9a-e6edaed197fb/W11"
+      },
+      {
+        "id": 132708,
+        "code": "W22 Metric",
+        "name": "Washing machine",
+        "w": 542,
+        "h": 767,
+        "d": 461,
+        "image_url": "https://blobs.prodboard.com/library/icon/63e355c3-0bee-43a1-b08e-9ae383ef2c67/W22"
+      }
+    ]
+  }
+}

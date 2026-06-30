@@ -169,6 +169,36 @@ class SaleOrder(models.Model):
     )
 
     # ------------------------------------------------------------------
+    # Room-First UX (Phase 1.3) — O2m to southbrook.room + smart button.
+    # ------------------------------------------------------------------
+    # copy=False per NF6 — Duplicate-as-Draft (v1 → v2) typically wants
+    # a fresh room measurement, not a carbon-copy. If a future workflow
+    # needs the room cloned across versions, flip this and add an
+    # explicit override on action_duplicate_as_draft.
+    room_ids = fields.One2many(
+        "southbrook.room", "order_id", string="Rooms", copy=False)
+    room_count = fields.Integer(
+        compute="_compute_room_count", store=False)
+
+    @api.depends("room_ids")
+    def _compute_room_count(self):
+        for rec in self:
+            rec.room_count = len(rec.room_ids)
+
+    def action_open_southbrook_room(self):
+        self.ensure_one()
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "southbrook_estimating.action_southbrook_room")
+        if len(self.room_ids) == 1:
+            action.update({
+                "views": [(False, "form")],
+                "res_id": self.room_ids.id,
+            })
+        else:
+            action["domain"] = [("order_id", "=", self.id)]
+        return action
+
+    # ------------------------------------------------------------------
     # 3D kitchen-run viewport — Track 1 commits 6 + 7 (2026-05-30).
     #
     # Returns a multi-cabinet 3D payload spanning every order_line whose

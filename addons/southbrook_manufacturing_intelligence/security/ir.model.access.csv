@@ -1,2 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_southbrook_mi_check_mrp_user,southbrook.mi.check mrp user,model_southbrook_mi_check,mrp.group_mrp_user,1,1,1,0
+access_southbrook_mi_check_mrp_manager,southbrook.mi.check mrp manager,model_southbrook_mi_check,mrp.group_mrp_manager,1,1,1,1
+access_southbrook_deviation_waiver_mrp_user,southbrook.deviation.waiver mrp user (QC),model_southbrook_deviation_waiver,mrp.group_mrp_user,1,1,1,0
+access_southbrook_deviation_waiver_mrp_manager,southbrook.deviation.waiver mrp manager (eng),model_southbrook_deviation_waiver,mrp.group_mrp_manager,1,1,1,1
+access_southbrook_deviation_approval_wizard_mrp_user,southbrook.deviation.approval.wizard mrp user,model_southbrook_deviation_approval_wizard,mrp.group_mrp_user,1,1,1,1
+access_southbrook_deviation_approval_wizard_mrp_manager,southbrook.deviation.approval.wizard mrp manager,model_southbrook_deviation_approval_wizard,mrp.group_mrp_manager,1,1,1,1

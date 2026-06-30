@@ -11,10 +11,26 @@
 <odoo noupdate="0">
 
   <!-- ============================================================== -->
-  <!-- 1 · family                                                     -->
+  <!-- 1 · family / "Cabinet Style"                                   -->
+  <!--                                                                -->
+  <!-- Renamed 2026-06-24 from "Family" → "Cabinet Style" after end- -->
+  <!-- to-end UX testing surfaced confusion: the customer-facing      -->
+  <!-- catalog already groups cabinets by Category (Base / Wall /     -->
+  <!-- Tall / Drawer / Vanity / Extras) via the tab bar, so labeling  -->
+  <!-- a SEPARATE attribute "Family" collided with the user's mental  -->
+  <!-- model. "Cabinet Style" reflects the actual mixed-axis nature:  -->
+  <!-- some values are STRUCTURAL types (Drawer Bank, Sink, Corner)   -->
+  <!-- and some are CATEGORIES (Base, Wall, Tall, Vanity, Worktop,    -->
+  <!-- Accessory). Every template is assigned exactly one Cabinet     -->
+  <!-- Style — the rule engine (config_rules.xml) keys on these       -->
+  <!-- values to enforce things like "drawer banks use drawer         -->
+  <!-- hardware, not door hardware." DO NOT restructure these values  -->
+  <!-- without auditing config_rules.xml first; per CLAUDE.md the     -->
+  <!-- BOM / pricing / hardware-rule chains are not to be altered     -->
+  <!-- as part of UX fixes.                                           -->
   <!-- ============================================================== -->
   <record id="attr_family" model="product.attribute">
-    <field name="name">Family</field>
+    <field name="name">Cabinet Style</field>
     <field name="display_type">select</field>
     <field name="create_variant">dynamic</field>
     <field name="sequence">1</field>

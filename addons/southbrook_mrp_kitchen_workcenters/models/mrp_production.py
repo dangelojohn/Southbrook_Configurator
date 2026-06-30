@@ -12,7 +12,12 @@ The x_sbk_kitchen_project_id reuses sb.kitchen.project from
 southbrook_kitchen_workspace per the locked decision in the M0
 discovery (no parallel project model).
 """
-from odoo import api, fields, models
+import logging
+
+from odoo import _, api, fields, models
+
+
+_logger = logging.getLogger(__name__)
 
 
 PRIORITY_LEVELS = [
@@ -24,7 +29,8 @@ PRIORITY_LEVELS = [
 
 
 class MrpProduction(models.Model):
-    _inherit = "mrp.production"
+    _inherit = ["mrp.production", "southbrook.qr.mixin"]
+    _qr_kind = "mo"
 
     x_sbk_kitchen_project_id = fields.Many2one(
         "sb.kitchen.project",
@@ -97,6 +103,42 @@ class MrpProduction(models.Model):
         help="actual − estimated. Positive = over budget.",
     )
 
+    # SAMI PRD MO-09 (2026-06-26) — real-time MO cost roll-up.
+    # Sums the per-WO labor + rework + downtime cost fields shipped in
+    # 19.0.4.x. Pure labor — material cost is rolled up by Odoo native
+    # mrp.production.extra_cost / cost_amount. The variance_pct is the
+    # supervisor's at-a-glance signal (positive = over budget).
+    x_sbk_total_estimated_cost = fields.Float(
+        string="Total Estimated Cost",
+        compute="_compute_x_sbk_total_costs",
+        store=True,
+        digits="Product Price",
+    )
+    x_sbk_total_actual_cost = fields.Float(
+        string="Total Actual Cost",
+        compute="_compute_x_sbk_total_costs",
+        store=True,
+        digits="Product Price",
+        help="Sum of WO labor cost + rework cost + downtime cost. "
+             "Native Odoo material cost is rolled up separately on "
+             "the standard 'Costs' tab.",
+    )
+    x_sbk_total_cost_variance = fields.Float(
+        string="Total Cost Variance",
+        compute="_compute_x_sbk_total_costs",
+        store=True,
+        digits="Product Price",
+        help="actual_cost − estimated_cost. Positive = over budget.",
+    )
+    x_sbk_cost_variance_pct = fields.Float(
+        string="Variance %",
+        compute="_compute_x_sbk_total_costs",
+        store=True,
+        digits=(8, 2),
+        help="Percentage delta of actual vs estimated cost. Supervisor "
+             "at-a-glance signal: >10% = investigate, >25% = ECO.",
+    )
+
     @api.depends(
         "workorder_ids.x_sbk_kitchen_expected_min",
         "workorder_ids.duration",
@@ -109,6 +151,29 @@ class MrpProduction(models.Model):
             mo.x_sbk_total_actual_min = act
             mo.x_sbk_total_variance_min = act - est
 
+    @api.depends(
+        "workorder_ids.x_sbk_estimated_cost",
+        "workorder_ids.x_sbk_actual_cost",
+        "workorder_ids.x_sbk_rework_cost",
+        "workorder_ids.x_sbk_downtime_cost",
+    )
+    def _compute_x_sbk_total_costs(self):
+        for mo in self:
+            wos = mo.workorder_ids
+            est_cost = sum(wos.mapped("x_sbk_estimated_cost"))
+            act_cost = (
+                sum(wos.mapped("x_sbk_actual_cost"))
+                + sum(wos.mapped("x_sbk_rework_cost"))
+                + sum(wos.mapped("x_sbk_downtime_cost"))
+            )
+            mo.x_sbk_total_estimated_cost = est_cost
+            mo.x_sbk_total_actual_cost = act_cost
+            mo.x_sbk_total_cost_variance = act_cost - est_cost
+            mo.x_sbk_cost_variance_pct = (
+                ((act_cost - est_cost) / est_cost * 100.0)
+                if est_cost else 0.0
+            )
+
     def action_sbk_recalc_all_workorder_durations(self):
         """Bulk recompute kitchen-formula expected duration across all
         of this MO's work orders. The per-WO button handles a single
@@ -118,3 +183,54 @@ class MrpProduction(models.Model):
         for mo in self:
             mo.workorder_ids.action_sbk_recalc_kitchen_duration()
         return True
+
+    # SAMI PRD W-08 (2026-06-26) — auto-create as-built on MO done.
+    def button_mark_done(self):
+        result = super().button_mark_done()
+        # Only spawn an as-built when the MO actually transitions to
+        # 'done' AND no as-built exists for it yet (idempotent).
+        Asbuilt = self.env["southbrook.asbuilt"]
+        for mo in self:
+            if mo.state != "done":
+                continue
+            try:
+                existing = Asbuilt.search(
+                    [("production_id", "=", mo.id)], limit=1)
+                if existing:
+                    continue
+                Asbuilt.sudo().create({
+                    "production_id": mo.id,
+                    "built_at": fields.Datetime.now(),
+                    "built_by": self.env.user.id,
+                })
+            except Exception as exc:  # noqa: BLE001
+                # W052 (MFG-REVIEW-R1.10) — never block an MO
+                # mark_done on an as-built failure, BUT do not let
+                # the failure disappear silently either. Log the full
+                # traceback to the server log AND post a chatter line
+                # on the MO so a supervisor sees the gap and can
+                # re-run as-built creation manually.
+                _logger.exception(
+                    "Auto as-built creation failed for MO %s (id=%s)",
+                    mo.name, mo.id,
+                )
+                try:
+                    mo.message_post(
+                        body=_(
+                            "Automatic as-built record creation "
+                            "failed: %s. Please create the as-built "
+                            "manually from the As-Built menu, or "
+                            "investigate the server log for the "
+                            "full traceback."
+                        ) % exc,
+                        message_type="comment",
+                        subtype_xmlid="mail.mt_note",
+                    )
+                except Exception:  # noqa: BLE001
+                    # Chatter post itself failing would be exotic;
+                    # log it but absolutely never block mark_done.
+                    _logger.exception(
+                        "Chatter post for asbuilt failure also failed "
+                        "on MO %s (id=%s)", mo.name, mo.id,
+                    )
+        return result

@@ -25,14 +25,23 @@ manufacturing logic (BoMs, work orders, routings, costing all stay in mrp).
 Reuses the custom MO tabs (CAD / Intelligence / Production Costs / Shop Floor)
 rather than duplicating them — material/BoM/cost are pulled FROM the linked MO.
 """,
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.3.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry / OdooIQ",
     "category": "Services/Project",
     # sale_mrp brings sale<->mrp; southbrook_project brings the task polish we
     # extend. mrp_product_costing is NOT depended on (it lives outside this
     # repo) — its cost fields are read defensively via getattr.
-    "depends": ["southbrook_project", "sale_mrp", "purchase_mrp", "maintenance"],
+    # W029 (R3.W5, 2026-06-27) — added southbrook_mrp_pm so the new
+    # Bottleneck Contention menu can hang under menu_southbrook_pm_root
+    # (where the planner already lives for capacity / ready-queue work).
+    "depends": [
+        "southbrook_project",
+        "southbrook_mrp_pm",
+        "sale_mrp",
+        "purchase_mrp",
+        "maintenance",
+    ],
     "data": [
         "security/ir.model.access.csv",
         "data/project_job_templates.xml",

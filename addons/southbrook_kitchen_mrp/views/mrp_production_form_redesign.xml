@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    MO form redesign — SAFE subset shippable from XML.
+
+    Why the user's proposal can't fully land from a data XML:
+    The Cabinet Code, Room/Zone, Install Due, MI Status, etc. are
+    Studio-class MANUAL fields (state='manual' in ir.model.fields).
+    Manual fields live in the DB schema but the Odoo view validator
+    (which runs at -u time) doesn't see them on the model class —
+    only Python-declared fields. So an XML inherit that places those
+    fields fails with:
+
+        Field "x_sbk_cabinet_code" does not exist in model "mrp.production"
+
+    Three paths forward for the manual-field changes:
+
+      (a) Place them via Studio's UI on the live form. Studio writes
+          the inherit to the DB directly without going through the
+          XML validator. This is the path the original proposal's
+          RPC-call route is doing.
+      (b) Promote the fields from manual to Python — define them as
+          fields.Char/Date/etc on a class _inherit="mrp.production"
+          in their owning addon (southbrook_mrp_kitchen_workcenters
+          and southbrook_manufacturing_intelligence). They'd then be
+          XML-reachable.
+      (c) Ship a post-init hook in this addon that creates the
+          inherit view rows via ORM (bypasses validation the same
+          way Studio does).
+
+    For this commit we ship (a) the always-safe changes — tab rename
+    + a new Cabinet Label tab that uses only THIS addon's Python
+    fields (sbk_label_*). The header context bar + MI tab from the
+    proposal are deferred to Studio or to a follow-up that ports the
+    manual fields to Python.
+
+    Two priority bands:
+
+      priority 18 — Tab rename for clarity
+                    "Miscellaneous" → "Admin / Locations".
+
+      priority 19 — Cabinet Label tab
+                    NEW notebook page with the eight sbk_label_*
+                    fields a floor operator wants to see (door
+                    name, color, interior, code, hinge, fin, QR
+                    URL) and the Print button.
+-->
+<odoo>
+
+    <record id="view_mrp_production_form_sbk_tab_renames" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_tab_renames</field>
+        <field name="model">mrp.production</field>
+        <field name="priority">18</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//page[@name='miscellaneous']" position="attributes">
+                <attribute name="string">Admin / Locations</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
+    <record id="view_mrp_production_form_sbk_label_tab" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_label_tab</field>
+        <field name="model">mrp.production</field>
+        <field name="priority">19</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Cabinet Label" name="sbk_label">
+                    <group string="Label Data — what prints on the Avery 9421 sticker">
+                        <group>
+                            <field name="sbk_label_customer_name" readonly="1"/>
+                            <field name="sbk_label_po_ref" readonly="1"/>
+                            <field name="sbk_label_tag" readonly="1"/>
+                            <field name="sbk_label_door_name" readonly="1"/>
+                            <field name="sbk_label_door_color" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="sbk_label_interior" readonly="1"/>
+                            <field name="sbk_label_hinge" readonly="1"/>
+                            <field name="sbk_label_fin" readonly="1"/>
+                            <field name="sbk_label_code" readonly="1"/>
+                            <field name="sbk_label_qr_url" readonly="1" widget="url"/>
+                        </group>
+                    </group>
+                    <div class="oe_button_box" style="margin-top: 1rem">
+                        <button name="action_print_cabinet_label"
+                                type="object"
+                                string="🏷 Print Cabinet Label"
+                                class="oe_highlight"
+                                groups="mrp.group_mrp_user"/>
+                    </div>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

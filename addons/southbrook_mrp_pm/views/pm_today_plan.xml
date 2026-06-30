@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W019 — Today's Plan planner-home view.
+
+  From docs/MFG-REVIEW-R3-planning-scheduling.md Win 2 + R9 master
+  roadmap row W019: the planner's morning walk today is 5+ menu hops
+  (Ready Queue -> In Production -> Late -> Floor Load -> Capacity).
+  Every signal needed already exists on mrp.production
+  (components_availability_state, x_mi_status, x_mi_blocker_count,
+  production_approval_state, date_deadline, next_action_hint from W010).
+
+  This view fuses them into one kanban grouped by `today_plan_section`
+  (computed; see southbrook_mrp_pm/models/mrp_production.py):
+
+    overdue       past deadline, not done (planner fires first)
+    ready_now     material OK + MI OK + approved, due today/tomorrow
+    at_risk       within 3-day window but missing material / MI / approval
+    long_horizon  due >3 days out, all clear (shown for context only)
+
+  default_group_by makes Odoo render four pipeline columns. Since
+  today_plan_section is computed/non-stored, group_expand can't be
+  added without storing it — Odoo will hide an empty bucket. That's
+  acceptable for a planner home (no false-positive columns when the
+  shop has nothing in a bucket).
+
+  Standalone (not inherited) so the canonical state-pipeline kanban
+  in mrp_production_kanban.xml stays the default for direct MO
+  navigation. This kanban is bound only to action_pm_today_plan.
+-->
+<odoo>
+  <data>
+
+    <!-- ===========================================================
+         TODAY'S PLAN KANBAN — one card per MO, grouped by section.
+         =========================================================== -->
+    <record id="view_mo_today_plan_kanban" model="ir.ui.view">
+      <field name="name">mrp.production.kanban.today_plan</field>
+      <field name="model">mrp.production</field>
+      <field name="arch" type="xml">
+        <kanban class="o_sb_today_plan_kanban"
+                default_group_by="today_plan_section"
+                default_order="date_deadline asc, priority desc"
+                sample="1">
+          <field name="state"/>
+          <field name="product_id"/>
+          <field name="product_qty"/>
+          <field name="product_uom_id"/>
+          <field name="date_deadline"/>
+          <field name="date_start"/>
+          <field name="priority"/>
+          <!-- 2026-06-27 fix: removed `partner_id` — not a direct field
+               on mrp.production (it lives on linked sale.order via
+               sale_mrp's sale_id relation). The kanban card now relies
+               on `origin` (= SO name string) for customer context. -->
+          <field name="origin"/>
+          <!-- 2026-06-27 fix: removed `workcenter_id` — not a field on
+               mrp.production (it lives on mrp.workorder). Was declared
+               but unused in templates; declaration alone trips view
+               validation on cold-load. -->
+          <field name="user_id"/>
+          <field name="today_plan_section"/>
+          <field name="next_action_hint"/>
+          <!-- 2026-06-27 fix: removed `x_mi_status`, `x_mi_blocker_count`,
+               `components_availability_state`, `production_approval_state`
+               field declarations. These either live on a SIBLING addon that
+               loads AFTER southbrook_mrp_pm (x_mi_*: declared by
+               southbrook_manufacturing_intelligence which depends-on
+               this addon — the view validator can't see them yet —
+               per [[odoo19_view_dep_chain_manual_fields]]) OR they're
+               on sale.order, not mrp.production (production_approval_state).
+               None are referenced by the kanban templates below; declarations
+               alone fail cold-load. The compute logic for today_plan_section /
+               next_action_hint reads them safely via `getattr` in
+               models/mrp_production.py. -->
+
+          <templates>
+            <t t-name="card">
+              <div class="oe_kanban_global_click o_sb_today_plan_card"
+                   t-att-data-section="record.today_plan_section.raw_value">
+                <header class="o_sb_today_plan_head">
+                  <span class="o_sb_today_plan_priority">
+                    <field name="priority" widget="priority"/>
+                  </span>
+                  <strong class="o_sb_today_plan_name">
+                    <field name="name"/>
+                  </strong>
+                  <span class="o_sb_today_plan_state">
+                    <field name="state" widget="badge"/>
+                  </span>
+                </header>
+                <div class="o_sb_today_plan_body">
+                  <div class="o_sb_today_plan_product">
+                    <field name="product_id"/>
+                    <span class="o_sb_today_plan_qty">
+                      x <field name="product_qty"/>
+                      <field name="product_uom_id"/>
+                    </span>
+                  </div>
+                  <!-- 2026-06-27 — partner block removed (mrp.production
+                       has no direct partner_id; origin already shown
+                       above in the SO reference line). -->
+                  <div class="o_sb_today_plan_origin"
+                       t-if="record.origin.raw_value">
+                    <small class="text-muted">
+                      <field name="origin"/>
+                    </small>
+                  </div>
+                  <div class="o_sb_today_plan_hint"
+                       t-if="record.next_action_hint.raw_value">
+                    <small class="text-warning">
+                      <i class="fa fa-exclamation-triangle"/>
+                      <field name="next_action_hint"/>
+                    </small>
+                  </div>
+                </div>
+                <footer class="o_sb_today_plan_foot">
+                  <span class="o_sb_today_plan_deadline">
+                    <field name="date_deadline" widget="remaining_days"/>
+                  </span>
+                  <span class="o_sb_today_plan_assignee">
+                    <field name="user_id" widget="many2one_avatar_user"/>
+                  </span>
+                </footer>
+              </div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+
+    <!-- ===========================================================
+         TODAY'S PLAN — single planner-home action. Domain scopes
+         to in-flight MOs only; today_plan_section returns False
+         for done / cancel / draft so the kanban auto-excludes them
+         even without an extra domain clause, but we still cap the
+         search-set explicitly for query economy.
+         =========================================================== -->
+    <record id="action_pm_today_plan" model="ir.actions.act_window">
+      <field name="name">Today's Plan</field>
+      <field name="res_model">mrp.production</field>
+      <field name="view_mode">kanban,list,form</field>
+      <field name="domain">[('state', 'in', ['confirmed', 'progress', 'to_close'])]</field>
+      <field name="context">{}</field>
+      <field name="view_ids" eval="[
+          (5, 0, 0),
+          (0, 0, {
+              'view_mode': 'kanban',
+              'view_id': ref('view_mo_today_plan_kanban'),
+          }),
+          (0, 0, {'view_mode': 'list'}),
+          (0, 0, {'view_mode': 'form'}),
+      ]"/>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">
+          Nothing on today's plan.
+        </p>
+        <p>
+          The Today's Plan view fuses ready queue, MI blockers, and
+          deadline pressure into one screen. Cards bucket into
+          Overdue / Ready Now / At Risk / Long Horizon so you can
+          start the day on the highest-impact MOs without bouncing
+          between five menus.
+        </p>
+      </field>
+    </record>
+
+    <!-- Menu — sequence 5 so it sits ABOVE the Ready-to-Release /
+         Blocked split and the legacy Ready Queue (All). The W010
+         split queues remain reachable; Today's Plan is just the
+         new front door. -->
+    <menuitem
+        id="menu_pm_today_plan"
+        parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+        name="Today's Plan"
+        action="action_pm_today_plan"
+        sequence="5"/>
+
+  </data>
+</odoo>

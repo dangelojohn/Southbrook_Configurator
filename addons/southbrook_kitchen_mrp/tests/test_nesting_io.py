@@ -38,7 +38,13 @@ class TestNestingIO(TransactionCase):
     def test_envelope_is_deterministic_and_versioned(self):
         cutlist = self._new_cutlist()
         envelope = cutlist.to_nesting_envelope()
-        self.assertEqual(envelope["schema"], "southbrook.nesting.v1")
+        # 2026-06-25 — v2 adds reference_origin + units + mo object.
+        self.assertEqual(envelope["schema"], "southbrook.nesting.v2")
+        self.assertEqual(envelope["units"], "mm")
+        self.assertIn("reference_origin", envelope)
+        self.assertEqual(
+            envelope["reference_origin"]["anchor"], "bottom_front_left"
+        )
         self.assertEqual(envelope["cutlist_id"], cutlist.id)
         # Same line count, same dims.
         self.assertEqual(len(envelope["panels"]), len(cutlist.line_ids))
@@ -49,6 +55,10 @@ class TestNestingIO(TransactionCase):
             self.assertIn("thickness_mm", panel)
             self.assertIn("edge_banding", panel)
             self.assertIsInstance(panel["edge_banding"], dict)
+            # v2: reserved fields present but null; partners can branch
+            # on null vs populated to negotiate spec uplift.
+            self.assertIn("bore_positions", panel)
+            self.assertIn("edge_banding_tape_skus", panel)
 
     def test_envelope_is_json_round_trippable(self):
         cutlist = self._new_cutlist()

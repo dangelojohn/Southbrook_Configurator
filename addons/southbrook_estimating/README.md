@@ -144,6 +144,69 @@ The locked Phase-1 smoke test (per Q7) is:
 If steps 4 or 5 fail, the pricelist resolution dictionary is the suspect
 (`models/sale_order.py:_TRADESPERSON_TIER_PRICELISTS`).
 
+## Prodboard Catalog Clone and Asset Cache
+
+The estimating module carries a Southbrook-owned clone of the supplied
+Prodboard BetterKitchens catalogue structure as internal taxonomy metadata.
+The 223 cabinet archetypes live in `southbrook.cabinet.archetype` and are
+seeded idempotently from `data/prodboard_taxonomy_source.json`.
+
+This catalogue layer does **not** create 223 sellable `product.template`
+records. The 12 locked Q8 Southbrook templates remain the price-bearing,
+configurable products for quoting, BoMs, reports, and manufacturing. The
+mapping helper `southbrook.estimating.template_archetype.assign_archetypes()`
+links the templates that have clean UK catalogue equivalents to their nearest
+archetype through `product.template.x_prodboard_archetype_id`.
+
+Prodboard image UUIDs, filenames, and source URLs are stored as internal
+references only. Licensed source binaries can be cached privately as
+`ir.attachment` rows linked to `southbrook.cabinet.archetype` by using
+`southbrook.estimating.prodboard_asset_importer.import_assets()`.
+
+Network fetching is disabled by default:
+
+```python
+env["southbrook.estimating.prodboard_asset_importer"].import_assets(
+    offline_dir="/path/to/prodboard-assets",
+)
+```
+
+Offline files may be named by UUID, for example:
+`c3d44b09-2933-46d2-9f1e-4a6c8b8b838d.png`, or by the original filename.
+To fetch directly from stored source URLs in an approved environment, call:
+
+```python
+env["southbrook.estimating.prodboard_asset_importer"].import_assets(
+    allow_network=True,
+)
+```
+
+The customer-facing UI must continue serving Southbrook-owned product imagery
+from `product.template.image_1920`, including through
+`/southbrook/catalog/icon/<uuid>/<filename>`. Do not render
+`blobs.prodboard.com` URLs or archetype attachments directly in public pages.
+
+The same data seed calls
+`southbrook.estimating.template_archetype.assign_placeholder_images()` to give
+each of the 12 locked templates a deterministic Southbrook-owned PNG
+placeholder when `image_1920` is blank. Existing product images are preserved by
+default; the helper only fills empty images and assigns stable
+`x_image_uuid`/`x_image_filename` values for the public catalog-icon route.
+
+## Configuration Sets Decision
+
+Product Configurator's MRP layer includes BoM-line Configuration Sets under
+Product Configurator -> Configuration -> Configuration Sets. Southbrook now
+seeds starter sets for the main reusable manufacturing conditions: series, box
+material, door style, drawer construction, soft-close, pull-out trash, and
+under-cabinet LED lighting.
+
+These are intentionally seeded as reusable condition records only. They are not
+attached to any `mrp.bom.line` records during install or upgrade because that
+would immediately change BoM explosion behavior. Production should attach them
+line by line after confirming which parts are conditional for each cabinet
+construction rule.
+
 ## Canonical design docs
 
 Read these before changing anything in this addon:
@@ -165,9 +228,11 @@ gating decisions.
 ## Custom-code surface
 
 Per `SAMI_Southbrook_Odoo19_Build_Spec.md` §4, exactly **7 routines** in
-this addon are genuinely custom code. Everything else is data,
-configuration, or `_inherit` extension. Adding an 8th routine requires a
-`PUNCHLIST.md` justification.
+this addon are genuinely custom business code. Everything else is data,
+configuration, `_inherit` extension, or documented support infrastructure.
+Adding an 8th business routine requires a `PUNCHLIST.md` justification. The
+Prodboard asset importer is documented there as a catalogue-ingestion support
+carve-out, not pricing/configurator business logic.
 
 ## License
 

@@ -8,3 +8,9 @@ from . import mrp_routing_workcenter
 from . import southbrook_mi_check
 from . import mrp_workorder
 from . import mrp_production
+from . import southbrook_asbuilt
+from . import southbrook_shift_handover
+from . import southbrook_opcua
+from . import qr_kind_handlers
+# W067 (R3.10, 2026-06-27) — calendar-aware capacity rows per (WC, day).
+from . import southbrook_capacity_day

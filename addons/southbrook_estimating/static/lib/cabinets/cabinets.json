@@ -1,0 +1,7 @@
+{
+  "_schema": "https://southbrookcabinetry.space/schemas/cabinets-v1",
+  "_description": "Tier-1 vendor-supplied cabinet GLB registry. Map a cabinet template or SKU to the .glb file (in this directory) that the Three.js viewport should render INSTEAD of the per-panel BoxGeometry. Lookup order in cabinet_glb_loader.esm.js: exact SKU (e.g. SB-BASE-1DR-30) -> template key (e.g. sb-base-1dr) -> null (fall back to BoxGeometry).",
+  "_workflow": "static/lib/cabinets/README.md",
+  "_units": "millimetres — every GLB must be modelled in mm; the loader does not rescale.",
+  "models": {}
+}

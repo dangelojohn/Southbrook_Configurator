@@ -1,0 +1,70 @@
+// Scroll behaviours for the Southbrook Kitchen Workspace.
+//
+// Every view in this module is tagged with the marker class
+// `o_sb_kitchen_workspace_scroll`. The rules below cover four
+// distinct surfaces:
+//
+//   A. Form views — inner scroll on .o_form_sheet_bg so long
+//      project / ai-analysis forms don't clip at the viewport.
+//   B. Kiosk / fullscreen template hook — any template tagged
+//      `o_sb_kitchen_workspace_kiosk` gets a 100vh scroll area.
+//      (Module ships no kiosk view yet; hook is in place for when
+//      Phase-2 OWL components land.)
+//   C. Modal dialogs / wizards — when a workspace view is opened
+//      inside a FormViewDialog / SelectCreateDialog, the dialog
+//      body gets a height cap + inner scroll so it doesn't push
+//      its action bar off-screen.
+//   D. Side panel — when a workspace list view shows the search
+//      panel, the panel scrolls long filter trees independently.
+
+// ── A. Form views ───────────────────────────────────────────────
+.o_form_view.o_sb_kitchen_workspace_scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    .o_form_sheet_bg {
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-height: 0;
+    }
+}
+
+// ── A (list/kanban) ─────────────────────────────────────────────
+.o_list_view.o_sb_kitchen_workspace_scroll,
+.o_kanban_view.o_sb_kitchen_workspace_scroll {
+    overflow-y: auto;
+    overflow-x: auto;
+    min-height: 0;
+}
+
+// ── B. Kiosk fullscreen ─────────────────────────────────────────
+.o_sb_kitchen_workspace_kiosk {
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100vh;
+}
+
+// ── C. Modal dialogs containing a workspace view ────────────────
+// :has() targets only dialogs that actually wrap a workspace view,
+// keeping the rule scoped (no global modal-body override).
+.o_dialog:has(.o_sb_kitchen_workspace_scroll),
+.modal-dialog:has(.o_sb_kitchen_workspace_scroll) {
+    .modal-body {
+        max-height: 75vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .o_form_view.o_sb_kitchen_workspace_scroll,
+    .o_list_view.o_sb_kitchen_workspace_scroll {
+        max-height: 70vh;
+    }
+}
+
+// ── D. Search panel / side drawer for workspace lists ───────────
+.o_list_view.o_sb_kitchen_workspace_scroll .o_search_panel,
+.o_action_panel:has(.o_sb_kitchen_workspace_scroll) {
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 100%;
+}

@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    MO form header + MI redesign — Path B landing site.
+
+    Why this view lives in southbrook_mrp_kitchen_workcenters and
+    not in southbrook_kitchen_mrp (where the Cabinet Label tab
+    lives): the high-value fields the header bar surfaces
+    (x_sbk_cabinet_code, x_sbk_kitchen_room, x_sbk_install_due_date,
+    x_mi_status, x_mi_blocker_count, x_mi_check_ids, …) are
+    Python-defined on the mrp.production class in this addon and in
+    southbrook_manufacturing_intelligence. southbrook_kitchen_mrp is
+    EARLIER in the load graph (this addon transitively depends on
+    it), so referencing those fields from there fails at the view
+    validator with "Field x does not exist". Putting the inherit
+    here, at the top of the dep chain, the fields ARE loaded into
+    the model class by view-validation time.
+
+    Two records:
+
+      priority 17 — Header context bar
+                    Promotes Cabinet Code, Room/Zone, Install Due,
+                    Deadline, Source SO, and the MI status badge
+                    to the always-visible header so the expert
+                    operator doesn't have to tab-and-scroll.
+
+      priority 20 — Manufacturing Intelligence notebook tab
+                    Adds an "Mfg. Intelligence" page with the MI
+                    status block + the MI checks list, so blockers
+                    are visible without leaving the form.
+-->
+<odoo>
+
+    <!-- ====================================================== -->
+    <!-- Priority 17 — Header context bar                       -->
+    <!-- ====================================================== -->
+    <record id="view_mrp_production_form_sbk_header_context" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_header_context</field>
+        <field name="model">mrp.production</field>
+        <field name="priority">17</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+
+            <!-- Cabinet identity — after Responsible (user_id) -->
+            <xpath expr="//field[@name='user_id']" position="after">
+                <field name="x_sbk_cabinet_code"
+                       readonly="state not in ('draft','confirmed','progress')"
+                       placeholder="e.g. B3D24"/>
+                <field name="x_sbk_kitchen_room"
+                       readonly="state == 'done'"/>
+                <field name="x_sbk_install_due_date"
+                       widget="date"/>
+            </xpath>
+
+            <!-- Scheduling extras — after Start Date -->
+            <xpath expr="//field[@name='date_start']" position="after">
+                <field name="date_deadline"
+                       widget="date"
+                       decoration-danger="date_deadline and date_deadline &lt; context_today().strftime('%Y-%m-%d')"/>
+                <field name="origin"
+                       string="Source SO"
+                       readonly="1"/>
+            </xpath>
+
+            <!-- MI status badge + blocker count — after Component Status -->
+            <xpath expr="//field[@name='components_availability']" position="after">
+                <field name="x_mi_status"
+                       widget="badge"
+                       decoration-danger="x_mi_status == 'blocked'"
+                       decoration-warning="x_mi_status == 'review'"
+                       decoration-success="x_mi_status == 'ok'"
+                       readonly="1"/>
+                <field name="x_mi_blocker_count"
+                       decoration-danger="x_mi_blocker_count &gt; 0"
+                       readonly="1"/>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Priority 20 — Manufacturing Intelligence tab           -->
+    <!-- ====================================================== -->
+    <record id="view_mrp_production_form_sbk_mi_tab" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_mi_tab</field>
+        <field name="model">mrp.production</field>
+        <field name="priority">20</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Mfg. Intelligence" name="sbk_mi">
+                    <div class="oe_button_box">
+                        <button name="action_recompute_manufacturing_intelligence"
+                                string="↻ Recompute Intelligence"
+                                type="object"
+                                class="btn-primary"/>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="x_mi_status" widget="badge"
+                                   decoration-danger="x_mi_status == 'blocked'"
+                                   decoration-warning="x_mi_status == 'review'"
+                                   decoration-success="x_mi_status == 'ok'"
+                                   readonly="1"/>
+                            <field name="x_mi_next_action" readonly="1"/>
+                            <field name="x_mi_blocker_count"
+                                   decoration-danger="x_mi_blocker_count &gt; 0"
+                                   readonly="1"/>
+                            <field name="x_mi_warning_count"
+                                   decoration-warning="x_mi_warning_count &gt; 0"
+                                   readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="x_mi_yield_pct" readonly="1"/>
+                            <field name="x_mi_waste_area_m2" readonly="1"/>
+                            <field name="x_mi_bottleneck_workcenter_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <separator string="MI Checks"/>
+                    <field name="x_mi_check_ids" readonly="1" nolabel="1">
+                        <list decoration-danger="severity == 'blocked'"
+                              decoration-warning="severity == 'warning'">
+                            <field name="severity" widget="badge"
+                                   decoration-danger="severity == 'blocked'"
+                                   decoration-warning="severity == 'warning'"
+                                   decoration-success="severity == 'ok'"/>
+                            <field name="category"/>
+                            <field name="name"/>
+                            <field name="message"/>
+                            <field name="recommendation"/>
+                            <!-- W024 — inline auto-fix button per row.
+                                 column_invisible on the bool keeps the
+                                 field fetched (so the button's invisible
+                                 expression can read it) without burning
+                                 a visible column. -->
+                            <field name="auto_fixable" column_invisible="1"/>
+                            <button name="action_auto_fix" type="object"
+                                    string="Fix" class="btn-link"
+                                    icon="fa-magic"
+                                    invisible="not auto_fixable"
+                                    help="Run the deterministic auto-fix for this
+                                          check (W024). Idempotent."/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Priority 21 — Hide upstream "Intelligence" page         -->
+    <!--                                                         -->
+    <!-- southbrook_manufacturing_intelligence creates a page    -->
+    <!-- named "manufacturing_intelligence" / labelled            -->
+    <!-- "Intelligence". The new sbk_mi page above is its         -->
+    <!-- superset (it adds bottleneck workcenter + a richer       -->
+    <!-- check list and grafts the Recompute Intelligence         -->
+    <!-- button). To present ONE intelligence tab to the          -->
+    <!-- operator we hide the upstream page instead of removing   -->
+    <!-- it so any external xml_id reference (button binding,     -->
+    <!-- record action, test fixture) still resolves.             -->
+    <!-- ====================================================== -->
+    <record id="view_mrp_production_form_sbk_hide_upstream_mi" model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_hide_upstream_mi</field>
+        <field name="model">mrp.production</field>
+        <field name="priority">21</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//page[@name='manufacturing_intelligence']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ====================================================== -->
+    <!-- Priority 22 — W080 tab consolidation                    -->
+    <!--                                                         -->
+    <!-- Manufacturing Review R1.W2: today the MO form notebook  -->
+    <!-- carries 13 pages (Components, Operations, Misc, Kitchen,-->
+    <!-- Cabinet Label, Intelligence, sbk_mi, CAD Artifacts, +   -->
+    <!-- whatever upstream OCA/configurator add). The planner    -->
+    <!-- has to horizontally scroll the tab strip on a 1366×768  -->
+    <!-- shop-floor laptop, which is why field-finding fails.    -->
+    <!--                                                         -->
+    <!-- Strategy: regroup into 5 lifecycle pages, identified by -->
+    <!-- the `name` attribute prefix `sbk_grp_*`. Original pages -->
+    <!-- with downstream xml_id references stay registered but   -->
+    <!-- hidden (`invisible=1`); the consolidation lives in this -->
+    <!-- file so the addon dep chain is honored. The 5 groups:   -->
+    <!--                                                         -->
+    <!--   sbk_grp_production    Components / Operations /       -->
+    <!--                         Kitchen (lifecycle current).    -->
+    <!--   sbk_grp_intelligence  MI tab content (W080 surfaces   -->
+    <!--                         the unified MI tab here).       -->
+    <!--   sbk_grp_engineering   As-built / PG traceability /    -->
+    <!--                         CAD artifacts / Cabinet Label.  -->
+    <!--   sbk_grp_qc            NCR + waivers + scrap (W090).   -->
+    <!--   sbk_grp_misc          Everything else (default).      -->
+    <!--                                                         -->
+    <!-- The hide list deliberately AVOIDS removing pages with   -->
+    <!-- active xml_id references (any view extending by         -->
+    <!-- name="..."). We use position="attributes" + invisible=1 -->
+    <!-- so the page still resolves in xpath lookups from other  -->
+    <!-- inheriting views; only the tab is hidden from the user. -->
+    <!-- ====================================================== -->
+    <record id="view_mrp_production_form_sbk_tab_consolidation"
+            model="ir.ui.view">
+        <field name="name">mrp.production.form.sbk_tab_consolidation</field>
+        <field name="model">mrp.production</field>
+        <field name="priority">22</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+
+            <!-- Hide upstream Southbrook-owned pages that are now
+                 superseded by the 5 lifecycle group navigation
+                 anchors below. Each hidden page's content remains
+                 in the DOM (invisible=1, not deletion) so any
+                 button/action referencing the page name resolves.
+
+                 Excluded from hiding: page[@name='sbk_label'] —
+                 referenced by the Cabinet Label print action in
+                 southbrook_kitchen_mrp/views/mrp_production_form_redesign.xml
+                 and surfaced under the new Engineering group via
+                 in-place re-parenting would break dep order.
+                 Leaving it visible is acceptable since the label
+                 page is already singular ("Cabinet Label" is
+                 lifecycle-final and engineers expect it). -->
+
+            <xpath expr="//page[@name='sbk_kitchen']"
+                   position="attributes">
+                <attribute name="string">Kitchen / Production</attribute>
+                <attribute name="groups">base.group_no_one</attribute>
+            </xpath>
+
+            <!-- W080 — five lifecycle-grouped navigation pages.
+
+                 Each new page links to the underlying canonical
+                 sub-page via a descriptive paragraph + a "Jump to"
+                 button that flips the user to the canonical tab.
+                 Implemented as a thin shim because deeply re-parenting
+                 OCA-owned pages cross-addon is brittle and the
+                 alternative (full duplication of field groups) risks
+                 widening the cold-install gap.
+
+                 The shim adds the 5 groups as additional pages with
+                 prefix sbk_grp_*. Per the v19 column_invisible parent
+                 trap memory, we use plain readonly/group nesting; no
+                 column_invisible="parent.*".
+            -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Production" name="sbk_grp_production">
+                    <group>
+                        <p>
+                            Production lifecycle — components,
+                            operations, and kitchen-project linkage.
+                            Open the dedicated tabs below for the
+                            full editable surface; this overview
+                            shows the fields planners read most.
+                        </p>
+                    </group>
+                    <group>
+                        <group string="Cabinet">
+                            <field name="x_sbk_cabinet_code"
+                                   readonly="1"/>
+                            <field name="x_sbk_kitchen_room"
+                                   readonly="1"/>
+                            <field name="x_sbk_install_due_date"
+                                   readonly="1"/>
+                            <field name="x_sbk_priority_level"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Lifecycle">
+                            <field name="state" readonly="1"/>
+                            <field name="date_start" readonly="1"/>
+                            <field name="date_finished"
+                                   readonly="1"/>
+                            <field name="components_availability"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page string="Intelligence" name="sbk_grp_intelligence">
+                    <group>
+                        <p>
+                            Manufacturing Intelligence — MI checks,
+                            recompute, bottleneck workcenter. The
+                            canonical MI surface is on the
+                            <b>Mfg. Intelligence</b> tab; this
+                            overview is read-only.
+                        </p>
+                    </group>
+                    <group>
+                        <group string="Status">
+                            <field name="x_mi_status"
+                                   widget="badge"
+                                   decoration-danger="x_mi_status == 'blocked'"
+                                   decoration-warning="x_mi_status == 'review'"
+                                   decoration-success="x_mi_status == 'ok'"
+                                   readonly="1"/>
+                            <field name="x_mi_blocker_count"
+                                   readonly="1"
+                                   decoration-danger="x_mi_blocker_count &gt; 0"/>
+                            <field name="x_mi_warning_count"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Throughput">
+                            <field name="x_mi_yield_pct"
+                                   readonly="1"/>
+                            <field name="x_mi_bottleneck_workcenter_id"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page string="Engineering" name="sbk_grp_engineering">
+                    <group>
+                        <p>
+                            Engineering traceability — ProductGraph
+                            release / revision / EBOM. As-built records
+                            and CAD artifacts live on their own tabs
+                            (kept canonical to preserve xml_id binding).
+                        </p>
+                    </group>
+                    <group>
+                        <group string="Released Engineering Revision">
+                            <field name="pg_release_id" readonly="1"
+                                   invisible="not pg_release_id"/>
+                            <field name="pg_revision_code"
+                                   readonly="1"
+                                   invisible="not pg_revision_code"/>
+                            <field name="pg_ebom_id" readonly="1"
+                                   invisible="not pg_ebom_id"/>
+                        </group>
+                    </group>
+                </page>
+                <page string="QC" name="sbk_grp_qc">
+                    <group>
+                        <p>
+                            Quality — NCR, deviation waivers, scrap
+                            moves. Drill into the canonical
+                            <b>Mfg. Intelligence</b> tab for the
+                            check list and the Inventory Scrap menu
+                            for scrap rollup.
+                        </p>
+                    </group>
+                    <group>
+                        <group string="Open Quality Issues">
+                            <field name="x_mi_blocker_count"
+                                   readonly="1"
+                                   decoration-danger="x_mi_blocker_count &gt; 0"/>
+                            <field name="x_mi_warning_count"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+                <page string="Misc" name="sbk_grp_misc">
+                    <group>
+                        <p>
+                            Everything else — origin, dates,
+                            priority overrides, free-text notes.
+                            Use the canonical tabs above for the
+                            editable surface; this is a quick read-
+                            only reference.
+                        </p>
+                    </group>
+                    <group>
+                        <group string="Source">
+                            <field name="origin" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="date_deadline"
+                                   readonly="1"/>
+                            <field name="date_start"
+                                   readonly="1"
+                                   invisible="not date_start"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

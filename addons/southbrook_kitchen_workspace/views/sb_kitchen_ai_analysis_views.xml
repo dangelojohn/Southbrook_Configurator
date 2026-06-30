@@ -4,7 +4,7 @@
         <field name="name">sb.kitchen.ai.analysis.form</field>
         <field name="model">sb.kitchen.ai.analysis</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_sb_kitchen_workspace_scroll">
                 <header>
                     <button name="action_confirm" string="Confirm"
                             type="object" class="oe_highlight"

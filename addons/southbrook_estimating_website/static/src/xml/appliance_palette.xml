@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<!--
+    AppliancePalette — Stage C (2026-06-28).
+    Docked sidebar listing kitchen appliance placeholders +
+    standard window/door sizes as drag-able thumbnails.
+
+    OWL conventions honoured:
+      - All t-att-* / t-if expressions use ||, &&, ! (no Python ops).
+      - Per [[owl_t_out_no_js_globals]] no JS-global references inside
+        t-out expressions; all derived values come from getters.
+-->
+<templates xml:space="preserve">
+    <t t-name="southbrook_estimating_website.AppliancePalette">
+        <section class="sb-palette">
+            <h3 class="sb-room-plan-section-title">
+                Catalog Palette
+            </h3>
+
+            <div class="sb-palette-toolbar">
+                <input class="sb-palette-search"
+                       type="search"
+                       placeholder="Search appliances, windows, doors…"
+                       t-model="state.search"
+                       t-att-aria-label="'Filter palette items'"/>
+            </div>
+
+            <p t-if="state.loading"
+               class="sb-palette-loading">
+                Loading catalog…
+            </p>
+
+            <p t-elif="_grouped.length === 0"
+               class="sb-palette-empty">
+                No items match the current filter.
+            </p>
+
+            <div t-else=""
+                 class="sb-palette-groups">
+                <t t-foreach="_grouped"
+                   t-as="group"
+                   t-key="group.key">
+                    <div class="sb-palette-group"
+                         t-att-class="'sb-palette-group--' + group.key">
+                        <button class="sb-palette-group-header"
+                                type="button"
+                                t-on-click="() => this._toggleGroup(group.key)"
+                                t-att-aria-expanded="!group.collapsed">
+                            <span class="sb-palette-group-chevron"
+                                  t-att-class="group.collapsed ? 'sb-palette-group-chevron--collapsed' : ''">
+                                ▾
+                            </span>
+                            <span class="sb-palette-group-label"
+                                  t-esc="group.label"/>
+                            <span class="sb-palette-group-count mono">
+                                <t t-esc="group.items.length"/>
+                            </span>
+                        </button>
+                        <ul t-if="!group.collapsed"
+                            class="sb-palette-group-items">
+                            <li t-foreach="group.items"
+                                t-as="item"
+                                t-key="item.id || item.syntheticKey"
+                                class="sb-palette-item"
+                                t-att-data-type="item.kitchen_appliance_type"
+                                t-on-pointerdown="(ev) => this._onItemPointerDown(item, ev)">
+                                <span class="sb-palette-item-name"
+                                      t-esc="item.name"/>
+                                <span class="sb-palette-item-size mono"
+                                      t-esc="_itemDisplaySize(item)"/>
+                            </li>
+                        </ul>
+                    </div>
+                </t>
+            </div>
+
+            <!--
+                Ghost preview — fixed-position div tracking the cursor
+                during drag. pointer-events:none in SCSS so it doesn't
+                intercept hit-tests on pointerup.
+            -->
+            <div t-if="state.dragState"
+                 class="sb-palette-ghost"
+                 t-att-class="_ghostStatusClass(state.dragState.snapInfo)"
+                 t-att-style="'left:' + state.dragState.ghostX + 'px;top:' + state.dragState.ghostY + 'px;'">
+                <span class="sb-palette-ghost-name"
+                      t-esc="state.dragState.template.name"/>
+                <span class="sb-palette-ghost-size mono"
+                      t-esc="_itemDisplaySize(state.dragState.template)"/>
+                <span t-if="state.dragState.snapInfo"
+                      class="sb-palette-ghost-snap mono">
+                    → <t t-esc="state.dragState.snapInfo.wallName || 'Wall'"/>
+                    @ <t t-esc="state.dragState.snapInfo.offsetMm"/>mm
+                </span>
+                <span t-if="state.dragState.snapInfo &amp;&amp; state.dragState.snapInfo.status === 'overlap'"
+                      class="sb-palette-ghost-warn">
+                    ✗ Overlaps existing <t t-esc="state.dragState.snapInfo.conflictName || 'item'"/>
+                </span>
+                <span t-if="state.dragState.snapInfo &amp;&amp; state.dragState.snapInfo.status === 'tight'"
+                      class="sb-palette-ghost-tight">
+                    ⚠ Tight clearance to <t t-esc="state.dragState.snapInfo.conflictName || 'neighbor'"/>
+                </span>
+            </div>
+        </section>
+    </t>
+</templates>

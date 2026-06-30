@@ -4,7 +4,7 @@
         <field name="name">sb.kitchen.project.list</field>
         <field name="model">sb.kitchen.project</field>
         <field name="arch" type="xml">
-            <list>
+            <list class="o_sb_kitchen_workspace_scroll">
                 <field name="code"/>
                 <field name="name"/>
                 <field name="partner_id"/>
@@ -24,7 +24,7 @@
         <field name="name">sb.kitchen.project.form</field>
         <field name="model">sb.kitchen.project</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_sb_kitchen_workspace_scroll">
                 <header>
                     <button name="action_start_designing" string="Start Designing"
                             type="object" class="oe_highlight"
@@ -48,6 +48,16 @@
                            statusbar_visible="draft,designing,awaiting_customer,approved,in_production,done"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_room_layout"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-th-large">
+                            <field name="room_count"
+                                   widget="statinfo"
+                                   string="Room Layout"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <h1>
                             <field name="name" placeholder="Project name…"/>
@@ -90,6 +100,8 @@
                             <field name="appliance_ids">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
+                                    <field name="product_id"
+                                           options="{'no_create_edit': True, 'no_quick_create': True}"/>
                                     <field name="name"/>
                                     <field name="appliance_type"/>
                                     <field name="width_mm"/>

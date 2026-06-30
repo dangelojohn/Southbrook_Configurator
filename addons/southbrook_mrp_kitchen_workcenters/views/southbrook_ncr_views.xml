@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only
+
+     NCR / Rework Queue surface (SAMI PRD #8 + #9). Wraps the existing
+     southbrook.mi.check model (defect taxonomy + rework_required +
+     rework_workcenter live since M3) with a form view + Create Rework
+     button + NCR queue menu entry.
+-->
+<odoo>
+
+    <!-- Form view: full QC inspection record with the Create Rework button -->
+    <record id="view_southbrook_mi_check_ncr_form" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.ncr.form</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="arch" type="xml">
+            <form string="NCR / Quality Check">
+                <header>
+                    <button name="action_create_rework_workorder"
+                            type="object"
+                            string="Create Rework WO"
+                            class="btn-primary"
+                            invisible="not x_sbk_rework_required or x_sbk_rework_workorder_id"/>
+                    <button name="action_create_rework_workorder"
+                            type="object"
+                            string="Open Rework WO"
+                            class="btn-secondary"
+                            invisible="not x_sbk_rework_workorder_id"/>
+                    <button name="action_quarantine_failed_batch"
+                            type="object"
+                            string="Quarantine Batch"
+                            class="btn-warning"
+                            invisible="x_sbk_result != 'fail' or x_sbk_quarantine_picking_id"/>
+                    <button name="action_quarantine_failed_batch"
+                            type="object"
+                            string="Open Quarantine Transfer"
+                            class="btn-secondary"
+                            invisible="not x_sbk_quarantine_picking_id"/>
+                    <field name="x_sbk_result" widget="statusbar"
+                           statusbar_visible="pass,fail,rework,hold"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Check / NCR title"/></h1>
+                    </div>
+                    <group>
+                        <group string="Context">
+                            <field name="x_sbk_workorder_id"/>
+                            <field name="x_sbk_workcenter_id" readonly="1"/>
+                            <field name="x_sbk_inspector_id"/>
+                            <!-- W044 (R5.8) — operator-at-the-bench
+                                 attribution. Distinct from inspector.
+                                 Resolves from the most recent PIN-gated
+                                 scan_log row on the WO. -->
+                            <field name="x_sbk_operator_who_caused_defect_id"
+                                   readonly="1"/>
+                            <field name="x_sbk_date_checked"/>
+                            <field name="x_sbk_check_stage"/>
+                            <!-- W049 (R7.5) — shift bucket derived
+                                 from the WO's date_start. Read-only;
+                                 supervisor uses it to pareto-by-
+                                 shift in the pivot/list. -->
+                            <field name="x_sb_shift" readonly="1"/>
+                        </group>
+                        <group string="Defect Detail">
+                            <field name="x_sbk_defect_type"/>
+                            <field name="x_sbk_defect_severity"/>
+                            <field name="severity" readonly="1" string="MI Triage"/>
+                            <field name="category"/>
+                        </group>
+                    </group>
+                    <group string="Rework">
+                        <field name="x_sbk_rework_required"/>
+                        <field name="x_sbk_rework_workcenter_id"
+                               invisible="not x_sbk_rework_required"/>
+                        <field name="x_sbk_rework_workorder_id" readonly="1"/>
+                    </group>
+                    <!-- W043 (R5.7) — re-inspection chain visibility.
+                         Surfaces when this NCR has a follow-up
+                         re-inspection check waiting, OR when this
+                         record IS itself a re-inspection (back-link
+                         to the originating NCR). -->
+                    <group string="Re-Inspection"
+                           invisible="x_sbk_reinspection_state == 'not_required' and not x_sbk_originating_check_id">
+                        <field name="x_sbk_reinspection_state"
+                               widget="badge"
+                               decoration-warning="x_sbk_reinspection_state == 'pending'"
+                               decoration-success="x_sbk_reinspection_state == 'passed'"
+                               decoration-danger="x_sbk_reinspection_state == 'failed'"/>
+                        <field name="x_sbk_reinspection_check_id"
+                               readonly="1"
+                               invisible="not x_sbk_reinspection_check_id"/>
+                        <field name="x_sbk_originating_check_id"
+                               readonly="1"
+                               invisible="not x_sbk_originating_check_id"/>
+                    </group>
+                    <group string="Quarantine"
+                           invisible="not x_sbk_quarantine_picking_id and x_sbk_result != 'fail'">
+                        <field name="x_sbk_quarantine_picking_id" readonly="1"/>
+                        <field name="x_sbk_quarantined_at" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Findings" name="findings">
+                            <group>
+                                <field name="message" nolabel="1" placeholder="What was found..."/>
+                                <field name="recommendation" nolabel="1" placeholder="Recommended action..."/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- W004 — NCR Pareto pivot view.
+         JTBD (R5.2): "When 3 cabinets fail edgebanding on the same shift,
+         I want a pareto by tool + material + operator + workcenter to spot
+         the root cause within the hour." Rows = check stage × defect type;
+         cols = create_date by week; measure = count. Defaults set on the
+         action context below so the view opens in a useful state. -->
+    <record id="view_southbrook_mi_check_ncr_pivot" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.ncr.pivot</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="arch" type="xml">
+            <pivot string="NCR Analysis" sample="1">
+                <field name="x_sbk_check_stage" type="row"/>
+                <field name="x_sbk_defect_type" type="row"/>
+                <!-- W044 (R5.8) — pareto-by-operator surface.
+                     Stored compute reads the most recent PIN-gated
+                     scan_log row on the WO; rows are now stage ×
+                     defect_type × operator so the supervisor can
+                     spot the "same operator, same defect" cluster
+                     without an Excel export. -->
+                <field name="x_sbk_operator_who_caused_defect_id" type="row"/>
+                <field name="create_date" type="col" interval="week"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- W004 — NCR Pareto graph view. Bar chart of NCR count grouped by
+         defect type, stacked by inspector-call severity (minor/major/
+         critical). Catches a defect cluster on one defect type after 1
+         cabinet, not 5. -->
+    <record id="view_southbrook_mi_check_ncr_graph" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.ncr.graph</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="arch" type="xml">
+            <graph string="NCR Pareto" type="bar" stacked="1" sample="1">
+                <field name="x_sbk_defect_type"/>
+                <field name="x_sbk_defect_severity"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- NCR Queue list: failed / rework checks only.
+         W004 added pivot + graph to view_mode so the queue opens with
+         tabs for List / Form / Pivot / Graph (Odoo renders Graph + Pivot
+         as switcher tabs). The context defaults give the pivot a useful
+         opening shape — rows = check_stage × defect_type, cols = week,
+         measure = count — so a supervisor lands on the pareto without
+         touching a groupby. -->
+    <record id="action_southbrook_ncr_queue" model="ir.actions.act_window">
+        <field name="name">NCR / Rework Queue</field>
+        <field name="res_model">southbrook.mi.check</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="domain">[('x_sbk_result', 'in', ['fail', 'rework', 'hold'])]</field>
+        <field name="context">{
+            'search_default_pending_rework': 1,
+            'pivot_measures': ['__count'],
+            'pivot_row_groupby': ['x_sbk_check_stage', 'x_sbk_defect_type', 'x_sbk_operator_who_caused_defect_id'],
+            'pivot_column_groupby': ['create_date:week'],
+            'graph_measure': '__count',
+            'graph_mode': 'bar',
+            'graph_groupbys': ['x_sbk_defect_type', 'x_sbk_defect_severity'],
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No open NCRs — nice work, floor team!
+            </p>
+            <p>
+                Records appear here when an inspector marks a check as Fail,
+                Rework, or Hold. Use the Create Rework WO button on the
+                form to route the failed part back to the right station.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_southbrook_ncr_queue_search" model="ir.ui.view">
+        <field name="name">southbrook.mi.check.ncr.search</field>
+        <field name="model">southbrook.mi.check</field>
+        <field name="arch" type="xml">
+            <search string="NCRs / Rework Queue">
+                <field name="name"/>
+                <field name="x_sbk_workorder_id"/>
+                <field name="x_sbk_defect_type"/>
+                <filter name="pending_rework"
+                        string="Awaiting rework WO"
+                        domain="[('x_sbk_rework_required','=',True),('x_sbk_rework_workorder_id','=',False)]"/>
+                <filter name="rework_spawned"
+                        string="Rework WO spawned"
+                        domain="[('x_sbk_rework_workorder_id','!=',False)]"/>
+                <filter name="severity_critical"
+                        string="Critical defect"
+                        domain="[('x_sbk_defect_severity','=','critical')]"/>
+                <group>
+                    <filter name="group_defect_type" string="Defect Type"
+                            context="{'group_by':'x_sbk_defect_type'}"/>
+                    <filter name="group_stage" string="Stage"
+                            context="{'group_by':'x_sbk_check_stage'}"/>
+                    <filter name="group_workcenter" string="Workcenter"
+                            context="{'group_by':'x_sbk_workcenter_id'}"/>
+                    <!-- W044 (R5.8) — operator-attribution groupby
+                         for pareto-by-operator NCR review. -->
+                    <filter name="group_operator" string="Operator"
+                            context="{'group_by':'x_sbk_operator_who_caused_defect_id'}"/>
+                    <!-- W049 (R7.5) — shift attribution group-by
+                         for "leading/lagging shift" reviews. -->
+                    <filter name="group_shift" string="Shift"
+                            context="{'group_by':'x_sb_shift'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Hook into the kitchen Ops menu so supervisors see it next to
+         downtime + production release. -->
+    <menuitem id="menu_sbk_ops_ncr_queue"
+              name="NCR / Rework Queue"
+              parent="menu_sbk_ops_root"
+              action="action_southbrook_ncr_queue"
+              sequence="35"/>
+
+    <!-- Defect QR sheet printer — open in new tab.
+         Wraps /sb/qr/defect-sheet for one-click access. -->
+    <record id="action_defect_qr_sheet" model="ir.actions.act_url">
+        <field name="name">Print Defect QR Sheet</field>
+        <field name="url">/sb/qr/defect-sheet</field>
+        <field name="target">new</field>
+    </record>
+    <menuitem id="menu_sbk_ops_defect_qr_sheet"
+              name="Defect QR Sheet (print)"
+              parent="menu_sbk_ops_root"
+              action="action_defect_qr_sheet"
+              sequence="36"/>
+
+</odoo>

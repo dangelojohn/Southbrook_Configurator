@@ -1,0 +1,68 @@
+// W074 (R8.6, 2026-06-27) — bottom-anchored mobile status bar.
+//
+// On a 10" tablet held one-handed (one of the load-bearing R8.6
+// shop-floor postures) the native Odoo `.o_form_statusbar` sits
+// at the top of the form, well out of thumb reach. Move it to the
+// bottom on narrow viewports so the START / DONE / NEXT actions
+// the operator hits constantly are inside the safe-zone.
+//
+// Scope:
+//   * Applies only to viewports <= 768px wide (phone + most
+//     portrait-held tablets). Desktop / wide-tablet keeps the
+//     native top-anchored bar — planners do not want their kanban
+//     overview shoved up by a fixed footer.
+//   * Works against `.o_form_view`, the wrapper Odoo emits for
+//     every form view. No new class needed in the workorder XML,
+//     so the rule applies to every form the operator drives —
+//     mrp.workorder, mrp.production, southbrook.mi.check, etc.
+//   * The bar is `position: fixed` so it stays put while the
+//     operator scrolls a long form (BoM tab, MI checks tab).
+
+@media (max-width: 768px) {
+    .o_form_view > .o_form_statusbar,
+    .o_form_view .o_form_renderer > .o_form_statusbar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1030;            // above sticky table headers; below
+                                  // Bootstrap modal backdrop (1040+).
+        background: var(--bs-body-bg, #fff);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
+        // Generous tap targets — meets R8.13 / B-1 minimum (56 px on
+        // secondary actions). The native statusbar buttons usually
+        // sit around 32 px which is below comfortable thumb reach.
+        min-height: 64px;
+        padding: 12px 16px;
+        // Honour iOS / Android safe-area insets so the bar doesn't
+        // tuck behind the home-indicator pill.
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        // Statusbar buttons + breadcrumb pill should breathe.
+        align-items: center;
+        gap: 12px;
+    }
+
+    .o_form_view > .o_form_statusbar .o_statusbar_buttons .btn,
+    .o_form_view .o_form_renderer > .o_form_statusbar .o_statusbar_buttons .btn {
+        min-height: 48px;
+        padding: 10px 18px;
+        font-size: 1.05rem;
+    }
+
+    // Push the form's own scrollable region up so the fixed status
+    // bar doesn't overlap the last field. Use the same height +
+    // safe-area math so the offset matches the bar.
+    .o_form_view .o_form_sheet_bg,
+    .o_form_view .o_form_sheet {
+        padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+// Belt + braces for narrow desktop windows that LARP as tablets
+// (split-screen at 800px etc) — keep the desktop layout.
+@media (min-width: 769px) {
+    .o_form_view > .o_form_statusbar,
+    .o_form_view .o_form_renderer > .o_form_statusbar {
+        position: static;
+    }
+}

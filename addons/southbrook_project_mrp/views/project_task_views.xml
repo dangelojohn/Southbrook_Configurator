@@ -817,6 +817,74 @@
         </field>
     </record>
 
+    <!-- ============================================================
+         W029 (R3.W5) — Cross-project bottleneck contention view.
+
+         JTBD: "When I'm planning and 3 customer projects all have
+         edgebanding as their bottleneck, I want a single view showing
+         the contention, so I can call out the conflict in standup."
+
+         Domain: every project.task that has at least one MO and a
+         resolved current_bottleneck_workcenter_id (i.e. has WOs with
+         duration). Default group_by surfaces the contention directly:
+         each WC row collapses to "N projects bottlenecked here".
+
+         Lives at the top of the Southbrook PM root menu so the
+         planner sees it first in standup. View order is list,kanban
+         because the eye-grep in standup is "which WC has the most
+         names under it".
+         ============================================================ -->
+    <record id="action_southbrook_bottleneck_contention" model="ir.actions.act_window">
+        <field name="name">Bottleneck Contention</field>
+        <field name="res_model">project.task</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[
+            ('production_count', '&gt;', 0),
+            ('current_bottleneck_workcenter_id', '!=', False),
+        ]</field>
+        <field name="context">{
+            'create': False,
+            'search_default_group_current_bottleneck_workcenter': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No customer jobs currently share a bottleneck work center.
+            </p>
+            <p>
+                Each row groups customer jobs (project tasks) by the work
+                center that currently carries the most committed minutes
+                in that job's manufacturing orders. When three projects
+                show up under EDGE_BAND, that's the conflict to surface
+                at standup.
+            </p>
+        </field>
+    </record>
+
+    <!-- Search-view group_by filter so the action's default context
+         resolves cleanly. Inherits the readiness search view. -->
+    <record id="project_task_search_bottleneck_group" model="ir.ui.view">
+        <field name="name">project.task.search.southbrook.bottleneck_group</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project_task_search_readiness"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='group_door_style']" position="after">
+                <filter name="group_current_bottleneck_workcenter"
+                        string="Current Bottleneck Work Center"
+                        context="{'group_by': 'current_bottleneck_workcenter_id'}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Menu entry under Southbrook PM root. Sequence 5 puts it ABOVE
+         Ready Queue so the planner sees contention before drilling
+         into per-WC release decisions. -->
+    <menuitem
+        id="menu_southbrook_bottleneck_contention"
+        parent="southbrook_mrp_pm.menu_southbrook_pm_root"
+        name="Bottleneck Contention"
+        action="action_southbrook_bottleneck_contention"
+        sequence="5"/>
+
     <!-- B3 (ideal): flag at-risk / ECO jobs on the Kanban card. -->
     <record id="project_task_kanban_mrp" model="ir.ui.view">
         <field name="name">project.task.kanban.southbrook.mrp</field>

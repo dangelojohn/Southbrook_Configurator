@@ -4,7 +4,7 @@
         <field name="name">sb.kitchen.design.option.list</field>
         <field name="model">sb.kitchen.design.option</field>
         <field name="arch" type="xml">
-            <list>
+            <list class="o_sb_kitchen_workspace_scroll">
                 <field name="project_id"/>
                 <field name="name"/>
                 <field name="estimated_price"/>

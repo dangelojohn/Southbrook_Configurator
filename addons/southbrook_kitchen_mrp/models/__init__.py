@@ -2,3 +2,5 @@
 from . import sb_cutlist
 from . import sb_hardware_package
 from . import sb_production_package
+from . import qr_kind_handlers
+from . import mrp_production
