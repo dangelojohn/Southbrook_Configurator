@@ -25,6 +25,12 @@ class TestPhase1Spine(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate;
+        # this suite builds synthetic SO->MO chains without exercising
+        # the approval workflow. See
+        # southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.partner = cls.env["res.partner"].create({
             "name": "Phase1 Test Customer",
         })

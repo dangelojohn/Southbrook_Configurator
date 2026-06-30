@@ -19,6 +19,12 @@ class TestP1AutoEmitCutlist(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate;
+        # this suite manually links MOs to synthetic SO lines without
+        # exercising the approval workflow. See
+        # southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.partner = cls.env["res.partner"].create({
             "name": "P1 Auto-Emit Test Customer",
         })
