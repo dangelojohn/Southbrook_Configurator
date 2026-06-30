@@ -18,6 +18,16 @@ class TestP8FloorTraveler(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Bypass the MO availability gate (southbrook_premium_orchestration
+        # blocks mo.action_confirm() when component moves can't be fully
+        # reserved). _make_package_with_tool_required_wo() builds an MO
+        # from a BoM without seeding stock quants, so the gate fires with
+        # "Cannot confirm — N component move(s) cannot be fully reserved".
+        # The gate is correct for production and stays ON elsewhere; the
+        # bypass is scoped to this test class only.
+        cls.env["ir.config_parameter"].sudo().set_param(
+            "southbrook.mo_availability_gate.enabled", "0",
+        )
         cls.Package = cls.env["sb.production.package"]
         cls.MO = cls.env["mrp.production"]
         cls.Cutlist = cls.env["sb.cutlist"]

@@ -33,6 +33,16 @@ class TestPhase2PracticalLoop(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Bypass the MO availability gate (southbrook_premium_orchestration
+        # blocks mo.action_confirm() when component moves can't be fully
+        # reserved). _new_mo_with_wo() builds MOs from BoMs without
+        # seeding stock quants, so the gate fires with "Cannot confirm —
+        # N component move(s) cannot be fully reserved". The gate is
+        # correct for production and stays ON elsewhere; the bypass is
+        # scoped to this test class only.
+        cls.env["ir.config_parameter"].sudo().set_param(
+            "southbrook.mo_availability_gate.enabled", "0",
+        )
         cls.Asset = cls.env["southbrook.tool.asset"]
         cls.Crib = cls.env["southbrook.tool.crib"]
         cls.OpReq = cls.env["southbrook.operation.tool.requirement"]
