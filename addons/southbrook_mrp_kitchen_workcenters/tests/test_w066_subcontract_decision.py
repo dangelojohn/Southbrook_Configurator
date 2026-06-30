@@ -109,6 +109,12 @@ class TestW066SubcontractDecision(TransactionCase):
             "workorder_id": self.wo.id,
             "planned_date": self.wo_date,
             "subcontract_qty": 1.0,
+            # selected_vendor_id is required=True on the wizard model
+            # (see southbrook_subcontract_decision_wizard.py L148-155).
+            # Seed it with the qualified vendor so create() doesn't
+            # raise NotNullViolation; individual tests that need a
+            # different vendor (e.g. test_70) overwrite it after.
+            "selected_vendor_id": self.vendor_qual.id,
         }
         defaults.update(overrides)
         return self.Wizard.with_context(
