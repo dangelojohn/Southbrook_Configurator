@@ -19,23 +19,55 @@ class TestRoomWallAssignment(TransactionCase):
             ],
         })
         cls.wall_a, cls.wall_b = cls.room.wall_ids
-        cls.product = cls.env.ref("southbrook_estimating.product_base_2dr").product_variant_id
+        # R3/R4/R5 fix chain for this setUpClass:
+        #   R3 PR #31 — the xmlid is `southbrook_estimating.base_2dr` (Q8
+        #     spec phrases it `southbrook.base_2dr`; the real Odoo prefix is
+        #     the addon name). Prior `product_base_2dr` slug never existed.
+        #   R4 PR #32 — sale.order.line.name is NOT NULL and v19 onchange
+        #     dispatch does NOT auto-populate it on raw .create() (only Form
+        #     does). Every test create passes name=self.product.display_name
+        #     via the _create_line helper below.
+        #   R5 (this PR) — Southbrook cabinet templates are config_ok=True
+        #     (Q6 dynamic-variant model; cf. NF22 in tests/common.py). The
+        #     OCA product_configurator override of _create_variant_ids()
+        #     is a no-op for config_ok templates, so
+        #     `template.product_variant_id` is an empty recordset at install
+        #     time. An empty recordset's .display_name is False, which
+        #     becomes NULL on insert -> NotNullViolation on the required
+        #     `name` field. Force-materialize a bare product.product so
+        #     this test can reference a concrete variant without going
+        #     through product.config.session.
+        template = cls.env.ref("southbrook_estimating.base_2dr")
+        cls.product = template.product_variant_id
+        if not cls.product:
+            cls.product = cls.env["product.product"].create({
+                "product_tmpl_id": template.id,
+            })
 
-    def test_unpositioned_line_does_not_break_existing_behavior(self):
-        line = self.env["sale.order.line"].create({
+    def _create_line(self, **extra):
+        # R4 PR #32 — v19 onchange dispatch does NOT auto-populate `name`
+        # on raw .create() (only Form does); sale.order.line.name is
+        # NOT NULL so every create must pass it explicitly. Default to
+        # the product's display name (now guaranteed non-empty by the
+        # R5 variant-guard in setUpClass).
+        vals = {
             "order_id": self.order.id,
             "product_id": self.product.id,
             "product_uom_qty": 1.0,
-        })
+            "name": self.product.display_name,
+        }
+        vals.update(extra)
+        return self.env["sale.order.line"].create(vals)
+
+    def test_unpositioned_line_does_not_break_existing_behavior(self):
+        line = self._create_line()
         self.assertFalse(line.wall_id)
         self.assertFalse(line.is_positioned)
 
     def test_position_a_cabinet_against_wall_a(self):
-        line = self.env["sale.order.line"].create({
-            "order_id": self.order.id, "product_id": self.product.id,
-            "product_uom_qty": 1.0,
-            "wall_id": self.wall_a.id, "position_from_left_mm": 0,
-        })
+        line = self._create_line(
+            wall_id=self.wall_a.id, position_from_left_mm=0,
+        )
         self.assertTrue(line.is_positioned)
         self.wall_a.invalidate_recordset(["used_mm", "remaining_mm"])
         # sb_width_mm default 600 for base cabinet without PTAV resolution
@@ -50,11 +82,9 @@ class TestRoomWallAssignment(TransactionCase):
             "distance_from_left_mm": 1000, "width_mm": 600,
         })
         # Cabinet starting at 900mm, 600mm wide → overlaps window (900-1500 vs 1000-1600)
-        line = self.env["sale.order.line"].create({
-            "order_id": self.order.id, "product_id": self.product.id,
-            "product_uom_qty": 1.0,
-            "wall_id": self.wall_a.id, "position_from_left_mm": 900,
-        })
+        self._create_line(
+            wall_id=self.wall_a.id, position_from_left_mm=900,
+        )
         self.wall_a.invalidate_recordset(["has_conflicts"])
         self.assertTrue(self.wall_a.has_conflicts)
         # The line itself also reports conflict via order-line compute
@@ -62,11 +92,9 @@ class TestRoomWallAssignment(TransactionCase):
         # is derived in the UI from wall conflicts intersecting position)
 
     def test_copy_false_on_duplicate(self):
-        line = self.env["sale.order.line"].create({
-            "order_id": self.order.id, "product_id": self.product.id,
-            "product_uom_qty": 1.0,
-            "wall_id": self.wall_a.id, "position_from_left_mm": 100,
-        })
+        self._create_line(
+            wall_id=self.wall_a.id, position_from_left_mm=100,
+        )
         new_order = self.order.copy()
         new_line = new_order.order_line[0]
         self.assertFalse(new_line.wall_id, "wall_id must not propagate on copy (NF6)")
@@ -79,11 +107,9 @@ class TestRoomWallAssignment(TransactionCase):
             "distance_from_left_mm": 1000, "width_mm": 600,
         })
         # Cabinet to the LEFT of the window (0-600), no overlap with 1000-1600
-        self.env["sale.order.line"].create({
-            "order_id": self.order.id, "product_id": self.product.id,
-            "product_uom_qty": 1.0,
-            "wall_id": self.wall_a.id, "position_from_left_mm": 0,
-        })
+        self._create_line(
+            wall_id=self.wall_a.id, position_from_left_mm=0,
+        )
         self.wall_a.invalidate_recordset(["has_conflicts"])
         self.assertFalse(self.wall_a.has_conflicts)
 
@@ -94,11 +120,9 @@ class TestRoomWallAssignment(TransactionCase):
             "wall_id": self.wall_a.id, "constraint_type": "power_outlet",
             "distance_from_left_mm": 200, "width_mm": 100,
         })
-        self.env["sale.order.line"].create({
-            "order_id": self.order.id, "product_id": self.product.id,
-            "product_uom_qty": 1.0,
-            "wall_id": self.wall_a.id, "position_from_left_mm": 0,
-        })
+        self._create_line(
+            wall_id=self.wall_a.id, position_from_left_mm=0,
+        )
         self.wall_a.invalidate_recordset(["has_conflicts"])
         self.assertFalse(self.wall_a.has_conflicts)
 
@@ -110,11 +134,9 @@ class TestRoomWallAssignment(TransactionCase):
             "wall_id": self.wall_a.id, "constraint_type": "window",
             "distance_from_left_mm": 0, "width_mm": 100,
         })
-        line = self.env["sale.order.line"].create({
-            "order_id": self.order.id, "product_id": self.product.id,
-            "product_uom_qty": 1.0,
-            "wall_id": self.wall_a.id, "position_from_left_mm": 1500,
-        })
+        line = self._create_line(
+            wall_id=self.wall_a.id, position_from_left_mm=1500,
+        )
         c_id, line_id = c.id, line.id
         self.wall_a.unlink()
         self.assertFalse(
