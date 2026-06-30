@@ -21,15 +21,21 @@ class SouthbrookApiIdempotency(models.Model):
     _order = "create_date desc"
 
     api_key_hash = fields.Char(required=True, index=True)
+    # `route_scope` was added 2026-06-15 — the cache used to be keyed
+    # only on (api_key_hash, idempotency_key), which let a client that
+    # re-used the same Idempotency-Key across two different POST routes
+    # get the OTHER route's cached body. Defaults to '' so legacy rows
+    # (pre-migration) still satisfy the unique constraint cleanly.
+    route_scope = fields.Char(default="", index=True)
     idempotency_key = fields.Char(required=True, index=True)
     status_code = fields.Integer(required=True)
     response_body = fields.Text(required=True)
 
-    _sql_constraints = [
-        ("api_idempotency_uniq",
-         "unique(api_key_hash, idempotency_key)",
-         "Duplicate idempotency record for this API key + key."),
-    ]
+    # Odoo 19: models.Constraint (legacy _sql_constraints silently no-op'd).
+    _api_idempotency_uniq = models.Constraint(
+        'unique(api_key_hash, route_scope, idempotency_key)',
+        "Duplicate idempotency record for this API key + route + key.",
+    )
 
     @api.model
     def _ttl_hours(self) -> int:
@@ -41,17 +47,23 @@ class SouthbrookApiIdempotency(models.Model):
             return 24
 
     @api.model
-    def get_cached(self, api_key_hash: str, idempotency_key: str):
-        """Return (status_code, response_body) for a cache hit, else None."""
+    def get_cached(self, api_key_hash: str, idempotency_key: str,
+                   route_scope: str = ""):
+        """Return (status_code, response_body) for a cache hit, else None.
+
+        `route_scope` is the request path (e.g. /api/v1/...). Passing
+        the empty string preserves the pre-2026-06-15 behaviour for any
+        caller that didn't get the route-scope upgrade.
+        """
         if not (api_key_hash and idempotency_key):
             return None
         record = self.sudo().search([
             ("api_key_hash", "=", api_key_hash),
+            ("route_scope", "=", route_scope or ""),
             ("idempotency_key", "=", idempotency_key),
         ], limit=1)
         if not record:
             return None
-        # Expired?
         cutoff = fields.Datetime.now() - timedelta(hours=self._ttl_hours())
         if record.create_date < cutoff:
             record.sudo().unlink()
@@ -60,14 +72,14 @@ class SouthbrookApiIdempotency(models.Model):
 
     @api.model
     def stash(self, api_key_hash: str, idempotency_key: str,
-              status_code: int, response_body: str):
+              status_code: int, response_body: str,
+              route_scope: str = ""):
         if not (api_key_hash and idempotency_key):
             return
-        # Best-effort; concurrent writes will race the unique constraint
-        # but each attempt produces the same content so the loser is OK.
         try:
             self.sudo().create({
                 "api_key_hash": api_key_hash,
+                "route_scope": route_scope or "",
                 "idempotency_key": idempotency_key,
                 "status_code": status_code,
                 "response_body": response_body,

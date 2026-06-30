@@ -85,10 +85,27 @@ class MrpProduction(models.Model):
         Reads the cabinet family + envelope from the MO's product
         template (Phase 1 mapping); a future Module-2 enhancement
         will swap in the configurator's per-MO spec when available.
+
+        2026-06-25: bridge v2 schema requires a `template` field
+        (the FreeCAD .FCStd template basename — e.g. base_default).
+        Live fire on WH/MO/00023 returned HTTP 422
+        `{"loc":["body","template"],"msg":"Field required"}`.
+
+        2026-06-25 (Option A): the template name is derived from the
+        cabinet family, matching the 6 master generators in
+        services/freecad_bridge/cabinet_masters/:
+          base_default, wall_default, drawer_bank_default,
+          tall_default, corner_default, vanity_default.
+        The bridge parameterizes those masters with the MO dimensions,
+        so a single FCStd per family covers all SKU variations.
+        Worktop / accessory have no FreeCAD master (they're slabs /
+        single panels); their POST will fail with "unknown_template:
+        worktop_default" — that's the correct outcome until those
+        families gain real masters.
         """
         self.ensure_one()
         tmpl = self.product_id.product_tmpl_id
-        family = getattr(tmpl, "x_cabinet_family", None) or "base"
+        family = (getattr(tmpl, "x_cabinet_family", None) or "base").lower()
         # Sensible defaults so a missing template attribute doesn't
         # break the POST.
         dims = {
@@ -96,8 +113,20 @@ class MrpProduction(models.Model):
             "height_mm": float(getattr(tmpl, "x_default_height_mm", 720.0)),
             "depth_mm":  float(getattr(tmpl, "x_default_depth_mm", 580.0)),
         }
+        # Family → FCStd master mapping. Keys cover the variants seen
+        # in both x_cabinet_family ("drawer_bank") and the configurator
+        # short-form ("drawer"). Sink falls back to base since the
+        # sink-base carcass is a base-class cabinet with a cutout —
+        # the FreeCAD master can render it correctly.
+        FAMILY_TO_MASTER = {
+            "drawer": "drawer_bank_default",
+            "drawer_bank": "drawer_bank_default",
+            "sink": "base_default",
+        }
+        template = FAMILY_TO_MASTER.get(family, f"{family}_default")
         return {
             "production_id": self.id,
+            "template": template,
             "dimensions": dims,
             "family": family,
             "door_count": int(getattr(tmpl, "x_default_door_count", 1)),
@@ -167,6 +196,26 @@ class MrpProduction(models.Model):
                     "to set the `freecad_bridge.enabled` system parameter "
                     "to True before regenerating CAD for this MO."))
             rec._post_cad_render_job()
+        return True
+
+    def action_reset_cad_status(self):
+        """Reset x_cad_status to pending for stuck MOs.
+
+        Operational use: when an MO is parked at "rendering" because
+        the bridge never called back, or at "error" from a failed
+        POST, an operator can use this button to put the MO back in
+        the activator's pending queue. The xml_id binds this to the
+        Bridge Operators group so only those users see the button.
+        """
+        for rec in self:
+            old = rec.x_cad_status
+            rec.write({"x_cad_status": "pending"})
+            rec.message_post(
+                body=_(
+                    "CAD status reset from %s → pending by %s."
+                ) % (old, rec.env.user.name),
+                subtype_xmlid="mail.mt_log_note",
+            )
         return True
 
     # ──────────────────────────────────────────────────────────────────

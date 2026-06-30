@@ -120,6 +120,37 @@ class SouthbrookEco(models.Model):
     )
     document_count = fields.Integer(compute="_compute_document_count")
 
+    # SAMI PRD PLM-02 (2026-06-26) — ECO impact analysis.
+    # When the ECO applies, _scan_and_flag_affected_mos populates this
+    # m2m with every live (confirmed/in_progress) MO whose bom_id
+    # matches the versioned BoM. Each MO also gets a chatter post so
+    # the floor lead knows their in-flight job is referencing an
+    # archived BoM.
+    affected_mo_ids = fields.Many2many(
+        "mrp.production",
+        "southbrook_eco_affected_mo_rel",
+        "eco_id",
+        "mo_id",
+        string="Affected Live MOs",
+        readonly=True,
+        copy=False,
+        help="Live MOs that referenced the BoM at the moment this "
+             "ECO was applied. They keep working off the archived BoM "
+             "version (no in-flight re-explosion); future MOs use the "
+             "new version. This field is the audit trail of who got "
+             "the heads-up.",
+    )
+    affected_mo_count = fields.Integer(
+        string="Affected MOs",
+        compute="_compute_affected_mo_count",
+        store=True,
+    )
+
+    @api.depends("affected_mo_ids")
+    def _compute_affected_mo_count(self):
+        for eco in self:
+            eco.affected_mo_count = len(eco.affected_mo_ids)
+
     # ---- Approval bookkeeping. ----
     approver_id = fields.Many2one(
         "res.users", readonly=True, copy=False, tracking=True
@@ -389,6 +420,13 @@ class SouthbrookEco(models.Model):
                     % eco.target_kind
                 )
             handler()
+            # SAMI PRD PLM-02 — flag live MOs that were referencing the
+            # versioned target. Non-fatal: failure to scan MUST NEVER
+            # block the ECO apply itself.
+            try:
+                eco._scan_and_flag_affected_mos()
+            except Exception:  # noqa: BLE001
+                pass
             applied_stage = self.env["southbrook.eco.stage"].search(
                 [("is_applied_stage", "=", True)], limit=1
             )
@@ -491,6 +529,57 @@ class SouthbrookEco(models.Model):
             body=_("Engineering-document update recorded (%d attachment(s)).")
             % len(self.document_ids)
         )
+
+    # ------------------------------------------------------------------
+    # Impact analysis (SAMI PRD PLM-02, 2026-06-26)
+    # ------------------------------------------------------------------
+    def _scan_and_flag_affected_mos(self):
+        """Find live MOs that referenced the versioned target at the
+        moment this ECO was applied, populate affected_mo_ids.
+
+        Live MO states scanned: 'confirmed', 'progress', 'to_close'.
+        Done / cancel MOs are skipped — they're finished.
+
+        BoM-kind ECOs:
+            MO bom_id == self.bom_id (the now-archived BoM)
+        Cut-spec / Rule / Document-kind ECOs:
+            Skipped — none directly bind to mrp.production.
+
+        Chatter notification is handled by southbrook_mrp_pm's M20
+        override of action_apply (which posts a richer Markup-wrapped
+        notice with proper HTML rendering). This method ONLY populates
+        the m2m so the ECO form's smart button can drill into the list.
+
+        Idempotent: re-running writes the same m2m without duplication.
+        """
+        self.ensure_one()
+        if self.target_kind != "bom" or not self.bom_id:
+            return self.env["mrp.production"]
+        affected = self.env["mrp.production"].search([
+            ("bom_id", "=", self.bom_id.id),
+            ("state", "in", ["confirmed", "progress", "to_close"]),
+        ])
+        if affected:
+            self.affected_mo_ids = [(4, mo.id) for mo in affected]
+        return affected
+
+    def action_rescan_affected_mos(self):
+        """Manual re-scan button — useful if an MO was created after
+        the ECO was applied but the BoM reference was set retroactively
+        to the archived version (unusual but possible)."""
+        for eco in self:
+            eco._scan_and_flag_affected_mos()
+        return True
+
+    def action_open_affected_mos(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Affected Manufacturing Orders"),
+            "res_model": "mrp.production",
+            "view_mode": "list,form",
+            "domain": [("id", "in", self.affected_mo_ids.ids)],
+        }
 
     # ------------------------------------------------------------------
     # Smart buttons

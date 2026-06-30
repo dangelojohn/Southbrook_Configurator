@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only
+
+     Site-wide removal of Odoo brand promotion. Targets Odoo 19 core
+     templates by id; no edits to core files.
+
+     2026-06-25 — covers:
+       1. Public website footer "Powered by Odoo" (web.brand_promotion)
+       2. Portal sidebar "Powered by Odoo" (portal.portal_record_sidebar)
+       3. Portal "Connect with your software!" button + modal
+          (sale.sale_order_portal_template)
+-->
+<odoo>
+
+    <!-- 1) Public website footer brand promo. -->
+    <template id="brand_promotion_remove"
+              inherit_id="web.brand_promotion"
+              name="Southbrook: hide Odoo brand promo (website footer)">
+        <xpath expr="//*" position="replace">
+            <t/>
+        </xpath>
+    </template>
+
+    <!-- 2) Portal sidebar "Powered by Odoo" block on /my/orders/* and
+            every other portal record page that uses portal_record_sidebar.
+            Targets the unique container div by its class signature. -->
+    <template id="portal_sidebar_brand_remove"
+              inherit_id="portal.portal_record_sidebar"
+              name="Southbrook: hide Odoo brand from portal sidebar">
+        <xpath expr="//div[contains(@class, 'd-none d-lg-block mt-5 small text-center text-muted')]"
+               position="replace">
+            <t/>
+        </xpath>
+    </template>
+
+    <!-- 3) "Connect with your software!" button + modal on the sales
+            order portal page. The button wrapper carries a t-if and is
+            removed entirely; the modal is removed separately so an
+            inline trigger somewhere else can't accidentally pop a stub. -->
+    <template id="sale_portal_connect_software_remove"
+              inherit_id="sale.sale_order_portal_template"
+              name="Southbrook: hide 'Connect with your software' button + modal">
+        <!-- Remove the button + its t-if wrapper div. -->
+        <xpath expr="//button[@id='portal_connect_software_modal_btn']/.."
+               position="replace">
+            <t/>
+        </xpath>
+        <!-- Remove the modal that the button was triggering. -->
+        <xpath expr="//div[@id='sale_portal_connect_software_modal']"
+               position="replace">
+            <t/>
+        </xpath>
+    </template>
+
+</odoo>

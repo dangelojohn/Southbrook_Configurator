@@ -11,7 +11,10 @@ import logging
 from typing import Any, Callable, Dict, Optional
 
 from odoo import _, http
-from odoo.exceptions import AccessDenied, AccessError, MissingError, UserError
+from odoo.exceptions import (
+    AccessDenied, AccessError, MissingError, UserError, ValidationError,
+)
+import psycopg2.errors  # noqa: F401 — used in except branches
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -22,12 +25,36 @@ SCHEMA_VERSION = "southbrook.flutter.api.v1"
 # ----------------------------------------------------------------------
 # Response helpers
 # ----------------------------------------------------------------------
+def _cors_headers() -> list:
+    """CORS headers stamped on every /api/v1/* response.
+
+    The API uses X-Api-Key (a custom header), which forces a preflight
+    on every cross-origin call. Without these headers, a browser
+    refuses to deliver the actual response to script. Same-origin
+    (the Flutter PWA at southbrookcabinetry.space/app/) sends them
+    too but ignores them — no harm.
+
+    Allow-Origin echoes the request origin when present; falls back
+    to '*'. We do NOT set Allow-Credentials (no cookies in this API)
+    so wildcard origin is safe.
+    """
+    origin = request.httprequest.headers.get("Origin", "*") if request else "*"
+    return [
+        ("Access-Control-Allow-Origin", origin),
+        ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
+        ("Access-Control-Allow-Headers",
+         "Content-Type, X-Api-Key, Idempotency-Key, Accept"),
+        ("Access-Control-Max-Age", "86400"),
+        ("Vary", "Origin"),
+    ]
+
+
 def _json(body: Dict[str, Any], status: int = 200) -> http.Response:
     body.setdefault("schema", SCHEMA_VERSION)
     payload = json.dumps(body)
     return request.make_response(
         payload, status=status,
-        headers=[("Content-Type", "application/json")],
+        headers=[("Content-Type", "application/json"), *_cors_headers()],
     )
 
 
@@ -37,6 +64,11 @@ def _error(code: str, message: str = "", status: int = 400,
     if details:
         body["details"] = details
     return _json(body, status=status)
+
+
+def _cors_preflight() -> http.Response:
+    """204 response for an OPTIONS preflight on any /api/v1/* route."""
+    return request.make_response("", status=204, headers=_cors_headers())
 
 
 def _hash_key(cleartext: str) -> str:
@@ -75,26 +107,39 @@ def requires_api_key(handler: Callable) -> Callable:
 
 
 def supports_idempotency(handler: Callable) -> Callable:
-    """Decorator: replay cached response on Idempotency-Key hit."""
+    """Decorator: replay cached response on Idempotency-Key hit.
+
+    Cache key is `(api_key_hash, route_path, idempotency_key)`. Earlier
+    the route was NOT part of the key — a client that reused the same
+    Idempotency-Key across two different routes (e.g. POST /approve and
+    POST /photos) would get a cached body from the OTHER route, which
+    is a correctness hazard the contract intentionally avoids. Scoping
+    by route keeps the replay-semantics local to the endpoint the
+    client originally hit.
+    """
     @functools.wraps(handler)
     def wrapper(self, *args, **kwargs):
         idempotency_key = request.httprequest.headers.get(
             "Idempotency-Key", "")
         api_key_hash = getattr(request, "_api_key_hash", "")
+        route_scope = request.httprequest.path or ""
         Cache = request.env["southbrook.api.idempotency"].sudo()
         if idempotency_key:
-            hit = Cache.get_cached(api_key_hash, idempotency_key)
+            hit = Cache.get_cached(
+                api_key_hash, idempotency_key, route_scope=route_scope)
             if hit is not None:
                 status_code, body = hit
                 return request.make_response(
                     body, status=status_code,
-                    headers=[("Content-Type", "application/json")],
+                    headers=[("Content-Type", "application/json"),
+                             *_cors_headers()],
                 )
         resp = handler(self, *args, **kwargs)
         if idempotency_key and 200 <= getattr(resp, "status_code", 0) < 300:
             try:
                 Cache.stash(api_key_hash, idempotency_key,
-                            resp.status_code, resp.get_data(as_text=True))
+                            resp.status_code, resp.get_data(as_text=True),
+                            route_scope=route_scope)
             except Exception:
                 _logger.debug("idempotency stash failed", exc_info=True)
         return resp
@@ -105,6 +150,22 @@ def supports_idempotency(handler: Callable) -> Callable:
 # Controller
 # ----------------------------------------------------------------------
 class SouthbrookApi(http.Controller):
+
+    # ==================================================================
+    # CORS preflight — catches OPTIONS on any /api/v1/* path. Without
+    # this, the cross-origin call from a future mobile webview /
+    # partner integration would fail before the actual request lands,
+    # since the API uses X-Api-Key (a custom header that always forces
+    # a preflight). Same-origin clients (the Flutter PWA at
+    # southbrookcabinetry.space/app/) don't preflight, so this is a
+    # no-op for them.
+    # ==================================================================
+    @http.route(
+        "/api/v1/<path:_subpath>", type="http", auth="public",
+        methods=["OPTIONS"], csrf=False,
+    )
+    def cors_preflight(self, _subpath=None, **_):
+        return _cors_preflight()
 
     # ==================================================================
     # §3.0 — GET /api/v1/health  (no auth — for monitors + smoke)
@@ -136,9 +197,17 @@ class SouthbrookApi(http.Controller):
     # ==================================================================
     @http.route(
         "/api/v1/auth/login", type="http", auth="public",
-        methods=["POST"], csrf=False,
+        methods=["POST", "OPTIONS"], csrf=False,
     )
     def auth_login(self, **_):
+        if request.httprequest.method == "OPTIONS":
+            # Cross-origin preflight — must return 2xx + CORS headers
+            # so the browser then sends the actual POST. The wildcard
+            # OPTIONS route earlier in this class is meant to cover
+            # this, but Odoo's router prefers the path-specific route
+            # even on method mismatch, so we handle preflight in-line
+            # for endpoints clients will call cross-origin.
+            return _cors_preflight()
         try:
             payload = json.loads(request.httprequest.data or b"{}")
         except json.JSONDecodeError:
@@ -266,11 +335,15 @@ class SouthbrookApi(http.Controller):
         # The mime header can lie and a truncated upload would otherwise blow
         # up the downstream AI pipeline (PIL) with an uncaught 500. Verify the
         # bytes actually decode as an image and reject corrupt rasters cleanly.
+        # NB: the import is OUTSIDE the verify try-block so a missing Pillow
+        # surfaces as a 500 (ops misconfig — the deploy installed nothing) and
+        # not a 422 invalid_image (which a client would retry on, masking the
+        # outage).
+        import io as _io
+        from PIL import Image as _PILImage
         try:
-            import io as _io
-            from PIL import Image as _PILImage
             _PILImage.open(_io.BytesIO(data)).verify()
-        except Exception:
+        except Exception:                                       # noqa: BLE001
             return _error("invalid_image",
                           "Photo is not a readable image.", 422)
 
@@ -424,8 +497,38 @@ class SouthbrookApi(http.Controller):
                           "Body must be a JSON object.", 400)
         try:
             cutlist.from_nesting_result(payload)
-        except Exception as exc:                              # noqa: BLE001
-            return _error("nesting_rejected", str(exc), 422)
+        except AccessError:
+            # ACL / record-rule denial — surface as the cross-tenant
+            # 404 (consistent with _fetch_cutlist_or_404's policy)
+            # rather than leaking the existence of the record.
+            _logger.warning(
+                "API ACL: user %s blocked from writing nesting result "
+                "on cutlist %s.", request.env.user.id, cutlist.id,
+            )
+            return _error("not_found", "Unknown cutlist id.", 404)
+        except (UserError, ValidationError) as exc:
+            # Domain/schema validation failure — this is the 422 case.
+            return _error("nesting_rejected",
+                          getattr(exc, "args", [str(exc)])[0], 422)
+        except psycopg2.errors.IntegrityError:
+            # DB constraint hit — server bug or race; surface as 500
+            # so monitors page, not as a 422 the client retries on.
+            _logger.exception(
+                "IntegrityError persisting nesting result for cutlist %s",
+                cutlist.id,
+            )
+            return _error("server_error",
+                          "Failed to persist nesting result.", 500)
+        except Exception:                                       # noqa: BLE001
+            # Unknown error — log the stack but DON'T leak it in the
+            # response body (str(exc) on a deep traceback can expose
+            # file paths or SQL fragments). Generic 500 instead.
+            _logger.exception(
+                "Unhandled exception in cutlist_nesting_result for %s",
+                cutlist.id,
+            )
+            return _error("server_error",
+                          "Failed to persist nesting result.", 500)
         return _json({
             "ok": True,
             "cutlist_id": cutlist.id,
@@ -436,8 +539,10 @@ class SouthbrookApi(http.Controller):
     # Helpers
     # ==================================================================
     def _fetch_cutlist_or_404(self, cutlist_id):
-        """Return the cutlist record if the API user can read it, or
-        an error response. Phase 4 Sprint 1 — Accucutt nesting bridge."""
+        """Return the cutlist record if the API user can read it, else
+        a uniform 404 response. Collapse-to-404 (vs distinguishing 403)
+        so the response does not leak existence of cutlists outside the
+        caller's tenant — mirrors _fetch_project_or_404 below."""
         try:
             cutlist = request.env["sb.cutlist"].browse(
                 cutlist_id).exists()
@@ -447,12 +552,16 @@ class SouthbrookApi(http.Controller):
         if not cutlist:
             return _error("not_found",
                           "Unknown cutlist id.", 404)
-        # Touch a field to provoke any AccessError record-rule.
         try:
             _ = cutlist.name
         except Exception:                                     # noqa: BLE001
-            return _error("forbidden",
-                          "Cutlist not accessible.", 403)
+            _logger.warning(
+                "API ACL: user %s attempted to access cutlist %s "
+                "without record-rule access — denied (404).",
+                request.env.user.id, cutlist.id,
+            )
+            return _error("not_found",
+                          "Unknown cutlist id.", 404)
         return cutlist
 
     def _fetch_project_or_404(self, project_id):

@@ -38,7 +38,7 @@ remains live for at least one Phase cycle per the contract §6.
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "depends": [
         "base",
         "mail",

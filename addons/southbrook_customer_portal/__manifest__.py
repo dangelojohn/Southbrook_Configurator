@@ -38,9 +38,13 @@ Three.js KitchenCanvas (Phase 2):
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.4.0",
+    "version": "19.0.0.6.0",
     "depends": [
+        "web",
+        "website",
         "portal",
+        "sale",
+        "southbrook_hermes",
         "southbrook_kitchen_workspace",
         "southbrook_config_engine",
     ],
@@ -48,6 +52,7 @@ Three.js KitchenCanvas (Phase 2):
         "security/southbrook_customer_portal_security.xml",
         "security/ir.model.access.csv",
         "views/kitchen_portal_templates.xml",
+        "views/debrand_views.xml",
     ],
     # NB: kitchen_canvas.js + kitchen_dims.js are NOT registered as
     # asset-bundle entries. Odoo's bundler does not transform their

@@ -44,7 +44,7 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
     "author": "Southbrook Cabinetry / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.4.0",
     "depends": [
         "mrp",
         "stock",
@@ -59,6 +59,8 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
         # Southbrook MO orchestration (sb.production.package) — consumption + cost
         # rollup hooks attach to it in commits 5-6
         "southbrook_kitchen_mrp",
+        # QR foundation — qr.mixin + scan controller.
+        "southbrook_qr_kit",
     ],
     "data": [
         "security/kitchen_tools_groups.xml",
@@ -74,6 +76,8 @@ Compatible with Odoo 19.0 Community Edition. No Enterprise-only deps.
         "views/tool_kit_views.xml",
         "views/mrp_workorder_views.xml",
         "views/workorder_tool_consumption_views.xml",
+        # QR-driven tool usage log (Phase 6, 2026-06-26).
+        "views/tool_usage_views.xml",
         "views/menus.xml",
     ],
     "demo": [
