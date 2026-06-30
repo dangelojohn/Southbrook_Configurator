@@ -59,6 +59,48 @@ run() {
 command -v rsync >/dev/null || fail "rsync not found"
 command -v ssh >/dev/null   || fail "ssh not found"
 
+# ---- deploy-from-main gate --------------------------------------------
+# Prevents the cold-install gap from regrowing by refusing to deploy
+# from a non-main checkout unless explicitly overridden. See close-out
+# doc ~/Downloads/Phase1_P0_CLOSE_OUT_2026-06-29.md for rationale.
+# Gap-regrowth pattern: feature-branch deploys land code in prod that
+# never reaches main, so CI cold-install on main is impossible and
+# DR is broken. The whole point of the cold-install gap closure work.
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  CURRENT_SHA=$(git rev-parse --short HEAD)
+  if [[ "$CURRENT_BRANCH" != "main" ]]; then
+    if ! git merge-base --is-ancestor HEAD main 2>/dev/null; then
+      # HEAD is on a branch that has commits not in main = feature-branch deploy
+      if [[ "${SOUTHBROOK_DEPLOY_OFF_MAIN:-0}" != "1" ]]; then
+        cat >&2 <<GATE
+[deploy] REFUSING TO DEPLOY: current HEAD ($CURRENT_BRANCH @ $CURRENT_SHA) is not in main.
+
+Why this exists:
+  Feature-branch deploys grow the cold-install gap. Deploys must
+  ship from main once the work is reviewed + merged.
+  See ~/Downloads/Phase1_P0_CLOSE_OUT_2026-06-29.md.
+
+Options:
+  - Open a PR + merge to main first (preferred).
+  - Override for an emergency:
+      SOUTHBROOK_DEPLOY_OFF_MAIN=1 $0 $*
+    (override is logged to /tmp/southbrook-offmain-deploys.jsonl
+    so it can be reconciled later.)
+
+GATE
+        exit 64
+      fi
+      # Override taken — log it for later reconciliation
+      OVERRIDE_LOG="/tmp/southbrook-offmain-deploys.jsonl"
+      printf '{"ts":"%s","branch":"%s","sha":"%s","user":"%s","modules":"%s"}\n' \
+        "$(date -u +%FT%TZ)" "$CURRENT_BRANCH" "$CURRENT_SHA" "$USER" "$MODULES_ARG" \
+        >> "$OVERRIDE_LOG"
+      log "OFF-MAIN OVERRIDE: deploying from $CURRENT_BRANCH @ $CURRENT_SHA (logged to $OVERRIDE_LOG)"
+    fi
+  fi
+fi
+
 log "target: $QNAP_HOST"
 log "modules: $MODULES_ARG"
 log "db: $DB"
