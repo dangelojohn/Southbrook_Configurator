@@ -105,16 +105,21 @@ class OsGenerators(models.AbstractModel):
                 "*No active cut spec defined.*\n"
             )
             return body
-        # Render the active spec — field names match southbrook_plm conventions.
+        # Render the active spec — field names match southbrook_plm's
+        # CONSTANT_FIELDS tuple in addons/southbrook_plm/models/
+        # southbrook_cut_spec.py (box_th, back_th, rabbet, door_th,
+        # door_reveal, shelf_tol, shelf_vent_gap, toekick_h). Earlier
+        # `*_mm`-suffixed names didn't exist on the model so getattr
+        # returned None and every row was silently skipped.
         fields_to_emit = [
-            ("box_thickness_mm", "Box / Carcass Thickness", "mm"),
-            ("back_thickness_mm", "Back-Panel Thickness", "mm"),
-            ("rabbet_depth_mm", "Rabbet Depth", "mm"),
-            ("door_thickness_mm", "Door Thickness", "mm"),
-            ("door_reveal_mm", "Door Reveal", "mm"),
-            ("shelf_tolerance_mm", "Shelf Tolerance", "mm"),
-            ("shelf_vent_gap_mm", "Shelf Ventilation Gap", "mm"),
-            ("toe_kick_height_mm", "Toe-Kick Height", "mm"),
+            ("box_th", "Box / Carcass Thickness", "mm"),
+            ("back_th", "Back-Panel Thickness", "mm"),
+            ("rabbet", "Rabbet Depth", "mm"),
+            ("door_th", "Door Thickness", "mm"),
+            ("door_reveal", "Door Reveal", "mm"),
+            ("shelf_tol", "Shelf Tolerance", "mm"),
+            ("shelf_vent_gap", "Shelf Ventilation Gap", "mm"),
+            ("toekick_h", "Toe-Kick Height", "mm"),
         ]
         lines = [
             "---", "slug: 06_cut_spec.generated",
