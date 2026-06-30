@@ -249,7 +249,7 @@ class ConfiguratorV2 extends Component {
                state.adding still wins for the in-flight RPC state. -->
           <button type="button"
                   class="sb_cfg_btn sb_cfg_btn_primary"
-                  t-att-disabled="(state.adding or not state.addToQuoteEnabled) ? 'disabled' : null"
+                  t-att-disabled="(state.adding || !state.addToQuoteEnabled) ? 'disabled' : null"
                   t-att-aria-disabled="state.addToQuoteEnabled ? null : 'true'"
                   t-on-click="onAddToQuote">
             <t t-if="state.adding">Adding…</t>
