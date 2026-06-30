@@ -151,7 +151,17 @@ class SaleOrder(models.Model):
 
     def _check_production_approval_gate(self):
         """Raise UserError if any manufacturing line lacks approval and
-        force_production_release is not set."""
+        force_production_release is not set.
+
+        Test-isolation bypass: mirror the same `bypass_production_approval`
+        context flag the model-layer `mrp.production.create` honors (see
+        mrp_production.py). Without this parallel check, tests that opt
+        out of the model-layer gate still tripped on `so.action_confirm()`'s
+        SO-side gate. Production code paths never set this flag, so the
+        gate stays enforced everywhere it matters.
+        """
+        if self.env.context.get("bypass_production_approval"):
+            return
         for order in self:
             if order.force_production_release:
                 # Log the bypass into chatter so the audit trail is
