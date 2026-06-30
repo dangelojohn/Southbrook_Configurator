@@ -161,10 +161,19 @@ exec $CONTAINER ps -ef | grep \"odoo.*-u\"'"
   printf '%s\n' "$upgrade_log" \
     | grep -E 'Modules loaded|Registry loaded|ParseError|CRITICAL|ValidationError|AssertionError|Failed to load registry|Traceback' \
     | sed 's/^/[odoo] /' >&2 || true
-  if printf '%s\n' "$upgrade_log" | grep -qE 'Failed to load registry|CRITICAL|AssertionError|Traceback \(most recent'; then
+  # Use bash native [[ ]] glob matching for the success/failure markers
+  # instead of `printf ... | grep -q`. With set -o pipefail enabled,
+  # grep -q (early-exit on first match) can SIGPIPE the upstream printf
+  # and poison the pipeline exit even when the pattern was actually
+  # matched — making the if-condition unreliable on huge upgrade logs.
+  # Pattern globbing on $upgrade_log directly has no pipe and no SIGPIPE.
+  if [[ "$upgrade_log" == *"Failed to load registry"* \
+     || "$upgrade_log" == *"CRITICAL"* \
+     || "$upgrade_log" == *"AssertionError"* \
+     || "$upgrade_log" == *"Traceback (most recent"* ]]; then
     fail "cold upgrade hit a registry/load error (see [odoo] lines above). NOT trusting this deploy — a live restart would crash. Investigate before restarting $CONTAINER."
   fi
-  if ! printf '%s\n' "$upgrade_log" | grep -q 'Modules loaded'; then
+  if [[ "$upgrade_log" != *"Modules loaded"* ]]; then
     log "tail of upgrade log:"; printf '%s\n' "$upgrade_log" | tail -20 >&2
     fail "cold upgrade did not reach 'Modules loaded' — treat as FAILED."
   fi
