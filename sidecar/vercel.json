@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "app/api/hermes/ask/route.ts": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 60
+    },
+    "app/api/hermes/conversation/log/route.ts": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 10
+    }
+  }
+}
