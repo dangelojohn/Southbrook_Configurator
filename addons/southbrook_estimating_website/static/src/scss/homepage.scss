@@ -163,6 +163,152 @@
 }
 
 // ---------------------------------------------------------------------
+// COMPARISON SECTION — industry default vs Southbrook.
+// Fulcrum-pattern Tier-1 #4 (see docs/Fulcrum.md). Five paired rows
+// re-frame the buying experience. Walnut/linen palette, no jokey
+// graphics — premium-restrained voice. Old side is muted linen + red
+// strike glyph; Southbrook side is white card with walnut arrow.
+// ---------------------------------------------------------------------
+.o_sb_compare {
+  padding: 80px 0;
+  background: var(--sb-paper, #fbf7ef);
+  border-top: 1px solid var(--sb-rule, #d8cfbf);
+  border-bottom: 1px solid var(--sb-rule, #d8cfbf);
+}
+
+.o_sb_compare_header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.o_sb_compare_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--sb-walnut, #6b3f2a);
+  max-width: 720px;
+  margin: 0 auto 16px;
+
+  @media (max-width: 768px) {
+    font-size: 30px;
+  }
+}
+
+.o_sb_compare_accent {
+  font-style: italic;
+  font-variation-settings: "opsz" 36, "wght" 400;
+  color: var(--sb-sky, #2b4f6b);
+}
+
+.o_sb_compare_sub {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--sb-ink-dim, #6b665e);
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+.o_sb_compare_rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.o_sb_compare_row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.o_sb_compare_cell {
+  padding: 22px 26px;
+  border-radius: 4px;
+  border: 1px solid var(--sb-rule, #d8cfbf);
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 100%;
+}
+
+.o_sb_compare_old {
+  background: var(--sb-linen, #f4ede2);
+
+  .o_sb_compare_glyph {
+    color: var(--sb-alert, #a83a2b);
+    opacity: 0.55;
+  }
+
+  .o_sb_compare_text {
+    color: var(--sb-ink-dim, #6b665e);
+    text-decoration-line: line-through;
+    text-decoration-color: rgba(168, 58, 43, 0.32);
+    text-decoration-thickness: 1px;
+  }
+
+  .o_sb_compare_label {
+    color: var(--sb-ink-dim, #6b665e);
+  }
+}
+
+.o_sb_compare_new {
+  background: white;
+  border-color: var(--sb-walnut, #6b3f2a);
+  box-shadow: 0 2px 8px rgba(74, 60, 46, 0.06);
+
+  .o_sb_compare_glyph {
+    color: var(--sb-walnut, #6b3f2a);
+  }
+
+  .o_sb_compare_text {
+    color: var(--sb-ink, #1a1814);
+  }
+
+  .o_sb_compare_label {
+    color: var(--sb-walnut, #6b3f2a);
+  }
+}
+
+.o_sb_compare_glyph {
+  flex-shrink: 0;
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 20px;
+  line-height: 1.4;
+  width: 22px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.o_sb_compare_body {
+  flex: 1;
+}
+
+.o_sb_compare_label {
+  display: block;
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.o_sb_compare_text {
+  font-family: var(--sb-font-sans, system-ui, sans-serif);
+  font-size: 15px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+// ---------------------------------------------------------------------
 // SECONDARY CTA STRIP
 // ---------------------------------------------------------------------
 .o_sb_cta_strip {

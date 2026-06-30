@@ -123,6 +123,133 @@
             </div>
           </section>
 
+          <!-- COMPARISON: industry default vs Southbrook (Fulcrum-pattern
+               Tier-1 #4 from docs/Fulcrum.md). Five paired rows that
+               re-frame the custom-cabinet buying experience without
+               jokey language. Premium-restrained voice. -->
+          <section class="o_sb_compare">
+            <div class="container">
+              <header class="o_sb_compare_header">
+                <h2 class="o_sb_compare_title">
+                  The custom-kitchen industry,<br/>
+                  <span class="o_sb_compare_accent">reimagined.</span>
+                </h2>
+                <p class="o_sb_compare_sub">
+                  What changes when the design tool, the price engine,
+                  and the cabinet shop share one source of truth.
+                </p>
+              </header>
+              <div class="o_sb_compare_rows">
+
+                <article class="o_sb_compare_row">
+                  <div class="o_sb_compare_cell o_sb_compare_old">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">×</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Industry default</span>
+                      <p class="o_sb_compare_text">
+                        Showroom appointment required to start.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="o_sb_compare_cell o_sb_compare_new">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">→</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Southbrook</span>
+                      <p class="o_sb_compare_text">
+                        Configure your kitchen from anywhere, on any device.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="o_sb_compare_row">
+                  <div class="o_sb_compare_cell o_sb_compare_old">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">×</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Industry default</span>
+                      <p class="o_sb_compare_text">
+                        A PDF quote, days after the appointment.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="o_sb_compare_cell o_sb_compare_new">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">→</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Southbrook</span>
+                      <p class="o_sb_compare_text">
+                        Live pricing in the configurator. Quote in minutes.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="o_sb_compare_row">
+                  <div class="o_sb_compare_cell o_sb_compare_old">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">×</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Industry default</span>
+                      <p class="o_sb_compare_text">
+                        Lead times revealed after deposit.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="o_sb_compare_cell o_sb_compare_new">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">→</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Southbrook</span>
+                      <p class="o_sb_compare_text">
+                        Production capacity visible at the quote.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="o_sb_compare_row">
+                  <div class="o_sb_compare_cell o_sb_compare_old">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">×</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Industry default</span>
+                      <p class="o_sb_compare_text">
+                        Hand-drafted cut lists. Drift between design and shop.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="o_sb_compare_cell o_sb_compare_new">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">→</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Southbrook</span>
+                      <p class="o_sb_compare_text">
+                        Cut spec and shop drawings auto-generated from the design.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="o_sb_compare_row">
+                  <div class="o_sb_compare_cell o_sb_compare_old">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">×</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Industry default</span>
+                      <p class="o_sb_compare_text">
+                        Custom means uncertain.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="o_sb_compare_cell o_sb_compare_new">
+                    <span class="o_sb_compare_glyph" aria-hidden="true">→</span>
+                    <div class="o_sb_compare_body">
+                      <span class="o_sb_compare_label">Southbrook</span>
+                      <p class="o_sb_compare_text">
+                        Every cabinet validated before fabrication.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+
+              </div>
+            </div>
+          </section>
+
           <!-- SECONDARY CTA STRIP -->
           <section class="o_sb_cta_strip">
             <div class="container">
