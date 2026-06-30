@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Positive fixtures for scripts/lint-owl-expr.py.
+
+  Section A: inside <templates> (OWL) — these must NOT trip the scanner
+  even though they look superficially similar to violations.
+  Section B: outside <templates> (server-side QWeb) — word ops here are
+  valid Python sandbox syntax; the scanner must skip this entire region.
+-->
+<odoo>
+
+  <!-- Section A: OWL context, all clean -->
+  <templates>
+    <t t-if="active || selected">G01 js-or-correct</t>
+    <t t-if="user.verified &amp;&amp; !user.guest">G02 js-and-not-correct</t>
+    <span t-out="'select a or b'">G03 word-op-inside-string-literal</span>
+    <t t-if="order.amount &gt; 0">G04 identifier-containing-or-prefix</t>
+    <t t-out="format(value)">G05 identifier-containing-or-suffix</t>
+    <span t-if="ancestor.name">G06 identifier-ending-with-or</span>
+    <t t-out="cannot_proceed">G07 identifier-containing-not</t>
+    <t t-out="a / b">G08 single-slash-not-regex</t>
+    <span name="not-a-template-attr">G09 word-op-in-non-t-attribute</span>
+    <t t-att-style="{display: ok ? 'block' : 'none'}">G10 object-literal-no-ops</t>
+    <t t-foreach="items" t-as="item">G11 foreach-plain</t>
+    <a t-attf-href="/web/page/#{record.id}">G12 attf-url-not-regex</a>
+    <a t-attf-href="/my/order/#{record.id}/edit">G13 attf-url-multi-slash</a>
+    <img t-attf-src="/web/image/{{model}}/{{id}}/image_1920"/>
+  </templates>
+
+  <!-- Section B: server-side QWeb context — word ops here are CORRECT -->
+  <template id="portal_my_orders" inherit_id="portal.portal_layout">
+    <t t-foreach="orders" t-as="order">
+      <div t-if="not order.archived and order.state == 'done'">G15 qweb-word-ops-ok</div>
+      <span t-out="order.partner_id.email or '(none)'">G16 qweb-or-default-ok</span>
+    </t>
+  </template>
+
+  <!-- Section B also covers reports / mail templates / etc. The scanner
+       must not enter any non-<templates> region. -->
+  <data noupdate="0">
+    <record id="some_mail_template" model="mail.template">
+      <field name="body_html" type="html">
+        <p t-out="object.partner_id.email or 'no-email@example.com'">G17 mail-template-or-ok</p>
+      </field>
+    </record>
+  </data>
+
+  <!-- Section C: inherit-view escape hatch. No <templates> block, but uses
+       OWL-only record.X.raw_value access — scanner treats whole file as OWL.
+       All these constructs use the CORRECT JS form. -->
+  <record id="kanban_inherit_view" model="ir.ui.view">
+    <field name="arch" type="xml">
+      <xpath expr="//header" position="after">
+        <t t-if="record.x_count.raw_value &amp;&amp; !record.x_done.raw_value">G18 inherit-js-ops-ok</t>
+        <span t-if="!record.x_blocker.raw_value">G19 inherit-not-ok</span>
+        <a t-att-href="record.x_url.value || '#'">G20 inherit-or-ok</a>
+      </xpath>
+    </field>
+  </record>
+
+</odoo>
