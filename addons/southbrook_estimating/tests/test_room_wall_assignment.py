@@ -19,7 +19,12 @@ class TestRoomWallAssignment(TransactionCase):
             ],
         })
         cls.wall_a, cls.wall_b = cls.room.wall_ids
-        cls.product = cls.env.ref("southbrook_estimating.product_base_2dr").product_variant_id
+        # Per CLAUDE.md Q8 locked-decisions: the canonical Base 2-Door cabinet
+        # template xml_id is `base_2dr` (Q8 spec phrases this as
+        # "southbrook.base_2dr"; the actual module prefix is the addon name,
+        # `southbrook_estimating`). Prior `product_base_2dr` slug never
+        # existed — corrected here against Q8 (R3 PR #31).
+        cls.product = cls.env.ref("southbrook_estimating.base_2dr").product_variant_id
 
     def test_unpositioned_line_does_not_break_existing_behavior(self):
         line = self.env["sale.order.line"].create({
