@@ -102,28 +102,29 @@
                  marker that's safe for SCSS targeting. -->
             <div class="o_southbrook_order_builder_page">
 
-            <!-- Header card with order info -->
-            <div class="o_southbrook_portal_header card mb-3">
-                <div class="card-body">
-                    <h2 class="card-title h4 mb-1">
-                        <t t-if="order">
-                            <span t-esc="order_name"/>
-                            <small class="text-muted ms-2">
-                                · <t t-esc="order.partner_id.name"/>
-                            </small>
-                        </t>
-                        <t t-else="">
-                            Order Builder
-                        </t>
-                    </h2>
-                    <p class="card-text text-muted mb-0" t-if="not order">
-                        Pick or create an order to configure your kitchen.
-                    </p>
-                    <p class="card-text text-muted mb-0" t-elif="order.state">
-                        Stage: <strong t-esc="dict(order._fields['state'].selection).get(order.state, order.state)"/>
-                    </p>
+            <!-- The OWL OrderTitlebar (portal_boot.esm.js) is the single source
+                 of truth for order name, partner, version, stage label, and
+                 last-saved stamp. The previous static QWeb content here ALSO
+                 displayed those fields but sat outside the reactive OWL mount,
+                 so it went stale after cancel/confirm — leaving the customer
+                 staring at "Stage: Quotation" on a cancelled order. We strip
+                 the content but KEEP an empty o_southbrook_portal_header
+                 anchor so the southbrook_hermes view-inheritance XPath
+                 (`//div[hasclass('o_southbrook_portal_header')]`) still has a
+                 target to inject after. -->
+            <div class="o_southbrook_portal_header" aria-hidden="true"/>
+            <t t-if="not order">
+                <!-- Anonymous landing copy when no order is bound — the OWL
+                     mount stays empty, so a minimal prompt belongs here. -->
+                <div class="o_southbrook_portal_no_order card mb-3">
+                    <div class="card-body">
+                        <h2 class="card-title h4 mb-1">Order Builder</h2>
+                        <p class="card-text text-muted mb-0">
+                            Pick or create an order to configure your kitchen.
+                        </p>
+                    </div>
                 </div>
-            </div>
+            </t>
 
             <!-- OWL mount point. Commit 2 mounts <OrderBuilder/> here.
                  The placeholder text appears in commit-1 builds so it's

@@ -1261,6 +1261,10 @@ class OrderLine extends Component {
                        t-on-change="_onBulkToggle"
                        t-att-aria-label="'Select line ' + props.line.sequence + ' for bulk edit'"/>
             </div>
+            <!-- Bulk-slot stub when no onBulkToggle is bound. Keeps the data
+                 row at exactly 9 cells so the .o_owl_lines 9-track grid stays
+                 aligned in customer-view mounts that don't expose bulk-edit. -->
+            <div t-else="" class="o_owl_line_bulk_cell" aria-hidden="true"/>
             <div class="o_owl_lineno" t-esc="props.line.sequence"/>
             <div class="o_owl_line_tpl">
                 <t t-esc="props.line.product_name"/>
@@ -1512,6 +1516,7 @@ class ZoneGroup extends Component {
             <div class="o_owl_lines" t-if="!state.collapsed">
                 <div class="o_owl_line_head">
                     <div/>
+                    <div class="o_owl_th_center">#</div>
                     <div>Template</div>
                     <div>Width</div>
                     <div>Spec</div>

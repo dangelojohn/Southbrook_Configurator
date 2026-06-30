@@ -1208,10 +1208,14 @@
     font-weight: 600;
 }
 
-// 8-column grid driving both header + each line row.
+// 9-column grid driving both header + each line row. Tracks:
+// [bulk 36px] [# 40px] [tpl 2fr] [width 70px] [spec 1fr] [qty 80px]
+// [retail 100px] [channel 100px] [menu 36px]. Header + every data row
+// must emit exactly 9 children — bulk + menu cells use t-else stubs
+// when their behaviour isn't bound, so cell count stays constant.
 .o_owl_lines {
     display: grid;
-    grid-template-columns: 36px 1.6fr 70px 1fr 80px 100px 100px 32px;
+    grid-template-columns: 36px 40px 2fr 70px 1fr 80px 100px 100px 36px;
     font-size: 12px;
 }
 
