@@ -7,12 +7,15 @@ class TestOsPublication(TransactionCase):
     def setUp(self):
         super().setUp()
         Section = self.env["southbrook.os.section"]
+        # NOTE: post_init_hook `_post_init_load_canonical` pre-seeds slugs
+        # `00_charter`, `02_catalog`, etc. Tests use a `99_test_*` prefix
+        # to avoid colliding with the unique-slug constraint on canonical seeds.
         self.s1 = Section.create({
-            "slug": "00_charter", "name": "Charter",
+            "slug": "99_test_charter", "name": "Charter",
             "source": "canonical", "body": "v1 body",
         })
         self.s2 = Section.create({
-            "slug": "02_catalog", "name": "Catalog",
+            "slug": "99_test_catalog", "name": "Catalog",
             "source": "canonical", "body": "v1 body",
         })
 
@@ -37,5 +40,5 @@ class TestOsPublication(TransactionCase):
         self.assertEqual(new_pub.calendar_key, "2026-06")
         # Snapshot of s1 should be at version 2
         s1_snap = new_pub.section_snapshot_ids.filtered(
-            lambda s: s.slug == "00_charter")
+            lambda s: s.slug == "99_test_charter")
         self.assertEqual(s1_snap.section_version, 2)

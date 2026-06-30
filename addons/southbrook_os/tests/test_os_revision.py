@@ -7,15 +7,18 @@ from odoo.tests.common import TransactionCase, tagged
 class TestOsRevision(TransactionCase):
     def setUp(self):
         super().setUp()
+        # NOTE: post_init_hook `_post_init_load_canonical` pre-seeds slug
+        # `04_lifecycle`. Tests use a `99_test_*` prefix to avoid colliding
+        # with the unique-slug constraint on canonical seeds.
         self.section = self.env["southbrook.os.section"].create({
-            "slug": "04_lifecycle", "name": "Lifecycle",
+            "slug": "99_test_lifecycle", "name": "Lifecycle",
             "source": "canonical", "body": "v1 body",
         })
 
     def test_full_state_machine_draft_to_applied(self):
         Rev = self.env["southbrook.os.revision"]
         rev = Rev.create({
-            "target_slug": "04_lifecycle",
+            "target_slug": "99_test_lifecycle",
             "change_summary": "Add Tier 4 partner pricing note",
             "proposed_body": "v2 body",
         })
@@ -33,7 +36,7 @@ class TestOsRevision(TransactionCase):
 
     def test_cannot_apply_unapproved_osro(self):
         rev = self.env["southbrook.os.revision"].create({
-            "target_slug": "04_lifecycle",
+            "target_slug": "99_test_lifecycle",
             "change_summary": "X",
             "proposed_body": "X",
         })
@@ -53,7 +56,7 @@ class TestOsRevision(TransactionCase):
 
     def test_reject_from_review(self):
         rev = self.env["southbrook.os.revision"].create({
-            "target_slug": "04_lifecycle",
+            "target_slug": "99_test_lifecycle",
             "change_summary": "Bad idea",
             "proposed_body": "X",
         })
