@@ -15,6 +15,12 @@ class TestT1OpenSide(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Opt out of southbrook_mrp_pm's SO->MO production-approval gate;
+        # _make_so_with_finished_sides builds synthetic SO->MO chains
+        # without exercising the approval workflow. See
+        # southbrook_mrp_pm/models/mrp_production.py.
+        cls.env = cls.env(context={
+            **cls.env.context, "bypass_production_approval": True})
         cls.Engine = cls.env["southbrook.mi.engine"]
         cls.Check = cls.env["southbrook.mi.check"]
         cls.Tmpl = cls.env["product.template"]
