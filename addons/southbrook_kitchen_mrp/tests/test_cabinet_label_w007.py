@@ -68,10 +68,14 @@ class TestCabinetLabelW007(TransactionCase):
                 "pg_revision_code",
             )
 
-        # QR URL must NOT contain ?rev= when no rev stamped.
+        # QR URL must NOT contain rev= when no rev stamped. Match the
+        # bare ``rev=`` substring so both ``?rev=`` and ``&rev=`` prefixes
+        # are caught — the actual URL is ``…/sb/qr/scan?p=<payload>&rev=…``
+        # because ``rev`` is appended after the existing ``?p=`` query
+        # param (see ``mrp_production._compute_sbk_label_qr``).
         self.assertNotIn(
-            "?rev=", mo.sbk_label_qr_url or "",
-            "QR URL must omit ?rev= when pg_revision_code is empty",
+            "rev=", mo.sbk_label_qr_url or "",
+            "QR URL must omit rev= when pg_revision_code is empty",
         )
 
         # Report must render without crashing. We render the QWeb
@@ -125,8 +129,10 @@ class TestCabinetLabelW007(TransactionCase):
         # Force QR recompute (it's store=False so reading triggers it).
         mo.invalidate_recordset(["sbk_label_qr_url", "sbk_label_qr_image"])
         url = mo.sbk_label_qr_url
+        # ``rev=`` (not ``?rev=``) — the URL already carries a ``?p=``
+        # signed payload, so rev is appended as ``&rev=…``.
         self.assertIn(
-            "?rev=A.3", url,
+            "rev=A.3", url,
             f"QR URL must carry the rev as a query param. Got: {url}",
         )
 
@@ -168,5 +174,7 @@ class TestCabinetLabelW007(TransactionCase):
         mo.invalidate_recordset(["sbk_label_qr_url", "sbk_label_qr_image"])
         url = mo.sbk_label_qr_url
         # The rev param value must be percent-encoded — no raw / or &
-        # leaking after the ?rev= sentinel.
-        self.assertIn("?rev=A%2F3%26x%3D1", url, f"Got: {url}")
+        # leaking after the rev= sentinel. Bare ``rev=`` substring
+        # matches both ``?rev=`` and ``&rev=`` prefixes (actual URL
+        # uses ``&rev=`` because ``?p=…`` is already present).
+        self.assertIn("rev=A%2F3%26x%3D1", url, f"Got: {url}")
