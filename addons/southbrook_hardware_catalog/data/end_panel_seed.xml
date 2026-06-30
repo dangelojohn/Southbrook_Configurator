@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A2 — End-Panel + Filler mini-catalogue.
+
+  Promotes the "Finished Sides" attribute from a 4-value Selection
+  (None/Left/Right/Both) into a real product catalogue. 18 records:
+
+    5 panel styles × 3 cabinet classes = 15 end-panel SKUs
+      Styles    : Standard / Inline / T&G / Radius / Square
+      Classes   : Base (720×570) / Tall (1970×570) / Wall (720×330)
+    3 fillers (Base / Tall / Wall) at 50mm width
+
+  Dimensions reflect the Prodboard BetterKitchens catalogue inventory
+  (CC- prefix is the Classic Collection convention there); Southbrook
+  uses an SB- prefix and ships these as in-house panels.
+
+  Pricing is intentionally NOT seeded — list_price=0 + x_pricing_pending=True
+  until a per-style retail price is signed off (same convention as the
+  Marathon-resold hardware in southbrook_hardware_seed.xml).
+-->
+<odoo noupdate="1">
+
+  <!-- ======================================================== -->
+  <!-- BASE END PANELS (720mm tall × 600mm deep cap, 18mm thick) -->
+  <!-- ======================================================== -->
+  <record id="ep_base_standard" model="product.product">
+    <field name="name">End Panel · Base · Standard (720 × 600)</field>
+    <field name="default_code">SB-EP-BASE-STD</field>
+    <field name="x_marathon_sku">SB-EP-BASE-STD</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">600</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF (paintable)</field>
+  </record>
+  <record id="ep_base_inline" model="product.product">
+    <field name="name">End Panel · Base · Inline (720 × 600)</field>
+    <field name="default_code">SB-EP-BASE-INL</field>
+    <field name="x_marathon_sku">SB-EP-BASE-INL</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">600</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF (paintable) — inline-style for run-mid use</field>
+  </record>
+  <record id="ep_base_tg" model="product.product">
+    <field name="name">End Panel · Base · Tongue &amp; Groove (720 × 600)</field>
+    <field name="default_code">SB-EP-BASE-TG</field>
+    <field name="x_marathon_sku">SB-EP-BASE-TG</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">600</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF with tongue-and-groove face detail</field>
+  </record>
+  <record id="ep_base_radius" model="product.product">
+    <field name="name">End Panel · Base · Radius (720 × 600, R60)</field>
+    <field name="default_code">SB-EP-BASE-RAD</field>
+    <field name="x_marathon_sku">SB-EP-BASE-RAD</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">600</field>
+    <field name="x_projection_mm">60</field>
+    <field name="x_material">60mm MDF with radius (curved) outboard edge</field>
+  </record>
+  <record id="ep_base_square" model="product.product">
+    <field name="name">End Panel · Base · Square (720 × 600)</field>
+    <field name="default_code">SB-EP-BASE-SQ</field>
+    <field name="x_marathon_sku">SB-EP-BASE-SQ</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">600</field>
+    <field name="x_projection_mm">50</field>
+    <field name="x_material">50mm MDF with crisp square edge profile</field>
+  </record>
+
+  <!-- ======================================================== -->
+  <!-- TALL END PANELS (1970mm tall × 570mm deep, 18mm thick) -->
+  <!-- ======================================================== -->
+  <record id="ep_tall_standard" model="product.product">
+    <field name="name">End Panel · Tall · Standard (1970 × 570)</field>
+    <field name="default_code">SB-EP-TALL-STD</field>
+    <field name="x_marathon_sku">SB-EP-TALL-STD</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">1970</field>
+    <field name="x_width_mm">570</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF (paintable)</field>
+  </record>
+  <record id="ep_tall_inline" model="product.product">
+    <field name="name">End Panel · Tall · Inline (1970 × 570)</field>
+    <field name="default_code">SB-EP-TALL-INL</field>
+    <field name="x_marathon_sku">SB-EP-TALL-INL</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">1970</field>
+    <field name="x_width_mm">570</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF — inline-style for run-mid use</field>
+  </record>
+  <record id="ep_tall_tg" model="product.product">
+    <field name="name">End Panel · Tall · Tongue &amp; Groove (1970 × 570)</field>
+    <field name="default_code">SB-EP-TALL-TG</field>
+    <field name="x_marathon_sku">SB-EP-TALL-TG</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">1970</field>
+    <field name="x_width_mm">570</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF with tongue-and-groove face detail</field>
+  </record>
+  <record id="ep_tall_radius" model="product.product">
+    <field name="name">End Panel · Tall · Radius (1970 × 570, R60)</field>
+    <field name="default_code">SB-EP-TALL-RAD</field>
+    <field name="x_marathon_sku">SB-EP-TALL-RAD</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">1970</field>
+    <field name="x_width_mm">570</field>
+    <field name="x_projection_mm">60</field>
+    <field name="x_material">60mm MDF with radius outboard edge</field>
+  </record>
+  <record id="ep_tall_square" model="product.product">
+    <field name="name">End Panel · Tall · Square (1970 × 570)</field>
+    <field name="default_code">SB-EP-TALL-SQ</field>
+    <field name="x_marathon_sku">SB-EP-TALL-SQ</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">1970</field>
+    <field name="x_width_mm">570</field>
+    <field name="x_projection_mm">50</field>
+    <field name="x_material">50mm MDF with crisp square edge profile</field>
+  </record>
+
+  <!-- ======================================================== -->
+  <!-- WALL END PANELS (720mm tall × 330mm deep, 18mm thick)  -->
+  <!-- ======================================================== -->
+  <record id="ep_wall_standard" model="product.product">
+    <field name="name">End Panel · Wall · Standard (720 × 330)</field>
+    <field name="default_code">SB-EP-WALL-STD</field>
+    <field name="x_marathon_sku">SB-EP-WALL-STD</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">330</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF (paintable)</field>
+  </record>
+  <record id="ep_wall_inline" model="product.product">
+    <field name="name">End Panel · Wall · Inline (720 × 330)</field>
+    <field name="default_code">SB-EP-WALL-INL</field>
+    <field name="x_marathon_sku">SB-EP-WALL-INL</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">330</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF — inline-style for run-mid use</field>
+  </record>
+  <record id="ep_wall_tg" model="product.product">
+    <field name="name">End Panel · Wall · Tongue &amp; Groove (720 × 330)</field>
+    <field name="default_code">SB-EP-WALL-TG</field>
+    <field name="x_marathon_sku">SB-EP-WALL-TG</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">330</field>
+    <field name="x_projection_mm">18</field>
+    <field name="x_material">18mm MDF with tongue-and-groove face detail</field>
+  </record>
+  <record id="ep_wall_radius" model="product.product">
+    <field name="name">End Panel · Wall · Radius (720 × 330, R60)</field>
+    <field name="default_code">SB-EP-WALL-RAD</field>
+    <field name="x_marathon_sku">SB-EP-WALL-RAD</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">330</field>
+    <field name="x_projection_mm">60</field>
+    <field name="x_material">60mm MDF with radius outboard edge</field>
+  </record>
+  <record id="ep_wall_square" model="product.product">
+    <field name="name">End Panel · Wall · Square (720 × 330)</field>
+    <field name="default_code">SB-EP-WALL-SQ</field>
+    <field name="x_marathon_sku">SB-EP-WALL-SQ</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">end_panel</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">330</field>
+    <field name="x_projection_mm">50</field>
+    <field name="x_material">50mm MDF with crisp square edge profile</field>
+  </record>
+
+  <!-- ======================================================== -->
+  <!-- FILLERS (50mm wide; closes gaps against walls / mismatched widths) -->
+  <!-- ======================================================== -->
+  <record id="filler_base" model="product.product">
+    <field name="name">Filler · Base (50 × 720 × 570)</field>
+    <field name="default_code">SB-FILLER-BASE</field>
+    <field name="x_marathon_sku">SB-FILLER-BASE</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">filler</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">50</field>
+    <field name="x_projection_mm">570</field>
+    <field name="x_material">18mm MDF</field>
+  </record>
+  <record id="filler_tall" model="product.product">
+    <field name="name">Filler · Tall (50 × 1970 × 570)</field>
+    <field name="default_code">SB-FILLER-TALL</field>
+    <field name="x_marathon_sku">SB-FILLER-TALL</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">filler</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">1970</field>
+    <field name="x_width_mm">50</field>
+    <field name="x_projection_mm">570</field>
+    <field name="x_material">18mm MDF</field>
+  </record>
+  <record id="filler_wall" model="product.product">
+    <field name="name">Filler · Wall (50 × 720 × 330)</field>
+    <field name="default_code">SB-FILLER-WALL</field>
+    <field name="x_marathon_sku">SB-FILLER-WALL</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">filler</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_length_mm">720</field>
+    <field name="x_width_mm">50</field>
+    <field name="x_projection_mm">330</field>
+    <field name="x_material">18mm MDF</field>
+  </record>
+
+</odoo>

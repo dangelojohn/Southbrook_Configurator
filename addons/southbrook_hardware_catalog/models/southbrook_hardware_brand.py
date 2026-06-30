@@ -21,7 +21,6 @@ class SouthbrookHardwareBrand(models.Model):
     active = fields.Boolean(default=True)
     note = fields.Text()
 
-    _sql_constraints = [
-        ("name_uniq", "unique(name)", "Brand name must be unique."),
-        ("code_uniq", "unique(code)", "Brand code must be unique."),
-    ]
+    # Odoo 19: models.Constraint (legacy _sql_constraints silently no-op'd).
+    _name_uniq = models.Constraint('unique(name)', "Brand name must be unique.")
+    _code_uniq = models.Constraint('unique(code)', "Brand code must be unique.")

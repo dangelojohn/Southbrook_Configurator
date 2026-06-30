@@ -3,3 +3,5 @@ from . import test_seed_integrity
 from . import test_resolution
 from . import test_pending_pricing
 from . import test_csv_import
+from . import test_a2_end_panel_seed
+from . import test_a3_corner_solutions

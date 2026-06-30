@@ -12,6 +12,32 @@
         Codes are stable identifiers used in xml_ids and the
         hardware_map.json so a brand swap doesn't ripple through code.
     -->
+    <!-- A2 (2026-06-18) — Southbrook in-house brand for cabinet panels
+         the shop manufactures itself (end panels, fillers, decorative
+         trims). NOT a Marathon-resold third-party brand. -->
+    <record id="brand_southbrook_inhouse" model="southbrook.hardware.brand">
+        <field name="name">Southbrook (In-House)</field>
+        <field name="code">southbrook</field>
+        <field name="sequence">5</field>
+        <field name="note">Cabinet panels and trims manufactured in-house by Southbrook (not sourced through Marathon). End panels, fillers, plinths, scribe.</field>
+    </record>
+    <!-- A3 (2026-06-18) — Two corner-mechanism brands not previously
+         in the seed. LAVA is an Italian specialty corner pull-out
+         manufacturer; Vauth-Sagel (Planero) is a German cabinet-fitting
+         brand whose corner solutions ship through Marathon's vendor
+         catalogue. -->
+    <record id="brand_lava" model="southbrook.hardware.brand">
+        <field name="name">LAVA</field>
+        <field name="code">lava</field>
+        <field name="sequence">110</field>
+        <field name="note">Italian specialty corner pull-out manufacturer. CPOS (Corner Pull-Out Shelving) mechanisms.</field>
+    </record>
+    <record id="brand_vauth_sagel" model="southbrook.hardware.brand">
+        <field name="name">Vauth-Sagel (Planero)</field>
+        <field name="code">vauth_sagel</field>
+        <field name="sequence">115</field>
+        <field name="note">German cabinet-fitting brand. Planero blind-corner-optimiser, swing-out larder, and pull-out larder mechanisms.</field>
+    </record>
     <record id="brand_blum" model="southbrook.hardware.brand">
         <field name="name">Blum</field>
         <field name="code">blum</field>

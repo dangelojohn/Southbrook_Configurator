@@ -47,7 +47,7 @@ Outstanding:
     "author": "Southbrook Kitchens / OdooIQ",
     "license": "LGPL-3",
     "category": "Manufacturing",
-    "version": "19.0.0.9.0",
+    "version": "19.0.2.1.0",
     "depends": [
         "product",
         "purchase",
@@ -69,6 +69,15 @@ Outstanding:
         # Per-finish variants will follow once a Path B catalog file
         # lands and lets us reconstruct the variant axes confidently.
         "data/marathon_browser20_seed.xml",
+        # A2 (2026-06-18) — End-panel + filler mini-catalogue (18 in-house
+        # Southbrook products). Brand record brand_southbrook_inhouse is
+        # in southbrook_hardware_brands.xml above.
+        "data/end_panel_seed.xml",
+        # A3 (2026-06-18) — Corner-solution catalogue (10 specialty
+        # mechanisms across LAVA / Vauth-Sagel / Häfele / Southbrook
+        # in-house brands). brand_lava and brand_vauth_sagel are
+        # already in southbrook_hardware_brands.xml.
+        "data/corner_solutions_seed.xml",
         "views/southbrook_hardware_brand_views.xml",
         "views/product_template_views.xml",
         "wizards/southbrook_hardware_import_views.xml",

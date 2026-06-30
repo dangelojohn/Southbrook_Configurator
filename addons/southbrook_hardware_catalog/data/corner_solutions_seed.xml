@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A3 — Corner-solution catalogue.
+
+  10 specialty corner mechanisms sourced from the Prodboard BetterKitchens
+  catalogue. These are high-margin specialty fitments (Magic Corner /
+  LAVA CPOS / Planero swing-out and pull-out) that turn dead corner
+  carcass space into accessible storage. Southbrook today has no
+  corner-mechanism inventory — this seed gives the configurator + BoM
+  pipeline a vocabulary to bind against.
+
+  Categorisation: x_hardware_category="corner_mech" (new in A2).
+  Pricing: x_pricing_pending=True (signoff gated, same as the existing
+  Marathon-resold hardware).
+-->
+<odoo noupdate="1">
+
+  <!-- ==================== BASE CORNER ==================== -->
+
+  <!-- Blind Corner Optimisers — close-the-dead-space mechanisms.
+       Vauth-Sagel's Planero BCO is one specific implementation;
+       this generic SKU represents the "any-vendor BCO" base. -->
+  <record id="corner_bco_generic" model="product.product">
+    <field name="name">Corner Blind Corner Optimiser (Generic)</field>
+    <field name="default_code">SB-CM-BCO</field>
+    <field name="x_marathon_sku">SB-CM-BCO</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">Steel chassis, soft-close, fits 1000mm corner carcass</field>
+  </record>
+
+  <record id="corner_planero_bco" model="product.product">
+    <field name="name">Planero Blind Corner Optimiser (Vauth-Sagel)</field>
+    <field name="default_code">SB-CM-PBCO</field>
+    <field name="x_marathon_sku">VS-PLANERO-BCO</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_vauth_sagel"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">Vauth-Sagel Planero BCO mechanism — 900/1000mm carcass</field>
+  </record>
+
+  <!-- Corner Pull-Out Shelving (CPOS) — wire baskets that pull out
+       of the blind corner. Generic + LAVA versions. -->
+  <record id="corner_cpos_generic" model="product.product">
+    <field name="name">Corner Pull-Out Shelving (Generic)</field>
+    <field name="default_code">SB-CM-CPOS</field>
+    <field name="x_marathon_sku">SB-CM-CPOS</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_southbrook_inhouse"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">2-tier wire basket pull-out for 800-1000mm corner carcass</field>
+  </record>
+
+  <record id="corner_lava_cpos" model="product.product">
+    <field name="name">LAVA Corner Pull-Out Shelving</field>
+    <field name="default_code">SB-CM-LCPOS</field>
+    <field name="x_marathon_sku">LAVA-CPOS-1000</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_lava"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">LAVA-branded soft-close CPOS mechanism, 1000mm carcass</field>
+  </record>
+
+  <!-- Magic Corner (LeMans-style swing-out arms). Häfele is the
+       classic vendor; Hettich also carries one. -->
+  <record id="corner_magic" model="product.product">
+    <field name="name">Magic Corner (LeMans Swing-Out, Häfele/Hettich)</field>
+    <field name="default_code">SB-CM-MC</field>
+    <field name="x_marathon_sku">SB-CM-MC</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_hafele"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">LeMans-style swing-out shelves for 800-1000mm corner carcass</field>
+  </record>
+
+  <!-- Planero Swing-Out Corner — Vauth-Sagel's high-end mechanism. -->
+  <record id="corner_planero_swing" model="product.product">
+    <field name="name">Planero Swing-Out Corner (Vauth-Sagel)</field>
+    <field name="default_code">SB-CM-PSOC</field>
+    <field name="x_marathon_sku">VS-PLANERO-SOC</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_vauth_sagel"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">Vauth-Sagel Planero swing-out — premium corner storage</field>
+  </record>
+
+  <!-- ==================== TALL CORNER ==================== -->
+
+  <record id="corner_planero_pull_larder_lower" model="product.product">
+    <field name="name">Planero Pull-Out Larder Unit · Small Lower Door (Vauth-Sagel)</field>
+    <field name="default_code">SB-CM-PPL-B</field>
+    <field name="x_marathon_sku">VS-PLANERO-PLB</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_vauth_sagel"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">Vauth-Sagel tall pull-out larder mechanism, lower-door variant, 300-400mm</field>
+  </record>
+
+  <record id="corner_planero_pull_larder_top" model="product.product">
+    <field name="name">Planero Pull-Out Larder Unit · Small Top Door (Vauth-Sagel)</field>
+    <field name="default_code">SB-CM-PPL-T</field>
+    <field name="x_marathon_sku">VS-PLANERO-PLT</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_vauth_sagel"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">Vauth-Sagel tall pull-out larder mechanism, top-door variant, 300-400mm</field>
+  </record>
+
+  <record id="corner_planero_swing_larder_lower" model="product.product">
+    <field name="name">Planero Swing-Out Larder Unit · Small Lower Door (Vauth-Sagel)</field>
+    <field name="default_code">SB-CM-PSL-B</field>
+    <field name="x_marathon_sku">VS-PLANERO-SLB</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_vauth_sagel"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">Vauth-Sagel tall swing-out larder mechanism, lower-door variant</field>
+  </record>
+
+  <record id="corner_planero_swing_larder_top" model="product.product">
+    <field name="name">Planero Swing-Out Larder Unit · Small Top Door (Vauth-Sagel)</field>
+    <field name="default_code">SB-CM-PSL-T</field>
+    <field name="x_marathon_sku">VS-PLANERO-SLT</field>
+    <field name="type">consu</field>
+    <field name="is_storable" eval="True"/>
+    <field name="x_hardware_category">corner_mech</field>
+    <field name="x_hardware_brand_id" ref="brand_vauth_sagel"/>
+    <field name="x_pricing_pending" eval="True"/>
+    <field name="x_material">Vauth-Sagel tall swing-out larder mechanism, top-door variant</field>
+  </record>
+
+</odoo>

@@ -20,6 +20,14 @@ HARDWARE_CATEGORIES = [
     ("leveler", "Cabinet Leveler"),
     ("cam_lock", "Cam Lock / RTA"),
     ("bumper", "Bumper / Stop"),
+    # A2 (2026-06-18) — End-panel + filler categories. End panels are
+    # finished side panels exposed at run-ends; fillers are narrow
+    # strips that close gaps against walls or non-aligned units.
+    ("end_panel", "End Panel"),
+    ("filler", "Filler"),
+    # A3 (2026-06-18) — Corner mechanism category for specialty corner
+    # fitments (LAVA / Planero / Magic Corner / BCO / CPOS).
+    ("corner_mech", "Corner Mechanism"),
     ("other", "Other"),
 ]
 
