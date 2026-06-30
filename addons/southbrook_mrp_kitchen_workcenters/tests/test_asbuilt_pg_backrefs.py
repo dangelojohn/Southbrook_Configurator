@@ -45,8 +45,12 @@ class TestAsbuiltPgBackrefs(TransactionCase):
                                   "warranty-trace queries to be fast")
         self.assertTrue(f.readonly, "pg_release_id is a snapshot — readonly")
         self.assertTrue(f.index, "pg_release_id must be indexed")
+        # v19 ORM normalized related-field representation to a single dotted
+        # string ("production_id.pg_release_id"), replacing the v16/v17/v18
+        # tuple form (("production_id", "pg_release_id")). Field.related is
+        # canonicalized on registry build — assert against the string form.
         self.assertEqual(
-            f.related, ("production_id", "pg_release_id"),
+            f.related, "production_id.pg_release_id",
             "pg_release_id must walk production_id.pg_release_id",
         )
 
@@ -57,7 +61,7 @@ class TestAsbuiltPgBackrefs(TransactionCase):
         self.assertTrue(f.readonly)
         self.assertTrue(f.index)
         self.assertEqual(
-            f.related, ("production_id", "pg_revision_code"),
+            f.related, "production_id.pg_revision_code",
         )
 
     def test_pg_ebom_id_is_stored_related_to_mo(self):
@@ -67,7 +71,7 @@ class TestAsbuiltPgBackrefs(TransactionCase):
         self.assertTrue(f.readonly)
         self.assertTrue(f.index)
         self.assertEqual(
-            f.related, ("production_id", "pg_ebom_id"),
+            f.related, "production_id.pg_ebom_id",
         )
 
     def test_pg_root_item_id_is_stored_related_to_mo(self):
@@ -77,7 +81,7 @@ class TestAsbuiltPgBackrefs(TransactionCase):
         self.assertTrue(f.readonly)
         self.assertTrue(f.index)
         self.assertEqual(
-            f.related, ("production_id", "pg_root_item_id"),
+            f.related, "production_id.pg_root_item_id",
         )
 
     def test_mo_supplies_the_pg_fields(self):
