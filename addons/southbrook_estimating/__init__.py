@@ -79,12 +79,19 @@ def _configure_southbrook_report_branding(env):
     target, so this is a no-op on a correctly-configured DB.
     """
     Company = env["res.company"].sudo()
-    Website = env["website"].sudo()
+    # Guard: `website` is not a manifest dep of this addon, so on cold
+    # installs that don't transitively pull it in (e.g. installing
+    # southbrook_estimating standalone, or via a sibling that doesn't
+    # bring website) env["website"] raises KeyError. Fall through to
+    # the no-logo path; company_details + standard layout still apply.
+    Website = (
+        env["website"].sudo() if "website" in env.registry.models else None
+    )
 
     standard_layout = env.ref(
         "web.external_layout_standard", raise_if_not_found=False,
     )
-    website = Website.search([], limit=1)
+    website = Website.search([], limit=1) if Website else False
     web_logo = website.logo if website else False
 
     for company in Company.search([]):
