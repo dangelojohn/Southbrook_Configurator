@@ -62,6 +62,15 @@ services:
       - "${ODOO_LONGPOLLING_PORT:-8172}:8072"   # longpolling / websocket
     volumes:
       - ./addons:/mnt/extra-addons:ro
+      # ProductGraph stack from the sibling repo. Required because
+      # southbrook_mrp_kitchen_workcenters + southbrook_plm_productgraph
+      # depend on product_graph_release which lives in ~/product_graph_v19/
+      # and is mounted separately on the prod QNAP container too. Without
+      # this, `make install-fresh` fails at 5s on a missing-dep UserError.
+      # If you don't have product_graph_v19/ cloned alongside this repo,
+      # cold-install validation won't work locally — clone it from
+      # https://github.com/dangelojohn/product_graph_v19.
+      - ../product_graph_v19/addons:/mnt/pg-addons:ro
       - ./shared:/srv/shared:ro
       - odoo-data:/var/lib/odoo
     restart: unless-stopped
@@ -71,7 +80,7 @@ services:
     # or mount a config file at /etc/odoo/odoo.conf.
     command: >
       odoo
-      --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+      --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons,/mnt/pg-addons
       --database=${ODOO_DB:-southbrook}
       --db_host=db
       --db_user=${POSTGRES_USER:-odoo}

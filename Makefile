@@ -32,7 +32,13 @@ MODULES = southbrook_ai_design,southbrook_api,southbrook_cmms_wms,southbrook_con
 
 # Odoo flags every command needs. The 8899/8902 port dodge is mandatory —
 # --no-http alone does not stop the gevent worker from binding 8072.
+# --addons-path is repeated here because `docker exec sami-odoo odoo ...`
+# starts a new odoo process that reads /etc/odoo/odoo.conf, which the base
+# odoo:19 image generates with only /mnt/extra-addons. The compose `command:`
+# extends addons_path for the long-running process but exec calls don't
+# inherit it. See [[southbrook_p1_cold_install_closed]] for the dep chain.
 ODOO_FLAGS = \
+  --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons,/mnt/pg-addons \
   --db_host=db --db_user=$(DB_USER) --db_password='$(PG_PASS)' \
   --stop-after-init --no-http \
   --http-port=8899 --gevent-port=8902 \
