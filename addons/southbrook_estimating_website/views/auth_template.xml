@@ -155,4 +155,33 @@
     </xpath>
   </template>
 
+  <!-- ================================================================
+       Remove "Use a Passkey" button from /web/login.
+       2026-06-26 — passkey UI was opted out of by John per customer-
+       flow simplification request. auth_passkey injects a passkey
+       button into the shared `auth_btns` list via
+       auth_passkey.auth_passkey_login_oauth. We inherit that
+       template with higher priority and remove ONLY the passkey
+       contribution; the parent .o_login_auth wrapper in
+       web.webclient_templates is guarded by `t-if="auth_btns"`, so
+       once auth_btns is empty the entire `- or -` divider + button
+       wrapper disappear with no leftover gap. auth_oauth isn't
+       installed at time of writing — if it ever is, this override
+       keeps OAuth provider buttons intact (only passkey is
+       surgically removed).
+
+       Reversible: disable this view in Settings → Technical → Views
+       → "Southbrook: Remove Use a Passkey from /web/login", or
+       delete this template block. Does not touch the stock
+       auth_passkey addon source.
+       ================================================================ -->
+  <template
+      id="remove_passkey_login_button"
+      name="Southbrook: Remove Use a Passkey from /web/login"
+      inherit_id="auth_passkey.auth_passkey_login_oauth"
+      priority="50">
+    <xpath expr="//t[@t-set='auth_btns' and contains(@t-value, 'passkey_btn')]"
+           position="replace"/>
+  </template>
+
 </odoo>

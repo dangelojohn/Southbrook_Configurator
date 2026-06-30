@@ -589,13 +589,23 @@
 .o_owl_dv_msg { flex: 1; }
 
 // Phase 3 Sprint C1 — per-zone inline "+ Add to <zone>" CTA.
+// The wrapper is a child of the .o_owl_lines CSS grid; without an explicit
+// grid-column span it would be squeezed into the 36px first column and the
+// button text would wrap one word per line.
 .o_owl_zone_add {
-    margin-top: 4px;
-    padding: 6px 12px;
-    text-align: center;
+    grid-column: 1 / -1;
+    width: auto;
+    display: flex;
+    justify-content: center;
+    padding: 8px 12px;
 }
 
 .o_owl_zone_add_btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    white-space: nowrap;
     background: transparent;
     border: 1px dashed var(--sb-rule);
     color: var(--sb-walnut);
