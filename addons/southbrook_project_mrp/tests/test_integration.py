@@ -10,6 +10,11 @@ class TestProjectMrpIntegration(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Bypass southbrook_premium_orchestration's MO availability gate —
+        # this class confirms MOs/SOs that drive MOs without seeding stock quants.
+        cls.env["ir.config_parameter"].sudo().set_param(
+            "southbrook.mo_availability_gate.enabled", "0",
+        )
         cls.partner = cls.env["res.partner"].create({"name": "Job Customer"})
         cls.project = cls.env["project.project"].create({"name": "Jobs"})
         # A manufacturable cabinetry-ish product (has a BoM => drives an MO).
