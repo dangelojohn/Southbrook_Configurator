@@ -22,8 +22,13 @@ PG_PASS = $(shell grep '^POSTGRES_PASSWORD=' .env 2>/dev/null | cut -d= -f2)
 # break in a module it never loads (this is how the x_sbk_estimated_cost outage
 # slipped through). This is the VALIDATED cold-installable subset (verified via
 # a fresh `-i` on a throwaway DB). Only 1 deployed module is still EXCLUDED:
-#   - southbrook_plm_productgraph : depends on unvendored module product_graph_release
-#       (add once product_graph_release is vendored, or drop plm_productgraph from prod)
+#   - southbrook_plm_productgraph : bridge addon (151 LOC in models/southbrook_eco.py
+#       — wraps ECO action_apply to fire pg.release.action_execute_release).
+#       Depends on product_graph_release, which lives in ~/product_graph_v19/addons/
+#       and is mounted separately on the prod container (the 14-addon ProductGraph
+#       stack is deployed — see project_productgraph_phase2_deployed memory).
+#       Intentionally excluded from this MODULES list: install on explicit demand
+#       for ECO→pg.release auto-trigger; no demand recorded as of 2026-06-30.
 # (estimating_website + mrp_pm were re-added once the configurator currency-fix
 #  view was made cold-install-safe — priority=1. mrp_kitchen_workcenters +
 #  manufacturing_intelligence merged from feature/mrp-kitchen-workcenters; the
