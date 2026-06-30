@@ -137,11 +137,20 @@ if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: (would then assert cold-load success + live /web/login 200)"
 else
   log "running cold upgrade under flock (validates a future restart will boot)…"
+  # Capture the cold-upgrade log directly. Earlier shape was
+  #     ssh HOST "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1"
+  #     upgrade_log="$(ssh HOST 'cat /tmp/deploy_upgrade.log')"
+  # The nested-quoted remote redirect lost Odoo's --logfile=/dev/stderr
+  # stream, so grep -q 'Modules loaded' would fail on successful upgrades
+  # — the marker reached ssh's local stderr (printed) but never made it
+  # into the file. Merging stderr locally via 2>&1 is unambiguous; the
+  # remote-file archive is preserved as a side-effect for forensics.
   set +e
-  ssh "$QNAP_HOST" "$upgrade_cmd > /tmp/deploy_upgrade.log 2>&1"
+  upgrade_log="$(ssh "$QNAP_HOST" "$upgrade_cmd" 2>&1)"
   rc=$?
   set -e
-  upgrade_log="$(ssh "$QNAP_HOST" 'cat /tmp/deploy_upgrade.log' 2>/dev/null || true)"
+  printf '%s\n' "$upgrade_log" \
+    | ssh "$QNAP_HOST" 'cat > /tmp/deploy_upgrade.log' >/dev/null 2>&1 || true
   # A flock timeout surfaces as exit 75 — surface it so the deploy doesn't
   # silently "succeed" on lock contention (the historical || true bug).
   if [[ "$rc" == "75" ]]; then
