@@ -16,11 +16,7 @@ class SaleOrder(models.Model):
         order and attach any MOs already created for it. MOs created later by
         procurement back-link themselves (see mrp.production.create)."""
         self.ensure_one()
-        tmpl_ids = self.order_line.product_id.product_tmpl_id.ids
-        drives_manufacturing = bool(tmpl_ids) and bool(
-            self.env["mrp.bom"].search_count(
-                [("product_tmpl_id", "in", tmpl_ids)]))
-        if not drives_manufacturing:
+        if not self._southbrook_has_manufacturable_line():
             return False
 
         Task = self.env["project.task"]
@@ -45,6 +41,65 @@ class SaleOrder(models.Model):
         ])
         mos.write({"project_task_id": task.id})
         return task
+
+    def _southbrook_has_manufacturable_line(self):
+        """True iff at least one order line resolves to a real, normal-type
+        BoM — the same definition `southbrook_mrp_pm` uses when actually
+        cutting MOs (`_resolve_bom_for_line` / `action_send_to_production`).
+
+        R3 PR #27 fix (2026-06-30): the prior check —
+            mrp.bom.search_count([('product_tmpl_id', 'in', tmpl_ids)])
+        — was over-broad in three ways and was spawning empty
+        project.task records in prod for non-manufacturing sales
+        (service-only, refacing-deposit, freight-only orders):
+
+        1. It accepted ANY BoM type (kit/phantom matched as well as
+           normal). A phantom BoM means "explode at sale", not
+           "manufacture", so it should not trigger a job.
+        2. It didn't honour variant-specific BoMs — `_bom_find` would
+           pick a more specific match (or none), but a raw template
+           search ignored that resolution.
+        3. It didn't filter by company, so multi-company DBs would
+           match a sibling company's BoM and create a cross-company
+           job task.
+
+        Reusing `_resolve_bom_for_line` (sibling-class @staticmethod on
+        the unified SaleOrder, contributed by southbrook_mrp_pm — which
+        we already depend on) ties this gate to the same predicate that
+        downstream MO-creation actually uses. If `_resolve_bom_for_line`
+        is somehow absent (defensive — e.g. southbrook_mrp_pm uninstalled
+        in a custom deployment), fall back to a normal-type search so we
+        still err on the side of "only spawn for true manufacturing
+        sales".
+        """
+        self.ensure_one()
+        Bom = self.env["mrp.bom"].sudo()
+        resolver = getattr(self, "_resolve_bom_for_line", None)
+        for line in self.order_line:
+            if not line.product_id:
+                continue
+            if getattr(line, "display_type", False):
+                # section / note lines — never manufacturable.
+                continue
+            if resolver is not None:
+                bom = resolver(Bom, line)
+            else:
+                bom = Bom.search(
+                    [
+                        "|",
+                        ("product_id", "=", line.product_id.id),
+                        "&",
+                        ("product_id", "=", False),
+                        ("product_tmpl_id", "=",
+                         line.product_id.product_tmpl_id.id),
+                        ("type", "=", "normal"),
+                    ],
+                    order="sequence, id",
+                    limit=1,
+                )
+            if bom:
+                return True
+        return False
 
     def _southbrook_job_project(self):
         """Target project for new jobs: ir.config_parameter override, else the
