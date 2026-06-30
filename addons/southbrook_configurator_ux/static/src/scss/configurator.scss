@@ -170,6 +170,13 @@ $sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
         color: $sb-cfg-blue;
         border: 1px solid $sb-cfg-blue-rule;
     }
+    .sb_cfg_cad_link {
+        margin-left: auto;
+        white-space: nowrap;
+    }
+    .sb_cfg_cad_link + .sb_cfg_btn_primary {
+        margin-left: 8px;
+    }
     .sb_cfg_btn_imp {
         background: $sb-cfg-blue;
         color: white;
@@ -227,75 +234,14 @@ $sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
         outline: 3px dashed $sb-cfg-blue;
         outline-offset: -6px;
     }
-
-    // 3D-rotatable cabinet preview. The .sb_cfg_cab is the
-    // perspective wrapper; the .sb_cab_3d_box inside is what
-    // actually rotates. Yaw/pitch come from OWL state via CSS
-    // custom properties set on .sb_cfg_cab inline.
     .sb_cfg_cab {
-        perspective: 900px;
-        perspective-origin: 50% 38%;
-        cursor: grab;
-        user-select: none;
-        touch-action: none;
-
-        &:active {
-            cursor: grabbing;
-        }
-
-        .sb_cab_3d_box {
-            position: relative;
-            transform-style: preserve-3d;
-            transform: rotateY(var(--cab-yaw, 0deg))
-                       rotateX(var(--cab-pitch, 0deg));
-            transform-origin: 50% 50%;
-            transition: transform 0.22s ease;
-            will-change: transform;
-        }
-        &.sb_cfg_cab_dragging .sb_cab_3d_box {
-            transition: none;
-        }
-
-        .sb_cab_face {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            box-sizing: border-box;
-            backface-visibility: hidden;
-        }
+        transition: width 350ms ease, height 350ms ease,
+                    background 350ms ease;
+        border-radius: 4px;
+        box-shadow: 0 18px 30px -12px rgba(40, 55, 80, 0.4);
 
         @media (prefers-reduced-motion: reduce) {
-            .sb_cab_3d_box {
-                transition: none;
-            }
-        }
-    }
-
-    .sb_cfg_preview_controls {
-        position: absolute;
-        bottom: 10px;
-        left: 10px;
-        display: flex;
-        gap: 4px;
-        z-index: 2;
-
-        button {
-            font-size: 10px;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 6px;
-            border: 1px solid $sb-cfg-blue-rule;
-            background: rgba(255, 255, 255, 0.92);
-            color: $sb-cfg-blue;
-            cursor: pointer;
-
-            &:hover {
-                background: white;
-            }
-            &.is-active {
-                background: $sb-cfg-blue;
-                color: white;
-            }
+            transition: none;
         }
     }
     .sb_cfg_badge {
@@ -389,6 +335,56 @@ $sb-cfg-chip-on:      #2f3b52;            // Selected-chip background
         padding: 2px 7px;
         border-radius: 20px;
         margin-left: 6px;
+    }
+
+    // ===== P6 — chosen-chips list =====
+    .sb_cfg_chiplist {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .sb_cfg_pickchip {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 6px 9px;
+        border-radius: 8px;
+        background: #f1f5fb;
+        border: 1px solid $sb-cfg-rule-soft;
+        font-size: 11px;
+        line-height: 1.2;
+        color: $sb-cfg-ink-mid;
+        max-width: 100%;
+
+        small { color: $sb-cfg-ink-dim; font-size: 10px; }
+        b { color: $sb-cfg-ink-mid; }
+    }
+    .sb_cfg_chip_derived {
+        background: $sb-cfg-ok-soft;
+        border-color: $sb-cfg-ok;
+        small { color: $sb-cfg-ok; }
+    }
+
+    // ===== P6 — required-missing checklist =====
+    .sb_cfg_missinglist {
+        margin-top: 10px;
+        padding: 9px 11px;
+        background: #fff7ed;
+        border-radius: 8px;
+        border: 1px solid #f59e0b;
+        font-size: 12px;
+        color: $sb-cfg-ink-mid;
+
+        b { color: #92400e; }
+        ul {
+            margin: 6px 0 0 0;
+            padding-left: 16px;
+        }
+        li {
+            margin: 2px 0;
+        }
+        small { color: $sb-cfg-ink-dim; }
     }
 
     // ===== Completion ring =====

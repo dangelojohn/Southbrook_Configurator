@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <template id="product_configurator_v2_onshape_url"
+            inherit_id="website_product_configurator.product_configurator"
+            priority="17"
+            name="Southbrook - Configurator v2 - Onshape CAD URL data attribute">
+
+    <xpath expr="//section[@id='sb_cfg_v2_root']" position="attributes">
+      <attribute name="t-att-data-onshape-cad-url">
+        product_tmpl.x_onshape_cad_url or ''
+      </attribute>
+    </xpath>
+
+    <xpath expr="//section[@id='sb_cfg_v2_root']" position="inside">
+      <script type="text/javascript">
+(function () {
+  "use strict";
+
+  var MAX_WAIT_MS = 15000;
+  var ATTR_KEY = "data-onshape-cad-url";
+  var SENTINEL = "data-onshape-injected";
+
+  function buildButton(cadUrl) {
+    var a = document.createElement("a");
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    var paths = [
+      "M12 2L2 7l10 5 10-5-10-5z",
+      "M2 17l10 5 10-5",
+      "M2 12l10 5 10-5"
+    ];
+
+    a.href = cadUrl;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.className = "sb_cfg_btn sb_cfg_btn_tpl sb_cfg_cad_link";
+    a.setAttribute(
+      "aria-label",
+      "Open CAD drawing in Onshape (opens in new tab)"
+    );
+
+    svg.setAttribute("width", "14");
+    svg.setAttribute("height", "14");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2.2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+
+    paths.forEach(function (d) {
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      svg.appendChild(path);
+    });
+
+    a.appendChild(svg);
+    a.appendChild(document.createTextNode("Open in Onshape CAD"));
+    return a;
+  }
+
+  function injectButton(actionBar, cadUrl) {
+    if (actionBar.hasAttribute(SENTINEL)) return;
+    actionBar.setAttribute(SENTINEL, "1");
+    var a = buildButton(cadUrl);
+    var primaryBtn = actionBar.querySelector(".sb_cfg_btn_primary");
+    if (primaryBtn) {
+      actionBar.insertBefore(a, primaryBtn);
+    } else {
+      actionBar.appendChild(a);
+    }
+  }
+
+  function bootstrap() {
+    var rootEl = document.getElementById("sb_cfg_v2_root");
+    if (!rootEl) return;
+    var cadUrl = rootEl.getAttribute(ATTR_KEY);
+    if (!cadUrl) return;
+
+    var bar = rootEl.querySelector(".sb_cfg_actionbar");
+    if (bar) {
+      injectButton(bar, cadUrl);
+      return;
+    }
+
+    var obs = new MutationObserver(function (_, observer) {
+      var nextBar = document.querySelector("#sb_cfg_v2_root .sb_cfg_actionbar");
+      if (nextBar) {
+        observer.disconnect();
+        injectButton(nextBar, cadUrl);
+      }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    setTimeout(function () { obs.disconnect(); }, MAX_WAIT_MS);
+  }
+
+  setTimeout(bootstrap, 0);
+}());
+      </script>
+    </xpath>
+  </template>
+</odoo>

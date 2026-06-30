@@ -64,7 +64,7 @@ Phase 5 — Tests + a11y
     engine, ARIA roles on chip selectors and import modal,
     keyboard navigation.
 """,
-    "version": "19.0.1.7.0",
+    "version": "19.0.6.2.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -95,6 +95,8 @@ Phase 5 — Tests + a11y
         # data/config_form_templates.xml because of the dependency
         # ordering above.
         "views/configurator_template.xml",
+        "views/product_template_views.xml",
+        "views/website_configurator_onshape.xml",
         # TACTICAL — demo-grade price_extra/weight_extra backfill so the
         # LIVE recalc badges show non-zero deltas. Delete once
         # southbrook_estimating ships authoritative seed data from
@@ -110,10 +112,9 @@ Phase 5 — Tests + a11y
         # that were only mentioned in Contractor / Signature rules.
         # Loads LAST so the catalog templates are fully wired first.
         "data/rule_completion.xml",
-        # NOTE: the English-Canada CAD-position flip used to live here
-        # as a data XML; doesn't work because base.CAD has
-        # noupdate=True on its ir.model.data row. It now ships as
-        # migrations/19.0.1.2.0/post-migration.py instead.
+        # P2 — Brand-aware Drawer Slide attribute. Loads after the
+        # catalog so per-template wiring finds the drawer templates.
+        "data/p2_drawer_slide.xml",
     ],
     "assets": {
         "web.assets_frontend": [
@@ -123,6 +124,9 @@ Phase 5 — Tests + a11y
             # Vanilla JS for Phase 1 — refactored to OWL Component in
             # Phase 2 when wiring to live attribute data via JSON-RPC.
             "southbrook_configurator_ux/static/src/js/configurator.esm.js",
+        ],
+        "web.assets_web": [
+            "southbrook_configurator_ux/static/src/js/website_builder_iframe_guard.esm.js",
         ],
     },
     "installable": True,
