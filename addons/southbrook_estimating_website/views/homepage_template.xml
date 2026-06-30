@@ -301,6 +301,155 @@
             </div>
           </section>
 
+          <!-- FAQ ACCORDION (Fulcrum-pattern Tier-2 #9 from
+               docs/Fulcrum.md). Eight grounded customer questions above
+               the CTA so visitors get policy answers before the final
+               ask. Pure HTML5 <details>/<summary> — zero JS, native
+               keyboard + screen-reader support. Custom +/- glyph
+               replaces the default disclosure triangle. Answers
+               grounded in repo code/copy; warranty + shipping carry
+               deliberate hedges ("talk to your designer / talk to us")
+               pending full policy confirmation. -->
+          <section class="o_sb_faq">
+            <div class="container">
+              <header class="o_sb_faq_header">
+                <h2 class="o_sb_faq_title">
+                  Questions,<br/>
+                  <span class="o_sb_faq_accent">answered.</span>
+                </h2>
+                <p class="o_sb_faq_sub">
+                  What custom-kitchen shoppers ask before they commit.
+                </p>
+              </header>
+              <div class="o_sb_faq_list">
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    How long does a Southbrook kitchen take to make?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      Typical lead time is 4–6 weeks. Orders start at a
+                      14-day shop baseline; some options (like Maple
+                      boxes) add about two weeks. Your exact lead time
+                      appears on the formal quote, so production capacity
+                      is visible before you commit.
+                    </p>
+                  </div>
+                </details>
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    How fast do I get a price for my kitchen?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      Live pricing appears inside the configurator as you
+                      choose cabinets and options — no waiting for a
+                      quote-back email. A full formal quote with spec
+                      sheet typically takes under five minutes from
+                      inside the planner.
+                    </p>
+                  </div>
+                </details>
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    What changes the price of a custom cabinet?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      Four things move the price: cabinet series
+                      (Contractor through Signature), box material
+                      (Maple adds about 10%), door style and finish, and
+                      accessories like soft-close hardware or pull-outs.
+                      Every choice re-prices live, so you see the impact
+                      immediately.
+                    </p>
+                  </div>
+                </details>
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    What's the difference between Signature and Contractor?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      Contractor is our value tier — white thermofoil
+                      slab doors, fixed option set. Signature is fully
+                      custom, including five-piece woodgrain doors,
+                      every finish, and Maple-box construction.
+                      Contemporary and Elegance sit between them. Pick
+                      the series that matches your room and budget.
+                    </p>
+                  </div>
+                </details>
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    Do my cabinets come with soft-close hardware?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      Soft-close hinges and slides are a standard
+                      accessory option on every cabinet family except
+                      bi-fold corner cabinets (the geometry doesn't
+                      support them). You select it alongside drawer
+                      organisers and pull-outs when you configure each
+                      cabinet.
+                    </p>
+                  </div>
+                </details>
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    What's covered by the warranty?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      Our finish carries a lifetime warranty. Full
+                      warranty terms for cabinet boxes, hinges, and
+                      slides ship with every order — talk to your
+                      designer for specifics on your kitchen.
+                    </p>
+                  </div>
+                </details>
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    Where do you ship and how do cabinets arrive?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      Cabinets ship flat-pack-ready, with cut lists and
+                      shop drawings generated directly from your
+                      approved design — so the box you open matches the
+                      plan you signed off on. Shipping rates and
+                      delivery area are quoted with your order; ask us
+                      about your address.
+                    </p>
+                  </div>
+                </details>
+
+                <details class="o_sb_faq_item">
+                  <summary class="o_sb_faq_question">
+                    What do I actually get with my quote?
+                  </summary>
+                  <div class="o_sb_faq_answer">
+                    <p>
+                      A formal Signature Spec Sheet PDF: itemised
+                      cabinet list, every dimension, every option, the
+                      rolled-up price, and 3D drawings of your design.
+                      You review it inside your account, sign off when
+                      it's right, then it goes to production.
+                    </p>
+                  </div>
+                </details>
+
+              </div>
+            </div>
+          </section>
+
           <!-- SECONDARY CTA STRIP -->
           <section class="o_sb_cta_strip">
             <div class="container">
