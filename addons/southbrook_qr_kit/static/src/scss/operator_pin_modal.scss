@@ -43,7 +43,7 @@
     color: #222;
     border-radius: 12px;
     padding: 24px;
-    width: min(360px, 92vw);
+    width: Min(360px, 92vw);  // Capital M — libsass evals lowercase min() and errors on mixed vw/px.
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 
     h2 {
