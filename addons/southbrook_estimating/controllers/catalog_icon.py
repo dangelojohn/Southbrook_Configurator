@@ -51,7 +51,15 @@ class SouthbrookCatalogIcon(http.Controller):
         # cache-key layer (Cloudflare + browser keyed on the
         # /southbrook/catalog/icon/<uuid>/* URL, the redirect target
         # is hot in Odoo's binary cache once warmed).
+        #
+        # K2-a (Round-2 misc fix): pass `unique=<uuid>` so Odoo's
+        # binary route emits the long-cache `Cache-Control:
+        # max-age=31536000, immutable` header. The UUID is content-
+        # addressed (changes whenever the image changes), so a far-
+        # future cache is safe and reverses the perf regression of
+        # icons reaching the origin on every page view.
         return request.redirect(
-            "/web/image/product.template/%d/image_1920" % tmpl.id,
+            "/web/image/product.template/%d/image_1920?unique=%s" % (
+                tmpl.id, uuid),
             local=True,
         )

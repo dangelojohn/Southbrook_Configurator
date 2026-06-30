@@ -99,7 +99,15 @@ class TestSouthbrookRoom(TransactionCase):
         self.env["southbrook.room"].create({"name": "B", "order_id": self.order.id})
         action = self.order.action_open_southbrook_room()
         self.assertEqual(action.get("domain"), [("order_id", "=", self.order.id)])
-        self.assertNotIn("res_id", action)
+        # K2-e (Round-2 misc fix): underlying ir.actions.act_window record
+        # ships with `res_id: 0` in v19, so `assertNotIn` is too strict.
+        # The intent is "no specific row preselected" — accept either an
+        # absent key or a falsy value (`0`).
+        self.assertFalse(
+            action.get("res_id"),
+            "multi-room path must not preselect a specific room "
+            "(res_id should be absent or 0).",
+        )
 
     def test_room_count_compute(self):
         self.assertEqual(self.order.room_count, 0)

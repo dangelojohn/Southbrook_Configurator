@@ -31,7 +31,12 @@ SHELF_TOL: float = 1.5        # hand-placement clearance, subtracted from inside
 SHELF_VENT_GAP: float = 12.7  # 1/2" ventilation gap subtracted from depth at the back
 TOEKICK_H: float = 101.6      # 4" — toe-kick height (integrated into sides, see toe_kick())
 
-TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity"})
+# Round-2 misc fix: `drawer` added to align with southbrook_estimating's
+# `mrp_bom.TOEKICK_FAMILIES` — drawer banks sit on the same toe-kick line
+# as base / sink / tall / vanity cabinets and therefore need toe-kick
+# panels. The G1 parity gate (test_bom_contents.test_constants_parity)
+# enforces this set is identical across the two sources of truth.
+TOEKICK_FAMILIES = frozenset({"base", "sink", "tall", "vanity", "drawer"})
 
 PanelCut = Tuple[float, float, float]
 
