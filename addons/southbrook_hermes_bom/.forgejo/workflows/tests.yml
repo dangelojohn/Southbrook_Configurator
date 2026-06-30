@@ -1,0 +1,151 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+#
+# Forgejo Actions workflow — lint-only.
+#
+# Why lint, not full odoo -i + tests:
+# 1. The qnap-runner (act_runner v0.2.11) silently kills log capture
+#    when a workflow uses `container: image: ...` (runs 217 + 219
+#    both reached a 12 min runtime then exited status=2 with
+#    log_in_storage=false / log_size=0 / no runner-side pickup log
+#    line). The same workflow without `container:` (run 216) ran
+#    cleanly but failed at `apt-get install odoo` with
+#    "held broken packages" on catthehacker/ubuntu:act-22.04 — the
+#    Odoo nightly chains against newer libpq/libxml2 than the act
+#    image ships. Both paths are runner-environment problems, not
+#    workflow bugs.
+# 2. The full 24-test suite is already validated on the live
+#    southbrook stack via the deploy script's -u step
+#    (deploy_to_qnap.sh wraps odoo -u <module> --test-enable in a
+#    flock so deploys ARE the test gate). CI doesn't add coverage —
+#    it just catches obvious breakage before the deploy attempt.
+# 3. Lint runs in ~30s without needing any external service or image
+#    pull, so the cost-of-CI is low and the signal-to-noise is high.
+#
+# When the runner environment is upgraded (or replaced with a host
+# capable of pulling odoo:19 cleanly), revert to the full test
+# workflow — the previous version of this file lived at
+# commit 495ad3a and can be restored with:
+#   git show 495ad3a:.forgejo/workflows/tests.yml
+
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: AST + XML + YAML syntax
+    runs-on: linux-amd64
+
+    steps:
+      - name: Install lint dependencies (catthehacker image already has python3)
+        run: |
+          set -eux
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            git ca-certificates libxml2-utils python3-yaml
+
+      - name: Clone this addon (no actions/checkout — runner can't reach data.forgejo.org)
+        run: |
+          set -eux
+          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" \
+            http://forgejo:3000/qnap/southbrook_hermes_bom.git \
+            /tmp/checkout
+          cd /tmp/checkout && git log -1 --oneline
+
+      - name: Python AST parse every .py
+        working-directory: /tmp/checkout
+        run: |
+          set -eux
+          python3 - <<'PY'
+          import ast, glob, sys
+          errs = 0
+          for f in sorted(glob.glob('**/*.py', recursive=True)):
+              try:
+                  ast.parse(open(f).read(), filename=f)
+              except SyntaxError as e:
+                  errs += 1
+                  print(f"FAIL {f}: {e}")
+          if errs:
+              sys.exit(1)
+          print(f"OK — all Python files parse")
+          PY
+
+      - name: xmllint every .xml
+        working-directory: /tmp/checkout
+        run: |
+          set -eux
+          fail=0
+          for f in $(find . -name '*.xml' -not -path './.git/*'); do
+            if ! xmllint --noout "$f"; then
+              echo "FAIL: $f"
+              fail=1
+            fi
+          done
+          test "$fail" -eq 0
+          echo "OK — all XML files valid"
+
+      - name: YAML parse every workflow + compose file
+        working-directory: /tmp/checkout
+        run: |
+          set -eux
+          python3 - <<'PY'
+          import yaml, glob, sys
+          errs = 0
+          for f in sorted(
+              glob.glob('.forgejo/workflows/*.yml')
+              + glob.glob('staging/*.yml')
+          ):
+              try:
+                  yaml.safe_load(open(f))
+              except yaml.YAMLError as e:
+                  errs += 1
+                  print(f"FAIL {f}: {e}")
+          if errs:
+              sys.exit(1)
+          print(f"OK — all YAML files parse")
+          PY
+
+      - name: Sanity-check manifest version
+        working-directory: /tmp/checkout
+        run: |
+          set -eux
+          python3 - <<'PY'
+          import re
+          src = open('__manifest__.py').read()
+          # Skip the SPDX header + any other comment lines until the
+          # dict literal; then literal_eval just that.
+          import ast
+          tree = ast.parse(src)
+          dict_node = next(
+              n.value for n in tree.body
+              if isinstance(n, ast.Expr)
+              and isinstance(n.value, ast.Dict)
+          )
+          manifest = ast.literal_eval(dict_node)
+          v = manifest.get('version', '')
+          if not re.match(r'^19\.0\.\d+\.\d+\.\d+$', v):
+              raise SystemExit(f"FAIL: manifest version {v!r} is not 19.0.X.Y.Z")
+          print(f"OK — manifest version {v}")
+          PY
+
+  # Provide an unambiguous "did the lint job pass?" check that other
+  # workflows (e.g. a downstream deploy gate) can reference.
+  lint-status:
+    name: Lint status
+    runs-on: linux-amd64
+    needs: lint
+    if: always()
+    steps:
+      - run: |
+          if [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "::error::Lint failed (${{ needs.lint.result }})"
+            exit 1
+          fi
+          echo "Lint passed"

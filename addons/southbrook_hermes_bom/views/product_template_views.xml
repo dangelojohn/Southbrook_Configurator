@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!--
+    Inherit the OCA-extended template form (NOT the stock product
+    form) so we land inside the <header> the OCA module already added.
+    Place the Hermes button immediately after the "Configure Product"
+    button.
+
+    The XPath is intentionally loose: anchor to the OCA button by
+    `name="configure_product"`, which is verified to exist in the
+    inherited view (product_configurator/views/product_view.xml line
+    ~28). If the OCA layout shifts, the install will fail loudly here
+    rather than silently miss the button — much easier to debug.
+  -->
+  <record id="view_product_template_form_hermes_button" model="ir.ui.view">
+    <field name="name">product.template.form.hermes.button</field>
+    <field name="model">product.template</field>
+    <field name="inherit_id" ref="product_configurator.product_template_only_form_view_inherited"/>
+    <field name="arch" type="xml">
+      <xpath expr="//button[@name='configure_product']" position="after">
+        <button name="action_hermes_research_and_build_bom"
+                string="Research &amp; Build BOM with Hermes"
+                type="object"
+                class="btn-secondary"
+                groups="southbrook_hermes_bom.group_hermes_user"
+                invisible="id == False"/>
+      </xpath>
+
+      <!--
+        Smart-button. Inherits the same view but xpath-targets the
+        button_box (added by southbrook_estimating via OCA's
+        button_box hook). Counter is computed on the fly from
+        hermes.research.job; clicking opens the filtered list.
+      -->
+      <xpath expr="//div[@name='button_box']" position="inside">
+        <button name="action_hermes_view_jobs"
+                type="object"
+                class="oe_stat_button"
+                icon="fa-flask"
+                groups="southbrook_hermes_bom.group_hermes_user"
+                invisible="hermes_research_job_count == 0">
+          <field name="hermes_research_job_count" widget="statinfo"
+                 string="Hermes Jobs"/>
+        </button>
+      </xpath>
+    </field>
+  </record>
+
+</odoo>

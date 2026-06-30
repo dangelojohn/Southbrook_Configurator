@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_hermes_research_job_list" model="ir.ui.view">
+    <field name="name">hermes.research.job.list</field>
+    <field name="model">hermes.research.job</field>
+    <field name="arch" type="xml">
+      <list string="Hermes Research Jobs" decoration-success="state == 'applied'"
+            decoration-danger="state == 'failed'"
+            decoration-muted="state == 'draft'">
+        <field name="name"/>
+        <field name="product_template_id"/>
+        <field name="state"/>
+        <field name="confidence_summary"/>
+        <field name="bom_id"/>
+        <field name="created_by"/>
+        <field name="create_date"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_hermes_research_job_form" model="ir.ui.view">
+    <field name="name">hermes.research.job.form</field>
+    <field name="model">hermes.research.job</field>
+    <field name="arch" type="xml">
+      <form string="Hermes Research Job">
+        <header>
+          <field name="state" widget="statusbar"
+                 statusbar_visible="draft,running,review,applied"/>
+        </header>
+        <sheet>
+          <div class="oe_title">
+            <h1><field name="name" readonly="1"/></h1>
+          </div>
+          <group>
+            <group>
+              <field name="product_template_id"/>
+              <field name="product_product_id"/>
+              <field name="bom_id"/>
+              <field name="confidence_summary"/>
+            </group>
+            <group>
+              <field name="created_by"/>
+              <field name="create_date"/>
+            </group>
+          </group>
+          <notebook>
+            <page string="Payload">
+              <field name="hermes_request_payload" widget="text"/>
+            </page>
+            <page string="Raw Response">
+              <field name="hermes_raw_response" widget="text"/>
+            </page>
+            <page string="Parsed Enrichment">
+              <field name="hermes_parsed_enrichment" widget="text"/>
+            </page>
+            <page string="Parsed BOM">
+              <field name="hermes_parsed_bom" widget="text"/>
+            </page>
+            <page string="Applied Fields">
+              <field name="applied_fields" widget="text"/>
+            </page>
+            <page string="Sources">
+              <field name="source_urls" widget="text"/>
+            </page>
+            <page string="Error"
+                  invisible="state != 'failed'">
+              <field name="error_message"/>
+            </page>
+          </notebook>
+        </sheet>
+        <chatter/>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_hermes_research_job" model="ir.actions.act_window">
+    <field name="name">Hermes Research Jobs</field>
+    <field name="res_model">hermes.research.job</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+</odoo>

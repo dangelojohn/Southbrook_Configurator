@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!--
+    Variant form — inherit the OCA-extended variant form so the button
+    lands in the same <header> as Reconfigure Product.
+  -->
+  <record id="view_product_product_form_hermes_button" model="ir.ui.view">
+    <field name="name">product.product.form.hermes.button</field>
+    <field name="model">product.product</field>
+    <field name="inherit_id" ref="product_configurator.product_form_view_custom_vals_inherit"/>
+    <field name="arch" type="xml">
+      <xpath expr="//button[@name='reconfigure_product']" position="after">
+        <button name="action_hermes_research_and_build_bom"
+                string="Research &amp; Build BOM with Hermes"
+                type="object"
+                class="btn-secondary"
+                groups="southbrook_hermes_bom.group_hermes_user"
+                invisible="id == False"/>
+      </xpath>
+    </field>
+  </record>
+
+</odoo>

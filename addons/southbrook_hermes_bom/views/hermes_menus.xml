@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <menuitem id="menu_hermes_root"
+            name="Hermes BOM"
+            parent="mrp.menu_mrp_root"
+            sequence="80"
+            groups="southbrook_hermes_bom.group_hermes_user"/>
+
+  <menuitem id="menu_hermes_jobs"
+            name="Research Jobs"
+            parent="menu_hermes_root"
+            action="action_hermes_research_job"
+            sequence="10"/>
+
+</odoo>

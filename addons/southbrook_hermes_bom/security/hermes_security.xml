@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!--
+    Distinct group from southbrook_hermes (Fabio Reviewer). The two
+    use-cases overlap conceptually but the BOM-builder permission
+    surface is narrower: write product.template + create mrp.bom.
+    A user can hold either, both, or neither.
+  -->
+  <record id="group_hermes_user" model="res.groups">
+    <field name="name">Hermes BOM Builder</field>
+    <field name="implied_ids" eval="[(4, ref('mrp.group_mrp_user'))]"/>
+    <field name="comment">Can dispatch Hermes research and apply enrichment + BOM proposals to Configurable Templates.</field>
+  </record>
+
+  <!-- System admins automatically inherit the group. -->
+  <record id="base.group_system" model="res.groups">
+    <field name="implied_ids" eval="[(4, ref('southbrook_hermes_bom.group_hermes_user'))]"/>
+  </record>
+
+</odoo>

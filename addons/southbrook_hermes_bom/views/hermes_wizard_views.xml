@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_hermes_wizard_form" model="ir.ui.view">
+    <field name="name">hermes.wizard.form</field>
+    <field name="model">hermes.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Hermes — Research &amp; Build BOM">
+        <field name="state" invisible="1"/>
+        <field name="job_id" invisible="1"/>
+        <field name="existing_bom_state" invisible="1"/>
+
+        <!-- ── Phase: collecting (pre-dispatch) ────────────────── -->
+        <group invisible="state != 'collecting'">
+          <div class="alert alert-info" role="alert">
+            <field name="status_message" readonly="1" nolabel="1"/>
+          </div>
+          <p>
+            Hermes will research this product and propose enrichment fields
+            and a derived BOM. Add any guidance below, then click <b>Run Hermes</b>.
+          </p>
+          <field name="user_notes" placeholder="Optional: tell Hermes what to focus on…"/>
+        </group>
+
+        <!-- ── Phase: researching / applying (in-flight) ──────── -->
+        <div invisible="state not in ('researching', 'applying')"
+             class="alert alert-info text-center" role="status">
+          <i class="fa fa-cog fa-spin fa-2x" aria-hidden="true"/>
+          <p class="mt-2"><field name="status_message" readonly="1" nolabel="1"/></p>
+        </div>
+
+        <!-- ── Phase: review ─────────────────────────────────── -->
+        <notebook invisible="state != 'review'">
+
+          <page string="Summary">
+            <group>
+              <group string="Product">
+                <field name="product_template_id" readonly="1"/>
+                <field name="confidence_score" widget="progressbar"/>
+              </group>
+              <group string="Existing Hermes BOM">
+                <field name="existing_bom_id" readonly="1"/>
+                <div invisible="existing_bom_state != 'confirmed'"
+                     class="alert alert-warning">
+                  This product already has a Hermes BOM that has been used by
+                  a manufacturing order. Applying will be refused until the
+                  existing BOM is archived or detached.
+                </div>
+              </group>
+            </group>
+            <group string="Apply Options">
+              <field name="apply_enrichment"/>
+              <field name="apply_bom"/>
+              <field name="apply_attachments"/>
+              <field name="apply_chatter_note"/>
+            </group>
+          </page>
+
+          <page string="Enrichment (current → proposed)">
+            <group>
+              <group string="Current">
+                <field name="current_name" readonly="1"/>
+                <field name="current_description_sale" readonly="1"/>
+                <field name="current_description_purchase" readonly="1"/>
+                <field name="current_description" readonly="1"
+                       widget="html"/>
+              </group>
+              <group string="Proposed">
+                <field name="proposed_name"/>
+                <field name="proposed_short_description"/>
+                <field name="proposed_technical_description"/>
+                <field name="proposed_long_description" widget="html"/>
+              </group>
+            </group>
+            <group string="Manufacturer (review only — not auto-applied)">
+              <field name="proposed_manufacturer"/>
+              <field name="proposed_manufacturer_pn"/>
+            </group>
+          </page>
+
+          <page string="Dimensions / Specs / Notes">
+            <group string="Dimensions">
+              <field name="dimensions_html" widget="html" nolabel="1"/>
+            </group>
+            <group string="Specs">
+              <field name="specs_html" widget="html" nolabel="1"/>
+            </group>
+            <group string="Install Notes">
+              <field name="install_notes_html" widget="html" nolabel="1"/>
+            </group>
+          </page>
+
+          <page string="Proposed BOM">
+            <field name="proposed_bom_html" widget="html" nolabel="1"/>
+            <separator string="Raw JSON (debug)"/>
+            <field name="proposed_bom_json" widget="text"/>
+          </page>
+
+          <page string="Sources">
+            <field name="source_urls_html" widget="html" nolabel="1"/>
+          </page>
+
+          <page string="Reviewer Notes">
+            <field name="user_notes" nolabel="1"
+                   placeholder="Optional notes — saved to chatter on apply."/>
+          </page>
+
+        </notebook>
+
+        <!-- ── Phase: done ───────────────────────────────────── -->
+        <group invisible="state != 'done'">
+          <div class="alert alert-success" role="alert">
+            <field name="status_message" readonly="1" nolabel="1"/>
+          </div>
+        </group>
+
+        <!-- ── Phase: error ──────────────────────────────────── -->
+        <group invisible="state != 'error'">
+          <div class="alert alert-danger" role="alert">
+            <field name="error_detail" readonly="1" nolabel="1"/>
+          </div>
+        </group>
+
+        <footer>
+          <button name="action_collect_and_research"
+                  string="Run Hermes"
+                  type="object"
+                  class="btn-primary"
+                  invisible="state != 'collecting'"/>
+          <button name="action_apply"
+                  string="Apply Selected Changes"
+                  type="object"
+                  class="btn-primary"
+                  invisible="state != 'review' or existing_bom_state == 'confirmed'"/>
+          <button string="Discard"
+                  class="btn-secondary"
+                  special="cancel"
+                  invisible="state == 'done'"/>
+          <button string="Close"
+                  class="btn-primary"
+                  special="cancel"
+                  invisible="state != 'done'"/>
+          <button name="action_collect_and_research"
+                  string="Retry"
+                  type="object"
+                  class="btn-warning"
+                  invisible="state != 'error'"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_hermes_wizard" model="ir.actions.act_window">
+    <field name="name">Hermes Research Wizard</field>
+    <field name="res_model">hermes.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+  </record>
+
+</odoo>
