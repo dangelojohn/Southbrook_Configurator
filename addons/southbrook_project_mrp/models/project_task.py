@@ -102,8 +102,18 @@ class ProjectTask(models.Model):
     production_ids = fields.One2many(
         "mrp.production", "project_task_id", string="Manufacturing Orders",
         help="Every MO that makes up this customer job (base, worktop, …).")
+    # R4 (2026-06-30): store=True so the SQL builder can resolve
+    # `('production_count', '>', 0)` in the Bottleneck Contention domain
+    # (project_task_views.xml line 842) and the kanban "Production Count"
+    # group-by. v19 hard-rejects search/group-by on unstored computed
+    # fields with `Cannot convert project.task.production_count to SQL
+    # because it is not stored`. Same pattern as R3 PR #27's
+    # `current_bottleneck_workcenter_id` fix.
+    # The `_compute_mrp_status` chain already depends on `production_ids`
+    # (line 679), which is the only source `len(mos)` reads — no depends
+    # change required.
     production_count = fields.Integer(
-        string="MO Count", compute="_compute_mrp_status")
+        string="MO Count", compute="_compute_mrp_status", store=True)
 
     # --- T1.2 / B3: read-only build status, sourced from mrp/stock ----------
     mo_reference = fields.Char(
