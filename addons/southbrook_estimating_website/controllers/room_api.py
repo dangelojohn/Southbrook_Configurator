@@ -5,9 +5,15 @@
 the upcoming Room Setup tab (Phase 2.B) and the 3-step wizard (Phase
 2.C). Server-side only; no OWL changes ship in 2.A.
 
-Auth + ownership reuse `_southbrook_resolve_order` from main.py via
-class inheritance — `SouthbrookRoomApi` is a subclass of
-`SouthbrookKitchenPlanner` so the helper resolves on `self` cleanly.
+Auth + ownership reuse the same `_southbrook_resolve_order` rule
+documented on `SouthbrookOrderBuilderPortal._southbrook_resolve_order`
+in main.py. The helper is duplicated as a method on
+`SouthbrookRoomApi` below (rather than inherited) because its
+canonical definition lives on `SouthbrookOrderBuilderPortal`, which
+extends `CustomerPortal` — a different MRO branch from
+`SouthbrookKitchenPlanner` (this module's parent). Keep the two
+copies in sync; any change to the access rule (e.g. broadening dealer
+visibility past first-level parent/child) needs both edits.
 
 Error convention follows the existing add-line endpoint
 (main.py:1223-1260): return `{"error": "<code>"}` strings; never raise
@@ -157,6 +163,42 @@ _CONSTRAINT_SCALAR_FIELDS = (
 
 class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     """Room CRUD JSON-RPC endpoints — Phase 2.A of Room-First UX."""
+
+    # ------------------------------------------------------------------
+    # Auth helper — see module docstring for the duplication rationale.
+    # Keep in sync with
+    # SouthbrookOrderBuilderPortal._southbrook_resolve_order (main.py).
+    # ------------------------------------------------------------------
+
+    def _southbrook_resolve_order(self, order_id):
+        """Look up the sale.order and check the user has access.
+
+        Access rule (mirrors main.py):
+          • Internal users (res.users.share=False) see every order.
+          • Portal users: logged-in partner must equal order.partner_id,
+            OR order.partner_id.parent_id must equal the logged-in
+            partner (dealer views customer order), OR the logged-in
+            partner's parent_id must equal order.partner_id (parent
+            partner views child's order).
+          • Anything else → AccessError.
+        """
+        order = request.env["sale.order"].sudo().browse(order_id).exists()
+        if not order:
+            raise MissingError("Sale order not found.")
+
+        user = request.env.user
+        if not user.share:
+            return order
+
+        my_partner = user.partner_id
+        order_partner = order.partner_id
+        if my_partner == order_partner:
+            return order
+        if order_partner.parent_id and order_partner.parent_id == my_partner:
+            return order
+        if my_partner.parent_id and my_partner.parent_id == order_partner:
+            return order
+        raise AccessError("This order is not accessible to your account.")
 
     # ------------------------------------------------------------------
     # Scope guards
