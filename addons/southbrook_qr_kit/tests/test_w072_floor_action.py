@@ -16,6 +16,8 @@ Tests cover:
 from contextlib import contextmanager
 from unittest.mock import patch
 
+import werkzeug.wrappers
+
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.southbrook_qr_kit.controllers import (
@@ -44,17 +46,25 @@ class _FakeRequest:
         return _FakeResponse(body, status=status, headers=headers)
 
 
-class _FakeResponse:
+class _FakeResponse(werkzeug.wrappers.Response):
+    """Real werkzeug.Response so v19's `Response.load(result)` accepts it.
+
+    NB(v19): `@http.route(type='http')` wraps the endpoint with a
+    `route_wrapper` that does `return Response.load(result)` (odoo/http.py
+    line 813 in v19). `Response.load` only accepts `Response`,
+    `werkzeug.wrappers.Response`, `HTTPException`, `bytes`, `str`, or
+    `None` — anything else raises `TypeError(...returns an invalid
+    value...)`. The earlier hand-rolled stub was a bare object, so every
+    test that exercised `floor_render` failed there before it could even
+    inspect `resp.status_code`. Subclassing `werkzeug.wrappers.Response`
+    keeps the same public surface the tests rely on (`status_code`, plus
+    werkzeug-native `get_data`/`set_data`) while satisfying the v19
+    type gate.
+    """
+
     def __init__(self, body, status=200, headers=None):
-        self.body = body
-        self.status_code = status
-        self.headers = headers or []
-
-    def get_data(self, as_text=False):
-        return self.body if as_text else self.body.encode("utf-8")
-
-    def set_data(self, body):
-        self.body = body
+        super().__init__(response=body, status=status,
+                         headers=headers or [])
 
 
 @contextmanager
@@ -109,8 +119,15 @@ class TestW072FloorAction(TransactionCase):
              "southbrook.floor.action.kind.temp_labor_signin"),
         ):
             handler = self.Kind.resolve_kind(slug)
-            self.assertTrue(handler,
-                            "Kind '%s' must be registered" % slug)
+            # NB(v19): `resolve_kind` returns either the literal `False`
+            # sentinel (not registered) or the env-bound AbstractModel
+            # handler (registered). The handler is naturally an empty
+            # recordset, so plain `assertTrue(handler)` mis-fires on a
+            # registered kind — see memory note
+            # [odoo19_abstract_model_falsy_recordset] and the parallel
+            # fix in qr_scan.py for the `southbrook.qr.kind` registry.
+            self.assertIsNot(handler, False,
+                             "Kind '%s' must be registered" % slug)
             self.assertEqual(handler._name, model)
 
     def test_11_unknown_kind_returns_none(self):

@@ -143,7 +143,16 @@ class FloorActionController(http.Controller):
                           status=429)
         Kind = env["southbrook.floor.action.kind"]
         handler = Kind.resolve_kind(action)
-        if not handler:
+        # NB(v19): `resolve_kind` returns the literal ``False`` sentinel
+        # when the action slug is not registered, OR the env-bound
+        # AbstractModel handler when it IS registered. In Odoo 19 every
+        # AbstractModel is an empty recordset and `bool(empty_recordset)`
+        # is False, so a plain ``if not handler:`` mis-fires on a
+        # registered kind — see memory note
+        # [odoo19_abstract_model_falsy_recordset] and the parallel fix
+        # in qr_scan.py for `southbrook.qr.kind` (commit b7f21b9). The
+        # ``is False`` discriminator fires only on the explicit sentinel.
+        if handler is False:
             _log_floor(env, None, p or "", action or "", "unknown_kind",
                        error="No handler for action=%r" % action)
             return _plain("Unknown floor action: %s" % action, status=404)
@@ -216,7 +225,10 @@ class FloorActionController(http.Controller):
                     "Rate limit exceeded. Try again shortly."}
         Kind = env["southbrook.floor.action.kind"]
         handler = Kind.resolve_kind(action)
-        if not handler:
+        # See identical note above on floor_render — `is False` is the
+        # only correct discriminator against the v19 AbstractModel
+        # falsy-recordset trap.
+        if handler is False:
             _log_floor(env, None, "", action or "", "unknown_kind",
                        error="No handler for action=%r" % action)
             return {"ok": False, "error":
