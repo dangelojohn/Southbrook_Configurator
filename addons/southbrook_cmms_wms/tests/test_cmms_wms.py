@@ -149,7 +149,9 @@ class TestSouthbrookCmmsWms(TransactionCase):
             "location_dest_id": self.picking_type.default_location_dest_id.id
                 or self.env.ref("stock.stock_location_stock").id,
             "move_ids": [(0, 0, {
-                "name": bigprod.name,
+                # v19 dropped stock.move.name; description comes from
+                # product display_name + description_picking.
+                "description_picking": bigprod.name,
                 "product_id": bigprod.id,
                 "product_uom_qty": 1.0,
                 "product_uom": bigprod.uom_id.id,
@@ -176,7 +178,9 @@ class TestSouthbrookCmmsWms(TransactionCase):
             "location_dest_id": self.picking_type.default_location_dest_id.id
                 or self.env.ref("stock.stock_location_stock").id,
             "move_ids": [(0, 0, {
-                "name": self.product.name,
+                # v19 dropped stock.move.name; description comes from
+                # product display_name + description_picking.
+                "description_picking": self.product.name,
                 "product_id": self.product.id,
                 "product_uom_qty": 5.0,
                 "product_uom": self.product.uom_id.id,

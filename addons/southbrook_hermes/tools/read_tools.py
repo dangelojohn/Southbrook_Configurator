@@ -62,8 +62,11 @@ def get_order_status(env, order_id: int):
 
 def _count_mos_for_order(env, order):
     line_ids = order.order_line.ids
+    # v19: mrp.production carries `sale_line_id` (not the legacy
+    # `sale_order_line_id` from older sample code). Use the canonical
+    # field so the search compiles cleanly under v19's domain validator.
     return env["mrp.production"].search_count(
-        [("sale_order_line_id", "in", line_ids)])
+        [("sale_line_id", "in", line_ids)])
 
 
 @hermes_tool(
