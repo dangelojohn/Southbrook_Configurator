@@ -1,0 +1,2766 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_14_project_module_architecture" model="slide.slide">
+            <field name="name">Project Module Architecture — What Southbrook Layers on Stock Odoo Project</field>
+            <field name="channel_id" ref="course_project_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Project Manager + Developer (anyone who maintains, customises, or deeply uses /odoo/project).</field>
+            <field name="html_content"><![CDATA[<h1 id="project-module-architecture-what-southbrook-layers-on-stock-odoo-project">Project Module Architecture — What Southbrook Layers on Stock Odoo Project</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a project manager who has used <code>/odoo/project</code> for a year and finally
+wants to know <em>why</em> the form looks the way it does — which fields are
+Southbrook custom and which are stock, which tab is doing what, and what
+breaks if you uninstall a module. Or you're a developer about to touch the
+Project surface and you don't want to step on cabinetry-specific compute
+logic by accident. This lesson maps the <em>whole</em> customization at module
+granularity so you can answer "where does this field come from" without
+grepping.</p>
+<p>Earlier lessons (2.1, 2.2, 12.4) describe what the project surface does
+<em>for the planner</em>. This one describes what it <em>is</em>, structurally.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> with any internal user account.</p>
+<blockquote>
+<p><strong>/odoo/project</strong> — the stock Odoo Project app entry. Lands you on the
+project list (kanban by default).</p>
+<p><strong>/odoo/project/<id></strong> — opens one project's task board (kanban grouped
+by <code>stage_id</code>).</p>
+<p><strong>/odoo/project/<id>/tasks/<task_id></strong> — opens one task's form view.</p>
+</blockquote>
+<p>The Southbrook customization does <strong>not</strong> add a top-level menu of its own
+under Project — every screen reuses the stock entry. The Kitchen-Ops side
+of the surface (lesson 12.4's Production Release Queue, lesson 2.x's
+Kitchen Jobs board) is registered under <strong>Kitchen Ops</strong> by
+<code>southbrook_premium_orchestration</code> and <code>southbrook_kitchen_workspace</code>, and
+those views render against the <em>same</em> <code>project.task</code> records, just with
+different domains + view IDs. So a task you open from
+<strong>Kitchen Ops → Kitchen Jobs</strong> and a task you open from
+<strong>/odoo/project → some project → some task</strong> are the same database row
+viewed through different lenses.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>There are two Southbrook addons doing the heavy lifting on this surface,
+plus two adjacent ones you'll see fields from. Knowing which is which
+saves an hour next time something breaks.</p>
+<p><strong><code>southbrook_project</code> (LGPL-3, v19.0.0.1.0)</strong> — the "cabinetry-shop
+polish" tier. Owns:</p>
+<ul>
+<li>Responsive Kanban SCSS
+  (<code>southbrook_project/static/src/scss/kanban_responsive.scss</code>) — at
+  ≥1280 px the 5 stage columns render side-by-side instead of horizontal-
+  scrolling. Scoped to <code>[data-model="project.task"]</code> so other kanbans
+  aren't touched.</li>
+<li>6 seeded <code>project.tags</code> (Rush, Custom, Warranty, Repair, Kitchen,
+  Vanity) — see <code>data/project_tags.xml</code>.</li>
+<li>Project ID 1 defaults — description, planned start/end, feature toggles
+  (<code>allow_task_dependencies</code>, <code>allow_milestones</code>) flipped on. Applied via
+  the <code>post_init_backfill_project_1</code> post-init hook (<code>hooks.py</code>).</li>
+<li>Custom fields on <code>project.task</code> (all 5 owned by this addon):
+  <code>x_southbrook_material_species</code> (Selection, 12 species),
+  <code>x_southbrook_unit_count</code> (Integer),
+  <code>x_southbrook_hardware_specs</code> (Text),
+  <code>x_southbrook_sale_order_id</code> (Many2one to <code>sale.order</code>),
+  <code>x_southbrook_priority</code> (Selection: standard / rush / urgent — clearer
+  than stock's single-star toggle).</li>
+<li><code>display_name</code> override on <code>project.task</code> — suffixes <code>[SO0042]</code> when an
+  originating SO is linked, so kanban cards surface the quote at a
+  glance.</li>
+<li><code>southbrook_top_level_task_count</code> field on <code>project.project</code> — sums
+  only tasks with <code>parent_id IS NULL</code>, fixing the "4 Tasks" inflation
+  the manual-QA report flagged.</li>
+</ul>
+<p><strong><code>southbrook_project_mrp</code> (LGPL-3, v19.0.1.0.0)</strong> — the "coordination
+layer above MRP." Depends on <code>southbrook_project</code> + <code>sale_mrp</code> +
+<code>purchase_mrp</code> + <code>maintenance</code>. Owns:</p>
+<ul>
+<li>80+ additional fields on <code>project.task</code> — production_ids (One2many to
+  <code>mrp.production</code>), mo_state_summary, components_available, job_at_risk,
+  job_risk_reason, job_industrial_cost, job_estimated_cost, plus the
+  entire readiness + release + install checklist. Documented field-by-
+  field in lessons 14.3 and 14.4.</li>
+<li>5 production-release sign-off booleans on <code>project.task</code>:
+  <code>southbrook_release_cad_approved</code>, <code>southbrook_release_cutlist_approved</code>,
+  <code>southbrook_release_bom_verified</code>, <code>southbrook_release_crew_reserved</code>,
+  <code>southbrook_release_equipment_available</code>. Detailed in lesson 14.4.</li>
+<li>The <code>southbrook_production_release_state</code> computed enum
+  (ready / review / blocked / info) and its <code>_reason</code> companion.</li>
+<li>Production-job mission-control fields on <code>project.project</code> —
+  <code>southbrook_job_count</code>, <code>_at_risk_job_count</code>, <code>_ready_job_count</code>, etc.
+  Plus the matching action methods that drill into each queue.</li>
+<li>4 new models — <code>southbrook.project.job.template</code>,
+  <code>southbrook.project.job.template.line</code>,
+  <code>southbrook.project.readiness.line</code>, and the data-quality report
+  pair (<code>southbrook.project.data.quality.report</code> +
+  <code>.line</code>).</li>
+<li>The <code>project_task_id</code> Many2one on <code>mrp.production</code> and the
+  <code>_action_confirm</code> override on <code>sale.order</code> that auto-creates the task
+  spine. Detailed in lesson 14.5.</li>
+<li>View inheritance: 5 records on <code>project.task</code> (form, list, kanban,
+  search) extending stock IDs (<code>project.view_task_form2</code>,
+  <code>project.view_task_tree2</code>, <code>project.view_task_kanban</code>,
+  <code>project.view_task_search_form</code>); 1 on <code>project.project</code> (kanban —
+  inactive by default, ref id <code>project_project_kanban_mission_control</code>,
+  surfaces mission-control badges); plus full-form/list/kanban views
+  for the 4 new models. Detailed in lesson 14.6.</li>
+</ul>
+<p><strong><code>southbrook_premium_orchestration</code> (cross-ref)</strong> — adds 1 field +
+1 cron entry point relevant here:</p>
+<ul>
+<li><code>readiness_last_recomputed_at</code> (Datetime) on <code>project.task</code> — stamped
+  each cron tick so dashboards can sort "most stale" first.</li>
+<li><code>_cron_recompute_readiness_all</code> (model method on <code>project.task</code>) —
+  driven by the seeded cron <em>Southbrook: Recompute Project Readiness</em>
+  (xml_id <code>southbrook_premium_orchestration.cron_recompute_readiness_all</code>),
+  every <strong>30 minutes</strong>, runs as root, calls
+  <code>action_recompute_readiness_lines</code> on every open kitchen task.</li>
+</ul>
+<p><strong><code>southbrook_kitchen_workspace</code> (cross-ref)</strong> — owns the <code>sb.kitchen.project</code>
+model, which is <em>not</em> a flavour of <code>project.project</code> — it's an entirely
+separate <code>mail.thread</code>-inheriting model representing the <em>design</em> stage
+before a quote exists. Lesson 14.2 explains why both records exist and
+how they relate.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>(Architecture lesson — there isn't a daily flow. Instead, here's the
+<strong>read order</strong> when you're about to touch this surface.)</p>
+<p><strong>1. Identify which field you're looking at.</strong> Open the task form,
+right-click the field label, choose <em>View Metadata</em> (developer mode on).
+The popup shows the model + field name. If the prefix is:</p>
+<ul>
+<li><code>x_southbrook_*</code> → owned by <code>southbrook_project</code>. Cabinetry-shop polish.</li>
+<li><code>southbrook_*</code> → owned by <code>southbrook_project_mrp</code>. Coordination layer.</li>
+<li><code>readiness_last_recomputed_at</code> → owned by
+  <code>southbrook_premium_orchestration</code>. Telemetry only.</li>
+<li>no prefix → stock Odoo <code>project</code> field. Don't extend it without a
+  reason; chances are an existing custom layer already wraps it.</li>
+</ul>
+<p><strong>2. Identify which view is rendering it.</strong> Same right-click menu →
+<em>Edit View: Form</em> (or List / Kanban / Search). The <em>Inherit From</em> shows
+which xml_id the view extends; the <em>Inherits</em> list shows everything
+extending it. The order matters — <code>southbrook_project</code>'s extensions land
+before <code>southbrook_project_mrp</code>'s, so an xpath in the MRP layer can
+reference a field the polish layer added.</p>
+<p><strong>3. Identify which compute fires when.</strong> Most Southbrook fields on
+<code>project.task</code> are <em>computed, non-stored</em> — they re-evaluate on every
+read of the record. The expensive ones (readiness, mission-control,
+material readiness) are gated by <code>@api.depends</code> triggers; if those
+triggers don't fire, the field shows stale values. Lesson 14.3
+catalogues every compute and its dependencies.</p>
+<p><strong>4. Check the cron.</strong> If a value isn't refreshing, check the cron
+<em>Southbrook: Recompute Project Readiness</em> under
+<strong>Settings → Technical → Scheduled Actions</strong>. Last-Run time tells you
+whether the 30-minute sweep is actually firing. The stamp it leaves on
+each task is <code>readiness_last_recomputed_at</code>.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I uninstalled <code>southbrook_project_mrp</code> and now /odoo/project tasks
+won't open."</strong></p>
+<p>You probably didn't uninstall <code>southbrook_premium_orchestration</code> first.
+The orchestration layer's cron calls <code>action_recompute_readiness_lines</code>,
+which is defined in <code>_project_mrp</code>; if the cron fires after the MRP
+layer is gone, you get a <code>KeyError</code> 500 on every form open because the
+readiness fields are still being looked up by view inheritance. Order
+of uninstall: orchestration → project_mrp → project. Same order, in
+reverse, for install.</p>
+<p><strong>"A field is missing on the form but I know it's in the addon."</strong></p>
+<p>Likely a view-inheritance order problem. Check the <em>Inherit</em> graph in
+the View Metadata. If the xpath targets a field that another addon
+added later, the xpath misses on cold install. The fix is to bump the
+<code>sequence</code> on the offending <code>ir.ui.view</code> record (lower = earlier).</p>
+<p><strong>"<code>southbrook_top_level_task_count</code> shows the right number on the
+project but <code>open_task_count</code> still shows the inflated one in some
+report."</strong></p>
+<p>Stock <code>open_task_count</code> is intact — we don't remove it, because the
+native Burndown + Tasks Analysis reports read it directly. The
+Southbrook polish field is what the <em>kanban tile</em> + <em>form smart button</em>
+read. Reports left untouched per the manifest's guardrail (no ACL/share/
+view-removal changes).</p>
+<p><strong>"I added a new custom field on <code>project.task</code> and it doesn't show in
+the search filters."</strong></p>
+<p>The search view inherit is in <code>southbrook_project/views/project_task_views.xml</code>
+(<code>view_project_task_search_inherit_southbrook</code>). Add an xpath to the
+inside-of-<code>//group</code> block to surface a Group-By filter; add another to
+the position-<code>before</code> of <code>filter[@name='message_needaction']</code> for a
+quick-filter chip. The pattern is copy-paste of the existing
+<code>southbrook_rush</code> / <code>southbrook_urgent</code> filters.</p>
+<p><strong>"Project ID 1 got renamed by someone and the post-init hook
+re-applied defaults."</strong></p>
+<p>The hook only fires on <em>install</em> of <code>southbrook_project</code>, not on every
+upgrade — so a rename is safe. If you reinstall the addon (drop + add
+back), the hook will re-fire and overwrite description + dates on
+whatever record currently has ID 1. Mitigation: keep the
+<code>post_init_backfill_project_1</code> hook idempotent (it already checks before
+overwriting), and don't reinstall in production without dumping first.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p><code>southbrook_project</code> is <strong>strictly view + data + thin model
+inheritance</strong>. No new models. No cron. No security changes. It exists
+because the manual-QA report against the live instance flagged five
+things (no responsive kanban, no tags, no project-1 defaults, no
+dependency/milestone toggles, no cabinetry fields on tasks) — each
+gets one tier in the addon, each tier is one commit, each tier is
+independently shippable.</p>
+<p><code>southbrook_project_mrp</code> is <strong>the bridge that turns Project into the
+shop-floor coordination layer.</strong> It declares
+<code>mrp.production.project_task_id</code> as the canonical link (FK on the MO
+side; reverse-One2many <code>production_ids</code> on the task side). On
+<code>sale.order._action_confirm</code> it auto-creates the task spine via
+<code>_southbrook_ensure_job</code>, then writes <code>project_task_id</code> onto every
+existing + future MO tied to that SO (<code>mrp.production.create</code> override
+back-links MOs that procurement adds later). Everything downstream
+(readiness, release state, mission control) is <em>computed</em> from this
+graph — there is no separate "kitchen job" model in this addon. The
+canonical job IS the <code>project.task</code>.</p>
+<p>The orchestration cron lives in
+<code>southbrook_premium_orchestration/data/ir_cron.xml</code> and its code body
+is <code>model._cron_recompute_readiness_all()</code>. The method (in
+<code>southbrook_premium_orchestration/models/project_task.py</code>) searches for
+<code>project.task</code> records with <code>x_southbrook_sale_order_id != False</code> AND
+<code>state not in (1_done, 1_canceled)</code>, snapshots their
+<code>readiness_decision</code> + <code>southbrook_production_release_state</code>, calls the
+recompute, stamps <code>readiness_last_recomputed_at = now</code>, and — if the
+decision flipped — posts a chatter note. The method is defensively
+written to probe three candidate recompute names
+(<code>action_recompute_readiness_lines</code>, <code>action_recompute_readiness</code>,
+<code>_recompute_readiness</code>) via <code>getattr</code>, so a rename in
+<code>southbrook_project_mrp</code> won't break the cron silently.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A field on <code>project.task</code> is showing the wrong value, but only
+after the morning sale-order confirmations. Where do you look first?</p>
+<blockquote>
+<p>The Southbrook readiness cron is <em>Southbrook: Recompute Project
+Readiness</em>, every 30 min. If it last fired at 09:30 and the order
+confirmed at 09:31, the task's readiness/release fields stay stale
+until ~10:00. Force a refresh by opening the task and clicking the
+<em>Readiness</em> smart button — that calls <code>action_recompute_readiness_lines</code>
+directly. Don't blame the field's <code>@api.depends</code>; the compute fires
+on read, but the chatter notification you'd expect about a state flip
+only fires when the cron runs.</p>
+</blockquote>
+<p><strong>2.</strong> You want to add a new cabinetry custom field to <code>project.task</code>
+that shows up in the Cabinetry Specs tab on the form. Which addon do
+you put it in, and why?</p>
+<blockquote>
+<p><code>southbrook_project</code> — that's where the existing 4 <code>x_southbrook_*</code>
+cabinetry custom fields live and where the "Cabinetry Specs" notebook
+page is xpath-inserted (<code>views/project_task_views.xml</code>,
+<code>view_project_task_form_inherit_southbrook</code>). Putting it in
+<code>_project_mrp</code> would land it on a different tab and force every other
+install of <code>southbrook_project</code> to depend on the MRP bridge.</p>
+</blockquote>
+<p><strong>3.</strong> A developer asks "is <code>sb.kitchen.project</code> the same model as
+<code>project.project</code>?" What do you tell them?</p>
+<blockquote>
+<p>No. <code>sb.kitchen.project</code> lives in <code>southbrook_kitchen_workspace</code> and
+is its own <code>models.Model</code> (mail.thread-inheriting) with its own
+state machine (draft → designing → awaiting_customer → approved →
+in_production → done / cancelled). <code>project.project</code> is the stock
+Odoo container. The two link through <code>sb.kitchen.project.sale_order_id</code>
+→ <code>sale.order</code> → (auto-confirm) → <code>project.task.x_southbrook_sale_order_id</code>,
+which is on a <code>project.project</code> record. Lesson 14.2 covers the
+handoff in detail.</p>
+</blockquote>
+<p><strong>4.</strong> You see a custom field <code>southbrook_release_bom_verified</code> on a
+task form. Which module owns it, and how do you confirm?</p>
+<blockquote>
+<p><code>southbrook_project_mrp</code>. Confirm by opening developer mode →
+right-click the field label → <em>View Metadata</em> → look at the <em>Module</em>
+field. Or grep: <code>grep -rn "southbrook_release_bom_verified"
+addons/southbrook_project_mrp/models/</code> lands you in <code>project_task.py</code>
+line ~306 (a <code>fields.Boolean(... tracking=True)</code>).</p>
+</blockquote>
+<p><strong>5.</strong> The <code>southbrook_top_level_task_count</code> button on a project's form
+shows "4 Customer Jobs" but the kanban tile on /odoo/project still
+shows "8 Tasks". Why?</p>
+<blockquote>
+<p>Two views, two different fields. The project <em>form</em> smart-button is
+wired to <code>southbrook_top_level_task_count</code> (sums only <code>parent_id IS
+NULL</code> tasks). The /odoo/project <em>kanban tile</em> is rendered by the
+stock <code>project.view_project_kanban</code> and reads <code>open_task_count</code>,
+which includes subtasks. The Southbrook override of the kanban view
+(<code>project_project_kanban_mission_control</code>, line ~856 of
+<code>project_task_views.xml</code> in <code>southbrook_project_mrp</code>) is shipped with
+<code>&lt;field name="active" eval="False"/&gt;</code> — it's an opt-in mission-
+control kanban, not the default. Operators who want the corrected
+count on the kanban tile must activate that view manually.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The kanban swimlanes, list filters, and calendar views in detail →
+  lesson 14.6 (task views + dashboards).</li>
+<li>The readiness compute algorithm + cron internals → lesson 14.3.</li>
+<li>The 5 release sign-off booleans + state transitions → lesson 14.4.</li>
+<li>The <code>project.task</code> ↔ <code>mrp.production</code> linkage → lesson 14.5.</li>
+<li><code>sb.kitchen.project</code> vs <code>project.project</code> — when each is used →
+  lesson 14.2.</li>
+<li>Project-level reporting + dashboards → lesson 14.7.</li>
+<li>The Hermes/Fabio recommendation flow that reads from this surface
+  → Course 3 + Course 7 (Floor Mgmt + Sysadmin).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_14_kitchen_vs_general_projects" model="slide.slide">
+            <field name="name">Kitchen Projects vs General Projects — Why Southbrook Has Both</field>
+            <field name="channel_id" ref="course_project_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Project Manager + Developer (and the salesperson curious about why a &quot;kitchen&quot; needs two records).</field>
+            <field name="html_content"><![CDATA[<h1 id="kitchen-projects-vs-general-projects-why-southbrook-has-both">Kitchen Projects vs General Projects — Why Southbrook Has Both</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a project manager who looks at the menu and sees both
+<strong>Sales → Kitchen Workspace → Projects</strong> AND <strong>/odoo/project</strong> and
+quietly suspects something is duplicated. Or you're a developer who
+just inherited the codebase and finds two models — <code>project.project</code>
+and <code>sb.kitchen.project</code> — that both seem to represent "the kitchen"
+and you can't tell which is canonical. This lesson is the
+reconciliation: WHY both exist, WHEN each is used, WHAT data flows
+between them, and what the UI cues are.</p>
+<p>Lesson 2.1 covers the planner's mental model. This lesson goes deeper
+into the <em>data layer</em> and answers the developer's "is one record the
+backing record of the other?" question definitively.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong>. The same physical
+kitchen can be looked at through three different doors:</p>
+<blockquote>
+<p><strong>Sales → Kitchen Workspace → Projects</strong> — opens the
+<code>sb.kitchen.project</code> list. This is the <em>design-stage</em> record. Owned
+by <code>southbrook_kitchen_workspace</code>. The salesperson lives here.</p>
+<p><strong>/odoo/project</strong> — opens the stock Odoo Project app. The
+<code>project.project</code> records ("Test", "Vanity Refits", etc.) are
+<em>buckets</em> — each holds many <code>project.task</code> rows. The PM lives here.</p>
+<p><strong>Kitchen Ops → Kitchen Jobs</strong> — opens the planner-facing kanban of
+the <code>project.task</code> spine for every confirmed kitchen order.
+Same <code>project.task</code> records as <code>/odoo/project</code>, different view.</p>
+</blockquote>
+<p>The vocabulary clash is real: the word "Project" means three different
+things depending on which door you open.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>A single physical kitchen at Southbrook is represented as <strong>three
+linked records</strong> during its lifecycle:</p>
+<ol>
+<li>
+<p><code>sb.kitchen.project</code> — the <em>design engagement.</em> Created the moment
+   the salesperson opens a Kitchen Workspace session. Custom model in
+   <code>southbrook_kitchen_workspace/models/sb_kitchen_project.py</code>. Lives
+   under <strong>Sales → Kitchen Workspace → Projects</strong>.</p>
+</li>
+<li>
+<p><code>sale.order</code> — the <em>commercial commitment.</em> Created when the
+   salesperson finalises a quote (manually or from the Order Builder).
+   Stock Odoo model. The <code>sb.kitchen.project.sale_order_id</code> Many2one
+   points at it.</p>
+</li>
+<li>
+<p><code>project.task</code> — the <em>shop-floor job.</em> Created automatically when
+   the <code>sale.order</code> confirms (via the override on
+   <code>sale.order._action_confirm</code> in <code>southbrook_project_mrp/models/sale_order.py</code>).
+   Lives on a <em>stock</em> <code>project.project</code> (typically project ID 1, "Test"
+   on the live instance — see lesson 14.1 for how the post-init hook
+   provisioned it). The PM works against it on <code>/odoo/project</code>.</p>
+</li>
+</ol>
+<p>Note the asymmetry: there's no <code>sb.kitchen.project</code> ⇄ <code>project.task</code>
+direct link in the data model. They link <strong>indirectly through the
+sale order</strong>:</p>
+<pre><code>sb.kitchen.project.sale_order_id  →  sale.order
+                                         ↓ (on _action_confirm)
+                                     project.task
+                                       (x_southbrook_sale_order_id back-ref)
+</code></pre>
+<p>So if you're standing on a <code>project.task</code> and want to find the
+originating Kitchen Workspace, you walk the chain:</p>
+<pre><code class="language-python">task.x_southbrook_sale_order_id  # the SO
+sb_kp = env['sb.kitchen.project'].search(
+    [('sale_order_id', '=', task.x_southbrook_sale_order_id.id)],
+    limit=1)
+</code></pre>
+<p>The reverse direction (<code>sb.kitchen.project</code> → <code>project.task</code>) is the
+same walk. No One2many shortcut, because the design-stage record
+shouldn't <em>need</em> to know about the shop-floor task — by the time the
+shop is involved, design is over.</p>
+<h3 id="fields-youll-see-on-sbkitchenproject-owner-southbrook_kitchen_workspace">Fields you'll see on <code>sb.kitchen.project</code> (owner: <code>southbrook_kitchen_workspace</code>)</h3>
+<ul>
+<li><code>name</code> (Char) — free-form, e.g. "Smith Walnut U-Shape"</li>
+<li><code>code</code> (Char) — sequential, "KP/2026/000123" format (seeded sequence)</li>
+<li><code>state</code> (Selection) — draft / designing / awaiting_customer /
+  approved / in_production / done / cancelled. <strong>State machine</strong>
+  enforced via <code>action_set_state</code> with a <code>VALID_TRANSITIONS</code> set —
+  off-graph transitions raise <code>UserError</code>.</li>
+<li><code>theme</code> (Selection) — signature / elegance / contemporary /
+  contractor (aligned with the four configurator series in
+  <code>southbrook_estimating</code>)</li>
+<li><code>partner_id</code> (Many2one to <code>res.partner</code>) — the customer, required</li>
+<li><code>opportunity_id</code> (Many2one to <code>crm.lead</code>) — origin opportunity</li>
+<li><code>salesperson_id</code> (Many2one to <code>res.users</code>) — the designer</li>
+<li><code>date_created</code>, <code>date_target</code>, <code>date_completed</code> (Date)</li>
+<li><code>design_option_ids</code> (One2many to <code>sb.kitchen.design.option</code>) —
+  concept A / B / C</li>
+<li><code>selected_design_option_id</code> (Many2one, computed-stored) — the
+  selected concept; selecting one clears the others</li>
+<li><code>ai_analysis_id</code> (Many2one to <code>sb.kitchen.ai.analysis</code>) — Gemini's
+  output for the room</li>
+<li><code>appliance_ids</code> (One2many to <code>sb.kitchen.appliance</code>) — stove,
+  fridge, sink, etc. with clearances</li>
+<li><code>approval_ids</code> (One2many to <code>sb.kitchen.approval</code>)</li>
+<li><code>sale_order_id</code> (Many2one to <code>sale.order</code>) — the link out to commerce</li>
+</ul>
+<h3 id="fields-youll-see-on-projecttask-owners-stock-project-southbrook_project-southbrook_project_mrp">Fields you'll see on <code>project.task</code> (owners: stock <code>project</code>, <code>southbrook_project</code>, <code>southbrook_project_mrp</code>)</h3>
+<p>The cabinetry custom fields owned by <code>southbrook_project</code>
+(<code>x_southbrook_material_species</code>, <code>x_southbrook_unit_count</code>,
+<code>x_southbrook_hardware_specs</code>, <code>x_southbrook_sale_order_id</code>,
+<code>x_southbrook_priority</code>) are catalogued in lesson 14.1. The full set
+of <code>southbrook_*</code> MRP/coordination fields owned by
+<code>southbrook_project_mrp</code> is catalogued in lessons 14.3 + 14.4 + 14.5.</p>
+<p>The clearest <strong>UI cue you're on a <code>project.task</code> (not an
+<code>sb.kitchen.project</code>)</strong> is the form heading: a task shows the
+"Cabinetry Specs" notebook tab and (when an SO is linked) the
+<code>display_name</code> is suffixed <code>[S0042]</code>. The Kitchen Project form has the
+"Design Options" + "Appliances" + "Approvals" tabs and no <code>[S0042]</code>
+suffix.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>As a salesperson, working pre-confirmation:</strong></p>
+<ol>
+<li>Open <strong>Sales → Kitchen Workspace → Projects</strong>, create a new
+   <code>sb.kitchen.project</code>, fill <code>name</code> + <code>partner_id</code>.</li>
+<li>Move state draft → designing (click the button or call
+   <code>action_start_designing</code>). The state machine logs the transition to
+   chatter.</li>
+<li>Add design options A / B / C, run AI analysis, capture appliances,
+   capture customer feedback.</li>
+<li>When the customer picks concept A, mark it selected (the One-of-N
+   compute clears B + C).</li>
+<li>Author the quote (Order Builder → generates <code>sale.order</code>).</li>
+<li>Set <code>sb.kitchen.project.sale_order_id</code> to the freshly created SO.</li>
+<li>Move state designing → awaiting_customer → approved.</li>
+</ol>
+<p>At no point in the salesperson's flow does a <code>project.task</code> exist.
+The shop hasn't seen the kitchen yet.</p>
+<p><strong>As a planner / PM, working post-confirmation:</strong></p>
+<ol>
+<li>Customer signs off → salesperson clicks <em>Confirm</em> on the SO.</li>
+<li><code>sale.order._action_confirm</code> calls <code>_southbrook_ensure_job</code>, which:
+   - Checks the order lines carry products with a BoM. If not, skips
+     (no shop work needed).
+   - Searches for an existing <code>project.task</code> with
+     <code>x_southbrook_sale_order_id = self.id</code>. If one exists, reuses it.
+   - Otherwise creates a new <code>project.task</code> on the first
+     <code>project.project</code> (or the project named in the
+     <code>southbrook_project_mrp.job_project_id</code> ir.config_parameter
+     override) with <code>name = "Job: &lt;SO&gt; — &lt;customer&gt;"</code> and
+     <code>x_southbrook_sale_order_id = self.id</code>.
+   - Back-links any existing MOs for that SO to the new task.</li>
+<li><strong>You</strong> (the PM) open the task from <strong>Kitchen Ops → Kitchen Jobs</strong>
+   and work through the release gate (lesson 14.4).</li>
+<li>Optionally, you flip <code>sb.kitchen.project.state</code> →
+   <code>in_production</code> (manual button) to keep the salesperson's view in
+   sync. This is a courtesy update — the data model doesn't enforce
+   that the two states agree.</li>
+</ol>
+<p><strong>As a developer, tracing a kitchen through the system:</strong></p>
+<p>Start from the customer name on the <code>partner_id</code>. Search:</p>
+<pre><code>sb.kitchen.project where partner_id = X        →  design engagement
+sale.order where partner_id = X                →  commercial
+project.task where x_southbrook_sale_order_id  →  shop-floor
+                  IN (those sale.order ids)
+mrp.production where project_task_id           →  MOs
+                    IN (those project.task ids)
+</code></pre>
+<p>That's the canonical walk. If a piece is missing (e.g. an SO confirmed
+without a task created), see "Common mistakes" below.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I confirmed a sale order but no <code>project.task</code> was created."</strong></p>
+<p>Three possible reasons, in order of likelihood:</p>
+<ol>
+<li>
+<p><strong>The product on the SO line has no BoM.</strong> The
+   <code>_southbrook_ensure_job</code> guard is
+   <code>drives_manufacturing = bool(tmpl_ids) and bool(mrp.bom.search_count([
+   ('product_tmpl_id', 'in', tmpl_ids)]))</code>. No BoM = no task.
+   Resolution: confirm the product has a BoM (Manufacturing → BoMs),
+   then manually call the <code>_southbrook_ensure_job</code> method on the SO
+   (developer mode → Action menu → Run Server Code, or run via shell:
+   <code>env['sale.order'].browse(&lt;id&gt;)._southbrook_ensure_job()</code>).</p>
+</li>
+<li>
+<p><strong>There is no <code>project.project</code> record in the database.</strong> The
+   <code>_southbrook_job_project</code> helper returns the first project it
+   finds or the one referenced by the
+   <code>southbrook_project_mrp.job_project_id</code> ir.config_parameter. If
+   both are empty, the helper returns <code>False</code> and no task is
+   created. Resolution: install <code>southbrook_project</code> (whose post-init
+   hook ensures project ID 1 exists) or create a project manually.</p>
+</li>
+<li>
+<p><strong>The override didn't fire.</strong> <code>_action_confirm</code> is overridden in
+   <code>southbrook_project_mrp/models/sale_order.py</code>. If the addon was
+   uninstalled, the SO confirms but the task isn't created. Same
+   resolution as case 1.</p>
+</li>
+</ol>
+<p><strong>"I have an <code>sb.kitchen.project</code> in state <code>in_production</code> but the
+linked SO has no <code>project.task</code>."</strong></p>
+<p>The Kitchen Workspace state machine is <em>independent</em> of the shop-floor
+flow. Someone called <code>action_set_state('in_production')</code> without
+confirming the SO. To recover: confirm the SO (which auto-creates the
+task), or manually rewind <code>sb.kitchen.project.state</code> to <code>approved</code>.
+The state machine allows the rewind via the
+(<code>awaiting_customer</code>, <code>approved</code>) transition only — going back from
+<code>in_production</code> requires a manual write or via cancel + restart.</p>
+<p><strong>"My salesperson keeps editing the kitchen after I've started
+production."</strong></p>
+<p>This is a process question, not a system one. The data model lets it
+happen because <code>sb.kitchen.project</code> and <code>project.task</code> are
+independently mutable. Convention: once <code>sale.order.state == 'sale'</code>
+the Kitchen Workspace should be locked (state moved to
+<code>in_production</code>). Enforce via training, not by extending the model.</p>
+<p><strong>"<code>sb.kitchen.project</code> shows a sale order that was cancelled."</strong></p>
+<p>The <code>sale_order_id</code> Many2one has no <code>ondelete</code> cascade — cancelling a
+SO doesn't touch the Kitchen Project. If you need a new quote, create
+a new SO and update the Many2one. Don't archive the old Kitchen
+Project unless you're sure no field is referencing its <code>code</code> for
+auditing.</p>
+<p><strong>"I see a <code>project.task</code> with no <code>x_southbrook_sale_order_id</code>. Is
+that an orphan?"</strong></p>
+<p>Not necessarily. The PM can create a task manually on /odoo/project
+(stock Odoo behavior). What's <em>missing</em> is the orchestration spine —
+no SO means the readiness cron skips it, no MOs auto-link, no
+mission-control aggregation. The Data Quality Dry Run
+(<code>action_southbrook_data_quality_dry_run</code> on <code>project.project</code>,
+documented in lesson 14.7) flags these as <code>blank_kitchen_project</code>
+warnings.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The two-model split is <strong>deliberate</strong> and reflects two different
+ownership stages of the same physical kitchen:</p>
+<ul>
+<li><strong><code>sb.kitchen.project</code> is owned by the design organisation.</strong> Its
+  state machine reflects what the <em>designer + customer</em> are doing
+  (drafting, presenting options, awaiting feedback, approving).</li>
+<li><strong><code>project.task</code> is owned by the shop.</strong> Its stage reflects what
+  the <em>PM + operators</em> are doing (cutting, assembling, finishing,
+  installing).</li>
+</ul>
+<p>A single record that covered both would have to multiplex two state
+machines that almost never share fields. Splitting them lets:</p>
+<ul>
+<li><code>sb.kitchen.project</code> carry photos, AI analysis, design options,
+  appliances — none of which the shop cares about.</li>
+<li><code>project.task</code> carry MO links, readiness compute, release sign-off
+  booleans, install checklist — none of which the designer cares
+  about.</li>
+</ul>
+<p>The <strong>glue between them is the sale order</strong>, which is canonical for
+commercial intent. The auto-create on <code>_action_confirm</code> makes the
+glue automatic — by the time a confirmed SO exists, the
+<code>project.task</code> exists too.</p>
+<p>The <code>southbrook_kitchen_workspace</code> addon depends on
+<code>southbrook_estimating</code>, not on <code>southbrook_project_mrp</code> — so the
+design stage doesn't pull in the MRP bridge. The bridge is loaded
+separately on the shop side. This is what lets a CE-only test
+database run the Workspace without MRP and a Workspace-less PM-only
+database run the bridge without Workspace.</p>
+<p>The state-machine validation in <code>sb.kitchen.project.action_set_state</code>
+is <em>not</em> mirrored on <code>project.task</code> — task stages on <code>/odoo/project</code>
+are stock Odoo (any-to-any transitions allowed), and the gate that
+matters (production release) is enforced via the readiness compute
+in <code>southbrook_project_mrp</code>, not via stage transitions. See lesson
+14.3 for how the gate actually works.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A new salesperson asks "do I create the <code>project.task</code> or
+does it create itself?" What do you tell them?</p>
+<blockquote>
+<p>Neither — you do not, and you should not. The <code>project.task</code> is
+auto-created by the <code>sale.order._action_confirm</code> override in
+<code>southbrook_project_mrp</code> once you confirm the SO. Your work is in
+the Kitchen Workspace + the Order Builder + Confirm. The PM sees the
+task appear under <strong>Kitchen Ops → Kitchen Jobs</strong> moments later.</p>
+</blockquote>
+<p><strong>2.</strong> You're tracing a problem: the customer says they signed off on
+the kitchen but the shop says nothing is in their queue. Which records
+do you check, in which order, and what's the diagnosis if the chain
+breaks at step 2?</p>
+<blockquote>
+<p>Step 1: <code>sb.kitchen.project</code> — does it exist for this customer? Is
+<code>state</code> past <code>approved</code>? Step 2: <code>sale.order</code> — does it exist? Is
+<code>state = 'sale'</code> (confirmed)? Step 3: <code>project.task</code> — does one
+exist with <code>x_southbrook_sale_order_id</code> = that SO? If step 2 breaks
+(no confirmed SO), the salesperson hit Approve in the Workspace but
+never confirmed the order. Resolution: confirm the SO.</p>
+</blockquote>
+<p><strong>3.</strong> A developer wants to add a "kitchen complexity score" field.
+The score is computed from <code>appliance_ids.count</code> + design-option
+complexity. Which model do you add it to and why?</p>
+<blockquote>
+<p><code>sb.kitchen.project</code> — because both source fields
+(<code>appliance_ids</code>, <code>design_option_ids</code>) live there. Adding it to
+<code>project.task</code> would force the compute to walk back through the SO
+to the Kitchen Project, which is the <em>wrong</em> direction (the shop
+shouldn't read design-stage fields). If the shop <em>also</em> needs the
+score, expose it as a <code>related</code> field from the SO Many2one chain:
+<code>project.task.kitchen_complexity = related='x_southbrook_sale_order_id.kitchen_project_id.complexity_score'</code>
+(and yes, you'd add the reverse Many2one from SO → Kitchen Project
+in <code>southbrook_kitchen_workspace</code> first).</p>
+</blockquote>
+<p><strong>4.</strong> Your QA dashboard shows an <code>sb.kitchen.project</code> in state
+<code>in_production</code> but the linked SO has been cancelled. Is the data
+model broken? What do you do?</p>
+<blockquote>
+<p>The data model isn't broken — <code>sale_order_id</code> has no <code>ondelete</code>
+cascade, by design (cancelled SOs are kept for audit). The Kitchen
+Project's state machine is independent and doesn't auto-rewind. To
+reconcile: either rewind <code>sb.kitchen.project.state</code> to <code>approved</code>
+manually (<code>action_set_state</code> only allows valid transitions, so
+you may need to cancel and re-author) or attach a new SO and
+leave the state as-is. Don't archive the Kitchen Project — the
+design-stage history is more valuable than the clean dashboard.</p>
+</blockquote>
+<p><strong>5.</strong> Two records claim to be "the project." A developer adds a
+field to <code>project.project</code> thinking it'll show up on the salesperson's
+Workspace form. Why doesn't it?</p>
+<blockquote>
+<p><code>project.project</code> and <code>sb.kitchen.project</code> are unrelated models.
+<code>project.project</code> is the stock Odoo container that holds
+<code>project.task</code> rows. <code>sb.kitchen.project</code> is a custom model in
+<code>southbrook_kitchen_workspace</code> that has nothing to do with
+<code>project.project</code> — there is no <code>_inherit</code>, no <code>_inherits</code>, no FK.
+The new field will appear on <code>/odoo/project</code> (project list/form),
+not on <code>Sales → Kitchen Workspace → Projects</code>. To add a field to
+the Workspace form, extend <code>sb.kitchen.project</code> in the kitchen
+workspace addon (or a downstream addon that depends on it).</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The state machine on <code>sb.kitchen.project</code> in detail (transition
+  rules, button wiring) → <code>southbrook_kitchen_workspace</code> docs +
+  Course 5/Estimating.</li>
+<li>The <code>sale.order</code> Order Builder flow that generates the SO →
+  lessons 5.2 + 8.4 (<code>05_estimating_a_quote.md</code>, <code>08_quote_to_mo_handoff.md</code>).</li>
+<li>The auto-creation of <code>project.task</code> on SO confirm + MO backlinks
+  in detail → lesson 14.5.</li>
+<li>The readiness + release gate on <code>project.task</code> → lessons 14.3 + 14.4.</li>
+<li>The Kitchen Workspace OWL UX (design options, appliance layout) →
+  Course 5.</li>
+<li>The Hermes recommendation queue that reads from both sides →
+  Course 3 (Floor Mgmt).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_14_task_lifecycle_readiness" model="slide.slide">
+            <field name="name">Task Lifecycle + Readiness Compute — How &quot;Ready&quot; Is Calculated</field>
+            <field name="channel_id" ref="course_project_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Project Manager + Production Planner (anyone who reads readiness to triage the day).</field>
+            <field name="html_content"><![CDATA[<h1 id="task-lifecycle-readiness-compute-how-ready-is-calculated">Task Lifecycle + Readiness Compute — How "Ready" Is Calculated</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the planner who triages the queue every morning by skimming the
+readiness badges (Ready / Review / Blocked / Info) and never quite
+trusts them because nobody told you what they actually compute. Or
+you're the PM who needs to defend "this job is blocked" to a sales
+rep and wants to point at the <em>specific check</em> that says so. This
+lesson is the algorithm, the inputs, the cron schedule, and the
+recovery moves when a value is wrong.</p>
+<p>Course 2's bottleneck lesson treats readiness as a primitive. Course
+12's queue lesson treats it as a header. This lesson takes it apart.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong>.</p>
+<blockquote>
+<p><strong>/odoo/project → any project → any task</strong> — opens the task form.
+The readiness state appears as a coloured badge near the header and
+in the "Readiness" smart button (count = number of readiness checks).</p>
+<p><strong>Kitchen Ops → Kitchen Jobs</strong> (planner kanban) — cards are coloured
+by <code>readiness_decision</code> (<code>ready</code> / <code>review</code> / <code>blocked</code> / <code>info</code>),
+sorted by <code>readiness_last_recomputed_at</code> desc by default.</p>
+<p><strong>Settings → Technical → Scheduled Actions → Southbrook: Recompute
+Project Readiness</strong> — the cron's admin page. Shows last run, next
+run, and any traceback if it errored.</p>
+<p><strong>(task form) → Readiness smart button</strong> — opens the
+<code>southbrook.project.readiness.line</code> list filtered to this task.
+Each line is one check (Cabinet Specs, Production Release Checklist,
+MRP Link, Materials / Purchasing, Scheduling, Crew, Equipment, etc.)
+with status + severity + reason + evidence + recommended_action.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The readiness header on a task is driven by <strong>four computed fields on
+<code>project.task</code></strong> (all owned by <code>southbrook_project_mrp</code>):</p>
+<ul>
+<li><code>readiness_decision</code> (Selection: ready / review / blocked / info) —
+  the four-state badge. <strong>Aliases the <code>manufacturing_readiness_state</code>
+  underneath.</strong> Set by <code>_compute_phase1_operational_context</code>.</li>
+<li><code>readiness_score</code> (Integer 0–100) — a tighter triage number.
+  Aliases <code>manufacturing_readiness_score</code>. Set by the same compute.</li>
+<li><code>readiness_last_recomputed_at</code> (Datetime, owned by
+  <code>southbrook_premium_orchestration</code>) — stamped on every cron tick.</li>
+<li><code>job_at_risk</code> (Boolean) — a separate computed flag from
+  <code>_compute_mrp_status</code>; means "this job is late or has a started MO
+  that isn't fully reserved." Surfaces as the red "At risk" banner on
+  the form and the "At risk" pill on the kanban card.</li>
+</ul>
+<p>The score and decision come from the <strong>underlying readiness compute</strong>
+which lives in <code>_compute_manufacturing_readiness</code> on <code>project.task</code>
+(<code>southbrook_project_mrp/models/project_task.py</code>, ~line 1749). It is
+the canonical source.</p>
+<h3 id="the-readiness-algorithm-what-gets-checked">The readiness algorithm — what gets checked</h3>
+<p>Each "gate" is one of 11 checks. Each check emits one of three
+verdicts — READY / REVIEW / BLOCKED — that get bucketed into three
+text summaries (<code>manufacturing_blocker_summary</code>,
+<code>manufacturing_warning_summary</code>, <code>manufacturing_info_summary</code>) plus
+the full chronological narrative in <code>manufacturing_waterfall_summary</code>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Gate</th>
+<th>READY when…</th>
+<th>REVIEW when…</th>
+<th>BLOCKED when…</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Data Completeness</td>
+<td><code>customer_id</code> AND <code>source_order_id</code> set</td>
+<td>—</td>
+<td>either missing</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Cabinet Specs</td>
+<td>all 4 spec fields set (see below)</td>
+<td>one or more missing</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Production Release Checklist</td>
+<td><code>southbrook_production_release_state == 'ready'</code></td>
+<td>—</td>
+<td>else (covers all the sub-checks in 14.4)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>MRP Link</td>
+<td><code>production_count &gt; 0</code></td>
+<td>—</td>
+<td>no linked MOs</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Engineering / CAD</td>
+<td><code>job_cad_status</code> empty OR contains "done"</td>
+<td>non-empty + no "done"</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Materials / Purchasing</td>
+<td>not material_at_risk AND no open procurement</td>
+<td>not at risk but open procurement exists</td>
+<td><code>material_at_risk == True</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Scheduling</td>
+<td><code>unscheduled_workorder_count == 0</code></td>
+<td>—</td>
+<td>any WOs without <code>date_start</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Crew</td>
+<td><code>crew_gap == False</code></td>
+<td>any unassigned MO or WO</td>
+<td>—</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Equipment / Tooling</td>
+<td><code>equipment_blocked == False</code></td>
+<td>—</td>
+<td>any open maintenance request</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Production Capacity</td>
+<td>not over capacity AND not job_at_risk</td>
+<td>over capacity OR job_at_risk</td>
+<td>—</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Delivery / Install</td>
+<td><code>southbrook_install_readiness_state == 'ready'</code></td>
+<td>install checklist incomplete</td>
+<td>—</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Calculations</td>
+<td>≥1 <code>southbrook.mi.check</code> linked</td>
+<td>—</td>
+<td>— (emits INFO, not blocker)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>PM Phase / Manufacturing Reality</td>
+<td><code>stage_mo_divergence == False</code></td>
+<td>stage hints at production but no MO started</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The 4 required cabinet specs (gate 2) are defined in the constant
+<code>_REQUIRED_CABINET_SPEC_LABELS</code> at the top of <code>project_task.py</code>:</p>
+<ul>
+<li><code>x_southbrook_material_species</code> (owner: <code>southbrook_project</code>)</li>
+<li><code>x_southbrook_hardware_specs</code> (owner: <code>southbrook_project</code>)</li>
+<li><code>southbrook_door_style</code> (owner: <code>southbrook_project_mrp</code>)</li>
+<li><code>southbrook_finish</code> (owner: <code>southbrook_project_mrp</code>)</li>
+</ul>
+<h3 id="how-the-decision-rolls-up">How the decision rolls up</h3>
+<pre><code>if any gate is BLOCKED:    decision = &quot;blocked&quot;
+elif any gate is REVIEW:   decision = &quot;review&quot;
+else:                       decision = &quot;ready&quot;
+</code></pre>
+<p>The <code>info</code> decision in the Selection is reserved for tasks with no
+manufacturing context (e.g. a hand-created task with no SO link); the
+canonical compute will return "ready" by default but
+<code>_compute_phase1_operational_context</code> falls back to "info" if
+<code>manufacturing_readiness_state</code> is unset.</p>
+<h3 id="how-the-score-rolls-up">How the score rolls up</h3>
+<pre><code>penalty = blockers × 25 + warnings × 10
+score = max(0, min(100, 100 - penalty))
+
+# Then apply caps — if specific blockers are present, score is
+# clamped to the cap even if the linear math says higher:
+caps:
+  no production_count           →  40
+  CAD status open               →  55
+  material_at_risk              →  60
+  unscheduled WOs               →  55
+  equipment_blocked             →  65
+  production_release != &quot;ready&quot; →  65
+  no job_install_due            →  80
+
+score = min(score, *caps_applied)
+</code></pre>
+<p>So a task with one blocker and one warning has a base score of
+<code>100 - 25 - 10 = 65</code>. If the blocker is "no production_count", the
+cap of 40 applies, and the final score is 40.</p>
+<h3 id="when-does-the-recompute-run">When does the recompute run?</h3>
+<p>Three triggers:</p>
+<ol>
+<li>
+<p><strong><code>@api.depends</code> recompute on read</strong> — every time you read the
+   field (open the form, query the API), the compute fires if any of
+   ~20 dependencies changed since last evaluation. The deps are
+   listed at the top of <code>_compute_manufacturing_readiness</code>:
+   <code>production_count</code>, <code>job_cad_status</code>, <code>material_at_risk</code>,
+   <code>procurement_count</code>, <code>unscheduled_workorder_count</code>, <code>crew_gap</code>,
+   <code>equipment_blocked</code>, <code>workcenter_over_capacity</code>, <code>job_at_risk</code>,
+   <code>job_risk_reason</code>, <code>job_install_due</code>,
+   <code>manufacturing_calculation_count</code>, <code>stage_mo_divergence</code>,
+   <code>stage_mo_note</code>, <code>customer_id</code>, <code>source_order_id</code>,
+   <code>southbrook_specs_complete</code>, <code>southbrook_production_release_state</code>,
+   <code>southbrook_production_release_reason</code>,
+   <code>southbrook_install_readiness_state</code>,
+   <code>southbrook_install_readiness_reason</code>.</p>
+</li>
+<li>
+<p><strong>The 30-minute cron</strong> —
+   <code>southbrook_premium_orchestration.cron_recompute_readiness_all</code>
+   fires <code>_cron_recompute_readiness_all</code> against every task with
+   <code>x_southbrook_sale_order_id != False</code> AND <code>state not in
+   (1_done, 1_canceled)</code>. For each, it calls
+   <code>action_recompute_readiness_lines</code> (which writes
+   <code>southbrook.project.readiness.line</code> rows for the smart-button
+   drill-down), then stamps <code>readiness_last_recomputed_at</code> and posts
+   a chatter note if <code>(readiness_decision, southbrook_production_release_state)</code>
+   changed since last tick.</p>
+</li>
+<li>
+<p><strong>Manual recompute</strong> — the <em>Readiness</em> smart button on the task
+   form (action <code>action_view_readiness_lines</code>) calls
+   <code>action_recompute_readiness_lines</code> before opening the list. So
+   every time you click in, you get fresh evidence.</p>
+</li>
+</ol>
+<h3 id="the-at-risk-flag-separate-from-readiness">The at-risk flag — separate from readiness</h3>
+<p><code>job_at_risk</code> (Boolean) on <code>project.task</code> is computed by
+<code>_compute_mrp_status</code> (<code>southbrook_project_mrp/models/project_task.py</code>,
+~line 624). It is True when <em>either</em>:</p>
+<ul>
+<li>A started MO (<code>state in ('confirmed', 'progress')</code>) is not
+  fully reserved (<code>reservation_state != 'assigned'</code>), OR</li>
+<li>Any non-done MO has a <code>date_deadline</code> in the past
+  (<code>m.date_deadline.date() &lt; today</code>).</li>
+</ul>
+<p>The reason string is <code>job_risk_reason</code>. The flag feeds into the
+"Production Capacity" gate of the readiness compute — when
+<code>job_at_risk == True</code>, that gate fires REVIEW, which contributes 10
+points of penalty + a "review" decision overall (unless something
+else already pushed decision to "blocked").</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>Morning (10 min):</strong></p>
+<ol>
+<li>Open <strong>Kitchen Ops → Kitchen Jobs</strong>. The kanban groups tasks by
+   <code>readiness_decision</code>. <strong>The "Blocked" lane is your day.</strong></li>
+<li>For each card in Blocked, click it open. Click the <em>Readiness</em>
+   smart button. The drill-down list shows you the <strong>specific check
+   that blocked it</strong> with the recommended action.</li>
+<li>Triage:
+   - "Missing customer / source sales order" → bounce to the
+     salesperson; this task shouldn't have been created.
+   - "No linked manufacturing orders" → run the <em>Link MOs from Sale</em>
+     action on the task (or wait for procurement to create them).
+   - "Components available: waiting" → check the procurement smart
+     button; chase the PO.
+   - "Equipment blocked" → check Maintenance; clear the open request
+     or reroute the WO.
+   - "X work orders not scheduled" → click the WOs smart button and
+     hit <em>Schedule</em> on each.</li>
+</ol>
+<p><strong>Mid-day:</strong></p>
+<ul>
+<li>The cron fires every 30 min on the half-hour mark (with a
+  +2-minute stagger from install — see lesson 14.1). Tasks whose
+  decision flipped since the last run get a chatter note on them so
+  the followers (typically the PM + salesperson) are notified.</li>
+</ul>
+<p><strong>End of day:</strong></p>
+<ul>
+<li>Sort the Kitchen Jobs board by
+  <code>readiness_last_recomputed_at</code> desc. The most-recently-recomputed
+  tasks are the ones the cron has touched in the last hour. If a
+  task hasn't been recomputed in &gt;2 hours, something is wrong —
+  check the cron's admin page.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"A task shows BLOCKED but I just fixed the thing it was complaining
+about."</strong></p>
+<p>You probably fixed the upstream condition but haven't read the task
+form yet — the compute is <code>@api.depends</code>-gated, so it only re-fires
+on read. Force a refresh: open the task form, OR wait for the next
+cron tick (max 30 min). The cron also recomputes
+<code>action_recompute_readiness_lines</code> which rebuilds the
+<code>southbrook.project.readiness.line</code> rows the drill-down reads.</p>
+<p><strong>"The cron stopped running."</strong></p>
+<p>Check <strong>Settings → Technical → Scheduled Actions → Southbrook:
+Recompute Project Readiness</strong>. If <code>nextcall</code> is in the past and
+<code>active = True</code>, Odoo's scheduler is paused (look at server logs).
+If <code>active = False</code>, someone archived it — re-enable. If you see a
+traceback, the most common cause is a task with malformed data
+(historically: a <code>date_deadline</code> being a string instead of a date —
+fixed 2026-06-11, see lesson 14.1's mention of the FIX 1 commit).</p>
+<p><strong>"<code>readiness_last_recomputed_at</code> is fresh but the decision still
+looks wrong."</strong></p>
+<p>The cron ran but the compute returned what it returned. Open the
+<em>Readiness</em> smart-button drill-down — the reasons are explicit.
+Common: a gate you thought was satisfied isn't (e.g., you set
+<code>southbrook_release_cad_approved = True</code> but the
+<code>southbrook_release_bom_verified</code> is still False, so the Production
+Release Checklist gate still blocks). Lesson 14.4 has the full
+checklist.</p>
+<p><strong>"A task is <code>info</code> but I expected <code>ready</code>."</strong></p>
+<p><code>info</code> is the fallback. It means <code>manufacturing_readiness_state</code> was
+None/empty when the alias compute fired. Triggers: the task has no
+SO link (so no MOs, so no gates run meaningfully). The drill-down
+will be sparse. Resolution: link the SO via
+<code>x_southbrook_sale_order_id</code> or trigger the linkage from the SO side
+(see lesson 14.5).</p>
+<p><strong>"The score on two tasks is identical but one is Blocked and one is
+Ready."</strong></p>
+<p>The score's caps are independent of the linear penalty math, so a
+"ready" task with no blockers can hit 80 (because <code>job_install_due</code>
+is missing — cap of 80) while a "blocked" task with one blocker can
+also hit 80 (one blocker = 75 base, no caps tighter). Resolution:
+read the decision first, score second. Score is a tie-breaker, not
+the headline.</p>
+<p><strong>"I want to override readiness for a specific task — I know the BoM
+isn't verified but I'm authorising it anyway."</strong></p>
+<p>You can flip <code>southbrook_release_bom_verified = True</code> (or any of the
+5 sign-off booleans — see lesson 14.4) by hand on the task form,
+which un-blocks the Production Release Checklist gate. <strong>It's
+tracked</strong> (the field has <code>tracking=True</code>) so the chatter logs who and
+when. This is the operator-controlled escape hatch; the readiness
+compute respects the booleans, it doesn't second-guess them.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The readiness algorithm is <strong>fully deterministic</strong> — no ML, no
+heuristics, no "fuzzy" matches. Every gate's verdict is a direct
+function of explicit data on linked records.</p>
+<p>The 13 gates are evaluated in a fixed order (data → specs →
+production release → MRP link → engineering → materials →
+scheduling → crew → equipment → capacity → install → calculations →
+stage coherence), and the gates' output is appended to four parallel
+buffers (gates, blockers, warnings, infos). At the end:</p>
+<pre><code class="language-python">task.manufacturing_waterfall_summary = &quot;\n&quot;.join(gates)
+task.manufacturing_blocker_summary  = &quot;\n&quot;.join(blockers) or &quot;No start blockers.&quot;
+task.manufacturing_warning_summary  = &quot;\n&quot;.join(warnings) or &quot;No manager-review warnings.&quot;
+task.manufacturing_info_summary     = &quot;\n&quot;.join(infos)    or &quot;No efficiency prompts.&quot;
+task.manufacturing_readiness_state  = &quot;blocked&quot; if blockers else (&quot;review&quot; if warnings else &quot;ready&quot;)
+</code></pre>
+<p>The waterfall summary is what the planner reads end-to-end in the
+"Waterfall Readiness" multiline text field on the form. The
+three summary buckets feed the three coloured callouts at the top of
+the form ("Start Blockers" / "Manager Review" / "Efficiency Prompts").</p>
+<p><code>action_recompute_readiness_lines</code> writes one
+<code>southbrook.project.readiness.line</code> row per check, with <code>status</code>
+(ready/review/blocked/info), <code>severity</code> (info/warning/blocker),
+<code>reason</code>, <code>evidence</code> (multiline context — the actual MO names, CAD
+status string, work-center load, etc.), and <code>recommended_action</code>
+(verbatim "do X next" text). The list view of these lines is what
+the <em>Readiness</em> smart button opens. The rows are blown away and
+recreated on every recompute (idempotent — no historical trail of
+past readiness, by design — if you need historical, audit the chatter
+on the task).</p>
+<p>The cron tick:</p>
+<pre><code class="language-python">domain = [
+    (&quot;x_southbrook_sale_order_id&quot;, &quot;!=&quot;, False),
+    (&quot;state&quot;, &quot;not in&quot;, (&quot;1_done&quot;, &quot;1_canceled&quot;)),
+]
+tasks = self.search(domain)
+for task in tasks:
+    previous = task._readiness_snapshot()  # (decision, release_state)
+    task._invoke_readiness_recompute()     # tries 3 method names via getattr
+    task.readiness_last_recomputed_at = now
+    current = task._readiness_snapshot()
+    if previous != current and any(previous) and any(current):
+        task._log_readiness_flip(previous, current)  # chatter
+</code></pre>
+<p>The defensive <code>getattr</code> dispatcher means if <code>southbrook_project_mrp</code>
+renames <code>action_recompute_readiness_lines</code>, the cron will silently
+fall through to <code>action_recompute_readiness</code> or <code>_recompute_readiness</code>
+without crashing — useful for in-place upgrades on a live instance.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A task shows decision = REVIEW, score = 90. You scan the
+waterfall and see all gates are READY except "Production Capacity:
+REVIEW — workcenter load over daily capacity." Why is the score so
+high?</p>
+<blockquote>
+<p>Production Capacity is a REVIEW (warning) gate, not a BLOCKED gate.
+Warnings cost 10 points each; one warning gives a base score of
+90. None of the capping conditions apply (no missing
+production_count, no CAD open, no material risk, etc.) so the
+linear math wins and the score is 90. The decision is REVIEW
+because <em>any</em> warning rolls up to REVIEW, but the planner can
+safely treat this as "low-priority watch list" — score gates are
+tuned so 90+ with a single warning is the "you'll probably be
+fine" zone.</p>
+</blockquote>
+<p><strong>2.</strong> The cron is running every 30 minutes but a particular task
+hasn't had its <code>readiness_last_recomputed_at</code> updated in 4 hours.
+What's most likely?</p>
+<blockquote>
+<p>The task fell out of the cron's <code>domain</code> filter. Check:
+(a) Is <code>x_southbrook_sale_order_id</code> still set? Someone might have
+blanked the link. (b) Has the task's <code>state</code> flipped to <code>1_done</code>
+or <code>1_canceled</code>? The cron skips closed tasks. Either case is
+probably correct behavior — re-link or leave done.</p>
+</blockquote>
+<p><strong>3.</strong> The "Cabinet Specs" gate is REVIEW and the recommended action
+says "missing Material/species, Door style, Finish". You set
+<code>x_southbrook_material_species</code>, <code>southbrook_door_style</code>,
+<code>southbrook_finish</code> but the gate stays REVIEW. What's wrong?</p>
+<blockquote>
+<p>The required-specs constant includes a fourth field:
+<code>x_southbrook_hardware_specs</code> (Text). The recommended action lists
+what's <em>currently</em> missing; if you fixed three out of four, the
+fourth still blocks. Open the Cabinetry Specs tab and paste in
+the hardware spec text from the quote.</p>
+</blockquote>
+<p><strong>4.</strong> You flip <code>southbrook_release_bom_verified</code> to True to
+unblock release. The Production Release Checklist gate stays
+BLOCKED. Why?</p>
+<blockquote>
+<p>The release checklist has 12 sub-checks (see lesson 14.4); BoM
+verified is only one. The compute
+<code>_compute_southbrook_production_release</code> rebuilds the missing-items
+list on every read and returns BLOCKED if <em>any</em> item is missing.
+Open the form and look at the per-item evidence string
+(<code>_southbrook_production_release_evidence</code>) to see which item is
+still red. Common culprits: <code>southbrook_site_measurement_status</code>
+still pending, no install due date on linked MOs, an unscheduled
+WO.</p>
+</blockquote>
+<p><strong>5.</strong> A task has <code>readiness_decision = ready</code> but <code>job_at_risk =
+True</code>. Is that a contradiction? What does it mean operationally?</p>
+<blockquote>
+<p>Not a contradiction — but the Production Capacity gate should have
+fired REVIEW, which should have pushed <code>readiness_decision</code> to
+"review". If you're seeing <code>ready</code> and <code>job_at_risk = True</code>
+together, either the compute hasn't refired since <code>job_at_risk</code>
+flipped (open the form to trigger re-evaluate) or the field-deps
+on <code>_compute_manufacturing_readiness</code> aren't catching the change
+(file a bug — the dep list does include <code>job_at_risk</code>).
+Operationally: trust <code>job_at_risk</code> for "is this job late?" and
+trust <code>readiness_decision</code> for "should I release more work to
+this?". They're different questions.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The 5 release sign-off booleans + the Production Release Checklist
+  internals → lesson 14.4.</li>
+<li>How a <code>project.task</code> becomes linked to MOs (the SO confirm flow) →
+  lesson 14.5.</li>
+<li>The custom task views (kanban, calendar, Gantt) that show readiness
+  badges → lesson 14.6.</li>
+<li>Project-level rollups (<code>southbrook_ready_job_count</code>, etc.) and
+  reporting → lesson 14.7.</li>
+<li>The Hermes Console + Fabio recommendation flow that consumes
+  readiness as input → Course 3 + Course 7.</li>
+<li>The Manufacturing Intelligence checks (<code>southbrook.mi.check</code>) that
+  the Calculations gate counts → Course 3 lesson 3.2.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_14_production_release_fields" model="slide.slide">
+            <field name="name">Production Release Fields — The 5 Sign-Off Booleans + the Release State Enum</field>
+            <field name="channel_id" ref="course_project_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Production Planner + ENG01 Engineer + Developer.</field>
+            <field name="html_content"><![CDATA[<h1 id="production-release-fields-the-5-sign-off-booleans-the-release-state-enum">Production Release Fields — The 5 Sign-Off Booleans + the Release State Enum</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're ENG01, the engineer who runs the release gate every morning,
+and you keep clicking through 12 things on the task form to figure
+out why a job is still blocked. Or you're a developer asked "can you
+add a sixth sign-off boolean for tariff sourcing?" and you need to
+know how the existing 5 interlock. Or you're a planner who wants to
+override a release on a critical job and you need to know what
+flipping the booleans actually does. This lesson is the <em>full</em>
+catalogue of release fields on <code>project.task</code> — names, owners,
+permissions, transitions, and downstream impact.</p>
+<p>Course 2's lesson 2.2 introduces the gate. Course 12's lesson 12.4
+covers the Release Queue dashboard. This lesson is the underlying
+data model + state machine.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong> as ENG01 or as a user
+with Project Manager rights.</p>
+<blockquote>
+<p><strong>/odoo/project → any project → any task</strong> — opens the task form.
+Scroll past the smart buttons to the "Production Release" group of
+fields (typically in a notebook tab or top-level group).</p>
+<p><strong>Kitchen Ops → Production Release Queue</strong> — the dashboard of all
+tasks with <code>southbrook_production_release_state in
+('blocked', 'review')</code>. Detailed in lesson 12.4.</p>
+<p><strong>(task form) → Readiness smart button</strong> — shows the readiness
+drill-down. The Production Release Checklist gate (line 3 of
+~13) carries the same status + reason as the release state field.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Open any kitchen task. The release section shows <strong>5 user-editable
+sign-off booleans</strong> plus <strong>2 computed read-only state fields</strong>.</p>
+<h3 id="the-5-sign-off-booleans-all-owned-by-southbrook_project_mrp">The 5 sign-off booleans (all owned by <code>southbrook_project_mrp</code>)</h3>
+<p>All five are <code>fields.Boolean(string="…", tracking=True)</code> on
+<code>project.task</code>. <code>tracking=True</code> means every flip is logged to the
+chatter with <code>(who, when, old → new)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>UI label</th>
+<th>Default</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_release_cad_approved</code></td>
+<td>CAD Approved</td>
+<td>False</td>
+<td><code>southbrook_project_mrp</code></td>
+</tr>
+<tr>
+<td><code>southbrook_release_cutlist_approved</code></td>
+<td>Cutlist Approved</td>
+<td>False</td>
+<td><code>southbrook_project_mrp</code></td>
+</tr>
+<tr>
+<td><code>southbrook_release_bom_verified</code></td>
+<td>BoM Verified</td>
+<td>False</td>
+<td><code>southbrook_project_mrp</code></td>
+</tr>
+<tr>
+<td><code>southbrook_release_crew_reserved</code></td>
+<td>Crew Assigned / Reserved</td>
+<td>False</td>
+<td><code>southbrook_project_mrp</code></td>
+</tr>
+<tr>
+<td><code>southbrook_release_equipment_available</code></td>
+<td>Critical Equipment Avail.</td>
+<td>False</td>
+<td><code>southbrook_project_mrp</code></td>
+</tr>
+</tbody>
+</table>
+<p>They're user-editable on the form. Permission to flip them is
+governed by the <strong>stock Project ACL</strong> (Project Manager group:
+<code>project.group_project_manager</code> can write all of them; Project User
+can read but not write). The <code>southbrook_project_mrp</code> manifest
+explicitly does NOT touch ACL/security
+(<code>security/ir.model.access.csv</code> only grants access to the new
+custom models — <code>southbrook.project.job.template</code>,
+<code>southbrook.project.readiness.line</code>, etc. — not to additional fields
+on <code>project.task</code>).</p>
+<p><strong>TBD:</strong> there is no Southbrook-specific group for "release authority"
+in the addon. If you want a tighter "only ENG01 can flip CAD-approved"
+ACL, that's a product gap — see the README's "Guardrails respected"
+section in <code>southbrook_project/README.md</code>.</p>
+<h3 id="the-release-state-reason-computed-read-only">The release state + reason (computed, read-only)</h3>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>Type</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_production_release_state</code></td>
+<td>Selection (ready / review / blocked / info)</td>
+<td><code>southbrook_project_mrp</code></td>
+</tr>
+<tr>
+<td><code>southbrook_production_release_reason</code></td>
+<td>Char</td>
+<td><code>southbrook_project_mrp</code></td>
+</tr>
+</tbody>
+</table>
+<p>Compute method: <code>_compute_southbrook_production_release</code>. Dependencies
+(from the <code>@api.depends</code> decorator):</p>
+<ul>
+<li><code>southbrook_site_measurement_status</code></li>
+<li>All 5 release sign-off booleans listed above</li>
+<li><code>job_cad_status</code> (read from linked MOs)</li>
+<li><code>southbrook_specs_complete</code> (the Cabinet Specs roll-up)</li>
+<li><code>production_count</code></li>
+<li><code>components_available</code></li>
+<li><code>workorder_count</code></li>
+<li><code>unscheduled_workorder_count</code></li>
+<li><code>crew_gap</code></li>
+<li><code>equipment_blocked</code></li>
+<li><code>job_install_due</code></li>
+</ul>
+<p>The compute calls <code>_southbrook_missing_production_release_items</code> which
+walks <strong>12 checks</strong>:</p>
+<ol>
+<li><strong>Final site measurements</strong> — <code>southbrook_site_measurement_status
+   in ('received', 'waived')</code></li>
+<li><strong>CAD approved</strong> — <code>southbrook_release_cad_approved == True</code> OR
+   the linked MO <code>job_cad_status</code> string contains "done"</li>
+<li><strong>Cutlist approved</strong> — <code>southbrook_release_cutlist_approved == True</code></li>
+<li><strong>Door/finish/hardware specs</strong> — <code>southbrook_specs_complete == True</code>
+   (the 4-field Cabinet Specs roll-up — see lesson 14.3)</li>
+<li><strong>BoM verified</strong> — <code>southbrook_release_bom_verified == True</code></li>
+<li><strong>Linked MOs</strong> — <code>production_count &gt; 0</code></li>
+<li><strong>Components available</strong> — <code>components_available == 'ready'</code></li>
+<li><strong>WOs generated</strong> — <code>workorder_count &gt; 0</code></li>
+<li><strong>Schedule work orders</strong> — <code>unscheduled_workorder_count == 0</code></li>
+<li><strong>Crew assigned/reserved</strong> — <code>not crew_gap</code> OR
+    <code>southbrook_release_crew_reserved == True</code></li>
+<li><strong>Critical equipment available</strong> — <code>not equipment_blocked</code> AND
+    <code>southbrook_release_equipment_available == True</code></li>
+<li><strong>Install due date confirmed</strong> — <code>job_install_due != False</code></li>
+</ol>
+<p>If the missing-items list is empty, <code>state = "ready"</code> and
+<code>reason = "Production release checklist is complete."</code> Otherwise,
+<code>state = "blocked"</code> and <code>reason = "Missing &lt;comma-separated list&gt;."</code></p>
+<p>Note: the compute uses only <strong>two values for state — "ready" or
+"blocked"</strong> — even though the Selection allows four (ready / review /
+blocked / info). The "review" and "info" values are reachable only
+via the alias compute (<code>_compute_phase1_operational_context</code>) for the
+generic <code>readiness_decision</code> field. So if you write a domain like
+<code>[('southbrook_production_release_state', '=', 'review')]</code> against
+this specific field, you'll get an empty set in practice.</p>
+<h3 id="auxiliary-state-on-the-task">Auxiliary state on the task</h3>
+<p>These are not "release" fields strictly but the compute reads them:</p>
+<ul>
+<li><code>southbrook_site_measurement_status</code> (Selection: pending / received /
+  waived, default pending, tracking=True). Owned by
+  <code>southbrook_project_mrp</code>. User-editable.</li>
+<li><code>southbrook_specs_complete</code> (Boolean, computed). Owned by
+  <code>southbrook_project_mrp</code>. True when all 4 required cabinet specs are
+  set (see lesson 14.3).</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>As ENG01 running the release gate (morning, ~30 min for a normal day):</strong></p>
+<ol>
+<li>Open <strong>Kitchen Ops → Production Release Queue</strong>.</li>
+<li>Cards in the "Blocked" lane are your queue. Sort by
+   <code>install_due_date</code> ascending — earliest install first.</li>
+<li>Open the first blocked card. Look at the
+   <code>southbrook_production_release_reason</code> value — it lists the
+   missing items in checklist order.</li>
+<li>For each missing item:
+   - <strong>Final site measurements</strong> → if the install crew has measured,
+     set <code>southbrook_site_measurement_status = 'received'</code>. If it's
+     a re-order of a known cabinet, set it to <code>'waived'</code>.
+   - <strong>CAD approved</strong> → review the CAD package. If approved, flip
+     <code>southbrook_release_cad_approved = True</code>. The chatter will
+     record (you, now, false → true). Alternative: have the linked
+     MO's <code>job_cad_status</code> set to "done" (this is upstream and
+     covers the field automatically).
+   - <strong>Cutlist approved</strong> → review the cut spec sheet. Flip
+     <code>southbrook_release_cutlist_approved = True</code>.
+   - <strong>Door/finish/hardware specs</strong> → not yours to fix; bounce to
+     the salesperson if missing.
+   - <strong>BoM verified</strong> → open the linked MO's BoM tab. Spot-check
+     the parts list. Flip <code>southbrook_release_bom_verified = True</code>.
+   - <strong>Linked MOs / WOs generated / scheduled</strong> → not yours to fix;
+     bounce to the production planner.
+   - <strong>Components available</strong> → not yours; bounce to procurement.
+   - <strong>Crew assigned/reserved</strong> → if a crew exists but not on MOs/WOs,
+     flip <code>southbrook_release_crew_reserved = True</code> (overrides the
+     <code>crew_gap</code> flag).
+   - <strong>Critical equipment available</strong> → if a workcenter has an open
+     maintenance ticket but the equipment is still usable, flip
+     <code>southbrook_release_equipment_available = True</code> (overrides
+     <code>equipment_blocked</code>).
+   - <strong>Install due date confirmed</strong> → set the MO's
+     <code>x_sbk_install_due_date</code> (this propagates to the task via
+     <code>job_install_due</code>).</li>
+<li>When all 12 items clear, the release state flips to "ready" and
+   the task moves out of your queue. The chatter logs the
+   transition (and the readiness cron posts a flip note within 30
+   min — see lesson 14.3).</li>
+</ol>
+<p><strong>As a planner overriding a release:</strong></p>
+<p>You can shortcut the gate by flipping the 5 sign-off booleans
+yourself if you have Project Manager rights. <strong>Don't.</strong> The chatter
+is permanent and your signature is on every transition. Use the
+override only when:</p>
+<ul>
+<li>You're authorising a job to start production despite a known soft
+  blocker (e.g. equipment is technically blocked by a 1-day
+  preventative maintenance ticket but you're fine running it the
+  hour before).</li>
+<li>ENG01 is unavailable and the install date is tomorrow.</li>
+</ul>
+<p>The system trusts the booleans; flipping them un-blocks the gate.
+There's no second-stage approval (TBD — could be a product
+enhancement if "release authority" needs to be tighter).</p>
+<p><strong>As a developer:</strong></p>
+<p>If you're adding a sixth sign-off boolean (e.g.
+<code>southbrook_release_tariff_sourced</code> for items with tariff exposure):</p>
+<ol>
+<li>Add the field to <code>project_task.py</code> in <code>southbrook_project_mrp</code>
+   with <code>tracking=True</code>.</li>
+<li>Add it to the <code>@api.depends</code> of
+   <code>_compute_southbrook_production_release</code>.</li>
+<li>Add it as a check inside
+   <code>_southbrook_missing_production_release_items</code>.</li>
+<li>Add it to <code>_southbrook_production_release_evidence</code> so the drill-
+   down shows its state.</li>
+<li>Add it to <code>_southbrook_production_release_next_action</code> so the
+   first-missing-item lookup table has a recommended action.</li>
+<li>Add it to the view (<code>southbrook_project_mrp/views/project_task_views.xml</code>)
+   in the Production Release notebook page.</li>
+</ol>
+<p>Don't reorder the existing checks — operators have built mental
+models around the current order.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I flipped all 5 booleans and the state is still 'blocked'."</strong></p>
+<p>5 of the 12 checks are booleans you control. The other 7 are
+upstream conditions (specs, MOs, WOs, components, install due
+date, equipment, crew). Read the <code>_reason</code> string — it lists what's
+still missing. Common: <code>southbrook_site_measurement_status</code> still
+'pending' (the booleans don't cover it), <code>job_install_due</code> blank
+(needs to be set on the MO, not the task), <code>southbrook_specs_complete</code>
+False (a cabinet spec is empty).</p>
+<p><strong>"The chatter shows I flipped CAD approved, then 30 minutes later
+it un-flipped to False."</strong></p>
+<p>The boolean doesn't auto-reset — but the compute that <em>reads</em> it
+will return "blocked" if some OTHER check fails, and the release
+state will flip back to blocked. The boolean is still True, the
+state is just computed from the <em>full</em> checklist. Open the form and
+read the reason; the boolean isn't the problem.</p>
+<p><strong>"I want to revert a release sign-off — can I just flip it back to
+False?"</strong></p>
+<p>Yes. Flip and save; chatter logs the revert. The release state will
+re-evaluate. Be aware that downstream work may have started against
+"ready" — e.g. the planner may have already moved WOs to "in
+progress" based on your sign-off. Reverting the boolean doesn't
+unwind shop-floor activity.</p>
+<p><strong>"A boolean stays True after I duplicate a task."</strong></p>
+<p><code>tracking=True</code> doesn't imply <code>copy=False</code>. Duplicating a task
+carries over the sign-off booleans. <strong>This is wrong</strong> — a copied
+task should start from scratch. <strong>TBD:</strong> consider adding
+<code>copy=False</code> to all 5 release sign-off fields in
+<code>southbrook_project_mrp/models/project_task.py</code>. Workaround for now:
+after duplicating, manually reset the 5 booleans.</p>
+<p><strong>"The release state shows 'ready' but I never approved anything."</strong></p>
+<p>The 5 booleans aren't the only sources for the 12 checks. CAD
+approval (check #2) is satisfied if EITHER the boolean OR the linked
+MO's <code>job_cad_status</code> contains "done" — so an upstream MO that PLM
+marked CAD-done auto-satisfies the gate without you flipping the
+boolean. Similarly, "Crew" (check #10) is satisfied if EITHER
+<code>crew_gap == False</code> (MOs/WOs have users assigned) OR the boolean
+override. The booleans are <em>overrides</em>, not the only source of truth.</p>
+<p><strong>"My release state still says 'blocked' even after fixing
+everything visible. The reason says 'Missing Components available'."</strong></p>
+<p><code>components_available == 'ready'</code> only when EVERY linked MO has
+<code>reservation_state == 'assigned'</code>. One MO that's still 'waiting' or
+'partially_available' blocks the gate. Open the MOs (smart button) and
+check the per-MO reservation state.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The release state is a <strong>pure function of 12 inputs</strong> — no state
+machine, no persisted enum, no transition graph. Every read of the
+field re-evaluates the 12 checks and returns the result. This is by
+design: the gate is <em>idempotent</em>, so the cron sweep (which runs the
+compute every 30 min as part of
+<code>action_recompute_readiness_lines</code>) can't get the state wrong, and
+two operators editing the same task at the same time can't desync
+the gate.</p>
+<p>The 5 sign-off booleans are persisted (regular <code>fields.Boolean</code>)
+and <code>tracking=True</code> means every write goes to <code>mail.tracking.value</code>
+which the chatter renders. The 5 are the <strong>only persisted state</strong> of
+the gate; everything else is computed.</p>
+<p><code>_southbrook_production_release_next_action</code> is a small lookup
+table that maps the <em>first</em> missing item to a recommended-action
+string:</p>
+<pre><code class="language-python">{
+    &quot;Final site measurements&quot;: &quot;Confirm final site measurements before release.&quot;,
+    &quot;CAD approved&quot;: &quot;Approve CAD before releasing production.&quot;,
+    &quot;Cutlist approved&quot;: &quot;Approve the cutlist before releasing production.&quot;,
+    &quot;Door/finish/hardware specs&quot;: &quot;Confirm cabinet specs before releasing production.&quot;,
+    &quot;BoM verified&quot;: &quot;Verify the BoM against the released cutlist.&quot;,
+    &quot;Linked MOs&quot;: &quot;Link or create manufacturing orders for this kitchen job.&quot;,
+    &quot;Components available&quot;: &quot;Resolve component shortages before release.&quot;,
+    &quot;WOs generated&quot;: &quot;Generate work orders from the linked MOs.&quot;,
+    &quot;Schedule work orders&quot;: &quot;Schedule work orders before advancing this job.&quot;,
+    &quot;Crew assigned/reserved&quot;: &quot;Assign or reserve crew for critical operations.&quot;,
+    &quot;Critical equipment available&quot;: &quot;Confirm critical equipment is available.&quot;,
+    &quot;Install due date confirmed&quot;: &quot;Confirm the install due date before release.&quot;,
+}
+</code></pre>
+<p>This is what feeds the <code>next_best_action</code> field on the task form
+(which shows the <em>single</em> most important next step). The other 11
+missing items, in checklist order, are summarised in the
+<code>southbrook_production_release_reason</code> Char.</p>
+<p>The Production Release Checklist gate is <strong>one of 13 gates</strong> in the
+overall readiness algorithm (see lesson 14.3). Its verdict is
+BLOCKED if <code>state != "ready"</code> AND READY otherwise. Because it's a
+blocker gate (not a warning), it contributes 25 points of penalty
+when not ready AND clamps the score to ≤65. So a task with the
+release checklist still open <em>cannot</em> score above 65 regardless of
+how clean everything else is.</p>
+<p>The relationship to downstream MO creation: there's no hard
+foreign-key check that blocks MO creation when release_state ==
+"blocked". MOs are created on SO confirm regardless. The release
+state is a <strong>signal to the planner</strong> that the task isn't yet ready
+to <em>start</em> — but it doesn't prevent the MOs from existing. This is
+deliberate: procurement may need to start ordering long-lead-time
+parts even before the release gate clears.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> ENG01 flips all 5 sign-off booleans on a task to True. The
+release state stays "blocked" with reason "Missing Components
+available, Install due date confirmed." What does ENG01 do?</p>
+<blockquote>
+<p>Neither of those is owned by ENG01. "Components available" requires
+all linked MOs to be <code>reservation_state = 'assigned'</code> — bounce to
+procurement to confirm POs/stock. "Install due date confirmed"
+requires the upstream MO <code>x_sbk_install_due_date</code> to be set — bounce
+to the planner or sales rep who owns the install schedule. ENG01's
+work is done; the task can't release until those two clear.</p>
+</blockquote>
+<p><strong>2.</strong> A new release sign-off is being added for "tariff sourcing
+verified". Where, in code, does each piece go?</p>
+<blockquote>
+<p>Field declaration: <code>southbrook_project_mrp/models/project_task.py</code>
+as <code>fields.Boolean(... tracking=True)</code>. Add to the <code>@api.depends</code>
+of <code>_compute_southbrook_production_release</code>. Add to the
+<code>_southbrook_missing_production_release_items</code> walker. Add to
+<code>_southbrook_production_release_evidence</code> (so the drill-down
+shows it). Add to <code>_southbrook_production_release_next_action</code>'s
+lookup table. Add to the form view at
+<code>southbrook_project_mrp/views/project_task_views.xml</code>. No ACL or
+security changes needed.</p>
+</blockquote>
+<p><strong>3.</strong> A task's release_state is "ready" but ENG01 hasn't flipped
+the CAD-approved boolean. Bug or feature?</p>
+<blockquote>
+<p>Feature. Check #2 (CAD approved) is satisfied if EITHER
+<code>southbrook_release_cad_approved == True</code> OR the linked MO's
+<code>job_cad_status</code> string contains "done". A PLM engineer can mark
+CAD done upstream and the gate auto-clears without needing ENG01
+to flip the boolean. The two paths exist because CAD approval
+sometimes happens at the MO level (per cabinet) and sometimes at
+the task level (per customer job) depending on the shop's flow.</p>
+</blockquote>
+<p><strong>4.</strong> You duplicate a task to create a sister job. You notice the
+new task already has <code>southbrook_release_bom_verified = True</code>
+inherited from the original. Why is this risky and how do you fix it?</p>
+<blockquote>
+<p>The duplicate carries the original's release sign-offs because
+<code>copy=False</code> isn't set on the booleans. Risky because the chatter
+on the <em>new</em> task doesn't show who originally signed off (it shows
+the duplication action only), and the new task may shortcut its
+own release gate based on the <em>original's</em> approvals. Fix:
+manually reset all 5 booleans (and <code>southbrook_site_measurement_status</code>)
+on the new task before working it. Long-term: add <code>copy=False</code> to
+all 5 fields in <code>project_task.py</code> (TBD per this lesson's "Common
+mistakes" item).</p>
+</blockquote>
+<p><strong>5.</strong> A planner says "I authorised this job for production but the
+score still shows 65 — what gives?" Score caps notwithstanding —
+what's the <em>most likely</em> cause?</p>
+<blockquote>
+<p>The Production Release Checklist gate is contributing a 65 cap
+because <code>southbrook_production_release_state != "ready"</code>. The
+planner authorised "the job" (verbally or via comment) but
+didn't actually flip the persisted booleans that the compute
+reads. Resolution: open the task → release group → flip the
+remaining booleans → save. The state will recompute to "ready",
+the cap clears, the score recomputes (typically jumping into the
+85-95 range).</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The full readiness algorithm and 13-gate waterfall → lesson 14.3.</li>
+<li>The site measurement workflow (when to mark received vs waived) →
+  Course 1 lesson 1.7 (Reading a Cut Spec from PLM).</li>
+<li>The CAD status field on <code>mrp.production</code> (<code>job_cad_status</code>,
+  upstream of the release gate) → Course 4 PLM lessons.</li>
+<li>Component availability + procurement loop → Course 2 (Production
+  Planning) + native Odoo Inventory.</li>
+<li>The Install Readiness state field
+  (<code>southbrook_install_readiness_state</code>) and the 7-item install
+  checklist — separate from production release. See the
+  <code>_compute_southbrook_install_readiness</code> compute, lesson 12.x.</li>
+<li>The Hermes / Fabio recommendation queue that consumes release state
+  → Course 3 lesson 3.2.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_14_task_mo_linkage" model="slide.slide">
+            <field name="name">Task → MO Linkage — How project.task Connects to mrp.production</field>
+            <field name="channel_id" ref="course_project_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Production Planner + Developer (anyone who&#x27;s wondered &quot;why is this MO not on my task?&quot;).</field>
+            <field name="html_content"><![CDATA[<h1 id="task-mo-linkage-how-projecttask-connects-to-mrpproduction">Task → MO Linkage — How project.task Connects to mrp.production</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a planner who opens a customer job task and sees "4 MOs" on
+the smart button but you can see in Manufacturing that this customer
+has 6 confirmed MOs. Or you're a developer asked "why does adding an
+MO not auto-link to the task?" and you need to know what the chain
+of automatic backlinks actually is. This lesson is the FK direction,
+the auto-create rules, the manual repair action, and the upstream
+sale.order linkage that anchors everything.</p>
+<p>Course 2's lessons treat MOs as a planner primitive. This lesson is
+how MOs and tasks find each other.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong>.</p>
+<blockquote>
+<p><strong>/odoo/project → any project → any task</strong> — the task form. Smart
+button "MOs" shows <code>production_count</code>. Click to open the linked
+MOs list.</p>
+<p><strong>Manufacturing → Operations → Manufacturing Orders → any MO</strong> —
+open an MO. Field "Customer Job"
+(<code>project_task_id</code> on <code>mrp.production</code>) is the back-pointer.</p>
+<p><strong>(task form) → Action → Link MOs from Sale</strong> — manual repair
+action (<code>action_link_productions_from_sale</code>) that re-walks the SO
+linkage and links any orphan MOs to the task. Use when procurement
+created MOs after the task was created but they didn't auto-link.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The linkage is a <strong>classic One2many / Many2one pair</strong>:</p>
+<ul>
+<li><strong><code>mrp.production.project_task_id</code></strong> (Many2one to <code>project.task</code>,
+  the FK side). Defined by <code>southbrook_project_mrp/models/mrp_production.py</code>.
+  Indexed. <code>copy=False</code>.</li>
+<li><strong><code>project.task.production_ids</code></strong> (One2many — reverse pointer).
+  Defined by <code>southbrook_project_mrp/models/project_task.py</code> at
+  ~line 51. Maps to the field above.</li>
+</ul>
+<p>So the <em>MO</em> knows which task it belongs to (single Many2one), and the
+<em>task</em> sees all its MOs (the reverse One2many). One task → many MOs;
+one MO → at most one task. A typical full-kitchen task has 4–8 MOs
+(one per cabinet family + worktop + pantry + appliance trim).</p>
+<h3 id="the-upstream-linkage-so-task">The upstream linkage: SO → Task</h3>
+<p>On <code>project.task</code>:</p>
+<ul>
+<li><strong><code>x_southbrook_sale_order_id</code></strong> (Many2one to <code>sale.order</code>) — the
+  upstream link to the originating quote/sale order. Owned by
+  <code>southbrook_project</code>. <code>ondelete='set null'</code> (SO cancellation leaves
+  the task; the link just goes blank).</li>
+</ul>
+<p>The chain is therefore:</p>
+<pre><code>sale.order (1)  ──◄  project.task.x_southbrook_sale_order_id (∞)
+                          │
+                          ▼ (reverse — One2many)
+                     project.task (1) ──◄  mrp.production.project_task_id (∞)
+                                                │
+                                                ▼ (FK back to SO line)
+                                           mrp.production.sale_line_id  →  sale.order.line.order_id
+</code></pre>
+<p>A <code>mrp.production</code> knows three things at once:
+- Which task it belongs to (<code>project_task_id</code>)
+- Which SO line generated it (<code>sale_line_id</code>) — native Odoo
+- Which SO that line belongs to (<code>sale_line_id.order_id</code>)</p>
+<p>That overlap is <em>deliberate redundancy</em> — it means orphan repair
+(below) can re-walk the SO chain and re-bind MOs without trusting
+the existing (possibly stale) <code>project_task_id</code>.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>The happy path (zero manual work):</strong></p>
+<ol>
+<li>Salesperson confirms a <code>sale.order</code> for a kitchen.</li>
+<li><strong>At confirm time</strong>, the override
+   <code>sale.order._action_confirm</code> in
+   <code>southbrook_project_mrp/models/sale_order.py</code> runs
+   <code>_southbrook_ensure_job</code>:
+   - Checks the order has products with a BoM
+     (<code>mrp.bom.search_count([('product_tmpl_id', 'in', tmpl_ids)]) &gt; 0</code>).
+     If no BoM, skip — the SO is not driving manufacturing.
+   - Searches for an existing task with
+     <code>x_southbrook_sale_order_id == self.id</code>. If found, reuse it.
+   - Otherwise creates a new task on the target <code>project.project</code>
+     (configurable via <code>southbrook_project_mrp.job_project_id</code>
+     ir.config_parameter, default = first project found) with
+     <code>name = "Job: &lt;SO&gt; — &lt;customer&gt;"</code>.
+   - Writes <code>project_task_id = task.id</code> onto every existing
+     <code>mrp.production</code> whose <code>sale_line_id.order_id == self.id</code>
+     AND <code>project_task_id == False</code>.</li>
+<li><strong>For MOs created later by procurement</strong> (the SO confirm triggers
+   procurement, which spawns MOs from BoMs over the next minute or
+   so), the override <code>mrp.production.create</code> in
+   <code>southbrook_project_mrp/models/mrp_production.py</code> runs the same
+   back-link logic on creation:
+   <code>python
+   if mo.project_task_id or not mo.sale_line_id:
+       continue
+   task = Task.search([
+       ('x_southbrook_sale_order_id', '=',
+        mo.sale_line_id.order_id.id)], limit=1)
+   if task:
+       mo.project_task_id = task.id</code>
+   This means MOs created by procurement minutes/hours/days after SO
+   confirm still find their way to the right task.</li>
+</ol>
+<p><strong>The unhappy path (you have to repair manually):</strong></p>
+<p>If MOs exist but aren't linked (typical causes in "Common mistakes"
+below), open the task and use the <code>Action → Link MOs from Sale</code>
+button. It runs <code>action_link_productions_from_sale</code>:</p>
+<pre><code class="language-python">order = task.x_southbrook_sale_order_id
+mos = self.env['mrp.production'].search([
+    ('sale_line_id.order_id', '=', order.id),
+    ('project_task_id', '=', False),
+])
+mos.write({'project_task_id': task.id})
+</code></pre>
+<p>This walks the SO chain from the task side, finds orphan MOs (those
+with no <code>project_task_id</code>), and binds them. It will NOT re-bind MOs
+already linked to a <em>different</em> task — if you need to do that,
+clear the wrong link by hand first.</p>
+<h3 id="completion-signals-does-one-side-reflect-to-the-other">Completion signals — does one side reflect to the other?</h3>
+<p><strong>The task's stage is <em>not</em> auto-updated when MOs finish.</strong> The
+linkage is for read-time aggregation only. If you finish all the
+MOs on a job, the task doesn't auto-flip to "Done" — the PM moves
+the stage on <code>/odoo/project</code> manually.</p>
+<p>What <em>is</em> auto-aggregated on the task side from the MOs:</p>
+<ul>
+<li><code>production_count</code> (Integer) — count of linked MOs</li>
+<li><code>mo_reference</code> (Char) — comma-separated MO names</li>
+<li><code>mo_product_summary</code> (Char) — comma-separated product SKUs</li>
+<li><code>mo_state_summary</code> (Char) — readable roll-up like "4 confirmed /
+  2 in progress"</li>
+<li><code>components_available</code> (Selection: none / ready / partial /
+  waiting) — derived from MOs' <code>reservation_state</code></li>
+<li><code>job_industrial_cost</code> (Monetary) — sum of MOs'
+  <code>planned_direct_cost</code> (with <code>industrial_cost</code> fallback)</li>
+<li><code>job_estimated_cost</code> (Monetary) — sum of <code>standard_price × qty</code></li>
+<li><code>job_install_due</code> (Date) — min of MOs' <code>x_sbk_install_due_date</code></li>
+<li><code>job_cad_status</code> (Char) — unique non-empty values of MOs'
+  <code>x_cad_status</code></li>
+<li><code>job_next_action</code> (Char) — first non-empty of MOs'
+  <code>x_mi_next_action</code></li>
+<li><code>job_at_risk</code> (Boolean) + <code>job_risk_reason</code> (Char) — true if any
+  started MO isn't fully reserved or any MO is past <code>date_deadline</code></li>
+<li><code>workorder_ids</code> (Many2many, computed) — all WOs across all MOs</li>
+<li><code>workorder_count</code>, <code>unscheduled_workorder_count</code> (Integers)</li>
+<li>Workcenter load, crew, equipment, ECO, material readiness
+  rollups — see lesson 14.3's compute catalogue</li>
+</ul>
+<p>All of these are <strong>computed, non-stored</strong> on the task. They re-fire
+on every read. So a MO completion DOES reflect to the task — the
+next time the task is read.</p>
+<p>The flow in the other direction (task action triggers something on
+the MO) is <strong>minimal</strong>. The task is a read-only lens onto MO state,
+not a controller. The one exception is
+<code>action_recompute_readiness_lines</code> which iterates the task's MOs
+and calls <code>action_recompute_manufacturing_intelligence</code> on each one
+to refresh the MI checks. That's the only "task pushes to MO"
+direction in the bridge.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The MOs smart button shows 4 but Manufacturing shows 6 MOs for
+this customer."</strong></p>
+<p>Two MOs were created without their <code>project_task_id</code> being set.
+Most common reason: they were created <strong>before</strong> the SO was
+confirmed (manual MO creation), so the
+<code>mrp.production.create</code> override didn't have a task to bind to.
+Less common: the SO override <code>_southbrook_ensure_job</code> was bypassed
+(direct DB write, or the addon was uninstalled at the time).</p>
+<p>Fix: open the task → Action → Link MOs from Sale. The repair
+walker binds any orphan MOs whose <code>sale_line_id.order_id</code> matches
+the task's SO.</p>
+<p><strong>"The MOs smart button shows 0 but I just confirmed the SO."</strong></p>
+<p>If the SO has no products with a BoM, <code>_southbrook_ensure_job</code>
+skipped task creation (the <code>drives_manufacturing</code> guard is False).
+If a task DOES exist but production_count == 0, no MOs were
+spawned yet — procurement may not have triggered. Check the SO's
+"Manufacturing" smart button on the sale order form.</p>
+<p><strong>"A MO is linked to the wrong task."</strong></p>
+<p>The <code>action_link_productions_from_sale</code> action won't fix this — it
+only binds orphans (<code>project_task_id == False</code>). Manual fix: open
+the MO → Customer Job field → clear it → save → go to the right
+task → Link MOs from Sale (which will now find it).</p>
+<p><strong>"Procurement re-created an MO after I closed the original one,
+and the new one isn't linked."</strong></p>
+<p>The <code>create</code> override only runs on initial creation. A re-create
+(close + new) should go through the create override and link
+correctly. If it doesn't, the MO probably has no <code>sale_line_id</code>
+(some procurement paths don't carry the SO line through). Fix:
+manual link via the MO's Customer Job field, or
+<code>Link MOs from Sale</code> (if the SO line IS set on the new MO).</p>
+<p><strong>"A new task I created manually has no MOs and <code>Link MOs from
+Sale</code> does nothing."</strong></p>
+<p><code>Link MOs from Sale</code> requires the task to have
+<code>x_southbrook_sale_order_id</code> set. If you created the task manually
+without setting the upstream SO, the walker has nothing to chain
+from. Fix: set <code>x_southbrook_sale_order_id</code> to the right SO, then
+re-run the action.</p>
+<p><strong>"I want to merge two customer jobs into one task."</strong></p>
+<p>Manually clear <code>project_task_id</code> on the MOs of one task, then run
+<code>Link MOs from Sale</code> on the destination task (assuming they share
+an SO — which is the only case merging makes sense for). If they
+don't share an SO, you can't merge cleanly — the SO linkage is the
+identity of the job.</p>
+<p><strong>"The data quality report flagged 'blank_kitchen_project' on an
+MO."</strong></p>
+<p>That means <code>project_task_id</code> is null on a non-done, non-cancelled
+MO. The report is <code>southbrook.project.data.quality.report</code>,
+triggered by <code>action_southbrook_data_quality_dry_run</code> on the
+project. Detailed in lesson 14.7. To fix, find the task that
+<em>should</em> own the MO and run <code>Link MOs from Sale</code>, or set
+<code>project_task_id</code> directly.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The linkage is <strong>redundant by design</strong> — three FKs point at the
+same SO:</p>
+<pre><code>project.task.x_southbrook_sale_order_id      → sale.order
+mrp.production.project_task_id               → project.task (whose .x_southbrook_sale_order_id is the SO)
+mrp.production.sale_line_id.order_id         → sale.order (directly)
+</code></pre>
+<p>This redundancy is what makes the orphan-repair logic deterministic.
+The walker re-derives the binding from the SO side, ignoring any
+stale <code>project_task_id</code> it might find.</p>
+<p>The <code>_southbrook_ensure_job</code> method (in
+<code>southbrook_project_mrp/models/sale_order.py</code>) is intentionally
+idempotent: calling it twice on the same SO doesn't create a
+second task. It searches by <code>x_southbrook_sale_order_id</code> and reuses
+any existing match.</p>
+<p>The choice of <code>x_southbrook_sale_order_id</code> vs the OCA
+<code>sale_project.sale_order_id</code> is documented in the
+<code>_southbrook_ensure_job</code> comment: we deliberately use the
+Southbrook-owned field to avoid pulling in the OCA addon's
+<em>auto-service-task creation</em>, which would create unwanted service
+tasks for every SO line.</p>
+<p>The bridge <strong>does not depend on <code>mrp_product_costing</code></strong> even
+though it reads cost fields (<code>planned_direct_cost</code>,
+<code>industrial_cost</code>). All cost reads use <code>getattr(..., 0.0)</code> so a
+database without the costing addon installed degrades cleanly to
+zero rather than crashing the form. Documented in the manifest:</p>
+<blockquote>
+<p>mrp_product_costing is NOT depended on (it lives outside this
+repo) — its cost fields are read defensively via getattr.</p>
+</blockquote>
+<p>The <code>mrp.production.create</code> override uses
+<code>@api.model_create_multi</code> and writes the back-link in a single
+pass <em>after</em> <code>super().create(vals_list)</code>. This avoids interfering
+with native MO creation (which has a lot of side effects —
+reservation, scheduling, etc.) and only adds the binding once the
+MO record exists.</p>
+<p>Finally — <strong>procurement creates MOs in a background flush</strong>, not
+synchronously with <code>sale.order.action_confirm()</code>. So at the
+moment <code>_southbrook_ensure_job</code> runs, the only MOs that exist for
+the SO are ones a human created manually pre-confirm. The override
+covers BOTH cases: the synchronous bind in <code>_southbrook_ensure_job</code>
+(catches manual MOs) and the per-MO bind in <code>mrp.production.create</code>
+(catches procurement-spawned MOs).</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open a task and see <code>production_count = 0</code> but you know
+the customer has manufacturing scheduled. Walk the chain — what do
+you check, in order?</p>
+<blockquote>
+<p>(a) Is <code>x_southbrook_sale_order_id</code> set on the task? If not, the
+task isn't a kitchen job — it's a hand-created task. (b) Is the
+SO in state <code>sale</code> (confirmed)? If not, procurement hasn't fired.
+(c) Does the SO have products with a BoM? If not,
+<code>_southbrook_ensure_job</code> skipped task creation (but you have a
+task somehow — likely manual). (d) Are MOs visible from the SO's
+Manufacturing smart button? If yes but <code>production_count = 0</code> on
+the task, they're orphan; run <code>Link MOs from Sale</code> from the task
+Action menu.</p>
+</blockquote>
+<p><strong>2.</strong> A procurement run at 14:30 spawned 6 MOs against an SO whose
+task was created at 09:00. Did the 6 MOs auto-link?</p>
+<blockquote>
+<p>Yes, via the <code>mrp.production.create</code> override. Each MO at
+creation time runs the search:
+<code>Task.search([('x_southbrook_sale_order_id', '=',
+mo.sale_line_id.order_id.id)], limit=1)</code>. The task exists (created
+at 09:00 by <code>_southbrook_ensure_job</code>), so the override finds it
+and writes <code>project_task_id</code>. No manual action needed.</p>
+</blockquote>
+<p><strong>3.</strong> A developer asks "why do we have both
+<code>project_task_id</code> on the MO AND <code>x_southbrook_sale_order_id</code> on
+the task — isn't that double bookkeeping?" What do you say?</p>
+<blockquote>
+<p>Yes, deliberately. The MO's <code>project_task_id</code> is the <em>fast</em>
+lookup for reading rollups (task → MOs via One2many). The
+task's <code>x_southbrook_sale_order_id</code> is the <em>anchor</em> for orphan
+repair — if the MO link is wrong or missing, the SO link is the
+ground truth we walk back to. The third link
+(<code>mo.sale_line_id.order_id</code>) is native Odoo and lets the SO walk
+<em>its</em> MOs without going through the task. Three paths to the same
+identity = resilience.</p>
+</blockquote>
+<p><strong>4.</strong> You manually create an MO from Manufacturing without an SO
+line. Does it link to any task?</p>
+<blockquote>
+<p>No. The <code>create</code> override skips MOs with no <code>sale_line_id</code>:
+<code>if mo.project_task_id or not mo.sale_line_id: continue</code>. The MO
+exists, has no task, and won't appear on any task's smart button.
+To link it manually, open the MO and set Customer Job to the
+right task. If you want it auto-linked, create the MO from the SO
+form (which sets <code>sale_line_id</code>) or from a confirmed SO's
+Manufacturing smart-button-driven flow.</p>
+</blockquote>
+<p><strong>5.</strong> A task shows 6 MOs but 2 of them are for a DIFFERENT
+customer. The original SO got merged with another and the bind
+went stale. How do you clean up?</p>
+<blockquote>
+<p>(a) Open each of the 2 wrong MOs, clear <code>project_task_id</code> (the
+Customer Job field) — chatter will log who did this and when.
+(b) Find the correct task for those 2 MOs (likely the other
+customer's task) and run <code>Link MOs from Sale</code> from that task —
+the orphan walker will pick them up (or if their SO is still the
+wrong one, you'll need to update <code>sale_line_id</code> upstream first).
+(c) Run the data-quality dry run on the project to confirm no
+remaining orphans (<code>action_southbrook_data_quality_dry_run</code>).</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The <code>sale.order</code> state machine, channel pricelists, and quote
+  pipeline → Course 5 (Estimating + Configurator).</li>
+<li>The MRP planner's workflow once MOs are linked — bottleneck
+  scheduling, WO sequencing → Course 2.</li>
+<li>ECO linkage via <code>southbrook.eco.bom_id</code> → Course 4 lesson 4.1
+  (Engineering Change Orders).</li>
+<li>The MI check linkage to MOs (<code>southbrook.mi.check.production_id</code>)
+  → Course 3 lesson 3.1.</li>
+<li>The 5 release sign-off booleans + checklist → lesson 14.4.</li>
+<li>The readiness compute that aggregates over linked MOs → lesson 14.3.</li>
+<li>Project-level rollups of MO counts and costs → lesson 14.7.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_14_task_views_dashboards" model="slide.slide">
+            <field name="name">Task Views + Dashboards — Custom Kanban, Lists, and Search on /odoo/project</field>
+            <field name="channel_id" ref="course_project_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Project Manager (the person who lives on the project surface every day).</field>
+            <field name="html_content"><![CDATA[<h1 id="task-views-dashboards-custom-kanban-lists-and-search-on-odooproject">Task Views + Dashboards — Custom Kanban, Lists, and Search on /odoo/project</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PM who looks at the same kanban board four hours a day and
+wants to know what every badge, color, and column means — so you can
+read the board faster. Or you're a developer about to extend a view
+and need to know which inherit chain to insert into without breaking
+the existing layout. This lesson catalogues every Southbrook view
+inherit on <code>project.task</code> (and a few on <code>project.project</code>), what each
+one adds, what the search filters mean, and the mobile considerations.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong>.</p>
+<blockquote>
+<p><strong>/odoo/project</strong> — the stock entry. The project kanban tile shows
+<code>southbrook_top_level_task_count</code> (when the corrected kanban is
+activated; see below) instead of stock <code>open_task_count</code>.</p>
+<p><strong>/odoo/project → any project</strong> — the task kanban grouped by
+<code>stage_id</code>. Kanban cards are decorated with Southbrook badges
+(At Risk, ECO, Rush, Urgent).</p>
+<p><strong>/odoo/project → any project → List view</strong> — the corrected list
+with Southbrook priority + material + SO ref + readiness columns
+as optional toggleable columns.</p>
+<p><strong>/odoo/project → any project → Search bar</strong> — extended with
+Southbrook quick filters (Rush, Urgent) and Group-By options
+(Southbrook Priority, Material / Species).</p>
+<p><strong>Kitchen Ops → Production Release Queue</strong> — a separate window
+action filtered to tasks where
+<code>southbrook_production_release_state in ('blocked', 'review')</code>.
+Owned by <code>southbrook_premium_orchestration</code> (see Course 12).</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="the-form-inherited-views">The form (inherited views)</h3>
+<p>Two addons extend the task form:</p>
+<p><strong><code>southbrook_project</code></strong> (<code>views/project_task_views.xml</code>):
+- ID: <code>view_project_task_form_inherit_southbrook</code>
+- Inherits: <code>project.view_task_form2</code>
+- Adds a "Cabinetry Specs" notebook page (after stock Description tab)
+  with <code>x_southbrook_material_species</code>, <code>x_southbrook_unit_count</code>,
+  <code>x_southbrook_priority</code> (badge widget), <code>x_southbrook_sale_order_id</code>,
+  and <code>x_southbrook_hardware_specs</code>.
+- Adds <code>x_southbrook_priority</code> as a badge in the header bar
+  (decoration-warning for rush, decoration-danger for urgent).
+- Adds the class <code>o_southbrook_project_chatter_bottom</code> to the form so
+  the chatter renders at the bottom (CSS in
+  <code>southbrook_project/static/src/scss/kanban_responsive.scss</code>).</p>
+<p><strong><code>southbrook_project_mrp</code></strong> (<code>views/project_task_views.xml</code>):
+- ID: <code>project_task_form_mrp</code>
+- Inherits: <code>project.view_task_form2</code>
+- Adds 12 smart buttons (MOs, ECOs, WOs, Calculations, Readiness,
+  POs, Maint., Rework WOs, Remakes, Scrap, Unbuilds, etc.).
+- Adds 4 alert banners below the smart buttons:
+  - Danger (red): "At risk: <reason>" — when <code>job_at_risk == True</code>
+  - Warning (yellow): "Spec change in flight: N pending ECO(s)" —
+    when <code>eco_pending_count &gt; 0</code>
+  - Warning (yellow): stage/MO divergence note
+  - Warning (yellow): material-at-risk note
+- Adds the Production Release section (the 5 sign-off booleans
+  plus the computed state — see lesson 14.4).
+- Adds the Install Readiness section (the 7-item install checklist).
+- Adds embedded lists for: linked MOs, work orders, readiness
+  evidence lines (the <code>southbrook.project.readiness.line</code> rows),
+  scrap, unbuilds, etc.</p>
+<h3 id="the-list">The list</h3>
+<p><code>southbrook_project</code> extends <code>project.view_task_tree2</code>
+(<code>view_project_task_list_inherit_southbrook</code>) — adds 4 optional
+columns: <code>x_southbrook_priority</code> (badge, shown by default),
+<code>x_southbrook_material_species</code> (hidden), <code>x_southbrook_unit_count</code>
+(hidden), <code>x_southbrook_sale_order_id</code> (hidden).</p>
+<p><code>southbrook_project_mrp</code> adds a separate full list view ID
+<code>project_task_list_readiness</code> (around line 667 of
+<code>project_task_views.xml</code>) — includes <code>cad_cutlist_review_required</code>,
+<code>install_date_missing</code>, and readiness fields. This is the list
+attached to the Production Release Queue and the
+mission-control drill-down actions on <code>project.project</code>.</p>
+<h3 id="the-kanban">The kanban</h3>
+<p><code>southbrook_project_mrp</code> extends <code>project.view_task_kanban</code>
+(<code>project_task_kanban_mrp</code>, line ~821):
+- Adds two badges in the kanban card footer:
+  - Red "At risk" badge when <code>job_at_risk == True</code>
+  - Yellow "ECO" badge when <code>eco_pending_count &gt; 0</code>
+- No swimlane / column reshuffling — the stock <code>stage_id</code> swimlanes
+  are intact.
+- No color-rule changes — Southbrook reads readiness via the
+  separate Kitchen Ops kanban (lesson 12.4) rather than recolouring
+  the stock board.</p>
+<p><strong>Mobile considerations:</strong> the responsive SCSS in
+<code>southbrook_project/static/src/scss/kanban_responsive.scss</code> defines
+three breakpoints:
+- <strong>Desktop ≥1280 px</strong> — all 5 stage columns side-by-side
+  (<code>flex: 1 1 0</code>, capped at 380 px wide).
+- <strong>Tablet 480–1279 px</strong> — horizontal scroll preserved, column
+  min-width raised so 1.5 columns visible at start.
+- <strong>Phone &lt;480 px</strong> — full-viewport single column, swipe-to-next
+  preserved.</p>
+<p>Scoped to <code>.o_kanban_view.o_kanban_project_task</code> and
+<code>[data-model="project.task"]</code> so other models' kanbans aren't
+affected.</p>
+<h3 id="the-search-view">The search view</h3>
+<p><code>southbrook_project</code> extends <code>project.view_task_search_form</code>
+(<code>view_project_task_search_inherit_southbrook</code>):
+- Quick-filter chips: <strong>Rush</strong> (<code>x_southbrook_priority = 'rush'</code>),
+  <strong>Urgent</strong> (<code>x_southbrook_priority = 'urgent'</code>).
+- Searchable Many2one: <code>x_southbrook_sale_order_id</code> (type the SO ref
+  to filter).
+- Searchable Selection: <code>x_southbrook_material_species</code>.
+- Group-By options: <strong>Southbrook Priority</strong>, <strong>Material / Species</strong>.</p>
+<p><code>southbrook_project_mrp</code> adds a separate inherited search view
+(<code>project_task_search_readiness</code>, line ~736) with additional
+filters:
+- <strong>Needs CAD / Cutlist</strong> (<code>cad_cutlist_review_required = True</code>)
+- <strong>Install Date Missing</strong>
+- <strong>Manufacturing Readiness: Ready / Review / Blocked</strong> (selection
+  on <code>manufacturing_readiness_state</code>)
+- <strong>Material at Risk</strong>, <strong>Crew Gap</strong>, <strong>Equipment Blocked</strong>, <strong>WC
+  Over Capacity</strong>, <strong>Late / At Risk</strong>, <strong>Missing Cabinet Specs</strong>,
+  <strong>Install Readiness Review</strong></p>
+<h3 id="the-project-level-kanban">The project-level kanban</h3>
+<p><code>southbrook_project_mrp</code> declares a project kanban override
+(<code>project_project_kanban_mission_control</code>, line ~856) — <strong>shipped
+inactive by default</strong> (<code>&lt;field name="active" eval="False"/&gt;</code>).</p>
+<p>When activated (toggle to True in Settings → Technical → User
+Interface → Views), the project tile gains:
+- A "mission prompt" line based on
+  <code>southbrook_intelligence_prompt</code> + <code>_severity</code> (color-coded:
+  green = "Clear", yellow = "Review", red = "Stop").
+- 7 stat badges: ready jobs, at-risk jobs, material risk,
+  unscheduled WOs, crew gap, equipment blocked, capacity issues.
+- An "Open Production Board" button that opens the project's
+  manufacturing jobs filtered to <code>production_count &gt; 0</code>.</p>
+<p>The reason it's inactive by default: the project-level kanban is the
+right home for executive triage but is too noisy for the day-to-day
+PM who wants to drill into tasks. Activate it for the production
+manager's view; leave it off for everyone else.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>Morning kanban scan (5 min):</strong></p>
+<ol>
+<li>Open <strong>/odoo/project → <your project></strong>. Kanban view (default).</li>
+<li>Read the swimlanes left → right: Design &amp; Quote → Cutting &amp;
+   Machining → Assembly → Finishing → Delivery &amp; Install. Cards in
+   each lane are the tasks at that stage.</li>
+<li>Scan for red <strong>At risk</strong> badges. Open any you find — the form's
+   top-of-page alert tells you why.</li>
+<li>Scan for yellow <strong>ECO</strong> badges. These don't block — they're a
+   heads-up that engineering is changing the spec mid-flight.</li>
+</ol>
+<p><strong>Mid-day priority sort (1 min):</strong></p>
+<ol>
+<li>Switch to List view.</li>
+<li>Click <em>Group By → Southbrook Priority</em>. Three groups (Standard,
+   Rush, Urgent) appear.</li>
+<li>Click into the Urgent group — those are your fires.</li>
+</ol>
+<p><strong>End-of-day search:</strong></p>
+<ol>
+<li>Search bar → click <strong>Rush</strong> filter. See all Rush jobs across all
+   stages.</li>
+<li>Search by SO number — type the SO ref into the search bar; it
+   matches <code>x_southbrook_sale_order_id</code>.</li>
+</ol>
+<p><strong>Activating the mission-control kanban (one-time, per user):</strong></p>
+<ol>
+<li><strong>Settings → Technical → User Interface → Views</strong>.</li>
+<li>Search for <code>project.project.kanban.southbrook.mission.control</code>.</li>
+<li>Toggle <code>active = True</code>.</li>
+<li>Reload <code>/odoo/project</code>. Project tiles now carry the mission-
+   prompt line + badges.</li>
+</ol>
+<p>Do this only for the production manager and yourself. Other users
+prefer the stock kanban for routine project management.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The 'At risk' badge isn't appearing on a task I know is at risk."</strong></p>
+<p>The compute <code>_compute_mrp_status</code> evaluates <code>job_at_risk</code> from MO
+state + reservation_state + date_deadline. If the MO's
+<code>date_deadline</code> is in the future (or null) and <code>reservation_state</code>
+== 'assigned', the task isn't <em>at risk</em> by the system's definition
+— even if you know the customer is breathing down your neck. The
+red banner is for <em>manufacturing</em> risk, not customer risk. For
+customer risk, use the <code>x_southbrook_priority</code> badge in the header
+(Rush / Urgent).</p>
+<p><strong>"The 'Cabinetry Specs' tab doesn't appear on the form."</strong></p>
+<p>Form-inherit failed because another addon altered the notebook
+structure. Open developer mode → right-click form → Edit View →
+look at the View Metadata for inherits. If a downstream addon
+removed the notebook, the Southbrook tab can't anchor. Fix: re-
+order view inheritance (lower <code>sequence</code> on the Southbrook view) or
+adjust the xpath to a more stable anchor.</p>
+<p><strong>"Kanban columns don't fit on my screen."</strong></p>
+<p>The responsive SCSS is breakpoint-gated. If you're between 1024 and
+1279 px, you're in the "tablet" range and get horizontal scroll.
+This is intentional — at 1024 px there's no way to fit 5 columns
+side-by-side without each being &lt;200 px wide, which renders the
+cards illegible. Fix: zoom out browser to 90%, OR collapse a
+column you don't use (kanban column header → kebab → Fold).</p>
+<p><strong>"Search filter 'Material at Risk' shows the wrong tasks."</strong></p>
+<p>The filter calls <code>_search_material_at_risk</code>, which uses the
+<code>_search_boolean_compute</code> pattern — it searches all tasks and
+filters by computed-field value. This is <strong>slow on large
+databases</strong> (&gt;10K tasks) because it bypasses the SQL index. If
+performance is a problem, materialise the field as
+stored=True (TBD — currently all readiness/risk fields are
+non-stored, by design to avoid stale-data bugs).</p>
+<p><strong>"The 5-column kanban renders 6 columns at desktop width."</strong></p>
+<p>Someone added a stage. The SCSS doesn't know about stage count —
+it just makes every column flex-share at ≥1280 px. With 6 columns
+at 1280 px, each gets ~213 px width which is below the
+card-readable threshold. Fix: either bump the desktop breakpoint
+up (e.g. 1440 px for 6 columns) or fold one column.</p>
+<p><strong>"I activated the mission-control project kanban and now my
+project list is too tall."</strong></p>
+<p>The mission-control kanban adds a multi-line prompt + badge row to
+each project tile, roughly doubling tile height. If you have 20+
+projects in the list, scrolling is painful. Mitigation: filter the
+project list to only <code>Active = True</code> and <code>My Projects</code> so you're
+scanning 5-10 tiles, not 50.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The Southbrook view layer is <strong>strictly inherit-and-add</strong>, never
+replace. Every customisation is a <code>&lt;record id="..."
+model="ir.ui.view"&gt;</code> with an <code>inherit_id</code> pointing at a stock view,
+and the changes are <code>&lt;xpath&gt;</code> blocks (<code>position="inside"</code>, <code>"after"</code>,
+<code>"before"</code>, occasionally <code>"replace"</code> for a single field reference).</p>
+<p>The advantage: stock Odoo upgrades land cleanly because the stock
+view IDs (<code>project.view_task_form2</code>,
+<code>project.view_task_kanban</code>, etc.) are stable. The disadvantage:
+xpath anchors are brittle — if Odoo renames a field or moves a
+notebook, the xpath fails on next upgrade. The brittleness is
+managed by:</p>
+<ol>
+<li>Anchoring on <strong>field names</strong>, not positional indices. E.g.
+   <code>xpath expr="//field[@name='priority']" position="after"</code>,
+   not <code>xpath expr="//field[3]"</code>.</li>
+<li>Anchoring on <strong>notebook pages by name</strong>, not by tab order.</li>
+<li>Keeping each addon's xpaths small — most of the inherits in
+   <code>southbrook_project</code> are 5–10 lines, so a broken upgrade is
+   easy to repair.</li>
+</ol>
+<p>The kanban field-list pattern (the <code>&lt;field name="..."/&gt;</code> records
+right before <code>&lt;templates&gt;</code> in the xpath of
+<code>project_task_kanban_mrp</code>) is <strong>required</strong> by Odoo — every field
+the kanban template references must be in the record's field list
+or the renderer can't read it. This is why those views have a
+seemingly-redundant block of <code>&lt;field&gt;</code> tags before the actual
+template changes.</p>
+<p>The corrected project-kanban tile field
+(<code>southbrook_top_level_task_count</code>) is shipped on the
+<code>view_project_kanban_inherit_southbrook</code> view but <strong>the view is
+inactive by default</strong> in <code>southbrook_project</code> (Tier 1; see
+<code>views/project_views.xml</code> line ~80). Activating it (toggle
+<code>active=True</code> on the view) replaces the inflated open_task_count
+on the project tile with the correct subtask-aware count.</p>
+<p>The Production Release Queue + Kitchen Jobs dashboards
+(under <strong>Kitchen Ops</strong> menu) are owned by
+<code>southbrook_premium_orchestration</code> and use the <em>same</em>
+<code>project.task</code> records but with different search domains. See
+Course 12 lesson 12.4 for those view definitions.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You want to add a new optional column on the task list — say,
+"# Linked POs" (procurement count). Which addon and which view
+record do you edit?</p>
+<blockquote>
+<p><code>southbrook_project_mrp</code>, file <code>views/project_task_views.xml</code>,
+view record <code>project_task_list_readiness</code> (the readiness-aware
+list). Add a <code>&lt;field name="procurement_count" optional="hide"/&gt;</code>
+inside the existing list. Don't add it to
+<code>southbrook_project</code>'s <code>view_project_task_list_inherit_southbrook</code>
+— that's the polish layer and doesn't depend on MRP fields.</p>
+</blockquote>
+<p><strong>2.</strong> A user complains the kanban scrolls horizontally on their
+laptop. You check — their screen is 1366×768 px. What's happening
+and how do you respond?</p>
+<blockquote>
+<p>1366 px is in the "tablet 480–1279 px" range <em>just barely</em> —
+wait, 1366 &gt; 1279 so they're in the desktop range. Likely cause:
+they have the kanban view at 90% browser zoom or there's an extra
+sidebar (Discuss panel, etc.) reducing effective viewport.
+Confirm: F12 → check <code>window.innerWidth</code>. If &lt;1280, the SCSS
+falls back to horizontal scroll, which is correct.</p>
+</blockquote>
+<p><strong>3.</strong> The "At Risk" red badge is showing on the kanban card but
+the task form's at-risk banner isn't. Bug?</p>
+<blockquote>
+<p>No — same underlying field (<code>job_at_risk</code>). The kanban card reads
+the stale-cached value from the list payload; the form re-fires
+the compute on open and may return False if the underlying
+condition changed (e.g. someone reserved the missing component
+just now). Refresh the kanban (browser reload) to re-read.</p>
+</blockquote>
+<p><strong>4.</strong> You want the search bar to default-filter to "My Rush
+Jobs" when a user opens /odoo/project. How do you do that?</p>
+<blockquote>
+<p>Add a <code>search_default_southbrook_rush=1</code> to the action context
+on whichever ir.actions.act_window the user is reaching. For the
+kanban opened from a project, that's the stock
+<code>project.act_project_project_2_project_task_all</code>. To customise
+per user, you can't — the action is shared. Better: create a new
+menu item under Kitchen Ops with a custom context
+<code>{'search_default_southbrook_rush': 1}</code> pointing at the same
+action. Don't modify the stock action.</p>
+</blockquote>
+<p><strong>5.</strong> The project kanban tile still shows "8 Tasks" even though
+<code>southbrook_top_level_task_count</code> is 3 (because 5 are subtasks).
+What do you do?</p>
+<blockquote>
+<p>The corrected kanban view
+(<code>view_project_kanban_inherit_southbrook</code> in
+<code>southbrook_project/views/project_views.xml</code>) is shipped
+<em>inactive</em> (<code>active="False"</code>). Toggle it active under Settings →
+Technical → User Interface → Views, search for "project.project.
+kanban.inherit.southbrook", and flip the Active checkbox. The
+kanban tile will then read <code>southbrook_top_level_task_count</code>
+instead of <code>open_task_count</code>. Caveat: any module that depends on
+the inflated count's appearance on the tile may break — but
+there shouldn't be any.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The readiness compute that drives many of these badges →
+  lesson 14.3.</li>
+<li>The 5 release sign-off booleans + release section of the form →
+  lesson 14.4.</li>
+<li>The Production Release Queue + Kitchen Jobs custom Kanban
+  surfaces under Kitchen Ops → Course 12 lesson 12.4 +
+  Course 2 lesson 2.1.</li>
+<li>Reporting / dashboards at the project level → lesson 14.7.</li>
+<li>The Cabinetry Specs custom fields and how they feed readiness →
+  lesson 14.3 (Cabinet Specs gate).</li>
+<li>Mobile-native UX (the mobile responsive SCSS is for the <em>web</em>
+  client only; Odoo's mobile app uses its own renderer and ignores
+  these SCSS files).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_14_project_reporting" model="slide.slide">
+            <field name="name">Project Reporting — Per-Project Metrics, Throughput, Late-Task Drill-Down</field>
+            <field name="channel_id" ref="course_project_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Project Manager + Production Manager (anyone who has to defend &quot;is the shop healthy?&quot; to leadership).</field>
+            <field name="html_content"><![CDATA[<h1 id="project-reporting-per-project-metrics-throughput-late-task-drill-down">Project Reporting — Per-Project Metrics, Throughput, Late-Task Drill-Down</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the PM whose Monday morning starts with "how was last week?"
+and you want to answer it with two clicks instead of a spreadsheet
+export. Or you're the production manager presenting to leadership
+and you need the slide that shows "X jobs ready, Y blocked, Z at
+risk" without making it up. This lesson is the project-side
+reporting surface — what's pre-aggregated, where it lives, what
+counts as a "late" task, and how to export when the dashboards
+don't quite cover the question.</p>
+<p>Course 2 lesson 2.5 covers MI (Manufacturing Intelligence) reports
+— that's the <em>manufacturing</em> lens. Course 12 lesson 12.6 will
+cover the Kitchen Ops report grid. This lesson is the <em>project</em>
+lens: rollups that read from <code>project.project</code> and <code>project.task</code>,
+not from <code>mrp.production</code>.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Sign in at <strong>southbrookcabinetry.space/odoo</strong>.</p>
+<blockquote>
+<p><strong>/odoo/project → any project (form)</strong> — the project form. Smart
+buttons + the (optional) mission-control kanban tile show
+per-project rollups.</p>
+<p><strong>/odoo/project → any project → Action → Southbrook Data Quality
+Dry Run</strong> — fires <code>action_southbrook_data_quality_dry_run</code>,
+creating a <code>southbrook.project.data.quality.report</code> record listing
+data-quality issues (orphan MOs, missing install dates, queue
+overlaps, equipment count mismatches).</p>
+<p><strong>Settings → Technical → Database Structure → Data Quality
+Reports</strong> — the list of past dry-run reports for audit.</p>
+<p><strong>(project form) → Manufacturing Jobs / Blocked Jobs / Review
+Jobs / Ready Jobs / Unscheduled Jobs / etc.</strong> — drill-down
+buttons on the project form, each filtered to a different
+readiness/risk slice. Catalogued below.</p>
+<p><strong>/odoo/project (kanban)</strong> — if you've activated the
+mission-control kanban (lesson 14.6), each project tile shows
+the rollup badges + a "Stop / Review / Clear" mission prompt.</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<h3 id="the-17-project-level-rollup-fields">The 17 project-level rollup fields</h3>
+<p><code>project.project</code> carries 17 computed-non-stored fields added by
+<code>southbrook_project_mrp/models/project_project.py</code>. All are summed
+or counted across the project's tasks that have linked MOs
+(<code>production_count &gt; 0</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>What it counts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>southbrook_job_count</code></td>
+<td>Integer</td>
+<td>Tasks with ≥1 linked MO</td>
+</tr>
+<tr>
+<td><code>southbrook_active_mo_count</code></td>
+<td>Integer</td>
+<td>Sum of <code>production_count</code> across those tasks</td>
+</tr>
+<tr>
+<td><code>southbrook_ready_job_count</code></td>
+<td>Integer</td>
+<td>Tasks where all of: components ready, not at risk, no material risk, no equipment block</td>
+</tr>
+<tr>
+<td><code>southbrook_blocked_job_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>manufacturing_readiness_state == 'blocked'</code></td>
+</tr>
+<tr>
+<td><code>southbrook_review_job_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>manufacturing_readiness_state == 'review'</code></td>
+</tr>
+<tr>
+<td><code>southbrook_at_risk_job_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>job_at_risk == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_material_risk_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>material_at_risk == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_cad_cutlist_job_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>cad_cutlist_review_required == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_unscheduled_wo_count</code></td>
+<td>Integer</td>
+<td>Σ <code>unscheduled_workorder_count</code> across tasks</td>
+</tr>
+<tr>
+<td><code>southbrook_unscheduled_job_count</code></td>
+<td>Integer</td>
+<td>Tasks with ≥1 unscheduled WO</td>
+</tr>
+<tr>
+<td><code>southbrook_can_start_today_wo_count</code></td>
+<td>Integer</td>
+<td>WOs where <code>southbrook_can_start_today == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_crew_gap_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>crew_gap == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_install_risk_job_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>install_date_missing == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_equipment_blocked_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>equipment_blocked == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_over_capacity_count</code></td>
+<td>Integer</td>
+<td>Tasks where <code>workcenter_over_capacity == True</code></td>
+</tr>
+<tr>
+<td><code>southbrook_job_cost_total</code></td>
+<td>Monetary</td>
+<td>Σ <code>job_industrial_cost</code> across tasks</td>
+</tr>
+<tr>
+<td><code>southbrook_intelligence_prompt</code> + <code>_severity</code></td>
+<td>Char + Selection</td>
+<td>The "Stop / Review / Clear" mission prompt the kanban tile renders</td>
+</tr>
+</tbody>
+</table>
+<p>All computed by <code>_compute_southbrook_mission_control</code> which is
+<code>@api.depends</code> on the underlying task fields — recomputes on read
+when any dependency changes.</p>
+<h3 id="the-mission-prompt-logic">The mission prompt logic</h3>
+<p><code>_southbrook_pick_mission_prompt</code> returns a <code>(severity, prompt)</code>
+tuple based on first-match priority:</p>
+<pre><code>no jobs                            → &quot;neutral&quot;, &quot;No manufacturing jobs yet&quot;
+equipment_blocked &gt; 0              → &quot;danger&quot;,  &quot;Stop: equipment blocked on N job(s)&quot;
+material_risk &gt; 0                  → &quot;danger&quot;,  &quot;Stop: material shortfall on N job(s)&quot;
+at_risk_job_count &gt; 0              → &quot;warning&quot;, &quot;Review: N job(s) at risk&quot;
+unscheduled_wo_count &gt; 0           → &quot;warning&quot;, &quot;Review: N WO(s) need planned start&quot;
+crew_gap_count &gt; 0                 → &quot;warning&quot;, &quot;Review: crew gap on N job(s)&quot;
+over_capacity_count &gt; 0            → &quot;warning&quot;, &quot;Review: work-center load over capacity on N job(s)&quot;
+otherwise                          → &quot;success&quot;, &quot;Clear: material, crew, and equipment ready&quot;
+</code></pre>
+<p>So the <em>first</em> triggered condition wins. If you have material risk
+AND a crew gap, the prompt reads "Stop: material shortfall" — the
+crew gap isn't surfaced in the prompt (it's still in the
+<code>southbrook_crew_gap_count</code> badge, just not headline).</p>
+<h3 id="the-drill-down-actions">The drill-down actions</h3>
+<p>12 action methods on <code>project.project</code>, each opening a filtered
+view of <code>project.task</code> (or <code>mrp.workorder</code> for the WO-level ones):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>What it opens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>action_southbrook_open_manufacturing_jobs</code></td>
+<td>All tasks with ≥1 MO</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_blocked_manufacturing_jobs</code></td>
+<td>Tasks where state = blocked</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_review_manufacturing_jobs</code></td>
+<td>Tasks where state = review</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_ready_manufacturing_jobs</code></td>
+<td>Tasks where state = ready</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_unscheduled_manufacturing_jobs</code></td>
+<td>Tasks with unscheduled WOs</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_workorders_can_start_today</code></td>
+<td>WOs flagged <code>southbrook_can_start_today</code></td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_cad_cutlist_jobs</code></td>
+<td>Tasks where cad_cutlist_review_required</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_crew_gap_jobs</code></td>
+<td>Tasks with crew_gap</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_install_risk_jobs</code></td>
+<td>Tasks with install_date_missing</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_equipment_blocked_jobs</code></td>
+<td>Tasks with equipment_blocked</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_over_capacity_jobs</code></td>
+<td>Tasks with workcenter_over_capacity</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_material_risk_jobs</code></td>
+<td>Tasks with material_at_risk</td>
+</tr>
+</tbody>
+</table>
+<p>Plus 5 <em>persona-targeted</em> drill-downs that combine filters for a
+specific role:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Audience</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>action_southbrook_open_pm_control_queue</code></td>
+<td>PM — all manufacturing jobs grouped by readiness</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_shop_lead_queue</code></td>
+<td>Shop lead — WOs that can start today</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_designer_queue</code></td>
+<td>Designer / Engineer — needs CAD/cutlist OR missing specs</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_installer_queue</code></td>
+<td>Install Coordinator — missing install date OR install readiness review</td>
+</tr>
+<tr>
+<td><code>action_southbrook_open_executive_queue</code></td>
+<td>Executive — tasks at risk_level critical/high/medium</td>
+</tr>
+</tbody>
+</table>
+<p>These are the buttons on the project form that drive the day's work
+allocation: "Designer, here's your queue; Installer, here's yours."</p>
+<h3 id="the-data-quality-dry-run">The Data Quality Dry Run</h3>
+<p><code>action_southbrook_data_quality_dry_run</code> creates a
+<code>southbrook.project.data.quality.report</code> record and populates it
+with <code>southbrook.project.data.quality.line</code> rows for each issue
+found. <strong>It doesn't change any production data</strong> — it's a read-only
+audit.</p>
+<p>Issues it flags:</p>
+<table>
+<thead>
+<tr>
+<th>Issue Key</th>
+<th>Severity</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>blank_kitchen_project</code></td>
+<td>warning</td>
+<td>Non-done MO with no <code>project_task_id</code></td>
+</tr>
+<tr>
+<td><code>missing_install_due</code></td>
+<td>warning</td>
+<td>Task with linked MOs but no <code>job_install_due</code></td>
+</tr>
+<tr>
+<td><code>placeholder_estimated_cost</code></td>
+<td>info</td>
+<td>Task where <code>job_estimated_cost == 0</code></td>
+</tr>
+<tr>
+<td><code>queue_overlap</code></td>
+<td>blocker</td>
+<td>Task in state "ready" but <code>job_at_risk</code> OR <code>material_at_risk</code> OR <code>equipment_blocked</code> is also True</td>
+</tr>
+<tr>
+<td><code>equipment_count_mismatch</code></td>
+<td>warning</td>
+<td><code>equipment_blocked != bool(maintenance_request_count)</code></td>
+</tr>
+<tr>
+<td><code>demo_scrap_unbuild</code></td>
+<td>info</td>
+<td>Scrap or unbuild with "REF" in display name (looks like demo data)</td>
+</tr>
+</tbody>
+</table>
+<p>The report opens after creation and shows the issues list with
+recommended actions. Use this:
+- Weekly — to catch silent data drift before it builds up.
+- After a major data migration or import — to validate the import.
+- Before a board / leadership demo — to make sure dashboards are
+  truthful.</p>
+<h3 id="what-counts-as-late">What counts as "late"?</h3>
+<p>There are two answers:</p>
+<ol>
+<li>
+<p><strong>At-risk task</strong> (<code>job_at_risk == True</code>) — at least one non-done
+   MO has <code>date_deadline.date() &lt; today</code>, OR a started MO isn't
+   fully reserved. The <code>job_risk_reason</code> Char enumerates the
+   conditions. This is what the "X jobs at risk" mission prompt
+   counts.</p>
+</li>
+<li>
+<p><strong>Install-risk task</strong> (<code>install_date_missing == True</code>) — the
+   task has linked MOs but <code>job_install_due</code> is null. Not "late"
+   strictly — it's "can't tell if it's late because the date is
+   missing." Surfaced separately because the resolution is
+   different (chase the install date from the customer, not the
+   shop floor).</p>
+</li>
+</ol>
+<p>There's <strong>no explicit "completed late" metric</strong> in the project
+rollup — for that, query MO <code>date_finished &gt; date_deadline</code> in
+Manufacturing.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>Monday morning (10 min): the leadership update</strong></p>
+<ol>
+<li>Open <strong>/odoo/project</strong>.</li>
+<li>If you've activated the mission-control kanban (lesson 14.6),
+   eyeball the mission prompt on each project tile. Green = nothing
+   to escalate. Yellow / red = drill in.</li>
+<li>Click the relevant project to open its form.</li>
+<li>Read the smart buttons: # Customer Jobs, # Ready, # Blocked,
+   # At Risk.</li>
+<li>The numbers ARE your slide. Snapshot them; you're done.</li>
+</ol>
+<p><strong>Weekly (30 min): the trend deep-dive</strong></p>
+<p>The rollup fields are computed-non-stored — they don't have a
+historical trend on their own. For trends:</p>
+<ol>
+<li>Open <strong>/odoo/project → project → Action → Southbrook Data
+   Quality Dry Run</strong> (creates a report).</li>
+<li>Compare to last week's report (open from Settings → Technical
+   → Database Structure → Data Quality Reports).</li>
+<li>Look at the issue counts week-over-week — are
+   <code>blank_kitchen_project</code> warnings growing? That means MOs are
+   being created without auto-linking (lesson 14.5 covers the
+   repair).</li>
+</ol>
+<p>For deeper trend analysis, you need to export the underlying task
+data and chart it externally:</p>
+<ol>
+<li>Open the task list (any filter).</li>
+<li>Top-right kebab → <em>Export All</em> (developer mode) or <em>Export
+   selected</em> (any user).</li>
+<li>Pick fields: <code>date_deadline</code>, <code>stage_id</code>, <code>production_count</code>,
+   <code>job_at_risk</code>, <code>job_install_due</code>, <code>southbrook_production_release_state</code>,
+   <code>manufacturing_readiness_score</code>.</li>
+<li>Download as XLSX or CSV → chart in Excel / Google Sheets.</li>
+</ol>
+<p><strong>Daily (5 min): the late-task chase</strong></p>
+<ol>
+<li>Open the project form → click <strong>At-Risk Jobs</strong> drill-down.</li>
+<li>The list opens filtered to <code>job_at_risk = True</code>.</li>
+<li>Sort by <code>install_due_date</code> ascending.</li>
+<li>For each, read <code>job_risk_reason</code> (one of:
+   "N MO(s) waiting on components", "N MO(s) past deadline").</li>
+<li>Chase the reason — components → procurement; past deadline →
+   reschedule.</li>
+</ol>
+<p><strong>Persona drill-downs (Designer / Installer / Shop Lead):</strong></p>
+<p>These five actions are the right way to delegate work. Open the
+project, click the persona button, and the user gets the filtered
+view to work through. The actions also drop the right
+<code>search_default_*</code> context so the user lands with the relevant
+filters already applied.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The mission prompt says 'Clear: material, crew, and equipment
+ready' but I know there's a late job."</strong></p>
+<p>The mission prompt is a <em>first-match</em> lookup that doesn't include
+<code>at_risk_job_count</code> past the equipment + material checks unless
+those are zero. Wait — actually it DOES check at_risk_job_count
+third. If it's saying "Clear", then <code>at_risk_job_count == 0</code>. The
+job you think is late might not be <code>job_at_risk = True</code> (e.g. the
+MO <code>date_deadline</code> is null, so the past-deadline check can't
+trigger). Open the task and check the MO's deadline field.</p>
+<p><strong>"The rollup shows 4 'Ready' jobs but only 3 are actually ready."</strong></p>
+<p>The "ready" rollup is computed as:</p>
+<pre><code>components_available == 'ready' AND not job_at_risk
+AND not material_at_risk AND not equipment_blocked
+</code></pre>
+<p>Note it does NOT check <code>southbrook_production_release_state</code>. So a
+task whose components are reserved, no risk flags raised, but
+release checklist still has incomplete sign-offs counts as "ready"
+in <em>this</em> rollup. The "blocked" / "review" rollup reads from
+<code>manufacturing_readiness_state</code> which DOES include release
+checklist — and that's the authoritative one. The "ready" rollup
+is a quick-glance proxy, not authoritative.</p>
+<p><strong>TBD:</strong> consider tightening <code>southbrook_ready_job_count</code> to also
+require <code>manufacturing_readiness_state == 'ready'</code> so the two
+counts can't disagree. Currently they can.</p>
+<p><strong>"The Data Quality Dry Run flagged 50 <code>demo_scrap_unbuild</code> issues
+on a fresh install."</strong></p>
+<p>The check matches any scrap or unbuild with "REF" in the display
+name. Native Odoo demo data uses "REF" as a SKU prefix. On a fresh
+install with demo data loaded, these will fire heavily. Mitigation:
+either delete the demo data (Settings → Technical → Demo Data) or
+set <code>southbrook_exclude_from_pm_reports</code> to True on the
+scrap/unbuild records you want to keep (the check honors that flag).</p>
+<p><strong>"The drill-down opens an empty list."</strong></p>
+<p>The action methods use <code>.filtered()</code> against the in-memory
+recordset, not a SQL domain. If the filter condition uses a
+computed-non-stored field, the filter still works — but you can't
+sort/paginate efficiently and the URL doesn't carry the filter, so
+refreshing reverts. For large databases (&gt;5K tasks), this is slow.
+Workaround: use the search view's quick filters instead, which are
+domain-based.</p>
+<p><strong>"I want to schedule a weekly report email."</strong></p>
+<p>Native Odoo's scheduled-action + email-template machinery works,
+but you'll need to author the QWeb template and the cron yourself
+— there's no canned weekly report in the addon. <strong>TBD:</strong> consider
+adding <code>southbrook.project.data.quality.report.email_weekly</code> cron
+in a future release.</p>
+<p><strong>"The 'Can Start Today' WO count is 0 but I have WOs scheduled
+for today."</strong></p>
+<p><code>southbrook_can_start_today</code> is a Boolean on <code>mrp.workorder</code>
+computed by <code>southbrook_kitchen_workspace</code> (or a related addon —
+TBD which exactly). It requires more than a <code>date_start = today</code>
+check: it usually also requires preceding WOs done, components
+reserved, workcenter free. If those aren't true, the count is 0.
+Open Manufacturing → Work Orders and filter to today's date_start
+to see the full list; <code>Can Start Today</code> is the subset that's
+<em>actually</em> ready.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The project-level rollups are <strong>pure aggregations</strong> over the task
+set: <code>for task in tasks</code> walks. There's no caching, no
+materialised view, no batch job. Every read of the rollup field
+re-walks the task set. For projects with ≤1000 tasks this is
+fast (&lt;100 ms); for &gt;5000 tasks the rollup is the slowest field
+on the project form and may trip the readiness view's &lt;2s
+expectations.</p>
+<p>The mission-control kanban is shipped <em>inactive</em> (lesson 14.6) in
+part because the rollup costs add ~200 ms per project tile, which
+multiplies on a 50-project list view. Activate it for production
+managers; don't activate it globally.</p>
+<p>The 12 drill-down actions use <code>.filtered()</code> rather than domain-
+based searches because most of the filter fields are computed-
+non-stored. The cost is:
+- Loading every task in the project into memory.
+- Filtering in Python.
+- Returning ids to the act_window.</p>
+<p>For a project with 200 active tasks this is ~50 ms — fine. For one
+with 5000+ archived tasks (an old "catch-all" project), it can be
+slow.</p>
+<p>The Data Quality Report is <strong>idempotent and additive</strong>: each call
+to <code>action_southbrook_data_quality_dry_run</code> creates a new
+<code>southbrook.project.data.quality.report</code> record with a fresh
+timestamp. Old reports stay. This is by design — the historical
+trail IS the trend. Don't auto-delete old reports; archive them if
+they're cluttering the list.</p>
+<p>The persona-targeted queues
+(<code>action_southbrook_open_pm_control_queue</code> et al.) set
+<code>search_default_*</code> context keys to pre-apply search filters on the
+opened view. This lets one user "pin" a persona view as their
+homepage by saving the filter combination as a favorite. The list
+view's default ordering is by <code>install_due_date</code> ascending, so the
+most urgent jobs surface first.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> The mission prompt on a project tile says "Stop: equipment
+blocked on 2 job(s)." You drill in — only 1 job has
+<code>equipment_blocked = True</code>. Bug?</p>
+<blockquote>
+<p>Likely a stale read on the kanban tile vs. fresh compute on
+drill-down. The rollup <code>southbrook_equipment_blocked_count</code> is
+computed-non-stored; the kanban tile read may be cached from a
+previous compute. Refresh the kanban (browser reload) and the
+number will reconcile to 1. The drill-down is authoritative — it
+uses <code>.filtered()</code> over the live recordset.</p>
+</blockquote>
+<p><strong>2.</strong> Leadership asks "how many jobs did we ship last week?" The
+project rollups don't tell you. Where do you go?</p>
+<blockquote>
+<p>The project rollups are point-in-time, not historical. Go to
+Manufacturing → Operations → Manufacturing Orders. Filter:
+<code>state = done</code> AND <code>date_finished within last 7 days</code>. Group by
+Customer Job (<code>project_task_id</code>). Count distinct task IDs —
+that's "jobs shipped last week" (where a job is the customer
+kitchen, not a single MO).</p>
+</blockquote>
+<p><strong>3.</strong> The Data Quality Dry Run reports 12
+<code>blank_kitchen_project</code> warnings. What do you do?</p>
+<blockquote>
+<p>Open the report. Each line names a specific <code>mrp.production</code>
+record with no <code>project_task_id</code>. For each: open the MO, look at
+the SO line, find the right task (via the SO's
+<code>x_southbrook_sale_order_id</code> link from the task side), and either
+(a) run <code>Link MOs from Sale</code> on that task (faster, 1-click), or
+(b) set <code>project_task_id</code> manually on the MO. Lesson 14.5 has the
+orphan-repair flow in detail.</p>
+</blockquote>
+<p><strong>4.</strong> You want to schedule a weekly Data Quality Dry Run that
+emails the result to the production manager. Tell me the high-
+level approach.</p>
+<blockquote>
+<p>(a) Create an <code>ir.cron</code> (in your own addon — not in
+<code>southbrook_project_mrp</code>) that calls
+<code>env['project.project'].search([]).action_southbrook_data_quality_dry_run()</code>
+weekly. (b) Override the action to also send an email after
+creating the report — use <code>mail.template</code> + <code>template.send_mail(report.id)</code>.
+(c) Author the email template with QWeb to render the line list.
+(d) Test with <code>--test-enable</code>. Don't touch the existing
+<code>southbrook_project_mrp</code> addon — extend it from a side module so
+upgrades stay clean.</p>
+</blockquote>
+<p><strong>5.</strong> The PM Control Queue button on the project form opens an
+empty list, but the project has 50 active tasks. Why?</p>
+<blockquote>
+<p>The PM Control Queue filters to <code>production_count &gt; 0</code> AND
+opens with <code>search_default_manufacturing_blocked: 1</code>. If none of
+the 50 tasks have linked MOs (e.g. SOs not yet confirmed), the
+list is empty. Resolution: the manufacturing pipeline hasn't
+started — that's correct behavior. To see all 50 tasks, use the
+stock "Tasks" smart button on the project, not the PM Control
+Queue.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The 17 rollup field internals at line-by-line code level — see
+  <code>southbrook_project_mrp/models/project_project.py</code>.</li>
+<li>Manufacturing-side reporting (OEE, cycle time, workcenter
+  utilisation) → Course 2 lesson 2.5 + Course 3 lesson 3.3.</li>
+<li>The Kitchen Ops report grid (Kitchen Jobs board + filter
+  dashboard) → Course 12 lesson 12.6.</li>
+<li>Building custom QWeb reports for project-level PDFs → Course 8
+  lesson 8.1 (<code>08_custom_reports.md</code>).</li>
+<li>The Hermes Console queues that consume the same rollup data →
+  Course 7 lesson 7.3.</li>
+<li>Native Odoo's Tasks Analysis + Burndown reports — those read
+  stock fields (<code>open_task_count</code>, etc.), not Southbrook ones.
+  Stock reports are not extended by <code>southbrook_project*</code>.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

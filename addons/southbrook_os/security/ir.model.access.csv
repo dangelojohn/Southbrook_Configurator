@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_os_section_user,os section read all,model_southbrook_os_section,base.group_user,1,0,0,0
+access_os_section_admin,os section admin,model_southbrook_os_section,base.group_system,1,1,1,1
+access_os_publication_user,os publication read,model_southbrook_os_publication,base.group_user,1,0,0,0
+access_os_publication_admin,os publication admin,model_southbrook_os_publication,base.group_system,1,1,1,1
+access_os_publication_section_user,os pub section read,model_southbrook_os_publication_section,base.group_user,1,0,0,0
+access_os_publication_section_admin,os pub section admin,model_southbrook_os_publication_section,base.group_system,1,1,1,1
+access_os_revision_user,os revision read,model_southbrook_os_revision,base.group_user,1,0,0,0
+access_os_revision_admin,os revision admin,model_southbrook_os_revision,base.group_system,1,1,1,1

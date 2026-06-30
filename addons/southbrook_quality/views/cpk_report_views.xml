@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_cpk_report_list" model="ir.ui.view">
+        <field name="name">southbrook.quality.cpk_report.list</field>
+        <field name="model">southbrook.quality.cpk_report</field>
+        <field name="arch" type="xml">
+            <list string="Cpk by Dimension and Work Center"
+                  decoration-danger="cpk &lt; 1.0"
+                  decoration-warning="cpk &gt;= 1.0 and cpk &lt; 1.33"
+                  decoration-success="cpk &gt;= 1.33">
+                <field name="dimension_key"/>
+                <field name="workcenter_id"/>
+                <field name="sample_count"/>
+                <field name="mean"/>
+                <field name="stddev"/>
+                <field name="lsl"/>
+                <field name="usl"/>
+                <field name="cpk"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cpk_report_graph" model="ir.ui.view">
+        <field name="name">southbrook.quality.cpk_report.graph</field>
+        <field name="model">southbrook.quality.cpk_report</field>
+        <field name="arch" type="xml">
+            <graph string="Cpk" type="bar">
+                <field name="dimension_key" type="row"/>
+                <field name="workcenter_id" type="row"/>
+                <field name="cpk" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_southbrook_cpk_report" model="ir.actions.act_window">
+        <field name="name">Cpk Report</field>
+        <field name="res_model">southbrook.quality.cpk_report</field>
+        <field name="view_mode">list,graph</field>
+    </record>
+</odoo>

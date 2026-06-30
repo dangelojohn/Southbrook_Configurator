@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asset_list" model="ir.ui.view">
+        <field name="name">southbrook.finance.asset.list</field>
+        <field name="model">southbrook.finance.asset</field>
+        <field name="arch" type="xml">
+            <list string="Assets" decoration-muted="state == 'disposed'">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="cca_class_id"/>
+                <field name="acquisition_date"/>
+                <field name="acquisition_cost"/>
+                <field name="accumulated_depreciation"/>
+                <field name="net_book_value"/>
+                <field name="state"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_asset_form" model="ir.ui.view">
+        <field name="name">southbrook.finance.asset.form</field>
+        <field name="model">southbrook.finance.asset</field>
+        <field name="arch" type="xml">
+            <form string="Asset">
+                <header>
+                    <button name="action_generate_schedule" type="object"
+                            string="Generate Schedule" class="oe_highlight"/>
+                    <button name="action_set_in_service" type="object"
+                            string="Set In Service" invisible="state != 'draft'"/>
+                    <button name="action_set_disposed" type="object"
+                            string="Dispose" invisible="state == 'disposed'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,in_service,disposed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                        <h3><field name="code" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="Acquisition">
+                            <field name="cca_class_id"/>
+                            <field name="acquisition_date"/>
+                            <field name="acquisition_cost"/>
+                            <field name="salvage_value"/>
+                        </group>
+                        <group string="Balances">
+                            <field name="accumulated_depreciation" readonly="1"/>
+                            <field name="net_book_value" readonly="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Schedule">
+                            <field name="schedule_ids">
+                                <list editable="bottom">
+                                    <field name="year"/>
+                                    <field name="opening_balance"/>
+                                    <field name="cca_amount"/>
+                                    <field name="closing_balance"/>
+                                    <field name="posted"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_asset_kanban" model="ir.ui.view">
+        <field name="name">southbrook.finance.asset.kanban</field>
+        <field name="model">southbrook.finance.asset</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="cca_class_id"/>
+                <field name="acquisition_cost"/>
+                <field name="net_book_value"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card">
+                            <strong><field name="code"/></strong>
+                            <div><field name="name"/></div>
+                            <div><field name="cca_class_id"/></div>
+                            <div>NBV: <field name="net_book_value"/></div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_asset" model="ir.actions.act_window">
+        <field name="name">Asset Register</field>
+        <field name="res_model">southbrook.finance.asset</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+</odoo>

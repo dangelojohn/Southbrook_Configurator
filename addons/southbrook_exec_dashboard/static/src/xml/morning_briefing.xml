@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_exec_dashboard.MorningBriefing">
+        <div class="sb-exec-dashboard">
+            <header class="sb-exec-header">
+                <div class="sb-exec-greeting">
+                    <h1>
+                        <t t-esc="greeting"/>, <t t-esc="userName"/>
+                    </h1>
+                    <div class="sb-exec-asof" t-if="state.snapshot">
+                        As of <t t-esc="asOfDisplay"/>
+                    </div>
+                </div>
+                <button class="btn btn-primary sb-refresh-btn"
+                        t-on-click="onRefresh"
+                        t-att-disabled="state.loading">
+                    <t t-if="state.loading">Refreshing…</t>
+                    <t t-else="">Refresh</t>
+                </button>
+            </header>
+
+            <div class="sb-exec-error" t-if="state.error">
+                <strong>Error:</strong> <t t-esc="state.error"/>
+            </div>
+
+            <div class="sb-exec-grid" t-if="state.snapshot &amp;&amp; !state.error">
+                <!-- Tile 1: Yesterday output -->
+                <div class="sb-tile sb-tile-yesterday">
+                    <div class="sb-tile-label">Yesterday Output</div>
+                    <div class="sb-tile-value">
+                        <t t-esc="formatInt(state.snapshot.yesterday_units_produced)"/>
+                        <span class="sb-tile-unit">units</span>
+                    </div>
+                    <div class="sb-tile-sub">
+                        target <t t-esc="formatInt(state.snapshot.yesterday_units_target)"/>
+                        · takt <t t-esc="formatPct(state.snapshot.yesterday_takt_adherence_pct)"/>
+                    </div>
+                </div>
+
+                <!-- Tile 2: FPY 7d (gauge) -->
+                <div class="sb-tile sb-tile-fpy">
+                    <div class="sb-tile-label">First Pass Yield (7d)</div>
+                    <div t-att-class="gaugeClass(state.snapshot.fpy_pct_7d)">
+                        <t t-esc="formatPct(state.snapshot.fpy_pct_7d)"/>
+                    </div>
+                </div>
+
+                <!-- Tile 3: OTD 30d (gauge) -->
+                <div class="sb-tile sb-tile-otd">
+                    <div class="sb-tile-label">On-Time Delivery (30d)</div>
+                    <div t-att-class="gaugeClass(state.snapshot.otd_pct_30d)">
+                        <t t-esc="formatPct(state.snapshot.otd_pct_30d)"/>
+                    </div>
+                </div>
+
+                <!-- Tile 4: WIP value -->
+                <div class="sb-tile sb-tile-wip">
+                    <div class="sb-tile-label">WIP Value</div>
+                    <div class="sb-tile-value">
+                        <t t-esc="formatMoney(state.snapshot.wip_value_current)"/>
+                    </div>
+                    <div class="sb-tile-sub">current snapshot</div>
+                </div>
+
+                <!-- Tile 5: Units planned today -->
+                <div class="sb-tile sb-tile-planned">
+                    <div class="sb-tile-label">Units Planned Today</div>
+                    <div class="sb-tile-value">
+                        <t t-esc="formatInt(state.snapshot.units_planned_today)"/>
+                    </div>
+                </div>
+
+                <!-- Tile 6: Bottleneck workcenter -->
+                <div class="sb-tile sb-tile-bottleneck">
+                    <div class="sb-tile-label">Top Bottleneck</div>
+                    <div class="sb-tile-value">
+                        <t t-esc="state.snapshot.top_bottleneck_workcenter || 'n/a'"/>
+                    </div>
+                    <div t-att-class="bottleneckClass(state.snapshot.top_bottleneck_load_pct)">
+                        <t t-esc="formatPct(state.snapshot.top_bottleneck_load_pct)"/> load
+                    </div>
+                </div>
+
+                <!-- Tile 7: Revenue 30d -->
+                <div class="sb-tile sb-tile-revenue">
+                    <div class="sb-tile-label">Revenue (30d)</div>
+                    <div class="sb-tile-value">
+                        <t t-esc="formatMoney(state.snapshot.revenue_last_30d)"/>
+                    </div>
+                </div>
+
+                <!-- Tile 8: Cash position -->
+                <div class="sb-tile sb-tile-cash">
+                    <div class="sb-tile-label">Cash Position</div>
+                    <div class="sb-tile-value">
+                        <t t-esc="formatMoney(state.snapshot.cash_position)"/>
+                    </div>
+                </div>
+
+                <!-- Tile 9: Critical NCRs (clickable) -->
+                <div class="sb-tile sb-tile-ncr sb-tile-clickable"
+                     t-on-click="openCriticalNcrs">
+                    <div class="sb-tile-label">Critical NCRs Open</div>
+                    <div class="sb-tile-value">
+                        <t t-esc="formatInt(state.snapshot.quality_open_critical_ncr_count)"/>
+                    </div>
+                    <div class="sb-tile-sub">tap to drill in</div>
+                </div>
+            </div>
+
+            <div class="sb-exec-loading" t-if="state.loading">
+                Loading morning briefing…
+            </div>
+        </div>
+    </t>
+
+</templates>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_wc_capacity_list" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.workcenter_capacity.list</field>
+    <field name="model">southbrook.mes_mps.workcenter_capacity</field>
+    <field name="arch" type="xml">
+      <list string="Workcenter Capacity"
+            decoration-danger="load_pct &gt; 110"
+            decoration-warning="load_pct &gt; 90 and load_pct &lt;= 110"
+            decoration-success="load_pct &lt;= 75">
+        <field name="workcenter_id"/>
+        <field name="week_start"/>
+        <field name="available_hours"/>
+        <field name="planned_hours"/>
+        <field name="load_pct" widget="percentage"/>
+        <field name="is_overloaded"/>
+        <button name="action_compute_load" type="object" string="Refresh"
+                icon="fa-refresh"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="view_wc_capacity_form" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.workcenter_capacity.form</field>
+    <field name="model">southbrook.mes_mps.workcenter_capacity</field>
+    <field name="arch" type="xml">
+      <form string="Workcenter Capacity">
+        <header>
+          <button name="action_compute_load" type="object" string="Refresh from Calendar"
+                  class="btn-primary"/>
+        </header>
+        <sheet>
+          <group>
+            <field name="workcenter_id"/>
+            <field name="week_start"/>
+            <field name="available_hours"/>
+            <field name="planned_hours" readonly="1"/>
+            <field name="load_pct" widget="percentage" readonly="1"/>
+            <field name="is_overloaded" readonly="1"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_wc_capacity" model="ir.actions.act_window">
+    <field name="name">Workcenter Capacity</field>
+    <field name="res_model">southbrook.mes_mps.workcenter_capacity</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+</odoo>

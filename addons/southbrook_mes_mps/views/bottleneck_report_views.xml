@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record id="view_bottleneck_report_form" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.bottleneck_report.form</field>
+    <field name="model">southbrook.mes_mps.bottleneck_report</field>
+    <field name="arch" type="xml">
+      <form string="Bottleneck Report">
+        <header>
+          <button name="action_compute" type="object" string="Recompute"
+                  class="btn-primary"/>
+        </header>
+        <sheet>
+          <div class="oe_title">
+            <h1><field name="name" readonly="1"/></h1>
+          </div>
+          <group>
+            <field name="as_of_date"/>
+            <field name="top_bottleneck_workcenter_id" readonly="1"/>
+            <field name="top_bottleneck_load_pct" widget="percentage" readonly="1"/>
+          </group>
+          <notebook>
+            <page string="Lines">
+              <field name="line_ids">
+                <list decoration-danger="load_pct &gt; 110"
+                      decoration-warning="load_pct &gt; 90 and load_pct &lt;= 110">
+                  <field name="workcenter_id"/>
+                  <field name="load_pct" widget="percentage"/>
+                  <field name="bottleneck_score"/>
+                  <field name="recommended_action"/>
+                </list>
+              </field>
+            </page>
+          </notebook>
+        </sheet>
+        <chatter/>
+      </form>
+    </field>
+  </record>
+
+  <record id="view_bottleneck_report_list" model="ir.ui.view">
+    <field name="name">southbrook.mes_mps.bottleneck_report.list</field>
+    <field name="model">southbrook.mes_mps.bottleneck_report</field>
+    <field name="arch" type="xml">
+      <list string="Bottleneck Reports">
+        <field name="name"/>
+        <field name="as_of_date"/>
+        <field name="top_bottleneck_workcenter_id"/>
+        <field name="top_bottleneck_load_pct" widget="percentage"/>
+      </list>
+    </field>
+  </record>
+
+  <record id="action_bottleneck_report" model="ir.actions.act_window">
+    <field name="name">Bottleneck Report</field>
+    <field name="res_model">southbrook.mes_mps.bottleneck_report</field>
+    <field name="view_mode">list,form</field>
+  </record>
+
+</odoo>

@@ -1,0 +1,945 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_26_mes_architecture" model="slide.slide">
+            <field name="name">MES + MPS Module — Architecture</field>
+            <field name="channel_id" ref="course_mes_mps_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer or admin learning southbrook_mes_mps internals.</field>
+            <field name="html_content"><![CDATA[<h1 id="mes-mps-module-architecture">MES + MPS Module — Architecture</h1>
+<h2 id="the-module-at-a-glance">The module at a glance</h2>
+<ul>
+<li>Path: <code>addons/southbrook_mes_mps/</code></li>
+<li>Version: 19.0.1.0.0</li>
+<li>Depends on: <code>base</code>, <code>mail</code>, <code>mrp</code>, <code>product</code>,
+  <code>southbrook_manufacturing_intelligence</code></li>
+</ul>
+<h2 id="source-layout">Source layout</h2>
+<pre><code>addons/southbrook_mes_mps/
+├── models/
+│   ├── mps_period.py         — rolling 13-week MPS records
+│   ├── workcenter_capacity.py — calculated capacity per workcenter per week
+│   ├── oee_snapshot.py        — daily OEE per workcenter
+│   ├── bottleneck_report.py   — read-only aggregated view
+│   └── mi_engine_ext.py
+├── views/
+└── data/
+</code></pre>
+<h2 id="what-mes-vs-mps">What MES vs MPS</h2>
+<ul>
+<li><strong>MES</strong> (Manufacturing Execution System) — operates the shop
+  floor today. OEE, breakdowns, in-progress tracking.</li>
+<li><strong>MPS</strong> (Master Production Schedule) — plans the next 13 weeks.
+  Demand × capacity = production plan.</li>
+</ul>
+<p>This module covers both. The MPS part schedules; the MES part
+monitors execution.</p>
+<h2 id="install">Install</h2>
+<pre><code class="language-bash">./scripts/deploy_to_qnap.sh southbrook_mes_mps
+</code></pre>
+<p>What -i does:
+1. Creates mps_period, workcenter_capacity, oee_snapshot tables
+2. Creates the SQL view for bottleneck_report
+3. Adds 5 menus under MES
+4. Registers crons (capacity recompute, OEE rollup, MPS expiry)</p>
+<h2 id="cron-landscape">Cron landscape</h2>
+<table>
+<thead>
+<tr>
+<th>Cron</th>
+<th>Schedule</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cron_capacity_recompute</code></td>
+<td>weekly Mondays 02:00</td>
+<td>Recomputes 13-week capacity per workcenter</td>
+</tr>
+<tr>
+<td><code>cron_oee_rollup</code></td>
+<td>daily 23:30</td>
+<td>Aggregates today's productivity into OEE snapshot</td>
+</tr>
+<tr>
+<td><code>cron_mps_expiry</code></td>
+<td>weekly Mondays 03:00</td>
+<td>Marks periods past their week as <code>executed</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="key-models">Key models</h2>
+<h3 id="mps-period">MPS Period</h3>
+<pre><code class="language-python">class SouthbrookMesMpsMpsPeriod(models.Model):
+    _name = &quot;southbrook.mes_mps.mps_period&quot;
+</code></pre>
+<p>One row per product per week_start. State machine:
+draft → approved → executed.</p>
+<h3 id="workcenter-capacity">Workcenter Capacity</h3>
+<pre><code class="language-python">class SouthbrookMesMpsWorkcenterCapacity(models.Model):
+    _name = &quot;southbrook.mes_mps.workcenter_capacity&quot;
+</code></pre>
+<p>Computed weekly: <code>hours_per_shift × shifts × days_per_week × time_efficiency</code>.</p>
+<h3 id="oee-snapshot">OEE Snapshot</h3>
+<pre><code class="language-python">class SouthbrookMesMpsOeeSnapshot(models.Model):
+    _name = &quot;southbrook.mes_mps.oee_snapshot&quot;
+</code></pre>
+<p>One row per workcenter per day. Stored A × P × Q with breakdown.</p>
+<h3 id="bottleneck-report">Bottleneck Report</h3>
+<pre><code class="language-python">class SouthbrookMesMpsBottleneckReport(models.Model):
+    _name = &quot;southbrook.mes_mps.bottleneck_report&quot;
+    _auto = False  # SQL view
+</code></pre>
+<p>Live view over capacity + demand.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"MPS Workbench empty"</strong> — no periods generated yet. Run
+  <code>Generate Rolling 13 Weeks</code> server action on selected products.</li>
+<li><strong>"OEE snapshots missing yesterday"</strong> — cron didn't run.
+  Manual trigger from server actions.</li>
+<li><strong>"Bottleneck report stale"</strong> — SQL view query. Should be live;
+  if showing old data, verify <code>auto = False</code> materialised correctly.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> MES vs MPS — what each covers?</p>
+<blockquote>
+<p>MES = execution + monitoring (OEE, breakdowns). MPS = planning
+(13-week schedule, capacity allocation).</p>
+</blockquote>
+<p><strong>Q2.</strong> OEE snapshot model — granularity?</p>
+<blockquote>
+<p>Per workcenter per day. Stored values for fast historical
+queries; cron-populated.</p>
+</blockquote>
+<p><strong>Q3.</strong> When does MPS period state advance to <code>executed</code>?</p>
+<blockquote>
+<p>Weekly Monday 03:00 cron marks periods whose <code>week_start</code> is in
+the past. So Monday morning, last week's periods are executed.</p>
+</blockquote>
+<p><strong>Q4.</strong> Workcenter capacity recompute interval?</p>
+<blockquote>
+<p>Weekly. The numbers change rarely (shift count, days/week);
+daily compute would waste cycles.</p>
+</blockquote>
+<p><strong>Q5.</strong> Adding a 14th week of MPS — approach?</p>
+<blockquote>
+<p>The rolling 13-week generator handles this. Each week's run
+adds the new week 13 weeks out + the prior week-1 ages out.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_26_mes_mps_generator" model="slide.slide">
+            <field name="name">MES + MPS Module — MPS Period and Rolling 13-Week Generator</field>
+            <field name="channel_id" ref="course_mes_mps_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Developer working on MPS period generation logic.</field>
+            <field name="html_content"><![CDATA[<h1 id="mes-mps-module-mps-period-and-rolling-13-week-generator">MES + MPS Module — MPS Period and Rolling 13-Week Generator</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookMesMpsMpsPeriod(models.Model):
+    _name = &quot;southbrook.mes_mps.mps_period&quot;
+    _description = &quot;MPS Period (Weekly)&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name              = fields.Char(default=lambda s: s._make_name())
+product_id        = fields.Many2one(&quot;product.product&quot;, required=True)
+product_tmpl_id   = fields.Many2one(related=&quot;product_id.product_tmpl_id&quot;)
+week_start        = fields.Date(required=True, index=True)
+year              = fields.Integer(compute=&quot;_compute_year_week&quot;, store=True)
+week_number       = fields.Integer(compute=&quot;_compute_year_week&quot;, store=True)
+
+forecast_qty         = fields.Float()
+safety_stock         = fields.Float()
+actual_demand_qty    = fields.Float(compute=&quot;_compute_demand&quot;, store=True)
+planned_supply_qty   = fields.Float(compute=&quot;_compute_supply&quot;, store=True)
+to_supply_qty        = fields.Float(compute=&quot;_compute_to_supply&quot;, store=True)
+
+state = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;approved&quot;, &quot;Approved&quot;),
+    (&quot;executed&quot;, &quot;Executed&quot;),
+], default=&quot;draft&quot;)
+</code></pre>
+<h2 id="year-week-from-date">Year + week from date</h2>
+<pre><code class="language-python">@api.depends(&quot;week_start&quot;)
+def _compute_year_week(self):
+    for p in self:
+        if p.week_start:
+            iso = p.week_start.isocalendar()
+            p.year = iso[0]
+            p.week_number = iso[1]
+</code></pre>
+<p>ISO week numbering — week 1 is the week containing the first
+Thursday of January.</p>
+<h2 id="demand-computation">Demand computation</h2>
+<pre><code class="language-python">@api.depends(&quot;product_id&quot;, &quot;week_start&quot;)
+def _compute_demand(self):
+    for p in self:
+        week_end = p.week_start + timedelta(days=6)
+        sos = self.env[&quot;sale.order&quot;].search([
+            (&quot;state&quot;, &quot;in&quot;, [&quot;sale&quot;, &quot;done&quot;]),
+            (&quot;commitment_date&quot;, &quot;&gt;=&quot;, p.week_start),
+            (&quot;commitment_date&quot;, &quot;&lt;=&quot;, week_end),
+        ])
+        p.actual_demand_qty = sum(
+            line.product_uom_qty
+            for so in sos
+            for line in so.order_line
+            if line.product_id == p.product_id)
+</code></pre>
+<p>Demand from confirmed sale orders with commitment_date in the
+period. Not pending forecasts; only committed.</p>
+<h2 id="supply-computation">Supply computation</h2>
+<pre><code class="language-python">@api.depends(&quot;product_id&quot;, &quot;week_start&quot;)
+def _compute_supply(self):
+    for p in self:
+        week_end = p.week_start + timedelta(days=6)
+        mos = self.env[&quot;mrp.production&quot;].search([
+            (&quot;product_id&quot;, &quot;=&quot;, p.product_id.id),
+            (&quot;date_planned_start&quot;, &quot;&gt;=&quot;, p.week_start),
+            (&quot;date_planned_start&quot;, &quot;&lt;=&quot;, week_end),
+            (&quot;state&quot;, &quot;not in&quot;, [&quot;draft&quot;, &quot;cancel&quot;]),
+        ])
+        p.planned_supply_qty = sum(mos.mapped(&quot;product_qty&quot;))
+</code></pre>
+<p>Supply from confirmed/in-progress MOs scheduled in the period.</p>
+<h2 id="to-supply">To-supply</h2>
+<pre><code class="language-python">@api.depends(&quot;forecast_qty&quot;, &quot;actual_demand_qty&quot;,
+             &quot;planned_supply_qty&quot;, &quot;safety_stock&quot;)
+def _compute_to_supply(self):
+    for p in self:
+        demand = max(p.forecast_qty, p.actual_demand_qty)
+        p.to_supply_qty = max(0,
+            demand + p.safety_stock - p.planned_supply_qty)
+</code></pre>
+<p>Uses the larger of forecast or actual demand — covers both
+"haven't sold yet but will" and "already sold more than forecast"
+scenarios.</p>
+<h2 id="rolling-13-week-generator">Rolling 13-week generator</h2>
+<pre><code class="language-python">@api.model
+def action_generate_rolling_13_weeks(self, product_id):
+    &quot;&quot;&quot;For a product, ensure 13 weeks ahead have MPS periods.&quot;&quot;&quot;
+    today = fields.Date.today()
+    # Find the current ISO week's Monday
+    current_monday = today - timedelta(days=today.weekday())
+
+    for offset in range(13):
+        week_start = current_monday + timedelta(weeks=offset)
+        existing = self.search([
+            (&quot;product_id&quot;, &quot;=&quot;, product_id),
+            (&quot;week_start&quot;, &quot;=&quot;, week_start),
+        ], limit=1)
+        if not existing:
+            self.create({
+                &quot;product_id&quot;: product_id,
+                &quot;week_start&quot;: week_start,
+                &quot;forecast_qty&quot;: self._forecast_for(product_id, week_start),
+                &quot;safety_stock&quot;: self._safety_stock_for(product_id),
+            })
+</code></pre>
+<p>Idempotent — calling twice in a week doesn't duplicate.</p>
+<h2 id="forecast-strategy">Forecast strategy</h2>
+<p>v1 uses a static forecast from the product's <code>mps_forecast_per_week</code>
+field. v1.1 candidate: history-based forecasting.</p>
+<pre><code class="language-python">def _forecast_for(self, product_id, week_start):
+    &quot;&quot;&quot;Static forecast from product field.&quot;&quot;&quot;
+    product = self.env[&quot;product.product&quot;].browse(product_id)
+    return product.product_tmpl_id.mps_forecast_per_week or 0
+</code></pre>
+<h2 id="state-transitions">State transitions</h2>
+<h3 id="approve">Approve</h3>
+<pre><code class="language-python">def action_approve(self):
+    self.write({&quot;state&quot;: &quot;approved&quot;})
+    # Trigger native MRP via procurement
+    for p in self.filtered(lambda x: x.to_supply_qty &gt; 0):
+        self.env[&quot;procurement.group&quot;].run([
+            self.env[&quot;procurement.group&quot;].Procurement(
+                p.product_id, p.to_supply_qty, ...)])
+</code></pre>
+<h3 id="mark-executed">Mark Executed</h3>
+<p>Manual (or by cron after week_end passes).</p>
+<pre><code class="language-python">def action_mark_executed(self):
+    self.write({&quot;state&quot;: &quot;executed&quot;})
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Generated periods but no demand showing"</strong> — sale orders
+  weren't filtered correctly. Verify <code>commitment_date</code> is set on
+  the SOs.</li>
+<li><strong>"Forecast = 0 for all periods"</strong> — <code>mps_forecast_per_week</code>
+  unset on product template. Set + regenerate.</li>
+<li><strong>"Approval triggered no MOs"</strong> — procurement.group config
+  issue. Verify product routes (manufacture vs buy).</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> ISO week 1 of 2026 starts when?</p>
+<blockquote>
+<p>Dec 29 2025 (Monday) — week containing first Thursday (Jan 1
+2026, which is the first Thursday since the year starts on
+Thursday).</p>
+</blockquote>
+<p><strong>Q2.</strong> Demand calc uses <code>commitment_date</code>, not <code>date_order</code>. Why?</p>
+<blockquote>
+<p>Commitment date = when customer was promised. That's when
+production needs to deliver, not when the order was placed.</p>
+</blockquote>
+<p><strong>Q3.</strong> Forecast vs actual demand — which used for to_supply?</p>
+<blockquote>
+<p><code>max(forecast, actual)</code>. Larger of the two. Conservative —
+ensures coverage if actuals exceed forecast.</p>
+</blockquote>
+<p><strong>Q4.</strong> Rolling 13 weeks: today is week 25. What weeks are
+covered?</p>
+<blockquote>
+<p>Week 25 through week 37 (current Monday + 12 weeks).</p>
+</blockquote>
+<p><strong>Q5.</strong> Approve fires native procurement run. What happens?</p>
+<blockquote>
+<p>Procurement.group runs for each approved period with
+to_supply &gt; 0. Creates draft MOs (or POs for purchased products)
+per the demand.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_26_mes_capacity_calc" model="slide.slide">
+            <field name="name">MES + MPS Module — Workcenter Capacity Calculation</field>
+            <field name="channel_id" ref="course_mes_mps_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Developer working on capacity logic or bottleneck math.</field>
+            <field name="html_content"><![CDATA[<h1 id="mes-mps-module-workcenter-capacity-calculation">MES + MPS Module — Workcenter Capacity Calculation</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookMesMpsWorkcenterCapacity(models.Model):
+    _name = &quot;southbrook.mes_mps.workcenter_capacity&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">workcenter_id    = fields.Many2one(&quot;mrp.workcenter&quot;, required=True)
+week_start       = fields.Date(required=True)
+year             = fields.Integer(compute=..., store=True)
+week_number      = fields.Integer(compute=..., store=True)
+
+raw_capacity_hours    = fields.Float()  # before efficiency
+effective_capacity_hours = fields.Float()  # after time_efficiency
+oee_target            = fields.Float(default=0.85)
+expected_output_units = fields.Float()
+</code></pre>
+<h2 id="compute-logic">Compute logic</h2>
+<pre><code class="language-python">@api.model
+def _cron_recompute_capacity(self):
+    &quot;&quot;&quot;Weekly: recompute next 13 weeks of capacity per workcenter.&quot;&quot;&quot;
+    today = fields.Date.today()
+    current_monday = today - timedelta(days=today.weekday())
+
+    for wc in self.env[&quot;mrp.workcenter&quot;].search([]):
+        for offset in range(13):
+            week_start = current_monday + timedelta(weeks=offset)
+            existing = self.search([
+                (&quot;workcenter_id&quot;, &quot;=&quot;, wc.id),
+                (&quot;week_start&quot;, &quot;=&quot;, week_start),
+            ])
+            if existing:
+                existing.unlink()  # Recompute from scratch
+
+            raw = wc.hours_per_shift * wc.shifts_per_day * 5  # 5-day week
+            efficient = raw * (wc.time_efficiency or 1.0)
+            expected = efficient * wc.oee_target / wc.time_per_cycle
+
+            self.create({
+                &quot;workcenter_id&quot;: wc.id,
+                &quot;week_start&quot;: week_start,
+                &quot;raw_capacity_hours&quot;: raw,
+                &quot;effective_capacity_hours&quot;: efficient,
+                &quot;expected_output_units&quot;: expected,
+            })
+</code></pre>
+<h2 id="time-efficiency-vs-oee">Time efficiency vs OEE</h2>
+<p>Two related but different concepts:</p>
+<ul>
+<li><strong><code>time_efficiency</code></strong> (set on workcenter) — wall-clock to working
+  time ratio. Accounts for setup, breaks, idle. Default 0.9.</li>
+<li><strong><code>oee_target</code></strong> — quality-aware effectiveness. Default 0.85 =
+  85% (typical for cabinet shops).</li>
+</ul>
+<p>So raw 40h × 0.9 efficiency = 36 effective hours. Then × 0.85 OEE
+target = 30.6 expected productive hours.</p>
+<h2 id="holidays-planned-downtime">Holidays + planned downtime</h2>
+<p>The current implementation uses 5 days/week flat. Holidays not
+considered. v1.1 candidate: integrate
+<code>resource.calendar.leaves</code> to subtract holidays + planned PM.</p>
+<p>For now, manually adjust capacity rows for known downtime:</p>
+<pre><code class="language-python">def adjust_for_pm(self, workcenter_id, pm_start, pm_end, hours):
+    &quot;&quot;&quot;Subtract planned maintenance hours from capacity.&quot;&quot;&quot;
+    affected = self.search([
+        (&quot;workcenter_id&quot;, &quot;=&quot;, workcenter_id),
+        (&quot;week_start&quot;, &quot;&gt;=&quot;, pm_start),
+        (&quot;week_start&quot;, &quot;&lt;=&quot;, pm_end),
+    ])
+    for cap in affected:
+        cap.raw_capacity_hours -= hours
+        # Recompute downstream
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Capacity hours look wrong"</strong> — verify workcenter's
+  <code>hours_per_shift</code> + <code>shifts_per_day</code>. Default values may not
+  match reality.</li>
+<li><strong>"Effective != raw × time_efficiency"</strong> — possible recompute
+  bug; check the cron's last execution.</li>
+<li><strong>"Holidays not accounted for"</strong> — known limitation.
+  Manually adjust.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Workcenter 8 hours/shift, 2 shifts/day, 5 days/week.
+time_efficiency = 0.9. Effective hours?</p>
+<blockquote>
+<p>8 × 2 × 5 × 0.9 = <strong>72 hours</strong>.</p>
+</blockquote>
+<p><strong>Q2.</strong> Raw 40h × 0.9 efficiency × 0.85 OEE × 1/0.5 cycle =?</p>
+<blockquote>
+<p>40 × 0.9 × 0.85 / 0.5 = <strong>61.2 expected output units</strong>.</p>
+</blockquote>
+<p><strong>Q3.</strong> Capacity recompute runs weekly. Why not daily?</p>
+<blockquote>
+<p>Underlying workcenter data changes rarely. Daily recompute
+wastes cycles.</p>
+</blockquote>
+<p><strong>Q4.</strong> Holiday this week. Capacity rows show full hours. Effect?</p>
+<blockquote>
+<p>Bottleneck report shows too-rosy utilisation. Manually adjust
+via <code>adjust_for_pm</code> or accept the slight overestimate.</p>
+</blockquote>
+<p><strong>Q5.</strong> New workcenter added today. When is its first capacity
+row?</p>
+<blockquote>
+<p>Next cron run (next Monday 02:00). Manual trigger available via
+server action.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_26_mes_oee_snapshot" model="slide.slide">
+            <field name="name">MES + MPS Module — OEE Snapshot Model</field>
+            <field name="channel_id" ref="course_mes_mps_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Developer working on OEE compute or rollup.</field>
+            <field name="html_content"><![CDATA[<h1 id="mes-mps-module-oee-snapshot-model">MES + MPS Module — OEE Snapshot Model</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookMesMpsOeeSnapshot(models.Model):
+    _name = &quot;southbrook.mes_mps.oee_snapshot&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">workcenter_id    = fields.Many2one(&quot;mrp.workcenter&quot;, required=True)
+snapshot_date    = fields.Date(required=True)
+
+availability_pct = fields.Float()  # 0-100
+performance_pct  = fields.Float()
+quality_pct      = fields.Float()
+oee_pct          = fields.Float(compute=&quot;_compute_oee&quot;, store=True)
+
+planned_production_time_min = fields.Float()
+actual_run_time_min         = fields.Float()
+ideal_cycle_time_min        = fields.Float()
+total_pieces                = fields.Float()
+good_pieces                 = fields.Float()
+</code></pre>
+<h2 id="oee-formula">OEE formula</h2>
+<pre><code class="language-python">@api.depends(&quot;availability_pct&quot;, &quot;performance_pct&quot;, &quot;quality_pct&quot;)
+def _compute_oee(self):
+    for s in self:
+        s.oee_pct = (s.availability_pct *
+                     s.performance_pct *
+                     s.quality_pct) / 10000
+</code></pre>
+<p>Multiplicative, divided by 10000 because each factor is 0-100.</p>
+<h2 id="daily-rollup-cron">Daily rollup cron</h2>
+<pre><code class="language-python">@api.model
+def _cron_rollup_oee(self):
+    &quot;&quot;&quot;Daily 23:30: snapshot today's OEE per workcenter.&quot;&quot;&quot;
+    today = fields.Date.today()
+
+    for wc in self.env[&quot;mrp.workcenter&quot;].search([(&quot;active&quot;, &quot;=&quot;, True)]):
+        snapshot_data = self._compute_workcenter_oee(wc, today)
+
+        existing = self.search([
+            (&quot;workcenter_id&quot;, &quot;=&quot;, wc.id),
+            (&quot;snapshot_date&quot;, &quot;=&quot;, today),
+        ])
+        if existing:
+            existing.write(snapshot_data)
+        else:
+            self.create({
+                &quot;workcenter_id&quot;: wc.id,
+                &quot;snapshot_date&quot;: today,
+                **snapshot_data,
+            })
+</code></pre>
+<h2 id="per-workcenter-oee-compute">Per-workcenter OEE compute</h2>
+<pre><code class="language-python">def _compute_workcenter_oee(self, workcenter, target_date):
+    &quot;&quot;&quot;Compute A × P × Q for the workcenter on the date.&quot;&quot;&quot;
+    productivity_records = self.env[&quot;mrp.workcenter.productivity&quot;].search([
+        (&quot;workcenter_id&quot;, &quot;=&quot;, workcenter.id),
+        (&quot;date_start&quot;, &quot;&gt;=&quot;, target_date),
+        (&quot;date_start&quot;, &quot;&lt;&quot;, target_date + timedelta(days=1)),
+    ])
+
+    planned_time = workcenter.hours_per_shift * 60 * \
+                   workcenter.shifts_per_day  # minutes
+
+    productive_time = sum(
+        (r.date_end - r.date_start).total_seconds() / 60
+        for r in productivity_records.filtered(
+            lambda r: r.loss_id.loss_type == &quot;productive&quot;))
+
+    breakdown_time = sum(
+        (r.date_end - r.date_start).total_seconds() / 60
+        for r in productivity_records.filtered(
+            lambda r: r.loss_id.loss_type == &quot;availability&quot;))
+
+    availability = (productive_time / (productive_time + breakdown_time)) \
+                   if (productive_time + breakdown_time) else 0
+
+    # Performance: actual output vs ideal
+    workorders = self.env[&quot;mrp.workorder&quot;].search([
+        (&quot;workcenter_id&quot;, &quot;=&quot;, workcenter.id),
+        (&quot;date_end&quot;, &quot;&gt;=&quot;, target_date),
+        (&quot;date_end&quot;, &quot;&lt;&quot;, target_date + timedelta(days=1)),
+        (&quot;state&quot;, &quot;=&quot;, &quot;done&quot;),
+    ])
+
+    total_pieces = sum(workorders.mapped(&quot;qty_produced&quot;))
+    ideal_cycle = workcenter.time_per_cycle  # min/piece
+    ideal_time = total_pieces * ideal_cycle
+    performance = ideal_time / productive_time if productive_time else 0
+
+    # Quality: good vs total
+    good_pieces = sum(workorders.mapped(&quot;qty_produced&quot;)) - \
+                  sum(workorders.mapped(&quot;scrap_qty&quot;))
+    quality = good_pieces / total_pieces if total_pieces else 0
+
+    return {
+        &quot;availability_pct&quot;: availability * 100,
+        &quot;performance_pct&quot;: performance * 100,
+        &quot;quality_pct&quot;: quality * 100,
+        &quot;planned_production_time_min&quot;: planned_time,
+        &quot;actual_run_time_min&quot;: productive_time,
+        &quot;ideal_cycle_time_min&quot;: ideal_cycle,
+        &quot;total_pieces&quot;: total_pieces,
+        &quot;good_pieces&quot;: good_pieces,
+    }
+</code></pre>
+<h2 id="historical-trend">Historical trend</h2>
+<p>Snapshots accumulate; trends visible via list/graph view.</p>
+<pre><code class="language-python"># Last 30 days OEE trend for a workcenter
+self.env[&quot;southbrook.mes_mps.oee_snapshot&quot;].search([
+    (&quot;workcenter_id&quot;, &quot;=&quot;, wc_id),
+    (&quot;snapshot_date&quot;, &quot;&gt;&quot;, fields.Date.today() - relativedelta(days=30)),
+]).read([&quot;snapshot_date&quot;, &quot;oee_pct&quot;])
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"OEE = 0 for all workcenters yesterday"</strong> — cron didn't run.
+  Manual: trigger server action <em>Rollup Yesterday</em>.</li>
+<li><strong>"Performance &gt; 100%"</strong> — operator beat ideal cycle time. Real;
+  flag for ideal_cycle review (may be too conservative).</li>
+<li><strong>"Quality = 0% for some workcenters"</strong> — no work orders
+  completed that day. Expected if workcenter idle.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> OEE formula?</p>
+<blockquote>
+<p>A × P × Q. Each factor 0-100; result 0-100. Multiplicative.</p>
+</blockquote>
+<p><strong>Q2.</strong> Workcenter Availability 80, Performance 90, Quality 95.
+OEE?</p>
+<blockquote>
+<p>(80 × 90 × 95) / 10000 = <strong>68.4%</strong>.</p>
+</blockquote>
+<p><strong>Q3.</strong> Performance = 105%. Issue?</p>
+<blockquote>
+<p>Not necessarily an issue — operator beat ideal cycle. May indicate
+the ideal cycle time is too conservative. Flag for review.</p>
+</blockquote>
+<p><strong>Q4.</strong> Daily rollup runs 23:30. What about partial days
+(today's not done yet)?</p>
+<blockquote>
+<p>Snapshot for today is taken at 23:30. Live data during the day
+not snapshotted; query the live productivity records directly.</p>
+</blockquote>
+<p><strong>Q5.</strong> Adding a new loss reason to mrp.workcenter.productivity.
+Effect?</p>
+<blockquote>
+<p>Categorise it via <code>loss_id.loss_type</code> (availability vs
+performance vs quality). OEE compute reads <code>loss_type</code> for
+bucketing.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_26_mes_bottleneck_query" model="slide.slide">
+            <field name="name">MES + MPS Module — Bottleneck Report Query</field>
+            <field name="channel_id" ref="course_mes_mps_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer working on bottleneck logic.</field>
+            <field name="html_content"><![CDATA[<h1 id="mes-mps-module-bottleneck-report-query">MES + MPS Module — Bottleneck Report Query</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookMesMpsBottleneckReport(models.Model):
+    _name = &quot;southbrook.mes_mps.bottleneck_report&quot;
+    _auto = False  # SQL view
+</code></pre>
+<p>Fields (from the view):</p>
+<pre><code class="language-python">workcenter_id      = fields.Many2one(&quot;mrp.workcenter&quot;, readonly=True)
+week_start         = fields.Date(readonly=True)
+capacity_hours     = fields.Float(readonly=True)
+demand_hours       = fields.Float(readonly=True)
+utilisation_pct    = fields.Float(readonly=True)
+</code></pre>
+<h2 id="sql-view">SQL view</h2>
+<pre><code class="language-sql">CREATE OR REPLACE VIEW southbrook_mes_mps_bottleneck_report AS
+SELECT
+    ROW_NUMBER() OVER () AS id,
+    c.workcenter_id,
+    c.week_start,
+    c.effective_capacity_hours AS capacity_hours,
+    COALESCE(SUM(
+        wo.duration_expected
+    ) / 60.0, 0) AS demand_hours,
+    CASE 
+        WHEN c.effective_capacity_hours &gt; 0 THEN
+            COALESCE(SUM(wo.duration_expected) / 60.0, 0) / 
+            c.effective_capacity_hours * 100
+        ELSE 0
+    END AS utilisation_pct
+FROM southbrook_mes_mps_workcenter_capacity c
+LEFT JOIN mrp_workorder wo ON wo.workcenter_id = c.workcenter_id
+    AND wo.date_planned_start &gt;= c.week_start
+    AND wo.date_planned_start &lt; c.week_start + INTERVAL '7 days'
+    AND wo.state IN ('ready', 'progress')
+GROUP BY c.id, c.workcenter_id, c.week_start, c.effective_capacity_hours;
+</code></pre>
+<h2 id="decoration-rules-in-view">Decoration rules (in view)</h2>
+<pre><code class="language-xml">&lt;list decoration-success=&quot;utilisation_pct &amp;lt; 80&quot;
+      decoration-warning=&quot;utilisation_pct &amp;gt;= 80 and utilisation_pct &amp;lt; 100&quot;
+      decoration-danger=&quot;utilisation_pct &amp;gt;= 100&quot;&gt;
+    &lt;field name=&quot;workcenter_id&quot;/&gt;
+    &lt;field name=&quot;week_start&quot;/&gt;
+    &lt;field name=&quot;capacity_hours&quot;/&gt;
+    &lt;field name=&quot;demand_hours&quot;/&gt;
+    &lt;field name=&quot;utilisation_pct&quot;/&gt;
+&lt;/list&gt;
+</code></pre>
+<h2 id="pivot-view">Pivot view</h2>
+<pre><code class="language-xml">&lt;pivot string=&quot;Bottleneck Pivot&quot;&gt;
+    &lt;field name=&quot;workcenter_id&quot; type=&quot;row&quot;/&gt;
+    &lt;field name=&quot;week_start&quot; type=&quot;col&quot; interval=&quot;week&quot;/&gt;
+    &lt;field name=&quot;utilisation_pct&quot; type=&quot;measure&quot;/&gt;
+&lt;/pivot&gt;
+</code></pre>
+<p>Easy scan: rows are workcenters, cols are weeks, cells are
+utilisation percentages. Red cells jump out.</p>
+<h2 id="common-queries">Common queries</h2>
+<h3 id="show-me-red-workcenters-this-week">"Show me red workcenters this week"</h3>
+<pre><code class="language-python">self.env[&quot;southbrook.mes_mps.bottleneck_report&quot;].search([
+    (&quot;week_start&quot;, &quot;=&quot;, today_monday),
+    (&quot;utilisation_pct&quot;, &quot;&gt;=&quot;, 100),
+])
+</code></pre>
+<h3 id="show-me-workcenters-that-have-been-red-3-weeks-running">"Show me workcenters that have been red 3+ weeks running"</h3>
+<pre><code class="language-python"># More complex — needs aggregation
+self.env.cr.execute(&quot;&quot;&quot;
+    SELECT workcenter_id, COUNT(*) AS red_weeks
+    FROM southbrook_mes_mps_bottleneck_report
+    WHERE utilisation_pct &gt;= 100
+      AND week_start &gt;= %s
+    GROUP BY workcenter_id
+    HAVING COUNT(*) &gt;= 3
+&quot;&quot;&quot;, (today - relativedelta(weeks=4),))
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Utilisation &gt; 200%"</strong> — <code>duration_expected</code> may be inflated.
+  Verify the work orders are correctly estimated.</li>
+<li><strong>"Workcenter shows 0 demand"</strong> — no work orders scheduled OR
+  filter mismatch on state. Check.</li>
+<li><strong>"Pivot view too dense"</strong> — filter to one product family or
+  one workcenter type first.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Why SQL view instead of stored model?</p>
+<blockquote>
+<p>Live computation; data fully derived. No business reason for a
+separate table.</p>
+</blockquote>
+<p><strong>Q2.</strong> Demand hours from <code>mrp.workorder.duration_expected</code>.
+What if work orders have wrong estimates?</p>
+<blockquote>
+<p>Bottleneck shows wrong utilisation. Fix the estimates first.</p>
+</blockquote>
+<p><strong>Q3.</strong> Workcenter with 60% utilisation 5 weeks running. Action?</p>
+<blockquote>
+<p>Underutilised — could absorb more demand. Sales conversation,
+or accept the spare capacity for resilience.</p>
+</blockquote>
+<p><strong>Q4.</strong> Same workcenter at 60% but next week at 110%. Action?</p>
+<blockquote>
+<p>Spike in demand. Reroute to backup workcenter (if available),
+push dates, or add overtime block.</p>
+</blockquote>
+<p><strong>Q5.</strong> Filter to "red workcenters this month." Approach?</p>
+<blockquote>
+<p>Search domain: <code>[("utilisation_pct", "&gt;=", 100), ("week_start",
+"&gt;=", month_start), ("week_start", "&lt;=", month_end)]</code>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_26_mes_mi_integration" model="slide.slide">
+            <field name="name">MES + MPS Module — MI Engine Integration</field>
+            <field name="channel_id" ref="course_mes_mps_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Developer working on MES/MPS signals to MI engine.</field>
+            <field name="html_content"><![CDATA[<h1 id="mes-mps-module-mi-engine-integration">MES + MPS Module — MI Engine Integration</h1>
+<h2 id="signals-mes-surfaces">Signals MES surfaces</h2>
+<ol>
+<li><strong>Workcenter red (&gt;100% utilisation)</strong> — recommendation for planner</li>
+<li><strong>OEE drop &gt; 10% week-over-week</strong> — recommendation for Plant GM</li>
+<li><strong>MPS approval pending &gt; 1 week</strong> — recommendation for planner</li>
+</ol>
+<h2 id="hook">Hook</h2>
+<pre><code class="language-python">class MiEngineMesExt(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.engine&quot;
+
+    @api.model
+    def _check_mes_signals(self):
+        self._check_workcenter_red()
+        self._check_oee_drop()
+        self._check_mps_stale()
+
+    def _check_workcenter_red(self):
+        today_monday = self._this_monday()
+        red = self.env[&quot;southbrook.mes_mps.bottleneck_report&quot;].search([
+            (&quot;week_start&quot;, &quot;=&quot;, today_monday),
+            (&quot;utilisation_pct&quot;, &quot;&gt;=&quot;, 100),
+        ])
+        for r in red:
+            self._emit_recommendation(
+                subject=f&quot;Workcenter {r.workcenter_id.name} red &quot;
+                        f&quot;({r.utilisation_pct:.0f}%)&quot;,
+                body=f&quot;Demand {r.demand_hours}h vs capacity &quot;
+                     f&quot;{r.capacity_hours}h. Decide reroute / shift / &quot;
+                     f&quot;date push.&quot;,
+                affected_records=r.workcenter_id,
+                persona=&quot;production_planner&quot;,
+            )
+
+    def _check_oee_drop(self):
+        last_week = fields.Date.today() - relativedelta(days=7)
+        for wc in self.env[&quot;mrp.workcenter&quot;].search([]):
+            recent = self.env[&quot;southbrook.mes_mps.oee_snapshot&quot;].search([
+                (&quot;workcenter_id&quot;, &quot;=&quot;, wc.id),
+                (&quot;snapshot_date&quot;, &quot;&gt;&quot;, last_week),
+            ])
+            prior = self.env[&quot;southbrook.mes_mps.oee_snapshot&quot;].search([
+                (&quot;workcenter_id&quot;, &quot;=&quot;, wc.id),
+                (&quot;snapshot_date&quot;, &quot;&lt;=&quot;, last_week),
+                (&quot;snapshot_date&quot;, &quot;&gt;&quot;, last_week - relativedelta(days=7)),
+            ])
+            if recent and prior:
+                recent_avg = sum(r.oee_pct for r in recent) / len(recent)
+                prior_avg = sum(p.oee_pct for p in prior) / len(prior)
+                if (prior_avg - recent_avg) &gt; 10:
+                    self._emit_recommendation(
+                        subject=f&quot;{wc.name} OEE dropped &quot;
+                                f&quot;{prior_avg-recent_avg:.1f}%&quot;,
+                        body=f&quot;Prior week avg {prior_avg:.1f}; &quot;
+                             f&quot;this week avg {recent_avg:.1f}. &quot;
+                             f&quot;Investigate.&quot;,
+                        persona=&quot;mfg_manager&quot;,
+                    )
+</code></pre>
+<h2 id="wiring-into-mi-loop">Wiring into MI loop</h2>
+<p><code>southbrook.mi.engine._check_all</code> calls all <code>_check_*</code> methods:</p>
+<pre><code class="language-python">@api.model
+def _check_all(self):
+    &quot;&quot;&quot;Main MI engine loop.&quot;&quot;&quot;
+    self._check_quality_signals()
+    self._check_finance_signals()
+    self._check_mes_signals()   # ← added by MES extension
+    # ... etc.
+</code></pre>
+<h2 id="dedup">Dedup</h2>
+<p>Same dedup pattern as Finance (lesson 24.6):</p>
+<pre><code class="language-python">def _emit_recommendation(self, subject, ...):
+    existing = self.env[&quot;hermes.recommendation&quot;].search([
+        (&quot;subject&quot;, &quot;=&quot;, subject),
+        (&quot;state&quot;, &quot;=&quot;, &quot;pending_review&quot;),
+        (&quot;created_at&quot;, &quot;&gt;&quot;, fields.Datetime.now() - relativedelta(days=1)),
+    ], limit=1)
+    if existing:
+        return existing
+    return self.env[&quot;hermes.recommendation&quot;].create({...})
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Workcenter red rec fires every day"</strong> — same workcenter,
+  same week. Dedup by subject + week_start.</li>
+<li><strong>"OEE drop rec fires immediately on first day with data"</strong> —
+  missing the "prior week required" guard. Add.</li>
+<li><strong>"MPS stale rec — what's the threshold?"</strong> — <code>&gt; 7 days
+  pending_approval</code>. Tune via system param.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Workcenter red 3 weeks running. Recommendations?</p>
+<blockquote>
+<p>One per week (dedup'd). Or via separate "chronic red" logic.</p>
+</blockquote>
+<p><strong>Q2.</strong> OEE drop signal — what triggers?</p>
+<blockquote>
+<blockquote>
+<p>10% drop in 7-day avg vs prior 7-day avg.</p>
+</blockquote>
+</blockquote>
+<p><strong>Q3.</strong> OEE drop on a workcenter with sparse data?</p>
+<blockquote>
+<p>If <code>len(recent) &lt; 3</code> or <code>len(prior) &lt; 3</code>, skip — too noisy.</p>
+</blockquote>
+<p><strong>Q4.</strong> MPS approval pending &gt; 7 days. Action?</p>
+<blockquote>
+<p>Recommendation to planner: "approve or reject these N pending
+periods."</p>
+</blockquote>
+<p><strong>Q5.</strong> Wire a new MES signal — where?</p>
+<blockquote>
+<p>Add <code>_check_&lt;new_signal&gt;</code> method, call from <code>_check_mes_signals</code>,
+include in <code>_check_all</code> chain (already happens via inheritance).</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_26_mes_customisation" model="slide.slide">
+            <field name="name">MES + MPS Module — Customisation Patterns</field>
+            <field name="channel_id" ref="course_mes_mps_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Developer extending MES/MPS for new scenarios.</field>
+            <field name="html_content"><![CDATA[<h1 id="mes-mps-module-customisation-patterns">MES + MPS Module — Customisation Patterns</h1>
+<h2 id="common-customisations">Common customisations</h2>
+<ol>
+<li>New forecast strategy</li>
+<li>New OEE loss reason taxonomy</li>
+<li>New bottleneck threshold per workcenter</li>
+<li>Per-product MPS template</li>
+</ol>
+<h2 id="new-forecast-strategy">New forecast strategy</h2>
+<p>Default static forecast (lesson 26.2). For history-based:</p>
+<pre><code class="language-python">class SouthbrookMesMpsMpsPeriod(models.Model):
+    _inherit = &quot;southbrook.mes_mps.mps_period&quot;
+
+    def _forecast_for(self, product_id, week_start):
+        &quot;&quot;&quot;Override: forecast from rolling 12-week historical average.&quot;&quot;&quot;
+        product = self.env[&quot;product.product&quot;].browse(product_id)
+        lookback_start = week_start - relativedelta(weeks=12)
+
+        # Average actual demand from last 12 weeks
+        history = self.search([
+            (&quot;product_id&quot;, &quot;=&quot;, product_id),
+            (&quot;week_start&quot;, &quot;&gt;=&quot;, lookback_start),
+            (&quot;week_start&quot;, &quot;&lt;&quot;, week_start),
+            (&quot;state&quot;, &quot;=&quot;, &quot;executed&quot;),
+        ])
+
+        if not history:
+            return super()._forecast_for(product_id, week_start)
+
+        return sum(h.actual_demand_qty for h in history) / len(history)
+</code></pre>
+<h2 id="new-oee-loss-reason">New OEE loss reason</h2>
+<p>Native <code>mrp.workcenter.productivity</code> has a loss_id field
+pointing at <code>mrp.workcenter.productivity.loss</code>. Loss types:
+availability / performance / quality.</p>
+<p>Add new loss reasons (e.g. setup vs unplanned downtime):</p>
+<pre><code class="language-xml">&lt;record id=&quot;loss_setup_changeover&quot; model=&quot;mrp.workcenter.productivity.loss&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Setup / Changeover&lt;/field&gt;
+    &lt;field name=&quot;loss_type&quot;&gt;availability&lt;/field&gt;
+    &lt;field name=&quot;manual&quot; eval=&quot;True&quot;/&gt;
+&lt;/record&gt;
+</code></pre>
+<p>The OEE compute (lesson 26.4) already categorises by loss_type;
+new losses inherit their bucket.</p>
+<h2 id="per-workcenter-bottleneck-threshold">Per-workcenter bottleneck threshold</h2>
+<p>Default: red = 100%. Some workcenters can run hotter safely
+(e.g. high-buffer, low-bottleneck stages).</p>
+<pre><code class="language-python">class MrpWorkcenter(models.Model):
+    _inherit = &quot;mrp.workcenter&quot;
+
+    bottleneck_red_threshold = fields.Float(default=100)
+    bottleneck_amber_threshold = fields.Float(default=80)
+</code></pre>
+<p>Update list view decoration to read from workcenter:</p>
+<pre><code class="language-xml">&lt;list decoration-success=&quot;utilisation_pct &amp;lt; workcenter_id.bottleneck_amber_threshold&quot;
+      decoration-warning=&quot;utilisation_pct &amp;gt;= workcenter_id.bottleneck_amber_threshold and utilisation_pct &amp;lt; workcenter_id.bottleneck_red_threshold&quot;
+      decoration-danger=&quot;utilisation_pct &amp;gt;= workcenter_id.bottleneck_red_threshold&quot;&gt;
+</code></pre>
+<p>(Caveat: v19 decoration syntax may not support cross-model
+field reference in all cases. Test.)</p>
+<h2 id="per-product-mps-template">Per-product MPS template</h2>
+<p>To preset forecast + safety_stock per product:</p>
+<pre><code class="language-python">class ProductTemplate(models.Model):
+    _inherit = &quot;product.template&quot;
+
+    mps_forecast_per_week = fields.Float()
+    mps_safety_stock = fields.Float()
+
+
+def _safety_stock_for(self, product_id):
+    return self.env[&quot;product.product&quot;].browse(
+        product_id).product_tmpl_id.mps_safety_stock or 0
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Forecast override broke existing periods"</strong> — override only
+  affects NEW period creation. Existing periods retain their
+  values. Recompute to update.</li>
+<li><strong>"Bottleneck threshold change didn't propagate to view"</strong> —
+  view didn't pick up the new threshold field. Reload view +
+  refresh browser.</li>
+<li><strong>"Per-product MPS template not respected"</strong> — <code>_forecast_for</code>
+  override wasn't called. Verify the call chain.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> History-based forecast on a new product (no history). 
+Behaviour?</p>
+<blockquote>
+<p>Falls back to static forecast via <code>super()._forecast_for(...)</code>.
+Important to keep the fallback so new products don't error.</p>
+</blockquote>
+<p><strong>Q2.</strong> Add a 4th OEE loss type. Effect?</p>
+<blockquote>
+<p>Native model has 3 (availability / performance / quality).
+A 4th loss_type isn't supported by the OEE compute. Use one of
+the 3 existing buckets.</p>
+</blockquote>
+<p><strong>Q3.</strong> Per-workcenter threshold — pros vs cons?</p>
+<blockquote>
+<p>Pro: fine-grained, matches operational reality. Con: more
+config to maintain; possible inconsistency across team
+communication.</p>
+</blockquote>
+<p><strong>Q4.</strong> Override <code>_compute_demand</code> to weight recent SOs more
+heavily. Approach?</p>
+<blockquote>
+<p>Custom decay function. Don't bypass; extend the existing
+method.</p>
+</blockquote>
+<p><strong>Q5.</strong> New product family with very different forecast pattern.
+Strategy?</p>
+<blockquote>
+<p>Add product_template field for forecast strategy selection
+(static / history / external). Override _forecast_for to
+dispatch.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

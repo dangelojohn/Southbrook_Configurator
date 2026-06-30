@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="action_floor_traveler_report" model="ir.actions.report">
+    <field name="name">Floor Traveler</field>
+    <field name="model">sb.production.package</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">southbrook_floor_traveler.floor_traveler_document</field>
+    <field name="report_file">southbrook_floor_traveler.floor_traveler_document</field>
+    <field name="binding_model_id" ref="southbrook_kitchen_mrp.model_sb_production_package"/>
+    <field name="binding_type">report</field>
+    <field name="print_report_name">'Floor Traveler — %s' % object.name</field>
+  </record>
+</odoo>

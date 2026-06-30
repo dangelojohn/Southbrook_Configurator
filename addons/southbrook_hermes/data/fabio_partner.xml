@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="partner_fabio_agent" model="res.partner">
+        <field name="name">Fabio</field>
+        <field name="email">fabio.agent@southbrookcabinetry.space</field>
+        <field name="company_type">person</field>
+        <field name="comment">Fabio agent identity for human-approved recommendations.</field>
+    </record>
+
+</odoo>

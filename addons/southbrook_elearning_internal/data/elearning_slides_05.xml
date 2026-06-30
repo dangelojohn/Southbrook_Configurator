@@ -1,0 +1,1561 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_05_configurator_basics" model="slide.slide">
+            <field name="name">Configurator Basics — Attributes, Exclusions, Construction Rules</field>
+            <field name="channel_id" ref="course_estimating_configurator"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">New estimator. You&#x27;ve used Odoo Sales but never configured a cabinet through `product_configurator` before.</field>
+            <field name="html_content"><![CDATA[<h1 id="configurator-basics-attributes-exclusions-construction-rules">Configurator Basics — Attributes, Exclusions, Construction Rules</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a brand-new Southbrook estimator. Today is the first time you'll
+hear the word "attribute" used in a technical sense — and probably the
+last time you'll see a kitchen quote written on a spreadsheet. The
+Southbrook stack runs every cabinet through the OCA <code>product_configurator</code>
+engine, layered with the 4 Southbrook business rules. This lesson is the
+vocabulary you need before you can build a quote in lesson 5.2. No
+clicking yet — just the words, the model behind the words, and how a
+kitchen gets decomposed into the records that drive everything downstream.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>You won't use the configurator directly from a menu. You drive it from a
+sale order line. But the vocabulary lives under three menus you should
+recognise:</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder</strong> — where you'll spend 90% of your day.</p>
+<p><strong>Sales → Configurable Products → Configurable Templates</strong> — the 12 cabinet
+templates plus the ~40 expanded catalog templates (<code>product.template</code> with
+<code>config_ok = True</code>).</p>
+<p><strong>Sales → Configuration → Configuration Rules</strong> — the rule catalog
+(<code>product.config.line</code> records — the business rules from §3.4 of
+<code>docs/Southbrook_Excel_to_Odoo_Mapping.md</code>).</p>
+</blockquote>
+<p>The third menu is read-only for you; an admin maintains it. You should
+recognise the records when you see one.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>Three concepts; learn them in order.</p>
+<ul>
+<li><strong>Attribute</strong> (<code>product.attribute</code>) — <em>a question the configurator asks</em>.
+  Southbrook ships 11 user-facing attributes plus 3 derived ones. Every
+  cabinet asks the same 11 questions in the same order: Family, Width,
+  Series, Box Material, Door Style, Finish, Hinge Side, Finished Sides,
+  Gables, Handle, Accessories. Plus the derived ones (Family Subtype on
+  the corner cabinet, Door Count behind the scenes, Accessory Type on
+  the accessory template). Each attribute carries a <code>display_type</code>
+  (<code>radio</code>, <code>select</code>, <code>color</code>, <code>pills</code>, <code>multi</code>, <code>image</code>) that controls
+  how the wizard renders it.</li>
+<li><strong>Value</strong> (<code>product.attribute.value</code>) — <em>one possible answer to one
+  question</em>. Width has 10 values: <code>9 in</code>, <code>12 in</code>, <code>15 in</code>, <code>18 in</code>,
+  <code>21 in</code>, <code>24 in</code>, <code>27 in</code>, <code>30 in</code>, <code>33 in</code>, <code>36 in</code>. Series has 4:
+  Contractor, Contemporary, Elegance, Signature. Each value carries
+  <code>sequence</code> (display order), and Southbrook-specific values carry
+  <code>value_inches</code> / <code>value_mm</code> (Width) or <code>lead_time_extra</code> (Maple box
+  carries <code>14.0</code> — that's the "+2 weeks" rule). An attribute without
+  values is not selectable; an attribute_line on a template without at
+  least one value will fail install (NF19).</li>
+<li><strong>Attribute Line</strong> (<code>product.template.attribute.line</code>) — <em>which
+  attributes apply to which cabinet</em>. The Vanity template has 11
+  attribute_lines; the Worktop template has 4 (it doesn't care about
+  Hinge Side). The configurator only asks the questions on the template's
+  attribute_lines, in the sequence on the attribute record. If you don't
+  see "Family Subtype" on a base cabinet, it's because there's no
+  attribute_line for it on <code>base_1dr</code> — it's scoped to the corner
+  template only (Q23(b)).</li>
+</ul>
+<p>Now the two things that turn picks into business rules:</p>
+<ul>
+<li><strong>Exclusion / Domain Rule</strong> (<code>product.config.line</code> + <code>product.config.domain</code>)
+  — <em>X plus Y is forbidden on this template</em>. Southbrook calls these the
+  "4 configurator rules" from <code>Southbrook_Excel_to_Odoo_Mapping.md</code> §3.4.
+  Each rule is one or more <code>product.config.line</code> records linking a
+  cabinet template, an attribute_line, a list of value_ids that get
+  blocked, and a <code>domain_id</code> (the trigger condition — e.g.
+  <code>domain_series_is_contractor</code> triggers when Series=Contractor). The
+  rule engine reads these records at every pick and disables the
+  forbidden options in real time.</li>
+<li><strong>Construction Rule</strong> — <em>X selected implies Y placed at line N</em>. In
+  Southbrook this is the same <code>product.config.line</code> machinery but used
+  to ADD lines instead of restrict them. Example: pick Maple as Box
+  Material → +10% price extra + 14 day lead time bump → the line is
+  added to the BoM through <code>product_configurator_mrp</code> at MO creation.
+  You don't see a construction rule in a separate UI; you see its
+  effect in the price and the BoM preview.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You won't author rules. You'll <em>recognise</em> them when they fire. The
+mental model: you pick an option, you see something disabled or
+something repriced, and you should be able to say which rule fired and
+why.</p>
+<p><strong>1. Understanding decomposition.</strong></p>
+<p>A kitchen design lands as a <em>list of cabinets</em>. There is no "kitchen"
+object in the database — there's a <code>sale.order</code> and a list of
+<code>sale.order.line</code> records, one line per cabinet. Each line points at a
+<code>product.product</code> (a configured variant), which points at a
+<code>product.template</code> (one of the 12 Q8 cabinet templates plus the ~40
+expanded catalog templates). The line carries:</p>
+<ul>
+<li><code>product_id</code> — the configured variant</li>
+<li><code>product_uom_qty</code> — usually 1 (one cabinet = one line; a kitchen with
+  18 cabinets has 18 lines)</li>
+<li><code>zone</code> — Base Run / Wall / Tall / Island / Accessory / Other (Q21)</li>
+<li><code>price_subtotal</code> — the line price, after the pricelist resolves the
+  channel + tier</li>
+</ul>
+<p><strong>2. Understanding the 11 questions.</strong></p>
+<p>Every cabinet (except Worktop / Accessory) is asked the same 11 in this
+order:</p>
+<table>
+<thead>
+<tr>
+<th>Seq</th>
+<th>Attribute</th>
+<th>What it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Family (<code>attr_family</code>)</td>
+<td>What kind of cabinet — Wall / Base / Drawer Bank / Sink / Tall / Corner / Vanity / Worktop / Accessory</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Family Subtype (<code>attr_family_subtype</code>)</td>
+<td>Corner only — Standard or Bi-fold</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Width (<code>attr_width</code>)</td>
+<td>9–36 in, in 3-in increments</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Series (<code>attr_series</code>)</td>
+<td>Contractor / Contemporary / Elegance / Signature</td>
+</tr>
+<tr>
+<td>30</td>
+<td>Box Material (<code>attr_box_material</code>)</td>
+<td>White Melamine or Maple (+10% / +2 wk)</td>
+</tr>
+<tr>
+<td>40</td>
+<td>Door Style (<code>attr_door_style</code>)</td>
+<td>Thermofoil Slab White / Five-Piece Woodgrain / Custom (Signature)</td>
+</tr>
+<tr>
+<td>50</td>
+<td>Finish (<code>attr_finish</code>)</td>
+<td>White / Maple Stain / Cherry Stain / Walnut Stain / Custom</td>
+</tr>
+<tr>
+<td>60</td>
+<td>Hinge Side (<code>attr_hinge_side</code>)</td>
+<td>LH / RH / N/A</td>
+</tr>
+<tr>
+<td>70</td>
+<td>Finished Sides (<code>attr_finished_sides</code>)</td>
+<td>None / Left / Right / Both</td>
+</tr>
+<tr>
+<td>—</td>
+<td>Door Count (<code>attr_door_count</code>, derived, hidden Q22(a))</td>
+<td>1 or 2 — set automatically by Width rule</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>sequence</code> field on each attribute drives the wizard's question
+order. You don't change it; you read it left-to-right top-to-bottom.</p>
+<p><strong>3. Recognising an exclusion fire.</strong></p>
+<p>You pick Series → Contractor on a base cabinet. The Door Style picker
+greys out Five-Piece Woodgrain and Custom (Signature), leaving only
+Thermofoil Slab — White available. That's Rule 1 (series → door style)
+firing. The reason is encoded in the <code>product.config.line</code> record
+<code>rule1_series_is_contractor_door_style_base_1dr</code> — the template <code>base_1dr</code>,
+attribute_line <code>attr_line_base_1dr_door_style</code>, restricting <code>value_ids</code>
+to <code>value_door_thermofoil_slab_white</code> when domain <code>domain_series_is_contractor</code>
+is satisfied. The sales-rep UI shows the option disabled with a tooltip;
+the customer-facing UI shows the option absent (so the customer never
+sees "Five-Piece Woodgrain is disabled because you picked Contractor" —
+they see a shorter list).</p>
+<p><strong>4. Recognising a construction-rule fire.</strong></p>
+<p>You pick Box Material → Maple on any cabinet. The price jumps by 10%
+and the line's lead-time delta jumps by 14 days. That's Rule 2 (box
+material → series + lead time) firing. You see it in the BoM preview
+tab: the wood-panel line items reference maple cores; the
+<code>mrp.bom.produce_delay</code> carries the extra 14 days.</p>
+<p><strong>5. The 4 Southbrook rules, end to end:</strong></p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Rule</th>
+<th>Trigger</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Series → Door Style</td>
+<td>Series = Contractor</td>
+<td>Only Thermofoil Slab White door style; others disabled</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Series → Door Style</td>
+<td>Series = Elegance</td>
+<td>Only Five-Piece Woodgrain; others disabled</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Box Material → Series</td>
+<td>Box Material = Maple</td>
+<td>Available only on Contemporary + Elegance; +10% + 14 days</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Width → Door Count</td>
+<td>Width ∈ {9, 12, 15, 18, 21 in}</td>
+<td>Door Count = 1 (forced)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Width → Door Count</td>
+<td>Width ∈ {24, 27, 30, 33, 36 in}</td>
+<td>Door Count = 2 (forced)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Family → Soft-close</td>
+<td>Corner template with Family Subtype = Bi-fold</td>
+<td>Soft-close hinge option HIDDEN entirely</td>
+</tr>
+</tbody>
+</table>
+<p>Rules 1–3 are <em>exclusions</em> (they disable values); Rule 4 is a
+<em>construction rule with negative effect</em> (it hides an entire
+attribute_line). All four are declarative — there is <strong>zero</strong>
+<code>if series == "contractor"</code> in <code>models/</code>. Grep it yourself.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I'm staring at the wizard and the Door Style picker is empty — no
+options at all."</strong></p>
+<p>You picked an incompatible Series → Box Material combination. Most
+likely Series = Contractor (forces Thermofoil Slab White) and an earlier
+admin removed Thermofoil Slab White from the value catalog. Open
+<strong>Sales → Configuration → Attributes</strong> and check that
+<code>value_door_thermofoil_slab_white</code> still exists and is active. If yes,
+your session is stale — close the wizard and re-open it. If no, escalate
+to your admin: the catalog is broken.</p>
+<p><strong>"I picked Series = Contractor and Box Material = Maple, and the
+system let me, but the Door Style picker is empty."</strong></p>
+<p>Rule 2 should have blocked Maple on Contractor — that combo is invalid.
+What probably happened: the rule_completion.xml in <code>southbrook_configurator_ux</code>
+hasn't loaded (Phase 1 rule gap). The OCA rule engine isn't seeing the
+Contractor + Maple exclusion. Tell your admin to run
+<code>-u southbrook_configurator_ux</code> and re-test. Meanwhile, change Box
+Material back to White Melamine.</p>
+<p><strong>"The wizard skipped the Family Subtype question entirely on a corner
+cabinet."</strong></p>
+<p>Family Subtype is scoped to the corner template via its attribute_line
+(<code>attr_line_corner_family_subtype</code>). If you don't see it, you're not
+on the corner template (<code>corner</code>) — you're on a base or vanity template
+that got mislabelled "Corner" in the catalog. Cancel the session, return
+to the order line, change the product to one whose default_code starts
+with <code>SB-CORNER</code>, and reconfigure.</p>
+<p><strong>"I picked Width = 30 in and the Door Count is showing 1, not 2."</strong></p>
+<p>Rule 3 should force Door Count = 2 for widths 24+. Most likely cause:
+your variant was already created at Width = 18 in (1 door) and you
+edited the Width attribute on the line without re-running the
+configurator. Click the Configure button on the line again — the
+session re-runs Rule 3 and Door Count flips to 2. The price will
+adjust by one extra door + hinge set in the BoM rollup.</p>
+<p><strong>"The customer says they want a Five-Piece Woodgrain door on a
+Contractor cabinet."</strong></p>
+<p>You can't sell that combination. It's Rule 1 hard-blocked. Options:
+(a) upsell them to Contemporary or Elegance series — Five-Piece is
+available there; (b) explain that Contractor is the entry-level
+thermofoil-only series and Five-Piece is on the wood-door series; (c)
+if they insist, the only way is a Signature custom door (<code>value_door_custom</code>)
+which any series allows but carries a manual price quote.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The OCA <code>product_configurator</code> machinery is essentially a state machine
+on a <code>product.config.session</code> record, which lives until the user
+finishes (state = <code>done</code>) and a <code>product.product</code> variant is
+materialised. Each pick is a write to <code>session.value_ids</code> (an
+<code>product.attribute.value</code> set). Every write triggers
+<code>validate_configuration()</code>, which:</p>
+<ol>
+<li>Loads all <code>product.config.line</code> records whose <code>product_tmpl_id</code>
+   matches the template.</li>
+<li>For each, evaluates the <code>domain_id</code>'s <code>compute_domain()</code> — does the
+   current value_ids set satisfy the trigger condition?</li>
+<li>If yes, the line's <code>value_ids</code> becomes the <em>allowed</em> value set on
+   that attribute_line; everything else is disabled.</li>
+</ol>
+<p>That's it. The whole rule engine is a domain-evaluation loop. Adding a
+5th Southbrook rule means adding (a) one or more <code>product.config.domain</code>
+records for the trigger, and (b) one <code>product.config.line</code> record per
+cabinet template the rule applies to — no Python. Grep the codebase for
+<code>if series ==</code> and you'll find zero hits inside <code>southbrook_estimating/models/</code>.
+That's the design contract.</p>
+<p>The construction-rule side (Maple → +10% / +14 days) reads
+<code>product.attribute.value.lead_time_extra</code> and <code>product.template.attribute.value.price_extra</code>
+during BoM rollup (<code>product_configurator_mrp.mrp.bom._compute</code>). Same
+mechanism, just on the price/lead-time axis instead of the
+allowed-values axis.</p>
+<p>When the wizard ends and you click "Add to Quote", three things happen:</p>
+<ul>
+<li>A <code>product.product</code> variant is created (or reused if the same
+  combination exists) — <code>create_variant='dynamic'</code> on every Southbrook
+  attribute (Q6).</li>
+<li>A <code>sale.order.line</code> is created on your draft order, with the
+  variant's price flowing through the channel-resolved pricelist.</li>
+<li>The <code>product.config.session</code> record moves to state <code>done</code>. You can
+  re-open it from the line via the Configure button if you need to
+  edit.</li>
+</ul>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You open a fresh draft order, add a cabinet line for <code>base_1dr</code>,
+launch the configurator, and pick Series = Contractor. You then click
+the Door Style picker. What do you see, and why?</p>
+<blockquote>
+<p>Only Thermofoil Slab — White is selectable. Five-Piece Woodgrain and
+Custom (Signature) are disabled. This is Rule 1 (series → door style)
+firing via the <code>domain_series_is_contractor</code> domain and the
+<code>rule1_series_is_contractor_door_style_base_1dr</code> <code>product.config.line</code>
+record restricting allowed values on <code>attr_line_base_1dr_door_style</code>.</p>
+</blockquote>
+<p><strong>2.</strong> A customer wants a 30-in Maple base cabinet with Elegance series.
+You pick Width = 30 in, Series = Elegance, Box Material = Maple. The
+price jumps and the line shows a "2 weeks extra" badge. Walk through
+which rules fired and which records carry their effects.</p>
+<blockquote>
+<p>Rule 3 (Width → Door Count) auto-forced Door Count = 2 because Width
+is in the wide band (≥24 in) — value comes from <code>value_width_30</code>
+via <code>domain_width_wide</code>. Rule 2 (Box Material → Series + extras)
+didn't <em>block</em> anything (Elegance allows Maple) but applied
+<code>value_box_maple.lead_time_extra = 14.0</code> to the BoM and the +10%
+price-extra on the maple PTAV.</p>
+</blockquote>
+<p><strong>3.</strong> You're configuring a corner cabinet. You set Family Subtype =
+Bi-fold. The Accessories picker no longer shows "Soft-Close Hinge Kit".
+Why?</p>
+<blockquote>
+<p>Rule 4 (family → soft-close) hides — not just disables — the
+soft-close option entirely on bi-fold corners. The
+<code>domain_family_subtype_bifold</code> trigger fires, and the
+<code>product.config.line</code> record on <code>attr_line_corner_accessories</code> restricts
+the allowed value_ids to exclude the soft-close kit. Bi-fold corner
+hardware mechanically cannot run soft-close hinges.</p>
+</blockquote>
+<p><strong>4.</strong> Your admin asks: "I want to add a 5th rule — Tall cabinets can't
+ship in Big-Box channel because they don't fit standard pallets." Where
+does that rule live and what records change?</p>
+<blockquote>
+<p>It's a <code>product.config.line</code> rule, not Python. Author it as: a new
+<code>product.config.domain</code> for "Family is Tall" (which already exists
+as the Family attribute restriction); a <code>product.config.line</code> per
+tall template (<code>tall_pantry</code>, <code>tall_oven</code>) whose
+<code>domain_id</code> triggers on the partner's channel — but careful, the
+rule engine reads variant values, not partner fields. Channel
+filtering is a <code>sale.order</code> validation, not a configurator
+exclusion. So: this rule belongs in a <code>sale.order</code> constraint
+(<code>_constrains</code>), NOT in the configurator. The admin asked the
+wrong layer.</p>
+</blockquote>
+<p><strong>5.</strong> A new estimator asks "where do I edit Width values to add 42 in?"
+What do you tell them, and why is the answer load-bearing?</p>
+<blockquote>
+<p>Go to <strong>Sales → Configuration → Attributes → Width</strong> and add a new
+<code>product.attribute.value</code> with name "42 in", <code>value_inches=42</code>,
+<code>value_mm=1067</code>, <code>sequence=11</code>. But also: edit each cabinet
+template's <code>attr_line_&lt;sku&gt;_width</code> to include the new value_id, and
+add Rule 3 width-band coverage for 42 (probably wide-band, so add
+<code>value_width_42</code> to <code>domain_width_wide</code> line). Then re-test the
+configurator — if you don't, the value will appear in the picker
+but Door Count won't auto-set on 42 (Rule 3 doesn't know about it),
+and the BoM math will fall back to 36-in geometry. The lesson:
+adding a value isn't one record — it's at least three.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>How to build an actual quote — that's lesson 5.2.</li>
+<li>The Marathon hardware catalog (per-carcass hardware resolution) —
+  lesson 5.3.</li>
+<li>The Southbrook configurator UX deltas vs OCA stock — lesson 5.4.</li>
+<li>BoM rollup and MO release — Production track (Course 2).</li>
+<li>The 3D Kitchen Preview tab in the Order Builder — Phase 3 material,
+  out of scope today.</li>
+<li>General OCA <code>product_configurator</code> administration (creating new
+  attributes from scratch, authoring domain records, etc.) — the OCA
+  module's own docs at
+  https://github.com/OCA/product-configurator are the source of truth.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_05_estimating_a_quote" model="slide.slide">
+            <field name="name">Estimating — Building a Quote from a Kitchen Design</field>
+            <field name="channel_id" ref="course_estimating_configurator"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Estimator. You have a customer&#x27;s kitchen design in hand (Prodboard export, hand sketch, or a designer&#x27;s spec sheet) and need to turn it into a priced, BoM-backed quote in Odoo.</field>
+            <field name="html_content"><![CDATA[<h1 id="estimating-building-a-quote-from-a-kitchen-design">Estimating — Building a Quote from a Kitchen Design</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator who turns a customer's design into a quote. The
+design lands on your desk in one of three forms: a Prodboard export, a
+designer's hand sketch, or a back-of-envelope cabinet list. Your job is
+to drive it through the Order Builder one cabinet at a time, watching
+the configurator price each line against the customer's resolved
+channel, and produce a Signature Spec Sheet PDF the customer signs off
+on. By the end of this lesson you'll have built a 9-line smoke-test
+order — the canonical Phase-1 gate per Q7.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The Order Builder lives in two places — same action, two entry points so
+you can find it however you remember it:</p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder</strong> (top-level app drawer entry)</p>
+<p><strong>Sales → Orders → Order Builder</strong> (legacy Build-Spec §2.2 placement)</p>
+</blockquote>
+<p>Both open the same action (<code>action_order_builder</code>) — a filtered
+<code>sale.order</code> list scoped to <code>state in ('draft', 'sent')</code>. Click an order
+to drop into the form; click "Create" to start a new one.</p>
+<p>For the customer-facing PDF preview / send:</p>
+<blockquote>
+<p><strong>(from inside the order form)</strong> Print → Signature Spec Sheet</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The Order Builder form is the standard <code>sale.order</code> form with Southbrook
+xpath additions. Top to bottom:</p>
+<ul>
+<li><strong>Illustrative-seed banner</strong> (<code>alert alert-warning</code>) — visible only
+  during demo / Phase-1 gate review (gated by <code>seed_mode_canonical</code>
+  context). If you see this banner in production, your demo data leaked
+  into a real DB — escalate.</li>
+<li><strong>Stat-button: Duplicate as Draft</strong> (<code>action_duplicate_as_draft</code>,
+  field <code>parent_order_id</code> + <code>version</code>) — the NF6 Image Floor pattern.
+  Iterative-design quotes (customer comes back with edits 3 times) chain
+  v1 → v2 → v3, each new version a new draft order linked back.</li>
+<li><strong>Customer block</strong>: <code>partner_id</code>, <code>pricelist_id</code> — the customer
+  drives <code>_resolve_channel_pricelist</code> which auto-fills the pricelist
+  based on <code>partner.channel</code> (and <code>tradesperson_tier</code> for the
+  contractor channel — NF5).</li>
+<li><strong>Parent-order link</strong> (<code>parent_order_id</code>, readonly) — appears only
+  when this order was duplicated from another.</li>
+<li><strong>Version</strong> (<code>version</code>, default 1) — auto-incremented by Duplicate as
+  Draft.</li>
+<li><strong>Order lines</strong> — grouped by <code>zone</code> field on <code>sale.order.line</code>,
+  default expanded. Zones are: Base Run / Wall / Tall / Island /
+  Accessory / Other. Each zone shows a sum row of <code>price_subtotal</code>
+  ("Zone Subtotal").</li>
+<li><strong>Per-line columns</strong> in the embedded list: zone, zone_label (visible
+  only when zone=other), product_id, name, product_uom_qty,
+  price_unit, price_subtotal. Plus the standard Configure button
+  added by <code>product_configurator_sale</code>.</li>
+<li><strong>State pipeline</strong> (top-right): the standard Odoo <code>state</code> field on
+  <code>sale.order</code> — <code>draft</code> → <code>sent</code> → <code>sale</code> → <code>done</code>, plus <code>cancel</code>
+  off-pipeline. Southbrook does NOT add custom states; the
+  "Draft → Estimating → Approval → Confirmed → In Production" pipeline
+  from the brief maps onto Odoo's standard state values plus the
+  <code>southbrook_submitted_date</code> Datetime field (set by the portal
+  "Request a Price" action — G14/G17).</li>
+<li><strong>Notebook tabs</strong>: Order Lines (standard); 3D Kitchen Preview
+  (<code>kitchen_3d_preview</code> page, Track 1 — <code>widget="kitchen_viewport"</code>);
+  Other Info; Customer Signature.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p><strong>1. Receive the design.</strong></p>
+<p>The design lands as one of:</p>
+<ul>
+<li>A Prodboard JSON export emailed by the customer / dealer.</li>
+<li>A designer's PDF with a cabinet schedule (e.g. "16 base, 8 wall, 2
+  tall, 1 corner — Maple box, Elegance series, Walnut Stain finish").</li>
+<li>A scribbled cabinet list on a service-ticket form.</li>
+</ul>
+<p>Read it first. Confirm what's there: how many cabinets, what series,
+what box material, any custom-finish requests, any accessories. If
+anything's ambiguous, call the designer before opening Odoo —
+spending 45 minutes building a quote and then re-doing it because the
+customer wanted soft-close throughout is the most common pain point
+of the job.</p>
+<p><strong>2. Open the Order Builder and create a new order.</strong></p>
+<blockquote>
+<p><strong>Southbrook Estimating → Order Builder → Create</strong></p>
+</blockquote>
+<ul>
+<li><strong>Customer</strong> (<code>partner_id</code>) — pick the customer. If they don't exist
+  yet, create them inline; before saving make sure their <strong>Southbrook
+  Channel</strong> (<code>channel</code>) is set correctly:</li>
+<li><code>retail</code> — walk-in, no discount</li>
+<li><code>dealer</code> — −50% (Richwood, Image Floor, etc.)</li>
+<li><code>tradesperson</code> — Contractor Pricing, requires <code>tradesperson_tier</code>
+    (1 = −25%, 2 = −30%, 3 = −35%)</li>
+<li><code>kd</code> — Central KD (component-only, ≈46% of retail)</li>
+<li><code>bigbox</code> — fixed $98/SKU wholesale</li>
+<li><code>refacing</code> — CTHS per-SF pricing</li>
+<li><strong>Pricelist</strong> auto-resolves via <code>_resolve_channel_pricelist</code> (custom
+  routine #3 — <code>models/sale_order.py</code>). You can override manually if
+  the customer is mid-conversion (e.g. retail walk-in negotiating
+  dealer terms).</li>
+<li>Save.</li>
+</ul>
+<p><strong>3. Per cabinet (the loop).</strong></p>
+<p>For each cabinet in the design:</p>
+<ul>
+<li>Click <strong>Add a line</strong> on Order Lines.</li>
+<li>Pick a product: type "SB-" and pick from the 12 locked Q8 templates
+  plus the ~40 catalog-expansion templates. The 12 anchors:
+  <code>SB-WALL-1DR</code>, <code>SB-WALL-2DR</code>, <code>SB-BASE-1DR</code>, <code>SB-BASE-2DR</code>,
+  <code>SB-DRAWER</code>, <code>SB-SINK-BASE</code>, <code>SB-TALL-PANTRY</code>, <code>SB-TALL-OVEN</code>,
+  <code>SB-CORNER</code>, <code>SB-VANITY</code>, <code>SB-ACCESSORY</code>, <code>SB-WORKTOP</code>.</li>
+<li>Set <strong>Zone</strong> for the line: Base Run / Wall / Tall / Island /
+  Accessory / Other. If Other, fill <strong>Zone Label</strong> (free-text — e.g.
+  "Laundry", "Mudroom", "Bar"). Lines auto-group by zone in the form.</li>
+<li>Click the row's <strong>Configure</strong> button (from <code>product_configurator_sale</code>).
+  The wizard opens. Walk the 11-attribute flow from lesson 5.1.</li>
+<li>When the wizard's done, the line's <code>price_unit</code> shows the resolved
+  price for that variant against the customer's pricelist.</li>
+<li>Repeat. A typical mid-range kitchen has 18–25 lines.</li>
+</ul>
+<p><strong>4. Hardware and install lines.</strong></p>
+<p>Cabinets are configured; you still need:</p>
+<ul>
+<li><strong>Hardware lines</strong> — most hardware is resolved automatically per
+  carcass via the <code>southbrook.hardware.catalog.resolve()</code> service
+  (lesson 5.3). Manual hardware lines you add yourself: an
+  upgraded handle / pull, a customer-supplied appliance pull, a
+  specialty hinge. Add as a regular order line with the
+  Marathon-cataloged <code>product.product</code>.</li>
+<li><strong>Install / labour lines</strong> — service products (e.g. <code>INST-DAY</code>,
+  <code>DELIVERY-GTA</code>). Not configurable; just add the SKU and quantity.</li>
+<li><strong>Filler / end-panel lines</strong> — accessory family on
+  <code>SB-ACCESSORY</code> with <code>accessory_type</code> sub-attribute (end_panel /
+  filler / cornice / pelmet / plinth).</li>
+</ul>
+<p><strong>5. Verify the BoM preview.</strong></p>
+<p>Open the <strong>BoM Preview</strong> tab (when wired through Phase 3 — today, look
+at the line-level computed fields):</p>
+<ul>
+<li><code>sb_panel_count</code> — total carcass panels on the line</li>
+<li><code>sb_door_count</code> — door / drawer fronts on the line</li>
+<li><code>sb_width_mm</code> — derived width</li>
+</ul>
+<p>If a line shows <code>sb_panel_count = 0</code>, the variant lacks attribute
+values <em>and</em> the line name doesn't parse. Most likely you skipped the
+configurator on that line — open the Configure button and walk the
+wizard.</p>
+<p><strong>6. Switch the customer (Q7 smoke-test step).</strong></p>
+<p>The locked Phase-1 smoke test:</p>
+<ul>
+<li>Customer set to <strong>Demo Tradesperson (Tier 3)</strong> → all lines reprice at
+  −35% (against cost+5% floor). Maple-box cabinets carry the +10% /
+  +2 weeks delta.</li>
+<li>Switch to a Retail walk-in customer → all lines reprice to list
+  price <em>without</em> reconfiguring any line.</li>
+<li>Switch back to Tier 3 → −35% restored.</li>
+</ul>
+<p>That's the channel-pricelist resolver doing its job. If a line <em>doesn't</em>
+reprice, its <code>pricelist_id</code> is hard-set instead of inherited from the
+order — escalate.</p>
+<p><strong>7. Generate the Signature Spec Sheet.</strong></p>
+<blockquote>
+<p><strong>Print → Signature Spec Sheet</strong> (<code>signature_spec_sheet.xml</code>)</p>
+</blockquote>
+<p>The PDF report (custom routine #6, QWeb template) groups lines by zone,
+shows pricing, totals, and is styled to match the Signature Series
+book. This is the customer-signed document.</p>
+<p>Sister reports:</p>
+<ul>
+<li><strong>Shop Copy</strong> (<code>shop_copy.xml</code>) — printed for the shop floor after
+  confirmation; bound to <code>mrp.production</code> not <code>sale.order</code>.</li>
+<li><strong>Door Order</strong> (<code>door_order.xml</code>) — per-SO door schedule for the
+  door supplier.</li>
+</ul>
+<p><strong>8. Customer sign-off and confirm.</strong></p>
+<ul>
+<li>Send the Spec Sheet PDF (Send by Email button → state <code>sent</code>).</li>
+<li>Customer signs, returns the signed PDF.</li>
+<li>Open the order, click <strong>Confirm</strong> → state <code>sale</code>. This triggers
+  <code>action_confirm</code> → captures <code>southbrook.order.analytics</code> (NF1 AI data
+  spine), and if MRP is wired, creates the <code>mrp.production</code> records.</li>
+<li>State will move to <code>done</code> once the MOs ship and invoicing closes.</li>
+</ul>
+<p>The full state machine: <strong><code>draft</code> → <code>sent</code> → <code>sale</code> → <code>done</code></strong> (plus
+<code>cancel</code> off-pipeline). These are the verbatim Odoo <code>sale.order.state</code>
+values. The <code>southbrook_submitted_date</code> Datetime field is set when the
+customer (or you on their behalf) clicks "Request a Price" through the
+portal — that's the "submitted for pricing" milestone the customer-
+facing timeline shows.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I built 18 lines, switched the customer from a Tier 3 contractor to
+a retail walk-in, and the lines didn't reprice."</strong></p>
+<p>The pricelist on the order was overridden manually. Open the order's
+<strong>Pricelist</strong> field — if it shows "Retail (List Price)" but the lines
+are still at Tier 3 numbers, the lines' <code>price_unit</code> was manually set,
+breaking the pricelist link. Recovery: click each line's price field
+and press the recompute icon (or update qty and back). For 18 lines,
+faster to right-click an empty area and "Update Prices" if the action
+is available, or duplicate the order and re-configure cleanly.</p>
+<p><strong>"I clicked Confirm and the order moved to <code>sale</code> state, but no MO
+was created."</strong></p>
+<p>The <code>mrp.bom</code> rollup is empty because no line had configured variants
+with a BoM relation. Verify: open the order, look at a line's BoM
+preview — if it's empty, you skipped the Configure button on that line.
+Recovery: cancel the order (state <code>cancel</code>), reset to draft, walk
+every line through the configurator, confirm again. Alternative for one
+or two unconfigured lines: open the line, click Configure, set picks,
+save — the BoM rollup re-evaluates on save.</p>
+<p><strong>"I picked Demo Tradesperson Tier 3 as the customer but the price is
+the same as retail."</strong></p>
+<p>Two suspects: (1) the partner has <code>channel = 'tradesperson'</code> but no
+<code>tradesperson_tier</code> set — <code>_resolve_tradesperson_pricelist</code> falls back
+to the base contractor pricelist (cost+5% floor, no tier discount, logs
+a soft warning); (2) the partner's <code>channel</code> field is blank/retail.
+Open the partner record, set <code>channel = 'tradesperson'</code> and
+<code>tradesperson_tier = '3'</code>, save. The order won't auto-reprice — switch
+customer to someone else and back to trigger the onchange.</p>
+<p><strong>"The customer wants Maple boxes throughout but two of the cabinets are
+Contractor series."</strong></p>
+<p>Rule 2 (Box Material → Series) blocks Maple on Contractor. Three
+options: (a) upsell those two cabinets to Contemporary or Elegance (the
+cheapest series that allows Maple — Contemporary is the natural step
+up); (b) accept White Melamine on the two Contractor cabinets and Maple
+on the rest (the customer may not notice — Contractor's painted
+thermofoil finish hides the box edges); (c) tell the customer Maple
+boxes aren't compatible with Contractor and let them decide. <strong>Do not</strong>
+try to override the rule manually — there's no UI for that, and you'd
+break the BoM math.</p>
+<p><strong>"I duplicated an order as draft, edited a few lines, and the original
+order's lines also changed."</strong></p>
+<p>That should not happen — <code>copy()</code> deep-clones the lines. If it did, one
+of the lines was actually a configured variant whose
+<code>product_template_attribute_value_ids</code> you edited on the variant record
+(not on the order line). The variant is shared across both orders.
+Recovery: re-configure the affected lines on the duplicate so a new
+variant is materialised. Future protection: only edit attribute values
+through the Configure wizard, never through the product.product form.</p>
+<p><strong>"The Signature Spec Sheet PDF doesn't render — I get a 500 error."</strong></p>
+<p>The <code>reports/signature_spec_sheet.xml</code> template depends on
+<code>reports/southbrook_report_styles.xml</code> loading first (per the
+<code>__manifest__.py</code> <code>data</code> ordering — don't alphabetise). If a contributor
+reordered the list, the spec sheet breaks. Check
+<code>southbrook_estimating/__manifest__.py</code> — <code>southbrook_report_styles.xml</code>
+must precede <code>signature_spec_sheet.xml</code>. If correct, look at the Odoo
+log for the QWeb error message; typically a missing field reference on
+the order or the partner.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>When you create an order and pick a customer, two onchange hooks fire:</p>
+<ul>
+<li><code>_onchange_partner_id_southbrook_pricelist</code> (<code>models/sale_order.py</code>) —
+  reads <code>partner.channel</code> (and <code>tradesperson_tier</code>) and writes
+  <code>pricelist_id</code> to the resolved pricelist record. Lookup tables:
+  <code>_CHANNEL_PRICELISTS</code> (5 simple channels) and
+  <code>_TRADESPERSON_TIER_PRICELISTS</code> (3 tiers). Fallback:
+  <code>pricelist_retail</code>.</li>
+<li>Standard Odoo <code>_onchange_partner_id</code> — copies billing / shipping
+  addresses, fiscal position.</li>
+</ul>
+<p>When you click Configure on a line, <code>product_configurator_sale</code> launches
+the OCA wizard, creates / reuses a <code>product.config.session</code> (state
+<code>draft</code>), and walks the user through <code>value_ids</code> picks. On finish, a
+<code>product.product</code> variant is materialised (or reused — <code>create_variant='dynamic'</code>)
+and bound to the line.</p>
+<p>When you click <strong>Confirm</strong>, the override in <code>models/sale_order.py</code>
+<code>action_confirm</code> runs:</p>
+<ol>
+<li><code>super().action_confirm()</code> — standard Odoo: state → <code>sale</code>,
+   creates <code>mrp.production</code> records via <code>sale_mrp</code> (the bridge addon
+   we explicitly depend on — NF25).</li>
+<li><code>southbrook.order.analytics.capture(order)</code> — creates an
+   analytics row capturing channel, predominant series, dealer (if
+   channel = <code>dealer</code>), cabinet/panel/door counts. Idempotent — safe
+   to reconfirm.</li>
+</ol>
+<p>Three QWeb reports are registered:</p>
+<ul>
+<li><code>signature_spec_sheet.xml</code> — customer-bound PDF, the document
+  the customer signs (custom routine #6 partial).</li>
+<li><code>shop_copy.xml</code> — <code>mrp.production</code>-bound shop-floor companion.</li>
+<li><code>door_order.xml</code> — per-SO door schedule for the door supplier.</li>
+</ul>
+<p>The <code>Duplicate as Draft</code> action chains orders via <code>parent_order_id</code> and
+auto-increments <code>version</code>. The <code>_southbrook_history_chain(max_depth=20)</code>
+helper walks the chain newest-first for the customer-portal timeline.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You receive a Prodboard export with 9 cabinets — the canonical
+Q7 smoke-test list. The customer is a Tier 3 contractor (Richwood). You
+build the order, all 9 lines configured, prices look right. You then
+switch the customer to a Retail walk-in. What do you expect to see, and
+what does it confirm?</p>
+<blockquote>
+<p>Every line repricing upward to list price <em>without</em> needing to
+reconfigure anything (no Configure-button clicks required). This
+confirms <code>_resolve_channel_pricelist</code> is wiring the pricelist
+correctly via the <code>_onchange_partner_id_southbrook_pricelist</code> hook,
+and that the <code>pricelist_id</code> on the order is propagating to each line's
+<code>price_unit</code> recompute. If a line doesn't reprice, its <code>price_unit</code>
+was manually overridden — recovery is to reset that line's price.</p>
+</blockquote>
+<p><strong>2.</strong> A customer changes their mind mid-quote — twice. You end up with
+v1, v2, v3 of the same kitchen. Where does the v3 record carry its
+ancestry, and how do you walk it back?</p>
+<blockquote>
+<p><code>parent_order_id</code> (Many2one back to v2 on v3, v1 on v2). Version is
+auto-incremented by <code>action_duplicate_as_draft</code> (3 on v3, 2 on v2,
+1 on v1). Use the helper <code>_southbrook_history_chain(max_depth=20)</code> to
+walk newest-first; the v3 form also shows a Parent Order link near
+the partner block. The original v1 is kept in <code>draft</code> / <code>cancel</code>
+state as the historical record.</p>
+</blockquote>
+<p><strong>3.</strong> You confirm an order with 14 cabinet lines. No MOs appear in
+Manufacturing. What's the most likely root cause?</p>
+<blockquote>
+<p>One or more cabinets weren't configured — the line was added but the
+Configure wizard never ran on it, so the variant has no
+attribute values and no BoM lineage. The <code>mrp.production</code> records
+are created by <code>sale_mrp</code> based on the line's variant + BoM; an
+unconfigured variant has nothing for <code>sale_mrp</code> to act on.
+Verification: open each line, check the BoM preview / <code>sb_panel_count</code>
+— zero = unconfigured. Reset to draft, configure, reconfirm.</p>
+</blockquote>
+<p><strong>4.</strong> You hit Print → Signature Spec Sheet and get a 500. The Odoo log
+shows <code>'name' field not found on res.partner</code>. What's the actual cause,
+and the fix?</p>
+<blockquote>
+<p>The QWeb template is referencing a partner field that doesn't exist
+on the current <code>res.partner</code> record — possibly an extension field
+from another module the report assumed was installed. Open
+<code>reports/signature_spec_sheet.xml</code>, grep for <code>partner_id.&lt;fieldname&gt;</code>,
+cross-reference with <code>res.partner</code> fields. Most likely the addon that
+defines the missing field needs to be installed, or the template
+needs a guard <code>t-if="order.partner_id.&lt;field&gt;"</code> to skip when absent.
+Escalate to your admin — this is a report bug, not a data bug.</p>
+</blockquote>
+<p><strong>5.</strong> A Big-Box customer (channel = <code>bigbox</code>) asks for a quote on 22
+SB-BASE-1DR cabinets. You build the order, every line shows $98.00 in
+<code>price_unit</code>. Total is $2,156. The customer says "that's wrong, you
+quoted me $85/cabinet last month." Where do you look?</p>
+<blockquote>
+<p>The Big-Box pricelist (<code>pricelist_bigbox</code>) sets a fixed $98.00 per
+SKU per Q1. If the customer was quoted $85 last month, either (a)
+a previous custom pricelist override was used on that order (look
+at the old order's <code>pricelist_id</code> field); (b) the pricelist item
+was edited between then and now (<code>pricelist_bigbox_item_global</code>'s
+<code>fixed_price</code> value); (c) the customer is misremembering, or
+referring to net-of-pallet pricing not invoice pricing. Don't lower
+the price unilaterally — escalate to sales management for the
+contractual answer, then if approved, override the line's
+<code>price_unit</code> and add a discount note.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The configurator vocabulary itself (attributes / exclusions /
+  construction rules) — lesson 5.1.</li>
+<li>Hardware catalog and per-carcass hardware resolution — lesson 5.3.</li>
+<li>The Configurator UX v2 surface (chip selectors, live preview, OWL
+  component) — lesson 5.4.</li>
+<li>The customer-facing one-page configurator (Phase 2 — not yet
+  shipped).</li>
+<li>The 3D Kitchen Preview tab — Phase 3 surface, behaviour subject to
+  change.</li>
+<li>General Odoo Sales workflow (sending quotes, invoicing,
+  delivery) — Odoo's own training site.</li>
+<li>MRP / production planning — Course 2 (Production Planning).</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_05_hardware_catalog" model="slide.slide">
+            <field name="name">Hardware Catalog — Marathon SKUs, Auto-Resolution, Manual Lines</field>
+            <field name="channel_id" ref="course_estimating_configurator"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Estimator + the person who adds non-cabinet items to a quote, plus the admin who keeps the Marathon catalog current.</field>
+            <field name="html_content"><![CDATA[<h1 id="hardware-catalog-marathon-skus-auto-resolution-manual-lines">Hardware Catalog — Marathon SKUs, Auto-Resolution, Manual Lines</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the estimator who realises a customer's quote needs an
+appliance-pull on the fridge cabinet, or a matte-black handle upgrade,
+or a soft-close kit on a vanity. You're also the person an admin asks
+"can you take a Marathon catalog CSV from the trade-account portal and
+import the 179 new SKUs?". This lesson covers both surfaces of the
+Marathon Hardware catalog: what gets resolved automatically per
+carcass (so you don't add 4 hinges manually on every base cabinet), and
+what you add by hand.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<blockquote>
+<p><strong>Inventory → Hardware Catalog → Brands</strong> — the 19 hardware
+manufacturers (<code>southbrook.hardware.brand</code>).</p>
+<p><strong>Inventory → Hardware Catalog → Import Marathon CSV</strong> — the upload
+wizard (<code>southbrook.hardware.import.wizard</code>).</p>
+<p><strong>Inventory → Products → Products</strong> — filter by Hardware Category to
+see every catalog SKU; each carries the "Hardware Catalog" tab on the
+product form.</p>
+</blockquote>
+<p>The auto-resolution service is <em>not</em> on a menu — it runs from
+<code>env['southbrook.hardware.catalog'].resolve(...)</code> when the FreeCAD
+bridge or the BoM rollup needs hardware. You'll see its output as
+extra BoM lines after you click Confirm on an order.</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p><strong>Brand record</strong> (<code>southbrook.hardware.brand</code>):</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code>) — display name (e.g. "Blum", "Salice", "Hettich",
+  "Marathon").</li>
+<li><strong>Code</strong> (<code>code</code>) — the snake-case key the <code>hardware_map.json</code> and
+  the import wizard match on (<code>blum</code>, <code>salice</code>, <code>hettich</code>, <code>marathon</code>).
+  Unique. Don't change it after seeded.</li>
+<li><strong>Sequence</strong> (<code>sequence</code>) — display order.</li>
+<li><strong>Active</strong> (<code>active</code>) — flip to false to hide a brand from selection
+  without deleting it.</li>
+</ul>
+<p><strong>Product variant — Hardware Catalog tab</strong> (on <code>product.product</code>):</p>
+<ul>
+<li><strong>Hardware Category</strong> (<code>x_hardware_category</code>) — selection: hinge /
+  slide / pin / screw / handle / leveler / cam_lock / bumper / other.
+  Drives the resolver's "this is a hinge" semantic.</li>
+<li><strong>Brand</strong> (<code>x_hardware_brand_id</code>) — m2o to the brand record above.</li>
+<li><strong>Marathon SKU</strong> (<code>x_marathon_sku</code>) — the vendor SKU as listed in
+  Marathon's workbook (e.g. <code>BLM-110-SC</code> for the Blum 110° soft-close
+  hinge, <code>MRH-HDL-PUL128</code> for the 128 mm pull). This is the join key
+  the resolver uses; it must be unique and stable across catalog
+  refreshes.</li>
+<li><strong>Pricing Pending</strong> (<code>x_pricing_pending</code>) — boolean, set to true when
+  the cost requires a trade-account login the Southbrook team doesn't
+  have yet. Quotes including pricing-pending hardware get flagged so
+  the customer doesn't see "$0.00 per hinge" by accident.</li>
+<li><strong>Standard / Length / Width / Projection / Diameter / Center-to-Center
+  / Material / Lead Time / Package Quantity / Marathon Image URL</strong> —
+  spec fields populated by the import wizard from the trade workbook.</li>
+</ul>
+<p><strong>Import wizard</strong> (<code>southbrook.hardware.import.wizard</code>):</p>
+<ul>
+<li><strong>CSV File</strong> (<code>csv_file</code> — binary upload) — the trade workbook
+  exported as CSV.</li>
+<li><strong>Dry Run</strong> (<code>dry_run</code>, default true) — parse-and-validate only; no
+  writes.</li>
+<li>After running: <strong>Created</strong> / <strong>Updated</strong> / <strong>Errors</strong> counters plus a
+  <strong>Result Log</strong> with row-by-row outcome.</li>
+</ul>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You have two reasons to touch hardware: auto-resolution outcomes when
+configuring a cabinet (passive — you read what the system produced),
+and manual lines when the customer needs something off-catalog (active
+— you add it by hand).</p>
+<p><strong>1. Auto-resolution: what the system did per carcass.</strong></p>
+<p>You configure a base cabinet in lesson 5.2. The FreeCAD bridge (or the
+BoM rollup on confirm) calls:</p>
+<pre><code>env['southbrook.hardware.catalog'].resolve(
+    cabinet_family='base',
+    door_count=2,
+    drawer_count=0,
+    shelf_count=1,
+    soft_close=True,
+    pull_finish='brushed_nickel',
+    pull_size_mm=128,
+    handle_style='pull',
+    mount_appliance=False,
+)
+</code></pre>
+<p>…and gets back a list of <code>(product.product, qty)</code> tuples. For a 2-door
+soft-close base with one shelf, brushed-nickel 128 mm pulls, the
+result is:</p>
+<table>
+<thead>
+<tr>
+<th>Marathon SKU</th>
+<th>Source rule</th>
+<th>Qty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BLM-110-SC</code></td>
+<td>per_door_soft_close (2 per door × 2 doors)</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MRH-DOORBUMP-CL</code></td>
+<td>per_door_soft_close (2 per door × 2 doors)</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MRH-HDL-PUL128</code></td>
+<td>per_door_soft_close (1 per door × 2 doors)</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MRH-SHLFPIN-5MM</code></td>
+<td>per_shelf (4 per shelf × 1 shelf)</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MRH-CAMLOCK-KIT</code></td>
+<td>per_cabinet</td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>MRH-LVL-50</code></td>
+<td>per_cabinet</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MRH-MTGSCR-25PK</code></td>
+<td>per_cabinet</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>That's the full pick list for one cabinet. You don't add any of these
+manually — they appear on the BoM as derived lines. The rules live in
+<code>data/hardware_map.json</code> shipped inside the addon and cached on the
+registry (<code>self.pool._southbrook_hardware_map</code>).</p>
+<p><strong>2. Per-family extras.</strong></p>
+<p><code>per_family</code> in the JSON map adds extras for specific cabinet families:</p>
+<ul>
+<li><code>tall</code>: +4 levelers (<code>MRH-LVL-50</code> — tall pantries need the extra
+  load support)</li>
+<li><code>sink</code>: +1 water barrier (<code>MRH-WATERBARRIER-1M</code>)</li>
+</ul>
+<p>The resolver aggregates duplicates — a tall pantry gets <code>MRH-LVL-50</code>
+once from <code>per_cabinet</code> and once from <code>per_family[tall]</code>, summed to 8
+levelers, not two separate lines.</p>
+<p><strong>3. Soft-close swap.</strong></p>
+<p>When the configurator sets <code>soft_close = False</code> (e.g. Rule 4 fires on a
+bi-fold corner cabinet), the resolver reads <code>per_door</code> instead of
+<code>per_door_soft_close</code>. That swaps <code>BLM-110-SC</code> for <code>BLM-110-NSC</code> (the
+non-soft-close hinge). All other hardware is unchanged.</p>
+<p><strong>4. Finish-aware handle override.</strong></p>
+<p>The default per-door / per-drawer rule places <code>MRH-HDL-PUL128</code> (brushed
+nickel 128 mm pull) on every door. If the customer picks Matte Black
+under the Handle attribute, the resolver:</p>
+<ul>
+<li>Strips <code>MRH-HDL-PUL128</code> from the totals (default pull SKU listed in
+  <code>pull_default_skus</code>).</li>
+<li>Looks up the override in <code>by_pull_finish['matte_black']['128mm']</code> →
+  <code>MRH-HDL-PUL128-MB</code>.</li>
+<li>Adds the override back with the same total quantity.</li>
+</ul>
+<p>Same mechanism for knobs (<code>by_knob_finish</code>, <code>knob_default_skus</code>).
+Appliance pulls are <em>added</em> on top (not swapped) when
+<code>mount_appliance=True</code>, one per appliance-door front, from
+<code>appliance_pulls[&lt;finish&gt;]</code>.</p>
+<p><strong>5. When to add a hardware line manually.</strong></p>
+<p>The auto-resolver covers ~90% of cabinets. Add a line yourself when:</p>
+<ul>
+<li>The customer brought their own pull / knob (customer-supplied — add
+  as a non-Marathon <code>product.product</code> with zero cost, qty = door
+  count).</li>
+<li>The customer wants a specialty hinge not in the rule (overlay vs
+  inset hinge swap, exterior frameless conversion). Find the SKU in
+  Inventory → Products, add it as an order line.</li>
+<li>The order needs install consumables (caulk, shims, screws beyond the
+  <code>MRH-MTGSCR-25PK</code> standard).</li>
+<li>The hardware is <em>replacement</em> parts for a refacing job — those
+  don't go through the carcass resolver at all.</li>
+</ul>
+<p>For a manual hardware line:</p>
+<blockquote>
+<p>Order Builder → (your order) → Order Lines → Add a line → search
+"MRH-" or "BLM-" or the brand → pick → qty → save.</p>
+</blockquote>
+<p>It goes on the order at the partner's pricelist price.</p>
+<p><strong>6. Catalog admin: importing the Marathon trade workbook.</strong></p>
+<p>When the Marathon trade-account workbook lands (the 179-row CSV), the
+admin uses the import wizard:</p>
+<blockquote>
+<p>Inventory → Hardware Catalog → Import Marathon CSV</p>
+</blockquote>
+<ul>
+<li>Attach the CSV (UTF-8, with header row).</li>
+<li>Leave <strong>Dry Run</strong> checked. Click <strong>Import</strong>.</li>
+<li>Read the <strong>Result Log</strong>: every row reports <code>created</code> or <code>updated</code> or
+  <code>ERROR: &lt;message&gt;</code>. Errors are typically:</li>
+<li><code>marathon_sku is required</code> — empty SKU column on a row.</li>
+<li><code>unknown brand_code 'foo'</code> — a brand code in the CSV that doesn't
+    match a <code>southbrook.hardware.brand.code</code>. Fix: add the brand
+    first under Inventory → Hardware Catalog → Brands.</li>
+<li><code>category 'foo' is not a HARDWARE_CATEGORY</code> — only <code>hinge</code>,
+    <code>slide</code>, <code>pin</code>, <code>screw</code>, <code>handle</code>, <code>leveler</code>, <code>cam_lock</code>,
+    <code>bumper</code>, <code>other</code> are accepted.</li>
+<li><code>list_price 'X' is not numeric</code> — non-number in a price column.</li>
+<li>Fix the source CSV, re-run dry-run until clean.</li>
+<li>Uncheck <strong>Dry Run</strong>, <strong>Import</strong> again. The import is upsert (matches
+  existing SKUs by <code>x_marathon_sku</code>, updates them; creates the rest).
+  Never deletes — a SKU removed from Marathon's workbook stays in
+  Odoo until an admin archives it manually.</li>
+</ul>
+<p><strong>7. Pricing and margin.</strong></p>
+<p>Per-SKU pricing on <code>product.product</code>:</p>
+<ul>
+<li><code>standard_price</code> — Southbrook's cost from Marathon.</li>
+<li><code>list_price</code> — Southbrook's resale price (what the customer sees).</li>
+<li><code>x_pricing_pending</code> — boolean flag. If true, the SKU's cost wasn't
+  available at import time. The Signature Spec Sheet PDF flags
+  pricing-pending lines with an asterisk; sales should clear the flag
+  (set <code>x_pricing_pending = False</code> and supply the cost) before sending
+  the quote.</li>
+</ul>
+<p>Margin per SKU = <code>(list_price - standard_price) / list_price</code>. Southbrook
+targets 35% on hardware (the same as on the refacing channel). No
+automatic enforcement — the admin's responsibility to maintain
+list_price as costs change.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"I confirmed an order and the BoM shows no hinges, no slides, no
+hardware at all."</strong></p>
+<p>The <code>resolve()</code> call ran but every SKU it returned was missing from the
+installed seed (the resolver logs a warning per missing SKU and skips
+it). Check the Odoo log for messages like <code>hardware_map references SKU
+'BLM-110-SC' not present in the catalog</code>. Recovery: install the
+hardware seed (<code>-u southbrook_hardware_catalog</code>) or import the trade
+workbook. The cabinet's BoM stays valid — you just need to back-fill
+the hardware seed.</p>
+<p><strong>"My order's BoM has 8 copies of the same <code>MRH-LVL-50</code> leveler line."</strong></p>
+<p>Aggregation failure — the resolver normally sums per_cabinet + per_family
+contributions into one line via the <code>totals</code> dict. If they're separate
+lines, you're looking at the configurator's preview, not the BoM
+rollup. The BoM rollup runs at MO creation. Open the
+<code>mrp.production</code> record and check the actual BoM — most likely it
+shows one <code>MRH-LVL-50</code> line at qty 8, which is correct.</p>
+<p><strong>"The customer wants brushed nickel pulls but the BoM shows
+<code>MRH-HDL-PUL128</code> (default), not the brushed-nickel-specific SKU."</strong></p>
+<p>The configurator wasn't passed a <code>pull_finish</code> argument. The Handle
+attribute on the cabinet needs to be set; in the OCA wizard, pick a
+specific finish, save. If the finish-specific SKU still doesn't
+appear, the <code>by_pull_finish</code> map doesn't have the customer's finish +
+size combination — fall back is the brushed-nickel default. The
+finish key is snake_case (e.g. <code>matte_black</code>, <code>antique_bronze</code>) and
+must match the <code>attr_pull_finish</code> value from <code>attributes.xml</code>.</p>
+<p><strong>"I imported a 179-row CSV and it shows 178 updated, 1 created. I
+expected 179 created on a fresh DB."</strong></p>
+<p>You imported against a DB with the 20-row demo seed already installed.
+The 20 demo SKUs hit upsert (match on <code>x_marathon_sku</code>) and get
+<code>updated</code>; the 159 truly new SKUs come up as <code>created</code>. Math: 20
+existing + 159 new = 179 rows processed. If you see 178 updated and 1
+created, your demo seed had 178 rows somehow — investigate by querying
+<code>product.product</code> filtered by <code>x_marathon_sku IS NOT NULL</code>.</p>
+<p><strong>"A SKU shows <code>x_pricing_pending = True</code> but I have the cost from the
+trade portal — how do I clear it?"</strong></p>
+<p>Open the product variant (Inventory → Products → search by Marathon
+SKU). Set <code>standard_price</code> to the cost. Set <code>list_price</code> to the
+cost / (1 - 0.35) for 35% margin (or whatever margin sales policy
+dictates). Set <code>x_pricing_pending = False</code>. Save. The Signature Spec
+Sheet PDF will stop flagging the line as pending.</p>
+<p><strong>"A hardware brand merged with another — Hettich bought Brand X. Can I
+delete Brand X?"</strong></p>
+<p>Brand has <code>ondelete='restrict'</code> on <code>x_hardware_brand_id</code> — you can't
+delete a brand that has products referencing it. Don't delete. Instead:
+(a) reassign each product's <code>x_hardware_brand_id</code> from Brand X to
+Hettich (use the list view, multi-select, edit brand); (b) set Brand X's
+<code>active = False</code> to hide it from selection while preserving history.
+A code change to the brand <code>code</code> field will break <code>hardware_map.json</code>
+lookups — don't change codes.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The hardware catalog is a small ecosystem:</p>
+<ul>
+<li><strong><code>southbrook.hardware.brand</code></strong> — a tiny model so Odoo CE doesn't
+  need OCA <code>product_brand</code>. 19 seeded brands; one Many2one from
+  <code>product.product.x_hardware_brand_id</code>.</li>
+<li><strong><code>product.product</code> extensions</strong> — 12 added fields (the
+  <code>x_hardware_*</code> set plus the spec fields). All are stored-related to
+  <code>product.template</code> (Tier 1.2 audit refactor) so writes propagate
+  cleanly across variants. The legacy XML seed that declared records as
+  <code>product.product</code> continues to work because the related/stored
+  declaration routes writes to the template.</li>
+<li><strong><code>southbrook.hardware.catalog</code></strong> — an <code>AbstractModel</code> (no records;
+  just a service) exposing <code>resolve(...)</code>. The mapping lives in
+  <code>data/hardware_map.json</code> (sections: <code>per_door</code>, <code>per_door_soft_close</code>,
+  <code>per_drawer</code>, <code>per_shelf</code>, <code>per_cabinet</code>, <code>per_family</code>,
+  <code>pull_default_skus</code>, <code>knob_default_skus</code>, <code>by_pull_finish</code>,
+  <code>by_knob_finish</code>, <code>appliance_pulls</code>).</li>
+<li><strong><code>southbrook.hardware.import.wizard</code></strong> — a <code>TransientModel</code> that
+  walks the CSV row by row inside a per-row savepoint, validates against
+  <code>REQUIRED_COLS</code> + <code>HARDWARE_CATEGORY_KEYS</code>, upserts by <code>x_marathon_sku</code>,
+  and returns a result-log view.</li>
+</ul>
+<p>When you confirm an order and the FreeCAD bridge writes the cabinet
+geometry, the bridge calls <code>resolve()</code> per cabinet line with the
+configured family + counts + finish. The returned tuples become BoM
+component lines on the cabinet's <code>mrp.bom</code> record. That BoM then flows
+into the <code>mrp.production</code> record on order confirm.</p>
+<p>Critical observation: the resolver fails <em>soft</em>. A missing SKU logs a
+warning and skips the line; the resolver doesn't raise. So a partial
+hardware catalog (the 20-row seed today vs the 179-row trade workbook
+tomorrow) installs cleanly and produces working orders with
+under-populated BoMs. The expectation is that the trade workbook lands
+before production cutover.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> You configure an <code>SB-BASE-2DR</code> with soft-close, brushed nickel
+128 mm pulls, one shelf. The customer also asks for an additional
+matte-black appliance pull because they're swapping the dishwasher
+later. Walk through how to get the appliance pull on the BoM.</p>
+<blockquote>
+<p>The standard resolve() call won't add an appliance pull on a base
+cabinet — <code>mount_appliance=True</code> is only set for tall_oven / tall_fridge
+by the configurator. For a manual appliance-pull add, edit the
+order: add a line for the matte-black appliance-pull SKU
+(<code>MRH-HDL-APP18-MB</code> if it exists in the catalog, otherwise the
+brushed-nickel <code>MRH-HDL-APP18-BN</code> is the seeded SKU). Qty 1, note
+"customer-supplied dishwasher pull, install on appliance door".
+Don't try to retrofit the resolver mid-quote.</p>
+</blockquote>
+<p><strong>2.</strong> Your admin asks you to import a 179-row Marathon CSV. You run
+dry-run; the log shows 12 errors all on the <code>brand_code</code> column:
+<code>unknown brand_code 'rev-a-shelf'</code>. What's the cause and the fix?</p>
+<blockquote>
+<p>The CSV references a Rev-a-Shelf brand that doesn't exist in
+<code>southbrook.hardware.brand</code>. Fix: add a brand record with name =
+"Rev-A-Shelf" and code = <code>rev-a-shelf</code> (the CSV's exact lowercase
+form). Re-run dry-run. If the 12 errors are now zero, run the
+non-dry-run import. The 12 rows will be created against the new
+brand. Lesson: when a new brand appears in a Marathon refresh, seed
+the brand before importing the products.</p>
+</blockquote>
+<p><strong>3.</strong> A confirmed order's BoM shows zero hinges on a 2-door base
+cabinet that should have 4. What's the most likely cause, and where do
+you start?</p>
+<blockquote>
+<p>Either (a) <code>BLM-110-SC</code> is missing from the installed catalog (most
+likely — check Odoo's log for <code>hardware_map references SKU
+'BLM-110-SC' not present</code> warnings); or (b) the cabinet was
+configured with soft_close=False (an oversight or a Rule 4 hit on a
+bi-fold corner) so the resolver returned <code>BLM-110-NSC</code> instead — but
+that's also expected behaviour. Run <code>env['southbrook.hardware.catalog'].resolve()</code>
+manually in the shell with the cabinet's params to confirm what
+SKUs <em>should</em> be there, then check which are missing from
+<code>product.product</code>.</p>
+</blockquote>
+<p><strong>4.</strong> The customer's hardware budget is tight and they ask you to
+swap the standard Blum soft-close hinges for the non-soft-close
+variant. You don't want to disable soft-close on the configurator (the
+customer might still want soft-close on the drawers). What's the right
+move?</p>
+<blockquote>
+<p>The resolver's <code>soft_close</code> parameter is per-call — toggling it from
+the configurator UI affects every door + drawer on that cabinet
+uniformly. You can't currently split door soft-close from drawer
+soft-close at resolve time. Two options: (a) accept the constraint
+and tell the customer it's all-or-nothing for that cabinet; (b)
+after resolving, manually edit the cabinet's BoM to swap <code>BLM-110-SC</code>
+lines for <code>BLM-110-NSC</code> while leaving the drawer slides as soft-close
+(BLM-MOV-450 is the standard slide — independent of door soft-close).
+Document the override in the order's internal notes.</p>
+</blockquote>
+<p><strong>5.</strong> A new estimator says "I added a hardware line for <code>MRH-HDL-KNB30</code>
+on the order but it's showing $0.00 — is that wrong?" What do you check?</p>
+<blockquote>
+<p>Look at the product variant's <code>x_pricing_pending</code> field. If true,
+Southbrook didn't have a cost for that SKU at import time and the
+list_price defaulted to 0. Don't sell at $0 — either look up the cost
+from the Marathon trade portal and update <code>standard_price</code> +
+<code>list_price</code> (then clear the pending flag), or pull the line and
+swap to a SKU that has a price. Recovery shortcut: if the
+Spec Sheet PDF flags pricing-pending lines, the customer would have
+seen the asterisk before signing — so the $0 is a visible signal,
+not a silent leak.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The configurator vocabulary (attributes / exclusions / construction
+  rules) — lesson 5.1.</li>
+<li>How to build the actual quote — lesson 5.2.</li>
+<li>The Configurator UX v2 deltas vs OCA stock — lesson 5.4.</li>
+<li>The FreeCAD bridge that consumes <code>resolve()</code> output to generate
+  cabinet renderings — Course 4 (PLM + Design), lesson 4.3.</li>
+<li>General Odoo Inventory administration — Odoo's own native eLearning
+  track.</li>
+<li>The trade-account access workflow to obtain Marathon's catalog — an
+  ops / purchasing concern, not estimating.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_05_configurator_ux" model="slide.slide">
+            <field name="name">Configurator UX v2 — Southbrook&#x27;s Deltas vs OCA Stock</field>
+            <field name="channel_id" ref="course_estimating_configurator"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Estimator + the designer who configures cabinets inside Odoo. You&#x27;ve used the OCA wizard once or twice and want to know why the customer-facing /shop page looks completely different.</field>
+            <field name="html_content"><![CDATA[<h1 id="configurator-ux-v2-southbrooks-deltas-vs-oca-stock">Configurator UX v2 — Southbrook's Deltas vs OCA Stock</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're a Southbrook estimator or designer who's worked the OCA
+configurator wizard inside Odoo and now needs to understand the
+customer-facing <code>/shop/&lt;cabinet-slug&gt;</code> page. The two surfaces are
+<em>different</em> — same data, same rules, same <code>product.config.session</code>
+records, but a completely redesigned UI. This lesson walks you through
+what the v2 UX changes, why those changes exist, when to use which
+surface, and how to read a failing validation message back to its
+underlying configurator rule.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>Two surfaces, two URLs:</p>
+<blockquote>
+<p><strong>OCA stock wizard</strong> — opens from any cabinet's <strong>Configure</strong> stat
+button in the backend (the Order Builder line's Configure action).
+Lives at <code>/web#action=...</code>.</p>
+<p><strong>Southbrook UX v2</strong> — public-facing, at <strong><code>/shop/&lt;cabinet-slug&gt;</code></strong> on
+southbrookcabinetry.space. Every customer who visits a configurable
+product page hits this layout. Internal users hit the same page but
+get an extra "Bulk tools" bar at the top.</p>
+</blockquote>
+<p>The v2 layout is enabled by installing <code>southbrook_configurator_ux</code> —
+uninstalling it returns the page to the OCA stock layout immediately.
+No data is touched; the layout swap is pure QWeb template inheritance
+plus a JS / SCSS bundle (<code>web.assets_frontend</code>).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The v2 page is a <strong>two-pane responsive grid</strong> plus a top strip:</p>
+<ul>
+<li><strong>Progress bar</strong> (<code>#sb_cfg_progwrap</code>) — sticky at the top, fills as
+  you make picks. Static <code>role="progressbar"</code> for screen readers; the
+  fill (<code>#sb_cfg_progbar</code>) is rendered by the OWL component.</li>
+<li><strong>Breadcrumbs</strong> (<code>.sb_cfg_crumbs</code>) — Shop › Category › Cabinet Name.
+  Server-rendered (navigation, not state).</li>
+<li><strong>Title bar</strong> (<code>.sb_cfg_titlebar</code>) — cabinet name, a tagline ("Build
+  a made-to-spec cabinet · live pricing · SKU auto-generates as you
+  configure").</li>
+<li><strong>Bulk-tools bar</strong> (<code>.sb_cfg_bulkbar</code>) — visible only to
+  internal users (<code>t-if="not user_id.share"</code> on the QWeb side, mirrored
+  by <code>data-internal-user</code> on the JS side). Two buttons: "⬇ Template
+  Layout" (downloads a starter xlsx via <code>/southbrook/api/import/template</code>)
+  and "⤒ Import Product" (opens the import overlay modal). Customers
+  never see this row.</li>
+</ul>
+<p><strong>Left pane (sticky)</strong> — the live preview + summary card:</p>
+<ul>
+<li><strong>Live preview</strong> (<code>.sb_cfg_viewer</code>) — a CSS-box rendering of the
+  cabinet that reshapes as you pick. Width/height/depth attribute
+  changes resize the box; Finish picks change the front face colour
+  using the JS <code>FINISH_COLORS</code> map (White → <code>#f3f0ea</code>, Maple Stain →
+  <code>#d9a566</code>, etc.).</li>
+<li><strong>Replace Photo button</strong> (<code>📷 Replace photo</code>) — drag-and-drop or
+  click. Replaces the CSS box with a customer-supplied reference
+  image. Local-only — the photo doesn't sync to the order.</li>
+<li><strong>Summary card</strong> (<code>.sb_cfg_summary</code>):</li>
+<li><strong>Price LIVE</strong> — server-resolved after each pick (POSTs to
+    <code>/southbrook/api/configurator/select</code> and reads
+    <code>serverPrice</code>). The <code>LIVE</code> badge stays visible during the round-trip.</li>
+<li><strong>Est. Weight</strong> — <code>serverWeight</code> from the same endpoint.</li>
+<li><strong>Auto SKU</strong> — composed from picks against <code>SKU_ATTR_NAMES =
+    ['Width', 'Series', 'Finish']</code> (live, client-side preview; the
+    canonical SKU is the variant's <code>default_code</code> on commit).</li>
+<li><strong>Your build</strong> spec line — joins picks for <code>SPEC_ATTR_NAMES =
+    ['Width', 'Series', 'Finish', 'Hinge Side', 'Handle']</code>.</li>
+<li><strong>Completion ring</strong> (<code>.sb_cfg_ring</code> with <code>--p:&lt;pct&gt;</code> CSS var) —
+    progress through required attributes, with a percentage in the
+    centre.</li>
+<li><strong>Action bar</strong> (<code>.sb_cfg_actionbar</code>):</li>
+<li>Validation status (<code>role="status" aria-live="polite"</code>) — green
+    "Ready to add" or amber "Choose Series to continue" — driven by the
+    OCA rule engine's <code>disabledValueIds</code> + the required-attribute set.</li>
+<li><strong>Add to Quote</strong> primary button — POSTs to
+    <code>/southbrook/api/configurator/commit</code>. On success: navigates to
+    the Order Builder; on <code>login_required</code>: navigates to the login
+    page with <code>return_to=&lt;here&gt;</code>.</li>
+</ul>
+<p><strong>Right pane (scroll)</strong> — the chip-selector configurator:</p>
+<ul>
+<li><strong>4 collapsible attribute groups</strong> (<code>config.step</code> buckets) — the
+  Phase 2K wizard step grouping: Construction, Door &amp; Finish, Hardware,
+  Interior. Each group has a header (number badge → checkmark when
+  complete) and a body of attribute pickers.</li>
+<li><strong>Chip selectors</strong> for <code>radio</code> and <code>pills</code> display_types — each
+  value is a clickable chip; selection highlights; disabled chips show
+  with reduced opacity and <code>aria-disabled="true"</code>.</li>
+<li><strong>Native <code>&lt;select&gt;</code></strong> for <code>select</code> display_type — Width, Door
+  Style, Finished Sides.</li>
+<li><strong>Color swatches</strong> for <code>color</code> display_type — Finish.</li>
+<li><strong>Per-option price delta</strong> (<code>.sb_cfg_pd</code>) — shows e.g. <code>+10%</code> next
+  to Maple in the Box Material picker, pulled live from the
+  attribute's <code>price_extra</code> via the <code>/state</code> and <code>/select</code> endpoints.</li>
+</ul>
+<p>The whole reactive UI is <strong>one OWL component</strong> (<code>ConfiguratorV2</code>)
+owning one state tree — picks, server-resolved fields, disabled value
+IDs, loading flags. The component mounts at <code>#sb_cfg_v2_main_mount</code>
+inside <code>#sb_cfg_v2_root[data-product-tmpl-id="&lt;id&gt;"]</code>. The
+mount-point guard means the bundle no-ops on any page without that
+root div — uninstalling the addon makes the JS silently skip.</p>
+<h2 id="your-daily-flow">Your daily flow</h2>
+<p>You'll work two surfaces depending on context.</p>
+<p><strong>1. The estimator's surface — OCA stock wizard (backend).</strong></p>
+<p>When you're building a quote in the Order Builder (lesson 5.2), the
+Configure button on each line opens the OCA stock wizard, not v2. The
+backend uses the OCA layout because:</p>
+<ul>
+<li>It carries the 11 attributes in 4 step buckets (<code>config.step</code>)
+  exactly as Southbrook seeded them.</li>
+<li>The wizard transitions are linear — Next / Previous per step — and
+  let you walk back through the picks of a 20-line order quickly.</li>
+<li>It shows the rule-block reason in the wizard's error area when
+  Rule 1 / 2 / 3 / 4 fires ("Maple box not available on Contractor
+  series") so you know <em>why</em> an option is disabled.</li>
+</ul>
+<p>You'll see the v2 UX only when:</p>
+<ul>
+<li>A customer or dealer is configuring on <code>/shop/&lt;slug&gt;</code>.</li>
+<li>You're internally previewing the customer-facing page to verify
+  visuals or test the chip-selector behaviour (paste the URL in your
+  browser).</li>
+</ul>
+<p><strong>2. The designer's surface — v2 inside <code>/shop</code>.</strong></p>
+<p>If you're previewing the customer experience, hit
+<code>/shop/&lt;cabinet-slug&gt;</code> (e.g. <code>/shop/base-2-door</code>) while logged into
+Odoo. You'll see the v2 layout plus the internal-only Bulk tools bar
+at the top. The bulk tools let you download an import template
+(<code>/southbrook/api/import/template</code>) or upload a filled-in CSV/xlsx
+through the import overlay (<code>#sb_cfg_importOverlay</code>).</p>
+<p><strong>3. Reading v2 validation messages.</strong></p>
+<p>The action-bar status text is the key tell — it tells you which rule
+fired:</p>
+<ul>
+<li><strong>"Choose a Series to continue"</strong> — required attribute unanswered.
+  Not a rule, just a missing pick. Pick a Series chip.</li>
+<li><strong>"Maple box is not available on Contractor Series"</strong> — Rule 2
+  fired. The Maple chip is disabled (greyed, <code>aria-disabled="true"</code>),
+  and the status text comes from the OCA rule engine's reason field.
+  This is an <strong>exclusion</strong> firing.</li>
+<li><strong>"Custom doors require Signature Series — switch to continue"</strong> —
+  Rule 1 fired in reverse (you picked Custom door style but Series
+  isn't Signature). Switch Series to Signature or change the door
+  style.</li>
+<li><strong>"Soft-close is not available on bi-fold corners"</strong> — Rule 4
+  fired. This one is a <em>construction rule</em> with negative effect — the
+  soft-close kit option is hidden entirely, not just disabled. You
+  won't see it in the Accessories picker on a bi-fold corner cabinet.</li>
+</ul>
+<p><strong>Recognising exclusion vs construction rule:</strong></p>
+<ul>
+<li><strong>Exclusion</strong> → option is <em>disabled</em> (visible, greyed). You can see
+  it, you can't click it. The disabled state is driven by
+  <code>state.disabledValueIds</code> populated from the <code>/select</code> endpoint
+  response.</li>
+<li><strong>Construction rule (negative)</strong> → option is <em>absent</em>. You don't
+  see it at all. The attribute_line itself was never rendered
+  (Rule 4 corner bi-fold).</li>
+<li><strong>Construction rule (positive)</strong> → side effects: a price extra
+  appears next to your pick (Maple <code>+10%</code>), the Auto SKU updates,
+  the completion ring advances, the lead-time hint appears in
+  the summary card.</li>
+</ul>
+<p><strong>4. Common workflow — bulk-loading 30+ cabinets.</strong></p>
+<p>Large-kitchen entry (30+ cabinets) is the v2 surface's biggest help.
+Two paths:</p>
+<ul>
+<li><strong>Per-cabinet via the customer's <code>/shop</code> flow</strong> — slow; you'd
+  configure 30 cabinets one at a time. Use only if the customer is
+  driving.</li>
+<li><strong>Bulk import via the v2 bulk-tools</strong> — fast. Click "⬇ Template
+  Layout" to download the starter xlsx. Fill the PRODUCTS sheet with
+  one row per cabinet (default_code, name, type, internal_category,
+  southbrook_category, southbrook_icon_key, attributes…). Upload via
+  the import overlay. The /preview endpoint validates each row
+  against the live vocab + the upsert invariants and shows you a
+  status table (Status, SKU, Name, Price, Category, Icon, Row,
+  Issue). Fix errors in your xlsx, re-upload, repeat. When clean,
+  click <strong>Commit N valid rows</strong> — a single transaction creates /
+  updates the <code>product.template</code> records.</li>
+</ul>
+<p>The import handles <strong>PRODUCTS only in v1</strong>. ATTRIBUTE_LINES /
+ATTRIBUTE_VALUES / BOM_HEADERS / HARDWARE_BOM / ACCESSORIES sheets
+are recognised but skipped with a "deferred to v2" status row. The
+endpoint contract accepts multi-sheet payloads from day one so v2 of
+the importer is a server-side change only.</p>
+<p><strong>5. Keyboard shortcuts.</strong></p>
+<p>The chip selectors have keyboard navigation:</p>
+<ul>
+<li>Tab into the chip group — first chip gets focus.</li>
+<li>Arrow keys move between chips inside a group.</li>
+<li>Enter / Space selects the focused chip (calls
+  <code>onChipKeydown</code> → <code>onChipClick</code>).</li>
+<li>Tab on a group header expands / collapses the group
+  (<code>onGroupKeydown</code> → <code>toggleGroup</code>).</li>
+</ul>
+<p>There are no other v2-specific shortcuts. Standard browser nav
+(Tab / Shift+Tab) walks the form.</p>
+<p><strong>6. When to fall back to the OCA stock view.</strong></p>
+<p>Two situations where the v2 page isn't enough:</p>
+<ul>
+<li><strong>You need to see the rule-block reason verbatim.</strong> v2 surfaces
+  the reason in the action-bar status text, but truncated. The OCA
+  wizard shows the full message. If a customer reports
+  "I picked X and the option disappeared and I don't understand why",
+  open the same cabinet in the backend OCA wizard, repro the picks,
+  read the full rule reason.</li>
+<li><strong>You need to see the configurator step structure.</strong> The 4-step
+  bucket (Construction / Door &amp; Finish / Hardware / Interior) is
+  collapsible in v2 but linear in the OCA wizard. The OCA wizard's
+  Next / Previous flow is easier to audit when you're verifying
+  which attributes are gating progression.</li>
+</ul>
+<p>Uninstall <code>southbrook_configurator_ux</code> and the v2 layout disappears
+immediately; the OCA stock layout returns unchanged. Don't do this in
+production — it's a single-command change but the customer-facing UX
+regression is severe.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The v2 page loads but the cabinet preview is blank and the picker
+chips don't respond."</strong></p>
+<p>The OWL component isn't mounted. Look at the browser console — if
+you see <code>Couldn't load this configurator</code> with a server-side message,
+the <code>/state</code> endpoint returned an error. Most common cause: the
+<code>product.template</code> isn't <code>config_ok=True</code>, so the OCA module's session
+machinery refused it. Fix on the admin side: open the template in the
+backend, tick Configurable.</p>
+<p><strong>"Customer says the Add to Quote button does nothing."</strong></p>
+<p>Look at the <code>state.commitMessage</code>. If it surfaces "Authentication
+required", the visitor is anonymous and the <code>/commit</code> endpoint
+returned <code>login_required</code>. The v2 JS navigates to <code>/web/login</code> with a
+<code>return_to</code> query string — make sure your CDN / proxy isn't stripping
+query strings on auth redirects.</p>
+<p><strong>"I see <code>+10%</code> next to the Maple chip even on the Contractor cabinet
+where Maple is supposed to be disabled."</strong></p>
+<p>The chip <em>is</em> disabled (<code>aria-disabled="true"</code>, reduced opacity), but
+the price-extra label renders independently. That's deliberate — it
+shows the customer "if you upgraded series, this is what Maple would
+add". Don't treat it as a bug; treat it as a feature flag for the
+upsell conversation.</p>
+<p><strong>"The bulk-tools bar is showing for a customer."</strong></p>
+<p><code>#sb_cfg_v2_main_mount</code> carries <code>data-internal-user</code> set from
+<code>request.env.user.share</code>. If a customer sees the bar, the
+<code>user.share</code> check is returning <code>False</code> for a portal user — possibly
+the portal user accidentally got internal access. Fix: open the user
+record (Settings → Users) and verify the user is <em>not</em> in any
+internal group (Sales / Inventory / etc.). The check is
+client-side display logic only; the actual <code>/southbrook/api/import/*</code>
+endpoints have a backend <code>auth='user'</code> + internal-user check, so the
+customer can't actually use the tools even if they see them. But
+hiding the bar correctly is still important visual hygiene.</p>
+<p><strong>"I picked Series → Contractor and the Door Style chips show
+Five-Piece Woodgrain as enabled."</strong></p>
+<p>The OCA rule engine isn't producing <code>disabledValueIds</code> correctly.
+Two suspects: (1) <code>rule_completion.xml</code> didn't load — re-run
+<code>-u southbrook_configurator_ux</code>; (2) the <code>/select</code> endpoint failed
+silently and the client kept stale state — look at the network tab,
+filter on <code>/select</code>, check for non-200 responses. The session falls
+through to client-side state if <code>/select</code> 500s; reload the page to
+reset.</p>
+<p><strong>"The 'Replace Photo' overlay accepts an image but it disappears on
+reload."</strong></p>
+<p>Photos are local-only (stored in component state as a data URL).
+Reloading the page wipes them. Don't promise the customer their
+reference photo will persist into the order — explain it's a
+preview-aid only.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The v2 layout swaps the body of the OCA template
+<code>website_product_configurator.product_configurator</code> via a single
+xpath <code>position="replace"</code> on <code>//section[@id='unique_product_configurator']</code>
+in <code>views/configurator_template.xml</code>. The OCA module's <em>route</em> is
+preserved; only the body markup changes.</p>
+<p>The replacement markup ships a minimal shell — root div carrying
+<code>data-product-tmpl-id</code>, four OWL mount points (<code>#sb_cfg_v2_main_mount</code>,
+the progress wrapper, the import overlay, the toast container), plus
+breadcrumbs and a no-JS fallback. Everything else is rendered by
+<code>ConfiguratorV2</code>.</p>
+<p>On mount, the component:</p>
+<ol>
+<li>POSTs <code>/southbrook/api/configurator/state</code> with
+   <code>product_tmpl_id</code>. Receives <code>{ok, product, base_price, groups,
+   attributes, session_id, selected_value_ids}</code> — the full
+   configurator vocabulary baked into the response.</li>
+<li>Hydrates <code>state.attributes</code>, <code>state.groups</code>, <code>state.picked</code> (any
+   server-persisted picks from <code>selected_value_ids</code>).</li>
+<li>Fires one <code>/southbrook/api/configurator/select</code> to populate
+   <code>disabledValueIds</code>, <code>serverPrice</code>, <code>serverWeight</code>, <code>liveSku</code>
+   <em>before</em> the user makes a pick — so initial invalid combinations
+   (e.g. from a restored session) are already disabled.</li>
+</ol>
+<p>Every chip click after that POSTs to <code>/select</code> with the full pick
+set; the server is authoritative; the response reconciles
+<code>state.serverPrice</code>, <code>state.serverWeight</code>, <code>state.disabledValueIds</code>,
+<code>state.liveSku</code>. The component is optimistic — it updates
+<code>state.picked</code> immediately and rolls back if the server response
+disagrees.</p>
+<p>On "Add to Quote", <code>/commit</code> materialises the variant via
+<code>session.create_get_variant()</code>, adds it to the user's draft sale
+order, moves the session to <code>state='done'</code>. Decision A (Phase 2
+cart-target lock): the order goes to the <strong>Order Builder</strong>, not the
+website_sale cart. The response carries <code>redirect_url</code> →
+<code>/my/southbrook/order-builder/&lt;id&gt;</code> so the customer lands in their
+portal estimate, not in checkout.</p>
+<p>The whole bundle is <code>web.assets_frontend</code> only — the OCA stock
+backend wizard is untouched. Authoring an additional Southbrook
+configurator surface (e.g. mobile-first or 3D) means writing another
+asset bundle; you don't change v2 in place.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A customer reports "I clicked Series = Contractor and the
+Five-Piece Woodgrain chip went grey — but the +10% price label is
+still showing next to Maple. Is that a bug?"</p>
+<blockquote>
+<p>No. The price-extra label renders independently of the disabled
+state — it shows "if you could pick Maple, this is what it would
+cost." The Maple chip itself is disabled (greyed, can't click).
+The Five-Piece grey is Rule 1 (Series → Door Style). Both are
+expected behaviour; the +10% label doubles as an upsell hint.</p>
+</blockquote>
+<p><strong>2.</strong> Where on the v2 page would you look to confirm the OCA rule
+engine actually fired Rule 2 (Box Material → Series), as opposed to
+the client-side optimistic guess?</p>
+<blockquote>
+<p>The Network tab. Filter on <code>/southbrook/api/configurator/select</code>.
+Look at the most recent response's <code>disabled_value_ids</code> array — if
+the Maple value_id is in it when Series is Contractor, the rule
+engine fired correctly. If it isn't, the server thinks Maple is
+allowed but the chip is greyed for a different reason (client-side
+stale state, or <code>rule_completion.xml</code> not loaded).</p>
+</blockquote>
+<p><strong>3.</strong> A designer wants to load 35 cabinets into a customer's quote
+from a CSV. What's the v2-specific workflow, and at which step is the
+human-confirm gate?</p>
+<blockquote>
+<p>Open <code>/shop/&lt;any-cabinet&gt;</code> while logged in internally. Click "⬇
+Template Layout" — downloads a starter xlsx with the PRODUCTS sheet
+columns and an example row. Fill the PRODUCTS sheet (35 rows).
+Click "⤒ Import Product" — opens the overlay. Drop the xlsx. The
+/preview endpoint validates and shows you per-row status. Read the
+table — fix errors in the xlsx, re-upload, repeat until clean.
+Click "Commit N valid rows" — the explicit confirm gate. /commit
+writes the records inside a single transaction. The Phase-4 stop-
+point is "never commit without the human clicking Commit."</p>
+</blockquote>
+<p><strong>4.</strong> You're seeing a customer-reported "the chips are all greyed
+out" but you can repro it on /shop yourself. The OCA backend wizard
+on the same template works fine. Where do you look first?</p>
+<blockquote>
+<p>The /select endpoint response. If it's returning every value_id in
+<code>disabled_value_ids</code>, the rule engine is treating the product as
+over-constrained (probably a malformed <code>product.config.line</code>
+record). If it's returning an empty <code>disabled_value_ids</code> but the
+chips still grey out, the client-side <code>isValueDisabled</code> is hitting
+a stale state — reload the page to reset
+<code>state.disabledValueIds</code>. The OCA backend wizard reads the same
+rule engine, so the fact it works there narrows it to the
+v2-specific JS code path or the /state hydration.</p>
+</blockquote>
+<p><strong>5.</strong> Your admin wants to roll back v2 because a customer complained
+about the price label format. What's the rollback procedure and what
+breaks?</p>
+<blockquote>
+<p>Uninstall the addon: <code>odoo -d &lt;db&gt; --uninstall southbrook_configurator_ux
+--stop-after-init --no-http</code>. The /shop/<slug> page returns to the
+OCA stock layout immediately — same data, same rules, same
+sessions, just the OCA-shipped one-page form. Nothing else breaks:
+no schema changes, no data migration, no impact on Order Builder
+or the backend wizard. The bulk-tools endpoints
+(<code>/southbrook/api/import/*</code>) stop responding — anything currently
+using them errors out. Re-install to restore. This is the right
+rollback path <em>only</em> when v2 is broken; for the price-label
+complaint, fix the SCSS or the JS instead.</p>
+</blockquote>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The OCA configurator vocabulary itself — lesson 5.1.</li>
+<li>How to build the actual quote — lesson 5.2.</li>
+<li>Hardware catalog and per-carcass resolution — lesson 5.3.</li>
+<li>The customer-facing portal (My Estimates page, portal account
+  setup) — Course 6 (Customer Touchpoints).</li>
+<li>The 3D Kitchen Preview tab in the backend Order Builder — Phase 3
+  surface, separate workstream.</li>
+<li>The Phase-3 OWL refactor that moves the disable rules from the
+  OCA rule-engine reads into a data-driven JSON endpoint — not yet
+  shipped.</li>
+<li>General Odoo Website / e-commerce administration — Odoo's own
+  native eLearning track.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

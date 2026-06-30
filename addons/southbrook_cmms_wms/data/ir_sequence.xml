@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sequences:
+
+    southbrook.cmms.mtbf      MTBF/<YYYY-MM-DD>/<seq>
+    southbrook.cmms.breakdown BRK/<YYYY>/<seq>    (yearly subsequence)
+
+  No `numbercall` / `doall` here — those fields were removed from ir.cron
+  in v19 (the rule applies to ir.cron; ir.sequence didn't carry them, but
+  noted for consistency).
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="seq_southbrook_cmms_mtbf" model="ir.sequence">
+            <field name="name">CMMS MTBF/MTTR Report</field>
+            <field name="code">southbrook.cmms.mtbf</field>
+            <field name="prefix">MTBF/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_southbrook_cmms_breakdown" model="ir.sequence">
+            <field name="name">CMMS Breakdown Alert</field>
+            <field name="code">southbrook.cmms.breakdown</field>
+            <field name="prefix">BRK/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="company_id" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

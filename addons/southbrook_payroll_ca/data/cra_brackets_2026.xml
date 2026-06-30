@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CRA 2026 federal + Ontario tax brackets, exposed for transparency.
+  The bracket values are owned by models/cra_calc.py — this XML is the
+  read-only view of those values in the Odoo UI.
+
+  Source: CRA T4127 Payroll Deductions Formulas (January 2026 edition).
+
+  threshold = 0 marks the open-ended top bracket.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <!-- ===== Federal 2026 ===== -->
+        <record id="bracket_federal_2026_1" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">federal</field>
+            <field name="year">2026</field>
+            <field name="threshold">57375.00</field>
+            <field name="rate">0.15</field>
+            <field name="cumulative">0.0</field>
+        </record>
+        <record id="bracket_federal_2026_2" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">federal</field>
+            <field name="year">2026</field>
+            <field name="threshold">114750.00</field>
+            <field name="rate">0.205</field>
+            <field name="cumulative">8606.25</field>
+        </record>
+        <record id="bracket_federal_2026_3" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">federal</field>
+            <field name="year">2026</field>
+            <field name="threshold">177882.00</field>
+            <field name="rate">0.26</field>
+            <field name="cumulative">20368.125</field>
+        </record>
+        <record id="bracket_federal_2026_4" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">federal</field>
+            <field name="year">2026</field>
+            <field name="threshold">253414.00</field>
+            <field name="rate">0.29</field>
+            <field name="cumulative">36782.445</field>
+        </record>
+        <record id="bracket_federal_2026_5" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">federal</field>
+            <field name="year">2026</field>
+            <field name="threshold">0.0</field>
+            <field name="rate">0.33</field>
+            <field name="cumulative">58686.775</field>
+        </record>
+
+        <!-- ===== Ontario 2026 ===== -->
+        <record id="bracket_ontario_2026_1" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">ontario</field>
+            <field name="year">2026</field>
+            <field name="threshold">52886.00</field>
+            <field name="rate">0.0505</field>
+            <field name="cumulative">0.0</field>
+        </record>
+        <record id="bracket_ontario_2026_2" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">ontario</field>
+            <field name="year">2026</field>
+            <field name="threshold">105775.00</field>
+            <field name="rate">0.0915</field>
+            <field name="cumulative">2670.743</field>
+        </record>
+        <record id="bracket_ontario_2026_3" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">ontario</field>
+            <field name="year">2026</field>
+            <field name="threshold">150000.00</field>
+            <field name="rate">0.1116</field>
+            <field name="cumulative">7510.0865</field>
+        </record>
+        <record id="bracket_ontario_2026_4" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">ontario</field>
+            <field name="year">2026</field>
+            <field name="threshold">220000.00</field>
+            <field name="rate">0.1216</field>
+            <field name="cumulative">12445.4765</field>
+        </record>
+        <record id="bracket_ontario_2026_5" model="southbrook.payroll.tax_bracket">
+            <field name="jurisdiction">ontario</field>
+            <field name="year">2026</field>
+            <field name="threshold">0.0</field>
+            <field name="rate">0.1316</field>
+            <field name="cumulative">20957.4765</field>
+        </record>
+    </data>
+</odoo>

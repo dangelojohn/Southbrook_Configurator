@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="dim_carcass_squareness_mm" model="southbrook.quality.dimension">
+            <field name="key">carcass_squareness_mm</field>
+            <field name="name">Carcass Squareness (mm)</field>
+            <field name="nominal">0.0</field>
+            <field name="usl">1.5</field>
+            <field name="lsl">-1.5</field>
+        </record>
+        <record id="dim_door_gap_mm" model="southbrook.quality.dimension">
+            <field name="key">door_gap_mm</field>
+            <field name="name">Door Gap (mm)</field>
+            <field name="nominal">3.0</field>
+            <field name="usl">3.5</field>
+            <field name="lsl">2.5</field>
+        </record>
+        <record id="dim_mdf_moisture_pct" model="southbrook.quality.dimension">
+            <field name="key">mdf_moisture_pct</field>
+            <field name="name">MDF Moisture (%)</field>
+            <field name="nominal">8.0</field>
+            <field name="usl">10.0</field>
+            <field name="lsl">6.0</field>
+        </record>
+        <record id="dim_finish_thickness_um" model="southbrook.quality.dimension">
+            <field name="key">finish_thickness_um</field>
+            <field name="name">Finish Thickness (um)</field>
+            <field name="nominal">80.0</field>
+            <field name="usl">100.0</field>
+            <field name="lsl">60.0</field>
+        </record>
+        <record id="dim_drawer_slide_alignment_mm" model="southbrook.quality.dimension">
+            <field name="key">drawer_slide_alignment_mm</field>
+            <field name="name">Drawer Slide Alignment (mm)</field>
+            <field name="nominal">0.0</field>
+            <field name="usl">1.0</field>
+            <field name="lsl">-1.0</field>
+        </record>
+        <record id="dim_hinge_overlay_mm" model="southbrook.quality.dimension">
+            <field name="key">hinge_overlay_mm</field>
+            <field name="name">Hinge Overlay (mm)</field>
+            <field name="nominal">0.0</field>
+            <field name="usl">0.8</field>
+            <field name="lsl">-0.8</field>
+        </record>
+    </data>
+</odoo>

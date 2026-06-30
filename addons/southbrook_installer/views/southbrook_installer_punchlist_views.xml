@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <!-- ================================================================
+         TEMPLATE views (admin config)
+         ================================================================ -->
+    <record id="view_installer_punchlist_template_list" model="ir.ui.view">
+        <field name="name">southbrook.installer.punchlist.template.list</field>
+        <field name="model">southbrook.installer.punchlist.template</field>
+        <field name="arch" type="xml">
+            <list string="Punchlist Templates" editable="bottom">
+                <field name="section"/>
+                <field name="sequence" widget="handle"/>
+                <field name="description"/>
+                <field name="require_photo_on_fail" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_installer_punchlist_template" model="ir.actions.act_window">
+        <field name="name">Punchlist Templates</field>
+        <field name="res_model">southbrook.installer.punchlist.template</field>
+        <field name="view_mode">list</field>
+        <field name="context">{"search_default_active": 1}</field>
+    </record>
+
+    <!-- ================================================================
+         PUNCHLIST views
+         ================================================================ -->
+    <record id="view_installer_punchlist_list" model="ir.ui.view">
+        <field name="name">southbrook.installer.punchlist.list</field>
+        <field name="model">southbrook.installer.punchlist</field>
+        <field name="arch" type="xml">
+            <list string="Punchlists"
+                  decoration-info="state == 'in_progress'"
+                  decoration-success="state == 'complete' and overall_result in ('pass','pass_with_minor')"
+                  decoration-danger="overall_result == 'fail'">
+                <field name="name"/>
+                <field name="job_id"/>
+                <field name="state" widget="badge"/>
+                <field name="overall_result" widget="badge" optional="show"/>
+                <field name="pass_count" optional="show"/>
+                <field name="minor_count" optional="show"/>
+                <field name="fail_count" optional="show"/>
+                <field name="pending_count" optional="show"/>
+                <field name="signed_by_name" optional="show"/>
+                <field name="signed_at" optional="show"/>
+                <field name="invoice_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_installer_punchlist_form" model="ir.ui.view">
+        <field name="name">southbrook.installer.punchlist.form</field>
+        <field name="model">southbrook.installer.punchlist</field>
+        <field name="arch" type="xml">
+            <form string="Punchlist">
+                <header>
+                    <button name="action_open" type="object"
+                            string="▶ Open Punchlist" class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_submit_signoff" type="object"
+                            string="✍ Submit Sign-Off" class="oe_highlight"
+                            invisible="state != 'in_progress'"/>
+                    <button name="action_print_punchlist_report" type="object"
+                            string="📄 Print Job Summary"
+                            invisible="state == 'draft'"/>
+                    <button name="action_cancel" type="object"
+                            string="Cancel"
+                            invisible="state in ('complete','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,in_progress,complete"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_invoice" type="object"
+                                class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not invoice_id">
+                            <field name="invoice_id" widget="statinfo"
+                                   string="Draft Invoice"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Complete"
+                            bg_color="bg-success"
+                            invisible="state != 'complete' or overall_result == 'fail'"/>
+                    <widget name="web_ribbon" title="Failed"
+                            bg_color="bg-danger"
+                            invisible="overall_result != 'fail'"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="job_id" readonly="state != 'draft'"/>
+                            <field name="overall_result" readonly="1"
+                                   widget="badge"/>
+                        </group>
+                        <group>
+                            <field name="pass_count" readonly="1"/>
+                            <field name="minor_count" readonly="1"/>
+                            <field name="fail_count" readonly="1"/>
+                            <field name="pending_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Inspection Items" name="items">
+                            <field name="item_ids">
+                                <list editable="bottom"
+                                      decoration-success="result == 'pass'"
+                                      decoration-warning="result == 'minor'"
+                                      decoration-danger="result == 'fail'">
+                                    <field name="section"/>
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="description"/>
+                                    <field name="result" widget="badge"/>
+                                    <field name="notes"/>
+                                    <field name="photo_count"/>
+                                    <field name="photo_ids"
+                                           widget="many2many_binary"
+                                           optional="hide"/>
+                                    <field name="product_id"
+                                           optional="hide"/>
+                                    <field name="deficiency_flag_id"
+                                           optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Sign-Off" name="signoff">
+                            <group>
+                                <group>
+                                    <field name="signed_by_name"
+                                           required="state == 'in_progress'"/>
+                                    <field name="signed_by_role"/>
+                                    <field name="signed_at" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="completed_date" readonly="1"/>
+                                </group>
+                            </group>
+                            <separator string="Builder Signature"/>
+                            <field name="signature_data" widget="image"
+                                   nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_installer_punchlist" model="ir.actions.act_window">
+        <field name="name">Punchlists</field>
+        <field name="res_model">southbrook.installer.punchlist</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

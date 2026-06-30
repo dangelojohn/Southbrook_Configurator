@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Phase 2.2 — surface the tool-consumption ledger on the work-order
+        form and give shop-floor supervisors a one-click path to record a
+        cut-spec deviation (handled by the southbrook.cut.spec.override
+        model from B8).
+    -->
+    <record id="view_mrp_workorder_form_inherit_sbk_orch" model="ir.ui.view">
+        <field name="name">mrp.workorder.form.inherit.sbk.orchestration</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_production_workorder_form_view_inherit"/>
+        <field name="arch" type="xml">
+
+            <!-- Header button — record a cut-spec deviation against the WO.
+                 Visible only while the WO is in confirmed / progress; once
+                 closed the override would just be noise. -->
+            <header position="inside">
+                <button name="action_open_cut_spec_override_for_wo"
+                        type="object"
+                        string="Record Cut-Spec Deviation"
+                        class="btn-secondary"
+                        invisible="state not in ('ready', 'progress', 'pending')"
+                        context="{'default_workorder_id': id}"/>
+            </header>
+
+            <!-- Tool Consumption notebook page. The latch field is dropped
+                 in as an invisible field so the form picks up changes
+                 written by button_finish without needing a reload. -->
+            <xpath expr="//sheet" position="inside">
+                <field name="sbk_lifecycle_processed" invisible="1"/>
+                <notebook>
+                    <page string="Tool Consumption"
+                          name="sbk_tool_consumption">
+                        <field name="sbk_consumption_ids"
+                               nolabel="1"
+                               readonly="1">
+                            <list string="Tool Consumption" create="0" delete="0">
+                                <field name="create_date"/>
+                                <field name="asset_id"/>
+                                <field name="quantity"/>
+                                <field name="unit_cost"/>
+                                <field name="total_cost" sum="Total"/>
+                                <field name="employee_id"/>
+                            </list>
+                        </field>
+                        <group class="oe_subtotal_footer">
+                            <field name="sbk_consumption_total_cost"
+                                   string="Total Tool Cost"
+                                   readonly="1"/>
+                        </group>
+                    </page>
+                </notebook>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

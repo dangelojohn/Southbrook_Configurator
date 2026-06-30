@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_southbrook_quality_root"
+              name="Quality"
+              parent="mrp.menu_mrp_root"
+              sequence="80"
+              groups="southbrook_quality.group_southbrook_quality_user"/>
+
+    <menuitem id="menu_southbrook_quality_ncr"
+              name="NCRs"
+              parent="menu_southbrook_quality_root"
+              action="action_southbrook_ncr"
+              sequence="10"/>
+
+    <menuitem id="menu_southbrook_quality_spc"
+              name="SPC Samples"
+              parent="menu_southbrook_quality_root"
+              action="action_southbrook_spc_sample"
+              sequence="20"/>
+
+    <menuitem id="menu_southbrook_quality_cpk"
+              name="Cpk Report"
+              parent="menu_southbrook_quality_root"
+              action="action_southbrook_cpk_report"
+              sequence="30"/>
+
+    <menuitem id="menu_southbrook_quality_dimensions"
+              name="Dimensions"
+              parent="menu_southbrook_quality_root"
+              action="action_southbrook_quality_dimension"
+              sequence="40"
+              groups="southbrook_quality.group_southbrook_quality_manager"/>
+
+    <menuitem id="menu_southbrook_quality_supplier_defects"
+              name="Supplier Defects"
+              parent="menu_southbrook_quality_root"
+              action="action_southbrook_supplier_defect"
+              sequence="50"/>
+
+    <menuitem id="menu_southbrook_quality_mi_tiles"
+              name="MI Tiles"
+              parent="menu_southbrook_quality_root"
+              action="action_southbrook_quality_mi_tiles"
+              sequence="60"/>
+</odoo>

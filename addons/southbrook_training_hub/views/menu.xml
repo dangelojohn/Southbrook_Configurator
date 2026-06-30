@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_training_root"
+              name="Training Hub"
+              sequence="85"
+              groups="southbrook_training_hub.group_training_user"/>
+
+    <menuitem id="menu_training_catalogue"
+              name="Catalogue"
+              parent="menu_training_root"
+              action="action_training_item"
+              sequence="10"/>
+
+    <menuitem id="menu_training_tags"
+              name="Tags"
+              parent="menu_training_root"
+              action="action_training_tag"
+              sequence="20"
+              groups="southbrook_training_hub.group_training_curator"/>
+
+    <menuitem id="menu_training_menu_links"
+              name="Menu Pins"
+              parent="menu_training_root"
+              action="action_training_menu_link"
+              sequence="30"
+              groups="southbrook_training_hub.group_training_curator"/>
+
+</odoo>

@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_25_integrations_architecture" model="slide.slide">
+            <field name="name">Integrations Module — Architecture</field>
+            <field name="channel_id" ref="course_integrations_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer learning the southbrook_integrations layout.</field>
+            <field name="html_content"><![CDATA[<h1 id="integrations-module-architecture">Integrations Module — Architecture</h1>
+<h2 id="the-module-at-a-glance">The module at a glance</h2>
+<ul>
+<li>Path: <code>addons/southbrook_integrations/</code></li>
+<li>Version: 19.0.1.0.0</li>
+<li>Depends on: <code>base</code>, <code>mail</code>, <code>mrp</code>, <code>stock</code>, <code>purchase</code>,
+  <code>account</code>, <code>southbrook_manufacturing_intelligence</code></li>
+</ul>
+<h2 id="source-layout">Source layout</h2>
+<pre><code>addons/southbrook_integrations/
+├── models/
+│   ├── homag_session.py          — Homag iX simulator session
+│   ├── homag_msg.py              — messages exchanged
+│   ├── asn_inbound.py            — 3PL inbound ASN
+│   ├── asn_outbound.py           — outbound ASN
+│   ├── mcp_tool.py               — MCP server tool registry
+│   ├── mcp_call_log.py           — MCP call audit
+│   ├── label_printer.py          — physical printer config
+│   └── label_log.py              — print history
+├── controllers/
+│   ├── mcp_api.py                — MCP HTTP endpoints
+│   ├── asn_api.py                — ASN webhook receivers
+│   └── label_api.py              — label print API
+├── views/
+└── data/
+</code></pre>
+<h2 id="the-4-integration-domains">The 4 integration domains</h2>
+<h3 id="1-homag-ix-manufacturing-equipment">1. Homag iX (manufacturing equipment)</h3>
+<p>Simulator + planned-live integration with Homag's iX platform for
+edge bander + CNC programs. Sends cabinet specs; receives nest /
+program files.</p>
+<p>Models: <code>homag_session</code>, <code>homag_msg</code>.</p>
+<h3 id="2-3pl-asn-logistics">2. 3PL ASN (logistics)</h3>
+<p>Advance Shipment Notice — inbound (3PL → Southbrook) for
+inventory receipts, outbound (Southbrook → 3PL) for shipments.</p>
+<p>Models: <code>asn_inbound</code>, <code>asn_outbound</code>.</p>
+<h3 id="3-mcp-server-ai-tooling">3. MCP server (AI tooling)</h3>
+<p>Model Context Protocol tool registry — read-only data access for
+self-hosted Qwen LLM (future). Distinct from Hermes' tool
+registry (different security model, different consumers).</p>
+<p>Models: <code>mcp_tool</code>, <code>mcp_call_log</code>.</p>
+<h3 id="4-label-printers-physical-output">4. Label printers (physical output)</h3>
+<p>Zebra ZPL + DataMax/Honeywell support for shipping labels +
+shop-floor traveller tags.</p>
+<p>Models: <code>label_printer</code>, <code>label_log</code>.</p>
+<h2 id="why-one-module-instead-of-four">Why one module instead of four</h2>
+<p>Each integration is small enough that a separate addon would be
+ceremony overhead. They share:
+- Common error logging pattern
+- MI engine integration for status surfacing
+- A consistent "session / message / log" record pattern</p>
+<p>The cost of separation &gt; value at v1. Split later if any of them
+grows substantially.</p>
+<h2 id="install">Install</h2>
+<pre><code class="language-bash">./scripts/deploy_to_qnap.sh southbrook_integrations
+</code></pre>
+<p>What -i does:
+1. Creates 8 tables
+2. Adds the 7 menus under Integrations
+3. Registers 2 crons (Homag heartbeat, label log cleanup)</p>
+<h2 id="cron-landscape">Cron landscape</h2>
+<table>
+<thead>
+<tr>
+<th>Cron</th>
+<th>Schedule</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cron_homag_heartbeat</code></td>
+<td>every 5 min</td>
+<td>Pings the Homag iX server to detect outages</td>
+</tr>
+<tr>
+<td><code>cron_label_log_cleanup</code></td>
+<td>02:00 daily</td>
+<td>Archives label logs older than 90 days</td>
+</tr>
+</tbody>
+</table>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"MCP endpoint 404"</strong> — module installed but new routes need
+  SIGHUP. <code>docker exec southbrook-odoo kill -HUP 1</code>.</li>
+<li><strong>"Homag session log empty"</strong> — Homag simulator not configured.
+  Set <code>southbrook_integrations.homag.endpoint</code> system parameter.</li>
+<li><strong>"Label printer offline"</strong> — physical printer issue;
+  monitoring tile shows status from heartbeat.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Why combine Homag + ASN + MCP + Label printers?</p>
+<blockquote>
+<p>Each is small at v1; sharing logging + MI patterns. Split later
+if growth warrants.</p>
+</blockquote>
+<p><strong>Q2.</strong> What native module dependencies?</p>
+<blockquote>
+<p><code>mrp</code> (for production-related ASN), <code>stock</code> (for warehouse),
+<code>purchase</code> (for ASN inbound), <code>account</code> (for ASN journal).</p>
+</blockquote>
+<p><strong>Q3.</strong> Homag heartbeat cron — what does it do?</p>
+<blockquote>
+<p>Pings the Homag iX server every 5 minutes; logs status to
+<code>homag_session</code> records. Alerts if 3 consecutive pings fail.</p>
+</blockquote>
+<p><strong>Q4.</strong> MCP vs Hermes tool registry — what's different?</p>
+<blockquote>
+<p>Hermes is persona-bound (JWT-claim-driven), serves trade
+partners on edge. MCP is model-bound (one row per <code>model_id</code>),
+read-only, serves self-hosted Qwen LLM with X-Api-Key auth.</p>
+</blockquote>
+<p><strong>Q5.</strong> Label log cleanup cron — preserves what?</p>
+<blockquote>
+<p>Last 90 days. Older entries archived to <code>ir.attachment</code> CSV
+bundle if needed for compliance.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_25_integrations_homag" model="slide.slide">
+            <field name="name">Integrations Module — Homag iX Simulator</field>
+            <field name="channel_id" ref="course_integrations_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Developer working with the Homag iX integration.</field>
+            <field name="html_content"><![CDATA[<h1 id="integrations-module-homag-ix-simulator">Integrations Module — Homag iX Simulator</h1>
+<h2 id="what-this-integrates">What this integrates</h2>
+<p>Homag iX is the cloud platform that controls modern Homag CNC
+routers + edge banders (and other Homag equipment). v1 ships a
+SIMULATOR — production iX integration is v1.x.</p>
+<p>The simulator implements:
+- Session establishment (auth + handshake)
+- Message exchange (nest request → nest file response)
+- Status reporting</p>
+<h2 id="models">Models</h2>
+<pre><code class="language-python">class SouthbrookIntegrationsHomagSession(models.Model):
+    _name = &quot;southbrook.integrations.homag_session&quot;
+    _description = &quot;Homag iX Session&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name           = fields.Char(default=lambda s: s._make_seq())
+machine_id     = fields.Char()  # iX machine identifier
+state          = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;active&quot;, &quot;Active&quot;),
+    (&quot;ended&quot;, &quot;Ended&quot;),
+    (&quot;errored&quot;, &quot;Errored&quot;),
+], default=&quot;draft&quot;)
+opened_at      = fields.Datetime()
+ended_at       = fields.Datetime()
+message_count  = fields.Integer(compute=&quot;_compute_msg_count&quot;)
+msg_ids        = fields.One2many(&quot;southbrook.integrations.homag_msg&quot;,
+                                 &quot;session_id&quot;)
+</code></pre>
+<h2 id="message-model">Message model</h2>
+<pre><code class="language-python">class SouthbrookIntegrationsHomagMsg(models.Model):
+    _name = &quot;southbrook.integrations.homag_msg&quot;
+    _order = &quot;sent_at&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">session_id   = fields.Many2one(&quot;...homag_session&quot;, required=True)
+direction    = fields.Selection([(&quot;in&quot;, &quot;Inbound&quot;), (&quot;out&quot;, &quot;Outbound&quot;)])
+msg_type     = fields.Char()  # &quot;nest_request&quot;, &quot;nest_response&quot;, etc.
+payload_json = fields.Text()
+sent_at      = fields.Datetime(default=fields.Datetime.now)
+status       = fields.Selection([
+    (&quot;ok&quot;, &quot;OK&quot;),
+    (&quot;error&quot;, &quot;Error&quot;),
+])
+</code></pre>
+<h2 id="simulator-flow">Simulator flow</h2>
+<pre><code class="language-python">def request_nest(self, cabinet_specs):
+    &quot;&quot;&quot;Simulate a nest request → wait for nest file response.&quot;&quot;&quot;
+    session = self._ensure_active_session()
+
+    # Outbound: nest request
+    out = self.env[&quot;southbrook.integrations.homag_msg&quot;].create({
+        &quot;session_id&quot;: session.id,
+        &quot;direction&quot;: &quot;out&quot;,
+        &quot;msg_type&quot;: &quot;nest_request&quot;,
+        &quot;payload_json&quot;: json.dumps(cabinet_specs),
+        &quot;status&quot;: &quot;ok&quot;,
+    })
+
+    # Simulate processing (in real iX: webhook back)
+    nest_file = self._fake_nest_response(cabinet_specs)
+
+    # Inbound: nest response
+    inn = self.env[&quot;southbrook.integrations.homag_msg&quot;].create({
+        &quot;session_id&quot;: session.id,
+        &quot;direction&quot;: &quot;in&quot;,
+        &quot;msg_type&quot;: &quot;nest_response&quot;,
+        &quot;payload_json&quot;: json.dumps({&quot;nest_file&quot;: nest_file}),
+        &quot;status&quot;: &quot;ok&quot;,
+    })
+
+    return nest_file
+</code></pre>
+<h2 id="real-ix-integration-plan-when-ready">Real iX integration plan (when ready)</h2>
+<p>The simulator's interface (<code>request_nest()</code> etc.) is preserved
+when swapping for the real client:</p>
+<pre><code class="language-python">def request_nest(self, cabinet_specs):
+    response = requests.post(
+        self.env.company.homag_ix_endpoint + &quot;/nest&quot;,
+        json=cabinet_specs,
+        headers={&quot;Authorization&quot;: f&quot;Bearer {self.api_key}&quot;},
+    )
+    response.raise_for_status()
+    return response.json()[&quot;nest_file&quot;]
+</code></pre>
+<p>The model + session pattern survive; only the simulation logic is
+replaced.</p>
+<h2 id="heartbeat-cron">Heartbeat cron</h2>
+<pre><code class="language-python">@api.model
+def _cron_homag_heartbeat(self):
+    endpoint = self.env.company.homag_ix_endpoint
+    if not endpoint:
+        return  # Not configured
+
+    try:
+        response = requests.get(endpoint + &quot;/health&quot;, timeout=10)
+        if response.status_code == 200:
+            self._log_heartbeat(&quot;ok&quot;)
+        else:
+            self._log_heartbeat(&quot;error&quot;)
+    except Exception as e:
+        self._log_heartbeat(&quot;error&quot;, message=str(e))
+</code></pre>
+<p>Three consecutive errors fire a recommendation to the Plant GM.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Sessions accumulate without ending"</strong> — <code>_ensure_active_session()</code>
+  may be creating new sessions per call. Verify it reuses an
+  active one if available.</li>
+<li><strong>"Nest response too large for payload_json"</strong> — Text field is
+  unlimited but UI may truncate at display. Add a separate
+  attachment field for binaries.</li>
+<li><strong>"Real iX integration fails after simulator works"</strong> —
+  authentication scheme differs. Real iX uses OAuth2; simulator
+  was bearer token. Update the auth flow.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Session model state transitions?</p>
+<blockquote>
+<p>draft → active → ended (or errored).</p>
+</blockquote>
+<p><strong>Q2.</strong> Simulator's <code>request_nest()</code> — what's faked?</p>
+<blockquote>
+<p>The nest computation. Real iX runs nesting algorithm; simulator
+returns a static pre-computed nest based on the spec.</p>
+</blockquote>
+<p><strong>Q3.</strong> Heartbeat fires recommendation after how many failures?</p>
+<blockquote>
+<p>Three consecutive. Configurable.</p>
+</blockquote>
+<p><strong>Q4.</strong> Swap simulator for real iX — what changes?</p>
+<blockquote>
+<p><code>request_nest()</code> body (HTTP call instead of fake), and config:
+set <code>homag_ix_endpoint</code> + auth credentials.</p>
+</blockquote>
+<p><strong>Q5.</strong> Message direction <code>in</code> vs <code>out</code> — from whose perspective?</p>
+<blockquote>
+<p>Southbrook's. <code>out</code> = sent to Homag; <code>in</code> = received from Homag.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_25_integrations_asn" model="slide.slide">
+            <field name="name">Integrations Module — 3PL ASN (Inbound and Outbound)</field>
+            <field name="channel_id" ref="course_integrations_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Developer working on 3PL Advance Shipment Notice flows.</field>
+            <field name="html_content"><![CDATA[<h1 id="integrations-module-3pl-asn-inbound-and-outbound">Integrations Module — 3PL ASN (Inbound and Outbound)</h1>
+<h2 id="what-asn-means">What ASN means</h2>
+<p>Advance Shipment Notice — the digital pre-arrival message a 3PL
+sends about incoming inventory, OR a shipment dispatching out.
+Driven by EDI in big retail; HTTP/JSON for newer 3PLs.</p>
+<h2 id="the-two-flows">The two flows</h2>
+<h3 id="inbound-asn-3pl-southbrook">Inbound ASN (3PL → Southbrook)</h3>
+<p>3PL receiver / handler sends notification "we received X SKUs;
+they'll arrive at your dock at Y date." Southbrook receives,
+creates stock.picking, plans put-away.</p>
+<h3 id="outbound-asn-southbrook-3pl">Outbound ASN (Southbrook → 3PL)</h3>
+<p>Southbrook ships finished goods to 3PL warehouse. Notifies them
+"X SKUs leaving by Y date; expected arrival Z." 3PL prepares
+receiving.</p>
+<h2 id="models">Models</h2>
+<pre><code class="language-python">class SouthbrookIntegrationsAsnInbound(models.Model):
+    _name = &quot;southbrook.integrations.asn_inbound&quot;
+    _description = &quot;Inbound ASN from 3PL&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<pre><code class="language-python">class SouthbrookIntegrationsAsnOutbound(models.Model):
+    _name = &quot;southbrook.integrations.asn_outbound&quot;
+    _description = &quot;Outbound ASN to 3PL&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Both share fields:</p>
+<pre><code class="language-python">asn_number       = fields.Char(required=True, index=True)
+partner_id       = fields.Many2one(&quot;res.partner&quot;)  # 3PL
+expected_date    = fields.Datetime()
+actual_date      = fields.Datetime()
+state            = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;pending&quot;, &quot;Pending&quot;),
+    (&quot;received&quot;, &quot;Received&quot;),  # or &quot;shipped&quot; for outbound
+    (&quot;error&quot;, &quot;Error&quot;),
+])
+line_ids         = fields.One2many(&quot;...asn_line&quot;, &quot;asn_id&quot;)
+linked_picking_id = fields.Many2one(&quot;stock.picking&quot;)
+</code></pre>
+<h2 id="inbound-webhook-receiver">Inbound webhook receiver</h2>
+<pre><code class="language-python">class SouthbrookIntegrationsAsnApi(http.Controller):
+
+    @http.route(&quot;/asn/inbound&quot;, type=&quot;json&quot;, auth=&quot;api_key&quot;,
+                methods=[&quot;POST&quot;], csrf=False)
+    def receive_inbound_asn(self, **payload):
+        &quot;&quot;&quot;Receive ASN from 3PL system.&quot;&quot;&quot;
+        # Validate API key (via auth='api_key' decorator)
+        asn = request.env[&quot;southbrook.integrations.asn_inbound&quot;]\
+            .sudo().create({
+                &quot;asn_number&quot;: payload[&quot;asn_number&quot;],
+                &quot;partner_id&quot;: self._resolve_partner(payload[&quot;sender_id&quot;]),
+                &quot;expected_date&quot;: payload[&quot;expected_date&quot;],
+                &quot;state&quot;: &quot;pending&quot;,
+            })
+
+        # Create lines
+        for line in payload.get(&quot;lines&quot;, []):
+            asn.env[&quot;southbrook.integrations.asn_inbound.line&quot;].create({
+                &quot;asn_id&quot;: asn.id,
+                &quot;product_id&quot;: self._resolve_product(line[&quot;sku&quot;]),
+                &quot;qty_expected&quot;: line[&quot;qty&quot;],
+            })
+
+        return {&quot;status&quot;: &quot;received&quot;, &quot;asn_id&quot;: asn.id}
+</code></pre>
+<h2 id="outbound-asn-send">Outbound ASN send</h2>
+<pre><code class="language-python">def action_send_outbound_asn(self):
+    self.ensure_one()
+    payload = {
+        &quot;asn_number&quot;: self.asn_number,
+        &quot;sender_id&quot;: self.env.company.partner_id.ref,
+        &quot;expected_date&quot;: self.expected_date.isoformat(),
+        &quot;lines&quot;: [
+            {&quot;sku&quot;: l.product_id.default_code, &quot;qty&quot;: l.qty}
+            for l in self.line_ids
+        ],
+    }
+    response = requests.post(
+        self.partner_id.asn_endpoint,
+        json=payload,
+        headers={&quot;Authorization&quot;: f&quot;Bearer {self.partner_id.asn_api_key}&quot;},
+    )
+    if response.status_code == 200:
+        self.state = &quot;shipped&quot;
+    else:
+        self.state = &quot;error&quot;
+        self.message_post(body=f&quot;3PL rejected: {response.text}&quot;)
+</code></pre>
+<h2 id="stock-picking-link">Stock picking link</h2>
+<p>When inbound ASN reaches state <code>received</code>:</p>
+<pre><code class="language-python">def action_confirm_received(self):
+    self.ensure_one()
+    picking = self.env[&quot;stock.picking&quot;].create({
+        &quot;picking_type_id&quot;: self.env.ref(
+            &quot;stock.picking_type_in&quot;).id,
+        &quot;partner_id&quot;: self.partner_id.id,
+        &quot;origin&quot;: f&quot;ASN/{self.asn_number}&quot;,
+    })
+    for line in self.line_ids:
+        self.env[&quot;stock.move&quot;].create({
+            &quot;picking_id&quot;: picking.id,
+            &quot;product_id&quot;: line.product_id.id,
+            &quot;product_uom_qty&quot;: line.qty_actual,
+            # ... 
+        })
+    self.linked_picking_id = picking.id
+    self.state = &quot;received&quot;
+</code></pre>
+<h2 id="edi-gateway-deferred">EDI gateway (deferred)</h2>
+<p>The webhook above handles JSON. EDI (EDIFACT, X12) needs a
+gateway service that translates EDI ↔ JSON. Listed as v1.x
+candidate; current 3PLs all support JSON.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Webhook fires but no ASN created"</strong> — auth failed or
+  payload validation rejected. Check <code>mail_log</code> for the request +
+  controller error.</li>
+<li><strong>"Stock picking didn't link"</strong> — <code>action_confirm_received</code> not
+  called. Manual button OR auto-trigger via state machine.</li>
+<li><strong>"ASN line product unrecognized"</strong> — SKU mapping table empty
+  for that 3PL. Maintain in <code>res.partner.sku_mapping_ids</code> m2m
+  field.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Inbound vs outbound — direction of stock movement?</p>
+<blockquote>
+<p>Inbound = 3PL → Southbrook. Outbound = Southbrook → 3PL.</p>
+</blockquote>
+<p><strong>Q2.</strong> What auth method on the webhook?</p>
+<blockquote>
+<p><code>auth='api_key'</code>. Per-partner API key configured on <code>res.partner</code>.</p>
+</blockquote>
+<p><strong>Q3.</strong> Receiving ASN — what happens automatically?</p>
+<blockquote>
+<p>ASN record created. Stock picking IS NOT auto-created until
+<code>action_confirm_received</code> is called. Allows admin review before
+committing the receipt.</p>
+</blockquote>
+<p><strong>Q4.</strong> EDI support — present?</p>
+<blockquote>
+<p>Not at v1. JSON only. v1.x candidate for EDI gateway.</p>
+</blockquote>
+<p><strong>Q5.</strong> Outbound ASN endpoint config — where?</p>
+<blockquote>
+<p><code>res.partner.asn_endpoint</code> field. Per-3PL configuration.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_25_integrations_mcp_registry" model="slide.slide">
+            <field name="name">Integrations Module — MCP Tool Registry</field>
+            <field name="channel_id" ref="course_integrations_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Developer extending the MCP server-side tool registry.</field>
+            <field name="html_content"><![CDATA[<h1 id="integrations-module-mcp-tool-registry">Integrations Module — MCP Tool Registry</h1>
+<h2 id="the-two-registries">The two registries</h2>
+<p>Southbrook ships TWO tool registries with similar names but
+different purposes:</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Hermes registry</th>
+<th>MCP registry</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Where</td>
+<td><code>southbrook_hermes.tools.decorator</code></td>
+<td><code>southbrook_integrations.mcp_tool</code></td>
+</tr>
+<tr>
+<td>How declared</td>
+<td><code>@hermes_tool(...)</code> decorator</td>
+<td><code>ir.model.data</code> row</td>
+</tr>
+<tr>
+<td>Where stored</td>
+<td>Process-level Python list</td>
+<td>Database table</td>
+</tr>
+<tr>
+<td>Who calls</td>
+<td>Hermes sidecar (trade partners)</td>
+<td>Self-hosted Qwen LLM (future VPS)</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>JWT with persona claims</td>
+<td><code>X-Api-Key</code></td>
+</tr>
+<tr>
+<td>Tier model</td>
+<td>T0 / T1 / T2</td>
+<td>All read-only in v1</td>
+</tr>
+<tr>
+<td>Args binding</td>
+<td>Persona-claim-bound</td>
+<td>Caller-supplied (with whitelist)</td>
+</tr>
+</tbody>
+</table>
+<p>The two are deliberately separate — don't conflate.</p>
+<h2 id="mcp-tool-model">MCP tool model</h2>
+<pre><code class="language-python">class SouthbrookIntegrationsMcpTool(models.Model):
+    _name = &quot;southbrook.integrations.mcp_tool&quot;
+    _description = &quot;MCP Server Tool (read-only scoped query)&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name             = fields.Char(required=True, index=True)
+description      = fields.Text()
+category         = fields.Selection([(&quot;read&quot;, &quot;Read&quot;),
+                                     (&quot;search&quot;, &quot;Search&quot;),
+                                     (&quot;write&quot;, &quot;Write&quot;)],
+                                    default=&quot;read&quot;)
+model_id         = fields.Many2one(&quot;ir.model&quot;, required=True)
+model_name       = fields.Char(related=&quot;model_id.model&quot;, store=True)
+domain_json      = fields.Text(default=&quot;[]&quot;)
+read_fields_json = fields.Text(default=&quot;[]&quot;)
+enabled          = fields.Boolean(default=True)
+rate_limit_per_min = fields.Integer(default=60)
+</code></pre>
+<h2 id="tool-invocation">Tool invocation</h2>
+<pre><code class="language-python">def invoke(self, args_json):
+    &quot;&quot;&quot;Execute a sandboxed read against the configured model+domain+fields.&quot;&quot;&quot;
+    self.ensure_one()
+
+    if not self.enabled:
+        raise AccessError(_(&quot;Tool disabled&quot;))
+    if self.category == &quot;write&quot;:
+        raise AccessError(_(&quot;Write tools not enabled in v1&quot;))
+
+    args = json.loads(args_json) if args_json else {}
+    domain = self._parse_domain()
+
+    extra_domain = args.get(&quot;extra_domain&quot;, [])
+    if extra_domain:
+        domain = domain + list(extra_domain)
+
+    field_names = self._parse_fields()
+    self._validate_read_fields_exist(field_names)
+
+    limit = int(args.get(&quot;limit&quot;, 50))
+    offset = int(args.get(&quot;offset&quot;, 0))
+
+    Target = self.env[self.model_name].sudo()
+    records = Target.search(domain, limit=limit, offset=offset)
+    rows = records.read(field_names) if field_names else records.read()
+
+    return {
+        &quot;schema&quot;: &quot;southbrook.mcp.invoke.v1&quot;,
+        &quot;tool&quot;: self.name,
+        &quot;model&quot;: self.model_name,
+        &quot;rows&quot;: rows,
+        &quot;count&quot;: len(rows),
+    }
+</code></pre>
+<h2 id="http-endpoint">HTTP endpoint</h2>
+<pre><code class="language-python">@http.route(&quot;/mcp/v1/invoke/&lt;string:slug&gt;&quot;, type=&quot;json&quot;,
+            auth=&quot;api_key&quot;, methods=[&quot;POST&quot;], csrf=False)
+def invoke(self, slug, **payload):
+    tool = request.env[&quot;southbrook.integrations.mcp_tool&quot;]\
+        .sudo().search([(&quot;name&quot;, &quot;=&quot;, slug)], limit=1)
+    if not tool:
+        raise NotFound()
+
+    # Rate limit check
+    self._check_rate_limit(tool, request.api_key_id)
+
+    args_json = json.dumps(payload.get(&quot;args&quot;, {}))
+    result = tool.invoke(args_json)
+
+    # Log
+    request.env[&quot;southbrook.integrations.mcp_call_log&quot;].sudo().create({
+        &quot;tool_id&quot;: tool.id,
+        &quot;api_key_id&quot;: request.api_key_id,
+        &quot;args_json&quot;: args_json,
+        &quot;result_size&quot;: result[&quot;count&quot;],
+    })
+
+    return result
+</code></pre>
+<h2 id="seeding-tools-via-xml">Seeding tools via XML</h2>
+<pre><code class="language-xml">&lt;record id=&quot;mcp_tool_list_open_sos&quot; model=&quot;southbrook.integrations.mcp_tool&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;list_open_sales_orders&lt;/field&gt;
+    &lt;field name=&quot;description&quot;&gt;List sales orders in draft or sale state&lt;/field&gt;
+    &lt;field name=&quot;category&quot;&gt;read&lt;/field&gt;
+    &lt;field name=&quot;model_id&quot; ref=&quot;sale.model_sale_order&quot;/&gt;
+    &lt;field name=&quot;domain_json&quot;&gt;[(&quot;state&quot;, &quot;in&quot;, [&quot;draft&quot;, &quot;sale&quot;])]&lt;/field&gt;
+    &lt;field name=&quot;read_fields_json&quot;&gt;
+        [&quot;name&quot;, &quot;partner_id&quot;, &quot;amount_total&quot;, &quot;state&quot;]
+    &lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<p>After install, Qwen can call <code>POST /mcp/v1/invoke/list_open_sales_orders</code>
+and get JSON rows back.</p>
+<h2 id="field-whitelist-validation">Field whitelist validation</h2>
+<pre><code class="language-python">def _validate_read_fields_exist(self, field_names):
+    if not field_names:
+        return
+    Target = self.env[self.model_name]
+    unknown = [f for f in field_names if f not in Target._fields]
+    if unknown:
+        raise UserError(
+            _(&quot;Unknown fields: %s&quot;) % &quot;, &quot;.join(unknown))
+</code></pre>
+<p>Prevents a typo'd field from returning silent empty results.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Tool returns empty rows even though data exists"</strong> — domain
+  filter too restrictive. Test with empty extra_domain to see all
+  records of that type.</li>
+<li><strong>"Tool returns 'AccessError: Tool disabled'"</strong> — <code>enabled = False</code>.
+  Enable in the tool record.</li>
+<li><strong>"Field whitelist error on a valid field"</strong> — field renamed in
+  newer Odoo. Update the read_fields_json.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Hermes tool registry vs MCP tool registry — main
+distinction?</p>
+<blockquote>
+<p>Hermes is persona-bound process-level; MCP is data-driven
+read-only. Different consumers, different auth.</p>
+</blockquote>
+<p><strong>Q2.</strong> v1 MCP supports write category?</p>
+<blockquote>
+<p>No — <code>category = "write"</code> raises AccessError. Reserved for v2
+when ACL story is decided.</p>
+</blockquote>
+<p><strong>Q3.</strong> Rate limit — per-tool or per-API-key?</p>
+<blockquote>
+<p>Per-tool (<code>rate_limit_per_min</code> field). Per-API-key is enforced
+at the HTTP layer separately.</p>
+</blockquote>
+<p><strong>Q4.</strong> New MCP tool: list MOs in progress. XML seed?</p>
+<blockquote>
+<p>Create with <code>model_id = mrp.model_mrp_production</code>,
+<code>domain_json = [("state", "in", ["confirmed", "progress"])]</code>,
+appropriate <code>read_fields_json</code>.</p>
+</blockquote>
+<p><strong>Q5.</strong> Self-hosted Qwen calls /mcp/v1/invoke/xyz. If xyz doesn't
+exist?</p>
+<blockquote>
+<p>404 NotFound. Tool slug not in the registry.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_25_integrations_label_printers" model="slide.slide">
+            <field name="name">Integrations Module — Label Printer Integration</field>
+            <field name="channel_id" ref="course_integrations_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer working on shipping label or shop-floor tag generation.</field>
+            <field name="html_content"><![CDATA[<h1 id="integrations-module-label-printer-integration">Integrations Module — Label Printer Integration</h1>
+<h2 id="what-this-integrates">What this integrates</h2>
+<p>Physical label printers — Zebra ZPL II + DataMax/Honeywell — for:
+- Shipping labels (carton, pallet)
+- Shop-floor traveller tags (cabinet ID, MO ID, cut spec)
+- Inventory bin labels</p>
+<h2 id="models">Models</h2>
+<pre><code class="language-python">class SouthbrookIntegrationsLabelPrinter(models.Model):
+    _name = &quot;southbrook.integrations.label_printer&quot;
+    _description = &quot;Label Printer Configuration&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name             = fields.Char(required=True)
+ip_address       = fields.Char(required=True)
+port             = fields.Integer(default=9100)
+language         = fields.Selection([
+    (&quot;zpl&quot;, &quot;Zebra ZPL&quot;),
+    (&quot;dpl&quot;, &quot;DataMax DPL&quot;),
+], required=True)
+dpi              = fields.Selection([
+    (&quot;203&quot;, &quot;203 dpi&quot;),
+    (&quot;300&quot;, &quot;300 dpi&quot;),
+])
+active           = fields.Boolean(default=True)
+last_print_at    = fields.Datetime()
+last_heartbeat   = fields.Datetime()
+status           = fields.Selection([
+    (&quot;online&quot;, &quot;Online&quot;),
+    (&quot;offline&quot;, &quot;Offline&quot;),
+    (&quot;error&quot;, &quot;Error&quot;),
+])
+</code></pre>
+<pre><code class="language-python">class SouthbrookIntegrationsLabelLog(models.Model):
+    _name = &quot;southbrook.integrations.label_log&quot;
+    _order = &quot;printed_at desc&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">printer_id     = fields.Many2one(&quot;...label_printer&quot;, required=True)
+label_data     = fields.Text()  # raw ZPL/DPL
+printed_at     = fields.Datetime(default=fields.Datetime.now)
+printed_by     = fields.Many2one(&quot;res.users&quot;)
+related_model  = fields.Char()  # e.g. &quot;stock.picking&quot;
+related_id     = fields.Integer()
+status         = fields.Selection([
+    (&quot;queued&quot;, &quot;Queued&quot;),
+    (&quot;sent&quot;, &quot;Sent&quot;),
+    (&quot;error&quot;, &quot;Error&quot;),
+])
+</code></pre>
+<h2 id="print-pipeline">Print pipeline</h2>
+<pre><code class="language-python">def print_label(self, label_data, related_record=None):
+    &quot;&quot;&quot;Send raw ZPL/DPL to the printer.&quot;&quot;&quot;
+    self.ensure_one()
+
+    log = self.env[&quot;southbrook.integrations.label_log&quot;].create({
+        &quot;printer_id&quot;: self.id,
+        &quot;label_data&quot;: label_data,
+        &quot;related_model&quot;: related_record._name if related_record else False,
+        &quot;related_id&quot;: related_record.id if related_record else False,
+        &quot;status&quot;: &quot;queued&quot;,
+    })
+
+    try:
+        socket = SocketIO((self.ip_address, self.port))
+        socket.send(label_data.encode(&quot;utf-8&quot;))
+        socket.close()
+        log.status = &quot;sent&quot;
+        self.last_print_at = fields.Datetime.now()
+    except Exception as e:
+        log.status = &quot;error&quot;
+        log.message_post(body=str(e))
+        raise UserError(_(&quot;Print failed: %s&quot;) % e)
+
+    return log
+</code></pre>
+<h2 id="zpl-template">ZPL template</h2>
+<p>A shop-floor traveller tag in ZPL:</p>
+<pre><code class="language-python">def render_traveller_zpl(self, mo):
+    return f&quot;&quot;&quot;
+^XA
+^FO50,50^A0N,50,50^FD{mo.name}^FS
+^FO50,150^A0N,30,30^FDCabinet: {mo.product_id.display_name}^FS
+^FO50,200^A0N,30,30^FDQty: {int(mo.product_qty)}^FS
+^FO50,250^BCN,100,Y,N,N^FD{mo.name}^FS
+^XZ
+&quot;&quot;&quot;
+</code></pre>
+<p>Renders barcode + product info on a 4×6 label.</p>
+<h2 id="heartbeat">Heartbeat</h2>
+<pre><code class="language-python">@api.model
+def _cron_printer_heartbeat(self):
+    for printer in self.search([(&quot;active&quot;, &quot;=&quot;, True)]):
+        if self._ping(printer.ip_address, printer.port):
+            printer.status = &quot;online&quot;
+        else:
+            printer.status = &quot;offline&quot;
+        printer.last_heartbeat = fields.Datetime.now()
+</code></pre>
+<p>Offline printers surface to MI engine as recommendation.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Print works locally but not from Odoo"</strong> — Odoo container
+  network can't reach printer's IP. Check Docker network +
+  printer's network segment.</li>
+<li><strong>"ZPL renders wrong dpi"</strong> — printer's actual dpi differs from
+  <code>dpi</code> field. Adjust the ZPL coordinates or update the field.</li>
+<li><strong>"Logs grow unboundedly"</strong> — <code>cron_label_log_cleanup</code>
+  archives &gt; 90 days. If disabled, runs OOM eventually.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Two printer languages supported?</p>
+<blockquote>
+<p>ZPL (Zebra) and DPL (DataMax/Honeywell).</p>
+</blockquote>
+<p><strong>Q2.</strong> ZPL templates produce binary or text?</p>
+<blockquote>
+<p>Plain text (ZPL is ASCII commands). Sent as bytes over TCP.</p>
+</blockquote>
+<p><strong>Q3.</strong> Printer offline — what happens?</p>
+<blockquote>
+<p>Heartbeat marks status <code>offline</code>. Print attempt raises
+UserError. MI engine may emit recommendation.</p>
+</blockquote>
+<p><strong>Q4.</strong> Add a new printer language (e.g. EPL Eltron). Path?</p>
+<blockquote>
+<p>Add to language Selection, write a render_method for that
+language. Wire into the dispatch.</p>
+</blockquote>
+<p><strong>Q5.</strong> Label_log relation field empty after print. Effect?</p>
+<blockquote>
+<p>Log still saves but can't be traced back to source record.
+Always pass <code>related_record</code> to <code>print_label()</code>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_25_integrations_new_vendor" model="slide.slide">
+            <field name="name">Integrations Module — Adding a New Vendor Adapter</field>
+            <field name="channel_id" ref="course_integrations_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Developer onboarding a new integration vendor.</field>
+            <field name="html_content"><![CDATA[<h1 id="integrations-module-adding-a-new-vendor-adapter">Integrations Module — Adding a New Vendor Adapter</h1>
+<h2 id="the-pattern-in-5-steps">The pattern (in 5 steps)</h2>
+<ol>
+<li>Add a new model + table for sessions / messages / logs</li>
+<li>Implement the API client (HTTP or socket)</li>
+<li>Add a heartbeat for status monitoring</li>
+<li>Wire MI engine integration if vendor failure is operationally
+   relevant</li>
+<li>Add views + menu</li>
+</ol>
+<h2 id="a-worked-example-adding-vendor-x-crm-integration">A worked example: adding "Vendor X" CRM integration</h2>
+<p>Goal: sync customer records to Vendor X CRM.</p>
+<h3 id="step-1-models">Step 1: Models</h3>
+<pre><code class="language-python"># In a new addon: southbrook_integrations_vendorx
+class SouthbrookIntegrationsVendorxSession(models.Model):
+    _name = &quot;southbrook.integrations.vendorx_session&quot;
+    _description = &quot;Vendor X CRM Session&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name        = fields.Char(default=lambda s: s._make_seq())
+state       = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;active&quot;, &quot;Active&quot;),
+    (&quot;ended&quot;, &quot;Ended&quot;),
+    (&quot;errored&quot;, &quot;Errored&quot;),
+])
+opened_at   = fields.Datetime()
+ended_at    = fields.Datetime()
+</code></pre>
+<h3 id="step-2-api-client">Step 2: API client</h3>
+<pre><code class="language-python">class SouthbrookIntegrationsVendorxClient(models.AbstractModel):
+    _name = &quot;southbrook.integrations.vendorx_client&quot;
+
+    @api.model
+    def push_customer(self, partner_id):
+        &quot;&quot;&quot;Push a customer to Vendor X CRM.&quot;&quot;&quot;
+        partner = self.env[&quot;res.partner&quot;].browse(partner_id)
+        endpoint = self.env.company.vendorx_endpoint
+        api_key = self.env.company.vendorx_api_key
+
+        payload = {
+            &quot;external_id&quot;: partner.id,
+            &quot;name&quot;: partner.name,
+            &quot;email&quot;: partner.email,
+            &quot;phone&quot;: partner.phone,
+        }
+
+        response = requests.post(
+            f&quot;{endpoint}/customers&quot;,
+            json=payload,
+            headers={&quot;Authorization&quot;: f&quot;Bearer {api_key}&quot;},
+            timeout=10,
+        )
+
+        if response.status_code != 200:
+            raise UserError(
+                _(&quot;Vendor X rejected: %s&quot;) % response.text)
+
+        return response.json()
+</code></pre>
+<h3 id="step-3-heartbeat">Step 3: Heartbeat</h3>
+<pre><code class="language-python">@api.model
+def _cron_vendorx_heartbeat(self):
+    try:
+        response = requests.get(
+            self.env.company.vendorx_endpoint + &quot;/health&quot;,
+            timeout=5,
+        )
+        if response.status_code == 200:
+            self._log_status(&quot;ok&quot;)
+        else:
+            self._log_status(&quot;error&quot;, message=response.text)
+    except Exception as e:
+        self._log_status(&quot;error&quot;, message=str(e))
+</code></pre>
+<p>Cron data:</p>
+<pre><code class="language-xml">&lt;record id=&quot;cron_vendorx_heartbeat&quot; model=&quot;ir.cron&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Vendor X Heartbeat&lt;/field&gt;
+    &lt;field name=&quot;model_id&quot; ref=&quot;model_southbrook_integrations_vendorx_client&quot;/&gt;
+    &lt;field name=&quot;state&quot;&gt;code&lt;/field&gt;
+    &lt;field name=&quot;code&quot;&gt;model._cron_vendorx_heartbeat()&lt;/field&gt;
+    &lt;field name=&quot;interval_type&quot;&gt;minutes&lt;/field&gt;
+    &lt;field name=&quot;interval_number&quot;&gt;5&lt;/field&gt;
+    &lt;field name=&quot;active&quot; eval=&quot;True&quot;/&gt;
+&lt;/record&gt;
+</code></pre>
+<h3 id="step-4-mi-engine-integration">Step 4: MI engine integration</h3>
+<pre><code class="language-python">class MiEngineVendorxExt(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.engine&quot;
+
+    @api.model
+    def _check_vendorx_signals(self):
+        &quot;&quot;&quot;Detect Vendor X outage; surface recommendation.&quot;&quot;&quot;
+        recent_pings = self.env[&quot;southbrook.integrations.vendorx_log&quot;]\
+            .search([(&quot;printed_at&quot;, &quot;&gt;&quot;, fields.Datetime.now() -
+                                          relativedelta(minutes=15))])
+        errors = recent_pings.filtered(lambda l: l.status == &quot;error&quot;)
+        if len(errors) &gt;= 3 and len(errors) / len(recent_pings) &gt;= 0.5:
+            self._emit_recommendation(
+                subject=&quot;Vendor X integration degraded&quot;,
+                body=(&quot;Vendor X heartbeat failing 50%+ in last 15 min. &quot;
+                      &quot;Check vendor status page + escalate.&quot;),
+                persona=&quot;sysadmin&quot;,
+            )
+</code></pre>
+<h3 id="step-5-views-menu">Step 5: Views + menu</h3>
+<pre><code class="language-xml">&lt;menuitem id=&quot;menu_vendorx&quot; name=&quot;Vendor X&quot;
+          parent=&quot;southbrook_integrations.menu_integrations_root&quot;/&gt;
+
+&lt;menuitem id=&quot;menu_vendorx_sessions&quot; name=&quot;Sessions&quot;
+          parent=&quot;menu_vendorx&quot;
+          action=&quot;action_vendorx_sessions&quot;/&gt;
+</code></pre>
+<h2 id="configuration-pattern">Configuration pattern</h2>
+<p>Per-company API keys + endpoints in <code>res.company</code>:</p>
+<pre><code class="language-python">class ResCompany(models.Model):
+    _inherit = &quot;res.company&quot;
+
+    vendorx_endpoint = fields.Char(default=&quot;https://api.vendorx.com&quot;)
+    vendorx_api_key = fields.Char()
+</code></pre>
+<p>Avoid sys-params for vendor secrets; per-company config supports
+multi-tenant.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"New integration but no logs"</strong> — heartbeat cron not active.
+  Check <code>ir.cron.active</code>.</li>
+<li><strong>"API key in code"</strong> — refactor to <code>res.company</code>. Never
+  hard-code secrets.</li>
+<li><strong>"MI engine doesn't fire"</strong> — <code>_check_vendorx_signals</code> not
+  hooked into the engine's main loop. Add to <code>_check_all</code>.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> New vendor integration — addons/in or new addon?</p>
+<blockquote>
+<p>New addon. Keeps each integration isolated; lets uninstalls clean up
+per-vendor.</p>
+</blockquote>
+<p><strong>Q2.</strong> API keys storage?</p>
+<blockquote>
+<p><code>res.company</code> fields. Never code.</p>
+</blockquote>
+<p><strong>Q3.</strong> Heartbeat cron interval typical?</p>
+<blockquote>
+<p>5 minutes for active integrations. Less frequent for low-traffic
+ones.</p>
+</blockquote>
+<p><strong>Q4.</strong> MI engine integration mandatory?</p>
+<blockquote>
+<p>Only if vendor downtime impacts operations. Cosmetic integrations
+don't need MI engine.</p>
+</blockquote>
+<p><strong>Q5.</strong> Test new vendor — environment?</p>
+<blockquote>
+<p>Vendor's sandbox URL (most provide one) before pointing at
+production. Configure as <code>vendorx_endpoint = sandbox URL</code>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_25_integrations_monitoring" model="slide.slide">
+            <field name="name">Integrations Module — Monitoring and Observability</field>
+            <field name="channel_id" ref="course_integrations_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Sysadmin or developer monitoring integration health.</field>
+            <field name="html_content"><![CDATA[<h1 id="integrations-module-monitoring-and-observability">Integrations Module — Monitoring and Observability</h1>
+<h2 id="what-to-monitor">What to monitor</h2>
+<p>Per integration:
+- Heartbeat last_seen
+- Recent error count
+- Recent latency
+- Recent volume</p>
+<h2 id="mi-tile">MI tile</h2>
+<p>The Integrations MI Tile aggregates all integrations:</p>
+<pre><code class="language-python">class IntegrationsMiTile(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.tile&quot;
+
+    @api.model
+    def get_integrations_tile(self):
+        homag_status = self._get_homag_status()
+        asn_status = self._get_asn_status()
+        mcp_status = self._get_mcp_status()
+        printers_status = self._get_printers_status()
+
+        overall = &quot;red&quot; if any(s == &quot;red&quot; for s in [
+            homag_status, asn_status, mcp_status, printers_status]) \
+            else &quot;amber&quot; if any(s == &quot;amber&quot; for s in [...]) \
+            else &quot;green&quot;
+
+        return {
+            &quot;title&quot;: &quot;Integrations Health&quot;,
+            &quot;value&quot;: overall,
+            &quot;subtitles&quot;: {
+                &quot;Homag&quot;: homag_status,
+                &quot;ASN (3PL)&quot;: asn_status,
+                &quot;MCP&quot;: mcp_status,
+                &quot;Printers&quot;: printers_status,
+            },
+            &quot;color&quot;: overall,
+        }
+</code></pre>
+<h2 id="log-models-for-audit">Log models for audit</h2>
+<p>Each integration has its own log:
+- <code>homag_msg</code> — Homag I/O
+- <code>asn_inbound</code> / <code>asn_outbound</code> — ASN history
+- <code>mcp_call_log</code> — MCP API calls
+- <code>label_log</code> — print history</p>
+<p>Together = full integration audit trail.</p>
+<h2 id="common-queries">Common queries</h2>
+<h3 id="why-was-vendor-x-down-last-week">"Why was Vendor X down last week?"</h3>
+<pre><code class="language-sql">SELECT DATE_TRUNC('hour', taken_at) AS hour,
+       status,
+       COUNT(*) AS count
+FROM southbrook_integrations_vendorx_log
+WHERE taken_at &gt; NOW() - INTERVAL '7 days'
+GROUP BY hour, status
+ORDER BY hour;
+</code></pre>
+<p>Shows hourly status breakdown.</p>
+<h3 id="which-3pl-has-highest-error-rate">"Which 3PL has highest error rate?"</h3>
+<pre><code class="language-sql">SELECT partner_id,
+       COUNT(*) FILTER (WHERE state = 'error') * 100.0 / COUNT(*) AS error_pct
+FROM southbrook_integrations_asn_inbound
+WHERE create_date &gt; NOW() - INTERVAL '30 days'
+GROUP BY partner_id
+ORDER BY error_pct DESC;
+</code></pre>
+<h2 id="alerts">Alerts</h2>
+<p>The MI engine emits recommendations:
+- Heartbeat failure for &gt; 15 minutes
+- &gt; 10% error rate in last hour
+- &gt; 50% latency spike vs baseline</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Tile shows green but I'm seeing problems"</strong> — tile cache
+  may be stale. Refresh.</li>
+<li><strong>"Heartbeat ran but status not updated"</strong> — cron error;
+  check <code>ir.cron.lastcall</code>.</li>
+<li><strong>"Logs full of errors but no recommendation"</strong> — MI engine
+  threshold not exceeded. Tune.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Integrations MI tile colour green vs red — what triggers?</p>
+<blockquote>
+<p>Green = all four integrations green. Red = any integration red.
+Amber = some amber, none red.</p>
+</blockquote>
+<p><strong>Q2.</strong> Audit trail — which models?</p>
+<blockquote>
+<p>homag_msg, asn_inbound, asn_outbound, mcp_call_log, label_log.</p>
+</blockquote>
+<p><strong>Q3.</strong> Vendor X down for 5 minutes. Recommendation fires?</p>
+<blockquote>
+<p>Depends on threshold (<code>&gt; 15 min</code> typical). 5 minutes alone =
+nothing. Sustained 15+ = fire.</p>
+</blockquote>
+<p><strong>Q4.</strong> SQL query: which integrations had &gt; 10 errors last 24h?</p>
+<blockquote>
+<p>Query log tables filtered by status=error + create_date &gt; 24h
+grouped by integration type.</p>
+</blockquote>
+<p><strong>Q5.</strong> Tile not updating — first investigation step?</p>
+<blockquote>
+<p>Check the cron that powers the tile compute. View
+<code>ir.cron.lastcall</code> + status.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

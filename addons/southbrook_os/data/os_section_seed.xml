@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <!-- Canonical sections are loaded by the post_init_hook in
+         southbrook_os/__init__.py — see models/os_loader.py. This file
+         exists because the manifest references it; future hand-curated
+         data records (e.g., demo OSROs) would land here. -->
+  </data>
+</odoo>

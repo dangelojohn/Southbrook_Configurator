@@ -1,0 +1,139 @@
+// HermesChat — token-aligned with the Southbrook portal design language.
+$hermes-radius: 12px;
+$hermes-pad: 14px;
+$hermes-bg: #fff;
+$hermes-border: #e3dcd1;
+$hermes-accent: #1a1814;
+$hermes-muted: #6f6a62;
+$hermes-bg-user: #f4efe7;
+$hermes-bg-assistant: #fafaf7;
+
+.o_hermes_chat {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 520px;
+    min-height: 360px;
+    max-height: 70vh;
+    background: $hermes-bg;
+    border: 1px solid $hermes-border;
+    border-radius: $hermes-radius;
+    overflow: hidden;
+    font-family: "Roboto Flex", "Inter", system-ui, sans-serif;
+
+    &__header {
+        padding: 10px 14px;
+        border-bottom: 1px solid $hermes-border;
+        background: $hermes-bg-assistant;
+        font-size: 0.95rem;
+    }
+
+    &__title {
+        font-weight: 600;
+        color: $hermes-accent;
+    }
+
+    &__subtitle {
+        color: $hermes-muted;
+        font-size: 0.85rem;
+    }
+
+    &__scroll {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: $hermes-pad;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    &__placeholder {
+        color: $hermes-muted;
+        font-size: 0.9rem;
+        padding: 16px 4px;
+        line-height: 1.5;
+    }
+
+    &__msg {
+        max-width: 88%;
+        padding: 8px 12px;
+        border-radius: 10px;
+        line-height: 1.45;
+        font-size: 0.95rem;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    &__msg--user {
+        align-self: flex-end;
+        background: $hermes-bg-user;
+        color: $hermes-accent;
+    }
+
+    &__msg--assistant {
+        align-self: flex-start;
+        background: $hermes-bg-assistant;
+        color: $hermes-accent;
+        border: 1px solid $hermes-border;
+    }
+
+    &__cursor {
+        display: inline-block;
+        animation: hermes-blink 1s steps(1) infinite;
+        color: $hermes-muted;
+    }
+
+    @keyframes hermes-blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+    }
+
+    &__error {
+        margin: 0 $hermes-pad;
+        padding: 8px;
+        color: #6e2727;
+        background: #fdecec;
+        border: 1px solid #f1b9b9;
+        border-radius: 8px;
+        font-size: 0.85rem;
+    }
+
+    &__input {
+        display: flex;
+        gap: 8px;
+        padding: $hermes-pad;
+        border-top: 1px solid $hermes-border;
+        background: $hermes-bg;
+
+        textarea {
+            flex: 1 1 auto;
+            resize: none;
+            border: 1px solid $hermes-border;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.4;
+
+            &:focus {
+                outline: none;
+                border-color: $hermes-accent;
+            }
+        }
+
+        button {
+            background: $hermes-accent;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 600;
+            cursor: pointer;
+
+            &:disabled {
+                background: $hermes-muted;
+                cursor: not-allowed;
+            }
+        }
+    }
+}

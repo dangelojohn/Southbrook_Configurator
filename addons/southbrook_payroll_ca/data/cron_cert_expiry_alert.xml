@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cron — daily certification expiry alert.
+
+  v19 dropped numbercall + doall from ir.cron (now inherits ir.actions.server),
+  so do NOT add them here. interval_number + interval_type are the only
+  scheduling fields.
+-->
+<odoo>
+    <data noupdate="1">
+        <record id="cron_cert_expiry_alert" model="ir.cron">
+            <field name="name">Southbrook Payroll: Certification expiry alert (daily)</field>
+            <field name="model_id" ref="model_southbrook_payroll_certification"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_alert_expiring()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

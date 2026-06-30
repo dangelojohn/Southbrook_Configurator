@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_payroll_run_list" model="ir.ui.view">
+        <field name="name">southbrook.payroll.run.list</field>
+        <field name="model">southbrook.payroll.run</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Runs" decoration-success="state == 'paid'" decoration-info="state == 'posted'">
+                <field name="name"/>
+                <field name="period_from"/>
+                <field name="period_to"/>
+                <field name="pay_date"/>
+                <field name="total_gross" sum="Gross"/>
+                <field name="total_deductions" sum="Deductions"/>
+                <field name="total_net" sum="Net"/>
+                <field name="total_wsib" sum="WSIB"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_payroll_run_form" model="ir.ui.view">
+        <field name="name">southbrook.payroll.run.form</field>
+        <field name="model">southbrook.payroll.run</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Run">
+                <header>
+                    <button name="action_compute" type="object" string="Compute"
+                            invisible="state != 'draft'" class="oe_highlight"/>
+                    <button name="action_compute" type="object" string="Recompute"
+                            invisible="state != 'computed'"/>
+                    <button name="action_post" type="object" string="Post"
+                            invisible="state != 'computed'" class="oe_highlight"/>
+                    <button name="action_pay" type="object" string="Mark Paid"
+                            invisible="state != 'posted'" class="oe_highlight"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,computed,posted,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Period">
+                            <field name="period_from"/>
+                            <field name="period_to"/>
+                            <field name="pay_date"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Totals">
+                            <field name="total_gross"/>
+                            <field name="total_deductions"/>
+                            <field name="total_net"/>
+                            <field name="total_wsib"/>
+                            <field name="total_eht"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Employees">
+                            <field name="employee_ids" widget="many2many_tags"/>
+                        </page>
+                        <page string="Payslips">
+                            <field name="payslip_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="employee_id"/>
+                                    <field name="gross"/>
+                                    <field name="cpp"/>
+                                    <field name="ei"/>
+                                    <field name="federal_tax"/>
+                                    <field name="provincial_tax"/>
+                                    <field name="additional_tax"/>
+                                    <field name="total_deductions"/>
+                                    <field name="net"/>
+                                    <field name="wsib_employer_premium"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Journal Entry">
+                            <field name="move_id" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_payroll_run" model="ir.actions.act_window">
+        <field name="name">Payroll Runs</field>
+        <field name="res_model">southbrook.payroll.run</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

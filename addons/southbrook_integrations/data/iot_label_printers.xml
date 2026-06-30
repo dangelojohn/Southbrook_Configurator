@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="iot_printer_shipping_dock_a" model="southbrook.integrations.iot_label_printer">
+            <field name="name">ZD420 - Shipping Dock A</field>
+            <field name="iot_device_identifier">zd420-dock-a</field>
+            <field name="model_target">stock.picking</field>
+            <field name="enabled" eval="True"/>
+            <field name="zpl_template">^XA
+^FO50,50^A0N,40,40^FDSouthbrook Cabinetry^FS
+^FO50,100^A0N,30,30^FDPicking ${name}^FS
+^FO50,140^A0N,30,30^FDTo: ${partner_id}^FS
+^FO50,180^BCN,80,Y,N,N^FD${name}^FS
+^XZ</field>
+        </record>
+
+        <record id="iot_printer_finished_goods" model="southbrook.integrations.iot_label_printer">
+            <field name="name">ZT411 - Finished Goods Bay</field>
+            <field name="iot_device_identifier">zt411-fg-bay</field>
+            <field name="model_target">mrp.production</field>
+            <field name="enabled" eval="True"/>
+            <field name="zpl_template">^XA
+^FO40,40^A0N,40,40^FDSouthbrook MO^FS
+^FO40,90^A0N,30,30^FDMO ${name}^FS
+^FO40,130^A0N,30,30^FDProduct ${product_id}^FS
+^FO40,170^A0N,30,30^FDQty ${product_qty}^FS
+^FO40,220^BCN,80,Y,N,N^FD${name}^FS
+^XZ</field>
+        </record>
+    </data>
+</odoo>

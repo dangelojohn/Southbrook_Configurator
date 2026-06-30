@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_supplier_defect_list" model="ir.ui.view">
+        <field name="name">southbrook.quality.supplier_defect.list</field>
+        <field name="model">southbrook.quality.supplier_defect</field>
+        <field name="arch" type="xml">
+            <list string="Supplier Defects">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="product_id"/>
+                <field name="purchase_order_id"/>
+                <field name="quantity_defective"/>
+                <field name="quantity_received"/>
+                <field name="defect_rate"/>
+                <field name="defect_type"/>
+                <field name="cost_impact"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_supplier_defect_form" model="ir.ui.view">
+        <field name="name">southbrook.quality.supplier_defect.form</field>
+        <field name="model">southbrook.quality.supplier_defect</field>
+        <field name="arch" type="xml">
+            <form string="Supplier Defect">
+                <header>
+                    <button name="action_alert_buyer" type="object"
+                            string="Alert Buyer" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="product_id"/>
+                            <field name="purchase_order_id"/>
+                            <field name="defect_type"/>
+                        </group>
+                        <group>
+                            <field name="quantity_received"/>
+                            <field name="quantity_defective"/>
+                            <field name="defect_rate" readonly="1"/>
+                            <field name="cost_impact"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_supplier_defect_pivot" model="ir.ui.view">
+        <field name="name">southbrook.quality.supplier_defect.pivot</field>
+        <field name="model">southbrook.quality.supplier_defect</field>
+        <field name="arch" type="xml">
+            <pivot string="Supplier Defect Rate">
+                <field name="partner_id" type="row"/>
+                <field name="create_date" type="col" interval="month"/>
+                <field name="defect_rate" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_southbrook_supplier_defect" model="ir.actions.act_window">
+        <field name="name">Supplier Defects</field>
+        <field name="res_model">southbrook.quality.supplier_defect</field>
+        <field name="view_mode">list,form,pivot</field>
+    </record>
+</odoo>

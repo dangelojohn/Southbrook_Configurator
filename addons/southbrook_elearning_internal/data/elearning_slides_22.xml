@@ -1,0 +1,1062 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_22_quality_architecture" model="slide.slide">
+            <field name="name">Quality Module — Architecture and Install</field>
+            <field name="channel_id" ref="course_quality_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer or technical admin learning the southbrook_quality internals.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-module-architecture-and-install">Quality Module — Architecture and Install</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>Developer or admin who needs to extend, debug, or customise the
+<code>southbrook_quality</code> module. Not a user lesson; this is the engine
+room.</p>
+<h2 id="the-module-at-a-glance">The module at a glance</h2>
+<ul>
+<li>Path: <code>addons/southbrook_quality/</code></li>
+<li>Version: 19.0.1.0.0 (current prod)</li>
+<li>License: LGPL-3</li>
+<li>Depends on: <code>base</code>, <code>mail</code>, <code>mrp</code>, <code>stock</code>, <code>account</code>,
+  <code>southbrook_manufacturing_intelligence</code> (for MI engine
+  extension)</li>
+</ul>
+<h2 id="source-layout">Source layout</h2>
+<pre><code>addons/southbrook_quality/
+├── __manifest__.py
+├── __init__.py
+├── models/
+│   ├── ncr.py                  — non-conformance record
+│   ├── spc_sample.py           — statistical process control entry
+│   ├── cpk_report.py           — process capability
+│   ├── quality_dimension.py    — master spec
+│   ├── supplier_defect.py      — supplier-side defect logging
+│   └── mi_engine_ext.py        — MI engine integration
+├── views/
+│   ├── ncr_views.xml
+│   ├── spc_views.xml
+│   ├── cpk_views.xml
+│   ├── quality_dimension_views.xml
+│   ├── supplier_defect_views.xml
+│   └── southbrook_quality_menus.xml
+├── security/
+│   ├── ir.model.access.csv
+│   └── southbrook_quality_groups.xml
+└── data/
+    ├── sequence_data.xml
+    └── default_dimensions.xml
+</code></pre>
+<h2 id="install">Install</h2>
+<pre><code class="language-bash">./scripts/deploy_to_qnap.sh southbrook_quality
+</code></pre>
+<p>Or via the Apps menu in Odoo backend: search "Southbrook Quality" →
+<em>Install</em>.</p>
+<h3 id="install-dependencies">Install dependencies</h3>
+<p>The manifest declares dependencies that must be resolved first.
+<code>mrp</code> + <code>stock</code> come with native Odoo Manufacturing/Inventory.
+<code>southbrook_manufacturing_intelligence</code> is a sibling Southbrook
+module that must be installed before Quality.</p>
+<h3 id="what-i-does">What -i does</h3>
+<ol>
+<li>Creates <code>southbrook.ncr</code>, <code>southbrook.quality.spc_sample</code>,
+   <code>southbrook.quality.cpk_report</code>, <code>southbrook.quality.dimension</code>,
+   <code>southbrook.quality.supplier_defect</code> tables</li>
+<li>Adds the <code>mi_engine_ext</code> model mixin to extend the MI engine</li>
+<li>Loads default sequence (<code>NCR/YYYY/000xx</code> format)</li>
+<li>Loads a seed dimension master (<code>default_dimensions.xml</code>) — 5
+   common cabinet-shop dimensions</li>
+<li>Creates security groups</li>
+<li>Adds menus + actions</li>
+<li>Registers a cron at 03:30 for the supplier defect rollup</li>
+</ol>
+<h3 id="what-u-does">What -u does</h3>
+<p>Same as -i but skipping data files with <code>noupdate="1"</code> (i.e. seed
+dimensions are NOT re-loaded; you can edit them safely).</p>
+<h2 id="v19-install-gotchas">v19 install gotchas</h2>
+<p>The module survived three known v19 traps; the developer should
+read these before extending:</p>
+<ol>
+<li><strong><code>res.groups.category_id</code> removed</strong> — the security XML omits
+   <code>category_id</code>; uses "Module / Role" naming instead.</li>
+<li><strong>Search view <code>&lt;group expand="0" string="Group By"&gt;</code> removed</strong> —
+   plain <code>&lt;group&gt;</code> element.</li>
+<li><strong><code>_sql_constraints</code> deprecated</strong> — module uses
+   <code>_name_uniq = models.Constraint('UNIQUE(name)', '...')</code> style.</li>
+</ol>
+<p>If you add a new model, follow these patterns or your -i will fail.</p>
+<h2 id="cron-landscape">Cron landscape</h2>
+<table>
+<thead>
+<tr>
+<th>Cron</th>
+<th>Schedule</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cron_rollup_supplier_scores</code></td>
+<td>03:30 daily</td>
+<td>Recomputes <code>res.partner.defect_rate_pct</code> + <code>consolidated_score</code> from supplier_defect records</td>
+</tr>
+<tr>
+<td>(MI engine has its own cron list; quality piggybacks via mi_engine_ext)</td>
+<td>varies</td>
+<td>Surfaces critical NCRs + SPC breaches as recommendations</td>
+</tr>
+</tbody>
+</table>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"-u fails with 'ParseError'"</strong> — most likely a v19 view
+  validation trap. Run with
+  <code>--log-handler=odoo.tools.convert:DEBUG</code> to surface the full
+  ValueError.</li>
+<li><strong>"Module installed but menus don't appear"</strong> — the user isn't in
+  the <code>group_southbrook_quality_user</code> group. Add them via
+  <em>Settings → Users</em>.</li>
+<li><strong>"Migration leaves orphan records after uninstall"</strong> — the
+  cleanup hook removes the cron + supplier scoring columns but
+  leaves the records (audit retention). Manual cleanup via SQL if
+  needed.</li>
+</ul>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The NCR state machine internals — lesson 22.2.</li>
+<li>SPC math — lesson 22.3.</li>
+<li>Cpk compute — lesson 22.4.</li>
+<li>Customising — lesson 22.7.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> You add a new selection value to <code>defect_type</code> on
+<code>southbrook.ncr</code>. -u fails. Most likely cause?</p>
+<blockquote>
+<p>The new value isn't in the security CSV's row that grants access.
+Wait, no — selection values don't gate ACL. More likely: a search
+view filter references the old set, or a record rule fails. Run
+with debug logging to surface.</p>
+</blockquote>
+<p><strong>Q2.</strong> Module imports import-failed. Which module isn't
+installed?</p>
+<blockquote>
+<p>Either <code>mrp</code>, <code>stock</code>, <code>account</code>, or
+<code>southbrook_manufacturing_intelligence</code>. Check
+<code>addons/southbrook_quality/__manifest__.py</code> <code>depends</code> list.</p>
+</blockquote>
+<p><strong>Q3.</strong> What's the default sequence format for NCRs?</p>
+<blockquote>
+<p><code>NCR/YYYY/000xx</code> — defined in <code>data/sequence_data.xml</code>.</p>
+</blockquote>
+<p><strong>Q4.</strong> What's the cron schedule for supplier score rollup?</p>
+<blockquote>
+<p>03:30 daily (<code>cron_rollup_supplier_scores</code>).</p>
+</blockquote>
+<p><strong>Q5.</strong> Where does the Quality module integrate with Hermes /
+Fabio?</p>
+<blockquote>
+<p>Via <code>mi_engine_ext.py</code> — the MI engine surfaces critical NCRs as
+recommendations into the Hermes queue.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_22_quality_ncr_state" model="slide.slide">
+            <field name="name">Quality Module — NCR State Machine Internals</field>
+            <field name="channel_id" ref="course_quality_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Developer extending or debugging the NCR model.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-module-ncr-state-machine-internals">Quality Module — NCR State Machine Internals</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're working in <code>addons/southbrook_quality/models/ncr.py</code>. This
+lesson walks the state machine, the side-effects of each
+transition, and the patterns for safe extension.</p>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookNcr(models.Model):
+    _name = &quot;southbrook.ncr&quot;
+    _description = &quot;Non-Conformance Record&quot;
+    _inherit = [&quot;mail.thread&quot;, &quot;mail.activity.mixin&quot;]
+    _order = &quot;create_date desc&quot;
+</code></pre>
+<p>Key fields:</p>
+<pre><code class="language-python">name           = fields.Char(default=lambda s: s._make_seq())
+production_id  = fields.Many2one(&quot;mrp.production&quot;, required=True)
+product_id     = fields.Many2one(&quot;product.product&quot;, required=True)
+workorder_id   = fields.Many2one(&quot;mrp.workorder&quot;)
+defect_type    = fields.Selection([...], required=True)
+severity       = fields.Selection([
+    (&quot;minor&quot;, &quot;Minor&quot;),
+    (&quot;major&quot;, &quot;Major&quot;),
+    (&quot;critical&quot;, &quot;Critical&quot;),
+])
+state          = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;quarantine&quot;, &quot;Quarantine&quot;),
+    (&quot;rework&quot;, &quot;Rework&quot;),
+    (&quot;scrap&quot;, &quot;Scrap&quot;),
+    (&quot;accept&quot;, &quot;Accept&quot;),
+], default=&quot;draft&quot;)
+description    = fields.Text(required_for=[&quot;major&quot;, &quot;critical&quot;])
+</code></pre>
+<h2 id="state-transitions">State transitions</h2>
+<pre><code>draft ──[Quarantine]──&gt; quarantine ──[Rework]──&gt; rework
+                            │       └──[Scrap]──&gt; scrap
+                            │       └──[Accept]──&gt; accept
+                            │
+                            └── auto-close on MO done
+</code></pre>
+<h3 id="quarantine">Quarantine</h3>
+<p><code>action_quarantine()</code>:</p>
+<ol>
+<li>State → <code>quarantine</code></li>
+<li>For each downstream <code>mrp.workorder</code> not yet <code>done</code>:
+   - Sets <code>block_reason = f"NCR/{self.id}"</code>
+   - The MES kanban renders these as red-bordered</li>
+<li>Posts <code>mail.activity</code> to the quality manager group</li>
+<li>Posts to MO chatter</li>
+</ol>
+<h3 id="rework">Rework</h3>
+<p><code>action_rework()</code>:</p>
+<ol>
+<li>State → <code>rework</code></li>
+<li>Required: <code>rework_workcenter_id</code></li>
+<li>Creates a <code>mrp.workorder.duration</code> adjustment for the rework cost</li>
+<li>Unblocks downstream WOs (clears <code>block_reason</code> from each)</li>
+<li>Routes the cabinet back to <code>rework_workcenter_id</code> first</li>
+<li>NCR stays open; closes when rework signs off</li>
+</ol>
+<h3 id="scrap">Scrap</h3>
+<p><code>action_scrap()</code>:</p>
+<ol>
+<li>State → <code>scrap</code></li>
+<li>Required: <code>scrap_quantity</code> (default 1)</li>
+<li>Creates <code>stock.scrap</code> for the product + qty</li>
+<li>Calls <code>procurement.group.run()</code> on the originating SO line to
+   trigger re-MO</li>
+<li>Logs to scrap GL account via native stock valuation</li>
+<li>NCR auto-closes after journal posts</li>
+</ol>
+<h3 id="accept">Accept</h3>
+<p><code>action_accept()</code>:</p>
+<ol>
+<li>State → <code>accept</code></li>
+<li>Required: <code>accept_reason</code> (text)</li>
+<li>Requires <code>group_southbrook_quality_manager</code></li>
+<li>Unblocks all downstream WOs</li>
+<li>NCR auto-closes</li>
+</ol>
+<h2 id="side-effects-per-transition-the-audit-table">Side effects per transition (the audit table)</h2>
+<table>
+<thead>
+<tr>
+<th>Transition</th>
+<th>DB writes</th>
+<th>Workorder effect</th>
+<th>Chatter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Quarantine</td>
+<td><code>state</code>, audit log</td>
+<td><code>block_reason</code> set</td>
+<td>activity assigned</td>
+</tr>
+<tr>
+<td>Rework</td>
+<td><code>state</code>, <code>rework_workcenter_id</code></td>
+<td><code>block_reason</code> cleared</td>
+<td>rework start logged</td>
+</tr>
+<tr>
+<td>Scrap</td>
+<td><code>state</code>, <code>scrap_quantity</code></td>
+<td>unaffected (already moved on)</td>
+<td>scrap link posted</td>
+</tr>
+<tr>
+<td>Accept</td>
+<td><code>state</code>, <code>accept_reason</code></td>
+<td><code>block_reason</code> cleared</td>
+<td>accept reason logged</td>
+</tr>
+</tbody>
+</table>
+<h2 id="extension-patterns">Extension patterns</h2>
+<h3 id="adding-a-new-state">Adding a new state</h3>
+<p>If you need a <code>repair</code> state (e.g. cabinet needs hardware
+replacement, not rework):</p>
+<pre><code class="language-python">state = fields.Selection(selection_add=[
+    (&quot;repair&quot;, &quot;Repair&quot;),
+])
+</code></pre>
+<p>Then add a transition method + a button in the form view.</p>
+<h3 id="customising-the-block-affected-logic">Customising the block-affected logic</h3>
+<p><code>_block_downstream()</code> is the helper:</p>
+<pre><code class="language-python">def _block_downstream(self):
+    self.ensure_one()
+    affected = self.production_id.workorder_ids.filtered(
+        lambda wo: wo.state in (&quot;ready&quot;, &quot;progress&quot;))
+    affected.write({&quot;block_reason&quot;: f&quot;NCR/{self.id}&quot;})
+</code></pre>
+<p>Override this method to add custom blocking logic (e.g. cabinet
+family-specific).</p>
+<h3 id="customising-the-rework-target-routing">Customising the rework target routing</h3>
+<p><code>_rework_routing()</code> is the helper that decides where the cabinet
+goes:</p>
+<pre><code class="language-python">def _rework_routing(self):
+    return self.rework_workcenter_id
+</code></pre>
+<p>Override if you need conditional routing (e.g. based on severity).</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"State transition allowed but downstream WOs didn't unblock"</strong> —
+  <code>_block_downstream()</code> was overridden but <code>_unblock_downstream()</code>
+  wasn't. Make sure both methods exist + handle the same cases.</li>
+<li><strong>"Scrap state but no re-MO appeared"</strong> — the SO link missing.
+  Trace: NCR → production_id → sale_order_id. If missing, the SO
+  link wasn't established at MO confirm time.</li>
+<li><strong>"Accept state set without the reason check"</strong> — <code>_check_accept()</code>
+  was bypassed (calling state= directly). Don't bypass; use
+  <code>action_accept()</code>.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> You call <code>record.state = 'rework'</code> directly. Side effects?</p>
+<blockquote>
+<p>None of the side effects fire. The <code>action_rework()</code> method does
+the side effects; setting state directly bypasses them. Always
+use the action methods.</p>
+</blockquote>
+<p><strong>Q2.</strong> NCR moves to <code>scrap</code>. Cabinet was already in MO progress.
+The <code>stock.scrap</code> records what stock?</p>
+<blockquote>
+<p>The <code>product_id</code> × <code>scrap_quantity</code> from the finished-goods (or
+WIP, depending on workorder state). Native <code>stock.scrap</code> handles
+location resolution.</p>
+</blockquote>
+<p><strong>Q3.</strong> Customise: add a 24h auto-escalate on critical NCRs not
+yet quarantined. Approach?</p>
+<blockquote>
+<p>Add a cron + scheduled action filtering critical drafts older
+than 24h, transitioning to <code>quarantine</code> + flagging to a
+manager activity. Don't change the state machine; add a
+background reconciliation.</p>
+</blockquote>
+<p><strong>Q4.</strong> State → <code>rework</code>. Operator marks workcenter complete.
+What unblocks the rework state?</p>
+<blockquote>
+<p>The <code>action_confirm_rework_done()</code> method on the NCR (called
+from the form button after rework completes). Sets state →
+<code>done</code>. Without this call, the NCR stays open in <code>rework</code>.</p>
+</blockquote>
+<p><strong>Q5.</strong> Where does NCR integrate with the MI engine?</p>
+<blockquote>
+<p><code>mi_engine_ext.py</code> subscribes to NCR creates with
+<code>severity = 'critical'</code> and posts a recommendation to the Hermes
+queue for the Plant GM persona.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_22_quality_spc_math" model="slide.slide">
+            <field name="name">Quality Module — SPC Sample Model and Control Limit Math</field>
+            <field name="channel_id" ref="course_quality_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Developer working on SPC sample logic or chart rendering.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-module-spc-sample-model-and-control-limit-math">Quality Module — SPC Sample Model and Control Limit Math</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookQualitySpcSample(models.Model):
+    _name = &quot;southbrook.quality.spc_sample&quot;
+    _description = &quot;SPC Sample&quot;
+    _order = &quot;taken_at desc&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">dimension_id   = fields.Many2one(&quot;southbrook.quality.dimension&quot;,
+                                 required=True, index=True)
+workcenter_id  = fields.Many2one(&quot;mrp.workcenter&quot;, required=True)
+measured_value = fields.Float(required=True, digits=(12, 4))
+sample_size    = fields.Integer(default=5)
+operator_id    = fields.Many2one(&quot;res.users&quot;,
+                                 default=lambda s: s.env.user)
+taken_at       = fields.Datetime(default=fields.Datetime.now)
+is_in_control  = fields.Boolean(compute=&quot;_compute_in_control&quot;,
+                                store=True)
+</code></pre>
+<p><code>is_in_control</code> is stored (not lazy) so search filters work.</p>
+<h2 id="control-limit-computation">Control limit computation</h2>
+<p>Control limits are recomputed on each sample create. The math:</p>
+<pre><code class="language-python">@api.model
+def _compute_control_limits(self, dimension_id, workcenter_id):
+    &quot;&quot;&quot;Return (centre, ucl, lcl) for the dimension+workcenter pair.&quot;&quot;&quot;
+    samples = self.search([
+        (&quot;dimension_id&quot;, &quot;=&quot;, dimension_id),
+        (&quot;workcenter_id&quot;, &quot;=&quot;, workcenter_id),
+    ], limit=30, order=&quot;taken_at desc&quot;)
+    if len(samples) &lt; 5:
+        # Not enough samples — fall back to dimension spec
+        dim = self.env[&quot;southbrook.quality.dimension&quot;].browse(dimension_id)
+        return dim.nominal, dim.nominal + (dim.usl - dim.nominal) * 0.66, \
+               dim.nominal - (dim.nominal - dim.lsl) * 0.66
+    values = samples.mapped(&quot;measured_value&quot;)
+    mean = sum(values) / len(values)
+    stdev = (sum((v - mean) ** 2 for v in values) / (len(values) - 1)) ** 0.5
+    k = 2 if samples[0].dimension_id.is_critical else 3
+    return mean, mean + k * stdev, mean - k * stdev
+</code></pre>
+<p>Notes:
+- 30-sample lookback hard-coded; adjust if you need more
+- Critical dimensions use 2σ; normal use 3σ
+- Fall-back to dimension spec when &lt; 5 samples avoid divide-by-zero</p>
+<h2 id="western-electric-rules">Western Electric rules</h2>
+<p>Rule detection runs in <code>_check_western_electric_rules()</code>:</p>
+<pre><code class="language-python">def _check_western_electric_rules(self):
+    &quot;&quot;&quot;Returns list of violated rule numbers (empty if clean).&quot;&quot;&quot;
+    # Rule 1: one point &gt; 3σ (or &gt; UCL for our control limits)
+    # Rule 2: 2 of 3 consecutive points &gt; 2σ same side
+    # Rule 3: 4 of 5 consecutive points &gt; 1σ same side
+    # Rule 4: 9 consecutive points one side of centre
+    violations = []
+    # ... rule detection ...
+    return violations
+</code></pre>
+<p>When violations fire, <code>is_in_control = False</code> is set on the sample.
+The MI engine subscribes via <code>mi_engine_ext.py</code>.</p>
+<h2 id="chart-rendering">Chart rendering</h2>
+<p>The chart is an OWL component (<code>southbrook_quality.spc_chart_widget</code>)
+reading the last 20 samples via JSON-RPC. Cached 60s in the browser
+via SWR pattern; not server-side cached.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Sample created but is_in_control = False even though value
+  looks fine"</strong> — control limits may be very tight if recent
+  samples were clustered. Investigate by reading actual
+  <code>_compute_control_limits()</code> output.</li>
+<li><strong>"30-sample lookback truncates older context"</strong> — increase the
+  limit (be careful — long histories can include obsolete process
+  conditions, distorting limits).</li>
+<li><strong>"Critical dimensions trigger too many false positives"</strong> — 2σ
+  limits are by design tighter. If false positives dominate,
+  reconsider whether the dimension is truly critical.</li>
+</ul>
+<h2 id="customisation-alternative-control-chart-types">Customisation: alternative control chart types</h2>
+<p>The default chart is an X-bar (sample mean) chart. To add an R-bar
+(range) chart:</p>
+<pre><code class="language-python">def _compute_range(self):
+    # Group by dimension+workcenter, return range per period
+    ...
+</code></pre>
+<p>Add a new view + widget; route via dimension's <code>chart_type</code>
+selection.</p>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> New sample with value 4.95 on a normal dimension (3σ).
+Last 30 samples cluster around 5.0 with stdev 0.02. In control?</p>
+<blockquote>
+<p>Mean ± 3σ = 5.0 ± 0.06 = (4.94, 5.06). 4.95 is inside → in control.</p>
+</blockquote>
+<p><strong>Q2.</strong> Same dimension marked critical (2σ). Same sample?</p>
+<blockquote>
+<p>Mean ± 2σ = 5.0 ± 0.04 = (4.96, 5.04). 4.95 is BELOW LCL → out of
+control.</p>
+</blockquote>
+<p><strong>Q3.</strong> Sample lookback is 30. Process changed significantly 60
+days ago. Limits reflect what?</p>
+<blockquote>
+<p>The last 30 samples — so post-change conditions only. Good IF
+sample density is &lt; 30 samples per 60 days. If denser, limits
+may still reflect old behaviour.</p>
+</blockquote>
+<p><strong>Q4.</strong> You want to surface rule-4 (9 consecutive points one side)
+breaches to Hermes. Where?</p>
+<blockquote>
+<p>Add a hook in <code>_check_western_electric_rules()</code> that posts a
+recommendation via <code>mi_engine_ext</code>. Don't compute Hermes calls
+from the chart widget — keep render lean.</p>
+</blockquote>
+<p><strong>Q5.</strong> Chart cache TTL is 60s. Sample entered now; visible in
+chart?</p>
+<blockquote>
+<p>Within 60s due to client cache. Force refresh = explicit
+<code>chart_refresh()</code> action on the widget.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_22_quality_cpk_engine" model="slide.slide">
+            <field name="name">Quality Module — Cpk Compute Engine</field>
+            <field name="channel_id" ref="course_quality_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Developer extending the Cpk computation.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-module-cpk-compute-engine">Quality Module — Cpk Compute Engine</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookQualityCpkReport(models.Model):
+    _name = &quot;southbrook.quality.cpk_report&quot;
+    _description = &quot;Process Capability Report&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">dimension_id   = fields.Many2one(required=True)
+period_days    = fields.Integer(default=30)
+sample_count   = fields.Integer(readonly=True)
+mean           = fields.Float(readonly=True, digits=(12, 4))
+stdev          = fields.Float(readonly=True, digits=(12, 4))
+cp             = fields.Float(readonly=True, digits=(8, 3))
+cpk            = fields.Float(readonly=True, digits=(8, 3))
+cpk_lower      = fields.Float(readonly=True, digits=(8, 3))
+cpk_upper      = fields.Float(readonly=True, digits=(8, 3))
+computed_at    = fields.Datetime(readonly=True)
+sample_ids     = fields.Many2many(
+    &quot;southbrook.quality.spc_sample&quot;,
+    compute=&quot;_compute_sample_ids&quot;, store=False)
+</code></pre>
+<h2 id="the-compute">The compute</h2>
+<pre><code class="language-python">def action_compute(self):
+    self.ensure_one()
+    domain = [
+        (&quot;dimension_id&quot;, &quot;=&quot;, self.dimension_id.id),
+        (&quot;taken_at&quot;, &quot;&gt;=&quot;, fields.Datetime.now() -
+                            relativedelta(days=self.period_days)),
+    ]
+    samples = self.env[&quot;southbrook.quality.spc_sample&quot;].search(domain)
+    if len(samples) &lt; 5:
+        raise UserError(_(&quot;Need at least 5 samples; have %d&quot;) % len(samples))
+    values = samples.mapped(&quot;measured_value&quot;)
+    n = len(values)
+    mean = sum(values) / n
+    stdev = (sum((v - mean) ** 2 for v in values) / (n - 1)) ** 0.5
+    usl = self.dimension_id.usl
+    lsl = self.dimension_id.lsl
+    self.write({
+        &quot;sample_count&quot;: n,
+        &quot;mean&quot;: mean,
+        &quot;stdev&quot;: stdev,
+        &quot;cp&quot;: (usl - lsl) / (6 * stdev) if stdev else 0,
+        &quot;cpk_upper&quot;: (usl - mean) / (3 * stdev) if stdev else 0,
+        &quot;cpk_lower&quot;: (mean - lsl) / (3 * stdev) if stdev else 0,
+        &quot;cpk&quot;: min((usl - mean) / (3 * stdev) if stdev else 0,
+                   (mean - lsl) / (3 * stdev) if stdev else 0),
+        &quot;computed_at&quot;: fields.Datetime.now(),
+    })
+</code></pre>
+<h2 id="notes-on-the-math">Notes on the math</h2>
+<h3 id="sample-standard-deviation-not-population">Sample standard deviation, not population</h3>
+<p>We divide by <code>(n - 1)</code>, not <code>n</code>. This is the standard estimator
+for a finite sample. Using <code>n</code> would systematically underestimate
+variability.</p>
+<h3 id="idempotent-compute">Idempotent compute</h3>
+<p>Calling <code>action_compute()</code> twice in a row produces the same result
+(deterministic). Useful for re-running after spotting an
+adjustment.</p>
+<h3 id="no-statistical-significance-test">No statistical significance test</h3>
+<p>Cpk is reported as a point estimate. A confidence interval would
+require knowing the sample size's effect on the estimate's
+precision. Not implemented; v1.1 candidate.</p>
+<h2 id="trustworthiness-threshold">Trustworthiness threshold</h2>
+<p>Cpk on <code>&lt; 30</code> samples is statistically noisy. The platform allows
+compute at 5+ but the form displays a warning. Don't act on
+sub-30-sample Cpk values.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Cpk = 0"</strong> — <code>stdev = 0</code> because all samples were identical.
+  Either the operator is measuring the same item repeatedly or
+  the gauge has zero precision. Re-sample with calibrated tool.</li>
+<li><strong>"Cpk negative"</strong> — process mean is outside spec entirely (mean &lt;
+  lsl OR mean &gt; usl). Halt + investigate.</li>
+<li><strong>"Cpk recompute didn't change"</strong> — same period + same samples =
+  same result. Either the lookback didn't catch new samples
+  (check <code>period_days</code>) or no new samples have come in.</li>
+</ul>
+<h2 id="customisation-add-pp-long-term-capability">Customisation: add Pp (long-term capability)</h2>
+<p>Pp uses long-term standard deviation across multiple periods. To
+add:</p>
+<pre><code class="language-python">pp = fields.Float(compute=&quot;_compute_pp&quot;)
+
+def _compute_pp(self):
+    # Compute stdev over a longer window (90 days)
+    # then Pp = (usl - lsl) / (6 * long_term_stdev)
+    ...
+</code></pre>
+<p>Pp will be lower than Cp for processes that drift; the
+short-vs-long comparison is informative.</p>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> USL = 5.2, LSL = 4.8, mean = 5.0, stdev = 0.05, n = 100.
+Cpk?</p>
+<blockquote>
+<p>Cp = (5.2 - 4.8) / (6 × 0.05) = 1.333
+Cpk_upper = (5.2 - 5.0) / (0.15) = 1.333
+Cpk_lower = (5.0 - 4.8) / (0.15) = 1.333
+Cpk = min = <strong>1.333</strong> (capable)</p>
+</blockquote>
+<p><strong>Q2.</strong> Same except mean = 5.10. Cpk?</p>
+<blockquote>
+<p>Cpk_upper = (5.2 - 5.1) / (0.15) = 0.667
+Cpk_lower = (5.1 - 4.8) / (0.15) = 2.0
+Cpk = <strong>0.667</strong> (NOT capable, drifted high)</p>
+</blockquote>
+<p><strong>Q3.</strong> stdev computed using <code>n</code> instead of <code>n-1</code>. Effect on Cpk?</p>
+<blockquote>
+<p>Underestimates stdev → overstates Cpk. Process looks more
+capable than it is. Don't do this.</p>
+</blockquote>
+<p><strong>Q4.</strong> Cpk = 1.5 with sample_count = 8. Action?</p>
+<blockquote>
+<p>Wait. 8 samples is too few; the 1.5 estimate has huge confidence
+interval. Sample more, recompute at 30+.</p>
+</blockquote>
+<p><strong>Q5.</strong> USL or LSL missing on dimension. Compute called. What
+happens?</p>
+<blockquote>
+<p><code>usl - lsl = None - None = TypeError</code>. Add a validation in
+<code>action_compute()</code> to raise UserError if usl/lsl unset.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_22_quality_dimension_master" model="slide.slide">
+            <field name="name">Quality Module — Dimension Master and Version Control</field>
+            <field name="channel_id" ref="course_quality_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer or admin maintaining the dimension master.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-module-dimension-master-and-version-control">Quality Module — Dimension Master and Version Control</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookQualityDimension(models.Model):
+    _name = &quot;southbrook.quality.dimension&quot;
+    _description = &quot;Quality Dimension Master Spec&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name        = fields.Char(required=True)
+description = fields.Text()
+nominal     = fields.Float(required=True, digits=(12, 4))
+usl         = fields.Float(required=True, digits=(12, 4))
+lsl         = fields.Float(required=True, digits=(12, 4))
+unit_of_measure = fields.Many2one(&quot;uom.uom&quot;, required=True)
+applicable_workcenter_ids = fields.Many2many(&quot;mrp.workcenter&quot;)
+sample_frequency = fields.Selection([
+    (&quot;per_hour&quot;, &quot;Per Hour&quot;),
+    (&quot;per_50_units&quot;, &quot;Per 50 Units&quot;),
+    (&quot;per_shift&quot;, &quot;Per Shift&quot;),
+    (&quot;per_day&quot;, &quot;Per Day&quot;),
+], default=&quot;per_50_units&quot;)
+is_critical = fields.Boolean(default=False)
+</code></pre>
+<h2 id="version-control-via-chatter">Version control via chatter</h2>
+<p>Every write to <code>nominal</code>, <code>usl</code>, <code>lsl</code>, <code>sample_frequency</code>,
+<code>is_critical</code> is tracked in the chatter via <code>mail.thread</code>.
+Historical values are derived from chatter history.</p>
+<p>This is a deliberate simplification. A full version-control model
+(with explicit <code>dimension_revision</code> records, effectivity dates,
+ECO links) was considered + deferred. The chatter trail is
+sufficient for audit; explicit versioning is v1.1 if needed.</p>
+<h2 id="effectivity-windows">Effectivity windows</h2>
+<p>If you change USL/LSL today, all NEW SPC samples are evaluated
+against the new limits. All EXISTING samples were evaluated at
+their creation time (<code>is_in_control</code> is stored, not lazy).</p>
+<p>This means a chart will look discontinuous around the change date —
+old samples on old math, new samples on new math. Document the
+change in the chatter so anyone reading the chart understands.</p>
+<h2 id="adding-a-dimension">Adding a dimension</h2>
+<p>Two paths:</p>
+<h3 id="xml-recommended-for-shipped-defaults">XML (recommended for shipped defaults)</h3>
+<pre><code class="language-xml">&lt;record id=&quot;dimension_panel_thickness_18mm&quot; model=&quot;southbrook.quality.dimension&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;Panel Thickness 18mm Board (SB-CNC-BORE)&lt;/field&gt;
+    &lt;field name=&quot;nominal&quot;&gt;18.0&lt;/field&gt;
+    &lt;field name=&quot;usl&quot;&gt;18.2&lt;/field&gt;
+    &lt;field name=&quot;lsl&quot;&gt;17.8&lt;/field&gt;
+    &lt;field name=&quot;unit_of_measure&quot; ref=&quot;uom.product_uom_millimeter&quot;/&gt;
+    &lt;field name=&quot;applicable_workcenter_ids&quot; eval=&quot;[(4, ref('mrp.mrp_workcenter_5'))]&quot;/&gt;
+    &lt;field name=&quot;sample_frequency&quot;&gt;per_50_units&lt;/field&gt;
+    &lt;field name=&quot;is_critical&quot; eval=&quot;True&quot;/&gt;
+&lt;/record&gt;
+</code></pre>
+<h3 id="ui-for-shop-floor-additions">UI (for shop-floor additions)</h3>
+<p><em>Quality → Dimensions → New</em>. Quality manager or curator role.</p>
+<h2 id="linking-dimensions-to-products">Linking dimensions to products</h2>
+<p>Dimensions can be associated with <code>product.template</code> via an m2m
+extension:</p>
+<pre><code class="language-python">class ProductTemplate(models.Model):
+    _inherit = &quot;product.template&quot;
+
+    quality_dimension_ids = fields.Many2many(
+        &quot;southbrook.quality.dimension&quot;,
+        string=&quot;Quality Dimensions&quot;,
+    )
+</code></pre>
+<p>This drives the SPC plan — when a product is being made, the
+applicable dimensions are auto-suggested for sampling.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Changed USL but old chart still shows old limit"</strong> — limits
+  cached client-side; reload. New samples will use new limits.</li>
+<li><strong>"Dimension archived but old samples still exist"</strong> — archiving
+  preserves data; the dimension just doesn't show in search.
+  Samples remain queryable via direct SQL.</li>
+<li><strong>"Critical flag toggled but Western Electric rules didn't
+  rerun"</strong> — only new samples re-evaluate. Old samples retain
+  their original <code>is_in_control</code> value.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> USL changed from 5.2 to 5.1 today. Existing samples with
+value 5.15 — in control or out?</p>
+<blockquote>
+<p>Their <code>is_in_control</code> was stored at create time using old limits.
+Out of new spec but still showing <code>is_in_control = True</code> (from
+old math). To re-evaluate, run a one-time script:
+<code>samples.filtered(...).write({'is_in_control': ...})</code>.</p>
+</blockquote>
+<p><strong>Q2.</strong> Dimension archived. Search still returns it?</p>
+<blockquote>
+<p>No — search excludes <code>active=False</code> by default. Toggle
+<em>Show Archived</em> to see.</p>
+</blockquote>
+<p><strong>Q3.</strong> Dimension's <code>is_critical</code> toggled true. Control limits
+recompute on what?</p>
+<blockquote>
+<p>Next sample creation. Critical = 2σ; old samples stay on 3σ math.</p>
+</blockquote>
+<p><strong>Q4.</strong> Dimension linked to 3 workcenters via m2m. SPC samples
+from a 4th workcenter (not in the m2m). Allowed?</p>
+<blockquote>
+<p>Yes — the m2m is advisory. The platform doesn't reject samples
+from non-listed workcenters. Documentation suggests the m2m =
+"where this dimension applies" for SPC planning purposes.</p>
+</blockquote>
+<p><strong>Q5.</strong> Where in code is <code>is_in_control</code> computed?</p>
+<blockquote>
+<p><code>southbrook.quality.spc_sample._compute_in_control()</code>. Called
+on every create + write to <code>measured_value</code>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_22_quality_supplier_mi" model="slide.slide">
+            <field name="name">Quality Module — Supplier Defect Rollup and MI Engine Integration</field>
+            <field name="channel_id" ref="course_quality_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Developer extending supplier scoring or MI engine integration.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-module-supplier-defect-rollup-and-mi-engine-integration">Quality Module — Supplier Defect Rollup and MI Engine Integration</h1>
+<h2 id="the-supplier_defect-model">The supplier_defect model</h2>
+<pre><code class="language-python">class SouthbrookQualitySupplierDefect(models.Model):
+    _name = &quot;southbrook.quality.supplier_defect&quot;
+    _description = &quot;Supplier Defect&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">supplier_id     = fields.Many2one(&quot;res.partner&quot;, required=True,
+                                   domain=&quot;[('supplier_rank', '&gt;', 0)]&quot;)
+po_id           = fields.Many2one(&quot;purchase.order&quot;, required=True)
+product_id      = fields.Many2one(&quot;product.product&quot;, required=True)
+defect_count    = fields.Integer(default=1)
+defect_type     = fields.Selection([...])
+severity        = fields.Selection([...])
+description     = fields.Text()
+linked_ncr_ids  = fields.Many2many(&quot;southbrook.ncr&quot;)
+is_warranty_claim = fields.Boolean(default=False)
+detected_at     = fields.Date(default=fields.Date.context_today)
+</code></pre>
+<h2 id="the-nightly-rollup">The nightly rollup</h2>
+<p>Cron <code>cron_rollup_supplier_scores</code> runs at 03:30 daily:</p>
+<pre><code class="language-python">@api.model
+def _cron_rollup_supplier_scores(self):
+    for partner in self.env[&quot;res.partner&quot;].search(
+        [(&quot;supplier_rank&quot;, &quot;&gt;&quot;, 0)]):
+        self._rollup_for_partner(partner)
+
+
+def _rollup_for_partner(self, partner):
+    period_days = 90
+    cutoff = fields.Date.context_today() - relativedelta(days=period_days)
+    defects = self.env[&quot;southbrook.quality.supplier_defect&quot;].search([
+        (&quot;supplier_id&quot;, &quot;=&quot;, partner.id),
+        (&quot;detected_at&quot;, &quot;&gt;=&quot;, cutoff),
+    ])
+    receipts = self.env[&quot;stock.move&quot;].search([
+        (&quot;partner_id&quot;, &quot;=&quot;, partner.id),
+        (&quot;state&quot;, &quot;=&quot;, &quot;done&quot;),
+        (&quot;date&quot;, &quot;&gt;=&quot;, cutoff),
+        (&quot;location_dest_id.usage&quot;, &quot;=&quot;, &quot;internal&quot;),
+    ])
+    total_defect_count = sum(d.defect_count for d in defects)
+    total_received_qty = sum(r.product_uom_qty for r in receipts)
+
+    defect_rate = total_defect_count / total_received_qty \
+                  if total_received_qty else 0
+
+    # on_time_delivery_pct from PO date vs receipt date
+    on_time = self._compute_on_time(partner, cutoff)
+
+    consolidated = 0.4 * (1 - defect_rate) + 0.4 * on_time + \
+                   0.2 * partner.lead_time_consistency
+
+    partner.write({
+        &quot;defect_rate_pct&quot;: defect_rate * 100,
+        &quot;on_time_delivery_pct&quot;: on_time * 100,
+        &quot;consolidated_score&quot;: consolidated,
+    })
+</code></pre>
+<h2 id="trend-sparkline">Trend sparkline</h2>
+<p>The trend uses JSON storage on the partner:</p>
+<pre><code class="language-python">class ResPartner(models.Model):
+    _inherit = &quot;res.partner&quot;
+
+    score_trend = fields.Json(default=lambda s: [])
+    # ... [0.85, 0.82, 0.78, ...]  — last 6 monthly snapshots
+</code></pre>
+<p>Sparkline rendered client-side from the JSON.</p>
+<h2 id="mi-engine-integration">MI engine integration</h2>
+<p>The MI engine surfaces three things from quality:</p>
+<ol>
+<li><strong>Critical NCR opened</strong> → recommendation for Plant GM</li>
+<li><strong>SPC rule breach</strong> → recommendation for quality manager</li>
+<li><strong>Supplier score below threshold</strong> → recommendation for
+   purchasing manager</li>
+</ol>
+<p>These hooks live in <code>mi_engine_ext.py</code>:</p>
+<pre><code class="language-python">class MiEngineExt(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.engine&quot;
+
+    @api.model
+    def _check_quality_signals(self):
+        &quot;&quot;&quot;Called from the MI engine's main loop.&quot;&quot;&quot;
+        # Critical NCRs
+        critical_ncrs = self.env[&quot;southbrook.ncr&quot;].search([
+            (&quot;severity&quot;, &quot;=&quot;, &quot;critical&quot;),
+            (&quot;state&quot;, &quot;in&quot;, (&quot;open&quot;, &quot;quarantine&quot;)),
+        ])
+        for ncr in critical_ncrs:
+            self._emit_recommendation(
+                subject=f&quot;Critical NCR {ncr.name}&quot;,
+                body=ncr.description or &quot;&quot;,
+                affected_records=ncr,
+                persona=&quot;mfg_manager&quot;,
+            )
+</code></pre>
+<h2 id="adding-a-new-mi-signal">Adding a new MI signal</h2>
+<p>To surface a new type of quality signal:</p>
+<ol>
+<li>Add detection logic to <code>_check_quality_signals()</code></li>
+<li>Use <code>_emit_recommendation()</code> with appropriate persona</li>
+<li>The recommendation lands in <code>hermes.recommendation</code> for human
+   review (Course 21 lesson 21.4)</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Supplier scorecard doesn't update after I log defects"</strong> —
+  nightly cron. Same-day defects don't reflect until tomorrow.</li>
+<li><strong>"Critical NCR didn't surface to Hermes"</strong> — MI engine cron
+  didn't run, OR NCR severity wasn't <code>critical</code>, OR
+  <code>_check_quality_signals()</code> errored mid-loop. Check logs.</li>
+<li><strong>"Score trend sparkline is empty"</strong> — only populated after 6+
+  months of rollups. First 5 months: sparkline blank.</li>
+<li><strong>"<code>linked_ncr_ids</code> empty even though defect was traced to a
+  finished-goods NCR"</strong> — auto-link only fires when <code>defect_type =
+  material</code> AND PO is within 90-day lookback. Manual link
+  otherwise.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Supplier received 1,000 units over 90 days; 5 defects
+logged. Defect rate?</p>
+<blockquote>
+<p>5 / 1,000 = 0.005 = 0.5%.</p>
+</blockquote>
+<p><strong>Q2.</strong> Same supplier, on-time delivery 92%, lead-time consistency
+0.85. Consolidated score?</p>
+<blockquote>
+<p>0.4 × (1 - 0.005) + 0.4 × 0.92 + 0.2 × 0.85
+= 0.398 + 0.368 + 0.17
+= <strong>0.936</strong></p>
+</blockquote>
+<p><strong>Q3.</strong> Critical NCR opened. MI engine recommendation appears in
+queue. Persona?</p>
+<blockquote>
+<p><code>mfg_manager</code> (Plant GM). Configured in <code>_check_quality_signals()</code>.</p>
+</blockquote>
+<p><strong>Q4.</strong> Two MI cron loops both touch quality. Risk?</p>
+<blockquote>
+<p>Race condition on recommendation creation — both could emit the
+same rec. Solution: <code>_emit_recommendation()</code> should dedupe by
+subject + affected record + day.</p>
+</blockquote>
+<p><strong>Q5.</strong> You want to surface "supplier score dropped &gt; 10% in one
+month" as a recommendation. Where?</p>
+<blockquote>
+<p>Add a check in <code>_check_quality_signals()</code> comparing the new
+rollup to the prior month's score (from <code>score_trend</code> JSON).
+If delta &lt; -0.10, emit a recommendation with <code>persona =
+"purchasing"</code>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_22_quality_customisation" model="slide.slide">
+            <field name="name">Quality Module — Customisation Patterns</field>
+            <field name="channel_id" ref="course_quality_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Developer building a Southbrook-specific extension.</field>
+            <field name="html_content"><![CDATA[<h1 id="quality-module-customisation-patterns">Quality Module — Customisation Patterns</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You need to customise the Quality module for a Southbrook-specific
+flow — a new state, a new field, a new dimension type, a new
+escalation rule. This lesson covers the safe patterns + the
+anti-patterns.</p>
+<h2 id="recommended-customisation-paths">Recommended customisation paths</h2>
+<h3 id="1-extend-in-a-new-addon">1. Extend in a NEW addon</h3>
+<p>Create <code>southbrook_quality_local</code> (or whatever name):</p>
+<pre><code class="language-python"># addons/southbrook_quality_local/models/ncr.py
+class SouthbrookNcr(models.Model):
+    _inherit = &quot;southbrook.ncr&quot;
+
+    your_new_field = fields.Char()
+
+    def your_new_action(self):
+        # custom logic
+        pass
+</code></pre>
+<p>Why: keeps <code>southbrook_quality</code> upgradeable. When the upstream
+ships a new version, your customisations live in their own
+module + don't conflict.</p>
+<h3 id="2-add-a-field-via-studio-for-non-critical-fields">2. Add a field via Studio (for non-critical fields)</h3>
+<p>For simple Char fields shown on the form but not used in business
+logic, Studio is fine. Studio fields are stored in DB but not in
+source.</p>
+<p>CAVEAT: Studio fields aren't versioned in git. If you uninstall
+your tenant, they're lost. Don't use Studio for fields that need
+to survive a re-install.</p>
+<h3 id="3-override-in-your-own-addon-heavy-customisation">3. Override in your own addon (heavy customisation)</h3>
+<pre><code class="language-python">class SouthbrookNcr(models.Model):
+    _inherit = &quot;southbrook.ncr&quot;
+
+    def action_quarantine(self):
+        result = super().action_quarantine()
+        # your additional logic
+        return result
+</code></pre>
+<p>Use <code>super()</code> to preserve upstream behavior. Don't replace; extend.</p>
+<h2 id="anti-patterns">Anti-patterns</h2>
+<h3 id="dont-patch-upstream-files">Don't patch upstream files</h3>
+<p>Editing <code>addons/southbrook_quality/models/ncr.py</code> directly:
+- Loses changes on <code>git pull</code> of the platform
+- Confuses other developers
+- Makes upgrades break</p>
+<h3 id="dont-bypass-the-state-machine">Don't bypass the state machine</h3>
+<pre><code class="language-python">ncr.state = &quot;scrap&quot;  # BAD — side effects skipped
+ncr.action_scrap()   # GOOD — side effects fire
+</code></pre>
+<h3 id="dont-add-stored-computed-fields-for-transient-data">Don't add stored computed fields for transient data</h3>
+<p>Stored computed fields force recompute on every change. Use a
+non-stored compute + cache externally if needed.</p>
+<h2 id="a-worked-example-add-a-defect_owner_id-tracking-field">A worked example: add a "defect_owner_id" tracking field</h2>
+<p>Goal: track who's responsible for fixing the defect (sometimes
+different from <code>assigned_user_id</code>).</p>
+<h3 id="step-1-new-addon">Step 1: New addon</h3>
+<pre><code>addons/southbrook_quality_extensions/
+├── __manifest__.py
+├── __init__.py
+├── models/
+│   ├── __init__.py
+│   └── ncr.py
+├── views/
+│   └── ncr_form_inherit.xml
+└── security/
+    └── ir.model.access.csv
+</code></pre>
+<h3 id="step-2-model-extension">Step 2: Model extension</h3>
+<pre><code class="language-python"># models/ncr.py
+class SouthbrookNcr(models.Model):
+    _inherit = &quot;southbrook.ncr&quot;
+
+    defect_owner_id = fields.Many2one(
+        &quot;res.users&quot;,
+        string=&quot;Defect Owner&quot;,
+        help=&quot;Who's responsible for fixing this defect.&quot;,
+    )
+</code></pre>
+<h3 id="step-3-form-view-extension">Step 3: Form view extension</h3>
+<pre><code class="language-xml">&lt;record id=&quot;view_ncr_form_inherit_ext&quot; model=&quot;ir.ui.view&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;southbrook.ncr.form.inherit.ext&lt;/field&gt;
+    &lt;field name=&quot;model&quot;&gt;southbrook.ncr&lt;/field&gt;
+    &lt;field name=&quot;inherit_id&quot; ref=&quot;southbrook_quality.view_southbrook_ncr_form&quot;/&gt;
+    &lt;field name=&quot;arch&quot; type=&quot;xml&quot;&gt;
+        &lt;xpath expr=&quot;//field[@name='reported_by']&quot; position=&quot;after&quot;&gt;
+            &lt;field name=&quot;defect_owner_id&quot;/&gt;
+        &lt;/xpath&gt;
+    &lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<h3 id="step-4-install-verify">Step 4: Install + verify</h3>
+<pre><code class="language-bash">./scripts/deploy_to_qnap.sh southbrook_quality_extensions
+</code></pre>
+<p>Verify in UI: open an NCR → form shows the new field.</p>
+<h2 id="adding-a-custom-state">Adding a custom state</h2>
+<p>Goal: add a <code>pending_supplier_response</code> state for when supplier
+needs to investigate.</p>
+<h3 id="step-1-extend-the-selection">Step 1: Extend the selection</h3>
+<pre><code class="language-python">class SouthbrookNcr(models.Model):
+    _inherit = &quot;southbrook.ncr&quot;
+
+    state = fields.Selection(
+        selection_add=[(&quot;pending_supplier_response&quot;, &quot;Pending Supplier&quot;)],
+        ondelete={&quot;pending_supplier_response&quot;: &quot;set default&quot;},
+    )
+</code></pre>
+<h3 id="step-2-add-the-transition-method">Step 2: Add the transition method</h3>
+<pre><code class="language-python">def action_pending_supplier_response(self):
+    self.ensure_one()
+    self.state = &quot;pending_supplier_response&quot;
+    self.message_post(body=_(&quot;Awaiting supplier investigation&quot;))
+    # Notify supplier
+    ...
+</code></pre>
+<h3 id="step-3-form-button">Step 3: Form button</h3>
+<pre><code class="language-xml">&lt;button name=&quot;action_pending_supplier_response&quot;
+        string=&quot;Pending Supplier&quot;
+        invisible=&quot;state != 'quarantine'&quot;
+        type=&quot;object&quot;/&gt;
+</code></pre>
+<h3 id="step-4-statusbar-update">Step 4: Statusbar update</h3>
+<pre><code class="language-xml">&lt;field name=&quot;state&quot; widget=&quot;statusbar&quot;
+       statusbar_visible=&quot;draft,quarantine,pending_supplier_response,rework,scrap,accept&quot;/&gt;
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Custom field doesn't appear on the form"</strong> — view inherit XPath
+  wrong. Test with the view in <em>Settings → Technical → Views</em> +
+  <em>Try the Inheritance</em>.</li>
+<li><strong>"State extension fires v19 validation"</strong> — <code>ondelete</code> clause
+  was missing. v19 requires explicit handling.</li>
+<li><strong>"Override broke upstream behavior"</strong> — forgot <code>super()</code>. Always
+  call super in overrides.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> You want to add a Boolean to NCR. Pure Studio OK?</p>
+<blockquote>
+<p>Studio fields aren't in source. If the field has business value
+(used in reports, rules, exports), put it in a custom module.
+Studio is for cosmetic fields.</p>
+</blockquote>
+<p><strong>Q2.</strong> You override <code>action_scrap()</code> to skip the
+<code>procurement.group.run()</code> call. Why is this risky?</p>
+<blockquote>
+<p>The native scrap → re-MO flow depends on it. Skipping breaks
+fulfilment. Either don't override, or call super first then skip
+the specific bit you want to bypass via a flag on the NCR.</p>
+</blockquote>
+<p><strong>Q3.</strong> New <code>defect_type</code> value needs to be added. Source-control
+approach?</p>
+<blockquote>
+<p>Custom module with <code>selection_add=[...]</code> on the field. v19
+requires <code>ondelete</code> clause. Don't edit upstream selection list.</p>
+</blockquote>
+<p><strong>Q4.</strong> Two custom addons both extend <code>southbrook.ncr.state</code> with
+new values. Conflict?</p>
+<blockquote>
+<p>No — both load; the resulting state field has both extensions.
+But ordering matters for <code>ondelete</code> defaults; check load order
+in module dependencies.</p>
+</blockquote>
+<p><strong>Q5.</strong> Your override breaks <code>mail.thread</code> audit trail. Why?</p>
+<blockquote>
+<p>You may have replaced <code>write()</code> or <code>create()</code> without calling
+super. Always <code>super().write(...)</code> for the audit to log.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

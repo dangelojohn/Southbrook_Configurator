@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- ============================================================
+             Department tags (8) — JTBD discovery axis.
+             Course-tags are auto-seeded from slide.channel by the
+             post_init_hook; department/role/module tags are seeded
+             here because they're orthogonal to courses.
+        ============================================================= -->
+        <record id="tag_dept_sales" model="southbrook.training.tag">
+            <field name="name">Sales</field>
+            <field name="kind">department</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="tag_dept_design" model="southbrook.training.tag">
+            <field name="name">Design / Engineering</field>
+            <field name="kind">department</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="tag_dept_planning" model="southbrook.training.tag">
+            <field name="name">Production Planning</field>
+            <field name="kind">department</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="tag_dept_floor" model="southbrook.training.tag">
+            <field name="name">Production Floor</field>
+            <field name="kind">department</field>
+            <field name="sequence">40</field>
+        </record>
+        <record id="tag_dept_quality" model="southbrook.training.tag">
+            <field name="name">Quality</field>
+            <field name="kind">department</field>
+            <field name="sequence">50</field>
+        </record>
+        <record id="tag_dept_maintenance" model="southbrook.training.tag">
+            <field name="name">Maintenance</field>
+            <field name="kind">department</field>
+            <field name="sequence">60</field>
+        </record>
+        <record id="tag_dept_finance" model="southbrook.training.tag">
+            <field name="name">Finance / Accounting</field>
+            <field name="kind">department</field>
+            <field name="sequence">70</field>
+        </record>
+        <record id="tag_dept_payroll" model="southbrook.training.tag">
+            <field name="name">Payroll / HR</field>
+            <field name="kind">department</field>
+            <field name="sequence">80</field>
+        </record>
+        <record id="tag_dept_warehouse" model="southbrook.training.tag">
+            <field name="name">Warehouse / Shipping</field>
+            <field name="kind">department</field>
+            <field name="sequence">90</field>
+        </record>
+        <record id="tag_dept_exec" model="southbrook.training.tag">
+            <field name="name">Executive</field>
+            <field name="kind">department</field>
+            <field name="sequence">100</field>
+        </record>
+        <record id="tag_dept_sysadmin" model="southbrook.training.tag">
+            <field name="name">Sysadmin</field>
+            <field name="kind">department</field>
+            <field name="sequence">110</field>
+        </record>
+
+        <!-- ============================================================
+             Role tags — concrete daily jobs, NOT job titles.
+        ============================================================= -->
+        <record id="tag_role_sales_rep" model="southbrook.training.tag">
+            <field name="name">Sales Rep</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_estimator" model="southbrook.training.tag">
+            <field name="name">Estimator</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_designer" model="southbrook.training.tag">
+            <field name="name">Designer / ECO Engineer</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_planner" model="southbrook.training.tag">
+            <field name="name">Production Planner</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_plant_gm" model="southbrook.training.tag">
+            <field name="name">Plant GM</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_operator_cnc" model="southbrook.training.tag">
+            <field name="name">CNC Operator</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_operator_edge" model="southbrook.training.tag">
+            <field name="name">Edge Banding Operator</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_operator_assy" model="southbrook.training.tag">
+            <field name="name">Assembler</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_operator_finish" model="southbrook.training.tag">
+            <field name="name">Finisher</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_quality" model="southbrook.training.tag">
+            <field name="name">Quality Manager</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_maintenance" model="southbrook.training.tag">
+            <field name="name">Maintenance Lead</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_controller" model="southbrook.training.tag">
+            <field name="name">Controller</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_payroll_admin" model="southbrook.training.tag">
+            <field name="name">Payroll Administrator</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_customer_service" model="southbrook.training.tag">
+            <field name="name">Customer Service</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_installer" model="southbrook.training.tag">
+            <field name="name">Installer</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_sysadmin" model="southbrook.training.tag">
+            <field name="name">Sysadmin</field>
+            <field name="kind">role</field>
+        </record>
+        <record id="tag_role_exec" model="southbrook.training.tag">
+            <field name="name">Executive / Owner</field>
+            <field name="kind">role</field>
+        </record>
+
+        <!-- ============================================================
+             Module tags — one per Southbrook addon.
+        ============================================================= -->
+        <record id="tag_mod_estimating" model="southbrook.training.tag">
+            <field name="name">southbrook_estimating</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_estimating_website" model="southbrook.training.tag">
+            <field name="name">southbrook_estimating_website</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_configurator_ux" model="southbrook.training.tag">
+            <field name="name">southbrook_configurator_ux</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_plm" model="southbrook.training.tag">
+            <field name="name">southbrook_plm</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_freecad" model="southbrook.training.tag">
+            <field name="name">southbrook_freecad_bridge</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_mrp_pm" model="southbrook.training.tag">
+            <field name="name">southbrook_mrp_pm</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_kitchen_mrp" model="southbrook.training.tag">
+            <field name="name">southbrook_kitchen_mrp</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_kitchen_workspace" model="southbrook.training.tag">
+            <field name="name">southbrook_kitchen_workspace</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_mi" model="southbrook.training.tag">
+            <field name="name">southbrook_manufacturing_intelligence</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_premium" model="southbrook.training.tag">
+            <field name="name">southbrook_premium_orchestration</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_quality" model="southbrook.training.tag">
+            <field name="name">southbrook_quality</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_payroll_ca" model="southbrook.training.tag">
+            <field name="name">southbrook_payroll_ca</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_finance_pack" model="southbrook.training.tag">
+            <field name="name">southbrook_finance_pack</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_integrations" model="southbrook.training.tag">
+            <field name="name">southbrook_integrations</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_mes_mps" model="southbrook.training.tag">
+            <field name="name">southbrook_mes_mps</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_cmms_wms" model="southbrook.training.tag">
+            <field name="name">southbrook_cmms_wms</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_exec_dashboard" model="southbrook.training.tag">
+            <field name="name">southbrook_exec_dashboard</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_hermes" model="southbrook.training.tag">
+            <field name="name">southbrook_hermes</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_hermes_bom" model="southbrook.training.tag">
+            <field name="name">southbrook_hermes_bom</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_customer_portal" model="southbrook.training.tag">
+            <field name="name">southbrook_customer_portal</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_dealer_portal" model="southbrook.training.tag">
+            <field name="name">southbrook_dealer_portal</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_installer" model="southbrook.training.tag">
+            <field name="name">southbrook_installer</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_hardware_catalog" model="southbrook.training.tag">
+            <field name="name">southbrook_hardware_catalog</field>
+            <field name="kind">module</field>
+        </record>
+        <record id="tag_mod_ai_design" model="southbrook.training.tag">
+            <field name="name">southbrook_ai_design</field>
+            <field name="kind">module</field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Workcenter Bottlenecks board — Phase 1.4
+        Surfaces active mrp.workcenter records using stock Odoo views.
+        Custom kanban/list omitted because v19's mrp.workcenter has
+        load-order quirks around capacity/load fields that fail view
+        validation during -u even when the fields exist in fields_get.
+        Falling back to stock views is safer and the killer signal
+        (load vs capacity) shows up there anyway.
+    -->
+    <record id="action_workcenter_bottleneck_board" model="ir.actions.act_window">
+        <field name="name">Workcenter Bottlenecks</field>
+        <field name="res_model">mrp.workcenter</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('active','=',True)]</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No active workcenters
+            </p>
+            <p>
+                Workcenters surface here with their load vs capacity so
+                the production team can spot bottlenecks before they
+                impact install dates.
+            </p>
+        </field>
+    </record>
+</odoo>

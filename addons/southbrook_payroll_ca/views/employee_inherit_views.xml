@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Conservative inherit: smart-button counters only, no notebook xpath.
+  v19 CE hr.employee form has chained inherits referencing skill_id
+  (singular) which doesn't exist on hr.employee (the field is skill_ids,
+  plural). Touching //notebook triggers a re-validation pass that
+  surfaces that broken ref as a load-time error. Smart buttons via the
+  oe_button_box xpath are safe — the chain doesn't re-validate.
+
+  Certifications are accessed via HR → Canadian Payroll → Certifications
+  menu and via the smart button on the employee form.
+-->
+<odoo>
+    <record id="view_hr_employee_form_southbrook_payroll" model="ir.ui.view">
+        <field name="name">hr.employee.form.southbrook.payroll</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
+                <button name="action_view_payroll_contracts" type="object"
+                        class="oe_stat_button" icon="fa-file-text-o"
+                        groups="southbrook_payroll_ca.group_southbrook_payroll_user">
+                    <field name="payroll_contract_count" widget="statinfo" string="Contracts"/>
+                </button>
+                <button name="action_view_certifications" type="object"
+                        class="oe_stat_button" icon="fa-certificate"
+                        groups="southbrook_payroll_ca.group_southbrook_payroll_user">
+                    <field name="cert_count" widget="statinfo" string="Certifications"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Tool Lifecycle Board — surfaces southbrook.tool.asset (saws,
+        blades, calipers, etc.) grouped by current condition with a
+        remaining-life progress bar. Powers the practical-intelligence
+        loop: tool consumption gets debited on WO finish; the board
+        is how the floor team sees that signal.
+    -->
+
+    <record id="view_tool_lifecycle_kanban" model="ir.ui.view">
+        <field name="name">southbrook.tool.asset.lifecycle.kanban</field>
+        <field name="model">southbrook.tool.asset</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="condition"
+                    class="o_kanban_small_column"
+                    sample="1">
+                <field name="name"/>
+                <field name="condition"/>
+                <field name="lifecycle_state"/>
+                <field name="remaining_life_qty"/>
+                <field name="estimated_life_qty"/>
+                <field name="next_sharpening_due_date"/>
+                <field name="next_calibration_due_date"/>
+                <field name="last_used_workorder_id"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_record_top">
+                            <div class="o_kanban_record_headings">
+                                <strong>
+                                    <field name="name"/>
+                                </strong>
+                            </div>
+                            <field name="lifecycle_state"
+                                   widget="label_selection"
+                                   options="{'classes': {'retired':'danger','needs_sharpening':'warning','needs_calibration':'warning','in_use':'info','available':'success'}}"/>
+                        </div>
+                        <div class="o_kanban_record_body">
+                            <div t-if="record.estimated_life_qty.raw_value">
+                                <span class="fw-bold">Life: </span>
+                                <field name="remaining_life_qty"
+                                       widget="progressbar"
+                                       options="{'current_value': 'remaining_life_qty', 'max_value': 'estimated_life_qty'}"/>
+                            </div>
+                            <div t-if="record.next_sharpening_due_date.raw_value">
+                                <span class="fw-bold">Sharpen: </span>
+                                <field name="next_sharpening_due_date"/>
+                            </div>
+                            <div t-if="record.next_calibration_due_date.raw_value">
+                                <span class="fw-bold">Calibrate: </span>
+                                <field name="next_calibration_due_date"/>
+                            </div>
+                            <div t-if="record.last_used_workorder_id.raw_value">
+                                <span class="fw-bold">Last WO: </span>
+                                <field name="last_used_workorder_id"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_tool_lifecycle_list" model="ir.ui.view">
+        <field name="name">southbrook.tool.asset.lifecycle.list</field>
+        <field name="model">southbrook.tool.asset</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <list string="Tool Lifecycle"
+                  decoration-danger="lifecycle_state == 'retired'"
+                  decoration-warning="lifecycle_state in ('needs_sharpening','needs_calibration')"
+                  decoration-success="lifecycle_state == 'available'">
+                <field name="name"/>
+                <field name="condition"/>
+                <field name="lifecycle_state" widget="badge"
+                       decoration-danger="lifecycle_state == 'retired'"
+                       decoration-warning="lifecycle_state in ('needs_sharpening','needs_calibration')"
+                       decoration-success="lifecycle_state == 'available'"/>
+                <field name="remaining_life_qty"/>
+                <field name="estimated_life_qty"/>
+                <field name="next_sharpening_due_date"/>
+                <field name="next_calibration_due_date"/>
+                <field name="last_used_workorder_id" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tool_lifecycle_form" model="ir.ui.view">
+        <field name="name">southbrook.tool.asset.lifecycle.form</field>
+        <field name="model">southbrook.tool.asset</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <form string="Tool Asset">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="e.g. Felder K700 Blade #3"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Condition">
+                            <field name="condition"/>
+                            <field name="lifecycle_state"/>
+                        </group>
+                        <group string="Life">
+                            <field name="remaining_life_qty"/>
+                            <field name="estimated_life_qty"/>
+                        </group>
+                        <group string="Schedule">
+                            <field name="next_sharpening_due_date"/>
+                            <field name="next_calibration_due_date"/>
+                        </group>
+                        <group string="Usage">
+                            <field name="last_used_workorder_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tool_lifecycle_search" model="ir.ui.view">
+        <field name="name">southbrook.tool.asset.lifecycle.search</field>
+        <field name="model">southbrook.tool.asset</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <search string="Tool Lifecycle">
+                <field name="name"/>
+                <field name="last_used_workorder_id"/>
+                <filter name="needs_attention"
+                        string="Needs Attention"
+                        domain="[('lifecycle_state','in',('needs_sharpening','needs_calibration'))]"/>
+                <filter name="retired"
+                        string="Retired"
+                        domain="[('lifecycle_state','=','retired')]"/>
+                <filter name="available"
+                        string="Available"
+                        domain="[('lifecycle_state','=','available')]"/>
+                <group name="group_by_tool">
+                    <filter name="group_condition"
+                            string="Condition"
+                            context="{'group_by': 'condition'}"/>
+                    <filter name="group_lifecycle"
+                            string="Lifecycle State"
+                            context="{'group_by': 'lifecycle_state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_tool_lifecycle_board" model="ir.actions.act_window">
+        <field name="name">Tool Lifecycle</field>
+        <field name="res_model">southbrook.tool.asset</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[]</field>
+        <field name="search_view_id" ref="view_tool_lifecycle_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No tool assets seeded
+            </p>
+            <p>
+                Tool assets (blades, bits, calipers) seed via
+                data/tool_asset_seed.xml. As work orders close, their
+                remaining life debits down — when below threshold the
+                lifecycle_state flips to needs_sharpening or
+                needs_calibration and the asset surfaces here.
+            </p>
+        </field>
+    </record>
+
+</odoo>

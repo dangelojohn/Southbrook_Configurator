@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Quality tiles for the Manufacturing Intelligence dashboard.
+
+  Rather than inheriting the MI dashboard XML (whose structure isn't
+  stable across releases), we expose a standalone quality-snapshot
+  form. The action below is linked into the MI dashboard menu next to
+  the existing Production Intelligence board so a manager sees the
+  four quality KPIs alongside the cut/production/assembly/install
+  rollups already shipped by southbrook_manufacturing_intelligence.
+-->
+<odoo>
+    <record id="view_southbrook_quality_mi_tiles_form" model="ir.ui.view">
+        <field name="name">southbrook.quality.mi_tiles.form</field>
+        <field name="model">southbrook.quality.mi_tiles</field>
+        <field name="arch" type="xml">
+            <form string="Quality Tiles" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Quality - Manufacturing Intelligence</h1>
+                    </div>
+                    <group>
+                        <group string="Yield">
+                            <field name="quality_fpy_30d"
+                                   widget="percentage"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Open Workload">
+                            <field name="quality_open_ncr_count" readonly="1"/>
+                            <field name="quality_critical_open_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Supplier">
+                            <field name="quality_supplier_defect_rate_30d"
+                                   widget="percentage"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_southbrook_quality_mi_tiles" model="ir.actions.act_window">
+        <field name="name">Quality MI Tiles</field>
+        <field name="res_model">southbrook.quality.mi_tiles</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_southbrook_quality_mi_tiles_form"/>
+        <field name="target">current</field>
+    </record>
+
+    <!-- Seed one snapshot row so the action opens cleanly without a
+         create gesture. noupdate=1 so manual edits survive upgrades. -->
+    <data noupdate="1">
+        <record id="mi_tiles_singleton" model="southbrook.quality.mi_tiles">
+            <field name="label">Quality Tiles</field>
+        </record>
+    </data>
+</odoo>

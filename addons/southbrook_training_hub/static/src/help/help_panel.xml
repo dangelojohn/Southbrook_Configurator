@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_training_hub.HelpPanelDialog">
+        <Dialog title.translate="Training Help" size="'lg'" contentClass="'sb-training-help-dialog'">
+            <div class="sb-training-help-body">
+                <div class="sb-training-help-search mb-3">
+                    <input type="search"
+                           class="form-control"
+                           placeholder="e.g. create a kitchen quote, run payroll, open an NCR"
+                           autofocus="autofocus"
+                           t-on-input="onInput"
+                           t-att-value="state.query"/>
+                </div>
+                <div t-if="state.loading" class="text-muted small">
+                    <i class="fa fa-spinner fa-spin me-2"/> searching…
+                </div>
+                <div t-if="state.error" class="alert alert-warning small">
+                    <t t-esc="state.error"/>
+                </div>
+                <div t-if="!state.loading &amp;&amp; !state.error &amp;&amp; !state.items.length"
+                     class="text-muted small">
+                    No matching training found. Try a different verb phrase, or
+                    browse the <a href="/odoo/e-learning" target="_blank">full catalogue</a>.
+                </div>
+                <ul class="list-unstyled sb-training-help-list" t-if="state.items.length > 0">
+                    <t t-foreach="state.items" t-as="item" t-key="item.id">
+                        <li class="sb-training-help-item p-2 mb-2 border rounded"
+                            t-on-click="() => this.onOpenItem(item.url)">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong t-esc="item.name"/>
+                                    <span class="badge text-bg-info ms-2"
+                                          t-if="item.kind === 'micro'">JTBD micro</span>
+                                    <span class="badge text-bg-secondary ms-2"
+                                          t-elif="item.kind === 'runbook'">runbook</span>
+                                    <span class="badge text-bg-light ms-2"
+                                          t-elif="item.kind === 'lesson'">lesson</span>
+                                </div>
+                                <div class="small text-muted" t-if="item.minutes">
+                                    <t t-esc="item.minutes"/> min
+                                </div>
+                            </div>
+                            <div t-if="item.summary" class="small text-muted mt-1">
+                                <t t-esc="item.summary"/>
+                            </div>
+                            <div t-if="item.tags &amp;&amp; item.tags.length > 0" class="mt-1">
+                                <t t-foreach="item.tags.slice(0,4)" t-as="tag" t-key="tag.id">
+                                    <span class="badge text-bg-light me-1 small">
+                                        <t t-esc="tag.name"/>
+                                    </span>
+                                </t>
+                            </div>
+                        </li>
+                    </t>
+                </ul>
+            </div>
+        </Dialog>
+    </t>
+
+</templates>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="seq_southbrook_payroll_contract" model="ir.sequence">
+            <field name="name">Southbrook Payroll Contract</field>
+            <field name="code">southbrook.payroll.contract</field>
+            <field name="prefix">CTR/%(range_year)s/</field>
+            <field name="padding">5</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_southbrook_payroll_run" model="ir.sequence">
+            <field name="name">Southbrook Payroll Run</field>
+            <field name="code">southbrook.payroll.run</field>
+            <field name="prefix">PAY/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_southbrook_payroll_payslip" model="ir.sequence">
+            <field name="name">Southbrook Payslip</field>
+            <field name="code">southbrook.payroll.payslip</field>
+            <field name="prefix">PSL/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_southbrook_payroll_t4_preview" model="ir.sequence">
+            <field name="name">Southbrook T4 Preview</field>
+            <field name="code">southbrook.payroll.t4_preview</field>
+            <field name="prefix">T4/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_southbrook_payroll_roe" model="ir.sequence">
+            <field name="name">Southbrook ROE</field>
+            <field name="code">southbrook.payroll.roe</field>
+            <field name="prefix">ROE/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_southbrook_payroll_certification" model="ir.sequence">
+            <field name="name">Southbrook Payroll Certification</field>
+            <field name="code">southbrook.payroll.certification</field>
+            <field name="prefix">CERT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

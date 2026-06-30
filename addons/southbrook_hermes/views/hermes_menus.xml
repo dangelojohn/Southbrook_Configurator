@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_hermes_root"
+              name="Fabio"
+              sequence="55"
+              groups="southbrook_hermes.group_hermes_reviewer"/>
+
+    <menuitem id="menu_hermes_recommendations"
+              name="Recommendations"
+              parent="menu_hermes_root"
+              action="action_hermes_recommendation"
+              sequence="10"
+              groups="southbrook_hermes.group_hermes_reviewer"/>
+
+    <menuitem id="menu_hermes_questions"
+              name="Ask"
+              parent="menu_hermes_root"
+              action="action_hermes_question"
+              sequence="5"
+              groups="southbrook_hermes.group_hermes_reviewer"/>
+
+</odoo>

@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// Southbrook palette: Sky / Walnut / Linen
+$sb-sky: #c7e3f0;
+$sb-sky-deep: #4a90b8;
+$sb-walnut: #5a3a22;
+$sb-walnut-light: #8b6240;
+$sb-linen: #f5efe2;
+$sb-linen-deep: #e8dcc3;
+$sb-ink: #1f2933;
+$sb-good: #2b8a3e;
+$sb-warn: #d97706;
+$sb-bad: #c0392b;
+
+.sb-exec-dashboard {
+    font-family: "Roboto Flex", "Roboto", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: $sb-linen;
+    color: $sb-ink;
+    min-height: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+
+    .sb-exec-header {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+        gap: 12px;
+
+        .sb-exec-greeting {
+            h1 {
+                margin: 0;
+                font-weight: 600;
+                color: $sb-walnut;
+                font-size: 1.5rem;
+            }
+            .sb-exec-asof {
+                font-size: 0.85rem;
+                color: $sb-walnut-light;
+                margin-top: 4px;
+            }
+        }
+
+        .sb-refresh-btn {
+            background: $sb-sky-deep;
+            border-color: $sb-sky-deep;
+            min-height: 44px;
+            padding: 8px 20px;
+            font-weight: 500;
+        }
+    }
+
+    .sb-exec-error {
+        background: lighten($sb-bad, 40%);
+        color: $sb-bad;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+    }
+
+    .sb-exec-loading {
+        text-align: center;
+        padding: 32px;
+        color: $sb-walnut-light;
+    }
+
+    .sb-exec-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+
+        @media (max-width: 768px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .sb-tile {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        min-height: 96px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border-left: 4px solid $sb-sky;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+        &.sb-tile-clickable {
+            cursor: pointer;
+            &:hover, &:active {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+            }
+        }
+
+        .sb-tile-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: $sb-walnut-light;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sb-tile-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: $sb-ink;
+            margin: 8px 0;
+            line-height: 1.1;
+
+            .sb-tile-unit {
+                font-size: 0.9rem;
+                font-weight: 400;
+                color: $sb-walnut-light;
+                margin-left: 6px;
+            }
+
+            &.sb-tile-danger {
+                color: $sb-bad;
+            }
+        }
+
+        .sb-tile-sub {
+            font-size: 0.8rem;
+            color: $sb-walnut-light;
+        }
+    }
+
+    .sb-tile-yesterday { border-left-color: $sb-sky-deep; }
+    .sb-tile-fpy { border-left-color: $sb-good; }
+    .sb-tile-otd { border-left-color: $sb-good; }
+    .sb-tile-wip { border-left-color: $sb-walnut; }
+    .sb-tile-planned { border-left-color: $sb-sky-deep; }
+    .sb-tile-bottleneck { border-left-color: $sb-warn; }
+    .sb-tile-revenue { border-left-color: $sb-walnut; }
+    .sb-tile-cash { border-left-color: $sb-walnut; }
+    .sb-tile-ncr { border-left-color: $sb-bad; }
+
+    .sb-gauge {
+        font-size: 2.2rem;
+        font-weight: 700;
+        text-align: center;
+        padding: 6px 0;
+
+        &.sb-gauge-good { color: $sb-good; }
+        &.sb-gauge-warn { color: $sb-warn; }
+        &.sb-gauge-bad { color: $sb-bad; }
+    }
+}

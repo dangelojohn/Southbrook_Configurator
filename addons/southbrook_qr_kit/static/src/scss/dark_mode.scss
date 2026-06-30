@@ -1,0 +1,206 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// W038 (R8.5, 2026-06-27) — Night-shift dark mode SCSS overlay.
+//
+// JTBD: "When my shift is 10pm-6am and the bright white UI burns my
+// eyes, I want a dark mode that auto-engages or persists across
+// sessions."
+//
+// SCOPED to body.sb-dark-mode — every rule below ONLY applies when
+// that class is present. Day-shift users see zero visual change.
+//
+// Activation lives in dark_mode_toggle.js:
+//   - URL ?theme=dark / ?theme=light persists to localStorage
+//   - localStorage key sb.dark.mode = "1"|"0"
+//   - ICP southbrook.dark_mode.auto_engage = "1" enables auto-engage
+//     in the 22:00-06:00 local window when no explicit preference is set
+//
+// Coverage target — operator surfaces:
+//   * Tablet kanban cards (.o_kanban_sb_tablet)
+//   * Scan modal (.o_dialog .modal-content when scan target)
+//   * POD page (@media print scoped to NOT apply dark — print stays
+//     paper-white because printer toner inverts the savings)
+//   * Traveler-print preview
+//   * Generic Odoo backend (kanban, list, form) — non-aggressive
+//     re-skin; backgrounds get dark-grey, text gets near-white;
+//     accent colors preserved
+//
+// Color tokens (intentionally MUTED, not full-black — pure black on
+// OLED can streak; gray-900 reduces eyestrain at 4am):
+//
+//   bg-base   #1a1d23   (gray-900-ish; primary surface)
+//   bg-raised #23262d   (gray-850; cards / inputs)
+//   bg-input  #2a2d36   (gray-800; inputs / dropdowns)
+//   text-pri  #e6e8eb   (off-white; primary text)
+//   text-mut  #9aa0a6   (muted; secondary / labels)
+//   border    #353841   (gray-700)
+//   accent    inherit   (don't recolor brand accents — confusing)
+
+body.sb-dark-mode {
+    // -----------------------------------------------------------------
+    // Root surface — Odoo's main app frame
+    // -----------------------------------------------------------------
+    background-color: #1a1d23;
+    color: #e6e8eb;
+
+    .o_main_navbar,
+    .o_action_manager,
+    .o_content,
+    .o_form_view,
+    .o_list_view,
+    .o_kanban_view {
+        background-color: #1a1d23;
+        color: #e6e8eb;
+    }
+
+    // -----------------------------------------------------------------
+    // Cards / panels — kanban, dashboard tiles, list rows
+    // -----------------------------------------------------------------
+    .oe_kanban_card,
+    .o_kanban_record,
+    .card,
+    .o_dashboard_kanban_view,
+    .o_list_table > tbody > tr {
+        background-color: #23262d;
+        color: #e6e8eb;
+        border-color: #353841;
+    }
+
+    .o_list_table > thead {
+        background-color: #1f2228;
+        color: #e6e8eb;
+    }
+
+    // Hovered list row — slightly lighter so the operator can
+    // track their cursor without losing it.
+    .o_list_table > tbody > tr:hover {
+        background-color: #2a2d36;
+    }
+
+    // -----------------------------------------------------------------
+    // Form inputs — text, select, datetime, etc.
+    // -----------------------------------------------------------------
+    input.o_input,
+    select.o_input,
+    textarea.o_input,
+    .o_input,
+    .o_field_widget input,
+    .o_field_widget select,
+    .o_field_widget textarea,
+    .form-control {
+        background-color: #2a2d36;
+        color: #e6e8eb;
+        border-color: #353841;
+    }
+
+    .o_input::placeholder,
+    .form-control::placeholder {
+        color: #9aa0a6;
+    }
+
+    // -----------------------------------------------------------------
+    // Modal — scan modal + generic dialogs
+    // -----------------------------------------------------------------
+    .modal-content {
+        background-color: #23262d;
+        color: #e6e8eb;
+    }
+    .modal-header,
+    .modal-footer {
+        background-color: #1f2228;
+        border-color: #353841;
+    }
+
+    // -----------------------------------------------------------------
+    // Tablet kanban (W014 sibling) — cards + meta
+    // -----------------------------------------------------------------
+    .o_kanban_sb_tablet {
+        background-color: #1a1d23;
+
+        .sb-tablet-card {
+            background-color: #23262d;
+            color: #e6e8eb;
+            border-color: #353841;
+        }
+        .sb-tablet-header {
+            color: #e6e8eb;
+        }
+        .sb-tablet-body .sb-meta {
+            color: #9aa0a6;
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // POD page — the public scan-receipt page rendered by the QR kit
+    // controller. Backgrounds darken; the QR + barcode stays bright
+    // (white background inside the QR card) so phone cameras still
+    // resolve them at low ambient light.
+    // -----------------------------------------------------------------
+    .sb-pod-page,
+    .o_portal_wrap {
+        background-color: #1a1d23;
+        color: #e6e8eb;
+
+        .sb-pod-card {
+            background-color: #23262d;
+            border-color: #353841;
+        }
+        // QR code card stays white — scanner cameras need contrast.
+        .sb-pod-qr,
+        .sb-qr-print-card {
+            background-color: #ffffff;
+            color: #000000;
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Buttons — preserve accent colors (brand identity); only mute
+    // the "secondary" + "default" variants so they don't glare.
+    // -----------------------------------------------------------------
+    .btn-secondary,
+    .btn-default {
+        background-color: #2a2d36;
+        color: #e6e8eb;
+        border-color: #353841;
+    }
+    .btn-light {
+        background-color: #353841;
+        color: #e6e8eb;
+        border-color: #4a4d56;
+    }
+
+    // -----------------------------------------------------------------
+    // Print preview — the traveler-print and label preview render
+    // inside an iframe with the body class inherited. Re-light those
+    // panels so the print preview stays accurate.
+    // -----------------------------------------------------------------
+    .sb-print-preview,
+    iframe.sb-print-frame {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
+// -----------------------------------------------------------------
+// @media print — print output STAYS LIGHT regardless of dark-mode
+// state. Inverting print would burn 4x toner with zero readability
+// benefit; the operator wants paper output to look like paper.
+// -----------------------------------------------------------------
+@media print {
+    body.sb-dark-mode {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+
+        .o_form_view,
+        .o_list_view,
+        .o_kanban_view,
+        .modal-content,
+        .card,
+        .oe_kanban_card,
+        .sb-tablet-card {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #cccccc !important;
+        }
+    }
+}

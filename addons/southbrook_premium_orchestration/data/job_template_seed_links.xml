@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 3.3 — seed config-parameter mappings that connect res.partner
+  segments / pricelists to the southbrook.project.job.template the
+  resolver should pick when a SO from that segment lands.
+
+  These rows are read by ProjectTask._resolve_template_for_sale_order
+  as a backstop AFTER the line-name keyword scan: if no keyword in the
+  order lines matched a template name, the resolver falls through to
+  these segment mappings keyed off the customer's channel.
+
+  Kept as ir.config_parameter rows (not a new model) so admins can
+  tweak the mapping live from Settings → Technical → Parameters
+  without a code deploy.
+
+  noupdate="0" so reinstalls keep the seeds in lockstep with module
+  upgrades; admins who customise these will lose their changes on
+  -u, by design — they should add new keys with a different prefix.
+-->
+<odoo>
+    <data noupdate="0">
+
+        <record id="config_param_template_map_dealer"
+                model="ir.config_parameter">
+            <field name="key">southbrook_premium.template_map.dealer</field>
+            <field name="value">Full Kitchen</field>
+        </record>
+
+        <record id="config_param_template_map_retail"
+                model="ir.config_parameter">
+            <field name="key">southbrook_premium.template_map.retail</field>
+            <field name="value">Full Kitchen</field>
+        </record>
+
+        <record id="config_param_template_map_tradesperson"
+                model="ir.config_parameter">
+            <field name="key">southbrook_premium.template_map.tradesperson</field>
+            <field name="value">Custom Single Cabinet</field>
+        </record>
+
+        <record id="config_param_template_map_kd"
+                model="ir.config_parameter">
+            <field name="key">southbrook_premium.template_map.kd</field>
+            <field name="value">Custom Single Cabinet</field>
+        </record>
+
+        <record id="config_param_template_map_default"
+                model="ir.config_parameter">
+            <field name="key">southbrook_premium.template_map.default</field>
+            <field name="value">Full Kitchen</field>
+        </record>
+
+    </data>
+</odoo>

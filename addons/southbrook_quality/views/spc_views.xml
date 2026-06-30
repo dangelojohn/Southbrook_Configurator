@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_spc_sample_list" model="ir.ui.view">
+        <field name="name">southbrook.quality.spc_sample.list</field>
+        <field name="model">southbrook.quality.spc_sample</field>
+        <field name="arch" type="xml">
+            <list string="SPC Samples"
+                  decoration-danger="in_spec == False">
+                <field name="name"/>
+                <field name="taken_at"/>
+                <field name="workcenter_id"/>
+                <field name="dimension_id"/>
+                <field name="measured_value"/>
+                <field name="nominal"/>
+                <field name="lsl"/>
+                <field name="usl"/>
+                <field name="in_spec"/>
+                <field name="operator_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_spc_sample_form" model="ir.ui.view">
+        <field name="name">southbrook.quality.spc_sample.form</field>
+        <field name="model">southbrook.quality.spc_sample</field>
+        <field name="arch" type="xml">
+            <form string="SPC Sample">
+                <header>
+                    <button name="action_create_ncr_if_oos" type="object"
+                            string="Escalate to NCR (if OOS)"
+                            invisible="in_spec == True"
+                            class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="workcenter_id"/>
+                            <field name="product_id"/>
+                            <field name="production_id"/>
+                            <field name="operator_id"/>
+                            <field name="taken_at"/>
+                        </group>
+                        <group>
+                            <field name="dimension_id"/>
+                            <field name="measured_value"/>
+                            <field name="nominal" readonly="1"/>
+                            <field name="lsl" readonly="1"/>
+                            <field name="usl" readonly="1"/>
+                            <field name="in_spec" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Linked NCRs">
+                            <field name="ncr_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="state"/>
+                                    <field name="severity"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_spc_sample_graph" model="ir.ui.view">
+        <field name="name">southbrook.quality.spc_sample.graph</field>
+        <field name="model">southbrook.quality.spc_sample</field>
+        <field name="arch" type="xml">
+            <graph string="SPC Measurements" type="line">
+                <field name="taken_at"/>
+                <field name="dimension_key" type="row"/>
+                <field name="measured_value" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_southbrook_spc_sample_search" model="ir.ui.view">
+        <field name="name">southbrook.quality.spc_sample.search</field>
+        <field name="model">southbrook.quality.spc_sample</field>
+        <field name="arch" type="xml">
+            <search string="SPC Samples">
+                <field name="dimension_id"/>
+                <field name="workcenter_id"/>
+                <field name="product_id"/>
+                <filter name="oos" string="Out of Spec"
+                        domain="[('in_spec', '=', False)]"/>
+                <group>
+                    <filter name="group_dim" string="Dimension"
+                            context="{'group_by': 'dimension_key'}"/>
+                    <filter name="group_wc" string="Work Center"
+                            context="{'group_by': 'workcenter_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_southbrook_spc_sample" model="ir.actions.act_window">
+        <field name="name">SPC Samples</field>
+        <field name="res_model">southbrook.quality.spc_sample</field>
+        <field name="view_mode">list,form,graph</field>
+        <field name="search_view_id" ref="view_southbrook_spc_sample_search"/>
+    </record>
+</odoo>

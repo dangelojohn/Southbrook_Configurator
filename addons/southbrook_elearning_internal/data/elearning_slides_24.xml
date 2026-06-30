@@ -1,0 +1,1011 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_24_finance_architecture" model="slide.slide">
+            <field name="name">Finance Pack — Architecture and Install</field>
+            <field name="channel_id" ref="course_finance_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">Developer or admin learning southbrook_finance_pack internals.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-pack-architecture-and-install">Finance Pack — Architecture and Install</h1>
+<h2 id="the-module-at-a-glance">The module at a glance</h2>
+<ul>
+<li>Path: <code>addons/southbrook_finance_pack/</code></li>
+<li>Version: 19.0.1.0.0</li>
+<li>License: LGPL-3</li>
+<li>Depends on: <code>base</code>, <code>account</code>, <code>mrp</code>, <code>stock</code>, <code>stock_account</code>,
+  <code>southbrook_manufacturing_intelligence</code></li>
+</ul>
+<h2 id="source-layout">Source layout</h2>
+<pre><code>addons/southbrook_finance_pack/
+├── models/
+│   ├── asset.py              — capital asset record
+│   ├── cca_class.py          — CRA class master
+│   ├── cca_entry.py          — per-year compute results
+│   ├── budget.py             — budget + budget pivot
+│   ├── hst_return.py         — quarterly/monthly HST return
+│   ├── wip_report.py         — read-only query view
+│   └── mi_engine_ext.py      — MI engine integration
+├── views/
+├── reports/                  — QWeb reports (asset summary, etc.)
+├── security/
+└── data/
+    ├── cca_classes.xml       — Class 8, 10, 12, 50, 53, etc.
+    └── default_accounts.xml  — chart of accounts hints
+</code></pre>
+<h2 id="install">Install</h2>
+<pre><code class="language-bash">./scripts/deploy_to_qnap.sh southbrook_finance_pack
+</code></pre>
+<p>Native <code>account</code> + <code>stock_account</code> are mandatory dependencies.
+<code>mrp</code> is for WIP report.</p>
+<h2 id="what-i-does">What -i does</h2>
+<ol>
+<li>Creates asset, cca_class, cca_entry, budget, hst_return tables</li>
+<li>Loads CCA class master (12 standard classes — 1, 8, 10, 12,
+   13, 14, 43, 50, 53, etc.)</li>
+<li>Adds 6 menus under Finance</li>
+<li>Creates a cron at 03:00 to refresh the WIP snapshot cache</li>
+</ol>
+<h2 id="cca-class-seed-data">CCA class seed data</h2>
+<pre><code class="language-xml">&lt;record id=&quot;cca_class_8&quot; model=&quot;southbrook.finance.cca_class&quot;&gt;
+    &lt;field name=&quot;code&quot;&gt;Class 8&lt;/field&gt;
+    &lt;field name=&quot;name&quot;&gt;General office equipment + general M&amp;P&lt;/field&gt;
+    &lt;field name=&quot;rate&quot;&gt;0.20&lt;/field&gt;
+    &lt;field name=&quot;half_year_rule&quot; eval=&quot;True&quot;/&gt;
+    &lt;field name=&quot;description&quot;&gt;Photocopiers, machinery without
+        specific class. Most generic equipment defaults here.&lt;/field&gt;
+&lt;/record&gt;
+
+&lt;record id=&quot;cca_class_53&quot; model=&quot;southbrook.finance.cca_class&quot;&gt;
+    &lt;field name=&quot;code&quot;&gt;Class 53&lt;/field&gt;
+    &lt;field name=&quot;name&quot;&gt;Manufacturing &amp;amp; processing equipment&lt;/field&gt;
+    &lt;field name=&quot;rate&quot;&gt;0.50&lt;/field&gt;
+    &lt;field name=&quot;half_year_rule&quot; eval=&quot;True&quot;/&gt;
+    &lt;field name=&quot;description&quot;&gt;CNC routers, edge banders, presses
+        acquired after 2015 for M&amp;P use.&lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<p>Verify against CRA T2 Schedule 8 for the current year; rates can
+change.</p>
+<h2 id="cron-landscape">Cron landscape</h2>
+<table>
+<thead>
+<tr>
+<th>Cron</th>
+<th>Schedule</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cron_wip_snapshot</code></td>
+<td>03:00 daily</td>
+<td>Cache the WIP report query (otherwise it's slow at month-end)</td>
+</tr>
+</tbody>
+</table>
+<p>The MI engine hooks (in <code>mi_engine_ext.py</code>) run on the MI loop's
+schedule, not a Finance-specific cron.</p>
+<h2 id="account-configuration">Account configuration</h2>
+<p>The pack relies on specific GL accounts being configured per
+company:</p>
+<ul>
+<li>WIP Account (e.g. 211000) — for WIP report reconciliation</li>
+<li>Asset register accounts (per CCA class)</li>
+<li>HST Receivable / Payable</li>
+<li>Gain on Disposal / Loss on Disposal</li>
+</ul>
+<p>Configure in <em>Settings → Companies → Accounts</em> (or via the
+Accounting Configuration wizard).</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Module installed but Asset Register menu empty"</strong> — CCA class
+  data file didn't load. Reinstall via <code>-i</code> (not <code>-u</code>) to
+  reload <code>noupdate=0</code> data. Or seed via UI.</li>
+<li><strong>"WIP report timeout"</strong> — query is heavy in high-MO tenants.
+  Verify the <code>cron_wip_snapshot</code> ran; if not, snapshot is empty
+  and live query runs.</li>
+<li><strong>"HST Return doesn't pull invoices"</strong> — <code>tax_line_id</code> filter
+  doesn't match the company's HST tax account configuration. Map
+  the right accounts in the HST Return form's <em>Tax Accounts</em> tab.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Native modules required?</p>
+<blockquote>
+<p><code>account</code>, <code>stock_account</code>, plus <code>mrp</code> for WIP report.</p>
+</blockquote>
+<p><strong>Q2.</strong> Where do CCA rates live?</p>
+<blockquote>
+<p><code>southbrook.finance.cca_class</code> records, seeded from
+<code>data/cca_classes.xml</code>.</p>
+</blockquote>
+<p><strong>Q3.</strong> Why a cron for WIP report?</p>
+<blockquote>
+<p>Query is heavy; cron caches at 03:00 so users get fast reads
+during the day.</p>
+</blockquote>
+<p><strong>Q4.</strong> Asset register vs native asset model — which to use?</p>
+<blockquote>
+<p>Both can coexist. Native <code>account.asset</code> handles accounting
+depreciation; Southbrook handles CCA (tax). You may need to
+configure each asset twice if you want both views.</p>
+</blockquote>
+<p><strong>Q5.</strong> HST Return menu shows no records. Reason?</p>
+<blockquote>
+<p>No HST Return created yet, OR <code>state</code> filter hiding draft.
+Create a new return + <em>Pull</em>.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_24_finance_cca_engine" model="slide.slide">
+            <field name="name">Finance Pack — CCA Depreciation Engine</field>
+            <field name="channel_id" ref="course_finance_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">Developer working on the CCA compute or disposal logic.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-pack-cca-depreciation-engine">Finance Pack — CCA Depreciation Engine</h1>
+<h2 id="the-models">The models</h2>
+<pre><code class="language-python">class SouthbrookFinanceAsset(models.Model):
+    _name = &quot;southbrook.finance.asset&quot;
+    _description = &quot;Capital Asset (CCA-tracked)&quot;
+    _inherit = [&quot;mail.thread&quot;]
+
+
+class SouthbrookFinanceCcaEntry(models.Model):
+    _name = &quot;southbrook.finance.cca_entry&quot;
+    _description = &quot;Yearly CCA Compute Result&quot;
+    _order = &quot;year desc&quot;
+</code></pre>
+<p><code>asset</code> is the long-lived master. <code>cca_entry</code> is one row per asset
+per year.</p>
+<h2 id="compute-flow">Compute flow</h2>
+<pre><code class="language-python">def action_compute_cca(self):
+    self.ensure_one()
+    year = self._target_year()  # default current fiscal year
+
+    # Skip if already computed
+    if self.cca_entry_ids.filtered(lambda e: e.year == year):
+        raise UserError(_(&quot;CCA already computed for %s&quot;) % year)
+
+    rate = self.cca_class_id.rate
+    half_year = self.cca_class_id.half_year_rule
+
+    # Determine UCC start
+    prev_entry = self.cca_entry_ids.sorted(&quot;year&quot;)[-1] \
+                 if self.cca_entry_ids else None
+    ucc_start = prev_entry.closing_ucc if prev_entry else self.original_cost
+
+    # Half-year rule
+    is_acquisition_year = (year == self.purchase_date.year)
+    claimable_base = ucc_start * 0.5 if (is_acquisition_year and half_year) \
+                     else ucc_start
+    cca_claimed = claimable_base * rate
+
+    ucc_end = ucc_start - cca_claimed
+
+    self.env[&quot;southbrook.finance.cca_entry&quot;].create({
+        &quot;asset_id&quot;: self.id,
+        &quot;year&quot;: year,
+        &quot;ucc_start&quot;: ucc_start,
+        &quot;cca_claimed&quot;: cca_claimed,
+        &quot;ucc_end&quot;: ucc_end,
+    })
+
+    self.write({&quot;current_ucc&quot;: ucc_end, &quot;last_cca_year&quot;: year})
+
+    # Post journal entry
+    self._post_cca_journal(year, cca_claimed)
+</code></pre>
+<h2 id="the-journal-entry">The journal entry</h2>
+<p>Per CCA compute, posts:
+- DR: CCA Expense (per class)
+- CR: Accumulated CCA (per class)</p>
+<pre><code class="language-python">def _post_cca_journal(self, year, amount):
+    self.env[&quot;account.move&quot;].create({
+        &quot;journal_id&quot;: self.env.company.cca_journal_id.id,
+        &quot;date&quot;: fields.Date(year, 12, 31),
+        &quot;ref&quot;: f&quot;CCA {year} - {self.name}&quot;,
+        &quot;line_ids&quot;: [
+            (0, 0, {
+                &quot;account_id&quot;: self.cca_class_id.cca_expense_account_id.id,
+                &quot;debit&quot;: amount,
+                &quot;name&quot;: f&quot;CCA Class {self.cca_class_id.code}&quot;,
+            }),
+            (0, 0, {
+                &quot;account_id&quot;: self.cca_class_id.accumulated_account_id.id,
+                &quot;credit&quot;: amount,
+                &quot;name&quot;: f&quot;CCA Class {self.cca_class_id.code}&quot;,
+            }),
+        ],
+    })
+</code></pre>
+<p>Journal posts as <code>state = draft</code> for controller review; bulk-post
+via <em>Accounting → Journal Entries → Post</em>.</p>
+<h2 id="disposal">Disposal</h2>
+<pre><code class="language-python">def action_dispose(self, proceeds, disposal_date):
+    self.ensure_one()
+    ucc_at_disposal = self.current_ucc
+
+    # Determine gain/loss
+    delta = proceeds - ucc_at_disposal
+
+    if delta &gt; 0:
+        # Recapture (taxable income)
+        journal_account = self.env.company.gain_on_disposal_account_id
+    else:
+        # Loss
+        journal_account = self.env.company.loss_on_disposal_account_id
+
+    # Post disposal journal
+    # ... DR asset cost out, DR accumulated CCA out, CR/DR gain/loss
+
+    self.write({
+        &quot;disposal_date&quot;: disposal_date,
+        &quot;disposal_proceeds&quot;: proceeds,
+        &quot;current_ucc&quot;: 0,
+        &quot;is_disposed&quot;: True,
+    })
+</code></pre>
+<h3 id="recapture-vs-terminal-loss">Recapture vs terminal loss</h3>
+<p>CRA rules:
+- If proceeds &gt; UCC and class has other assets → recapture pool
+- If proceeds &gt; UCC and class has no other assets → recapture
+  taxed as ordinary income
+- If proceeds &lt; UCC and class has other assets → reduces pool
+  UCC (no immediate loss)
+- If proceeds &lt; UCC and class has no other assets → terminal
+  loss (deductible)</p>
+<p>The engine handles all four cases via <code>_compute_disposal_treatment()</code>.</p>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"CCA computed twice for same year"</strong> — the guard raises
+  UserError. Hit via the form button only; don't call programmatically.</li>
+<li><strong>"Wrong CCA class"</strong> — class change re-validates the math.
+  Edit class, re-compute. Prior year's entry stays at old class —
+  amend the entry if needed.</li>
+<li><strong>"Disposal posted to wrong account"</strong> — <code>gain_on_disposal_account_id</code>
+  or <code>loss_on_disposal_account_id</code> misconfigured on company.
+  Fix on company; the disposal journal can be re-posted.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Class 53 (50%), Year 1 of $20k asset. CCA claimed?</p>
+<blockquote>
+<p>Half-year: claimable = $10k. CCA = $10k × 50% = <strong>$5,000</strong>.</p>
+</blockquote>
+<p><strong>Q2.</strong> Class 53, Year 6 of same asset. <code>current_ucc = $1,200</code>. CCA?</p>
+<blockquote>
+<p>$1,200 × 50% = <strong>$600</strong>. UCC end = $600.</p>
+</blockquote>
+<p><strong>Q3.</strong> Asset sold Year 7 for $300. UCC = $600. Class 53 has 5
+other assets. Effect?</p>
+<blockquote>
+<p>$300 reduces the Class 53 pool's collective UCC. No immediate
+gain or loss; depreciation continues on the remaining pool.</p>
+</blockquote>
+<p><strong>Q4.</strong> Same except Class 53 has no other assets. Effect?</p>
+<blockquote>
+<p>$300 proceeds, $600 UCC. Terminal loss = $300. Deductible.
+Posts to Loss on Disposal account.</p>
+</blockquote>
+<p><strong>Q5.</strong> Compute uses <code>self.cca_class_id.rate</code>. Year-over-year
+class rate change?</p>
+<blockquote>
+<p>Current year uses current rate. Prior year entries are
+historical (not recomputed). v1.1 candidate: warn if class rate
+changes after prior computes.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_24_finance_wip_query" model="slide.slide">
+            <field name="name">Finance Pack — WIP Report Query and GL Reconciliation</field>
+            <field name="channel_id" ref="course_finance_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">Developer working on the WIP report or reconciliation logic.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-pack-wip-report-query-and-gl-reconciliation">Finance Pack — WIP Report Query and GL Reconciliation</h1>
+<h2 id="the-model-read-only-view">The model (read-only view)</h2>
+<pre><code class="language-python">class SouthbrookFinanceWipReport(models.Model):
+    _name = &quot;southbrook.finance.wip_report&quot;
+    _description = &quot;Work in Progress Report&quot;
+    _auto = False  # No table; backed by SQL view
+    _rec_name = &quot;mo_ref&quot;
+</code></pre>
+<p>Fields are derived from the SQL view:</p>
+<pre><code class="language-python">mo_ref           = fields.Char(readonly=True)
+product_id       = fields.Many2one(&quot;product.product&quot;, readonly=True)
+responsible_team = fields.Char(readonly=True)
+cost_so_far      = fields.Float(readonly=True)
+cost_to_complete = fields.Float(readonly=True)
+wip_value        = fields.Float(readonly=True)
+</code></pre>
+<h2 id="the-sql-view">The SQL view</h2>
+<pre><code class="language-sql">CREATE OR REPLACE VIEW southbrook_finance_wip_report AS
+SELECT
+    mp.id AS id,
+    mp.name AS mo_ref,
+    mp.product_id,
+    rt.name AS responsible_team,
+    COALESCE(SUM(sv.value), 0) AS cost_so_far,
+    mp.product_qty * mp.product_id.standard_price - 
+        COALESCE(SUM(sv.value), 0) AS cost_to_complete,
+    COALESCE(SUM(sv.value), 0) AS wip_value
+FROM mrp_production mp
+LEFT JOIN mrp_workcenter wc ON wc.id = mp.workcenter_id
+LEFT JOIN res_users ru ON ru.id = mp.user_id
+LEFT JOIN res_partner rp ON rp.id = ru.partner_id
+LEFT JOIN stock_move sm ON sm.raw_material_production_id = mp.id
+    AND sm.state = 'done'
+LEFT JOIN stock_valuation_layer sv ON sv.stock_move_id = sm.id
+WHERE mp.state IN ('confirmed', 'progress')
+GROUP BY mp.id, mp.name, mp.product_id, rt.name, mp.product_qty,
+         mp.product_id.standard_price;
+</code></pre>
+<p>(Simplified — actual query joins more tables for full data.)</p>
+<h2 id="cron-cached-snapshot">Cron-cached snapshot</h2>
+<p>Live query is slow at scale. The cron snapshots into a stored
+materialized table:</p>
+<pre><code class="language-python">@api.model
+def _cron_snapshot_wip(self):
+    self.env.cr.execute(&quot;&quot;&quot;
+        DELETE FROM southbrook_finance_wip_snapshot;
+        INSERT INTO southbrook_finance_wip_snapshot
+        SELECT * FROM southbrook_finance_wip_report;
+    &quot;&quot;&quot;)
+</code></pre>
+<p>Runs at 03:00 daily. The list view reads from snapshot during
+business hours.</p>
+<h2 id="gl-reconciliation">GL reconciliation</h2>
+<p>The reconciliation is in the controller's head (lesson 20.2), but
+the SQL helper produces the comparison:</p>
+<pre><code class="language-python">def gl_balance_query(self, company_id, period_end):
+    &quot;&quot;&quot;Return GL WIP account balance at period_end.&quot;&quot;&quot;
+    wip_account = self.env.company.wip_account_id.id
+    self.env.cr.execute(&quot;&quot;&quot;
+        SELECT COALESCE(SUM(debit - credit), 0)
+        FROM account_move_line
+        WHERE account_id = %s
+          AND date &lt;= %s
+          AND parent_state = 'posted'
+    &quot;&quot;&quot;, (wip_account, period_end))
+    return self.env.cr.fetchone()[0]
+
+
+def report_balance(self):
+    return sum(self.search([]).mapped(&quot;wip_value&quot;))
+
+
+def reconciliation_variance(self, period_end):
+    return self.report_balance() - self.gl_balance_query(
+        self.env.company.id, period_end)
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"SQL view not refreshing"</strong> — Postgres caches the view
+  definition. Re-create on -u via <code>CREATE OR REPLACE VIEW</code> in the
+  install hook.</li>
+<li><strong>"Snapshot empty"</strong> — cron didn't run; snapshot is empty so
+  list view shows nothing. Check <code>ir.cron</code> for the snapshot job.</li>
+<li><strong>"Variance always growing"</strong> — likely backdated stock moves not
+  reflected in the snapshot. Either rerun the snapshot manually
+  or accept the staleness.</li>
+</ul>
+<h2 id="extension-per-team-wip-target">Extension: per-team WIP target</h2>
+<p>To track WIP target vs actual:</p>
+<pre><code class="language-python">class SouthbrookFinanceWipTarget(models.Model):
+    _name = &quot;southbrook.finance.wip_target&quot;
+
+    responsible_team = fields.Char()
+    target_amount = fields.Float()
+
+
+# Then enhance the view to include the target.
+</code></pre>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Why a SQL view instead of a regular model?</p>
+<blockquote>
+<p>The data is fully derived from <code>mrp.production</code> + 
+<code>stock_valuation_layer</code>. No business reason for a separate
+table. View prevents stale Python-cached data.</p>
+</blockquote>
+<p><strong>Q2.</strong> Snapshot vs live query — when does which fire?</p>
+<blockquote>
+<p>List view → snapshot. Form view (drill-through) → live. Form
+needs current data; list can be a few hours stale.</p>
+</blockquote>
+<p><strong>Q3.</strong> WIP variance $0.50. Source?</p>
+<blockquote>
+<p>Standard cost rounding. Accept; document in close memo.</p>
+</blockquote>
+<p><strong>Q4.</strong> WIP variance grows by $100/day. Cause?</p>
+<blockquote>
+<p>An MO is closing without consumption posting, OR an MO has
+stock moves being added retroactively. Investigate via
+mrp.production audit log.</p>
+</blockquote>
+<p><strong>Q5.</strong> Add a WIP report column for "days_in_progress." Where?</p>
+<blockquote>
+<p>Add to the SQL view: <code>EXTRACT(EPOCH FROM (NOW() -
+mp.create_date)) / 86400 AS days_in_progress</code>. Then expose
+the field in the Python model.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_24_finance_hst_internals" model="slide.slide">
+            <field name="name">Finance Pack — HST Return Internals</field>
+            <field name="channel_id" ref="course_finance_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">40</field>
+            <field name="description">Developer working on HST return logic or tax account configuration.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-pack-hst-return-internals">Finance Pack — HST Return Internals</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookFinanceHstReturn(models.Model):
+    _name = &quot;southbrook.finance.hst_return&quot;
+    _description = &quot;HST Return&quot;
+    _inherit = [&quot;mail.thread&quot;]
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">name           = fields.Char(default=lambda s: s._make_name())
+period_start   = fields.Date(required=True)
+period_end     = fields.Date(required=True)
+state          = fields.Selection([
+    (&quot;draft&quot;, &quot;Draft&quot;),
+    (&quot;pending_filing&quot;, &quot;Pending Filing&quot;),
+    (&quot;filed&quot;, &quot;Filed&quot;),
+], default=&quot;draft&quot;)
+
+output_hst     = fields.Float(compute=&quot;_compute_amounts&quot;, store=True)
+input_hst      = fields.Float(compute=&quot;_compute_amounts&quot;, store=True)
+net_remittance = fields.Float(compute=&quot;_compute_amounts&quot;, store=True)
+
+line_ids       = fields.One2many(
+    &quot;southbrook.finance.hst_return.line&quot;, &quot;return_id&quot;)
+cra_confirmation = fields.Char()
+filed_date     = fields.Date()
+</code></pre>
+<h2 id="pull-algorithm">Pull algorithm</h2>
+<pre><code class="language-python">def action_pull(self):
+    self.ensure_one()
+    self.line_ids.unlink()
+
+    # HST tax accounts (configured per company)
+    sale_taxes = self.env.company.sale_hst_taxes
+    purchase_taxes = self.env.company.purchase_hst_taxes
+
+    # Output side: sale invoice tax lines in period
+    output_lines = self.env[&quot;account.move.line&quot;].search([
+        (&quot;date&quot;, &quot;&gt;=&quot;, self.period_start),
+        (&quot;date&quot;, &quot;&lt;=&quot;, self.period_end),
+        (&quot;tax_line_id&quot;, &quot;in&quot;, sale_taxes.ids),
+        (&quot;parent_state&quot;, &quot;=&quot;, &quot;posted&quot;),
+    ])
+
+    # Input side: purchase bill tax lines in period
+    input_lines = self.env[&quot;account.move.line&quot;].search([
+        (&quot;date&quot;, &quot;&gt;=&quot;, self.period_start),
+        (&quot;date&quot;, &quot;&lt;=&quot;, self.period_end),
+        (&quot;tax_line_id&quot;, &quot;in&quot;, purchase_taxes.ids),
+        (&quot;parent_state&quot;, &quot;=&quot;, &quot;posted&quot;),
+    ])
+
+    # Create return lines
+    for ml in output_lines:
+        self.line_ids.create({
+            &quot;return_id&quot;: self.id,
+            &quot;category&quot;: &quot;output&quot;,
+            &quot;move_line_id&quot;: ml.id,
+            &quot;amount&quot;: abs(ml.balance),
+        })
+    for ml in input_lines:
+        self.line_ids.create({
+            &quot;return_id&quot;: self.id,
+            &quot;category&quot;: &quot;input&quot;,
+            &quot;move_line_id&quot;: ml.id,
+            &quot;amount&quot;: abs(ml.balance),
+        })
+</code></pre>
+<h2 id="compute-totals">Compute totals</h2>
+<pre><code class="language-python">@api.depends(&quot;line_ids.amount&quot;, &quot;line_ids.category&quot;)
+def _compute_amounts(self):
+    for r in self:
+        r.output_hst = sum(
+            l.amount for l in r.line_ids if l.category == &quot;output&quot;)
+        r.input_hst = sum(
+            l.amount for l in r.line_ids if l.category == &quot;input&quot;)
+        r.net_remittance = r.output_hst - r.input_hst
+</code></pre>
+<h2 id="mark-filed">Mark filed</h2>
+<pre><code class="language-python">def action_mark_filed(self, cra_confirmation):
+    self.ensure_one()
+    self.write({
+        &quot;state&quot;: &quot;filed&quot;,
+        &quot;cra_confirmation&quot;: cra_confirmation,
+        &quot;filed_date&quot;: fields.Date.today(),
+    })
+    self._post_remittance_journal()
+
+def _post_remittance_journal(self):
+    &quot;&quot;&quot;Post the period remittance journal entry.&quot;&quot;&quot;
+    # DR Output HST, CR Input HST, CR HST Payable (or DR HST Receivable)
+    ...
+</code></pre>
+<h2 id="tax-account-configuration">Tax account configuration</h2>
+<p>Each company needs:</p>
+<pre><code class="language-python">class ResCompany(models.Model):
+    _inherit = &quot;res.company&quot;
+
+    sale_hst_taxes = fields.Many2many(
+        &quot;account.tax&quot;,
+        relation=&quot;company_sale_hst_taxes_rel&quot;,
+        domain=&quot;[('type_tax_use', '=', 'sale')]&quot;,
+    )
+    purchase_hst_taxes = fields.Many2many(
+        &quot;account.tax&quot;,
+        relation=&quot;company_purchase_hst_taxes_rel&quot;,
+        domain=&quot;[('type_tax_use', '=', 'purchase')]&quot;,
+    )
+    hst_receivable_account_id = fields.Many2one(&quot;account.account&quot;)
+    hst_payable_account_id = fields.Many2one(&quot;account.account&quot;)
+</code></pre>
+<p>Configure in <em>Settings → Companies → Tax &amp; HST</em>.</p>
+<h2 id="capital-itc-handling">Capital ITC handling</h2>
+<p>Capital input tax credits (on asset purchases) are special — they
+land in the same input pool but track separately for asset
+register purposes.</p>
+<p>The model adds:</p>
+<pre><code class="language-python">class SouthbrookFinanceHstReturnLine(models.Model):
+    _name = &quot;southbrook.finance.hst_return.line&quot;
+
+    is_capital_itc = fields.Boolean(
+        compute=&quot;_compute_is_capital_itc&quot;, store=True)
+
+
+@api.depends(&quot;move_line_id.account_id&quot;)
+def _compute_is_capital_itc(self):
+    for line in self:
+        line.is_capital_itc = (
+            line.move_line_id.account_id.is_capital_account)
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Output HST too low"</strong> — invoices in draft. Filter
+  account.move where state = draft in period.</li>
+<li><strong>"Input HST includes personal expenses"</strong> — common mistake;
+  bill the personal expense to non-business account, or set
+  vendor's tax exemption.</li>
+<li><strong>"Mark filed but no journal entry"</strong> — <code>_post_remittance_journal</code>
+  may have failed silently. Check chatter for posting error.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Tax lines for output filter on?</p>
+<blockquote>
+<p><code>tax_line_id IN sale_hst_taxes</code> AND <code>parent_state = posted</code> AND
+date in period.</p>
+</blockquote>
+<p><strong>Q2.</strong> Why exclude draft account.move?</p>
+<blockquote>
+<p>Drafts can still be edited; their amounts aren't authoritative
+until posted.</p>
+</blockquote>
+<p><strong>Q3.</strong> Capital ITC vs current ITC — same input box?</p>
+<blockquote>
+<p>Same box on CRA filing; tracked separately for asset register.
+<code>is_capital_itc</code> flag distinguishes.</p>
+</blockquote>
+<p><strong>Q4.</strong> Mark filed posts the journal. Posting fails. State?</p>
+<blockquote>
+<p>State stays <code>pending_filing</code> or rolls back. The mark_filed
+action should be transactional. Check the implementation.</p>
+</blockquote>
+<p><strong>Q5.</strong> Rate change mid-period. Effect on Pull?</p>
+<blockquote>
+<p>Pull is by invoice date. Invoices before rate change use old
+rate; after, new rate. Math handled correctly per invoice.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_24_finance_budget_model" model="slide.slide">
+            <field name="name">Finance Pack — Budget Model and Pivot View</field>
+            <field name="channel_id" ref="course_finance_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">50</field>
+            <field name="description">Developer working on budget logic or pivot reporting.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-pack-budget-model-and-pivot-view">Finance Pack — Budget Model and Pivot View</h1>
+<h2 id="the-model">The model</h2>
+<pre><code class="language-python">class SouthbrookFinanceBudget(models.Model):
+    _name = &quot;southbrook.finance.budget&quot;
+    _description = &quot;Budget Line&quot;
+</code></pre>
+<p>Fields:</p>
+<pre><code class="language-python">fiscal_year     = fields.Integer(required=True, index=True)
+department      = fields.Many2one(&quot;hr.department&quot;, required=True)
+account_id      = fields.Many2one(&quot;account.account&quot;, required=True)
+budget_amount   = fields.Float(required=True)
+actual_amount   = fields.Float(compute=&quot;_compute_actual&quot;, store=False)
+variance        = fields.Float(compute=&quot;_compute_variance&quot;, store=False)
+variance_pct    = fields.Float(compute=&quot;_compute_variance&quot;, store=False)
+</code></pre>
+<h2 id="actual-computation">Actual computation</h2>
+<pre><code class="language-python">@api.depends(&quot;fiscal_year&quot;, &quot;department&quot;, &quot;account_id&quot;)
+def _compute_actual(self):
+    for b in self:
+        amls = self.env[&quot;account.move.line&quot;].search([
+            (&quot;account_id&quot;, &quot;=&quot;, b.account_id.id),
+            (&quot;date&quot;, &quot;&gt;=&quot;, f&quot;{b.fiscal_year}-01-01&quot;),
+            (&quot;date&quot;, &quot;&lt;=&quot;, f&quot;{b.fiscal_year}-12-31&quot;),
+            (&quot;parent_state&quot;, &quot;=&quot;, &quot;posted&quot;),
+            (&quot;analytic_distribution&quot;, &quot;ilike&quot;,
+             str(b.department.id) + &quot;:&quot;),
+        ])
+        b.actual_amount = sum(aml.balance for aml in amls)
+</code></pre>
+<p>(Department-budget mapping via <code>analytic_distribution</code> JSON.
+Native Odoo native budget mechanism.)</p>
+<h2 id="variance-computation">Variance computation</h2>
+<pre><code class="language-python">@api.depends(&quot;budget_amount&quot;, &quot;actual_amount&quot;)
+def _compute_variance(self):
+    for b in self:
+        b.variance = b.actual_amount - b.budget_amount
+        b.variance_pct = (
+            b.variance / b.budget_amount * 100
+            if b.budget_amount else 0)
+</code></pre>
+<h2 id="pivot-view">Pivot view</h2>
+<p>The pivot view groups by department row × account column with
+budget + actual + variance measures:</p>
+<pre><code class="language-xml">&lt;record id=&quot;view_budget_pivot&quot; model=&quot;ir.ui.view&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;southbrook.finance.budget.pivot&lt;/field&gt;
+    &lt;field name=&quot;model&quot;&gt;southbrook.finance.budget&lt;/field&gt;
+    &lt;field name=&quot;arch&quot; type=&quot;xml&quot;&gt;
+        &lt;pivot string=&quot;Budget vs Actuals&quot;&gt;
+            &lt;field name=&quot;department&quot; type=&quot;row&quot;/&gt;
+            &lt;field name=&quot;account_id&quot; type=&quot;col&quot;/&gt;
+            &lt;field name=&quot;budget_amount&quot; type=&quot;measure&quot;/&gt;
+            &lt;field name=&quot;actual_amount&quot; type=&quot;measure&quot;/&gt;
+            &lt;field name=&quot;variance&quot; type=&quot;measure&quot;/&gt;
+        &lt;/pivot&gt;
+    &lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<h2 id="annual-budget-upload">Annual budget upload</h2>
+<p>Excel/CSV import via native data import. Map columns to
+<code>fiscal_year</code>, <code>department</code>, <code>account_id</code>, <code>budget_amount</code>.</p>
+<p>For programmatic seeding:</p>
+<pre><code class="language-python">def seed_budget_year(self, year, csv_path):
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            self.create({
+                &quot;fiscal_year&quot;: year,
+                &quot;department&quot;: self.env[&quot;hr.department&quot;].search(
+                    [(&quot;name&quot;, &quot;=&quot;, row[&quot;department&quot;])]).id,
+                &quot;account_id&quot;: self.env[&quot;account.account&quot;].search(
+                    [(&quot;code&quot;, &quot;=&quot;, row[&quot;account_code&quot;])]).id,
+                &quot;budget_amount&quot;: float(row[&quot;amount&quot;]),
+            })
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"Actual doesn't match GL"</strong> — analytic_distribution JSON
+  format mismatch. Verify the department's analytic account is
+  configured correctly.</li>
+<li><strong>"Variance shows huge negative"</strong> — actual exceeds budget. Not
+  a bug; that's the point of the report.</li>
+<li><strong>"Budget rows from prior years pollute pivot"</strong> — pivot view
+  has no default fiscal_year filter. Add <code>fiscal_year</code> filter
+  to the action's domain.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Pivot view rows by department, cols by account. To add
+quarters as a third dimension?</p>
+<blockquote>
+<p>Add <code>period</code> field (computed from <code>account.move.line.date</code>).
+Then pivot can group by <code>period</code> as col1 + account as col2.</p>
+</blockquote>
+<p><strong>Q2.</strong> Actual amount queries <code>account.move.line</code>. Why filter
+<code>parent_state = 'posted'</code>?</p>
+<blockquote>
+<p>Draft entries aren't final; their amounts aren't authoritative.</p>
+</blockquote>
+<p><strong>Q3.</strong> Budget for fiscal year 2027 added in early 2026. Effect?</p>
+<blockquote>
+<p>Variance shows actual_amount = 0 (no 2027 entries yet) versus
+budget. Shows the future plan; nothing wrong.</p>
+</blockquote>
+<p><strong>Q4.</strong> Two departments with same account, budget total $10k each.
+Pivot shows the account column = $20k?</p>
+<blockquote>
+<p>No — pivot aggregates the rows. If you filter to one department,
+shows that one's $10k. Total without filter sums to $20k. Pivot
+respects current filter.</p>
+</blockquote>
+<p><strong>Q5.</strong> Add a "rolling 12 month actual" measure. Approach?</p>
+<blockquote>
+<p>New computed field that queries the last 12 months instead of
+the fiscal year. Add to pivot as a measure.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_24_finance_mi_integration" model="slide.slide">
+            <field name="name">Finance Pack — MI Engine Integration</field>
+            <field name="channel_id" ref="course_finance_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">60</field>
+            <field name="description">Developer working on Finance signals to MI engine.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-pack-mi-engine-integration">Finance Pack — MI Engine Integration</h1>
+<h2 id="what-finance-surfaces-to-mi">What Finance surfaces to MI</h2>
+<p>Three categories of signal:</p>
+<ol>
+<li><strong>WIP variance</strong> &gt; threshold → recommendation for controller</li>
+<li><strong>Aged AR</strong> &gt; threshold (count or amount) → for sales manager</li>
+<li><strong>HST filing deadline approaching</strong> → for controller</li>
+</ol>
+<h2 id="hook-implementation">Hook implementation</h2>
+<pre><code class="language-python">class MiEngineFinanceExt(models.AbstractModel):
+    _inherit = &quot;southbrook.mi.engine&quot;
+
+    @api.model
+    def _check_finance_signals(self):
+        &quot;&quot;&quot;Called from the MI engine main loop.&quot;&quot;&quot;
+        self._check_wip_variance()
+        self._check_aged_ar()
+        self._check_hst_deadline()
+
+    def _check_wip_variance(self):
+        report = self.env[&quot;southbrook.finance.wip_report&quot;]
+        wip_total = sum(report.search([]).mapped(&quot;wip_value&quot;))
+        gl_balance = report.gl_balance_query(
+            self.env.company.id, fields.Date.today())
+        variance = abs(wip_total - gl_balance)
+        threshold = self.env.company.wip_variance_threshold or 1000
+        if variance &gt; threshold:
+            self._emit_recommendation(
+                subject=f&quot;WIP variance ${variance:.0f}&quot;,
+                body=(f&quot;WIP report total ${wip_total:.0f} vs GL &quot;
+                      f&quot;${gl_balance:.0f}. Variance ${variance:.0f}. &quot;
+                      f&quot;Recommended: investigate before month-end close.&quot;),
+                persona=&quot;controller&quot;,
+            )
+
+    def _check_aged_ar(self):
+        cutoff = fields.Date.today() - relativedelta(days=60)
+        aged = self.env[&quot;account.move&quot;].search([
+            (&quot;move_type&quot;, &quot;=&quot;, &quot;out_invoice&quot;),
+            (&quot;amount_residual&quot;, &quot;&gt;&quot;, 0),
+            (&quot;date_due&quot;, &quot;&lt;&quot;, cutoff),
+            (&quot;parent_state&quot;, &quot;=&quot;, &quot;posted&quot;),
+        ])
+        if len(aged) &gt;= 5:  # threshold
+            total_aged = sum(aged.mapped(&quot;amount_residual&quot;))
+            self._emit_recommendation(
+                subject=f&quot;AR aged 60+ : {len(aged)} customers ${total_aged:.0f}&quot;,
+                ...,
+                persona=&quot;sales_manager&quot;,
+            )
+
+    def _check_hst_deadline(self):
+        next_filing = self._next_hst_deadline()
+        days_until = (next_filing - fields.Date.today()).days
+        if days_until &lt;= 7:
+            self._emit_recommendation(
+                subject=f&quot;HST filing due in {days_until} days&quot;,
+                ...,
+                persona=&quot;controller&quot;,
+            )
+</code></pre>
+<h2 id="recommendation-lifecycle">Recommendation lifecycle</h2>
+<ol>
+<li>MI engine emits → <code>hermes.recommendation</code> row, state <code>pending_review</code></li>
+<li>Persona-routed to controller / sales manager / Plant GM</li>
+<li>They Apply / Modify / Reject (Course 21 lesson 21.4)</li>
+<li>Audit logged on the recommendation chatter</li>
+</ol>
+<h2 id="dedup-logic">Dedup logic</h2>
+<p>The MI engine should dedup so the same recommendation isn't
+emitted daily:</p>
+<pre><code class="language-python">def _emit_recommendation(self, subject, body, persona, **kwargs):
+    # Dedup: check if a similar rec already pending
+    existing = self.env[&quot;hermes.recommendation&quot;].search([
+        (&quot;subject&quot;, &quot;=&quot;, subject),
+        (&quot;state&quot;, &quot;=&quot;, &quot;pending_review&quot;),
+        (&quot;created_at&quot;, &quot;&gt;&quot;, fields.Datetime.now() - relativedelta(days=1)),
+    ], limit=1)
+    if existing:
+        return existing
+    # Create new
+    return self.env[&quot;hermes.recommendation&quot;].create({...})
+</code></pre>
+<h2 id="configuration">Configuration</h2>
+<p>Per-company thresholds via system parameters or company-specific
+fields:</p>
+<pre><code class="language-python">class ResCompany(models.Model):
+    _inherit = &quot;res.company&quot;
+
+    wip_variance_threshold = fields.Float(default=1000)
+    aged_ar_count_threshold = fields.Integer(default=5)
+    aged_ar_days_threshold = fields.Integer(default=60)
+</code></pre>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<ul>
+<li><strong>"WIP variance recommendation fires every day"</strong> — dedup not
+  working. Recommendations from &gt; 24h ago shouldn't trigger
+  another. Check the dedup query.</li>
+<li><strong>"Recommendation persona wrong"</strong> — the persona resolution may
+  not match the Plant GM's user. Verify persona mapping in
+  <code>southbrook_hermes</code>.</li>
+<li><strong>"MI engine doesn't seem to fire"</strong> — <code>southbrook.mi.engine</code>
+  cron may be off; check cron status.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> WIP variance $500, threshold $1,000. Recommendation
+emitted?</p>
+<blockquote>
+<p>No — below threshold. The MI engine remains quiet until variance
+exceeds threshold.</p>
+</blockquote>
+<p><strong>Q2.</strong> AR aged 60+: 4 customers, $50k. Threshold = 5 count.
+Recommendation?</p>
+<blockquote>
+<p>No — below count threshold even though the dollar exposure is
+material. Threshold logic may need an <code>OR</code> clause for amount.</p>
+</blockquote>
+<p><strong>Q3.</strong> Same as Q2 but recommendation fires on amount &gt; $30k OR
+count &gt;= 5. Logic?</p>
+<blockquote>
+<p><code>if len(aged) &gt;= count_threshold OR total &gt; amount_threshold</code>.</p>
+</blockquote>
+<p><strong>Q4.</strong> HST deadline check returns same recommendation 7 days in a
+row. Why?</p>
+<blockquote>
+<p>Dedup didn't fire. Each day creates a new recommendation
+because subject changes (<code>due in 7</code>, <code>due in 6</code>, etc.). Add
+dedup by base subject without the day count.</p>
+</blockquote>
+<p><strong>Q5.</strong> New Finance signal: month-end period not locked by day 7.
+Where add?</p>
+<blockquote>
+<p>New method in <code>_check_finance_signals</code>. Subscribes to fiscal
+year state; if today &gt; 7th and prev period unlocked, emit
+recommendation to controller.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_24_finance_extension" model="slide.slide">
+            <field name="name">Finance Pack — Extension Points</field>
+            <field name="channel_id" ref="course_finance_module"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">70</field>
+            <field name="description">Developer adding new Finance Pack capabilities.</field>
+            <field name="html_content"><![CDATA[<h1 id="finance-pack-extension-points">Finance Pack — Extension Points</h1>
+<h2 id="the-5-most-common-extensions">The 5 most common extensions</h2>
+<ol>
+<li>New CCA class (e.g. accelerated investment incentive)</li>
+<li>New asset disposal scenario (e.g. donation)</li>
+<li>New HST jurisdiction (e.g. PEI)</li>
+<li>New budget dimension (e.g. project)</li>
+<li>New financial report (e.g. cash flow summary)</li>
+</ol>
+<h2 id="new-cca-class">New CCA class</h2>
+<pre><code class="language-xml">&lt;record id=&quot;cca_class_53_accii_2025&quot; model=&quot;southbrook.finance.cca_class&quot;&gt;
+    &lt;field name=&quot;code&quot;&gt;Class 53 (AccII 2025)&lt;/field&gt;
+    &lt;field name=&quot;name&quot;&gt;M&amp;amp;P equipment under Accelerated 
+        Investment Incentive 2025&lt;/field&gt;
+    &lt;field name=&quot;rate&quot;&gt;1.00&lt;/field&gt;  &lt;!-- 100% first year --&gt;
+    &lt;field name=&quot;half_year_rule&quot; eval=&quot;False&quot;/&gt;
+    &lt;field name=&quot;description&quot;&gt;Accelerated incentive class for
+        M&amp;P equipment acquired between Nov 21, 2025 and 
+        Dec 31, 2027. See CRA T2 Schedule 8.&lt;/field&gt;
+&lt;/record&gt;
+</code></pre>
+<h2 id="new-asset-disposal-donation">New asset disposal: donation</h2>
+<p>Default disposal handles sale/scrap; donations are different
+because proceeds = $0 but you get a charitable deduction.</p>
+<pre><code class="language-python">class SouthbrookFinanceAsset(models.Model):
+    _inherit = &quot;southbrook.finance.asset&quot;
+
+    def action_dispose_as_donation(self, donation_date, charity_id):
+        self.ensure_one()
+        # Apply standard disposal with proceeds = 0
+        self.action_dispose(0, donation_date)
+
+        # Plus: post the charitable deduction
+        deduction_amount = self.current_ucc  # FMV usually
+        self.env[&quot;account.move&quot;].create({
+            &quot;journal_id&quot;: self.env.company.donation_journal_id.id,
+            &quot;ref&quot;: f&quot;Donation - {self.name}&quot;,
+            # ... DR Charitable Deduction, CR ... 
+        })
+
+        # Document the charity
+        self.message_post(
+            body=_(&quot;Asset donated to %s on %s&quot;) % (
+                charity_id.name, donation_date))
+</code></pre>
+<h2 id="new-hst-jurisdiction-pei">New HST jurisdiction: PEI</h2>
+<pre><code class="language-xml">&lt;record id=&quot;tax_pei_hst&quot; model=&quot;account.tax&quot;&gt;
+    &lt;field name=&quot;name&quot;&gt;PEI HST 15%&lt;/field&gt;
+    &lt;field name=&quot;amount&quot;&gt;15.0&lt;/field&gt;
+    &lt;field name=&quot;type_tax_use&quot;&gt;sale&lt;/field&gt;
+    &lt;field name=&quot;company_id&quot; eval=&quot;False&quot;/&gt;
+    &lt;field name=&quot;tax_group_id&quot; ref=&quot;account.tax_group_hst&quot;/&gt;
+&lt;/record&gt;
+</code></pre>
+<p>Then configure on company's <code>sale_hst_taxes</code> for PEI-resident
+sales.</p>
+<h2 id="new-budget-dimension-project">New budget dimension: project</h2>
+<p>To track budget by project:</p>
+<pre><code class="language-python">class SouthbrookFinanceBudget(models.Model):
+    _inherit = &quot;southbrook.finance.budget&quot;
+
+    project_id = fields.Many2one(&quot;project.project&quot;)
+</code></pre>
+<p>Update the actual compute to filter by project's analytic
+account:</p>
+<pre><code class="language-python">@api.depends(...)
+def _compute_actual(self):
+    for b in self:
+        domain = [...]
+        if b.project_id:
+            domain.append(
+                (&quot;analytic_distribution&quot;, &quot;ilike&quot;,
+                 str(b.project_id.analytic_account_id.id) + &quot;:&quot;))
+        amls = self.env[&quot;account.move.line&quot;].search(domain)
+        b.actual_amount = sum(aml.balance for aml in amls)
+</code></pre>
+<h2 id="new-financial-report-cash-flow-summary">New financial report: cash flow summary</h2>
+<pre><code class="language-python">class SouthbrookFinanceCashFlow(models.Model):
+    _name = &quot;southbrook.finance.cash_flow&quot;
+    _auto = False
+
+    period = fields.Char()
+    operating_cash = fields.Float()
+    investing_cash = fields.Float()
+    financing_cash = fields.Float()
+    net_cash = fields.Float()
+
+# SQL view that aggregates account_move_line by cash flow category
+</code></pre>
+<p>QWeb report + pivot view follow standard pattern.</p>
+<h2 id="what-to-avoid">What to avoid</h2>
+<ul>
+<li>Don't modify the WIP SQL view — extend with a new view if you
+  need different aggregation.</li>
+<li>Don't write to <code>southbrook.finance.cca_entry</code> directly — use
+  the compute methods.</li>
+<li>Don't post manual journal entries for CCA — use the
+  <code>_post_cca_journal()</code> helper for audit consistency.</li>
+</ul>
+<h2 id="quiz">Quiz</h2>
+<p><strong>Q1.</strong> Accelerated CCA on Class 53. Year 1 — different from
+half-year rule?</p>
+<blockquote>
+<p>Yes — AccII typically waives half-year rule. Set
+<code>half_year_rule = False</code> on the new class record.</p>
+</blockquote>
+<p><strong>Q2.</strong> Donating an asset. Proceeds = $0 but FMV = $5k. CCA
+recapture?</p>
+<blockquote>
+<p>Treated as proceeds = $0, so no recapture (UCC was $5k, $0 in,
+terminal loss case). But the charitable deduction = $5k
+(typically FMV) for tax purposes.</p>
+</blockquote>
+<p><strong>Q3.</strong> PEI HST rate is 15%. Why a separate tax record?</p>
+<blockquote>
+<p>Different jurisdictions can have different rates; <code>account.tax</code>
+records distinguish. The HST Return Pull queries by tax_line_id,
+so each tax (per jurisdiction) shows separately.</p>
+</blockquote>
+<p><strong>Q4.</strong> Budget by project — actual amount computed by project. Why
+analytic_distribution?</p>
+<blockquote>
+<p>Native Odoo uses analytic accounts for project costing. Linking
+budgets to project requires matching the analytic distribution.</p>
+</blockquote>
+<p><strong>Q5.</strong> New cash flow report. Why a SQL view?</p>
+<blockquote>
+<p>Same reasoning as WIP — fully derived data, no business reason
+for a separate table. Use SQL view for read-only aggregation.</p>
+</blockquote>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

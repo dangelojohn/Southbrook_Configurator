@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_exec_snapshot_user,exec snapshot user,model_southbrook_exec_dashboard_snapshot,group_southbrook_exec_dashboard_user,1,1,1,0
+access_exec_snapshot_admin,exec snapshot admin,model_southbrook_exec_dashboard_snapshot,base.group_system,1,1,1,1

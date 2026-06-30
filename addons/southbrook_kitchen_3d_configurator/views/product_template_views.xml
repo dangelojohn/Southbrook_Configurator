@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Product form: Southbrook Cabinet tab -->
+    <record id="view_product_template_form_sbk" model="ir.ui.view">
+        <field name="name">product.template.form.southbrook.cabinet</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Southbrook Cabinet" name="southbrook_cabinet">
+                    <group>
+                        <group string="Classification">
+                            <field name="southbrook_is_cabinet"
+                                   widget="boolean_toggle"/>
+                            <field name="southbrook_cabinet_type"
+                                   invisible="not southbrook_is_cabinet"
+                                   required="southbrook_is_cabinet"/>
+                            <field name="southbrook_material"
+                                   invisible="not southbrook_is_cabinet"/>
+                            <field name="southbrook_door_style"
+                                   invisible="not southbrook_is_cabinet"/>
+                            <field name="southbrook_3d_asset_url"
+                                   invisible="not southbrook_is_cabinet"/>
+                        </group>
+                        <group string="Cabinet Dimensions">
+                            <field name="southbrook_width_in"
+                                   invisible="not southbrook_is_cabinet"/>
+                            <field name="southbrook_height_in"
+                                   invisible="not southbrook_is_cabinet"/>
+                            <field name="southbrook_depth_in"
+                                   invisible="not southbrook_is_cabinet"/>
+                            <field name="southbrook_bom_available"
+                                   invisible="not southbrook_is_cabinet"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Cabinet Products action (filtered product list) -->
+    <record id="action_southbrook_cabinet_products" model="ir.actions.act_window">
+        <field name="name">Cabinet Products</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[("southbrook_is_cabinet", "=", True)]</field>
+        <field name="context">{
+            "default_southbrook_is_cabinet": True,
+            "default_sale_ok": True,
+            "default_purchase_ok": True
+        }</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_southbrook_payroll_contract_form" model="ir.ui.view">
+        <field name="name">southbrook.payroll.contract.form</field>
+        <field name="model">southbrook.payroll.contract</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Contract">
+                <header>
+                    <button name="action_activate" type="object" string="Activate" class="oe_highlight"
+                            invisible="state != 'draft'"/>
+                    <button name="action_terminate" type="object" string="Terminate"
+                            invisible="state != 'active'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                        </group>
+                        <group>
+                            <field name="wage"/>
+                            <field name="pay_periods_per_year"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Tax (CRA TD1)" name="tax">
+                            <group>
+                                <field name="cra_td1_personal_amount_federal"/>
+                                <field name="cra_td1_personal_amount_ontario"/>
+                                <field name="additional_federal_tax_request"/>
+                            </group>
+                        </page>
+                        <page string="WSIB" name="wsib">
+                            <group>
+                                <field name="wsib_rate_pct"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_southbrook_payroll_contract_list" model="ir.ui.view">
+        <field name="name">southbrook.payroll.contract.list</field>
+        <field name="model">southbrook.payroll.contract</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Contracts">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="wage"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_southbrook_payroll_contract" model="ir.actions.act_window">
+        <field name="name">Payroll Contracts</field>
+        <field name="res_model">southbrook.payroll.contract</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

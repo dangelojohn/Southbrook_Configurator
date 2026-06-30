@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_southbrook_cmms_service_contract_list" model="ir.ui.view">
+        <field name="name">southbrook.cmms.service_contract.list</field>
+        <field name="model">southbrook.cmms.service_contract</field>
+        <field name="arch" type="xml">
+            <list string="Service Contracts"
+                  decoration-danger="state == 'expired'"
+                  decoration-warning="state == 'expiring_soon'"
+                  decoration-success="state == 'active'">
+                <field name="name"/>
+                <field name="vendor_id"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="days_to_expiry"/>
+                <field name="annual_value"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_service_contract_form" model="ir.ui.view">
+        <field name="name">southbrook.cmms.service_contract.form</field>
+        <field name="model">southbrook.cmms.service_contract</field>
+        <field name="arch" type="xml">
+            <form string="Service Contract">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="vendor_id"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="expiry_alert_at"/>
+                            <field name="state_override"/>
+                        </group>
+                        <group>
+                            <field name="annual_value"/>
+                            <field name="currency_id"/>
+                            <field name="days_to_expiry"/>
+                            <field name="state"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Equipment" name="equipment">
+                            <field name="equipment_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="category_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_southbrook_cmms_service_contract_calendar" model="ir.ui.view">
+        <field name="name">southbrook.cmms.service_contract.calendar</field>
+        <field name="model">southbrook.cmms.service_contract</field>
+        <field name="arch" type="xml">
+            <calendar string="Contracts by End Date" date_start="date_end" mode="month" color="vendor_id">
+                <field name="name"/>
+                <field name="vendor_id"/>
+            </calendar>
+        </field>
+    </record>
+
+    <record id="action_southbrook_cmms_service_contract" model="ir.actions.act_window">
+        <field name="name">Service Contracts</field>
+        <field name="res_model">southbrook.cmms.service_contract</field>
+        <field name="view_mode">list,form,calendar</field>
+    </record>
+
+</odoo>

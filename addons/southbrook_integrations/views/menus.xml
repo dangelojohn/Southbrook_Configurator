@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_integrations_root"
+              name="Integrations"
+              parent="mrp.menu_mrp_root"
+              sequence="80"
+              groups="southbrook_integrations.group_integrations_user"/>
+
+    <menuitem id="menu_integrations_homag_sessions"
+              name="Homag Sessions"
+              parent="menu_integrations_root"
+              action="action_homag_session"
+              sequence="10"/>
+
+    <menuitem id="menu_integrations_asn_3pl"
+              name="3PL ASNs"
+              parent="menu_integrations_root"
+              action="action_asn_3pl"
+              sequence="20"/>
+
+    <menuitem id="menu_integrations_mcp_tools"
+              name="MCP Tools"
+              parent="menu_integrations_root"
+              action="action_mcp_tool"
+              sequence="30"/>
+
+    <menuitem id="menu_integrations_mcp_call_log"
+              name="MCP Call Log"
+              parent="menu_integrations_root"
+              action="action_mcp_call_log"
+              sequence="40"/>
+
+    <menuitem id="menu_integrations_label_printers"
+              name="Label Printers"
+              parent="menu_integrations_root"
+              action="action_iot_label_printer"
+              sequence="50"/>
+
+    <menuitem id="menu_integrations_label_log"
+              name="Label Log"
+              parent="menu_integrations_root"
+              action="action_iot_label_log"
+              sequence="60"/>
+
+    <menuitem id="menu_integrations_mi_tiles"
+              name="Integration Snapshot"
+              parent="menu_integrations_root"
+              action="action_integrations_mi_tiles"
+              sequence="70"/>
+</odoo>

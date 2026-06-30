@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+    <record id="view_qr_scan_log_list" model="ir.ui.view">
+        <field name="name">southbrook.qr.scan.log.list</field>
+        <field name="model">southbrook.qr.scan.log</field>
+        <field name="arch" type="xml">
+            <list string="QR Scan Log"
+                  decoration-success="result == 'ok'"
+                  decoration-warning="result in ('expired','unknown_kind','unknown_action')"
+                  decoration-danger="result in ('invalid_signature','access_denied','error','record_not_found')">
+                <field name="create_date" string="When"/>
+                <field name="user_id"/>
+                <field name="employee_id" optional="show"/>
+                <field name="kind"/>
+                <field name="ident"/>
+                <field name="target_model" optional="show"/>
+                <field name="target_id" optional="show"/>
+                <field name="action"/>
+                <field name="result" widget="badge"/>
+                <field name="source_ip" optional="hide"/>
+                <field name="error_message" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_qr_scan_log_search" model="ir.ui.view">
+        <field name="name">southbrook.qr.scan.log.search</field>
+        <field name="model">southbrook.qr.scan.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="user_id"/>
+                <field name="employee_id"/>
+                <field name="kind"/>
+                <field name="target_model"/>
+                <filter name="ok" string="OK" domain="[('result','=','ok')]"/>
+                <filter name="failed" string="Failed" domain="[('result','!=','ok')]"/>
+                <filter name="last24h" string="Last 24h"
+                        domain="[('create_date','&gt;=', (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                <group>
+                    <filter name="g_kind" string="Kind" context="{'group_by':'kind'}"/>
+                    <filter name="g_user" string="User" context="{'group_by':'user_id'}"/>
+                    <filter name="g_employee" string="Operator" context="{'group_by':'employee_id'}"/>
+                    <filter name="g_result" string="Result" context="{'group_by':'result'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_qr_scan_log" model="ir.actions.act_window">
+        <field name="name">QR Scan Log</field>
+        <field name="res_model">southbrook.qr.scan.log</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_last24h': 1}</field>
+    </record>
+
+    <menuitem id="menu_qr_scan_log_root" name="QR Kit"
+              parent="base.menu_administration" sequence="80"/>
+    <menuitem id="menu_qr_scan_log" name="Scan Log"
+              parent="menu_qr_scan_log_root"
+              action="action_qr_scan_log" sequence="10"/>
+</odoo>

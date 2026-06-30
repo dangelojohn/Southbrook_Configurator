@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_training_item_list" model="ir.ui.view">
+        <field name="name">southbrook.training.item.list</field>
+        <field name="model">southbrook.training.item</field>
+        <field name="arch" type="xml">
+            <list string="Training Items"
+                  decoration-muted="not is_active"
+                  decoration-info="kind == 'micro'">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="channel_id" optional="show"/>
+                <field name="minutes"/>
+                <field name="audience" optional="show"/>
+                <field name="tag_ids" widget="many2many_tags"
+                       options="{'color_field': 'color'}" optional="show"/>
+                <field name="is_active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_training_item_form" model="ir.ui.view">
+        <field name="name">southbrook.training.item.form</field>
+        <field name="model">southbrook.training.item</field>
+        <field name="arch" type="xml">
+            <form string="Training Item">
+                <header>
+                    <button name="open_url" string="Open"
+                            type="object" class="btn-primary"
+                            invisible="not url"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived"
+                            bg_color="text-bg-danger"
+                            invisible="is_active"/>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Lesson title"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="kind"/>
+                            <field name="channel_id"/>
+                            <field name="sequence"/>
+                            <field name="minutes"/>
+                            <field name="audience"/>
+                        </group>
+                        <group>
+                            <field name="source_ref"/>
+                            <field name="url" widget="url"/>
+                            <field name="is_active"/>
+                        </group>
+                    </group>
+                    <group string="Summary">
+                        <field name="summary" nolabel="1"/>
+                    </group>
+                    <group string="Tags">
+                        <field name="tag_ids" widget="many2many_tags"
+                               options="{'color_field': 'color'}"
+                               nolabel="1"/>
+                    </group>
+                    <group string="Restricted to groups (empty = everyone)">
+                        <field name="role_group_ids" widget="many2many_tags"
+                               nolabel="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_training_item_kanban" model="ir.ui.view">
+        <field name="name">southbrook.training.item.kanban</field>
+        <field name="model">southbrook.training.item</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="kind">
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="channel_id"/>
+                <field name="minutes"/>
+                <field name="audience"/>
+                <field name="url"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card oe_kanban_global_click">
+                            <strong><field name="name"/></strong>
+                            <div t-if="record.audience.raw_value" class="text-muted small">
+                                <field name="audience"/>
+                            </div>
+                            <div class="mt-2 small">
+                                <field name="channel_id"/>
+                                <span t-if="record.minutes.raw_value">
+                                    · <field name="minutes"/> min
+                                </span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_training_item_search" model="ir.ui.view">
+        <field name="name">southbrook.training.item.search</field>
+        <field name="model">southbrook.training.item</field>
+        <field name="arch" type="xml">
+            <search string="Training Catalogue">
+                <field name="name"/>
+                <field name="tag_ids"/>
+                <field name="channel_id"/>
+                <separator/>
+                <filter name="active" string="Active"
+                        domain="[('is_active','=',True)]"/>
+                <filter name="archived" string="Archived"
+                        domain="[('is_active','=',False)]"/>
+                <separator/>
+                <filter name="kind_lesson" string="Lessons"
+                        domain="[('kind','=','lesson')]"/>
+                <filter name="kind_micro" string="JTBD Micros"
+                        domain="[('kind','=','micro')]"/>
+                <filter name="kind_runbook" string="Runbooks"
+                        domain="[('kind','=','runbook')]"/>
+                <filter name="kind_tour" string="In-App Tours"
+                        domain="[('kind','=','tour')]"/>
+                <group>
+                    <filter name="group_kind" string="Kind"
+                            context="{'group_by': 'kind'}"/>
+                    <filter name="group_channel" string="Course"
+                            context="{'group_by': 'channel_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_training_item" model="ir.actions.act_window">
+        <field name="name">Training Catalogue</field>
+        <field name="res_model">southbrook.training.item</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_training_item_search"/>
+    </record>
+
+</odoo>

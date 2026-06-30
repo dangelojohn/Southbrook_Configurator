@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <record id="view_installer_stage_log_list" model="ir.ui.view">
+        <field name="name">southbrook.installer.stage.log.list</field>
+        <field name="model">southbrook.installer.stage.log</field>
+        <field name="arch" type="xml">
+            <list string="Installation Phase Logs"
+                  decoration-success="state == 'done'"
+                  decoration-warning="state == 'in_progress'"
+                  decoration-muted="state == 'skipped'">
+                <field name="sequence" widget="handle"/>
+                <field name="job_id"/>
+                <field name="phase_id"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-info="state == 'in_progress'"
+                       decoration-muted="state == 'skipped'"/>
+                <field name="photo_count"/>
+                <field name="min_photos_required" string="Min Photos"
+                       optional="show"/>
+                <field name="photo_gate_passed" widget="boolean_toggle"
+                       optional="show"/>
+                <field name="duration_mins"/>
+                <field name="estimated_duration_mins" string="Est. (min)"
+                       optional="show"/>
+                <field name="completed_by_id" optional="show"/>
+                <field name="complete_time" optional="show"/>
+                <button name="action_mark_in_progress" type="object"
+                        string="Start" icon="fa-play"
+                        invisible="state in ('in_progress', 'done')"/>
+                <button name="action_mark_done" type="object"
+                        string="Complete" icon="fa-check"
+                        invisible="state == 'done'"
+                        class="oe_highlight"/>
+                <button name="action_mark_skipped" type="object"
+                        string="Skip" icon="fa-step-forward"
+                        invisible="state == 'done'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_installer_stage_log_form" model="ir.ui.view">
+        <field name="name">southbrook.installer.stage.log.form</field>
+        <field name="model">southbrook.installer.stage.log</field>
+        <field name="arch" type="xml">
+            <form string="Installation Phase Log">
+                <header>
+                    <button name="action_mark_in_progress" type="object"
+                            string="Start" class="oe_highlight"
+                            invisible="state in ('in_progress', 'done')"/>
+                    <button name="action_mark_done" type="object"
+                            string="Complete" class="oe_highlight"
+                            invisible="state == 'done'"/>
+                    <button name="action_mark_skipped" type="object"
+                            string="Skip"
+                            invisible="state == 'done'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,in_progress,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="job_id" readonly="1"/>
+                            <field name="phase_id" readonly="1"/>
+                            <field name="completed_by_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="start_time" readonly="1"/>
+                            <field name="complete_time" readonly="1"/>
+                            <field name="duration_mins" widget="float_time"/>
+                            <field name="estimated_duration_mins"/>
+                        </group>
+                    </group>
+                    <group string="Photo Gate">
+                        <field name="min_photos_required"/>
+                        <field name="photo_count" readonly="1"/>
+                        <field name="photo_gate_passed" readonly="1"/>
+                        <field name="photo_ids" widget="many2many_binary"/>
+                    </group>
+                    <group string="GPS at completion">
+                        <field name="gps_lat" readonly="1"/>
+                        <field name="gps_lng" readonly="1"/>
+                    </group>
+                    <separator string="Notes"/>
+                    <field name="notes" nolabel="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

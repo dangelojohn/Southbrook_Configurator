@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Parent: under Accounting top-level menu provided by account module. -->
+    <menuitem id="menu_finance_pack_root"
+              name="Finance Pack"
+              parent="account.menu_finance"
+              sequence="90"
+              groups="southbrook_finance_pack.group_southbrook_finance_user"/>
+
+    <menuitem id="menu_finance_asset"
+              name="Asset Register"
+              parent="menu_finance_pack_root"
+              action="action_asset"
+              sequence="10"/>
+
+    <menuitem id="menu_finance_cca_class"
+              name="CCA Classes"
+              parent="menu_finance_pack_root"
+              action="action_cca_class"
+              sequence="20"
+              groups="southbrook_finance_pack.group_southbrook_finance_manager"/>
+
+    <menuitem id="menu_finance_budget"
+              name="Budgets"
+              parent="menu_finance_pack_root"
+              action="action_budget"
+              sequence="30"/>
+
+    <menuitem id="menu_finance_budget_pivot"
+              name="Budget Pivot"
+              parent="menu_finance_pack_root"
+              action="action_budget_line_pivot"
+              sequence="35"/>
+
+    <menuitem id="menu_finance_hst_return"
+              name="HST Returns"
+              parent="menu_finance_pack_root"
+              action="action_hst_return"
+              sequence="40"/>
+
+    <menuitem id="menu_finance_wip_report"
+              name="WIP Reports"
+              parent="menu_finance_pack_root"
+              action="action_wip_report"
+              sequence="50"/>
+
+    <menuitem id="menu_finance_mi_tiles"
+              name="Finance Snapshot"
+              parent="menu_finance_pack_root"
+              action="action_finance_mi_tiles"
+              sequence="60"/>
+</odoo>

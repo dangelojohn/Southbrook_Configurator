@@ -1,0 +1,1172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="slide_07_orchestration_admin" model="slide.slide">
+            <field name="name">Premium Orchestration — The Six Crons and How to Read Their Last-Run State</field>
+            <field name="channel_id" ref="course_sysadmin"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">10</field>
+            <field name="description">IT Admin / Sysadmin who owns the Odoo 19 stack on QNAP and is on-call when a nightly cron misses.</field>
+            <field name="html_content"><![CDATA[<h1 id="premium-orchestration-the-six-crons-and-how-to-read-their-last-run-state">Premium Orchestration — The Six Crons and How to Read Their Last-Run State</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the sysadmin on call when a Southbrook user opens a ticket saying
+"the Kitchen Jobs board is stale" or "MI Status hasn't refreshed since
+yesterday." Both are cron-driven surfaces. The <code>southbrook_premium_orchestration</code>
+addon owns <strong>six scheduled actions</strong> that, together, keep the platform's
+analytical / creative / practical loop alive. This lesson is how you find
+them, read their last-run telemetry, manually re-fire one after a missed
+window, and recover when one errors mid-run.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The six crons are seeded by the addon into Odoo's native scheduler. To
+inspect them, sign in at <strong>southbrookcabinetry.space/odoo</strong> as a member of
+the <em>Administration / Settings</em> group, then:</p>
+<blockquote>
+<p><strong>Settings → Technical → Automation → Scheduled Actions</strong></p>
+</blockquote>
+<p>Filter the list by <em>Name</em> containing <code>Southbrook:</code> — you should see
+<strong>exactly six</strong> records. If you see fewer than six, an admin has archived
+one by hand; the addon re-seeds with <code>noupdate="0"</code> on every <code>-u</code> upgrade,
+so re-running <code>docker exec southbrook-odoo odoo -u southbrook_premium_orchestration</code>
+will restore any missing record.</p>
+<p>For the MI engine's last-run telemetry specifically, the in-app view is:</p>
+<blockquote>
+<p><strong>Kitchen Ops → MI Status → Southbrook Manufacturing Intelligence</strong></p>
+</blockquote>
+<p>That form shows the singleton state record (<code>southbrook.mi.engine.state</code>)
+with <code>last_run_at</code>, <code>last_run_check_count</code>, <code>last_run_blockers</code>,
+<code>last_run_warnings</code>, and <code>last_run_duration_ms</code> — the six-field telemetry
+panel populated by the hourly refire cron.</p>
+<p>For SSH-level inspection of cron output, the Odoo container log on the QNAP
+is the source of truth:</p>
+<blockquote>
+<p><strong><code>ssh admin@ssh.odooiq.com</code></strong> then
+<strong><code>docker logs southbrook-odoo --since 24h | grep -E "Southbrook:|cron"</code></strong></p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The Scheduled Actions list view for the six Southbrook crons shows, per
+row:</p>
+<ul>
+<li><strong>Name</strong> (<code>name</code> on <code>ir.cron</code>) — the human-readable cron label, all
+  prefixed <code>Southbrook:</code> so you can grep them out of the native Odoo
+  cron noise.</li>
+<li><strong>Model</strong> (<code>model_id</code> on <code>ir.cron</code>) — the model the cron's code runs
+  against. Useful when you're tracing which model's <code>_cron_*</code> method
+  fires.</li>
+<li><strong>Active</strong> (<code>active</code> on <code>ir.cron</code>) — boolean. <strong>All six must stay
+  True.</strong> If you see a row with Active = False, that cron has been
+  manually disabled and the loop it belongs to is silently dark.</li>
+<li><strong>Next Execution Date</strong> (<code>nextcall</code> on <code>ir.cron</code>) — the next time
+  Odoo's scheduler will fire this cron. If <code>nextcall</code> is in the past
+  by more than the cron's <code>interval</code>, the scheduler is backed up or
+  the worker is wedged.</li>
+<li><strong>Interval</strong> (<code>interval_number</code> + <code>interval_type</code>) — how often the
+  cron is supposed to fire. The six Southbrook crons run on five
+  distinct intervals: <strong>30 min, 1 h, 6 h, daily, weekly</strong>.</li>
+<li><strong>User</strong> (<code>user_id</code>) — should be <code>OdooBot</code> (<code>base.user_root</code>) on
+  every Southbrook cron. If it's a real human user, someone edited it
+  by hand and the cron will fail the moment that human is archived.</li>
+</ul>
+<p>The MI Engine form (Kitchen Ops → MI Status) adds runtime telemetry:</p>
+<ul>
+<li><strong>MOs In Flight</strong> (<code>mo_in_flight_count</code> on <code>southbrook.mi.engine.state</code>)
+  — computed live, count of MOs in state <code>confirmed</code> or <code>progress</code>.</li>
+<li><strong>Active Gate Rules</strong> (<code>rule_count</code>) — computed live, count of
+  <code>southbrook.mi.check</code> records with <code>is_gate = True</code>.</li>
+<li><strong>Last Run At</strong> (<code>last_run_at</code>) — stamped by <code>_cron_refire_gates</code>
+  every successful run. If this is older than 2 h on a live system,
+  the MI refire cron is in trouble.</li>
+<li><strong>Last Run Duration (ms)</strong> (<code>last_run_duration_ms</code>) — sanity check.
+  Normal range is a few hundred ms on 1-50 in-flight MOs. If it's
+  growing toward the 30-min cron window, that's your early signal to
+  raise an issue against the MI engine team.</li>
+</ul>
+<h2 id="the-six-crons-in-detail">The six crons in detail</h2>
+<p>The order below is the install order from <code>data/ir_cron.xml</code> plus the
+phase-2 <code>data/eco_proposal_cron.xml</code>. Each subsection follows the same
+shape: <strong>what it does, schedule, what it reads, what it writes, where to
+look on a missed run, recovery procedure.</strong></p>
+<h3 id="cron-1-recompute-project-readiness">Cron 1 — Recompute Project Readiness</h3>
+<ul>
+<li><strong>Cron name</strong> (verbatim from XML): <code>Southbrook: Recompute Project Readiness</code></li>
+<li><strong>XML id</strong>: <code>cron_recompute_readiness_all</code></li>
+<li><strong>Model</strong>: <code>project.task</code></li>
+<li><strong>Code</strong>: <code>model._cron_recompute_readiness_all()</code></li>
+<li><strong>Schedule</strong>: every <strong>30 minutes</strong>, first fire +2 min after install.</li>
+<li><strong>What it reads</strong>: every open <code>project.task</code> carrying an
+  <code>x_southbrook_sale_order_id</code> link (the orchestration spine), in any
+  state other than done / cancelled.</li>
+<li><strong>What it writes</strong>: for each task, snapshots <code>readiness_decision</code> and
+  <code>southbrook_production_release_state</code>, runs the readiness recompute,
+  stamps <code>readiness_last_recomputed_at</code> on the task, and posts a
+  chatter note on any task whose readiness <em>flipped</em> (ready → blocked,
+  blocked → ready, etc.). The Kitchen Jobs dashboard sorts by
+  <code>readiness_last_recomputed_at desc</code> so a stale stamp shows up
+  immediately.</li>
+<li><strong>Log signal</strong>: search the Odoo container log for
+  <code>Premium Orchestration: readiness recompute changed status</code> — that's
+  the chatter-emit path. The cron itself doesn't log on success;
+  successful runs are silent.</li>
+<li><strong>Common error mode</strong>: a sibling addon (e.g. <code>southbrook_project_mrp</code>)
+  drifts and removes a readiness compute method the cron calls via
+  <code>_invoke_readiness_recompute</code>. The cron is <strong>defensive</strong> — it
+  iterates a priority list of method names and silently no-ops if
+  none exist. So the symptom is not a stack trace but a <em>quiet</em>
+  cron where readiness flips stop appearing in chatter.</li>
+<li><strong>Recovery</strong>: open <em>Settings → Technical → Automation → Scheduled
+  Actions → Southbrook: Recompute Project Readiness</em>, click <em>Run
+  Manually</em>. If the dashboard still doesn't refresh, the issue is
+  upstream in <code>southbrook_project_mrp</code>; raise a ticket against that
+  agent. <strong>Do not</strong> disable this cron — Kitchen Jobs goes dark.</li>
+</ul>
+<h3 id="cron-2-refire-mi-stage-gate-checks">Cron 2 — Refire MI Stage-Gate Checks</h3>
+<ul>
+<li><strong>Cron name</strong> (verbatim): <code>Southbrook: Refire MI Stage-Gate Checks</code></li>
+<li><strong>XML id</strong>: <code>cron_mi_engine_refire_gates</code></li>
+<li><strong>Model</strong>: <code>southbrook.mi.engine.state</code></li>
+<li><strong>Code</strong>: <code>model._cron_refire_gates()</code></li>
+<li><strong>Schedule</strong>: every <strong>1 hour</strong>, first fire +5 min after install.</li>
+<li><strong>What it reads</strong>: every <code>mrp.production</code> in state <code>confirmed</code> or
+  <code>progress</code>, every <code>southbrook.mi.check</code> with <code>is_gate = True</code>. Runs
+  each check against each MO — the (MO × check) cartesian product is
+  bounded because gate checks are usually small.</li>
+<li><strong>What it writes</strong>: the singleton <code>southbrook.mi.engine.state</code> row
+  with <code>last_run_at</code>, <code>last_run_check_count</code>, <code>last_run_blockers</code>,
+  <code>last_run_warnings</code>, <code>last_run_duration_ms</code>. Plus whatever side
+  effects the individual checks have on <code>mrp.production</code> (typically
+  toggling a <code>gate_pass</code> flag).</li>
+<li><strong>Log signal</strong>: <code>MI engine refire: N MOs × M checks = X evaluations,
+  B blockers, W warnings, D ms</code> is emitted on every successful run at
+  INFO level.</li>
+<li><strong>Common error mode</strong>: a misbehaving <code>southbrook.mi.check</code> raises an
+  exception during evaluation. The cron catches per-check exceptions
+  and logs <code>MI engine: evaluation of check &lt;id&gt; against MO &lt;id&gt; raised
+  &lt;error&gt;; counted as a no-op.</code> It does <strong>not</strong> raise — the whole sweep
+  finishes — but the warning tells you which check + MO to investigate.</li>
+<li><strong>Recovery</strong>: search the log for <code>MI engine: evaluation of check</code> to
+  find the offending check, open it in <em>Kitchen Ops → MI Status →
+  Checks</em>, fix or temporarily disable (toggle <code>is_gate = False</code>). Then
+  <em>Run Manually</em> the cron. The button <strong>Run Now</strong> on the MI Engine
+  form does the same thing and reports the dict back via a notification
+  toast — preferable to the bare scheduler trigger because you get the
+  evaluations/blockers/warnings summary inline.</li>
+</ul>
+<h3 id="cron-3-backfill-order-analytics">Cron 3 — Backfill Order Analytics</h3>
+<ul>
+<li><strong>Cron name</strong> (verbatim): <code>Southbrook: Backfill Order Analytics</code></li>
+<li><strong>XML id</strong>: <code>cron_backfill_order_analytics</code></li>
+<li><strong>Model</strong>: <code>southbrook.order.analytics</code></li>
+<li><strong>Code</strong>: <code>model._cron_backfill_unscored()</code></li>
+<li><strong>Schedule</strong>: every <strong>6 hours</strong>, first fire +10 min after install.</li>
+<li><strong>What it reads</strong>: a raw SQL <code>LEFT JOIN</code> between <code>sale_order</code> (state
+  = <code>sale</code>) and <code>southbrook_order_analytics</code>, fetching <code>sale.order.id</code>
+  rows that don't yet have an analytics row. Avoids pulling the full
+  analytics table into Python.</li>
+<li><strong>What it writes</strong>: one new <code>southbrook.order.analytics</code> row per
+  unscored confirmed sale order via the existing idempotent
+  <code>capture(order)</code> method. Per-order failures are caught and logged
+  with <code>Southbrook analytics backfill: capture failed for sale.order
+  &lt;id&gt; (&lt;exc&gt;) — skipping.</code> so one bad order doesn't poison the sweep.</li>
+<li><strong>Log signal</strong>: <code>Southbrook analytics backfill: N unscored confirmed
+  orders found, capturing…</code> then <code>captured N / M unscored orders.</code> —
+  the N over M tells you how many failed (M - N).</li>
+<li><strong>Common error mode</strong>: <code>capture()</code> raises because a downstream model
+  (<code>product_configurator_mrp</code> BoM, or <code>southbrook_estimating</code>'s pricelist
+  resolver) drifted. The capture itself is owned by
+  <code>southbrook_estimating</code> — this cron is just discovery + dispatch.</li>
+<li><strong>Recovery</strong>: confirm the log line shows <code>captured 0 / N</code> (vs N / N
+  on a healthy run). If 0 / N, <em>Run Manually</em> once to confirm the
+  failure is reproducible; if it is, raise a ticket against
+  <code>southbrook_estimating.southbrook.order.analytics.capture</code>. The
+  cron will keep re-trying every 6 hours and self-heals automatically
+  once the upstream is fixed.</li>
+</ul>
+<h3 id="cron-4-weekly-planning-baseline">Cron 4 — Weekly Planning Baseline</h3>
+<ul>
+<li><strong>Cron name</strong> (verbatim): <code>Southbrook: Weekly Planning Baseline</code></li>
+<li><strong>XML id</strong>: <code>cron_weekly_planning_baseline</code></li>
+<li><strong>Model</strong>: <code>mrp.planning.run</code></li>
+<li><strong>Code</strong>: <code>model._cron_baseline()</code></li>
+<li><strong>Schedule</strong>: every <strong>7 days</strong>. <code>nextcall</code> is computed at install
+  time to land on the next upcoming <strong>Sunday 02:00</strong> local time.</li>
+<li><strong>What it reads</strong>: existing <code>mrp.planning.run</code> records from the last
+  24 hours (de-dup guard).</li>
+<li><strong>What it writes</strong>: a single new <code>mrp.planning.run</code> record with
+  <code>date = today</code> and, where the OpenValue layer is present,
+  <code>capacity_horizon_days = 14</code>, <code>include_sales_demand = True</code>,
+  <code>multilevel = False</code>. Then calls <code>run.action_run()</code> if available.</li>
+<li><strong>Log signal</strong>: <code>Southbrook planning baseline: run &lt;name&gt; exists
+  within 24h window, skipping.</code> on a duplicate guard, or
+  <code>Southbrook planning baseline: action_run failed on &lt;run&gt; (&lt;exc&gt;)
+  — leaving run in draft for manual inspection.</code> on a failure.</li>
+<li><strong>Common error mode</strong>: <code>action_run()</code> fails because the OpenValue
+  engine hit a workcenter capacity edge case. The cron leaves the
+  draft run in place so you can re-trigger it manually after the
+  fix — it does <strong>not</strong> roll back the create.</li>
+<li><strong>Recovery</strong>: open <em>Manufacturing → Planning → Planning Runs</em>, find
+  the draft run with today's date, open it, click <em>Run</em> manually. If
+  the OpenValue engine raises a useful exception you'll see it in the
+  flash message; otherwise the Odoo log is the next stop. <strong>Do not</strong>
+  delete the draft and re-run the cron — it will be skipped by the
+  24-hour de-dup guard.</li>
+</ul>
+<h3 id="cron-5-quality-dry-run-nightly">Cron 5 — Quality Dry-Run Nightly</h3>
+<ul>
+<li><strong>Cron name</strong> (verbatim): <code>Southbrook: Quality Dry-Run Nightly</code></li>
+<li><strong>XML id</strong>: <code>cron_dq_nightly_dry_run</code></li>
+<li><strong>Model</strong>: <code>southbrook.project.data.quality.report</code></li>
+<li><strong>Code</strong>: <code>model._cron_nightly_dry_run()</code></li>
+<li><strong>Schedule</strong>: every <strong>1 day</strong>, <code>nextcall</code> lands at <strong>03:00 local</strong>
+  (or the next 03:00 if installed after 03:00 today). Pairs with the
+  QNAP logrotate window at 03:30 so heavy I/O lands after rotation
+  completes.</li>
+<li><strong>What it reads</strong>: every <code>project.project</code> with <code>active = True</code>.</li>
+<li><strong>What it writes</strong>: one <code>southbrook.project.data.quality.report</code> row
+  per active project, plus a scored line per DQ dimension on each. The
+  cron returns the count of reports created. Per-project errors are
+  written to <code>ir.logging</code> as warnings via the sudoed <code>_cron_nightly_dry_run</code>
+  func tag — search <code>ir.logging</code> filtering by
+  <code>func = _cron_nightly_dry_run</code> to see which projects failed without
+  scrolling container logs.</li>
+<li><strong>Common error mode</strong>: a project with a malformed BoM blows up the
+  scoring of one dimension; the per-project exception handler swallows
+  it and continues the fan-out. The report for that project is missing.</li>
+<li><strong>Recovery</strong>: query the DQ report list filtered by today's date —
+  any active project NOT in the list is a candidate. <em>Run Manually</em>
+  on the cron, then re-check; if a specific project is still missing,
+  open that project's BoMs and look for the <code>convert.py</code> complaint in
+  the <code>ir.logging</code> warning text.</li>
+</ul>
+<h3 id="cron-6-propose-ecos-for-high-frequency-cut-spec-overrides">Cron 6 — Propose ECOs for High-Frequency Cut-Spec Overrides</h3>
+<ul>
+<li><strong>Cron name</strong> (verbatim): <code>Southbrook: Propose ECOs for High-Frequency Cut-Spec Overrides</code></li>
+<li><strong>XML id</strong>: <code>cron_propose_eco_for_high_freq_overrides</code></li>
+<li><strong>Model</strong>: <code>southbrook.cut.spec.override</code></li>
+<li><strong>Code</strong>: <code>model._cron_propose_eco_for_high_frequency_overrides()</code></li>
+<li><strong>Schedule</strong>: every <strong>1 day</strong>, <code>nextcall</code> lands at <strong>04:00 local</strong> the
+  day after install (so it runs after the DQ dry-run at 03:00 in cron 5).</li>
+<li><strong>What it reads</strong>: <code>read_group</code> over <code>southbrook.cut.spec.override</code>
+  records from the last <code>window_days = 90</code> days, grouped by <code>rule_key</code>.</li>
+<li><strong>What it writes</strong>: for each <code>rule_key</code> with ≥ 10 overrides in 90
+  days and no existing open ECO referencing it, creates one new
+  <code>southbrook.eco</code> of type <em>Construction-Rule Change</em> with HTML
+  description listing the 5 most recent sample overrides. Back-links
+  each sample override via <code>eco_proposed_id</code> so the engineer reviewing
+  the ECO can see the evidence.</li>
+<li><strong>Log signal</strong>: <code>No Construction-Rule Change ECO type found; skipping
+  ECO proposal sweep.</code> is the bootstrap-gap signal — the addon expects
+  an ECO type seeded by <code>southbrook_plm</code>. Otherwise the cron is silent
+  on success.</li>
+<li><strong>Common error mode</strong>: the <em>Construction-Rule Change</em> ECO type is
+  missing because the PLM module wasn't installed before Premium
+  Orchestration. The cron logs the warning above and exits clean.</li>
+<li><strong>Recovery</strong>: install / re-install <code>southbrook_plm</code>, then <em>Run
+  Manually</em>. Result is a <code>{'proposed': N}</code> dict — N is the number of
+  ECOs auto-drafted.</li>
+</ul>
+<h2 id="daily-weekly-on-call">Daily / Weekly / On-call</h2>
+<p><strong>Daily (5 min, before standup):</strong></p>
+<ul>
+<li>Open <em>Settings → Technical → Automation → Scheduled Actions</em>, filter
+  <code>Southbrook:</code>. Confirm <strong>all six</strong> rows show <em>Active = True</em> and
+  <em>Next Execution Date</em> in the future, not the past.</li>
+<li>Open <em>Kitchen Ops → MI Status</em>. Confirm <em>Last Run At</em> is within the
+  last 2 h and <em>Last Run Duration (ms)</em> is under ~5,000.</li>
+</ul>
+<p><strong>Weekly (Monday morning):</strong></p>
+<ul>
+<li>Open <em>Manufacturing → Planning → Planning Runs</em>. Confirm a fresh run
+  exists from the previous Sunday 02:00 ± 1 h. If it's missing or in
+  draft (didn't <code>action_run</code>), see cron 4 recovery.</li>
+<li>Open the DQ Report list, filter to the last 7 days, confirm there's
+  one row per active project per day. Gaps indicate cron 5 misses.</li>
+</ul>
+<p><strong>On-call (incident triggered by a user ticket):</strong></p>
+<ol>
+<li>Identify which surface the user is complaining about (Kitchen Jobs,
+   MI Status, Order Analytics, Planning, DQ, or ECO queue).</li>
+<li>Map it to its cron via the table above.</li>
+<li>Open the cron, check <em>Next Execution Date</em> vs <em>Now</em>.</li>
+<li>If <em>Next Execution Date</em> is in the past by more than one interval,
+   the Odoo scheduler is backed up — <code>docker logs southbrook-odoo
+   --tail 200</code> for the master cron-runner heartbeat.</li>
+<li>If the cron is firing but doing nothing, search the container log
+   for the log signals listed above.</li>
+<li><em>Run Manually</em> once you've isolated the root cause — never as the
+   first action.</li>
+</ol>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"A user archived a cron because it looked spammy and now the dashboard
+is dark."</strong></p>
+<p>Re-seed via <code>docker exec southbrook-odoo odoo -u southbrook_premium_orchestration
+-d southbrook --stop-after-init</code> from the QNAP host. The <code>noupdate="0"</code>
+flag on the data XML re-creates any cron that's been deleted; archived
+records get re-activated by the same load (active is in the data record).
+<strong>Don't</strong> un-archive by hand and assume that's enough — the user may have
+edited intervals or <code>user_id</code> too.</p>
+<p><strong>"The MI refire cron is firing on schedule but Last Run At isn't
+updating."</strong></p>
+<p>The model <code>southbrook.mi.engine.state</code> is a singleton. If two singletons
+ever get created (e.g. by a botched data migration), the cron writes to
+one and your form view reads the other. Check with
+<code>docker exec southbrook-odoo odoo shell -d southbrook -c
+'self.env["southbrook.mi.engine.state"].search_count([])'</code> — answer must
+be <strong>1</strong>. If it's &gt; 1, keep the one with the most recent <code>last_run_at</code>
+and unlink the others.</p>
+<p><strong>"I ran the weekly planning cron manually and now there are two
+planning runs from this week."</strong></p>
+<p>The de-dup guard skips creates within a 24-hour window, but if the
+scheduled run already happened and you manually fired again later, you
+get one scheduled + one manual. The scheduler doesn't double-count;
+either run is valid. Pick the one you trust (typically the manual one
+since you ran it after fixing the issue) and archive the other from
+<em>Manufacturing → Planning → Planning Runs</em>.</p>
+<p><strong>"The ECO proposal cron is creating duplicate ECOs."</strong></p>
+<p>It isn't — by design. The guard is <code>Eco.search([('state', '=', 'open'),
+('eco_type_id', '=', rule_change_type.id), ('description', 'ilike',
+rk)])</code>. If you see what looks like a duplicate, the prior ECO was moved
+to a non-<code>open</code> state (probably <code>closed</code> or <code>done</code>) and the cron treats
+it as resolved. That's the correct behaviour: a closed ECO does not
+suppress new evidence.</p>
+<p><strong>"Container restart and now Next Execution Date is in the past for
+all six crons."</strong></p>
+<p>That's normal — Odoo's scheduler catches up by firing each overdue cron
+once on next worker tick. Confirm by watching <code>docker logs
+southbrook-odoo --follow</code> for 2-3 minutes after the container is up. If
+nothing fires, the cron-runner thread isn't healthy — restart the
+container (<code>docker restart southbrook-odoo</code>) and watch for the
+<code>Cron-runner</code> startup line.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>Odoo's native <code>ir.cron</code> model owns the scheduler loop — one of the Odoo
+worker threads polls <code>ir.cron WHERE active = True AND nextcall &lt;= NOW()</code>,
+acquires a row-level Postgres lock per row to prevent parallel workers
+from double-firing the same cron, executes the <code>code</code> field as a Python
+expression with <code>model</code> bound to the model named by <code>model_id</code>, and
+advances <code>nextcall</code> by <code>interval</code>. Every cron the Premium Orchestration
+addon ships is <code>state = code</code> (vs the deprecated <code>state = code_exec</code>
+variant) and references its method via <code>model._cron_*()</code> — never a free
+function.</p>
+<p>The de-dup guards (24-hour window on the planning baseline, "existing
+open ECO" search on the ECO proposer) are application-level idempotency
+defenses, layered on top of Odoo's row-lock so that even a manually
+triggered run inside the scheduled-window doesn't double-create. This
+is why <code>Run Manually</code> is safe to use as your first recovery action
+once you've isolated the root cause — the worst case is a no-op.</p>
+<p>The <code>_cron_*</code> methods are all written to be <strong>best-effort, non-raising</strong>:
+they catch per-record exceptions and log warnings rather than propagate
+to the scheduler. The scheduler treats a raised exception as a failed
+run and the row stays at the same <code>nextcall</code>, leading to tight retry
+loops. Premium Orchestration's pattern of per-record <code>try/except</code> + log
++ continue is deliberate; if you find yourself adding bare <code>raise</code> to
+one of these methods, you're breaking the contract.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A user opens a ticket: "Kitchen Jobs board hasn't shown new
+readiness flips since 9 AM." It's now 11 AM. Walk to the surface and
+the chain of checks — what do you look at first?</p>
+<blockquote>
+<p><em>Settings → Technical → Automation → Scheduled Actions</em>, filter
+<code>Southbrook:</code>. Find <em>Recompute Project Readiness</em>, check
+<em>Next Execution Date</em>. If it's in the past by more than 30 min,
+the scheduler is wedged — check <code>docker logs southbrook-odoo</code> for
+cron-runner activity. If <code>Next Execution Date</code> is in the future,
+the cron fired but the readiness recompute itself is silent —
+click <em>Run Manually</em> and watch the container log for the chatter
+emit line <code>Premium Orchestration: readiness recompute changed
+status</code>. No emit means no flips happened, which is consistent
+with the user's complaint but not a bug.</p>
+</blockquote>
+<p><strong>2.</strong> The MI Engine form shows <em>Last Run Duration (ms) = 28,400</em>
+where it was 380 ms a week ago. Cron interval is 1 hour. What's the
+risk and what do you do?</p>
+<blockquote>
+<p>Risk: the cron is approaching the 1-hour budget and at the
+current growth rate will exceed it within weeks, at which point
+runs overlap and the next run's <code>nextcall</code> advancement gets out
+of sync. Action: look at <em>MOs In Flight</em> — if it's spiked (e.g.
+200+ vs the historical 20-30), the cartesian product (MOs × checks)
+is the cause. Talk to the production manager about closing finished
+MOs that lingered in <code>progress</code>. Don't change the cron interval —
+the fix is upstream.</p>
+</blockquote>
+<p><strong>3.</strong> You ran <code>docker exec southbrook-odoo odoo -u
+southbrook_premium_orchestration -d southbrook --stop-after-init</code> during
+a maintenance window. The container is back up and a user reports the
+MI Status page now shows <code>Last Run At</code> as "yesterday". What happened?</p>
+<blockquote>
+<p>The MI engine singleton's stamp persists across the upgrade (it's
+a stored field on <code>southbrook.mi.engine.state</code>). The hourly refire
+cron's <code>nextcall</code> was advanced past the maintenance window, so it
+hasn't fired yet post-restart. Wait for the next scheduled fire,
+or <em>Run Manually</em> if the user needs the dashboard immediately —
+the <em>Run Now</em> button on the MI Engine form is the cleanest path
+because it reports the per-run summary inline.</p>
+</blockquote>
+<p><strong>4.</strong> The weekly planning baseline cron's last run is logged as
+<code>action_run failed on Planning-2026-06-15 (Capacity exceeded on
+SB-EDGE) — leaving run in draft for manual inspection.</code> What's the
+right recovery sequence?</p>
+<blockquote>
+<p>Don't re-fire the cron — the 24h de-dup guard will skip and you'll
+chase your tail. Open <em>Manufacturing → Planning → Planning Runs</em>,
+find the draft <code>Planning-2026-06-15</code>, open it. The capacity exception
+means a workcenter is over-allocated; either reschedule the
+conflicting MOs upstream or adjust the workcenter's capacity for
+the planning window, then click <em>Run</em> on the draft directly. The
+next scheduled cron fire (next Sunday 02:00) will be a fresh run.</p>
+</blockquote>
+<p><strong>5.</strong> The ECO proposal cron logs <code>No Construction-Rule Change ECO type
+found; skipping ECO proposal sweep.</code> every night for a week. Engineers
+ask "are we missing override-driven ECOs?" — what's the answer and the
+fix?</p>
+<blockquote>
+<p>Yes, the cron has been a no-op all week. The <em>Construction-Rule
+Change</em> ECO type is seeded by <code>southbrook_plm</code>. Either the PLM
+module isn't installed, or its seed data ran before the type
+existed. Check <code>southbrook.eco.type</code> for any row whose name matches
+<code>%Construction-Rule Change%</code> or <code>%rule%</code> — the cron's lookup is
+<code>ilike</code> and tolerant of label variants. If absent, install
+<code>southbrook_plm</code>, then <em>Run Manually</em> on the proposal cron; the
+return dict <code>{'proposed': N}</code> tells you how many ECOs were drafted
+across the last 90 days of overrides.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The QNAP-level cron (<code>backup-odoo.sh</code> at 03:00) and how to verify
+  artifacts landed → <strong>lesson 7.2 (Backups)</strong>.</li>
+<li>The external Hermes Console queue at <code>hermes.odooiq.com</code> and how
+  approved sysadmin recommendations get applied → <strong>lesson 7.3
+  (Hermes Console)</strong>.</li>
+<li>The Production Planner's view of these crons (when to use the
+  Production Release Queue vs <em>Run Manually</em>) → lesson 2.4.</li>
+<li>The MI dashboard from the floor manager's perspective (interpreting
+  blockers vs warnings) → lesson 3.1.</li>
+<li>Generic Odoo <code>ir.cron</code> mechanics (de-dup locking, worker tick) →
+  Odoo's own platform docs.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_07_backups" model="slide.slide">
+            <field name="name">Backups — Verifying the Nightly Job Ran and the Artifacts Landed</field>
+            <field name="channel_id" ref="course_sysadmin"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">20</field>
+            <field name="description">IT Admin / Sysadmin on call when a backup is missing, stale, or restoring after a corruption event.</field>
+            <field name="html_content"><![CDATA[<h1 id="backups-verifying-the-nightly-job-ran-and-the-artifacts-landed">Backups — Verifying the Nightly Job Ran and the Artifacts Landed</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the sysadmin on call when a Southbrook user opens a ticket saying
+"the database is missing yesterday's orders" or "I deleted a kitchen
+project and need it back." The QNAP host runs a nightly <code>backup-odoo.sh</code>
+job at 03:00 that captures the Southbrook DB, filestore, and config to a
+versioned tree under <code>/share/CACHEDEV3_DATA/OdooIQ-Backups/</code>. This lesson
+is how you verify a backup actually ran, what to do when one didn't, and
+how to restore a single site to a point-in-time dump.</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The backup pipeline is <strong>not</strong> an Odoo feature — it's a QNAP host-level
+shell script + a host crontab entry. Inspection is SSH-only:</p>
+<blockquote>
+<p><strong><code>ssh admin@ssh.odooiq.com</code></strong> (via the Cloudflare tunnel — works from
+anywhere) <strong>or</strong> <strong><code>ssh admin@192.168.68.108</code></strong> (LAN-only)</p>
+</blockquote>
+<p>The exact paths you'll touch are:</p>
+<blockquote>
+<p><strong>Backup script</strong>: <code>/share/CACHEDEV3_DATA/Container/scripts/backup-odoo.sh</code>
+<strong>Cron entry</strong>: <code>/etc/config/crontab</code> line <code>0 3 * * * /share/CACHEDEV3_DATA/Container/scripts/backup-odoo.sh</code>
+<strong>Artifact root</strong>: <code>/share/CACHEDEV3_DATA/OdooIQ-Backups/</code>
+<strong>Off-site stub</strong>: <code>/share/CACHEDEV3_DATA/Container/scripts/offsite-sync.sh</code></p>
+</blockquote>
+<p>The artifact root is also exposed as an SMB share <code>OdooIQ-Backups</code> —
+reachable from any LAN client at <code>smb://192.168.68.108/OdooIQ-Backups</code>
+for quick browsing without SSH. The SMB share is <strong>not</strong> registered in
+QTS Control Panel → Shared Folders UI; it was added directly to
+<code>/etc/config/smb.conf</code> and is mode 777 for <code>everyone</code> (the QNAP is on a
+LAN-only management VLAN, not a flat office network).</p>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>After <code>ssh admin@ssh.odooiq.com</code> and <code>cd
+/share/CACHEDEV3_DATA/OdooIQ-Backups/</code>, you'll see:</p>
+<ul>
+<li><strong>One subdirectory per site</strong> — <code>alfacore</code>, <code>southbrook</code>, <code>sapienzium</code>,
+  <code>porterly</code>, <code>tribancs</code>, <code>odooiq</code>, <code>quattroporte</code>, <code>odooai</code>. Each holds
+  the per-site artifacts.</li>
+<li><strong><code>README.md</code></strong> — pinned doc with restore steps, retention table, and
+  contact email for the on-call sysadmin.</li>
+<li><strong><code>_meta/</code></strong> — pipeline metadata; contains:</li>
+<li><code>_meta/logs/backup-YYYYMMDD.log</code> — the full stdout+stderr of the
+    night's run. <strong>This is the file to read when a backup didn't land.</strong></li>
+<li><code>_meta/manifest.json</code> — latest inventory written at the end of every
+    run: per-artifact sizes, sha256 prefix, mtime. The manifest is the
+    fastest "did anything change?" diagnostic.</li>
+</ul>
+<p>Inside each site's directory:</p>
+<ul>
+<li><strong><code>db/daily/&lt;site&gt;-YYYYMMDD.sql.gz</code></strong> — gzipped <code>pg_dump</code> from
+  <code>&lt;site&gt;-postgres</code>. Retention: <strong>14 days</strong>.</li>
+<li><strong><code>db/weekly/&lt;site&gt;-YYYY-WNN.sql.gz</code></strong> — ISO-week-stamped dump,
+  written on Sundays only. Retention: <strong>12 weeks</strong>.</li>
+<li><strong><code>db/monthly/&lt;site&gt;-YYYY-MM.sql.gz</code></strong> — written on the 1st of
+  every month. Retention: <strong>12 months</strong>.</li>
+<li><strong><code>filestore/weekly/&lt;site&gt;-filestore-YYYYMMDD.tar.gz</code></strong> — tarball of
+  <code>odoo-data/filestore/</code>. Retention: <strong>4 weeks</strong>.</li>
+<li><strong><code>filestore/monthly/&lt;site&gt;-filestore-YYYYMMDD.tar.gz</code></strong> — written 1st
+  of month. Retention: <strong>4 months</strong>.</li>
+<li><strong><code>config/latest/</code></strong> — <code>docker-compose.yml</code> + redacted <code>odoo.conf</code>
+  for that site. Always the latest; not retention-pruned (one snapshot
+  is enough for "what did the stack look like that night").</li>
+</ul>
+<h2 id="daily-weekly-on-call">Daily / Weekly / On-call</h2>
+<p><strong>Daily (1 min, end-of-day):</strong></p>
+<ul>
+<li>SSH in, <code>ls -lat /share/CACHEDEV3_DATA/OdooIQ-Backups/_meta/logs/ |
+  head -5</code>. The most recent file should be today's <code>backup-YYYYMMDD.log</code>
+  and the modification time should be within the last 24 h.</li>
+<li><code>cat /share/CACHEDEV3_DATA/OdooIQ-Backups/_meta/logs/backup-YYYYMMDD.log
+  | tail -20</code> — last 20 lines confirm the pipeline finished. The
+  expected tail is a per-site <code>OK</code> summary plus a final <code>manifest.json
+  written</code>.</li>
+</ul>
+<p><strong>Weekly (Monday morning, 5 min):</strong></p>
+<ul>
+<li>For each site, <code>ls -lat
+  /share/CACHEDEV3_DATA/OdooIQ-Backups/southbrook/db/daily/ | head -10</code>
+  — you should see 7 dumps from the last 7 nights.</li>
+<li><code>ls /share/CACHEDEV3_DATA/OdooIQ-Backups/southbrook/filestore/weekly/</code>
+  — confirm Sunday's filestore tarball is there.</li>
+<li>Spot-check sizes: a healthy southbrook daily dump is ~10-30 MB
+  gzipped (grows ~5 MB per million records). A dump that suddenly shrunk
+  to 1 KB is a Postgres connection failure mid-dump — investigate the
+  log.</li>
+</ul>
+<p><strong>Monthly (1st of month, 10 min):</strong></p>
+<ul>
+<li>Confirm <code>db/monthly/southbrook-YYYY-MM.sql.gz</code> and
+  <code>filestore/monthly/southbrook-filestore-YYYYMMDD.tar.gz</code> both exist
+  for the new month.</li>
+<li>Confirm 12-month retention is holding by checking the oldest monthly:
+  <code>ls /share/CACHEDEV3_DATA/OdooIQ-Backups/southbrook/db/monthly/ |
+  head -1</code>. Anything more than 12 entries means the rotation cron in
+  the script's <code>find -mtime -delete</code> lines isn't pruning correctly.</li>
+</ul>
+<p><strong>On-call (a backup didn't run, or a user needs a restore):</strong></p>
+<p>The procedures are in the next two sections.</p>
+<h2 id="how-to-verify-the-latest-backup-actually-ran">How to verify the latest backup actually ran</h2>
+<p>A user opens a ticket: "did last night's backup happen?" The fastest
+path:</p>
+<ol>
+<li><code>ssh admin@ssh.odooiq.com</code></li>
+<li><code>cat /share/CACHEDEV3_DATA/OdooIQ-Backups/_meta/manifest.json | jq
+   '.generated_at, .sites[] | select(.site=="southbrook") |
+   {site, db_daily_count, db_daily_latest, filestore_weekly_latest}'</code>
+   The <code>db_daily_latest</code> field is the most recent daily dump's path
+   plus mtime — that's your authoritative "did the southbrook DB get
+   dumped" answer.</li>
+<li>If <code>jq</code> isn't comfortable, just <code>ls -lt
+   /share/CACHEDEV3_DATA/OdooIQ-Backups/southbrook/db/daily/ | head -3</code>.</li>
+<li>If the most recent dump is more than 25 h old, the cron missed. Go
+   to the log: <code>cat
+   /share/CACHEDEV3_DATA/OdooIQ-Backups/_meta/logs/backup-YYYYMMDD.log</code>
+   (yesterday's date). If the log doesn't exist, the cron didn't fire
+   at all — see <em>Common mistakes</em> below for the crontab-reload procedure.</li>
+</ol>
+<h2 id="how-to-restore-from-a-backup">How to restore from a backup</h2>
+<p>The restore procedure for a single site, point-in-time, daily dump:</p>
+<pre><code class="language-bash"># 1. Pick a site + date. Example: southbrook, 2026-06-15.
+S=southbrook
+DATE=20260615
+
+# 2. Stop the Odoo container — postgres MUST keep running for the
+#    restore. Stopping odoo prevents the workers from holding connections.
+docker stop ${S}-odoo
+
+# 3. Drop and recreate the database. --force closes any orphan sessions.
+docker exec ${S}-postgres dropdb -U odoo --force $S
+docker exec ${S}-postgres createdb -U odoo -O odoo $S
+
+# 4. Restore the dump.
+gunzip -c /share/CACHEDEV3_DATA/OdooIQ-Backups/$S/db/daily/${S}-${DATE}.sql.gz \
+  | docker exec -i ${S}-postgres psql -U odoo -d $S
+
+# 5. Restore the filestore IF the user's complaint involves attachments,
+#    PDFs, ir.attachment binary data, or images. Skip otherwise.
+cd /share/CACHEDEV3_DATA/Container/$S/odoo-data
+sudo rm -rf filestore
+sudo tar xzf /share/CACHEDEV3_DATA/OdooIQ-Backups/$S/filestore/weekly/${S}-filestore-*.tar.gz
+
+# 6. Start Odoo and watch the logs for a clean boot.
+docker start ${S}-odoo
+docker logs -f ${S}-odoo
+</code></pre>
+<p><strong>Important:</strong></p>
+<ul>
+<li>Filestore tarballs only exist <strong>weekly</strong>, not daily. The restored
+  filestore will be from the most recent Sunday, not the exact date of
+  the DB dump. For most ticket types this is fine (attachments don't
+  change daily); for a strict point-in-time recovery, accept that the
+  filestore is up to 7 days off.</li>
+<li>The <code>alfacore</code> site uses the legacy path
+  <code>/share/CACHEDEV3_DATA/Container/odoo/</code> instead of <code>.../alfacore/</code> —
+  the script's per-site mapping handles this, but the restore command
+  above also needs the swap: <code>cd
+  /share/CACHEDEV3_DATA/Container/odoo/odoo-data</code> for alfacore.</li>
+<li>After restore, <strong>invalidate any sessions</strong> by restarting the Odoo
+  container once more. The post-restore boot can leave stale ormcache
+  entries that produce 500s on <code>/web/login</code> ("Circular assets bundle"
+  is the classic symptom — same recovery as the upgrade cache reset).</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"The backup hasn't run for two nights and no log was written."</strong></p>
+<p>The most common cause on QNAP: someone edited the cron via <code>crontab -e</code>
+instead of <code>/etc/config/crontab</code>. The user-mode crontab gets <strong>wiped on
+reboot</strong> because QTS regenerates it from <code>/etc/config/crontab</code>. Fix:</p>
+<pre><code class="language-bash">grep backup-odoo /etc/config/crontab   # should show &quot;0 3 * * * /share/.../backup-odoo.sh&quot;
+# If missing, append it:
+echo '0 3 * * * /share/CACHEDEV3_DATA/Container/scripts/backup-odoo.sh' &gt;&gt; /etc/config/crontab
+crontab /etc/config/crontab            # reload user crontab from the persistent file
+/etc/init.d/crond.sh restart           # restart crond
+</code></pre>
+<p>Re-fire the script manually once to seed today's backup:</p>
+<pre><code class="language-bash">/share/CACHEDEV3_DATA/Container/scripts/backup-odoo.sh
+</code></pre>
+<p><strong>"The backup ran but the log shows <code>find: ... non-zero exit</code> and the
+script aborted halfway."</strong></p>
+<p>Two likely causes, both encountered during initial deployment:</p>
+<ul>
+<li><code>numfmt</code> not present on QNAP busybox. Pretty-printing of byte sizes
+  fails under <code>set -euo pipefail</code>. The script was patched to print raw
+  bytes; if you see this on a fresh QNAP, search the script for any
+  remaining <code>numfmt --to=iec</code> and replace with the raw <code>$BYTES</code> print.</li>
+<li><code>ls glob_with_no_match</code> returns non-zero. The script uses <code>find
+  -name "*.ext" 2&gt;/dev/null | wc -l</code> for counting; if you see a new
+  <code>ls</code> introduced, swap it.</li>
+</ul>
+<p><strong>"Disk filled up and the backup truncated."</strong></p>
+<p>Check <code>df -h /share/CACHEDEV3_DATA</code>. The retention math is <strong>14 daily +
+12 weekly + 12 monthly DB dumps + 4 weekly + 4 monthly filestore
+tarballs per site × 8 sites</strong>. At ~30 MB per daily, ~200 MB per weekly
+filestore, the steady-state is roughly 80 GB. If you're above 200 GB,
+the rotation cron's <code>find -mtime -delete</code> isn't pruning — check the
+script's retention block for a typo'd <code>-mtime</code> value.</p>
+<p><strong>"The restore worked but Odoo boots into a maintenance screen."</strong></p>
+<p>The <code>southbrook</code> DB carries module records that point at addon code
+versions. If you restored a DB from a date <em>before</em> a module upgrade
+(e.g. you restored a dump from 2026-06-10 but <code>southbrook_premium_orchestration</code>
+was upgraded on 2026-06-15), the module registry is at the newer
+version on disk but the DB has the older <code>ir.module.module.latest_version</code>.
+Recovery: re-run <code>-u southbrook_premium_orchestration</code> to sync the DB
+forward, then restart.</p>
+<p><strong>"The off-site rsync didn't fire — was it supposed to?"</strong></p>
+<p>Not yet. <code>offsite-sync.sh</code> is a stub with <code>exit 0</code> at the top. The
+second QNAP isn't in place yet. <strong>When it arrives</strong>: set
+<code>OFFSITE_HOST</code>, set up SSH key auth <code>admin → admin</code>, remove the early
+<code>exit 0</code>, add a crontab entry <code>30 4 * * * /share/.../offsite-sync.sh</code>
+so it lands one hour after the primary backup finishes. Until then,
+this is <strong>expected to be a no-op</strong>, not a failure.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The script <code>backup-odoo.sh</code> is a single bash file run by QNAP's
+host-level <code>crond</code> (not by Odoo's <code>ir.cron</code>). At 03:00 it iterates the
+8 sites, and for each site it:</p>
+<ol>
+<li><code>docker exec ${S}-postgres pg_dump -U odoo -F p ${S}</code> and pipes
+   through <code>gzip -9</code> to <code>db/daily/&lt;site&gt;-YYYYMMDD.sql.gz</code>. Plain SQL
+   format (not custom) so a <code>psql</code> restore works with no <code>pg_restore</code>
+   dependency.</li>
+<li>On Sundays (<code>date +%u = 7</code>), additionally writes
+   <code>db/weekly/&lt;site&gt;-YYYY-WNN.sql.gz</code> and <code>filestore/weekly/&lt;site&gt;-filestore-YYYYMMDD.tar.gz</code>.</li>
+<li>On the 1st of the month, additionally writes the monthly variants.</li>
+<li>After dumps, <code>find &lt;site&gt;/db/daily -mtime +14 -delete</code> etc. for
+   each retention class.</li>
+<li>Snapshots <code>docker-compose.yml</code> + a redacted <code>odoo.conf</code> (admin
+   password stripped) into <code>config/latest/</code>.</li>
+<li>Computes a <code>manifest.json</code> at the end with per-artifact size +
+   sha256 prefix + mtime, written to <code>_meta/manifest.json</code>.</li>
+<li>Tee'd stdout+stderr lands in <code>_meta/logs/backup-YYYYMMDD.log</code>.</li>
+</ol>
+<p><code>set -uo pipefail</code> (not <code>-euo</code>) so legitimate non-zero exits like
+"glob with no match" don't abort the run; <code>nounset</code> + <code>pipefail</code>
+still catch real bugs.</p>
+<p>The script does <strong>not</strong> run inside any Odoo container — it runs on the
+QNAP host, talks to each site's <code>${S}-postgres</code> and <code>${S}-odoo</code>
+containers via <code>docker exec</code>. This decoupling is intentional: an Odoo
+DB upgrade or container restart doesn't interrupt the backup, and a
+backup script bug doesn't block Odoo from running.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> A user reports "I deleted a Kitchen Project today and need it
+back." It's 11 AM. What dump do you restore from, and what's the
+gotcha?</p>
+<blockquote>
+<p>The most recent daily dump (last night's, at
+<code>db/daily/southbrook-YYYYMMDD.sql.gz</code> where YYYYMMDD = today). The
+gotcha: any sale orders, configurator sessions, or work orders
+created <strong>today</strong> will be wiped by the restore. Confirm with the
+user that they accept a 24-hour rollback before proceeding — if
+not, the answer is "we cannot restore one record without restoring
+the whole DB; please re-enter the project."</p>
+</blockquote>
+<p><strong>2.</strong> It's Monday morning. You SSH in and
+<code>db/daily/southbrook-</code> shows dumps from Friday and Saturday but
+nothing for Sunday or this morning. The log dir shows
+<code>backup-20260613.log</code> (Saturday) but no Sunday or Monday log. What
+happened?</p>
+<blockquote>
+<p>The cron didn't fire on Sunday night. Most likely the QNAP was
+rebooted between Saturday's run and Sunday at 03:00 and the
+user-mode crontab got wiped (crontab edited via <code>crontab -e</code>
+instead of the persistent file). Recovery: check
+<code>/etc/config/crontab</code> for the <code>0 3 * * *</code> entry, restore if
+missing, <code>crontab /etc/config/crontab &amp;&amp; /etc/init.d/crond.sh
+restart</code>, then re-fire today's backup manually to plug the gap.</p>
+</blockquote>
+<p><strong>3.</strong> Disk usage on <code>/share/CACHEDEV3_DATA</code> is at 92%. What's the
+fastest legitimate cleanup that doesn't put data at risk?</p>
+<blockquote>
+<p>Don't touch the retention-pruned dump tree. The fastest legitimate
+cleanup is the QNAP <code>Container/scripts/</code> logs (the backup log dir
+is bounded by retention but <code>Container/</code> may hold other log trees).
+If the dump tree is genuinely the bloat, check
+<code>du -sh /share/CACHEDEV3_DATA/OdooIQ-Backups/*</code> — a site with
+800 GB indicates the retention pruning has stopped working; fix the
+script's <code>find -mtime -delete</code> block before deleting anything by
+hand.</p>
+</blockquote>
+<p><strong>4.</strong> A restore worked, Odoo boots, but <code>/web/login</code> returns 500
+with "Circular assets bundle: web.assets_frontend &gt;
+web.assets_frontend". You haven't run <code>-u</code> yet. What's wrong?</p>
+<blockquote>
+<p>The ormcache is poisoned by the restore — the registry on disk is
+ahead of the asset records the dump carried. Restart the Odoo
+container (<code>docker restart southbrook-odoo</code>). If that doesn't
+clear it, the dump pre-dates a module upgrade and you need to
+run <code>-u &lt;module&gt;</code> against the module that was upgraded between
+the dump date and now (typically the most recently deployed
+custom addon).</p>
+</blockquote>
+<p><strong>5.</strong> The off-site rsync stub is logging "exit 0" every night. Is
+this a bug?</p>
+<blockquote>
+<p>No — by design. The second QNAP isn't in place yet, so
+<code>offsite-sync.sh</code> is a placeholder that exits 0 immediately and
+writes nothing. The fact that it logs at all means the cron is
+wired correctly; when the second QNAP arrives, edit the script's
+top to remove the early exit, set <code>OFFSITE_HOST</code> and SSH key auth,
+and the same cron entry begins doing real work.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>Premium Orchestration's six in-Odoo crons → <strong>lesson 7.1</strong>.</li>
+<li>The external Hermes Console queue at hermes.odooiq.com, where the
+  <code>backup_health</code> agent loop is supposed to file a recommendation when
+  a backup is stale or failed (see <code>BackupHealthLoop</code> in
+  <code>hermes-console/api/agent_loops.py</code>). The loop reads the same
+  artifact tree and emits a queued recommendation when the most recent
+  backup is older than <code>HERMES_BACKUP_MAX_AGE_HOURS</code> or the outcome
+  was failure. Approval + apply flow → <strong>lesson 7.3</strong>.</li>
+<li>A <code>southbrook_premium_orchestration</code> "backup stale" recommendation
+  that surfaces inside Odoo's <em>Kitchen Ops → MI Status</em> is <strong>planned
+  but not yet implemented</strong> in the addon at the time of writing. Once
+  it lands, the in-Odoo signal will mirror the Hermes Console signal;
+  lesson 7.3 covers the external path until then.</li>
+<li>Cloudflare tunnel + Cloudflare Access OTP for the SSH path →
+  separate platform doc (<code>~/.claude/projects/-Users-naadmin/memory/qnap_cloudflared_ssh_tunnel.md</code>).</li>
+<li>General Postgres administration → external docs; this lesson covers
+  only the restore commands you need to run.</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+        <record id="slide_07_hermes_sysadmin" model="slide.slide">
+            <field name="name">Hermes Console — The External Sysadmin Recommendations Queue</field>
+            <field name="channel_id" ref="course_sysadmin"/>
+            <field name="slide_category">article</field>
+            <field name="sequence">30</field>
+            <field name="description">IT Admin / Sysadmin who triages platform-health, backup, runner, and tunnel recommendations surfaced by the external Hermes Console.</field>
+            <field name="html_content"><![CDATA[<h1 id="hermes-console-the-external-sysadmin-recommendations-queue">Hermes Console — The External Sysadmin Recommendations Queue</h1>
+<h2 id="who-this-lesson-is-for">Who this lesson is for</h2>
+<p>You're the sysadmin who watches the platform itself — not manufacturing,
+not customer support. When the nightly backup is stale, when the
+Forgejo Actions runner stops registering, when the Cloudflare tunnel
+drops, the system that proactively surfaces those events to you is the
+<strong>Hermes Console</strong>, hosted externally at <code>hermes.odooiq.com</code>. It's a
+standalone control plane, separate from Odoo, that runs agent loops
+against the platform and writes recommendations into its own queue for
+you to approve or reject. This lesson is how you find that queue, what
+the kinds of recommendations mean, and how you push an approved
+recommendation through to a tenant (Southbrook's <code>southbrook_hermes</code>
+Odoo addon, future Forgejo Actions runner, etc.).</p>
+<h2 id="where-this-lives-on-the-site">Where this lives on the site</h2>
+<p>The Hermes Console is <strong>not</strong> part of Odoo. It runs as two containers
+on the QNAP host:</p>
+<ul>
+<li><code>hermes-ui</code> — Vue 3 + Vite PWA</li>
+<li><code>hermes-api</code> — FastAPI service backed by local SQLite</li>
+</ul>
+<p>Both fronted by the shared <code>alfacore-caddy</code> and exposed via Cloudflare
+tunnel at:</p>
+<blockquote>
+<p><strong><code>https://hermes.odooiq.com</code></strong></p>
+</blockquote>
+<p>Cloudflare Access OTP is in front of the tunnel; only enrolled emails
+(currently <code>dangelo.john@gmail.com</code>) can reach the UI. The Console UI
+never says "Fabio" — that name belongs only to the in-Odoo skin of the
+<code>southbrook_hermes</code> addon, which is a <strong>consumer</strong> of approved
+recommendations from this Console.</p>
+<p>If you need to inspect the backend directly:</p>
+<blockquote>
+<p><strong><code>ssh admin@ssh.odooiq.com</code></strong> then
+<strong><code>docker logs hermes-api --tail 200</code></strong> and
+<strong><code>curl http://localhost:9080/api/health</code></strong> (via Caddy on the QNAP)</p>
+</blockquote>
+<p>For the queue UI itself, after Cloudflare OTP:</p>
+<blockquote>
+<p><strong><code>hermes.odooiq.com</code> → Recommendations tab</strong></p>
+</blockquote>
+<p>For agent loop telemetry (when did each loop last run, what did it
+return, was it errored):</p>
+<blockquote>
+<p><strong><code>hermes.odooiq.com</code> → Agents tab</strong> (proxies <code>GET /api/agents</code>)</p>
+</blockquote>
+<h2 id="what-your-screen-shows">What your screen shows</h2>
+<p>The Console's <strong>Recommendations queue</strong> is the primary surface. Each
+recommendation has:</p>
+<ul>
+<li><strong>Title</strong> — short label written by the agent loop that filed it.
+  E.g. <code>Nightly backup stale (28h old)</code> or <code>Backup status file missing</code>.</li>
+<li><strong>Source</strong> (<code>source</code> on the local recommendation row) — which agent
+  loop filed it. The sysadmin-relevant sources are:</li>
+<li><code>platform_health</code> — the LLM-backed proactive loop. Runs every
+    <code>HERMES_PLATFORM_HEALTH_INTERVAL</code> seconds. Reads recent agent run
+    history and surfaces patterns ("backup_health has filed the same
+    issue 3 nights running — escalate"). Deterministically defaults
+    <code>source = platform_health</code> on every item it emits.</li>
+<li><code>backup_health</code> — deterministic, no LLM. Reads
+    <code>/share/CACHEDEV3_DATA/OdooIQ-Backups/hermes/&lt;status_file&gt;</code> and
+    emits a recommendation when the most recent backup is older than
+    <code>HERMES_BACKUP_MAX_AGE_HOURS</code> or the outcome was not <code>success</code>.
+    Idempotent: skips emit if the most recent reco from <code>backup_health</code>
+    is still <code>ready</code> or <code>approved</code>.</li>
+<li><code>daily_digest</code> — LLM-backed end-of-day summary, includes any
+    platform-level events that fired during the day.</li>
+<li><strong>Priority</strong> (<code>priority</code>) — <code>low</code>, <code>normal</code>, <code>high</code>, or <code>blocker</code>.
+  <code>BackupHealthLoop</code> emits <code>blocker</code> on a failed outcome, <code>high</code> on
+  staleness, <code>high</code> on missing status file. <code>platform_health</code> defaults
+  to <code>normal</code> and the LLM can override.</li>
+<li><strong>State</strong> (<code>state</code>) — the queue's lifecycle field. Values:
+  <code>ready</code> (just created, awaiting review), <code>approved</code> (you said yes),
+  <code>rejected</code> (you said no), <code>applied</code> (the bridge has pushed it
+  downstream), <code>failed</code> (the bridge rejected synchronously),
+  <code>queued</code> (the bridge was unreachable — sitting on the outbound
+  retry queue).</li>
+<li><strong>Tenant hint</strong> (<code>tenant_hint</code>) — optional. For sysadmin
+  recommendations this is usually <code>null</code> because the action happens on
+  the QNAP host, not in any tenant. Manufacturing-side recommendations
+  (the Fabio queue) carry <code>tenant_hint = "southbrook"</code>.</li>
+<li><strong>Proposed action</strong> — free-text suggestion the loop wrote. For
+  <code>backup_health</code> this is literally the runbook path:
+  <code>Check /share/CACHEDEV3_DATA/OdooIQ-Backups/hermes/cron.log on the
+  QNAP for the latest run's stderr; consult
+  custom-hermes-skills/skills/qnap-backup-snapshot-checker/runs/
+  hermes-nightly-backup-runbook.md for the rollback path.</code></li>
+<li><strong>Payload</strong> (<code>payload</code>) — JSON the loop attached. For <code>backup_health</code>
+  it carries <code>{"status_path": "..."}</code> so the approver can confirm the
+  loop was reading the right file.</li>
+<li><strong>Created at / Updated at</strong> — timestamps. A reco that's been in
+  <code>ready</code> for more than 24 h is your cue that triage is falling
+  behind.</li>
+</ul>
+<p>The <strong>Agents tab</strong> (proxies <code>GET /api/agents</code>) shows per-loop:</p>
+<ul>
+<li><strong>Name</strong> — <code>platform_health</code>, <code>backup_health</code>, <code>daily_digest</code>.</li>
+<li><strong>Interval seconds</strong> — the loop's tick.</li>
+<li><strong>Last run at</strong> — when the loop last completed.</li>
+<li><strong>Last run status</strong> — <code>ok</code> or <code>error</code>. An <code>error</code> row that hasn't
+  cleared in two ticks means the loop is wedged.</li>
+</ul>
+<h2 id="what-lives-here-vs-the-in-odoo-fabio-queue">What lives here vs. the in-Odoo Fabio queue</h2>
+<p>This is the most important distinction in the platform and the one most
+likely to cause confusion. Keep it straight:</p>
+<table>
+<thead>
+<tr>
+<th>Queue</th>
+<th>Surface</th>
+<th>Kinds of recommendations</th>
+<th>Approver</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Hermes Console</strong> (this lesson)</td>
+<td><code>hermes.odooiq.com</code> (external, standalone)</td>
+<td>Platform health: backup, tunnel, runner, container restarts, disk usage</td>
+<td><strong>Sysadmin</strong> (you)</td>
+</tr>
+<tr>
+<td><strong>Fabio</strong> (in-Odoo)</td>
+<td>Odoo backend → <em>Hermes</em> menu, served by <code>southbrook_hermes</code> addon</td>
+<td>Manufacturing: slow workorder, materials blocked, scrap event, cut-spec audit, MI gate failures</td>
+<td><strong>Production manager</strong> (lesson 3.2) / <strong>CS rep</strong> (lesson 6.3)</td>
+</tr>
+</tbody>
+</table>
+<p>The Hermes Console is the <strong>primary</strong> system; Fabio is one of its
+<strong>consumers</strong>. A recommendation that lands in Fabio either originated
+inside Odoo (via the MI engine refire cron — lesson 7.1) <strong>or</strong> was
+approved in the Hermes Console and pushed downstream to Fabio by the
+<code>southbrook_hermes</code> tenant bridge.</p>
+<p><strong>As sysadmin, you live in the Hermes Console queue. Manufacturing
+recommendations are not your queue.</strong> If a <code>tenant_hint =
+"southbrook"</code> recommendation slips into your view, it's because the
+queue UI shows everything; you can filter it out via the source filter.</p>
+<h2 id="your-daily-flow-on-call">Your daily flow — On-call</h2>
+<p><strong>Daily (5 min, morning):</strong></p>
+<ol>
+<li>Open <code>hermes.odooiq.com</code> (Cloudflare OTP gates the page).</li>
+<li>Go to <strong>Recommendations</strong>, filter <code>state = ready</code> and <code>source IN
+   (platform_health, backup_health)</code>. Sort by priority desc, created
+   asc.</li>
+<li>For each row, read the title and proposed action. The deterministic
+   loops (especially <code>backup_health</code>) tell you exactly which file to
+   check and which runbook to follow — start there before approving.</li>
+<li>For <code>platform_health</code> items, the LLM has already correlated the
+   evidence — read the rationale field for the reasoning, then
+   independently verify the underlying claim (<code>backup_health filed 3
+   nights running</code> is easy to disprove or confirm in 30 seconds via
+   the queue filter).</li>
+</ol>
+<p><strong>Per recommendation:</strong></p>
+<ul>
+<li><strong>Investigate</strong> — do the diagnostic the proposed action suggests.
+  For a backup-staleness reco, that's the lesson 7.2 procedure.</li>
+<li><strong>Approve</strong> if the recommendation is correct AND you intend to act.
+  Approval moves <code>state → approved</code> but does NOT execute anything.</li>
+<li><strong>Reject</strong> if the recommendation is wrong, duplicate, or already
+  resolved out-of-band. Rejection moves <code>state → rejected</code> with an
+  optional reason and the loop's idempotency check picks up "no
+  active reco" on its next tick, so duplicate emits resume only after
+  a fresh failure.</li>
+<li><strong>Apply</strong> when you're ready to execute. Apply fires the configured
+  tenant bridge for the recommendation. <strong>For sysadmin recommendations
+  in current scope, there is no tenant bridge — Apply is a manual
+  acknowledgement that you've completed the action.</strong> (Future:
+  Forgejo Actions tenant bridge will let you push approved sysadmin
+  actions to a runner that executes them — see "Upcoming" below.)</li>
+</ul>
+<p><strong>On WhatsApp escalation:</strong></p>
+<p>If <code>HERMES_WHATSAPP_ENABLED=true</code> and the WhatsApp sidecar is up
+(check <code>Settings → integrations</code> or <code>GET /api/health.whatsapp.status</code>),
+new <code>priority = high</code> and <code>priority = blocker</code> recommendations notify
+the configured operator phone (E.164 from
+<code>HERMES_WHATSAPP_OPERATOR</code>). The notification message is generated by
+<code>render_new_recommendation_message</code> in <code>api/whatsapp.py</code>. You can
+reply to that message with inbound commands (parsed by
+<code>parse_inbound_command</code>) — currently supports approve/reject by
+recommendation ID without leaving the chat. The shared secret on
+<code>/api/whatsapp/inbound</code> is <code>HERMES_WHATSAPP_SHARED_SECRET</code>; rotate it
+if the sidecar is ever cloned or the QR code re-paired.</p>
+<p><strong>Weekly:</strong></p>
+<ul>
+<li>Open the Agents tab. Confirm <code>platform_health</code>, <code>backup_health</code>, and
+  <code>daily_digest</code> all show <em>Last run</em> within the expected interval.</li>
+<li>Open <code>GET /api/health</code> (the overall health endpoint) via the UI or
+  <code>curl</code>. Confirm <code>api</code>, <code>sqlite</code>, <code>llm</code> (per provider), <code>bridges</code>
+  (per tenant), <code>whatsapp</code> are all <code>ok</code> or <code>disabled</code>. Any
+  <code>unreachable</code> is your weekly triage target.</li>
+</ul>
+<h2 id="common-mistakes-how-to-recover">Common mistakes + how to recover</h2>
+<p><strong>"<code>backup_health</code> is filing the same <code>Nightly backup stale</code> reco
+every interval, even though I approved the last one."</strong></p>
+<p>You <strong>approved</strong> it. Approval doesn't fix the underlying problem —
+the loop is still reading the same stale status file. Approval moves
+the reco to <code>approved</code>, which the idempotency check still treats as
+"there's an active reco for this source, skip emit." So you should
+NOT see duplicate emits while one is <code>approved</code>. If you are seeing
+duplicates, either (a) you rejected the prior one (which the
+idempotency check ignores — rejected recos are not "active"), or (b)
+the loop's <code>recent_recommendations_for_digest(hours=48)</code> cutoff
+expired. Fix the backup, then mark the reco <code>applied</code>. The next loop
+tick reads the fresh status file and stays silent.</p>
+<p><strong>"I approved a recommendation but nothing happened on the QNAP."</strong></p>
+<p>Correct — approval doesn't execute anything. The current Console
+build has tenant bridges only for <code>southbrook_hermes</code> and
+<code>HomeAssistantBridge</code>. Sysadmin actions (restart a container, kick the
+crontab, re-fire the backup) are not bridged; <em>Apply</em> on a sysadmin
+reco is a manual acknowledgement that you've done the work via SSH.
+The Forgejo Actions bridge that will execute approved sysadmin actions
+is in the project direction (see "Upcoming") but not in the current
+shipped build.</p>
+<p><strong>"<code>platform_health</code> is filing recommendations that look like
+hallucinations — <code>Disk near full on /share/CACHEDEV3_DATA</code> when df
+shows 38%."</strong></p>
+<p>The LLM loop reads agent run history, not live system state. If
+<code>backup_health</code> raised a "backup status file missing" reco a week
+ago and the LLM is over-indexing on that event, the reasoning chain
+can drift. Reject the bad reco with a reason (the reason becomes
+context for the next tick). If hallucinations persist, lower the
+loop's interval to slow drift, or switch the primary provider via
+<code>HERMES_PRIMARY_PROVIDER</code> if the Hermes harness is the cause and
+<code>openai</code> is more grounded.</p>
+<p><strong>"I can't reach <code>hermes.odooiq.com</code> — Cloudflare Access shows
+'unauthorised'."</strong></p>
+<p>Two layers to check. (1) Cloudflare Access OTP: are you signed in as
+<code>dangelo.john@gmail.com</code>? Open an incognito window, sign in fresh.
+(2) The tunnel itself: <code>cloudflared</code> is a separate container on the
+QNAP. If <code>cloudflared</code> is down, you get a Cloudflare 1033 (not an
+Access error). Check <code>docker ps | grep cloudflared</code> and restart if
+missing. The tunnel ingress map for <code>hermes.odooiq.com</code> lives in the
+cloudflared config; if you've recently changed it, a restart is
+required for ingress reloads.</p>
+<p><strong>"The WhatsApp sidecar lost its session and notifications stopped."</strong></p>
+<p>WhatsApp Web sessions occasionally drop. The sidecar is
+<code>hermes-whatsapp</code> (whatsapp-web.js + headless Chrome). Recovery: SSH
+to the QNAP, <code>docker logs hermes-whatsapp --tail 100</code> to find the QR
+prompt URL or the auth failure, re-pair if needed. Until paired,
+<code>/api/health.whatsapp.status</code> reports <code>unreachable</code> and the Console
+silently falls back to in-UI notifications. <strong>Do not</strong> disable the
+sidecar — <code>priority = blocker</code> recommendations need an out-of-band
+notification channel.</p>
+<h2 id="what-the-system-is-doing-behind-the-scenes">What the system is doing behind the scenes</h2>
+<p>The Hermes Console runs three components inside <code>hermes-api</code>:</p>
+<ol>
+<li><strong>Local store</strong> — SQLite file in a QNAP-mounted volume. Survives
+   container, Caddy, and QNAP reboots. All recommendations, chat
+   threads, and outbound bridge pushes live here. The store is
+   independent of Odoo on purpose — Hermes outlives any tenant.</li>
+<li><strong>Agent loop runner</strong> — a single asyncio task started in the
+   FastAPI <code>lifespan</code> context. Iterates <code>_BUILT_IN_LOOPS</code> per their
+   interval, calls <code>loop.run(env)</code>, persists returned items as
+   recommendations via <code>env.store.create_recommendation</code>. Per-loop
+   exceptions are caught and recorded as an <code>error</code> run record without
+   crashing the runner.</li>
+<li><strong>Outbound queue</strong> — a retry buffer for tenant-bridge pushes that
+   failed transiently. The <code>southbrook_hermes</code> bridge POSTs to the
+   Odoo addon's <code>create_recommendation</code> route; on unreachable Odoo,
+   the push is queued for retry on the next <code>/api/queue/flush</code> (manual
+   or scheduled).</li>
+</ol>
+<p>The LLM provider registry talks OpenAI Chat Completions only. Two
+providers can be configured simultaneously (<code>OPENAI_API_KEY</code> for
+OpenAI; <code>HERMES_HARNESS_BASE_URL</code> + <code>HERMES_HARNESS_API_KEY</code> for the
+self-hosted Hermes harness). <code>HERMES_PRIMARY_PROVIDER</code> picks the
+default; per-thread overrides via the UI.</p>
+<p>Recommendations created by the loops always include
+<code>source = &lt;loop name&gt;</code> so the queue filter is reliable. The state
+machine is <code>ready → approved → applied</code> (happy path) or
+<code>ready → rejected</code> (no further state). <code>failed</code> and <code>queued</code> are
+states the bridge transition can land in — a synchronous bridge
+rejection goes <code>approved → failed</code>; a transient bridge unreachable goes
+<code>approved → queued</code> and stays there until the retry worker drains it.</p>
+<h2 id="upcoming-forgejo-actions-bridge">Upcoming — Forgejo Actions bridge</h2>
+<p>Per the project direction, an upcoming tenant bridge will let you push
+approved sysadmin actions to a Forgejo Actions runner registered on
+the QNAP (<code>forgejo-runner</code> on the <code>forgejo-net</code> Docker network, label
+<code>linux-amd64</code>). The workflow:</p>
+<ol>
+<li>The agent loop files a sysadmin recommendation. E.g.
+   <code>Rebuild southbrook-odoo container after image bump</code>.</li>
+<li>You approve it in the Hermes Console.</li>
+<li><em>Apply</em> fires the Forgejo Actions bridge, which POSTs a
+   <code>workflow_dispatch</code> event to the matching workflow file in the
+   <code>qnap/sysadmin-actions</code> Forgejo repo.</li>
+<li>The runner picks up the event, executes the workflow (which can
+   build/run prod containers via the system-docker socket mount), and
+   POSTs back to a Hermes callback URL with the outcome.</li>
+<li>The reco transitions <code>applied</code> on runner success, <code>failed</code> on
+   runner failure.</li>
+</ol>
+<p>This is <strong>not yet in the current shipped build</strong>. Until it lands,
+sysadmin recommendations are "human applies them via SSH."
+The trust-boundary risk (runner has docker socket access) is the gating
+concern; once approved-recommendation-to-runner is a fully signed,
+auditable path, this lesson gets a new "How to execute via runner"
+section.</p>
+<h2 id="quiz-5-questions-applied">Quiz (5 questions, applied)</h2>
+<p><strong>1.</strong> It's 9 AM. You open <code>hermes.odooiq.com</code> and see two
+<code>backup_health</code> recos with <code>priority = blocker</code> from 03:30 last night
+and 03:30 this morning. Both say <code>Nightly backup last run failed
+(error)</code>. What's wrong with the queue and the underlying system, and
+what's the right sequence?</p>
+<blockquote>
+<p>Two <code>blocker</code> recos from <code>backup_health</code> two nights in a row means
+the idempotency guard didn't suppress the second. The most likely
+cause: you rejected (not approved) the first reco, OR <code>backup_health</code>'s
+48-hour "recent" window expired between emits. Either way, the
+underlying backup is broken two nights running — that's the urgent
+issue. Sequence: (a) SSH to the QNAP and run the lesson 7.2 manual
+backup procedure to plug the gap, (b) read <code>/share/.../_meta/logs/</code>
+for both nights to find the root cause, (c) fix, (d) re-fire the
+backup once, (e) come back to the Console, mark BOTH recos
+<code>applied</code>. The next tick will be silent.</p>
+</blockquote>
+<p><strong>2.</strong> A production manager opens a ticket: "I see a recommendation
+about Cloudflare tunnel health in my Hermes queue inside Odoo. Is
+that for me?" What do you tell them, and what's the correct surface?</p>
+<blockquote>
+<p>No, that's a sysadmin recommendation that got mis-routed into the
+Fabio queue. Tunnel health belongs in the <strong>external Hermes Console
+at hermes.odooiq.com</strong>, not in the in-Odoo <em>Hermes</em> menu. If it
+landed in Fabio, either the <code>tenant_hint</code> on the original Console
+recommendation was set to <code>southbrook</code> incorrectly, or the
+<code>southbrook_hermes</code> addon is mis-filtering. Triage: dismiss it
+from the production manager's queue, find the original in the
+Console (filter <code>source = platform_health</code> or by title), and
+investigate from the sysadmin side.</p>
+</blockquote>
+<p><strong>3.</strong> The Agents tab shows <code>backup_health</code> <em>Last run</em> is 4 hours
+old; the interval is supposed to be 15 minutes. Recommendations
+section is empty. Is the system healthy or broken?</p>
+<blockquote>
+<p>Broken. The loop hasn't ticked in 16 intervals. Most likely the
+agent loop runner task crashed and the lifespan didn't restart it
+(or the API container is up but the runner thread is wedged).
+Recovery: <code>docker logs hermes-api --tail 200</code> for a stack trace
+from the runner; if found, restart with <code>docker restart hermes-api</code>.
+Confirm recovery by watching the Agents tab — <code>backup_health</code>
+<em>Last run</em> should advance within 15 minutes.</p>
+</blockquote>
+<p><strong>4.</strong> You approve a <code>Nightly backup stale</code> reco. An hour later
+<code>backup_health</code> files a fresh one. Bug, or intended?</p>
+<blockquote>
+<p>Intended IF the underlying backup is still stale. Approval doesn't
+fix the backup; the loop reads the same status file on its next
+tick, sees the same staleness, and would normally suppress the
+emit because the prior reco is still in <code>approved</code> state (not
+rejected). If you're seeing a fresh emit, check: (a) did you
+actually approve, or did you mis-click reject? (b) is the prior
+reco older than 48 h (the <code>recent_recommendations_for_digest</code>
+window)? If both no, that's a real bug — file against
+<code>BackupHealthLoop</code> idempotency check.</p>
+</blockquote>
+<p><strong>5.</strong> You're paged via WhatsApp with a <code>blocker</code> reco. You reply
+<code>approve 142</code> from your phone. What does the system do, and what does
+it NOT do?</p>
+<blockquote>
+<p>The WhatsApp sidecar receives the inbound, posts it to
+<code>/api/whatsapp/inbound</code> with the shared secret. The Console parses
+<code>approve 142</code> via <code>parse_inbound_command</code>, looks up reco id 142,
+moves its state to <code>approved</code>, and replies via the sidecar with
+a confirmation. What it does NOT do: it does not execute the
+remediation. <em>Apply</em> is still a manual step from the UI (or, when
+the Forgejo Actions bridge ships, an automatic runner dispatch).
+WhatsApp lets you triage from the phone; the actual fix still
+happens at the keyboard.</p>
+</blockquote>
+<hr>
+<h2 id="what-this-lesson-does-not-cover">What this lesson does NOT cover</h2>
+<ul>
+<li>The Premium Orchestration six crons (in-Odoo) → <strong>lesson 7.1</strong>.</li>
+<li>The QNAP backup script details and the restore procedure →
+  <strong>lesson 7.2</strong>.</li>
+<li>The Fabio (in-Odoo) recommendation queue for manufacturing — that's
+  a separate queue with a different audience. The production
+  manager's view → lesson 3.2; the CS rep's view → lesson 6.3.</li>
+<li>Cloudflare Access enrolment / OTP onboarding for new sysadmin
+  operators → separate platform doc.</li>
+<li>The Console's chat surface (chat threads, message history, queue-from-message)
+  — useful as a "scratch with the LLM, promote an assistant reply
+  to a queued recommendation" workflow but out of scope here; the
+  queue side of that flow is the same as a loop-generated reco.</li>
+<li>Multi-tenant onboarding (adding a new tenant bridge for a future
+  Alfacore or third-party consumer) → see <code>hermes-console/README.md</code>
+  §"Multi-tenant readiness".</li>
+</ul>]]></field>
+            <field name="is_published" eval="True"/>
+        </record>
+    </data>
+</odoo>

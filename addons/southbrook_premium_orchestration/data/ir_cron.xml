@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 1.2 of Southbrook Premium MRP Orchestration — the five always-on
+  crons that close the data flow loop the underlying southbrook_* addons
+  already have schemas for.
+
+  Before this commit there was exactly one Southbrook cron in the
+  database ("Southbrook: Tool Asset Maintenance Sweep"). Everything else
+  — project readiness, MI stage-gate refire, order analytics backfill,
+  MRP planning baseline, project data-quality dry-run — was stale until
+  a human clicked refresh. That stops here.
+
+  noupdate="0" so a module upgrade (-u) re-seeds any cron a sysadmin
+  archived by hand. Each cron is referenced by xml_id (not by name), so
+  re-seeding is a no-op when the record already exists.
+-->
+<odoo>
+    <data noupdate="0">
+
+        <!-- ============================================================
+             1. Project readiness recompute — every 30 minutes
+             ============================================================
+             Sweeps project.task and recomputes the readiness mask
+             (BOM / drawings / tooling / labour). Owned by B1.
+        -->
+        <record id="cron_recompute_readiness_all" model="ir.cron">
+            <field name="name">Southbrook: Recompute Project Readiness</field>
+            <field name="model_id" ref="model_project_task"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_recompute_readiness_all()</field>
+            <field name="interval_number">30</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+            <!-- Stagger first fire +2min from install to avoid co-firing with
+                 the other 3 high-frequency crons on a 2G Odoo container. -->
+            <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=2))"/>
+        </record>
+
+        <!-- ============================================================
+             2. MI stage-gate refire — every hour
+             ============================================================
+             Re-evaluates open Manufacturing Intelligence gates so a
+             gate that was previously blocked clears the moment its
+             upstream condition (BOM, drawings, tooling) flips green.
+             Owned by B3.
+        -->
+        <record id="cron_mi_engine_refire_gates" model="ir.cron">
+            <field name="name">Southbrook: Refire MI Stage-Gate Checks</field>
+            <field name="model_id" ref="model_southbrook_mi_engine_state"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_refire_gates()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=5))"/>
+        </record>
+
+        <!-- ============================================================
+             3. Order analytics backfill — every 6 hours
+             ============================================================
+             Captures analytics rows for confirmed sale orders that
+             don't have one yet. Idempotent — re-runs on the same
+             order update rather than duplicate. Owned by B2 (this
+             addon).
+        -->
+        <record id="cron_backfill_order_analytics" model="ir.cron">
+            <field name="name">Southbrook: Backfill Order Analytics</field>
+            <field name="model_id" ref="model_southbrook_order_analytics"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_backfill_unscored()</field>
+            <field name="interval_number">6</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(minutes=10))"/>
+        </record>
+
+        <!-- ============================================================
+             4. Weekly MRP planning baseline — DISABLED 2026-06-23
+             ============================================================
+             Original intent: create + run a weekly mrp.planning.run.
+             Disabled because mrp.planning.run lives in OpenValue's
+             openvalue_mrp_planning_engine, which is NOT installed on
+             this stack. Without the base model the cron's model_id
+             reference fails to resolve at install (xmlid
+             model_mrp_planning_run cannot be created when the model
+             doesn't exist). The Python sibling
+             models/mrp_planning_run_cron.py was removed in the same
+             commit. Restore by un-commenting both when OpenValue is
+             vendored or otherwise present in the addon path.
+        <record id="cron_weekly_planning_baseline" model="ir.cron">
+            <field name="name">Southbrook: Weekly Planning Baseline</field>
+            <field name="model_id" ref="model_mrp_planning_run"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_baseline()</field>
+            <field name="interval_number">7</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="nextcall" eval="(DateTime.now().replace(hour=2, minute=0, second=0, microsecond=0) + timedelta(days=((6 - DateTime.now().weekday()) % 7) or 7))"/>
+        </record>
+        -->
+        <!-- 4 was: weekly planning baseline (see comment above) -->
+
+        <!-- ============================================================
+             5. Project data-quality nightly dry-run — every day ~03:00
+             ============================================================
+             Walks the project tree, scores each project against the
+             DQ ruleset, writes a dry-run report. Pairs with the
+             logrotate window so the heavy I/O lands after log
+             rotation completes at 03:30. Owned by B10.
+        -->
+        <record id="cron_dq_nightly_dry_run" model="ir.cron">
+            <field name="name">Southbrook: Quality Dry-Run Nightly</field>
+            <field name="model_id" ref="model_southbrook_project_data_quality_report"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_nightly_dry_run()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="nextcall" eval="((DateTime.now().replace(hour=3, minute=0, second=0, microsecond=0)) + timedelta(days=1 if DateTime.now().hour >= 3 else 0))"/>
+        </record>
+
+    </data>
+</odoo>

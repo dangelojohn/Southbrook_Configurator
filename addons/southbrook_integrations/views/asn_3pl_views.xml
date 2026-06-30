@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asn_3pl_list" model="ir.ui.view">
+        <field name="name">southbrook.integrations.asn_3pl.list</field>
+        <field name="model">southbrook.integrations.asn_3pl</field>
+        <field name="arch" type="xml">
+            <list string="3PL ASNs"
+                  decoration-info="state == 'sent'"
+                  decoration-success="state == 'delivered'"
+                  decoration-warning="oversize_load_flag">
+                <field name="name"/>
+                <field name="picking_id"/>
+                <field name="carrier_id"/>
+                <field name="state"/>
+                <field name="tracking_number"/>
+                <field name="oversize_load_flag"/>
+                <field name="permit_jurisdictions"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_asn_3pl_form" model="ir.ui.view">
+        <field name="name">southbrook.integrations.asn_3pl.form</field>
+        <field name="model">southbrook.integrations.asn_3pl</field>
+        <field name="arch" type="xml">
+            <form string="3PL ASN">
+                <header>
+                    <button name="action_emit_asn" type="object" string="Emit ASN"
+                            invisible="state != 'draft'" class="oe_highlight"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,sent,acked,shipped,delivered"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="picking_id"/>
+                            <field name="carrier_id"/>
+                            <field name="tracking_number"/>
+                        </group>
+                        <group>
+                            <field name="oversize_load_flag"/>
+                            <field name="permit_jurisdictions"
+                                   invisible="not oversize_load_flag"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="ASN Payload">
+                            <field name="payload_json" widget="ace"
+                                   options="{'mode': 'json'}" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_asn_3pl" model="ir.actions.act_window">
+        <field name="name">3PL ASNs</field>
+        <field name="res_model">southbrook.integrations.asn_3pl</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

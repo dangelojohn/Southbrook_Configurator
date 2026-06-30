@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: LGPL-3.0-only -->
+<odoo>
+
+    <menuitem id="menu_installer_root"
+              name="Installation"
+              web_icon="southbrook_installer,static/description/icon.png"
+              sequence="70"
+              groups="group_sami_installer_helper"/>
+
+    <menuitem id="menu_installer_dispatch_board"
+              name="Dispatch Board"
+              parent="menu_installer_root"
+              action="action_installer_dispatch_board"
+              sequence="5"
+              groups="group_sami_dispatcher"/>
+
+    <menuitem id="menu_installer_jobs"
+              name="Jobs"
+              parent="menu_installer_root"
+              action="action_installer_job"
+              sequence="10"/>
+
+    <menuitem id="menu_installer_manifests"
+              name="Delivery Manifests"
+              parent="menu_installer_root"
+              action="action_delivery_manifest"
+              sequence="20"/>
+
+    <menuitem id="menu_installer_damage_flags"
+              name="Damage Flags"
+              parent="menu_installer_root"
+              action="action_damage_flag"
+              sequence="30"/>
+
+    <menuitem id="menu_installer_tool_loans"
+              name="Tool Loans"
+              parent="menu_installer_root"
+              action="action_installer_tool_loan"
+              sequence="40"/>
+
+    <menuitem id="menu_installer_closeouts"
+              name="Close-Outs"
+              parent="menu_installer_root"
+              action="action_installer_closeout"
+              sequence="50"/>
+
+    <menuitem id="menu_installer_punchlists"
+              name="Punchlists"
+              parent="menu_installer_root"
+              action="action_installer_punchlist"
+              sequence="55"/>
+
+    <menuitem id="menu_installer_config"
+              name="Configuration"
+              parent="menu_installer_root"
+              sequence="90"
+              groups="group_sami_operations_mgr"/>
+
+    <menuitem id="menu_installer_config_stages"
+              name="Workflow Stages"
+              parent="menu_installer_config"
+              action="action_installer_stage"
+              sequence="10"/>
+
+    <menuitem id="menu_installer_config_phases"
+              name="Installation Phases"
+              parent="menu_installer_config"
+              action="action_installer_phase"
+              sequence="20"/>
+
+    <menuitem id="menu_installer_config_punchlist_template"
+              name="Punchlist Template"
+              parent="menu_installer_config"
+              action="action_installer_punchlist_template"
+              sequence="30"/>
+
+</odoo>
