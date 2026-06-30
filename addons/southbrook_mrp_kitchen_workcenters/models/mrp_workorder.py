@@ -226,9 +226,18 @@ class MrpWorkorder(models.Model):
     @api.depends_context("uid")
     @api.depends("time_ids", "time_ids.user_id")
     def _compute_x_sbk_my_time_ids(self):
+        # R3 fix (2026-06-30, surfaced by test_w054.test_30):
+        # Operators with no extra groups can ACL-deny on the cold
+        # read of `time_ids` (mrp.workcenter.productivity rows on
+        # other users' WOs). The security boundary HERE is the
+        # per-uid filter that follows — we only ever surface the
+        # current user's own rows. Sudo'ing the read is safe and
+        # is what makes the "my own time" widget show up reliably
+        # for new operators with no extra group memberships.
+        uid = self.env.uid
         for wo in self:
-            wo.x_sbk_my_time_ids = wo.time_ids.filtered(
-                lambda t: t.user_id.id == self.env.uid
+            wo.x_sbk_my_time_ids = wo.sudo().time_ids.filtered(
+                lambda t, _uid=uid: t.user_id.id == _uid
             )
 
     @api.depends_context("uid")
@@ -244,9 +253,12 @@ class MrpWorkorder(models.Model):
         # progress badge that the operator reads as ballpark.
         today_start = datetime.combine(
             fields.Date.context_today(self), dtime.min)
+        # Same ACL bypass as `_compute_x_sbk_my_time_ids` above —
+        # the per-uid filter is the security boundary.
+        uid = self.env.uid
         for wo in self:
-            mine = wo.time_ids.filtered(
-                lambda t: t.user_id.id == self.env.uid
+            mine = wo.sudo().time_ids.filtered(
+                lambda t, _uid=uid: t.user_id.id == _uid
                 and t.date_start
                 and t.date_start >= today_start
             )
@@ -796,12 +808,29 @@ class MrpWorkorder(models.Model):
         # on the env's context. Skip silently to keep test runs clean.
         if env.context.get("test_enable"):
             return
-        # Cron / sudo with no request — skip.
+        # Cron / sudo with no request — skip. `request` is a
+        # werkzeug.local.LocalProxy; when no request is bound
+        # (cron, test harness outside a mock request, RPC),
+        # attribute access on the proxy raises RuntimeError
+        # ("Working outside of request context") -- `getattr(..., None)`
+        # only swallows AttributeError, NOT RuntimeError, so the bare
+        # check below would explode. Wrap in a try/except that treats
+        # any failure as "no request bound" and no-ops. Defensive guard
+        # added in R3 2026-06-30 (surfaced by test_w018.test_30 calling
+        # this helper outside _patched_request) -- also robust for
+        # any future caller that bypasses the mock-request context.
         try:
             from odoo.http import request
         except Exception:  # noqa: BLE001
             return
-        if request is None or not getattr(request, "httprequest", None):
+        try:
+            has_request = (
+                request is not None
+                and getattr(request, "httprequest", None) is not None
+            )
+        except Exception:  # noqa: BLE001
+            has_request = False
+        if not has_request:
             return
         # The QR scan controller writes its own log row at
         # `/sb/qr/scan`; if web_read fires as a side effect of that

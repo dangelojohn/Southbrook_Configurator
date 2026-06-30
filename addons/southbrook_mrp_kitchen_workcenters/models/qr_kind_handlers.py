@@ -303,6 +303,14 @@ class DefectQrKind(models.AbstractModel):
             context_resolved = bool(wo_id)
         vals = {
             "name": _("NCR from defect scan: %s") % defect_type,
+            # `message` is required (NOT NULL) on southbrook.mi.check;
+            # omitting it raised NotNullViolation in prod (R3 fix
+            # 2026-06-30 — surfaced by test_w018.test_40). Use the
+            # defect_type as context-aware seed text the inspector
+            # can edit before approving the NCR.
+            "message": _(
+                "Auto-generated from defect scan: %s"
+            ) % defect_type,
             "x_sbk_defect_type": str(defect_type),
             "x_sbk_result": "fail",
         }
