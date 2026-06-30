@@ -2176,6 +2176,12 @@ class ProjectTask(models.Model):
 
     @api.depends("production_ids.workorder_ids.workcenter_id")
     def _compute_equipment_readiness(self):
+        # Odoo 19: mrp.workcenter.equipment_ids no longer exists. Walk the
+        # forward path maintenance.equipment.workcenter_id instead, mirroring
+        # the sibling pattern in mrp_workorder.py:81-90 (Pattern C). Per-wc
+        # rollup is preserved so equipment_readiness_summary still emits one
+        # line per workcenter.
+        Equipment = self.env["maintenance.equipment"]
         Request = self.env["maintenance.request"]
         for task in self:
             workcenters = task.production_ids.mapped(
@@ -2183,7 +2189,7 @@ class ProjectTask(models.Model):
             requests = Request
             lines = []
             for wc in workcenters.sorted("name"):
-                equipment = wc.equipment_ids
+                equipment = Equipment.search([("workcenter_id", "=", wc.id)])
                 wc_requests = equipment.mapped("maintenance_ids").filtered(
                     lambda req: not req.stage_id.done)
                 requests |= wc_requests
