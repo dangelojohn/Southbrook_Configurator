@@ -23,9 +23,10 @@ class SbGeminiPromptTemplate(models.Model):
         help="Short changelog for this prompt rev.",
     )
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "Prompt template code must be unique."),
-    ]
+    # Odoo 19: models.Constraint (legacy _sql_constraints silently no-op'd).
+    _code_uniq = models.Constraint(
+        'unique(code)', "Prompt template code must be unique.",
+    )
 
     @api.model
     def get_by_code(self, code: str):
