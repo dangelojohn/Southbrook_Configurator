@@ -187,7 +187,15 @@ class TestGoldenPathAllFlagsOn(TransactionCase):
             _session_for(variant_k2832))
         sku_b = self.api._compute_sku_from_session(
             _session_for(variant_movento))
-        self.assertNotEqual(
+        # The R1 PR #2 P5 SKU change shipped: _SKU_ATTR_NAMES is now
+        # ("Width", "Series", "Finish") only — drawer slide brand no
+        # longer widens the SKU. Since this golden-path test holds
+        # Width/Series/Finish constant across the two sibling orders,
+        # the SKUs MUST match. If P5 is later extended to re-include
+        # hardware attributes in the SKU grammar, flip this back to
+        # assertNotEqual.
+        self.assertEqual(
             sku_k, sku_b,
-            "(d) SKU grammar is lossless — slide brand divergence "
-            "produces distinct SKUs")
+            "(d) Current SKU grammar (Width/Series/Finish) does not "
+            "encode slide brand — sibling orders that differ only on "
+            "Drawer Slide produce identical SKUs by design.")
