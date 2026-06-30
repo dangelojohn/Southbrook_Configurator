@@ -122,44 +122,211 @@
 }
 
 // ---------------------------------------------------------------------
-// THREE-UP FEATURES
+// STAT BAND — three proof pills directly under the hero.
+// Fulcrum-pattern Tier-1 #2 (see docs/Fulcrum.md). Big mono value +
+// small sans label, three across on desktop, stacked on mobile.
+// Uses the .sb-mono-value 28px-style typographic treatment.
 // ---------------------------------------------------------------------
-.o_sb_features {
+.o_sb_stats {
+  padding: 32px 0;
+  background: var(--sb-paper, #fbf7ef);
+  border-bottom: 1px solid var(--sb-rule, #d8cfbf);
+}
+
+.o_sb_stats_grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  max-width: 880px;
+  margin: 0 auto;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+.o_sb_stat {
+  text-align: center;
+  padding: 12px 24px;
+  border-right: 1px solid var(--sb-rule, #d8cfbf);
+
+  &:last-child {
+    border-right: none;
+  }
+
+  @media (max-width: 768px) {
+    border-right: none;
+    border-bottom: 1px solid var(--sb-rule, #d8cfbf);
+    padding-bottom: 24px;
+
+    &:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+  }
+}
+
+.o_sb_stat_value {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--sb-walnut, #6b3f2a);
+  font-variant-numeric: tabular-nums;
+
+  @media (max-width: 768px) {
+    font-size: 36px;
+  }
+}
+
+.o_sb_stat_value_text {
+  font-style: italic;
+  font-variation-settings: "opsz" 36, "wght" 400;
+  color: var(--sb-sky, #2b4f6b);
+}
+
+.o_sb_stat_unit {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 16px;
+  font-weight: 500;
+  font-style: normal;
+  margin-left: 4px;
+  letter-spacing: 0.02em;
+  color: var(--sb-ink-dim, #6b665e);
+  text-transform: lowercase;
+}
+
+.o_sb_stat_label {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sb-ink-dim, #6b665e);
+  margin-top: 8px;
+}
+
+// ---------------------------------------------------------------------
+// FOUR-STEP JOURNEY — Design / Configure / Approve / Build.
+// Fulcrum-pattern Tier-2 #5 (see docs/Fulcrum.md). Numbered horizontal
+// row on desktop with chevron dividers (::after pseudo on each non-
+// last stage), stacks on mobile. Replaces the old 3-up FontAwesome
+// circle-icon row — real narrative beats decorative icons.
+// ---------------------------------------------------------------------
+.o_sb_journey {
   padding: 72px 0;
   background: var(--sb-paper, #fbf7ef);
 }
 
-.o_sb_feature {
+.o_sb_journey_header {
   text-align: center;
-  padding: 20px 12px;
+  margin-bottom: 48px;
 }
 
-.o_sb_feature_icon {
-  display: inline-block;
-  width: 56px;
-  height: 56px;
-  line-height: 56px;
-  font-size: 24px;
-  border-radius: 50%;
-  background: var(--sb-sky-l, #d8e3ec);
+.o_sb_journey_title {
+  font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--sb-walnut, #6b3f2a);
+  max-width: 680px;
+  margin: 0 auto 14px;
+
+  @media (max-width: 768px) {
+    font-size: 28px;
+  }
+}
+
+.o_sb_journey_accent {
+  font-style: italic;
+  font-variation-settings: "opsz" 36, "wght" 400;
   color: var(--sb-sky, #2b4f6b);
-  margin-bottom: 18px;
 }
 
-.o_sb_feature_title {
+.o_sb_journey_sub {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--sb-ink-dim, #6b665e);
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.o_sb_journey_stages {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+
+  @media (max-width: 991px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  @media (max-width: 575px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.o_sb_journey_stage {
+  position: relative;
+  padding: 24px 22px;
+  background: white;
+  border: 1px solid var(--sb-rule, #d8cfbf);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(74, 60, 46, 0.06);
+
+  // Chevron divider between stages on desktop only
+  &:not(:last-child)::after {
+    content: "›";
+    position: absolute;
+    right: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
+    font-size: 32px;
+    line-height: 1;
+    color: var(--sb-walnut-l, #c89e85);
+    font-weight: 300;
+    z-index: 2;
+    background: var(--sb-paper, #fbf7ef);
+    padding: 2px 4px;
+    border-radius: 50%;
+
+    @media (max-width: 991px) {
+      display: none;
+    }
+  }
+}
+
+.o_sb_journey_stage_num {
+  font-family: var(--sb-font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--sb-walnut-l, #c89e85);
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.o_sb_journey_stage_title {
   font-family: var(--sb-font-display, 'Roboto Flex', sans-serif);
   font-variation-settings: "opsz" 14, "wght" 600;
   font-size: 20px;
   color: var(--sb-walnut, #6b3f2a);
-  margin: 0 0 12px;
+  margin: 0 0 10px;
 }
 
-.o_sb_feature_body {
+.o_sb_journey_stage_body {
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--sb-ink, #1a1814);
-  max-width: 320px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 // ---------------------------------------------------------------------

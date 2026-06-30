@@ -82,44 +82,95 @@
             </div>
           </section>
 
-          <!-- THREE-UP FEATURE BLOCKS -->
-          <section class="o_sb_features">
+          <!-- STAT BAND (Fulcrum-pattern Tier-1 #2 from docs/Fulcrum.md).
+               Three proof pills under the hero. Claims pulled from
+               already-published homepage copy — no fabricated numbers.
+               Stat-style typography (big mono value + small sans label)
+               mirrors the .sb-mono-value treatment in portal_root. -->
+          <section class="o_sb_stats">
             <div class="container">
-              <div class="row g-4">
-                <div class="col-md-4">
-                  <div class="o_sb_feature">
-                    <span class="o_sb_feature_icon fa fa-cog"/>
-                    <h3 class="o_sb_feature_title">Configure</h3>
-                    <p class="o_sb_feature_body">
-                      Pick a cabinet family, set width / height / depth
-                      to the millimetre, choose door style + finish +
-                      hardware. Everything updates live.
-                    </p>
+              <div class="o_sb_stats_grid">
+                <div class="o_sb_stat">
+                  <div class="o_sb_stat_value">
+                    &lt;&#160;5<span class="o_sb_stat_unit">min</span>
+                  </div>
+                  <div class="o_sb_stat_label">
+                    Quote inside the configurator
                   </div>
                 </div>
-                <div class="col-md-4">
-                  <div class="o_sb_feature">
-                    <span class="o_sb_feature_icon fa fa-cubes"/>
-                    <h3 class="o_sb_feature_title">Visualize</h3>
-                    <p class="o_sb_feature_body">
-                      See your kitchen in 3D. Toggle between rendered
-                      cabinets and blueline architectural drawings
-                      with auto-dimensions.
-                    </p>
+                <div class="o_sb_stat">
+                  <div class="o_sb_stat_value">
+                    4–6<span class="o_sb_stat_unit">wk</span>
+                  </div>
+                  <div class="o_sb_stat_label">
+                    Typical lead time
                   </div>
                 </div>
-                <div class="col-md-4">
-                  <div class="o_sb_feature">
-                    <span class="o_sb_feature_icon fa fa-check-square-o"/>
-                    <h3 class="o_sb_feature_title">Order</h3>
-                    <p class="o_sb_feature_body">
-                      Request a formal quote with one click. We review
-                      your configuration, confirm pricing, and ship
-                      your kitchen — typically in 4-6 weeks.
-                    </p>
+                <div class="o_sb_stat">
+                  <div class="o_sb_stat_value o_sb_stat_value_text">
+                    Lifetime
+                  </div>
+                  <div class="o_sb_stat_label">
+                    Finish warranty
                   </div>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <!-- FOUR-STEP JOURNEY (Fulcrum-pattern Tier-2 #5 from
+               docs/Fulcrum.md). Replaces the prior 3-up FontAwesome
+               feature row with a numbered Design -> Configure -> Approve
+               -> Build narrative. Chevron divider mirrors the
+               .o_owl_stages clip-path treatment from portal_root.scss
+               at a marketing scale. -->
+          <section class="o_sb_journey">
+            <div class="container">
+              <header class="o_sb_journey_header">
+                <h2 class="o_sb_journey_title">
+                  From idea to installed,<br/>
+                  <span class="o_sb_journey_accent">in four steps.</span>
+                </h2>
+                <p class="o_sb_journey_sub">
+                  Every stage visible to you. No black-box handoffs
+                  between the design tool and the cabinet shop.
+                </p>
+              </header>
+              <ol class="o_sb_journey_stages">
+                <li class="o_sb_journey_stage">
+                  <div class="o_sb_journey_stage_num">01</div>
+                  <h3 class="o_sb_journey_stage_title">Design</h3>
+                  <p class="o_sb_journey_stage_body">
+                    Sketch your kitchen layout in the planner. Define
+                    walls, doors, windows, and appliances.
+                  </p>
+                </li>
+                <li class="o_sb_journey_stage">
+                  <div class="o_sb_journey_stage_num">02</div>
+                  <h3 class="o_sb_journey_stage_title">Configure</h3>
+                  <p class="o_sb_journey_stage_body">
+                    Pick cabinet families. Set dimensions to the
+                    millimetre. Choose door style, finish, and hardware.
+                  </p>
+                </li>
+                <li class="o_sb_journey_stage">
+                  <div class="o_sb_journey_stage_num">03</div>
+                  <h3 class="o_sb_journey_stage_title">Approve</h3>
+                  <p class="o_sb_journey_stage_body">
+                    Review your formal quote, spec sheet, and 3D
+                    drawings. Sign off when it's right.
+                  </p>
+                </li>
+                <li class="o_sb_journey_stage">
+                  <div class="o_sb_journey_stage_num">04</div>
+                  <h3 class="o_sb_journey_stage_title">Build</h3>
+                  <p class="o_sb_journey_stage_body">
+                    Our shop fabricates from your approved design,
+                    Mission Control validates every cabinet before
+                    fab, and the kitchen ships flat-pack-ready.
+                  </p>
+                </li>
+              </ol>
             </div>
           </section>
 
