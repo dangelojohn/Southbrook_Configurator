@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.5.4.13",
+    "version": "19.0.5.4.14",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -72,25 +72,6 @@
             # free-camera mode and zoom dolly.
             "southbrook_estimating/static/lib/three/OrbitControls.js",
             "southbrook_kitchen_3d_configurator/static/src/scss/kitchen_configurator.scss",
-            # Rec D · Sprint 2d shared canvas modules. All MUST load
-            # before kitchen_configurator.js so ES imports resolve.
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/constants.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/three_loader.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/pointer_helpers.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/view_specs.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/mesh_factory.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/pack_row.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/easing.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/ortho_frustum.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/selection.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/drop_raycaster.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/room_shell.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/drag_handle.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/drop_lanes.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/pbr_env_map.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/base_cabinet.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/wall_cabinet.esm.js",
-            "southbrook_kitchen_3d_configurator/static/src/js/canvas/other_cabinets.esm.js",
             "southbrook_kitchen_3d_configurator/static/src/js/kitchen_configurator.js",
         ],
     },
