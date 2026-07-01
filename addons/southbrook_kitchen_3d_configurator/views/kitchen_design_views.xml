@@ -178,6 +178,12 @@
                                     <field name="position_label" readonly="1"/>
                                     <field name="product_id"/>
                                     <field name="cabinet_type" readonly="1"/>
+                                    <!-- v19.0.4.22.0 audit P2#9 — Q21 zone tagging.
+                                         zone is computed from cabinet_type but
+                                         user-overridable (island, corner-wall). -->
+                                    <field name="zone" optional="show"/>
+                                    <field name="zone_label" optional="hide"
+                                           invisible="zone != 'other'"/>
                                     <field name="width_in"/>
                                     <field name="height_in"/>
                                     <field name="depth_in"/>

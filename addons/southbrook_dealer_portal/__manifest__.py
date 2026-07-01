@@ -40,6 +40,12 @@ Outstanding:
         "southbrook_customer_portal",
         "southbrook_kitchen_mrp",
         "sale",
+        # 2026-07-01 E2E audit — controllers/main.py reads
+        # `partner.channel` (owned by southbrook_estimating's res.partner
+        # extension); security/dealer_portal_security.xml references
+        # `channel = 'dealer'`. Transitive via customer_portal today, but
+        # a direct dep matches what the code actually consumes.
+        "southbrook_estimating",
     ],
     "data": [
         "security/dealer_portal_security.xml",

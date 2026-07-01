@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Southbrook Kitchen 3D Configurator — v19.0.4.22.0
+  Security group taxonomy (audit P1#6).
+
+  Replaces the pre-4.22 single-row ACL that granted full CRUD on
+  southbrook.kitchen.design + .line to every base.group_user. Now
+  three tiers implied through each other so upgrades preserve the
+  pre-taxonomy default (every internal user → Manager) and no
+  external portal user sees the Southbrook Kitchen menu.
+
+  Repo convention (finance_pack, mes_mps) confirmed via grep:
+    * res.groups.category_id was removed in v19 — module surface
+      picks category via manifest "category" key.
+    * name pattern: "Southbrook <Pkg> / <Role>".
+    * <data noupdate="1"> so a UI-side user assignment survives a -u.
+
+  Migration path — the <function> block sweeps every non-share
+  internal user into group_kitchen_manager on install + every -u,
+  idempotent via (4, id). Preserves current full-access default;
+  admin can revoke and re-grant manually afterward.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="group_kitchen_readonly" model="res.groups">
+            <field name="name">Southbrook Kitchen 3D / Read-Only</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Read any kitchen design; no create/edit/delete.</field>
+        </record>
+
+        <record id="group_kitchen_designer" model="res.groups">
+            <field name="name">Southbrook Kitchen 3D / Designer</field>
+            <field name="implied_ids" eval="[(4, ref('group_kitchen_readonly'))]"/>
+            <field name="comment">Create + edit own designs; cannot delete; cannot touch other reps' designs.</field>
+        </record>
+
+        <record id="group_kitchen_manager" model="res.groups">
+            <field name="name">Southbrook Kitchen 3D / Manager</field>
+            <field name="implied_ids" eval="[(4, ref('group_kitchen_designer'))]"/>
+            <field name="comment">Full CRUD on any design.</field>
+        </record>
+
+        <!-- Migration: assign every existing non-share internal user
+             to Manager so a -u upgrade preserves the pre-taxonomy
+             full-access default. Runs on -i and -u; idempotent. -->
+        <function model="res.groups" name="write">
+            <value eval="[ref('group_kitchen_manager')]"/>
+            <value eval="{'user_ids': [(4, u.id) for u in
+                obj().env['res.users'].search([
+                    ('group_ids', 'in', [ref('base.group_user')]),
+                    ('share', '=', False),
+                ])]}"/>
+        </function>
+
+    </data>
+</odoo>

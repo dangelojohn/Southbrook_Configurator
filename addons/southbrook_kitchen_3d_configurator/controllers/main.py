@@ -612,6 +612,21 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
     # block to render the topbar badge.
 
     def _browse_partner(self, partner_id):
+        """Resolve partner_id to a browsable res.partner while enforcing
+        the caller's ACL + record rules. Empty recordset means 'no
+        partner, use retail' — never raises so /products keeps
+        rendering.
+
+        v19.0.4.22.0 audit P1#5: pre-4.22 this method .sudo()'d the
+        browse, letting any authenticated user enumerate every
+        partner in the DB via /products or /layout and leak their
+        .channel / pricing tier through _channel_meta +
+        _resolve_pricelist. The check_access("read") gate degrades
+        strangers to retail silently rather than raising (an error
+        would leak existence and would break inventory rendering
+        for logged-in customers whose portal_user has no partner
+        access at all).
+        """
         if not partner_id:
             return request.env["res.partner"]
         try:
@@ -620,7 +635,16 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             return request.env["res.partner"]
         if pid <= 0:
             return request.env["res.partner"]
-        return request.env["res.partner"].sudo().browse(pid).exists()
+        partner = request.env["res.partner"].browse(pid).exists()
+        if not partner:
+            return request.env["res.partner"]
+        try:
+            partner.check_access("read")
+        except Exception:
+            # Silent degrade — never raise AccessError; would leak
+            # existence and would break configurator rendering.
+            return request.env["res.partner"]
+        return partner
 
     def _resolve_pricelist(self, partner):
         # Reuses the canonical southbrook_estimating dispatcher so the

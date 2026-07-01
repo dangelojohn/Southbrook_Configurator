@@ -9,9 +9,18 @@
     </record>
 
     <!-- Menu structure ──────────────────────────────────────────────────────── -->
+    <!-- v19.0.4.22.0 audit P1#6 + P3#12:
+         * `groups=` — gate the root menu on the readonly group.
+           Manager + Designer both imply Readonly, so all three
+           see the menu. Portal / share users don't.
+         * `name` — renamed from "Southbrook Kitchen" to
+           "Kitchen 3D Configurator" so the app-selector no longer
+           shows three tiles named "Southbrook Kitchen"
+           (workcenters + workspace + this one). -->
     <menuitem id="menu_sbk_root"
-              name="Southbrook Kitchen"
+              name="Kitchen 3D Configurator"
               sequence="35"
+              groups="southbrook_kitchen_3d_configurator.group_kitchen_readonly"
               web_icon="southbrook_kitchen_3d_configurator,static/description/icon.png"/>
 
     <menuitem id="menu_sbk_configurator"

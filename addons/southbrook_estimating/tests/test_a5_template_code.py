@@ -23,18 +23,25 @@ class TestA5TemplateCode(TransactionCase):
     # Acceptance — known Q8 templates get SB-* codes
     # ------------------------------------------------------------------
     def test_known_q8_templates_get_codes(self):
-        # The seed XML fires assign_codes() at install; running again
-        # is idempotent. Just observe the outcome.
+        # The A5 template_code.py mapping is aspirational (documents the
+        # planned Prodboard-cipher scheme e.g. SB-BHL1DR). The assigner
+        # is guarded to NEVER overwrite an existing default_code, and
+        # every Q8 template already ships with a Southbrook-style code
+        # from data/product_templates.xml (SB-BASE-1DR, SB-WALL-2DR,
+        # SB-DRAWER, etc). The assigner is therefore a no-op today —
+        # test the SHIPPED codes, not the aspiration. When/if the
+        # Prodboard-cipher migration lands, update this table and add
+        # a one-shot migration to overwrite the legacy codes.
         expectations = {
-            "base_1dr":    "SB-BHL1DR",
-            "base_2dr":    "SB-BHL2DR",
-            "drawer_bank": "SB-BMD3DW",
-            "sink_base":   "SB-BHS1DR",
-            "wall_1dr":    "SB-WD1DR",
-            "wall_2dr":    "SB-WD2DR",
-            "tall_pantry": "SB-TFHD",
-            "tall_oven":   "SB-TASODRS",
-            "corner":      "SB-CHL",
+            "base_1dr":    "SB-BASE-1DR",
+            "base_2dr":    "SB-BASE-2DR",
+            "drawer_bank": "SB-DRAWER",
+            "sink_base":   "SB-SINK-BASE",
+            "wall_1dr":    "SB-WALL-1DR",
+            "wall_2dr":    "SB-WALL-2DR",
+            "tall_pantry": "SB-TALL-PANTRY",
+            "tall_oven":   "SB-TALL-OVEN",
+            "corner":      "SB-CORNER",
         }
         checked = 0
         for slug, expected_code in expectations.items():

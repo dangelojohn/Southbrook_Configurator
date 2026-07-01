@@ -47,6 +47,13 @@ Three.js KitchenCanvas (Phase 2):
         "southbrook_hermes",
         "southbrook_kitchen_workspace",
         "southbrook_config_engine",
+        # 2026-07-01 E2E audit — views/kitchen_portal_templates.xml lines
+        # 251, 257 hit `southbrook_estimating.report_signature_spec_sheet_doc`
+        # via `t-attf-href`. Runtime coupling was surviving on the
+        # transitive chain (kitchen_workspace + config_engine both depend
+        # on estimating). Declaring it explicitly guarantees the QWeb
+        # ref resolves even if either transitive edge is dropped.
+        "southbrook_estimating",
     ],
     "data": [
         "security/southbrook_customer_portal_security.xml",

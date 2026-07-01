@@ -248,14 +248,17 @@
 
           <!--
             Phase 5 — Floor Plan page. SVG returned by to_svg() is
-            inlined via t-raw (the markup is trusted — we generate it
-            and html-escape any user-supplied label text inside).
+            inlined via t-out with a Markup wrapper (the markup is
+            trusted — we generate it and html-escape any user-supplied
+            label text inside). v19 deprecated t-raw in favour of
+            t-out(Markup(...)); QWeb still supports t-raw but warns
+            noisily and will remove it in a future release.
           -->
           <div class="page" t-if="o.room_ids">
             <t t-set="room" t-value="o.room_ids[0]"/>
             <h2 class="report_h2" style="margin: 0 0 8px 0;">Floor Plan</h2>
             <div style="text-align:center; margin: 8px 0;">
-              <t t-raw="room.to_svg(720, 540)"/>
+              <t t-out="Markup(room.to_svg(720, 540))"/>
             </div>
             <p style="font-size: 8pt; color:#776B5C; text-align:center; margin-top: 6px;">
               Top-down view. Cabinet positions are nominal — verify against

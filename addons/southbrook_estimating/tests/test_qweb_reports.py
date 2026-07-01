@@ -120,6 +120,14 @@ class TestQWebReports(SouthbrookTestCase):
 
     def test_07_shop_copy_renders_mo_and_so_ref(self):
         """Shop Copy must show originating SO ref + product name."""
+        # southbrook_mrp_pm's mrp.production.create() gate refuses to
+        # spawn a customer-facing MO whose origin SO is not Production-
+        # Approved. That gate is correct for prod — but here we are just
+        # exercising the QWeb render surface. Set force_production_release
+        # (the sanctioned one-off escape hatch) if the field exists so
+        # the report render is testable regardless of the gating addon.
+        if "force_production_release" in self.order._fields:
+            self.order.sudo().force_production_release = True
         # Create a minimal MO that links back to our SO.
         mo = self.env["mrp.production"].create({
             "product_id": self.product.id,

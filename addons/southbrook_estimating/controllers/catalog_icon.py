@@ -51,7 +51,19 @@ class SouthbrookCatalogIcon(http.Controller):
         # cache-key layer (Cloudflare + browser keyed on the
         # /southbrook/catalog/icon/<uuid>/* URL, the redirect target
         # is hot in Odoo's binary cache once warmed).
-        return request.redirect(
+        #
+        # Cache-Control note: /web/image emits "no-cache, private" by
+        # default which defeats CDN and browser cache on the redirect
+        # follow. The whole point of the UUID-in-URL scheme is that
+        # the URL changes when the content changes (content-addressed),
+        # so 1 year immutable is safe. We rewrite the header on the
+        # 302 response and set `public,immutable` so Cloudflare will
+        # store the redirect result and re-serve without hitting Odoo.
+        response = request.redirect(
             "/web/image/product.template/%d/image_1920" % tmpl.id,
             local=True,
         )
+        response.headers["Cache-Control"] = (
+            "public, max-age=31536000, immutable"
+        )
+        return response

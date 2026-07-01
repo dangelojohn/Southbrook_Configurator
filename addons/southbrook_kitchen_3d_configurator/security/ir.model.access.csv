@@ -1,3 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_sbk_kitchen_design_user,southbrook.kitchen.design (user),model_southbrook_kitchen_design,base.group_user,1,1,1,1
-access_sbk_kitchen_design_line_user,southbrook.kitchen.design.line (user),model_southbrook_kitchen_design_line,base.group_user,1,1,1,1
+access_sbk_kitchen_design_readonly,southbrook.kitchen.design (readonly),model_southbrook_kitchen_design,southbrook_kitchen_3d_configurator.group_kitchen_readonly,1,0,0,0
+access_sbk_kitchen_design_designer,southbrook.kitchen.design (designer),model_southbrook_kitchen_design,southbrook_kitchen_3d_configurator.group_kitchen_designer,1,1,1,0
+access_sbk_kitchen_design_manager,southbrook.kitchen.design (manager),model_southbrook_kitchen_design,southbrook_kitchen_3d_configurator.group_kitchen_manager,1,1,1,1
+access_sbk_kitchen_design_line_readonly,southbrook.kitchen.design.line (readonly),model_southbrook_kitchen_design_line,southbrook_kitchen_3d_configurator.group_kitchen_readonly,1,0,0,0
+access_sbk_kitchen_design_line_designer,southbrook.kitchen.design.line (designer),model_southbrook_kitchen_design_line,southbrook_kitchen_3d_configurator.group_kitchen_designer,1,1,1,1
+access_sbk_kitchen_design_line_manager,southbrook.kitchen.design.line (manager),model_southbrook_kitchen_design_line,southbrook_kitchen_3d_configurator.group_kitchen_manager,1,1,1,1

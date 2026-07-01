@@ -320,6 +320,147 @@ class SouthbrookKitchenDesign(models.Model):
                      eff_top),
             })
 
+        # ── v19.0.4.22.0 audit P2#7 — extended production checks ──────
+
+        # 7) Y-axis (front-back) depth collision — pairs of same-type
+        #    cabs whose x AND y footprints both overlap. Catches L-run
+        #    corner clashes and back-to-back islands the x-only check
+        #    at (3) sees as "different runs".
+        for ct, lines in by_type.items():
+            if ct in ("filler", "panel"):
+                continue
+            for i in range(len(lines)):
+                for j in range(i + 1, len(lines)):
+                    a, b = lines[i], lines[j]
+                    if a.x_position_in + (a.width_in or 0) <= b.x_position_in + 0.01:
+                        continue
+                    if b.x_position_in + (b.width_in or 0) <= a.x_position_in + 0.01:
+                        continue
+                    ay0, by0 = a.y_position_in or 0.0, b.y_position_in or 0.0
+                    ay1 = ay0 + (a.depth_in or 0)
+                    by1 = by0 + (b.depth_in or 0)
+                    if ay1 <= by0 + 0.01 or by1 <= ay0 + 0.01:
+                        continue
+                    if (abs((a.depth_in or 0) - (b.depth_in or 0)) < 0.01
+                            and abs(ay0 - by0) < 0.01):
+                        continue  # pure x-clash, already flagged at (3)
+                    issues.append({
+                        "code":     "Y_AXIS_COLLISION",
+                        "severity": "blocking",
+                        "message":  (
+                            "%s cabinets overlap front-back at x=%.1f\": "
+                            "%s (d=%.1f\") vs %s (d=%.1f\")"
+                        ) % (
+                            ct.title(), a.x_position_in,
+                            a.product_id.display_name, a.depth_in or 0,
+                            b.product_id.display_name, b.depth_in or 0,
+                        ),
+                    })
+
+        # 8) Z-axis collision — wall-cab vertical extent inside a tall's
+        #    vertical extent. Bases don't clash with walls in z (they
+        #    live on different run rows).
+        for tall in by_type.get("tall", []):
+            tx0 = tall.x_position_in
+            tx1 = tx0 + (tall.width_in or 0)
+            tz0 = tall.z_position_in or 0.0
+            tz1 = tz0 + (tall.height_in or 0)
+            for wall in by_type.get("wall", []):
+                wx0 = wall.x_position_in
+                wx1 = wx0 + (wall.width_in or 0)
+                if wx1 <= tx0 + 0.01 or wx0 >= tx1 - 0.01:
+                    continue
+                wz0 = wall.z_position_in or 0.0
+                wz1 = wz0 + (wall.height_in or 0)
+                if wz1 <= tz0 + 0.01 or wz0 >= tz1 - 0.01:
+                    continue
+                issues.append({
+                    "code":     "Z_AXIS_COLLISION",
+                    "severity": "blocking",
+                    "message":  (
+                        "Wall %s (bottom %.1f\") intrudes into tall "
+                        "%s (top %.1f\") at x=%.1f\""
+                    ) % (
+                        wall.product_id.display_name, wz0,
+                        tall.product_id.display_name, tz1,
+                        tall.x_position_in,
+                    ),
+                })
+
+        # 9) Orphan filler — filler with no adjacent base/wall/tall
+        #    within ±0.5" on either side. Fillers must bridge two
+        #    cabinets, never sit alone.
+        neighbours = [
+            l for l in self.cabinet_line_ids
+            if l.cabinet_type in ("base", "wall", "tall")
+        ]
+        for f in by_type.get("filler", []):
+            fx0 = f.x_position_in or 0.0
+            fx1 = fx0 + (f.width_in or 0)
+            left = any(
+                abs((c.x_position_in or 0) + (c.width_in or 0) - fx0) <= 0.5
+                for c in neighbours
+            )
+            right = any(
+                abs((c.x_position_in or 0) - fx1) <= 0.5 for c in neighbours
+            )
+            if not (left or right):
+                issues.append({
+                    "code":     "ORPHAN_FILLER",
+                    "severity": "blocking",
+                    "message":  (
+                        "Filler %s at x=%.1f\" has no adjacent cabinet; "
+                        "fillers must bridge two cabinets."
+                    ) % (f.product_id.display_name, fx0),
+                })
+
+        # 10) End-cap panel adjacency — twin of the controller-side
+        #     _validate_end_cap_panel_placement (controllers/main.py),
+        #     escalated from WARN to BLOCKING per the audit. Follow-up:
+        #     extract the pure algorithm to an @api.model classmethod
+        #     so client + server share one implementation.
+        panels = by_type.get("panel", [])
+        if panels:
+            hosts = [
+                l for l in self.cabinet_line_ids
+                if l.cabinet_type in ("base", "wall")
+            ]
+            valid_x = []
+            for h in hosts:
+                hx = h.x_position_in or 0.0
+                hw = h.width_in or 0.0
+                valid_x.append(hx + hw)   # right side of host
+                for p in panels:
+                    valid_x.append(hx - (p.width_in or 0))
+            for p in panels:
+                px = p.x_position_in or 0.0
+                if not any(abs(px - v) <= 0.5 for v in valid_x):
+                    issues.append({
+                        "code":     "PANEL_WALL_ATTACH",
+                        "severity": "blocking",
+                        "message":  (
+                            "End-cap panel %s at x=%.1f\" isn't adjacent "
+                            "to any base/wall side face; panels can't "
+                            "attach to room walls."
+                        ) % (p.product_id.display_name, px),
+                    })
+
+        # 11) Unrealistic single-base width — warning (custom 60"+
+        #     bases exist for eat-at-counter runs, but a 200" typo
+        #     shouldn't burn the shop floor).
+        for line in self.cabinet_line_ids:
+            if line.cabinet_type != "base":
+                continue
+            if (line.width_in or 0) > 60.0:
+                issues.append({
+                    "code":     "UNREALISTIC_DIM",
+                    "severity": "warning",
+                    "message":  (
+                        "%s is %.1f\" wide — over 60\" on a single base "
+                        "is unusual; confirm not a typo."
+                    ) % (line.product_id.display_name, line.width_in),
+                })
+
         return issues
 
     def action_validate_production(self):
@@ -406,6 +547,28 @@ class SouthbrookKitchenDesign(models.Model):
                     "Design isn't production-ready. Resolve these blocking "
                     "issues first:\n\n%s" % msg
                 )
+            # v19.0.4.22.0 audit P1#4 — Both `price_unit` AND
+            # `pricelist_id` are set intentionally. The audit initially
+            # flagged this as a double-discount landmine; a v19-source
+            # investigation (see docs/southbrook_kitchen_audit_2026-07-01
+            # .md §P1#4) proved Odoo's `_compute_price_unit` REPLACES
+            # rather than stacks — an explicit `price_unit` in create()
+            # is honoured and downstream recompute (from qty/partner/
+            # product change) re-derives from `pricelist_id._get_
+            # product_price(product, qty)` NOT from the current
+            # `price_unit`. Zero arithmetic double-discount risk.
+            #
+            # Why keep BOTH:
+            #   * `price_unit` — locks the design-time snapshot for
+            #     `pricelist_refacing` customers whose pricelist has
+            #     no items (priced via a Python routine, not pricelist
+            #     items); a bare pricelist_id would auto-compute to
+            #     `product.lst_price` (retail) — an accidental margin
+            #     leak.
+            #   * `pricelist_id` — needed for the rep's customer-flip
+            #     workflow: swapping partner on the created SO triggers
+            #     `_compute_price_unit` which re-derives from the new
+            #     partner's channel. Standard Odoo semantics.
             vals = {
                 "partner_id": design.partner_id.id,
                 "origin":     design.name,
@@ -475,7 +638,7 @@ class SouthbrookKitchenDesign(models.Model):
         if not product and raise_if_missing:
             raise UserError(
                 "No saleable %s cabinet product found. "
-                "Go to Southbrook Kitchen > Cabinet Products and add one." % cabinet_type
+                "Go to Kitchen 3D Configurator > Cabinet Products and add one." % cabinet_type
             )
         return product or self.env["product.product"]
 
@@ -495,6 +658,29 @@ class SouthbrookKitchenDesign(models.Model):
             "y_position_in":  y,
             "z_position_in":  z,
         })
+
+
+# v19.0.4.22.0 audit P2#9 — Q21 zone lexicon (mirrors PUNCHLIST Q21
+# on sale.order.line). Declared at module scope so search domains
+# and future sale_order_line inheritance can reference the same list
+# without duplicating the tuple.
+ZONE_SELECTION = [
+    ("base_run",  "Base Run"),
+    ("wall",      "Wall"),
+    ("tall",      "Tall"),
+    ("island",    "Island"),
+    ("accessory", "Accessory"),
+    ("other",     "Other"),
+]
+
+_ZONE_FROM_CABINET_TYPE = {
+    "base":   "base_run",
+    "wall":   "wall",
+    "tall":   "tall",
+    "corner": "base_run",   # dominant case is base-run corner; user overrides for tall/wall corners
+    "filler": "accessory",
+    "panel":  "accessory",
+}
 
 
 class SouthbrookKitchenDesignLine(models.Model):
@@ -546,6 +732,31 @@ class SouthbrookKitchenDesignLine(models.Model):
         ("corner", "Corner Unit"),
     ], required=True)
 
+    # ── v19.0.4.22.0 audit P2#9 — Q21 zone tagging ─────────────────────
+    # Mirrors the sale.order.line zone lexicon locked by PUNCHLIST Q21
+    # so design lines can be aggregated per-zone in the Order Builder
+    # without re-deriving from cabinet_type. Stored + indexed so it
+    # groups/filters in views. readonly=False lets users override
+    # (corner-wall cabinets, island bases, etc.).
+    zone = fields.Selection(
+        selection=ZONE_SELECTION,
+        string="Zone",
+        required=True,
+        store=True,
+        index=True,
+        compute="_compute_zone",
+        readonly=False,
+        copy=True,
+        default="base_run",
+        help="Q21 zone grouping. Defaults from cabinet_type; override "
+             "for island-mounted bases or corner-wall cabinets.",
+    )
+    zone_label = fields.Char(
+        string="Zone Label",
+        help="Free-text label surfaced when zone=Other "
+             "(e.g. 'Butler's Pantry', 'Coffee Bar').",
+    )
+
     width_in  = fields.Float(required=True, digits=(6, 2))
     height_in = fields.Float(required=True, digits=(6, 2))
     depth_in  = fields.Float(required=True, digits=(6, 2))
@@ -585,6 +796,23 @@ class SouthbrookKitchenDesignLine(models.Model):
         string="Position",
         compute="_compute_position_label",
     )
+
+    @api.depends("cabinet_type")
+    def _compute_zone(self):
+        for line in self:
+            # Only backfill on empty; preserve any prior user override.
+            if not line.zone:
+                line.zone = _ZONE_FROM_CABINET_TYPE.get(
+                    line.cabinet_type, "other",
+                )
+
+    @api.constrains("zone", "zone_label")
+    def _check_zone_label_only_on_other(self):
+        # Silently strip a stale label when the zone flips away from
+        # 'other' — matches PUNCHLIST Q21 UX spec.
+        for line in self:
+            if line.zone != "other" and line.zone_label:
+                line.zone_label = False
 
     @api.depends("cabinet_type", "x_position_in", "z_position_in")
     def _compute_position_label(self):

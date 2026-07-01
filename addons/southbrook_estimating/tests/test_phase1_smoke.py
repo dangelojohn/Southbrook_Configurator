@@ -250,6 +250,12 @@ class TestPhase1Smoke(SouthbrookTestCase):
     def test_step_08_customer_switch_reprices(self):
         """Step 8: switch a draft order's customer to Walk-in Retail;
         the pricelist re-resolves to retail via the onchange (NF13 regression).
+
+        Extended 2026-07-01 (E2E audit): CLAUDE.md §9 acceptance says
+        "re-prices EVERY LINE without re-configuring it". Previously
+        the test only asserted the header pricelist_id swap. This
+        version adds a real order line and asserts per-line
+        `price_unit` re-computation across the swap.
         """
         if not self._demo_loaded():
             self.skipTest("--demo not loaded; demo partners absent by design")
@@ -272,14 +278,39 @@ class TestPhase1Smoke(SouthbrookTestCase):
                 "southbrook_estimating.pricelist_tradesperson_tier_3"
             ),
         )
-        # Switch to Walk-in Retail; pricelist must re-resolve.
+        # Seed a canonical priced product (base_1dr — SB-BASE-1DR
+        # ships list_price via data/cabinet_prices.xml).
+        variant = self.env.ref(
+            "southbrook_estimating.base_1dr"
+        ).product_variant_id
+        # Add a line at the current (tradesperson) pricelist; capture the
+        # negotiated price. Use Form so onchange + pricelist recompute
+        # fire the same way they do in the UI.
+        with Form(saved) as f:
+            with f.order_line.new() as line:
+                line.product_id = variant
+                line.product_uom_qty = 1.0
+        saved = f.save()
+        tier3_line_price = saved.order_line[0].price_unit
+        # Switch to Walk-in Retail; pricelist must re-resolve AND the
+        # existing line price_unit must recompute to the retail rate.
         with Form(saved) as f:
             f.partner_id = walkin
+        saved = f.save()
         self.assertEqual(
             saved.pricelist_id,
             self.env.ref("southbrook_estimating.pricelist_retail"),
             "Switching to Walk-in Retail must re-resolve to retail "
             "pricelist (smoke step 8 / NF13 regression).",
+        )
+        retail_line_price = saved.order_line[0].price_unit
+        # Tier-3 gives a discount off retail; retail must be strictly
+        # greater than what the tradesperson paid.
+        self.assertGreater(
+            retail_line_price, tier3_line_price,
+            "Q7 acceptance (CLAUDE.md §9): every line must re-price on "
+            "customer swap. Tier-3 line price=%s, retail line price=%s "
+            "— retail should be higher." % (tier3_line_price, retail_line_price),
         )
 
     # ------------------------------------------------------------------

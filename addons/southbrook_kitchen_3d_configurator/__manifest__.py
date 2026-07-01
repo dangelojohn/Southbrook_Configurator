@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.4.21.0",
+    "version": "19.0.4.22.2",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -25,7 +25,17 @@
         "southbrook_estimating",
     ],
     "data": [
+        # 2026-07-01 E2E audit fix — security/groups.xml + kitchen_design_rules.xml
+        # existed on disk but were NOT declared in this manifest. That
+        # left ir.model.access.csv referring to group xml_ids
+        # (`group_kitchen_readonly` etc) that no XML seed ever created,
+        # so on a clean install the CSV load raised
+        #    `No matching record found for external id
+        #     'southbrook_kitchen_3d_configurator.group_kitchen_readonly'`.
+        # Groups MUST load before the ACL CSV and before record rules.
+        "security/groups.xml",
         "security/ir.model.access.csv",
+        "security/kitchen_design_rules.xml",
         "views/product_template_views.xml",
         "views/kitchen_design_views.xml",
         "views/kitchen_configurator_views.xml",

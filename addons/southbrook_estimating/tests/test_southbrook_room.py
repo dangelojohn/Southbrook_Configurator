@@ -99,7 +99,10 @@ class TestSouthbrookRoom(TransactionCase):
         self.env["southbrook.room"].create({"name": "B", "order_id": self.order.id})
         action = self.order.action_open_southbrook_room()
         self.assertEqual(action.get("domain"), [("order_id", "=", self.order.id)])
-        self.assertNotIn("res_id", action)
+        # v19 always seeds res_id=0 in act_window dicts; the semantic
+        # check is that no specific record is being singled-out for
+        # form-view landing. Treat 0/False as "not pinned".
+        self.assertIn(action.get("res_id"), (0, False, None))
 
     def test_room_count_compute(self):
         self.assertEqual(self.order.room_count, 0)

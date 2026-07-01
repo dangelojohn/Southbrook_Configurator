@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Southbrook Kitchen 3D Configurator — v19.0.4.22.0
+  Record rules for southbrook.kitchen.design (audit P1#6).
+
+  Designer sees only their own designs (create_uid match).
+  Readonly sees all designs but read-only.
+  Manager unrestricted.
+
+  Design lines inherit access via the design_id FK + ondelete=cascade
+  and the CSV grants — no separate ir.rule needed for the line model.
+
+  noupdate="1" per repo convention so ops-side rule tweaks don't
+  get overwritten on -u.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="rule_kitchen_design_designer_own" model="ir.rule">
+            <field name="name">Kitchen Design: designer sees own</field>
+            <field name="model_id" ref="model_southbrook_kitchen_design"/>
+            <field name="domain_force">[('create_uid','=',user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_kitchen_designer'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_kitchen_design_readonly_all" model="ir.rule">
+            <field name="name">Kitchen Design: read-only sees all</field>
+            <field name="model_id" ref="model_southbrook_kitchen_design"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="groups" eval="[(4, ref('group_kitchen_readonly'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_kitchen_design_manager_all" model="ir.rule">
+            <field name="name">Kitchen Design: manager unrestricted</field>
+            <field name="model_id" ref="model_southbrook_kitchen_design"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="groups" eval="[(4, ref('group_kitchen_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

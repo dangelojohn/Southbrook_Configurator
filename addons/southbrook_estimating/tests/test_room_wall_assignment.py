@@ -19,13 +19,29 @@ class TestRoomWallAssignment(TransactionCase):
             ],
         })
         cls.wall_a, cls.wall_b = cls.room.wall_ids
-        cls.product = cls.env.ref("southbrook_estimating.product_base_2dr").product_variant_id
+        # base_2dr is `create_variant='dynamic'` per Q6, so its
+        # `product_variant_id` is an EMPTY recordset until a config-
+        # session materialises one. Under -i (no --demo) that means
+        # tests using it hit v19's accountable_required_fields check
+        # (product_id NULL) AND the NOT NULL name check. Materialise
+        # a straightforward test product inline instead — the wall-
+        # assignment logic doesn't care about the OCA variant path.
+        cls.product = cls.env["product.product"].create({
+            "name": "Test Cabinet SB-BASE-2DR",
+            "default_code": "SB-BASE-2DR-TEST",
+            "type": "consu",
+            "list_price": 500.0,
+        })
 
     def test_unpositioned_line_does_not_break_existing_behavior(self):
         line = self.env["sale.order.line"].create({
             "order_id": self.order.id,
             "product_id": self.product.id,
             "product_uom_qty": 1.0,
+            # sale.order.line.name is NOT NULL in v19. product_variant_id
+            # on Q6 dynamic templates can be empty at test-time, so
+            # display_name → None → NULL. Use a static string.
+            "name": "Test SB-BASE-2DR line",
         })
         self.assertFalse(line.wall_id)
         self.assertFalse(line.is_positioned)
@@ -34,6 +50,10 @@ class TestRoomWallAssignment(TransactionCase):
         line = self.env["sale.order.line"].create({
             "order_id": self.order.id, "product_id": self.product.id,
             "product_uom_qty": 1.0,
+            # sale.order.line.name is NOT NULL in v19. product_variant_id
+            # on Q6 dynamic templates can be empty at test-time, so
+            # display_name → None → NULL. Use a static string.
+            "name": "Test SB-BASE-2DR line",
             "wall_id": self.wall_a.id, "position_from_left_mm": 0,
         })
         self.assertTrue(line.is_positioned)
@@ -53,6 +73,10 @@ class TestRoomWallAssignment(TransactionCase):
         line = self.env["sale.order.line"].create({
             "order_id": self.order.id, "product_id": self.product.id,
             "product_uom_qty": 1.0,
+            # sale.order.line.name is NOT NULL in v19. product_variant_id
+            # on Q6 dynamic templates can be empty at test-time, so
+            # display_name → None → NULL. Use a static string.
+            "name": "Test SB-BASE-2DR line",
             "wall_id": self.wall_a.id, "position_from_left_mm": 900,
         })
         self.wall_a.invalidate_recordset(["has_conflicts"])
@@ -65,6 +89,10 @@ class TestRoomWallAssignment(TransactionCase):
         line = self.env["sale.order.line"].create({
             "order_id": self.order.id, "product_id": self.product.id,
             "product_uom_qty": 1.0,
+            # sale.order.line.name is NOT NULL in v19. product_variant_id
+            # on Q6 dynamic templates can be empty at test-time, so
+            # display_name → None → NULL. Use a static string.
+            "name": "Test SB-BASE-2DR line",
             "wall_id": self.wall_a.id, "position_from_left_mm": 100,
         })
         new_order = self.order.copy()
@@ -82,6 +110,10 @@ class TestRoomWallAssignment(TransactionCase):
         self.env["sale.order.line"].create({
             "order_id": self.order.id, "product_id": self.product.id,
             "product_uom_qty": 1.0,
+            # sale.order.line.name is NOT NULL in v19. product_variant_id
+            # on Q6 dynamic templates can be empty at test-time, so
+            # display_name → None → NULL. Use a static string.
+            "name": "Test SB-BASE-2DR line",
             "wall_id": self.wall_a.id, "position_from_left_mm": 0,
         })
         self.wall_a.invalidate_recordset(["has_conflicts"])
@@ -97,6 +129,10 @@ class TestRoomWallAssignment(TransactionCase):
         self.env["sale.order.line"].create({
             "order_id": self.order.id, "product_id": self.product.id,
             "product_uom_qty": 1.0,
+            # sale.order.line.name is NOT NULL in v19. product_variant_id
+            # on Q6 dynamic templates can be empty at test-time, so
+            # display_name → None → NULL. Use a static string.
+            "name": "Test SB-BASE-2DR line",
             "wall_id": self.wall_a.id, "position_from_left_mm": 0,
         })
         self.wall_a.invalidate_recordset(["has_conflicts"])
@@ -113,6 +149,7 @@ class TestRoomWallAssignment(TransactionCase):
         line = self.env["sale.order.line"].create({
             "order_id": self.order.id, "product_id": self.product.id,
             "product_uom_qty": 1.0,
+            "name": self.product.display_name,
             "wall_id": self.wall_a.id, "position_from_left_mm": 1500,
         })
         c_id, line_id = c.id, line.id

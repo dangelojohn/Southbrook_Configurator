@@ -23,6 +23,15 @@ recommendation.
         "southbrook_api",
         "southbrook_kitchen_workspace",
         "southbrook_os",
+        # 2026-07-01 E2E audit fix — views/order_builder_chat_inject.xml
+        # inherits QWeb template `southbrook_estimating_website
+        # .portal_order_builder`, resolved at manifest data-load time.
+        # Without this dep, -i southbrook_hermes on a DB where
+        # _website is not present raises `External ID not found`.
+        # southbrook_estimating_website itself depends transitively on
+        # kitchen_workspace via estimating, so this widens the load-
+        # order guarantee to include the website addon.
+        "southbrook_estimating_website",
     ],
     # PyJWT (`import jwt`) is needed at RUNTIME for any /hermes/* or
     # /api/hermes/* endpoint that mints or verifies a token, but the helper

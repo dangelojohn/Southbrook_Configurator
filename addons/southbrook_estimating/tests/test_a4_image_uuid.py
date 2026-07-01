@@ -64,13 +64,32 @@ class TestA4CatalogIconController(HttpCase):
             "x_image_uuid": "deadbeef-aaaa-bbbb-cccc-ddddeeeeffff",
             "image_1920": base64.b64encode(_TINY_PNG).decode("ascii"),
         })
+        # The controller returns a 302 to /web/image/... with a public,
+        # immutable Cache-Control (content-addressed URL: the UUID
+        # changes with the payload, so 1-year cache is safe). Check the
+        # redirect response, NOT the follow-redirect image response.
+        # Cloudflare caches the 302 for a year — that's the perf win.
         response = self.url_open(
-            f"/southbrook/catalog/icon/{tmpl.x_image_uuid}")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers.get("Content-Type"), "image/png")
+            f"/southbrook/catalog/icon/{tmpl.x_image_uuid}",
+            allow_redirects=False)
+        # Werkzeug's `request.redirect(local=True)` returns a 303 (See
+        # Other) in v19 — semantically better for POST→GET flows but
+        # also used for GET-to-GET. Accept either 302/303.
+        self.assertIn(response.status_code, (302, 303))
+        self.assertIn("/web/image/product.template/",
+                      response.headers.get("Location", ""))
         self.assertIn("max-age=31536000",
                       response.headers.get("Cache-Control", ""))
-        self.assertEqual(response.content, _TINY_PNG)
+        # And verify the underlying image bytes are still reachable by
+        # following once. /web/image re-encodes the PNG through its
+        # variant-size pipeline (image_1920 → derived thumbnails) so
+        # the returned bytes are NOT the exact _TINY_PNG we uploaded —
+        # verify only that we got a 200 with an image/png payload.
+        followed = self.url_open(
+            f"/southbrook/catalog/icon/{tmpl.x_image_uuid}")
+        self.assertEqual(followed.status_code, 200)
+        self.assertEqual(followed.headers.get("Content-Type"), "image/png")
+        self.assertTrue(followed.content.startswith(b"\x89PNG"))
 
     def test_controller_returns_404_for_unknown_uuid(self):
         response = self.url_open(
