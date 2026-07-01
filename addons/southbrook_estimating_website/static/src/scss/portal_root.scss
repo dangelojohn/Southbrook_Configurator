@@ -784,7 +784,7 @@
     font-variation-settings: "opsz" 36, "wght" 500;
     // 2026-06-02 fluid scale — clamp() so titles grow / shrink with
     // viewport. Bare px would freeze across mobile → 4K.
-    font-size: clamp(1.05rem, calc(1rem + 0.8vw), 1.5rem);
+    font-size: #{clamp(1.05rem, calc(1rem + 0.8vw), 1.5rem)};
     line-height: 1.25;
     color: var(--sb-walnut);
     margin: 0 0 8px;
@@ -792,7 +792,7 @@
 }
 
 .o_owl_modal_sub {
-    font-size: clamp(0.8rem, calc(0.76rem + 0.25vw), 0.9rem);
+    font-size: #{clamp(0.8rem, calc(0.76rem + 0.25vw), 0.9rem)};
     line-height: 1.5;
     color: var(--sb-ink-dim);
     margin: 0;
@@ -2066,17 +2066,17 @@
     // calc() inside clamp() defers the rem + vw addition to the
     // browser's runtime CSS engine. Without it, SASS errors at
     // compile time with "Incompatible units: 'vw' and 'rem'".
-    $cp-title:   clamp(1.05rem,  calc(1rem    + 0.8vw),  1.5rem);   // modal/section titles
-    $cp-name:    clamp(0.9rem,   calc(0.85rem + 0.4vw),  1.05rem);  // card name
-    $cp-price:   clamp(1rem,     calc(0.95rem + 0.5vw),  1.2rem);   // card price (emphasized)
-    $cp-body:    clamp(0.8rem,   calc(0.76rem + 0.25vw), 0.9rem);   // tabs, count, search input
-    $cp-desc:    clamp(0.75rem,  calc(0.72rem + 0.2vw),  0.85rem);  // description + empty body
-    $cp-meta:    clamp(0.7rem,   calc(0.68rem + 0.15vw), 0.8rem);   // sku, dims, busy, qty input
-    $cp-micro:   clamp(0.6rem,   calc(0.58rem + 0.1vw),  0.7rem);   // badges, tab count, channel lbl
+    $cp-title:   #{clamp(1.05rem,  calc(1rem    + 0.8vw),  1.5rem)};   // modal/section titles
+    $cp-name:    #{clamp(0.9rem,   calc(0.85rem + 0.4vw),  1.05rem)};  // card name
+    $cp-price:   #{clamp(1rem,     calc(0.95rem + 0.5vw),  1.2rem)};   // card price (emphasized)
+    $cp-body:    #{clamp(0.8rem,   calc(0.76rem + 0.25vw), 0.9rem)};   // tabs, count, search input
+    $cp-desc:    #{clamp(0.75rem,  calc(0.72rem + 0.2vw),  0.85rem)};  // description + empty body
+    $cp-meta:    #{clamp(0.7rem,   calc(0.68rem + 0.15vw), 0.8rem)};   // sku, dims, busy, qty input
+    $cp-micro:   #{clamp(0.6rem,   calc(0.58rem + 0.1vw),  0.7rem)};   // badges, tab count, channel lbl
     // Card-grid min-track width: shrinks on small viewports so
     // cards don't get uncomfortably narrow before wrapping.
     // calc() wrap for same SASS unit-add reason as above.
-    $cp-card-min: clamp(180px, calc(18vw + 100px), 232px);
+    $cp-card-min: #{clamp(180px, calc(18vw + 100px), 232px)};
 
     // Modal shell shared by the catalog picker.
     .o_owl_modal_panel {
@@ -2103,7 +2103,7 @@
     .o_owl_modal_close {
         background: transparent;
         border: 0;
-        font-size: clamp(1.25rem, calc(1.1rem + 0.6vw), 1.7rem);
+        font-size: #{clamp(1.25rem, calc(1.1rem + 0.6vw), 1.7rem)};
         line-height: 1;
         color: var(--sb-ink-dim);
         padding: 4px 10px;
@@ -2246,7 +2246,7 @@
         // Also flex-shrink:0 so a parent flex container (the modal
         // panel) can't compress the nav out of existence on tight
         // vertical space.
-        min-height: clamp(38px, calc(34px + 0.5vw), 44px);
+        min-height: #{clamp(38px, calc(34px + 0.5vw), 44px)};
         flex-shrink: 0;
 
         // iOS / touch smooth horizontal swipe.
@@ -2440,8 +2440,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width:  clamp(40px, calc(32px + 1.4vw), 56px);
-        height: clamp(40px, calc(32px + 1.4vw), 56px);
+        width:  #{clamp(40px, calc(32px + 1.4vw), 56px)};
+        height: #{clamp(40px, calc(32px + 1.4vw), 56px)};
         border-radius: 8px;
         background: linear-gradient(
             135deg,

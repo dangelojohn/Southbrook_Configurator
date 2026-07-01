@@ -24,8 +24,10 @@
 #     returns the existing BoM rather than creating a duplicate.
 
 from odoo.addons.base.tests.common import BaseCommon
+from odoo.tests import tagged
 
 
+@tagged("configurator")
 class TestBoMContents(BaseCommon):
     @classmethod
     def setUpClass(cls):

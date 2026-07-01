@@ -5,8 +5,10 @@ from odoo import fields
 from ..tests.common import (
     TestProductConfiguratorValues,
 )
+from odoo.tests import tagged
 
 
+@tagged("configurator")
 class TestProductConfigStepLine(TestProductConfiguratorValues):
     def test_get_website_template(self):
         self.configStepLine.write(

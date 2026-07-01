@@ -1,6 +1,7 @@
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 
+@tagged("configurator")
 class TestResConfigSettings(TransactionCase):
     @classmethod
     def setUpClass(cls):

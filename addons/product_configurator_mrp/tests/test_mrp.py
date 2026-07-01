@@ -4,8 +4,10 @@
 from datetime import datetime
 
 from odoo.addons.product_configurator.tests.common import ProductConfiguratorTestCases
+from odoo.tests import tagged
 
 
+@tagged("configurator")
 class TestMrp(ProductConfiguratorTestCases):
     """Repair + re-enable of the inherited-from-18.0 disabled
     test_mrp.py. Fixes the six sub-findings disclosed in PR #1's body

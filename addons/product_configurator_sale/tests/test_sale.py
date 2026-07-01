@@ -1,8 +1,10 @@
 from odoo.addons.product_configurator.tests import (
     common as TC,
 )
+from odoo.tests import tagged
 
 
+@tagged("configurator")
 class SaleOrder(TC.ProductConfiguratorTestCases):
     @classmethod
     def setUpClass(cls):

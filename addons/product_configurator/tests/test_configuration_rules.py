@@ -3,10 +3,11 @@
 
 from odoo import SUPERUSER_ID, Command
 from odoo.exceptions import ValidationError
-from odoo.tests import Form, TransactionCase
+from odoo.tests import Form, TransactionCase, tagged
 from odoo.tools.safe_eval import safe_eval
 
 
+@tagged("configurator")
 class ConfigurationRules(TransactionCase):
     @classmethod
     def setUpClass(cls):

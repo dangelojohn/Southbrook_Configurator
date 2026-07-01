@@ -1,8 +1,10 @@
 from ..tests.common import (
     TestProductConfiguratorValues,
 )
+from odoo.tests import tagged
 
 
+@tagged("configurator")
 class TestSaleOrder(TestProductConfiguratorValues):
     @classmethod
     def setUpClass(cls):

@@ -1,12 +1,14 @@
 from odoo.exceptions import ValidationError
 
 from odoo.addons.base.tests.common import BaseCommon
+from odoo.tests import tagged
 
 # FIXME: many tests here do not have any assertions.
 # They simply run something and expect it to not raise an exception.
 # This is not a good practice. Tests should have assertions.
 
 
+@tagged("configurator")
 class ProductAttributes(BaseCommon):
     @classmethod
     def setUpClass(cls):

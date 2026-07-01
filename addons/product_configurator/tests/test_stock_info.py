@@ -5,8 +5,10 @@
 # aggregation that surfaces in the wizard's [REF] (e) stock badge.
 
 from .common import ProductConfiguratorTestCases
+from odoo.tests import tagged
 
 
+@tagged("configurator")
 class TestStockInfo(ProductConfiguratorTestCases):
     @classmethod
     def setUpClass(cls):
