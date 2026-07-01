@@ -675,6 +675,16 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.selected = this.state.items[idx] || this.state.items[idx - 1] || null;
         this._recomputeLayoutFromItems();
         if (this.T.scene) this._buildScene();
+        // v19.0.4.23.2 P0#1 Stage 1 — sync delete server-side so
+        // pinned-line rows don't resurrect on next load. Fire-and-
+        // forget; the debounced /save is the fallback. Skipped when
+        // designId isn't set yet (nothing server-side to delete).
+        if (this.state.designId && sel.layout_key) {
+            rpc("/southbrook_kitchen/configurator/delete_line", {
+                design_id:  this.state.designId,
+                layout_key: sel.layout_key,
+            }).catch(() => { /* non-fatal — auto-save reconciles */ });
+        }
         this._queueAutoSave();    // D5
     }
 
@@ -708,11 +718,48 @@ class SouthbrookKitchenConfigurator extends Component {
             ["tall", "corner"].includes(it.cabinet_type)
         ).sort(sortX);
 
-        let bx = 0;
-        for (const b of bases) { b.x_position_in = bx; bx += (b.width_in || 0); }
-        let wx = 0;
-        for (const w of walls) { w.x_position_in = wx; wx += (w.width_in || 0); }
-        for (const t of tailItems) { t.x_position_in = bx; bx += (t.width_in || 0); }
+        // v19.0.4.23.2 P0#1 Stage 1 — Pin-aware row packer. Pinned
+        // items keep their stored x_position_in; unpinned items fit
+        // into the free gaps between pinned ones (left-to-right),
+        // and any overflow extends past the rightmost pinned. When
+        // no item in a row is pinned, behaviour is identical to the
+        // pre-4.23 cascade (pack from x=0), so existing designs
+        // render exactly as before until the user drags a cabinet.
+        const packRow = (row) => {
+            const pinned   = row.filter(it => it.pinned).sort(sortX);
+            const unpinned = row.filter(it => !it.pinned);
+            let cursor = 0;
+            let pi = 0;
+            for (const u of unpinned) {
+                const w = u.width_in || 0;
+                while (pi < pinned.length
+                       && (pinned[pi].x_position_in || 0) <= cursor) {
+                    cursor = Math.max(
+                        cursor,
+                        (pinned[pi].x_position_in || 0)
+                            + (pinned[pi].width_in || 0),
+                    );
+                    pi++;
+                }
+                if (pi < pinned.length
+                    && (pinned[pi].x_position_in || 0) >= cursor + w) {
+                    u.x_position_in = cursor;
+                    cursor += w;
+                } else if (pi < pinned.length) {
+                    cursor = (pinned[pi].x_position_in || 0)
+                           + (pinned[pi].width_in || 0);
+                    pi++;
+                    u.x_position_in = cursor;
+                    cursor += w;
+                } else {
+                    u.x_position_in = cursor;
+                    cursor += w;
+                }
+            }
+        };
+        packRow(bases);
+        packRow(walls);
+        packRow(tailItems);
         // NOTE: filler items get X from server /layout; end-cap panels get X
         //       relative to their host cabinet (set by _addCabinetFromProduct
         //       or downstream). Both are left untouched here on purpose.
@@ -1727,10 +1774,17 @@ class SouthbrookKitchenConfigurator extends Component {
             const cvs = this.T.renderer && this.T.renderer.domElement;
             if (cvs) cvs.style.cursor = "";
             if (wasCommitted) {
+                // v19.0.4.23.2 P0#1 Stage 1 — Mark as pinned so the
+                // recompute pass respects the user's chosen X.
+                // Fillers/panels have server-driven X; skip pinning.
+                if (!["filler", "panel"].includes(item.cabinet_type)) {
+                    item.pinned = true;
+                    this._savePinnedPosition(item);
+                }
                 this._recomputeLayoutFromItems();
                 if (this.T.scene) this._buildScene();
                 this.notification.add(
-                    `Moved ${item.name} to ${item.x_position_in}″`,
+                    `Moved ${item.product_name || item.name || "cabinet"} to ${Math.round(item.x_position_in)}″`,
                     { type: "success" }
                 );
                 this._queueAutoSave();
@@ -1778,6 +1832,34 @@ class SouthbrookKitchenConfigurator extends Component {
             this.notification.add("Save failed: " + (e.message || e), { type: "danger" });
         } finally {
             this.state.saving = false;
+        }
+    }
+
+    // v19.0.4.23.2 P0#1 Stage 1 — Persist a single pinned drop
+    // position. Fire-and-forget — silent on failure so the debounced
+    // /save reconciles the whole design later. Skipped when designId
+    // isn't set yet (unsaved design, nothing server-side to update).
+    //
+    // IMPORTANT: this must NEVER be awaited by onWillStart or any
+    // lifecycle hook. It's a side-channel write; any lifecycle
+    // dependency will silently hang the WebClient mount if the RPC
+    // hits a routing miss (see post-mortem of 4.20.0 in
+    // docs/southbrook_kitchen_audit_2026-07-01.md §P0#1).
+    async _savePinnedPosition(item) {
+        if (!this.state.designId || !item || !item.layout_key) return;
+        try {
+            await rpc("/southbrook_kitchen/configurator/save_position", {
+                design_id:      this.state.designId,
+                layout_key:     item.layout_key,
+                x_position_in:  item.x_position_in || 0,
+                y_position_in:  item.y_position_in || 0,
+                z_position_in:  item.z_position_in || 0,
+                rotation_deg:   item.rotation_deg  || 0,
+                pinned:         true,
+            });
+        } catch (_) {
+            // Non-fatal — pin stays on the client until the next
+            // full /save.
         }
     }
 
