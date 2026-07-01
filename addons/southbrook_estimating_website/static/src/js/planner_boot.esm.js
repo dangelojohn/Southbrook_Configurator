@@ -39,11 +39,12 @@
 
 import {
     Component,
-    mount,
     onMounted,
     useState,
+    whenReady,
     xml,
 } from "@odoo/owl";
+import { mountComponent } from "@web/env";
 
 // ---------------------------------------------------------------------
 // rpcCall — pure fetch + JSON-RPC envelope.
@@ -546,18 +547,28 @@ class KitchenPlanner extends Component {
 async function mountKitchenPlanner() {
     const root = document.getElementById("kitchen_planner_root");
     if (!root || root.dataset.owlMounted === "1") return;
-    root.dataset.owlMounted = "1";
 
     // Clear the P2C1 placeholder (rail + catalog + viewport
     // skeletons) before mounting.
     root.innerHTML = "";
 
     try {
-        await mount(KitchenPlanner, root, {
+        // 2026-07-01 defensive migration — use `mountComponent` from
+        // `@web/env` rather than raw OWL `mount()`. mountComponent
+        // seeds a fresh Odoo env (env.services populated via
+        // startServices, template registry via getTemplate) so any
+        // future child of KitchenPlanner that uses
+        // `static template = "module.Name"` OR `useService(...)` just
+        // works. Today's KitchenPlanner uses only inline xml`` and
+        // no services, but Phase 3 (3D viewport, catalog_tile,
+        // dimensioning) will need both — see
+        // [[odoo19_public_owl_mount_env_services]].
+        root.dataset.owlMounted = "1";
+        await mountComponent(KitchenPlanner, root, {
             props: {},
-            dev: false,
         });
     } catch (err) {
+        delete root.dataset.owlMounted;
         root.innerHTML =
             '<div class="o_kp_state o_kp_error">' +
             '<strong>Planner failed to mount.</strong>' +
@@ -566,8 +577,9 @@ async function mountKitchenPlanner() {
     }
 }
 
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mountKitchenPlanner);
-} else {
-    queueMicrotask(mountKitchenPlanner);
-}
+whenReady(mountKitchenPlanner).catch((err) => {
+    // Async work outside the try/catch above (DOM lookup,
+    // dataset reads, innerHTML="") can throw on hardened portals.
+    // eslint-disable-next-line no-console
+    console.error("[southbrook_estimating_website] mountKitchenPlanner failed before mount:", err);
+});

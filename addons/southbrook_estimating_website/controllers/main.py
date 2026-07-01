@@ -88,24 +88,32 @@ class _SouthbrookOrderAccessMixin:
             parent_id must equal order.partner_id (parent partner
             views child's order).
 
-          • Anything else → AccessError, controller redirects to /my.
+          • Anything else → AccessError, controller redirects to /my
+            (or JSON endpoints return {"error": "forbidden"}).
+
+        Missing IDs collapse to AccessError too — distinguishing
+        "not found" from "forbidden" is an existence-oracle leak: an
+        authenticated portal user could probe order_ids and infer
+        which ones belong to other partners. Matches the convention
+        f44eff9 established for `_southbrook_resolve_line` and the
+        room_api scope guards at room_api.py:_get_room_scoped.
+        Callers (main.py:1097, 1238, 1377, 1588, 1693, 1863, 2166,
+        2223, 2250, 2339) still have `except MissingError` branches;
+        those are now dead code but harmless — delete-in-a-follow-up.
         """
         order = request.env["sale.order"].sudo().browse(order_id).exists()
-        if not order:
-            raise MissingError("Sale order not found.")
-
         user = request.env.user
-        if not user.share:
-            return order
-
-        my_partner = user.partner_id
-        order_partner = order.partner_id
-        if my_partner == order_partner:
-            return order
-        if order_partner.parent_id and order_partner.parent_id == my_partner:
-            return order
-        if my_partner.parent_id and my_partner.parent_id == order_partner:
-            return order
+        if order:
+            if not user.share:
+                return order
+            my_partner = user.partner_id
+            order_partner = order.partner_id
+            if my_partner == order_partner:
+                return order
+            if order_partner.parent_id and order_partner.parent_id == my_partner:
+                return order
+            if my_partner.parent_id and my_partner.parent_id == order_partner:
+                return order
         raise AccessError("This order is not accessible to your account.")
 
 

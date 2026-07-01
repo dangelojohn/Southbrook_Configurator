@@ -11,7 +11,7 @@ AI/tool orchestration can submit draft recommendations through an API key, but
 business changes remain gated by Odoo users who approve, reject, and apply the
 recommendation.
 """,
-    "version": "19.0.4.3.0",
+    "version": "19.0.4.3.1",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -51,16 +51,16 @@ recommendation.
     ],
     "assets": {
         "web.assets_frontend": [
-            # 2026-06-22 bugfix: XML BEFORE JS so the OWL templates
-            # registry has `southbrook_hermes.HermesChat` populated by
-            # the time autoMount() runs. The opposite ordering used to
-            # race the templates loader on the Order Builder portal
-            # page (manifested as
-            #   `OwlError: Missing template: "southbrook_hermes.HermesChat"`
-            # + `TypeError: ... reading 'add'`). The autoMount() in
-            # hermes_chat.esm.js also try/catches the mount so a
-            # similar race in a future bundle can't break the host
-            # page — but ordering first is the cheaper fix.
+            # XML before JS is defence-in-depth; the LOAD-BEARING fix
+            # for `OwlError: Missing template: "southbrook_hermes.HermesChat"`
+            # (and the cascading `TypeError: ... reading 'add'` from
+            # the error_service) landed 2026-07-01 in hermes_chat.esm.js
+            # — raw OWL `mount()` was creating an App with no template
+            # registry AND no env.services. The fix imports
+            # `getTemplate` from `@web/core/templates` and passes it to
+            # the mount config; see [[odoo19_public_owl_mount_env_services]].
+            # Ordering XML before JS is cheap belt-and-suspenders and
+            # doesn't hurt, so left in place.
             "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.xml",
             "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.esm.js",
             "southbrook_hermes/static/src/components/hermes_chat/hermes_chat.scss",
