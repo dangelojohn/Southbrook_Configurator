@@ -1706,6 +1706,33 @@ SouthbrookKitchenConfigurator.template = xml`
         <h1 class="o_sbk_title">3D Room Configurator</h1>
       </div>
     </div>
+    <!-- Room dimensions moved into the topbar (2026-06-30) so the
+         left aside is dedicated to setup/preferences, not spatial
+         inputs. margin-right:auto (in SCSS) keeps this group flush
+         against the brand block; actions stay right-aligned. -->
+    <div class="o_sbk_room_dims">
+      <label class="o_sbk_room_dim">
+        <span class="o_sbk_room_dim_label">Width</span>
+        <div class="o_sbk_room_dim_input_row">
+          <input type="number" min="12" step="6"
+                 t-att-value="state.room.width_in"
+                 t-on-change="(ev) => this._changeRoom('width_in', ev.target.value)"/>
+          <span class="o_sbk_room_dim_ft"><t t-esc="(state.room.width_in / 12).toFixed(1)"/>′</span>
+        </div>
+      </label>
+      <label class="o_sbk_room_dim">
+        <span class="o_sbk_room_dim_label">Depth</span>
+        <input type="number" min="12" step="6"
+               t-att-value="state.room.depth_in"
+               t-on-change="(ev) => this._changeRoom('depth_in', ev.target.value)"/>
+      </label>
+      <label class="o_sbk_room_dim">
+        <span class="o_sbk_room_dim_label">Height</span>
+        <input type="number" min="84" step="6"
+               t-att-value="state.room.height_in"
+               t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
+      </label>
+    </div>
     <!-- D3 — Channel pricing badge. Shows the partner-resolved
          pricelist so every price the user sees in the configurator
          is the one the quote will use. Suppressed for the default
@@ -1757,29 +1784,7 @@ SouthbrookKitchenConfigurator.template = xml`
     <aside class="o_sbk_controls">
       <h3>Room</h3>
 
-      <label class="o_sbk_field">
-        <span>Width (in)</span>
-        <div class="o_sbk_input_row">
-          <input type="number" min="12" step="6"
-                 t-att-value="state.room.width_in"
-                 t-on-change="(ev) => this._changeRoom('width_in', ev.target.value)"/>
-          <span class="o_sbk_unit"><t t-esc="(state.room.width_in / 12).toFixed(1)"/> ft</span>
-        </div>
-      </label>
-
-      <label class="o_sbk_field">
-        <span>Depth (in)</span>
-        <input type="number" min="12" step="6"
-               t-att-value="state.room.depth_in"
-               t-on-change="(ev) => this._changeRoom('depth_in', ev.target.value)"/>
-      </label>
-
-      <label class="o_sbk_field">
-        <span>Height (in)</span>
-        <input type="number" min="84" step="6"
-               t-att-value="state.room.height_in"
-               t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
-      </label>
+      <!-- Width/Depth/Height moved to the topbar (2026-06-30). -->
 
       <!-- D4 — Save current room dims as this user's default. -->
       <button class="o_sbk_save_default_link"

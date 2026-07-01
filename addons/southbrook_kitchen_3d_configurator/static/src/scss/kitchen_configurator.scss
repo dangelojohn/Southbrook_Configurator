@@ -72,6 +72,72 @@ $sbk-amber:      #B45309;
     color: $sbk-dark;
 }
 
+// ─── Room dimensions inline in topbar ────────────────────────────────────────
+// margin-right:auto is what pins this group against the brand block instead
+// of the space-between distribution taking it to the middle of the bar.
+.o_sbk_room_dims {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    margin-right: auto;
+    padding-left: 4px;
+}
+
+.o_sbk_room_dim {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    line-height: 1;
+    margin: 0;
+}
+
+.o_sbk_room_dim_label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: $sbk-muted;
+}
+
+.o_sbk_room_dim_input_row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.o_sbk_room_dim input[type=number] {
+    width: 62px;
+    padding: 4px 6px;
+    border: 1px solid $sbk-border;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: $sbk-dark;
+    background: $sbk-white;
+    -moz-appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    &:focus-visible {
+        outline: 2px solid rgba(24, 102, 212, 0.4);
+        outline-offset: 0;
+        border-color: $sbk-accent;
+    }
+}
+
+.o_sbk_room_dim_ft {
+    font-size: 10px;
+    font-weight: 600;
+    color: $sbk-muted;
+    line-height: 1;
+    white-space: nowrap;
+}
+
 // ─── Buttons ──────────────────────────────────────────────────────────────────
 .o_sbk_actions {
     display: flex;
