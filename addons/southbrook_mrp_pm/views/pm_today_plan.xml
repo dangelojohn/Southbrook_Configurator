@@ -108,7 +108,8 @@
                   <div class="o_sb_today_plan_hint"
                        t-if="record.next_action_hint.raw_value">
                     <small class="text-warning">
-                      <i class="fa fa-exclamation-triangle"/>
+                      <i class="fa fa-exclamation-triangle"
+                         title="Next-action alert"/>
                       <field name="next_action_hint"/>
                     </small>
                   </div>
