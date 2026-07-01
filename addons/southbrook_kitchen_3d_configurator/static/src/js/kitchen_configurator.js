@@ -32,6 +32,8 @@ import { computeOrthoFrustum } from "@southbrook_kitchen_3d_configurator/js/canv
 import { highlightSelected } from "@southbrook_kitchen_3d_configurator/js/canvas/selection";
 import { computeDropXIn } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_raycaster";
 import { buildRoomShell } from "@southbrook_kitchen_3d_configurator/js/canvas/room_shell";
+import { buildDragHandle } from "@southbrook_kitchen_3d_configurator/js/canvas/drag_handle";
+import { buildDropLanes } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_lanes";
 
 const actionRegistry = registry.category("actions");
 
@@ -1543,83 +1545,17 @@ class SouthbrookKitchenConfigurator extends Component {
             this.T.clickable.push(body);
         });
 
-        // ── Drag handle ── (PBR sphere with self-emissive glow so it
-        // pops out of the scene against any background/exposure)
-        const THREE3 = this.T.THREE;
-        const hdl = new THREE3.Mesh(
-            new THREE3.SphereGeometry(0.18, 20, 20),
-            new THREE3.MeshStandardMaterial({
-                color: P.drag, emissive: 0x001166, emissiveIntensity: 0.4,
-                roughness: 0.3, metalness: 0.1,
-            })
+        // Rec D · Sprint 2d step 12 — drag handle + arrow cones
+        // moved to canvas/drag_handle.esm.js.
+        const { handleMesh, arrowMeshes } = buildDragHandle(
+            THREE, scene, P, rw, rd,
         );
-        hdl.position.set(rw + 0.08, 0.18, rd / 2);
-        hdl.userData = { isDragHandle: true };
-        scene.add(hdl);
-        this.T.handleMesh = hdl;
+        this.T.handleMesh = handleMesh;
+        this.T.arrowMeshes.push(...arrowMeshes);
 
-        // Arrow cones flanking handle
-        [{ offset: -0.42, rotZ: Math.PI/2 }, { offset: 0.42, rotZ: -Math.PI/2 }].forEach(({ offset, rotZ }) => {
-            const arr = new THREE3.Mesh(
-                new THREE3.ConeGeometry(0.08, 0.22, 8),
-                new THREE3.MeshStandardMaterial({
-                    color: P.arrow, roughness: 0.4, metalness: 0.1,
-                })
-            );
-            arr.rotation.z = rotZ;
-            arr.position.set(rw + offset, 0.18, rd / 2);
-            scene.add(arr);
-            this.T.arrowMeshes.push(arr);
-        });
-
-        // ── D16 — Per-zone drop lanes (visible during drag-from-inventory).
-        // BASE lane: thin floor band 24" deep along the back wall.
-        // WALL lane: tall band on the back wall sitting at the
-        //   configured wall_z (D8 alignment-aware).
-        // TALL_END lane: full-height band at the right end of the
-        //   base run, where dropped tall / corner / panel land.
-        const wallH    = 30 * IN;
-        const baseD    = 24 * IN;
-        const wallBotZ = WBY;                 // bottom of wall cabinet
-        // BASE lane — floor band along back wall, full room width
-        const baseLane = new THREE.Mesh(
-            new THREE.PlaneGeometry(rw, baseD),
-            new THREE.MeshBasicMaterial({
-                color: 0x1866d4, transparent: true, opacity: 0.0,
-                side: THREE.DoubleSide, depthWrite: false,
-            }),
-        );
-        baseLane.rotation.x = -Math.PI / 2;
-        baseLane.position.set(rw / 2, 0.004, baseD / 2);
-        baseLane.visible = false;
-        scene.add(baseLane);
-        // WALL lane — vertical band on the back wall at wall cab z
-        const wallLane = new THREE.Mesh(
-            new THREE.PlaneGeometry(rw, wallH),
-            new THREE.MeshBasicMaterial({
-                color: 0x1e9e6a, transparent: true, opacity: 0.0,
-                side: THREE.DoubleSide, depthWrite: false,
-            }),
-        );
-        wallLane.position.set(rw / 2, wallBotZ + wallH / 2, 0.004);
-        wallLane.visible = false;
-        scene.add(wallLane);
-        // TALL_END lane — full-height band at the right end of base run,
-        //   24" wide × room_height × cabinet depth. Caps at room height.
-        const tallH = Math.max(rh - 3.5 * IN, 60 * IN);
-        const tallW = 24 * IN;
-        const tallLane = new THREE.Mesh(
-            new THREE.BoxGeometry(tallW, tallH, baseD),
-            new THREE.MeshBasicMaterial({
-                color: 0xc89b5a, transparent: true, opacity: 0.0,
-                depthWrite: false,
-            }),
-        );
-        // Position at the right edge of current room width
-        tallLane.position.set(rw - tallW / 2, 3.5 * IN + tallH / 2, baseD / 2);
-        tallLane.visible = false;
-        scene.add(tallLane);
-        this.T.laneMeshes = { base: baseLane, wall: wallLane, tall: tallLane };
+        // Rec D · Sprint 2d step 13 — three drop lanes moved to
+        // canvas/drop_lanes.esm.js.
+        this.T.laneMeshes = buildDropLanes(THREE, scene, rw, rh);
         this._updateLaneVisibility();
 
         // ── D1 — Re-compute view specs from current room dims and
