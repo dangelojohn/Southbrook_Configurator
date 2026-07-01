@@ -19,6 +19,7 @@
                 <field name="partner_id"/>
                 <field name="total_cabinets"/>
                 <field name="estimated_price" widget="monetary"/>
+                <field name="currency_id" column_invisible="1"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'draft'"
                        decoration-warning="state == 'configured'"

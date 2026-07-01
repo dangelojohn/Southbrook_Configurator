@@ -51,6 +51,23 @@
             "default_sale_ok": True,
             "default_purchase_ok": True
         }</field>
+        <!-- 2026-07-01 v19.0.4.20.2 — empty-state UX. Without this the
+             action lands on a blank grid the first time a user opens
+             it (before any Southbrook cabinet is tagged), with no
+             breadcrumb explaining the domain filter. -->
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No cabinet products tagged yet
+            </p>
+            <p>
+                Add a product and tick <strong>Southbrook Cabinet</strong> on
+                its product form (in the <em>Southbrook Cabinet</em> tab),
+                or clear the filter to see every product in the catalogue.
+                This screen only shows products flagged as Southbrook
+                cabinets — they're what the 3D Configurator's inventory
+                pane serves.
+            </p>
+        </field>
     </record>
 
 </odoo>
