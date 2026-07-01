@@ -44,6 +44,30 @@
         </field>
     </record>
 
+    <!-- ── Sprint 2c · "Open in 3D" button on sale.order form ──────
+         Direct jump from an SO to the 3D scene without the rep
+         having to walk kanban → design → open configurator. Calls
+         a class-method on southbrook.kitchen.design that reverse-
+         looks-up the design (via sale_order_id), falling back to
+         the room's action or a bare configurator. Behind
+         `invisible="not id"` so it only appears on a saved SO
+         (calling from a fresh draft would have no id to pass). -->
+    <record id="view_sale_order_form_rec_d_open_3d" model="ir.ui.view">
+        <field name="name">sale.order.form.rec_d.open_3d</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_in_kitchen_3d"
+                        type="object"
+                        string="Open in 3D"
+                        class="btn-secondary"
+                        icon="fa-cube"
+                        invisible="not id"/>
+            </xpath>
+        </field>
+    </record>
+
     <!-- ── v19.0.5.2.0 Sprint 2b · Room Layout tab inline on SO form
          Adds a "Room Layout" notebook page to the sale.order form
          showing the linked southbrook.room's walls + constraints +

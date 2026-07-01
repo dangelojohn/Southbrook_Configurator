@@ -186,6 +186,34 @@ class SouthbrookKitchenDesign(models.Model):
             design._generate_standard_layout()
         return True
 
+    @api.model
+    def action_open_from_sale_order(self, order_id):
+        """Rec D Sprint 2c · reverse-lookup helper.
+
+        Called by the "Open in 3D" button on sale.order form. Finds
+        the linked design (via sale_order_id) and opens its
+        configurator. If no design exists yet but the SO has a
+        southbrook.room, delegates to room.action_open_kitchen_3d
+        so the rep can still design against the room's dimensions.
+        """
+        order = self.env["sale.order"].browse(int(order_id or 0))
+        if not order.exists():
+            return False
+        design = self.search([("sale_order_id", "=", order.id)], limit=1)
+        if design:
+            return design.action_open_configurator()
+        room = order.room_ids[:1]
+        if room:
+            return room.action_open_kitchen_3d()
+        # Neither design nor room — spin up a bare configurator.
+        return {
+            "type":   "ir.actions.client",
+            "tag":    "southbrook_kitchen_configurator",
+            "params": {
+                "partner_id": order.partner_id.id if order.partner_id else False,
+            },
+        }
+
     def action_open_configurator(self):
         """Open the 3D Configurator pre-loaded with this design's dimensions.
 
