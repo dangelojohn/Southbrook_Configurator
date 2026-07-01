@@ -384,59 +384,41 @@ $sbk-amber:      #B45309;
     font-variant-numeric: tabular-nums;
 }
 
-// Category filter pills — compact row above the search box.
-.o_sbk_inv_tabs {
+// Category filter dropdown — compact row above the search box.
+.o_sbk_inv_cat_field {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    align-items: center;
+    gap: 8px;
     margin: 8px 0 4px;
 }
 
-.o_sbk_inv_tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 9px;
-    background: transparent;
-    border: 1px solid $sbk-border;
-    border-radius: 999px;
-    color: $sbk-mid;
-    font-family: inherit;
+.o_sbk_inv_cat_label {
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.4px;
+    letter-spacing: 1px;
     text-transform: uppercase;
-    line-height: 1;
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
-
-    &:hover:not(.is-active) {
-        background: $sbk-bg;
-        border-color: $sbk-muted;
-    }
-
-    &.is-active {
-        background: $sbk-accent;
-        border-color: $sbk-accent;
-        color: $sbk-white;
-
-        .o_sbk_inv_tab_count {
-            background: rgba(255, 255, 255, 0.22);
-            color: $sbk-white;
-        }
-    }
+    color: $sbk-muted;
+    white-space: nowrap;
 }
 
-.o_sbk_inv_tab_count {
-    background: $sbk-accent-bg;
-    color: $sbk-accent;
-    font-size: 9px;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 999px;
-    min-width: 16px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
+.o_sbk_inv_cat_select {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid $sbk-border;
+    border-radius: 4px;
+    background: $sbk-white;
+    color: $sbk-dark;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+
+    &:focus-visible {
+        outline: 2px solid rgba(24, 102, 212, 0.4);
+        outline-offset: 0;
+        border-color: $sbk-accent;
+    }
 }
 
 .o_sbk_inv_search {

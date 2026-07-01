@@ -2169,50 +2169,39 @@ SouthbrookKitchenConfigurator.template = xml`
         </span>
       </div>
 
-      <!-- Category filter pills. Tabs with zero items are hidden so
-           the bar stays compact as SKUs grow into new categories.
-           Active pill highlights in $sbk-accent. -->
-      <div class="o_sbk_inv_tabs" role="tablist" aria-label="Filter by product category">
-        <button role="tab"
-                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'all' ? ' is-active' : '')"
-                t-att-aria-selected="state.inventoryCategory === 'all' ? 'true' : 'false'"
-                t-on-click="() => this._setInventoryCategory('all')">
-          All
-          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('all')"/></span>
-        </button>
-        <button role="tab"
-                t-if="_categoryCount('base') &gt; 0"
-                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'base' ? ' is-active' : '')"
-                t-att-aria-selected="state.inventoryCategory === 'base' ? 'true' : 'false'"
-                t-on-click="() => this._setInventoryCategory('base')">
-          Base
-          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('base')"/></span>
-        </button>
-        <button role="tab"
-                t-if="_categoryCount('wall') &gt; 0"
-                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'wall' ? ' is-active' : '')"
-                t-att-aria-selected="state.inventoryCategory === 'wall' ? 'true' : 'false'"
-                t-on-click="() => this._setInventoryCategory('wall')">
-          Wall
-          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('wall')"/></span>
-        </button>
-        <button role="tab"
-                t-if="_categoryCount('tall') &gt; 0"
-                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'tall' ? ' is-active' : '')"
-                t-att-aria-selected="state.inventoryCategory === 'tall' ? 'true' : 'false'"
-                t-on-click="() => this._setInventoryCategory('tall')">
-          Tall
-          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('tall')"/></span>
-        </button>
-        <button role="tab"
-                t-if="_categoryCount('panels') &gt; 0"
-                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'panels' ? ' is-active' : '')"
-                t-att-aria-selected="state.inventoryCategory === 'panels' ? 'true' : 'false'"
-                t-on-click="() => this._setInventoryCategory('panels')">
-          Panels
-          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('panels')"/></span>
-        </button>
-      </div>
+      <!-- Category filter dropdown. Options with zero matching
+           products auto-hide so the menu stays tight as SKUs grow
+           into new categories (Appliances etc. will surface here
+           automatically when their data lands, no template edit
+           needed). Count next to each label so users see at a
+           glance how many items are in each group. -->
+      <label class="o_sbk_inv_cat_field">
+        <span class="o_sbk_inv_cat_label">Filter by type</span>
+        <select class="o_sbk_inv_cat_select"
+                t-att-value="state.inventoryCategory"
+                t-on-change="(ev) => this._setInventoryCategory(ev.target.value)"
+                aria-label="Filter cabinet inventory by product category">
+          <option value="all" t-att-selected="state.inventoryCategory === 'all' ? 'selected' : ''">
+            All (<t t-esc="_categoryCount('all')"/>)
+          </option>
+          <option t-if="_categoryCount('base') &gt; 0" value="base"
+                  t-att-selected="state.inventoryCategory === 'base' ? 'selected' : ''">
+            Base (<t t-esc="_categoryCount('base')"/>)
+          </option>
+          <option t-if="_categoryCount('wall') &gt; 0" value="wall"
+                  t-att-selected="state.inventoryCategory === 'wall' ? 'selected' : ''">
+            Wall (<t t-esc="_categoryCount('wall')"/>)
+          </option>
+          <option t-if="_categoryCount('tall') &gt; 0" value="tall"
+                  t-att-selected="state.inventoryCategory === 'tall' ? 'selected' : ''">
+            Tall (<t t-esc="_categoryCount('tall')"/>)
+          </option>
+          <option t-if="_categoryCount('panels') &gt; 0" value="panels"
+                  t-att-selected="state.inventoryCategory === 'panels' ? 'selected' : ''">
+            Panels (<t t-esc="_categoryCount('panels')"/>)
+          </option>
+        </select>
+      </label>
 
       <!-- D13 — Searchable inventory. Filters by name, SKU, cabinet
            type, material, door style. Empty = full catalog. -->
