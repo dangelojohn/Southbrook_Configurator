@@ -42,6 +42,11 @@ import {
 } from "@southbrook_kitchen_3d_configurator/js/canvas/other_cabinets.esm";
 import { initScene } from "@southbrook_kitchen_3d_configurator/js/canvas/scene_init.esm";
 import { destroyScene } from "@southbrook_kitchen_3d_configurator/js/canvas/scene_dispose.esm";
+import {
+    setView as setViewShared,
+    animateCamera as animateCameraShared,
+    onWheel as onWheelShared,
+} from "@southbrook_kitchen_3d_configurator/js/canvas/camera_controller.esm";
 
 const actionRegistry = registry.category("actions");
 
@@ -863,86 +868,28 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // Swap to a named view. instant=true jumps; otherwise lerps over ms.
+    // Rec D · Sprint 2d step 22 — camera controller (setView +
+    // animateCamera + onWheel) moved to canvas/camera_controller.
+    // esm.js. Class-side wrappers still write this.state.view
+    // (OWL reactive) before delegating.
     _setView(key, instant = false) {
-        const t = this.T;
-        if (!t.viewSpecs || !t.viewSpecs[key]) return;
-        const spec = t.viewSpecs[key];
         this.state.view = key;
-        // Reset wheel-zoom on view change for a predictable starting frame.
-        t.vsScale = 1;
-        // Swap active camera; orbit only enabled in persp.
-        if (spec.cam === "ortho") {
-            t.activeCamera = t.cameras.ortho;
-            if (t.orbit) t.orbit.enabled = false;
-        } else {
-            t.activeCamera = t.cameras.persp;
-            if (t.orbit) {
-                t.orbit.enabled = true;
-                t.orbit.target.copy(spec.target);
-            }
-        }
-        // Hide/show the drag handle + arrow cones per view (only iso + top
-        // expose room-width resize; in other views the right edge isn't
-        // visible or doesn't map intuitively to room width).
-        const handleVisible = (key === "iso" || key === "top");
-        if (t.handleMesh)  t.handleMesh.visible  = handleVisible;
-        if (t.arrowMeshes) t.arrowMeshes.forEach(m => { m.visible = handleVisible; });
-        if (instant) {
-            t.activeCamera.position.copy(spec.pos);
-            t.activeCamera.up.copy(spec.up);
-            t.activeCamera.lookAt(spec.target);
-            t.currentTarget.copy(spec.target);
-            this._applyOrthoFrustum();
-        } else {
-            this._animateCamera(spec.pos, spec.target, spec.up, 400);
-            this._applyOrthoFrustum();
-        }
+        setViewShared(this.T, key, {
+            instant,
+            applyOrthoFrustum: () => this._applyOrthoFrustum(),
+            animateCamera: (p, tgt, up, ms) => this._animateCamera(p, tgt, up, ms),
+        });
     }
 
-    // Lerp the active camera from its current pos+target to the new ones.
     _animateCamera(toPos, toTarget, toUp, ms = 400) {
-        const t = this.T;
-        const cam = t.activeCamera;
-        if (!cam) return;
-        const fromPos = cam.position.clone();
-        const fromTgt = t.currentTarget.clone();
-        const t0 = performance.now();
-        // Rec D · Sprint 2d step 7 — the ease closure moved to
-        // canvas/easing.esm.js as easeInOutCubic (same shape).
-        const ease = easeInOutCubic;
-        t.animatingCamera = true;
-        const step = () => {
-            if (!this.T.activeCamera || this.T.activeCamera !== cam) {
-                t.animatingCamera = false;
-                return;
-            }
-            const dt = Math.min(1, (performance.now() - t0) / ms);
-            const k  = ease(dt);
-            cam.position.lerpVectors(fromPos, toPos, k);
-            const tgt = fromTgt.clone().lerp(toTarget, k);
-            cam.up.copy(toUp);
-            cam.lookAt(tgt);
-            t.currentTarget.copy(tgt);
-            if (t.orbit && t.orbit.enabled) t.orbit.target.copy(tgt);
-            if (dt < 1) requestAnimationFrame(step);
-            else        t.animatingCamera = false;
-        };
-        step();
+        animateCameraShared(
+            this.T, toPos, toTarget, toUp, ms,
+            easeInOutCubic, requestAnimationFrame,
+        );
     }
 
     _onWheel(e) {
-        e.preventDefault();
-        const t = this.T;
-        const k = e.deltaY > 0 ? 1.1 : 0.9;
-        if (t.activeCamera === t.cameras.persp && t.orbit) {
-            // Persp dolly via OrbitControls; mirror wheel direction.
-            // OrbitControls handles its own wheel internally if enabled,
-            // but we keep an explicit fallback for parity in case it
-            // gets disabled mid-session.
-            return;   // OrbitControls already wired to wheel when enabled
-        }
-        t.vsScale = Math.max(0.3, Math.min(3.0, (t.vsScale || 1) * k));
-        this._applyOrthoFrustum();
+        onWheelShared(this.T, e, () => this._applyOrthoFrustum());
     }
 
     _onKeyDown(e) {
