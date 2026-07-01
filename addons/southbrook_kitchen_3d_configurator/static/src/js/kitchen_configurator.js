@@ -751,6 +751,10 @@ class SouthbrookKitchenConfigurator extends Component {
         this._validateEndCapPlacement(
             items.filter(it => it.cabinet_type === "panel"),
         );
+        // 24c — force a new array reference so <KitchenCanvas>'s
+        // onWillUpdateProps rebuild path fires. packRow mutates
+        // entries in place, which OWL cannot observe as a prop change.
+        this.state.items = this.state.items.slice();
     }
 
     _validateEndCapPlacement(endCapItems) {
@@ -1742,11 +1746,20 @@ SouthbrookKitchenConfigurator.template = xml`
           t-on-dragover="_onCanvasDragOver"
           t-on-dragleave="_onCanvasDragLeave"
           t-on-drop="_onCanvasDrop">
-      <div t-ref="canvas3d" class="o_sbk_canvas3d"/>
-      <!-- 24b: hidden-sibling <KitchenCanvas> proves the child can
-           build a scene from props without swapping the visible
-           surface. Event props deferred to 24c-e. -->
-      <KitchenCanvas items="state.items" room="state.room" view="state.view" selected="state.selected"/>
+      <!-- Rec D · Sprint 2d Step 24c — KitchenCanvas is now the sole
+           visible 3D surface. Parent's <div t-ref="canvas3d"/> is
+           removed. Callback props route child events back into parent
+           OWL state; onReady exposes an imperative API for the
+           parent's window-scoped keyboard + HTML5 drop handlers. -->
+      <KitchenCanvas items="state.items" room="state.room"
+                     view="state.view" selected="state.selected"
+                     draggedProduct="state.draggedProduct"
+                     dragHover="state.dragHover"
+                     onSelectItem="(item) => this._onCanvasSelect(item)"
+                     onMoveItem="(p) => this._onCanvasMove(p)"
+                     onResizeRoom="(nw, f) => this._onCanvasResize(nw, f)"
+                     onViewChange="(k) => this._onCanvasViewChange(k)"
+                     onReady="(api) => this._onCanvasReady(api)"/>
 
       <!-- Dimension ruler overlay -->
       <div class="o_sbk_ruler">
@@ -2014,7 +2027,38 @@ SouthbrookKitchenConfigurator.props = {
     "*":            true,
 };
 SouthbrookKitchenConfigurator.defaultProps = {};
-// Rec D · Sprint 2d Step 24b — register <KitchenCanvas> as a child.
+// Rec D · Sprint 2d Step 24c — register <KitchenCanvas> as a child.
 SouthbrookKitchenConfigurator.components = { KitchenCanvas };
+
+// Rec D · Sprint 2d Step 24c bridge — child-to-parent callbacks.
+// Injects fire-and-forget state mutations into the parent lifecycle
+// so the child stays pure viewport (no RPCs, no notification writes).
+SouthbrookKitchenConfigurator.prototype._onCanvasReady = function (api) {
+    this._canvasApi = api;
+};
+SouthbrookKitchenConfigurator.prototype._onCanvasSelect = function (item) {
+    this.state.selected = item;
+};
+SouthbrookKitchenConfigurator.prototype._onCanvasMove = function ({ item, x_position_in, pinnable }) {
+    if (pinnable) {
+        item.pinned = true;
+        this._savePinnedPosition(item);
+    }
+    this._recomputeLayoutFromItems();
+    this.notification.add(
+        `Moved ${item.product_name || item.name || "cabinet"} to ${Math.round(x_position_in)}″`,
+        { type: "success" }
+    );
+    this._queueAutoSave();
+};
+SouthbrookKitchenConfigurator.prototype._onCanvasResize = function (newWidthIn, inFlight) {
+    this.state.room.width_in = newWidthIn;
+    if (!inFlight) {
+        this._refreshLayout().then(() => this._queueAutoSave());
+    }
+};
+SouthbrookKitchenConfigurator.prototype._onCanvasViewChange = function (key) {
+    if (this.state.view !== key) this.state.view = key;
+};
 
 actionRegistry.add("southbrook_kitchen_configurator", SouthbrookKitchenConfigurator);
