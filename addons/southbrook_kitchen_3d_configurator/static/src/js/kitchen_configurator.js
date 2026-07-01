@@ -675,7 +675,7 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.selected = this.state.items[idx] || this.state.items[idx - 1] || null;
         this._recomputeLayoutFromItems();
         if (this.T.scene) this._buildScene();
-        // v19.0.4.23.2 P0#1 Stage 1 — sync delete server-side so
+        // v19.0.4.24.0 P0#1 Stage 1 — sync delete server-side so
         // pinned-line rows don't resurrect on next load. Fire-and-
         // forget; the debounced /save is the fallback. Skipped when
         // designId isn't set yet (nothing server-side to delete).
@@ -718,7 +718,7 @@ class SouthbrookKitchenConfigurator extends Component {
             ["tall", "corner"].includes(it.cabinet_type)
         ).sort(sortX);
 
-        // v19.0.4.23.2 P0#1 Stage 1 — Pin-aware row packer. Pinned
+        // v19.0.4.24.0 P0#1 Stage 1 — Pin-aware row packer. Pinned
         // items keep their stored x_position_in; unpinned items fit
         // into the free gaps between pinned ones (left-to-right),
         // and any overflow extends past the rightmost pinned. When
@@ -1173,6 +1173,24 @@ class SouthbrookKitchenConfigurator extends Component {
             return;
         }
 
+        // v19.0.4.25.0 P0#1 Stage 3 — Q rotates selected cabinet 90°
+        // counter-clockwise, E rotates 90° clockwise. Both flip
+        // pinned=true so the pack cascade leaves the cabinet in place.
+        // Y-axis only (kitchen cabinets don't tumble). Persistence
+        // happens via _savePinnedPosition. Visual rotation of the
+        // mesh is deferred; the rotation_deg is stored + toasted so
+        // reps can reason about door direction even before Stage 3.5
+        // ships the visual layer.
+        //
+        // Q/E chosen (not R) to avoid clobbering the existing R
+        // "reset view to iso" muscle memory.
+        if (!ctrl && (k === "q" || k === "Q" || k === "e" || k === "E")) {
+            e.preventDefault();
+            const delta = (k === "e" || k === "E") ? 90 : -90;
+            this._rotateSelected(delta);
+            return;
+        }
+
         // D6 — Esc clears the cabinet selection.
         if (k === "Escape") {
             if (this.state.selected) {
@@ -1246,6 +1264,38 @@ class SouthbrookKitchenConfigurator extends Component {
         this._selectCabinet(selectable[idx]);
     }
 
+    // v19.0.4.25.0 P0#1 Stage 3 — Rotate the selected cabinet by
+    // deltaDeg (±90) and persist. Sets item.rotation_deg (mod 360),
+    // flips pinned=true so the pack cascade leaves the cabinet
+    // where the user put it, and fires _savePinnedPosition to sync
+    // the new rotation to the DB. Fillers + panels don't rotate
+    // (their orientation is host-relative).
+    //
+    // Visual rotation of the mesh is DEFERRED to a follow-up patch —
+    // rotation_deg is stored and displayed via toast so the sales
+    // rep can reason about door direction, but the 3D scene keeps
+    // meshes at their un-rotated pose. Wrapping cabinet meshes in
+    // THREE.Groups is what broke the WebClient at 4.20.0; that
+    // refactor is staged separately (see audit §P0#1 recovery plan).
+    _rotateSelected(deltaDeg) {
+        const item = this.state.selected;
+        if (!item) return;
+        if (item.cabinet_type === "filler" || item.cabinet_type === "panel") {
+            return;
+        }
+        const cur = ((item.rotation_deg || 0) + deltaDeg) % 360;
+        item.rotation_deg = (cur + 360) % 360;
+        item.pinned = true;
+        this._savePinnedPosition(item);
+        if (this.notification && this.notification.add) {
+            this.notification.add(
+                `Rotated ${item.product_name || item.name || "cabinet"} to ${item.rotation_deg}°`,
+                { type: "success" }
+            );
+        }
+        this._queueAutoSave();
+    }
+
     _destroyScene() {
         const t = this.T;
         // D5 — clear any pending auto-save so we don't fire after the
@@ -1287,12 +1337,29 @@ class SouthbrookKitchenConfigurator extends Component {
         const rd = this.state.room.depth_in  * IN;
         const rh = this.state.room.height_in * IN;
 
-        // Dispose previous geometry
+        // Dispose previous geometry.
+        // v19.0.4.25.0 P0#1 Stage 3 — cabObjs may now include
+        // THREE.Group wrappers per rotated cabinet (see rotationGroup
+        // helper). Groups have no .geometry / .material of their own,
+        // so a bare `if (m.geometry) m.geometry.dispose()` silently
+        // leaks the child meshes' resources. We `.traverse()` every
+        // node — Meshes get their geometry + material disposed,
+        // Groups just visit their descendants. Post-mortem of 4.20.0
+        // (see audit §P0#1) identified this as the WebGL context loss
+        // that follows ~10 refreshes once grouping is introduced.
+        const disposeNode = (n) => {
+            if (!n) return;
+            if (n.geometry) n.geometry.dispose();
+            if (n.material) {
+                if (Array.isArray(n.material)) n.material.forEach(x => x.dispose());
+                else n.material.dispose();
+            }
+        };
         [...this.T.roomObjs, ...this.T.cabObjs].forEach(m => {
-            if (m.geometry) m.geometry.dispose();
-            if (m.material) {
-                if (Array.isArray(m.material)) m.material.forEach(x => x.dispose());
-                else m.material.dispose();
+            if (m && typeof m.traverse === "function") {
+                m.traverse(disposeNode);
+            } else {
+                disposeNode(m);
             }
             scene.remove(m);
         });
@@ -1430,6 +1497,20 @@ class SouthbrookKitchenConfigurator extends Component {
                 [x + cbW/2, cbH + CTR * 0.3, cbD + 0.07], null,
                 { rough: 0.5, metal: 0.05 }
             ));
+
+            // v19.0.4.24.0 P0#1 Stage 2 — Visual pin indicator. Small
+            // teal sphere hovering just above the countertop's back-
+            // right corner marks the cabinet as manually placed.
+            // Gated behind item.pinned so a fresh page render adds
+            // zero geometry (no regression on non-pinned scenes).
+            // Disposed by the existing cabObjs cleanup at frame start.
+            if (item.pinned) {
+                this.T.cabObjs.push(mk(
+                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
+                    [x + cbW - 0.10, cbH + CTR + 0.16, cbD - 0.10], null,
+                    { rough: 0.3, metal: 0.5 }
+                ));
+            }
         });
 
         wallItems.forEach((item, i) => {
@@ -1472,6 +1553,15 @@ class SouthbrookKitchenConfigurator extends Component {
                 [x + wbW/2, wbY - 0.010, wbD/2], null,
                 { rough: 0.4, metal: 0.05 }
             ));
+
+            // v19.0.4.24.0 P0#1 Stage 2 — pin indicator (see base loop)
+            if (item.pinned) {
+                this.T.cabObjs.push(mk(
+                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
+                    [x + wbW - 0.10, wbY + wbH - 0.10, wbD - 0.10], null,
+                    { rough: 0.3, metal: 0.5 }
+                ));
+            }
         });
 
         // D13 — Generic-type fallback: tall / corner / panel cabinets
@@ -1513,6 +1603,19 @@ class SouthbrookKitchenConfigurator extends Component {
                 );
                 this.T.cabObjs.push(body);
                 this.T.clickable.push(body);
+            }
+
+            // v19.0.4.24.0 P0#1 Stage 2 — pin indicator on tall/corner
+            // (skip panels — end-caps aren't user-pinnable per Stage 1's
+            // _onMouseUp filter).
+            if (item.pinned
+                && (item.cabinet_type === "tall"
+                    || item.cabinet_type === "corner")) {
+                this.T.cabObjs.push(mk(
+                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
+                    [x + w - 0.10, z0 + h + 0.16, d - 0.10], null,
+                    { rough: 0.3, metal: 0.5 }
+                ));
             }
         });
 
@@ -1774,7 +1877,7 @@ class SouthbrookKitchenConfigurator extends Component {
             const cvs = this.T.renderer && this.T.renderer.domElement;
             if (cvs) cvs.style.cursor = "";
             if (wasCommitted) {
-                // v19.0.4.23.2 P0#1 Stage 1 — Mark as pinned so the
+                // v19.0.4.24.0 P0#1 Stage 1 — Mark as pinned so the
                 // recompute pass respects the user's chosen X.
                 // Fillers/panels have server-driven X; skip pinning.
                 if (!["filler", "panel"].includes(item.cabinet_type)) {
@@ -1835,7 +1938,7 @@ class SouthbrookKitchenConfigurator extends Component {
         }
     }
 
-    // v19.0.4.23.2 P0#1 Stage 1 — Persist a single pinned drop
+    // v19.0.4.24.0 P0#1 Stage 1 — Persist a single pinned drop
     // position. Fire-and-forget — silent on failure so the debounced
     // /save reconciles the whole design later. Skipped when designId
     // isn't set yet (unsaved design, nothing server-side to update).
