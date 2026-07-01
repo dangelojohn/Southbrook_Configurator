@@ -83,6 +83,28 @@
         </field>
     </record>
 
+    <!-- ── Sprint 2c · "Open in 3D" button on southbrook.room form ──
+         Calls action_open_kitchen_3d which either opens the bridged
+         design's 3D configurator OR spins up a fresh scene pre-
+         loaded with this room's dims + partner. Placed in the form
+         header so it sits alongside any existing room-level
+         actions (there are none yet from estimating; this is the
+         first). -->
+    <record id="view_southbrook_room_form_rec_d_open_3d" model="ir.ui.view">
+        <field name="name">southbrook.room.form.rec_d.open_3d</field>
+        <field name="model">southbrook.room</field>
+        <field name="inherit_id" ref="southbrook_estimating.view_southbrook_room_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_kitchen_3d"
+                        type="object"
+                        string="Open in 3D"
+                        class="btn-primary"
+                        icon="fa-cube"/>
+            </xpath>
+        </field>
+    </record>
+
     <!-- ── Extra columns on sale.order.line embedded list ───────────
          All added as optional="hide" so the default view stays
          uncluttered; power users can enable via the column-toggle

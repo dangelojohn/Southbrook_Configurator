@@ -91,3 +91,43 @@ class SouthbrookRoom(models.Model):
         "room_id",
         string="Bridged Kitchen Designs",
     )
+
+    # ── Sprint 2c · "Open in 3D" jump from a room record ────────
+    # Reps looking at a room want to hop into the 3D scene without
+    # having to find the linked design first. Prefers the bridged
+    # design if one exists (via Sprint 1's reconciliation); if
+    # not, opens the standalone configurator pre-loaded with this
+    # room's dimensions so the rep can design in-place and the
+    # next cron tick links the resulting design back to the room.
+    def action_open_kitchen_3d(self):
+        """Rec D Sprint 2c · jump from a southbrook.room to the 3D
+        configurator scene. Prefers the bridged design (from Sprint 1
+        reconciliation); falls back to opening a fresh configurator
+        pre-loaded with this room's dims + partner.
+        """
+        self.ensure_one()
+        # Prefer the bridged design when one exists — opens the
+        # exact scene the rep is looking at.
+        if self.sb_design_ids:
+            return self.sb_design_ids[:1].action_open_configurator()
+
+        # No bridged design yet — open a standalone configurator
+        # pre-loaded with room dims + partner. Cron will link the
+        # resulting design back on next tick.
+        return {
+            "type": "ir.actions.client",
+            "tag":  "southbrook_kitchen_configurator",
+            "params": {
+                "design_name":            self.name,
+                "room_width_in":          (self.wall_ids[:1].length_mm or 0) / 25.4,
+                "room_depth_in":          24.0,  # standard base depth default
+                "room_height_in":         (self.ceiling_height_mm or 0) / 25.4,
+                "partner_id":             self.order_id.partner_id.id
+                                          if self.order_id.partner_id
+                                          else False,
+                "filler_strategy":        self.sb_filler_strategy or "split",
+                "soffit_height_in":       (self.sb_soffit_height_mm or 2134) / 25.4,
+                "wall_cab_top_alignment": self.sb_wall_cab_top_alignment
+                                          or "fixed_gap",
+            },
+        }
