@@ -22,23 +22,9 @@ import { rpc } from "@web/core/network/rpc";
 import {
     IN, BW, BH, BD, WW, WH, WD, CTR, GAP, WBY, P,
 } from "@southbrook_kitchen_3d_configurator/js/canvas/constants";
+import { loadThreeJS } from "@southbrook_kitchen_3d_configurator/js/canvas/three_loader";
 
 const actionRegistry = registry.category("actions");
-
-// ─── Three.js loader ──────────────────────────────────────────────────────────
-// As of 19.0.3.0.0 we depend on southbrook_estimating, which ships a
-// vendored r160 build of THREE in web.assets_backend (via this addon's
-// manifest). The previous CDN load of three@0.128 was dropped — it
-// lacked SRGBColorSpace / ACESFilmicToneMapping (r152+) and double-
-// loaded against the catalog's local copy. window.THREE is guaranteed
-// to be present at module load time.
-function loadThreeJS() {
-    if (window.THREE) return Promise.resolve(window.THREE);
-    return Promise.reject(new Error(
-        "Three.js not available. southbrook_estimating's vendored " +
-        "three.min.js must load before kitchen_configurator.js (see manifest)."
-    ));
-}
 
 // ─── OWL Component ────────────────────────────────────────────────────────────
 class SouthbrookKitchenConfigurator extends Component {
