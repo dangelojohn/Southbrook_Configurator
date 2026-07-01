@@ -58,7 +58,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.7.1.0",
+    "version": "19.0.7.2.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],
@@ -144,6 +144,15 @@ design-docs index, and PUNCHLIST.md for the locked-decisions trace
         # Order Builder has real numbers to show. Must load AFTER
         # product_templates.xml (overrides list_price=0.0 set there).
         "data/cabinet_prices.xml",
+        # 19.0.7.2.0 (2026-07-01) — PTAV price_extra backfill on 5 OCA-
+        # configured anchor values (Maple, Signature, five-piece,
+        # soft-close, Blum Legrabox). noupdate="1" so product-owner
+        # runtime edits survive -u. MUST load AFTER cabinet_prices.xml
+        # (Maple derivation depends on the seeded list_price) AND
+        # AFTER product_templates.xml (PTAV rows must exist). See
+        # docs/track_c_price_extra_pending_2026-07-01.md for the anchor
+        # decisions + the finish_premium_colors deferral note.
+        "data/attribute_values_price_extra.xml",
         # 19.0.1.1.0 (2026-06-02) — catalog-picker redesign metadata
         # seed (category / description / dimensions / icon_key for all
         # 12 Q8 cabinets). Must load AFTER product_templates.xml since

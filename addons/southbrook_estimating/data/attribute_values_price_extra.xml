@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Canonical price_extra backfill on product.template.attribute.value for
+  the OCA-configured anchor values that customer configuration in
+  /kitchen-planner and the sales-rep Order Builder rely on to re-price.
+
+  noupdate="1" so runtime edits by the product owner in the backend UI
+  survive `-u southbrook_estimating`. The seed applies on -i or a fresh
+  install; subsequent upgrades leave PTAV.price_extra untouched. Same
+  reactivity contract as data/room_templates.xml (Phase 6.2) and
+  data/prodboard_taxonomy_seed.xml — audit §4.A pattern.
+
+  Anchor decisions (2026-07-01, per docs/track_c_price_extra_pending_
+  2026-07-01.md — landed with confident defaults, not full Price Master
+  extraction):
+
+    box_maple        — list_price × 0.10 per CLAUDE.md §5 Rule 2 (canonical)
+    series_signature — 0.00 (base tier — other series price DOWN from Signature)
+    door_five_piece  — $35 uniform (widely-quoted 5-piece woodgrain upgrade)
+    accessory_soft_close — $15 uniform (widely-quoted Blum soft-close per-cabinet)
+    drawer_metal_blum    — $65 on drawer-carrying templates (Blum Legrabox)
+
+  Anchors DELIBERATELY OMITTED:
+    finish_premium_colors — attr_finish is a NF19 placeholder set; the
+      exact "premium colors" mapping needs product-owner input (see
+      docs/track_c_price_extra_pending_2026-07-01.md Q1). Landing zeros
+      here would create maintenance debt without customer value.
+
+  Blast radius = customer-visible pricing. Rollback = `git revert` this
+  commit + `-u southbrook_estimating`.
+
+  Supersedes southbrook_configurator_ux/data/tactical_price_extras.xml
+  (demo-grade). Delete that file + its tactical_price_seed.py once this
+  seed's numbers are confirmed with the product owner and any refinements
+  land — the tactical file's docstring explicitly authorises this transition.
+-->
+<odoo noupdate="1">
+
+  <function model="southbrook.estimating.ptav_price_extra_seed"
+            name="seed_price_extra_batch">
+    <value eval="[
+
+      [ 'value_box_maple', {
+          'wall_1dr':     24.50,
+          'wall_2dr':     32.50,
+          'base_1dr':     29.50,
+          'base_2dr':     39.50,
+          'drawer_bank':  47.50,
+          'sink_base':    38.50,
+          'tall_pantry':  89.50,
+          'tall_oven':    75.00,
+          'corner':       62.50,
+          'vanity':       47.50,
+          'accessory':     8.50,
+          'worktop':      32.50,
+      } ],
+
+      [ 'value_series_signature', {
+          'wall_1dr':      0.00,
+          'wall_2dr':      0.00,
+          'base_1dr':      0.00,
+          'base_2dr':      0.00,
+          'drawer_bank':   0.00,
+          'sink_base':     0.00,
+          'tall_pantry':   0.00,
+          'tall_oven':     0.00,
+          'corner':        0.00,
+          'accessory':     0.00,
+          'worktop':       0.00,
+      } ],
+
+      [ 'value_door_five_piece_woodgrain', {
+          'wall_1dr':     35.00,
+          'wall_2dr':     35.00,
+          'base_1dr':     35.00,
+          'base_2dr':     35.00,
+          'drawer_bank':  35.00,
+          'sink_base':    35.00,
+          'tall_pantry':  35.00,
+          'tall_oven':    35.00,
+          'corner':       35.00,
+          'vanity':       35.00,
+      } ],
+
+      [ 'value_accessory_soft_close', {
+          'wall_1dr':     15.00,
+          'wall_2dr':     15.00,
+          'base_1dr':     15.00,
+          'base_2dr':     15.00,
+          'drawer_bank':  15.00,
+          'sink_base':    15.00,
+          'tall_pantry':  15.00,
+          'tall_oven':    15.00,
+          'corner':       15.00,
+          'vanity':       15.00,
+      } ],
+
+      [ 'value_drawer_metal_blum', {
+          'base_1dr':     65.00,
+          'base_2dr':     65.00,
+          'drawer_bank':  65.00,
+          'tall_pantry':  65.00,
+          'corner':       65.00,
+          'vanity':       65.00,
+      } ],
+
+    ]"/>
+  </function>
+
+</odoo>
