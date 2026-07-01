@@ -24,6 +24,7 @@ import {
 } from "@southbrook_kitchen_3d_configurator/js/canvas/constants";
 import { loadThreeJS } from "@southbrook_kitchen_3d_configurator/js/canvas/three_loader";
 import { ndcFromEvent } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_helpers";
+import { computeViewSpecs } from "@southbrook_kitchen_3d_configurator/js/canvas/view_specs";
 
 const actionRegistry = registry.category("actions");
 
@@ -956,46 +957,11 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // ─── D1 — Multi-view camera system ──────────────────────────────────────────
-    // Compute view specs from current room dimensions. Each entry =
-    // { pos: Vector3, target: Vector3, up: Vector3, cam: 'ortho'|'persp',
-    //   vs?: number (ortho frustum half-height in scene-feet) }.
+    // Rec D · Sprint 2d step 4 — thin wrapper delegating to the
+    // shared pure function so <KitchenCanvas> can compute its own
+    // view specs. Same dict shape assigned to the same class ref.
     _recomputeViews(rw, rh, rd) {
-        const THREE = this.T.THREE;
-        const max3  = Math.max(rw, rd, rh);
-        const max2  = Math.max(rw, rd);
-        const wallH = Math.max(rw, rh);
-        const sideH = Math.max(rd, rh);
-        this.T.viewSpecs = {
-            iso:   { cam: "ortho",
-                     pos:    new THREE.Vector3(rw + 12, rh * 0.7 + 6, rd + 12),
-                     target: new THREE.Vector3(rw / 2, rh * 0.28, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     max3  * 0.68 + 4.5 },
-            top:   { cam: "ortho",
-                     pos:    new THREE.Vector3(rw / 2, rh + 20, rd / 2),
-                     target: new THREE.Vector3(rw / 2, 0, rd / 2),
-                     up:     new THREE.Vector3(0, 0, -1),
-                     vs:     max2  * 0.60 + 3.0 },
-            front: { cam: "ortho",
-                     pos:    new THREE.Vector3(rw / 2, rh / 2, rd + 18),
-                     target: new THREE.Vector3(rw / 2, rh / 2, 0),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     wallH * 0.60 + 2.0 },
-            left:  { cam: "ortho",
-                     pos:    new THREE.Vector3(-18, rh / 2, rd / 2),
-                     target: new THREE.Vector3(0, rh / 2, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     sideH * 0.60 + 2.0 },
-            right: { cam: "ortho",
-                     pos:    new THREE.Vector3(rw + 18, rh / 2, rd / 2),
-                     target: new THREE.Vector3(rw, rh / 2, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     sideH * 0.60 + 2.0 },
-            persp: { cam: "persp",
-                     pos:    new THREE.Vector3(rw + 10, rh * 0.9, rd + 10),
-                     target: new THREE.Vector3(rw / 2, rh * 0.35, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0) },
-        };
+        this.T.viewSpecs = computeViewSpecs(this.T.THREE, rw, rh, rd);
     }
 
     // Apply the current view's ortho frustum + the wheel-zoom multiplier.
