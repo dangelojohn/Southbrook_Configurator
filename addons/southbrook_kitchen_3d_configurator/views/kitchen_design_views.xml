@@ -107,6 +107,17 @@
                             string="Create Quotation"
                             class="btn-secondary"
                             invisible="not cabinet_line_ids or state == 'quoted' or state == 'ordered'"/>
+                    <!-- v19.0.5.6.0 — BOM autoseed workstream. Same
+                         target action; confirm_immediately context
+                         flips the SO to `sale` in place and returns
+                         the mrp.production surface instead of the
+                         SO form. -->
+                    <button name="action_create_quotation"
+                            type="object"
+                            string="Create &amp;amp; Confirm →"
+                            class="oe_highlight"
+                            context="{'confirm_immediately': True}"
+                            invisible="not cabinet_line_ids or state == 'quoted' or state == 'ordered'"/>
                     <button name="action_create_quotation"
                             type="object"
                             string="View Quotation"

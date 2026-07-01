@@ -1,7 +1,12 @@
+import json
+import logging
 import math
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
+
+
+_logger = logging.getLogger(__name__)
 
 
 class SouthbrookKitchenDesign(models.Model):
@@ -575,6 +580,95 @@ class SouthbrookKitchenDesign(models.Model):
         copy = self.copy({"name": "%s (Copy)" % self.name, "state": "draft"})
         return copy.action_open_configurator()
 
+    # ── BOM autoseed (v19.0.5.6.0) ─────────────────────────────────────────────
+    # Sprint 2d workstream that dodges the JS/canvas failure surface. The
+    # goal is narrow: at quote-time, for every unique product.template on
+    # the fresh SO, ensure a template-level mrp.bom stub exists. If one
+    # already does, no-op — this method must be safely re-callable across
+    # multiple designs that share templates.
+    #
+    # Panel geometry is computed via southbrook_estimating.mrp_bom.
+    # _compute_panel_dimensions (the single canonical Custom Routine #1)
+    # and persisted as a JSON blob on the note field until raw-material
+    # product.product records exist. bom_line_ids stays empty; the shop
+    # team fills it in manually or a follow-up commit wires it up.
+    def _ensure_kitchen_bom(self, product_tmpl):
+        """Idempotently seed a template-level mrp.bom stub.
+
+        Returns the existing (or newly-created) mrp.bom record. Safe to
+        call from a quote-time loop — repeated calls on the same
+        template are no-ops.
+        """
+        self.ensure_one()
+        if not product_tmpl:
+            return self.env["mrp.bom"]
+
+        Bom = self.env["mrp.bom"].sudo()
+
+        # Fast path — the template already carries a normal-type BOM.
+        existing = product_tmpl.bom_ids.filtered(lambda b: b.type == "normal")
+        if existing:
+            return existing[:1]
+
+        # Inches → mm (25.4). Templates carry the inch-native fields
+        # exposed by southbrook_kitchen_3d_configurator.product_template;
+        # _compute_panel_dimensions is metric per NF14.
+        w_in = product_tmpl.southbrook_width_in or 24.0
+        h_in = product_tmpl.southbrook_height_in or 34.5
+        d_in = product_tmpl.southbrook_depth_in or 24.0
+        width_mm = w_in * 25.4
+        height_mm = h_in * 25.4
+        depth_mm = d_in * 25.4
+
+        ct = product_tmpl.southbrook_cabinet_type or "base"
+        family_map = {
+            "base":   "base",
+            "wall":   "wall",
+            "tall":   "tall",
+            "corner": "corner",
+            "filler": "accessory",
+            "panel":  "accessory",
+        }
+        family = family_map.get(ct, "base")
+
+        # Rule 3 (Southbrook_Excel_to_Odoo_Mapping.md §3.4) — width →
+        # door count for base/wall/tall. Accessories emit no door.
+        if family == "accessory":
+            door_count = 0
+        elif w_in >= 24.0:
+            door_count = 2
+        else:
+            door_count = 1
+
+        panel = Bom._compute_panel_dimensions(
+            width_mm=width_mm,
+            height_mm=height_mm,
+            depth_mm=depth_mm,
+            family=family,
+            door_count=door_count,
+            drawer_count=0,
+            finished_sides="none",
+        )
+
+        default_code = product_tmpl.default_code or ("TMPL-%d" % product_tmpl.id)
+        bom = Bom.create({
+            "product_tmpl_id": product_tmpl.id,
+            "type":            "normal",
+            "product_qty":     1.0,
+            "code":            "KitchenAutoSeed-%s" % default_code,
+            "bom_line_ids":    [],
+            # Panel geometry as JSON on the note field. When raw-material
+            # product.product records exist a follow-up commit walks this
+            # blob and materialises bom_line_ids from it.
+            "note": json.dumps(
+                panel, default=str, sort_keys=True, indent=2,
+            ),
+        })
+        _logger.info(
+            "auto-seeded BOM for %s", product_tmpl.display_name,
+        )
+        return bom
+
     def action_create_quotation(self):
         SaleOrder = self.env["sale.order"]
         for design in self:
@@ -637,8 +731,54 @@ class SouthbrookKitchenDesign(models.Model):
             if pricelist:
                 vals["pricelist_id"] = pricelist.id
             order = SaleOrder.create(vals)
+
+            # ── BOM autoseed (v19.0.5.6.0) ─────────────────────────────
+            # For every unique product_tmpl on the fresh SO, make sure
+            # a template-level mrp.bom stub exists. Idempotent per
+            # _ensure_kitchen_bom. Wrapped so per-template failures
+            # don't block quote creation — the D12 pre-quote
+            # MISSING_BOM gate already flags absent BOMs as blocking
+            # upstream, so this is defence-in-depth on the forward path.
+            templates = order.order_line.mapped("product_id.product_tmpl_id")
+            for tmpl in templates:
+                try:
+                    design._ensure_kitchen_bom(tmpl)
+                except UserError as e:
+                    _logger.warning(
+                        "BOM autoseed skipped for %s on SO %s: %s",
+                        tmpl.display_name, order.name, e,
+                    )
+
             design.sale_order_id = order.id
             design.state = "quoted"
+
+            # Optional confirm-immediately flow driven by the
+            # "Create & Confirm →" button (context={'confirm_
+            # immediately': True}). Confirms the SO in place and
+            # pivots the return action from SO form to mrp.production.
+            if self.env.context.get("confirm_immediately"):
+                order.action_confirm()
+                Mo = self.env["mrp.production"].sudo()
+                mos = Mo.search([("origin", "=", order.name)])
+                if len(mos) == 1:
+                    return {
+                        "type":      "ir.actions.act_window",
+                        "res_model": "mrp.production",
+                        "res_id":    mos.id,
+                        "views":     [(False, "form")],
+                        "view_mode": "form",
+                        "target":    "current",
+                    }
+                # Zero-MO or multi-MO — send to origin-filtered list.
+                return {
+                    "type":      "ir.actions.act_window",
+                    "name":      "Manufacturing Orders (%s)" % order.name,
+                    "res_model": "mrp.production",
+                    "views":     [(False, "list"), (False, "form")],
+                    "view_mode": "list,form",
+                    "domain":    [("origin", "=", order.name)],
+                    "target":    "current",
+                }
         return {
             "type":      "ir.actions.act_window",
             "res_model": "sale.order",
