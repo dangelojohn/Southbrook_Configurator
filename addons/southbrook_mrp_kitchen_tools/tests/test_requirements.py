@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Commit-3 tests: workcenter + operation tool requirements, tool kits."""
+import uuid
+
 from odoo.exceptions import ValidationError
 from odoo.tests import TransactionCase, tagged
 
@@ -85,6 +87,11 @@ class TestToolKit(TransactionCase):
         self.assertEqual(kit.line_count, 2)
 
     def test_kit_code_unique(self):
-        self.Kit.create({"code": "UTEST-KIT-DUP", "name": "first"})
-        with self.assertRaises(Exception):
-            self.Kit.create({"code": "UTEST-KIT-DUP", "name": "second"})
+        # Dynamic code prevents cross-run + cross-class collisions on the
+        # UNIQUE(code) constraint; savepoint wrapper isolates the expected
+        # IntegrityError from the outer TransactionCase transaction so
+        # rollback stays clean.
+        code = f"UTEST-KIT-DUP-{uuid.uuid4().hex[:8]}"
+        self.Kit.create({"code": code, "name": "first"})
+        with self.assertRaises(Exception), self.env.cr.savepoint():
+            self.Kit.create({"code": code, "name": "second"})
