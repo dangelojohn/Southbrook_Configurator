@@ -1049,6 +1049,44 @@ class SouthbrookKitchenConfigurator extends Component {
             }
             return;
         }
+
+        // Delete / Backspace — remove the selected item (any type: base,
+        // wall, tall, corner, filler, panel) from the layout AND the
+        // quote. _removeSelectedCabinet already splices the item out of
+        // state.items and calls _queueAutoSave which persists the design
+        // to the server (drives southbrook.kitchen.design.line records —
+        // the quote source). Standard 3D-editor UX (Blender / SketchUp /
+        // Fusion keybinding).
+        //
+        // Guarded against firing when the user is typing in a text
+        // input, textarea, or contentEditable region so we don't hijack
+        // Backspace inside inline edits (width entry, notes, room name,
+        // inventory search).
+        if (k === "Delete" || k === "Backspace") {
+            const t = e.target;
+            const inEditable = t && (
+                t.tagName === "INPUT"
+                || t.tagName === "TEXTAREA"
+                || t.tagName === "SELECT"
+                || t.isContentEditable
+            );
+            if (inEditable) return;
+            if (!this.state.selected) return;
+            const doomed = this.state.selected;
+            const doomedName = doomed.product_name || doomed.name
+                || doomed.layout_key || "item";
+            const doomedType = doomed.cabinet_type || "item";
+            e.preventDefault();
+            this._removeSelectedCabinet();
+            if (this.notification && this.notification.add) {
+                this.notification.add(
+                    "Removed " + doomedName + " (" + doomedType +
+                    ") from the layout and quote.",
+                    { type: "info" }
+                );
+            }
+            return;
+        }
     }
 
     // D6 — cycle selection through selectable items (bases then walls,
