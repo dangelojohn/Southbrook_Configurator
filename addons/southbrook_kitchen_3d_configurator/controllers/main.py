@@ -360,6 +360,11 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
                 "x_position_in":  item.get("x_position_in", 0),
                 "y_position_in":  item.get("y_position_in", 0),
                 "z_position_in":  item.get("z_position_in", 0),
+                # v19.0.4.20.0 — Smart-pinning (Option C): persist per-line
+                # manual-move + rotation so a reload restores the user's
+                # placement instead of the /layout auto-generated one.
+                "pinned":         bool(item.get("pinned")),
+                "rotation_deg":   float(item.get("rotation_deg") or 0.0),
                 "layout_key":     layout_key,
                 "origin":         "configurator",
             }
@@ -382,6 +387,118 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             "id":   design.id,
             "name": design.display_name,
         }
+
+    # ── v19.0.4.20.0 · Smart-pinning RPC surface ─────────────────────────────────
+    # Three lightweight routes so the client can persist a single
+    # cabinet's placement (or unlink it) without triggering the full
+    # save_design write-cycle. Called on pointer-up after a drag, on
+    # R-key rotation, and on Delete/Backspace.
+    #
+    #   /load_design_lines  → returns the design's configurator-origin
+    #                         lines as {layout_key: item-dict} so the
+    #                         client can rehydrate a saved manual
+    #                         placement instead of throwing it away.
+    #   /save_position      → writes x_position_in / y_position_in /
+    #                         z_position_in / rotation_deg / pinned on
+    #                         a single line, matched by layout_key.
+    #   /delete_line        → unlinks a single configurator-origin
+    #                         line, matched by layout_key.
+    #
+    # None of these touch manual-origin lines. save_position + delete_line
+    # silently no-op when the target design/line isn't found or the
+    # calling user lacks write access — surfacing an error would hijack
+    # the drag UX.
+    @http.route(
+        "/southbrook_kitchen/configurator/load_design_lines",
+        type="json", auth="user", methods=["POST"],
+    )
+    def load_design_lines(self, design_id):
+        design = request.env["southbrook.kitchen.design"].browse(int(design_id or 0))
+        if not design.exists():
+            return {"lines": []}
+        try:
+            design.check_access("read")
+        except Exception:
+            return {"lines": []}
+        lines = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator"
+        )
+        out = []
+        for line in lines:
+            product = line.product_id
+            out.append({
+                "id":             product.id,
+                "product_id":     product.id,
+                "product_name":   product.display_name,
+                "layout_key":     line.layout_key,
+                "cabinet_type":   line.cabinet_type,
+                "width_in":       line.width_in,
+                "height_in":      line.height_in,
+                "depth_in":       line.depth_in,
+                "x_position_in":  line.x_position_in,
+                "y_position_in":  line.y_position_in,
+                "z_position_in":  line.z_position_in,
+                "rotation_deg":   line.rotation_deg,
+                "pinned":         line.pinned,
+                "price":          line.price_unit,
+                "quantity":       line.quantity,
+            })
+        return {"lines": out}
+
+    @http.route(
+        "/southbrook_kitchen/configurator/save_position",
+        type="json", auth="user", methods=["POST"],
+    )
+    def save_position(self, design_id, layout_key, x_position_in=None,
+                      y_position_in=None, z_position_in=None,
+                      rotation_deg=None, pinned=None):
+        design = request.env["southbrook.kitchen.design"].browse(int(design_id or 0))
+        if not design.exists() or not layout_key:
+            return {"ok": False, "reason": "not_found"}
+        try:
+            design.check_access("write")
+        except Exception:
+            return {"ok": False, "reason": "forbidden"}
+        line = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator"
+                      and l.layout_key == layout_key
+        )[:1]
+        if not line:
+            return {"ok": False, "reason": "no_matching_line"}
+        vals = {}
+        if x_position_in is not None:
+            vals["x_position_in"] = float(x_position_in)
+        if y_position_in is not None:
+            vals["y_position_in"] = float(y_position_in)
+        if z_position_in is not None:
+            vals["z_position_in"] = float(z_position_in)
+        if rotation_deg is not None:
+            vals["rotation_deg"] = float(rotation_deg) % 360.0
+        if pinned is not None:
+            vals["pinned"] = bool(pinned)
+        if vals:
+            line.write(vals)
+        return {"ok": True, "id": line.id}
+
+    @http.route(
+        "/southbrook_kitchen/configurator/delete_line",
+        type="json", auth="user", methods=["POST"],
+    )
+    def delete_line(self, design_id, layout_key):
+        design = request.env["southbrook.kitchen.design"].browse(int(design_id or 0))
+        if not design.exists() or not layout_key:
+            return {"ok": False, "reason": "not_found"}
+        try:
+            design.check_access("write")
+        except Exception:
+            return {"ok": False, "reason": "forbidden"}
+        line = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator"
+                      and l.layout_key == layout_key
+        )
+        n = len(line)
+        line.unlink()
+        return {"ok": True, "removed": n}
 
     # ── Helpers ──────────────────────────────────────────────────────────────────
     def _validate_end_cap_panel_placement(self, items, tol=0.5):

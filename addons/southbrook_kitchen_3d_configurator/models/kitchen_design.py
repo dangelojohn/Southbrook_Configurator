@@ -555,6 +555,31 @@ class SouthbrookKitchenDesignLine(models.Model):
     y_position_in = fields.Float(string="Y Position (in)", digits=(6, 2))
     z_position_in = fields.Float(string="Z Position (in)", digits=(6, 2))
 
+    # 2026-07-01 v19.0.4.20.0 — Smart-pinning (Option C).
+    # `pinned` is flipped True the first time the user manually
+    # drags or rotates this cabinet in the 3D configurator. Once
+    # pinned, the client-side auto-pack (_recomputeLayoutFromItems)
+    # and the server /layout regenerator both treat this line as
+    # immovable: its x_position_in / z_position_in / rotation_deg
+    # are the source of truth, and un-pinned neighbours pack around
+    # it. `rotation_deg` is 0/90/180/270 (Y-axis) applied to the
+    # cabinet's mesh in the scene and, when persisted, to the
+    # nested BOM's rendered orientation.
+    pinned = fields.Boolean(
+        string="Manually Placed",
+        default=False,
+        copy=True,
+        help="True when the user has manually dragged or rotated this "
+             "cabinet; auto-layout will not move or reflow it.",
+    )
+    rotation_deg = fields.Float(
+        string="Rotation (deg)",
+        digits=(6, 2),
+        default=0.0,
+        copy=True,
+        help="Y-axis rotation in degrees (0/90/180/270 in normal use).",
+    )
+
     # Computed display
     position_label = fields.Char(
         string="Position",
