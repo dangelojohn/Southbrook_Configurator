@@ -1,6 +1,7 @@
 // ─── Design tokens ────────────────────────────────────────────────────────────
 $sbk-black:      #111111;
 $sbk-dark:       #1A1A1A;
+$sbk-ink:        #1A1A1A;  // alias for input/text foreground; used on lines 330/353/860 (added 2026-06-30 to unbreak web.assets_web SCSS compile)
 $sbk-mid:        #4A4E57;
 $sbk-muted:      #888D96;
 $sbk-border:     #DDD8D0;
