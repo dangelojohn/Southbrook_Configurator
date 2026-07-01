@@ -25,6 +25,7 @@ import {
 import { loadThreeJS } from "@southbrook_kitchen_3d_configurator/js/canvas/three_loader";
 import { ndcFromEvent } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_helpers";
 import { computeViewSpecs } from "@southbrook_kitchen_3d_configurator/js/canvas/view_specs";
+import { makeMesh } from "@southbrook_kitchen_3d_configurator/js/canvas/mesh_factory";
 
 const actionRegistry = registry.category("actions");
 
@@ -1314,25 +1315,14 @@ class SouthbrookKitchenConfigurator extends Component {
         this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = []; this.T.handleMesh = null;
         this.T.arrowMeshes = [];
 
-        // Helper: make + add mesh — now PBR (MeshStandardMaterial).
-        // opts.rough / opts.metal control the PBR contract; if absent
-        // we default to a matte-carcass profile (rough=0.7, metal=0.0).
-        // cs/rs flags toggle shadow casting/receiving as before.
-        const mk = (geo, color, pos, rotE, opts = {}) => {
-            const mat = new THREE.MeshStandardMaterial({
-                color,
-                roughness: opts.rough != null ? opts.rough : 0.7,
-                metalness: opts.metal != null ? opts.metal : 0.0,
-            });
-            const m = new THREE.Mesh(geo, mat);
-            m.position.set(...pos);
-            if (rotE) { m.rotation.x = rotE[0]; m.rotation.y = rotE[1]; m.rotation.z = rotE[2]; }
-            if (opts.cs) m.castShadow    = true;
-            if (opts.rs) m.receiveShadow = true;
-            if (opts.ud) m.userData      = opts.ud;
-            scene.add(m);
-            return m;
-        };
+        // Rec D · Sprint 2d step 5 — thin closure over the shared
+        // makeMesh factory so the ~40 call sites below stay
+        // signature-compatible with the pre-2d code (`mk(geo, color,
+        // pos, rotE, opts)`) while the actual mesh construction lives
+        // in canvas/mesh_factory.esm.js for future <KitchenCanvas>
+        // reuse.
+        const mk = (geo, color, pos, rotE, opts) =>
+            makeMesh(THREE, scene, geo, color, pos, rotE, opts);
 
         // ── Room shell ── (matte plaster + flooring; high roughness)
         const floor = mk(new THREE.PlaneGeometry(rw, rd), P.floor, [rw/2, 0, rd/2], [-Math.PI/2, 0, 0], { rs: true, rough: 0.95, metal: 0.0 });
