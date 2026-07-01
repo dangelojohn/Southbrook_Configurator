@@ -119,6 +119,11 @@ class SouthbrookKitchenConfigurator extends Component {
             warnings:            [],
             // D13 — searchable inventory + drag-and-drop add.
             inventorySearch: "",
+            // Category filter pill selection. Values: "all" |
+            // "base" | "wall" | "tall" | "panels". Tab click toggles
+            // this; _filteredProducts() applies it BEFORE the search
+            // filter so users can narrow to "wall" then type a size.
+            inventoryCategory: "all",
             dragHover:       false,
             // D16 — Track which product is being dragged from the
             // inventory so the canvas can highlight the matching
@@ -338,11 +343,31 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // ─── D13 — Searchable inventory + drag-and-drop add ─────────────────────────
-    // Case-insensitive filter across name / SKU / cabinet type / material.
-    // Returns the full catalog when the search box is empty.
+    // Category tabs first, then case-insensitive text search across
+    // name / SKU / cabinet type / material / door-style. Both empty →
+    // full catalog. INVENTORY_CATEGORY_MAP maps each tab key to the
+    // cabinet_type values it should include; keeping the map next to
+    // the filter keeps the tab UI and the data contract in one place.
+    _inventoryCategoryTypes(key) {
+        return ({
+            all:      null,   // null = passthrough (no cabinet_type filter)
+            base:     ["base"],
+            wall:     ["wall"],
+            tall:     ["tall", "corner"],
+            panels:   ["filler", "panel"],
+        })[key] || null;
+    }
+
+    _productsByCategory(key) {
+        const types = this._inventoryCategoryTypes(key);
+        const list = this.state.products || [];
+        if (!types) return list;
+        return list.filter(p => types.includes(p.cabinet_type));
+    }
+
     _filteredProducts() {
         const q = (this.state.inventorySearch || "").toLowerCase().trim();
-        const list = this.state.products || [];
+        const list = this._productsByCategory(this.state.inventoryCategory || "all");
         if (!q) return list;
         return list.filter(p =>
             (p.name && p.name.toLowerCase().includes(q)) ||
@@ -351,6 +376,16 @@ class SouthbrookKitchenConfigurator extends Component {
             (p.material && p.material.toLowerCase().includes(q)) ||
             (p.door_style && p.door_style.toLowerCase().includes(q))
         );
+    }
+
+    // Tab count badges — only compute against the raw catalog so a
+    // typed search doesn't shrink the visible tab counts.
+    _categoryCount(key) {
+        return this._productsByCategory(key).length;
+    }
+
+    _setInventoryCategory(key) {
+        this.state.inventoryCategory = key;
     }
 
     _onSearchInput(ev) {
@@ -1977,6 +2012,51 @@ SouthbrookKitchenConfigurator.template = xml`
         <span class="o_sbk_inv_count">
           <t t-esc="_filteredProducts().length"/> / <t t-esc="state.products.length"/>
         </span>
+      </div>
+
+      <!-- Category filter pills. Tabs with zero items are hidden so
+           the bar stays compact as SKUs grow into new categories.
+           Active pill highlights in $sbk-accent. -->
+      <div class="o_sbk_inv_tabs" role="tablist" aria-label="Filter by product category">
+        <button role="tab"
+                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'all' ? ' is-active' : '')"
+                t-att-aria-selected="state.inventoryCategory === 'all' ? 'true' : 'false'"
+                t-on-click="() => this._setInventoryCategory('all')">
+          All
+          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('all')"/></span>
+        </button>
+        <button role="tab"
+                t-if="_categoryCount('base') &gt; 0"
+                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'base' ? ' is-active' : '')"
+                t-att-aria-selected="state.inventoryCategory === 'base' ? 'true' : 'false'"
+                t-on-click="() => this._setInventoryCategory('base')">
+          Base
+          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('base')"/></span>
+        </button>
+        <button role="tab"
+                t-if="_categoryCount('wall') &gt; 0"
+                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'wall' ? ' is-active' : '')"
+                t-att-aria-selected="state.inventoryCategory === 'wall' ? 'true' : 'false'"
+                t-on-click="() => this._setInventoryCategory('wall')">
+          Wall
+          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('wall')"/></span>
+        </button>
+        <button role="tab"
+                t-if="_categoryCount('tall') &gt; 0"
+                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'tall' ? ' is-active' : '')"
+                t-att-aria-selected="state.inventoryCategory === 'tall' ? 'true' : 'false'"
+                t-on-click="() => this._setInventoryCategory('tall')">
+          Tall
+          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('tall')"/></span>
+        </button>
+        <button role="tab"
+                t-if="_categoryCount('panels') &gt; 0"
+                t-att-class="'o_sbk_inv_tab' + (state.inventoryCategory === 'panels' ? ' is-active' : '')"
+                t-att-aria-selected="state.inventoryCategory === 'panels' ? 'true' : 'false'"
+                t-on-click="() => this._setInventoryCategory('panels')">
+          Panels
+          <span class="o_sbk_inv_tab_count"><t t-esc="_categoryCount('panels')"/></span>
+        </button>
       </div>
 
       <!-- D13 — Searchable inventory. Filters by name, SKU, cabinet

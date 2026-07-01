@@ -383,6 +383,62 @@ $sbk-amber:      #B45309;
     color: $sbk-muted;
     font-variant-numeric: tabular-nums;
 }
+
+// Category filter pills — compact row above the search box.
+.o_sbk_inv_tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 8px 0 4px;
+}
+
+.o_sbk_inv_tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    background: transparent;
+    border: 1px solid $sbk-border;
+    border-radius: 999px;
+    color: $sbk-mid;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+
+    &:hover:not(.is-active) {
+        background: $sbk-bg;
+        border-color: $sbk-muted;
+    }
+
+    &.is-active {
+        background: $sbk-accent;
+        border-color: $sbk-accent;
+        color: $sbk-white;
+
+        .o_sbk_inv_tab_count {
+            background: rgba(255, 255, 255, 0.22);
+            color: $sbk-white;
+        }
+    }
+}
+
+.o_sbk_inv_tab_count {
+    background: $sbk-accent-bg;
+    color: $sbk-accent;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    min-width: 16px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
 .o_sbk_inv_search {
     position: relative;
     margin: 8px 0 6px;
