@@ -1,0 +1,233 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+"""Recommendation D — Sprint 1 reconciliation cron.
+
+One-way mirror: `southbrook.kitchen.design(.line)` (source of truth in
+Sprint 1) → `southbrook.room` + `southbrook.room.wall` +
+`sale.order.line` (Rec D authoritative graph from Sprint 2 onward).
+
+Runs every 5 minutes. Only touches designs whose write_date is newer
+than the last successful run (stored in ir.config_parameter). Logs
+divergence between design.estimated_price and the summed
+sale.order line totals but does NOT auto-heal — flagged for manual
+review during Sprint 1 to build confidence before Sprint 2 flips the
+direction.
+
+Sprint 2 will add the reverse cron; Sprint 3 will delete this cron
+after retiring the design model.
+"""
+
+import logging
+
+from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
+
+# 25.4 mm per inch — canonical conversion used both here and in
+# southbrook_estimating's room_api.py for cross-controller parity.
+IN_TO_MM = 25.4
+
+# Config-param key tracking the last successful cron run so re-runs
+# skip untouched designs. Never manually reset — use TaskUpdate on
+# the cron record itself to force a full re-scan.
+_LAST_RUN_KEY = "southbrook.rec_d.design_reconcile.last_run"
+
+
+class SouthbrookDesignReconcile(models.AbstractModel):
+    """Rec D Sprint 1 · one-way mirror design → room + SO line graph.
+
+    Abstract because there's no persistent state — the cron just
+    iterates recent designs and writes into the target graph.
+    """
+
+    _name = "southbrook.design.reconcile"
+    _description = "Rec D Sprint 1 · Design → Room reconciliation"
+
+    # ── Public cron entrypoint ─────────────────────────────────────
+    @api.model
+    def cron_reconcile_designs(self, batch_limit=200):
+        """Runs every 5 min via ir.cron. Reads modified designs, mirrors
+        them into rooms + sale.order.line. Never destroys authoring
+        data on the design side; logs divergence for manual review.
+        """
+        params = self.env["ir.config_parameter"].sudo()
+        last_run_iso = params.get_param(_LAST_RUN_KEY) or "1970-01-01 00:00:00"
+
+        Design = self.env["southbrook.kitchen.design"]
+        domain = [("write_date", ">", last_run_iso)]
+        designs = Design.search(domain, order="write_date", limit=batch_limit)
+
+        # Stamp the new watermark BEFORE writing so a partial run doesn't
+        # re-process the same batch. Any failures inside the loop are
+        # logged individually; the cron self-heals on the next tick.
+        if designs:
+            new_watermark = max(d.write_date for d in designs)
+            params.set_param(_LAST_RUN_KEY, str(new_watermark))
+
+        stats = {"mirrored": 0, "created_orders": 0, "created_rooms": 0,
+                 "created_lines": 0, "divergence": 0, "errors": 0}
+        for design in designs:
+            # Per-design SAVEPOINT so a failure on one design doesn't
+            # poison the whole batch (Postgres aborts the outer txn on
+            # any error — savepoints let us rollback to a clean state
+            # and continue with the next design).
+            try:
+                with self.env.cr.savepoint():
+                    self._reconcile_one(design, stats)
+            except Exception as e:                      # noqa: BLE001
+                _logger.warning(
+                    "[sb.rec_d] reconcile failed for design id=%s (%s): %s",
+                    design.id, design.name, e,
+                    exc_info=True,
+                )
+                stats["errors"] += 1
+
+        if designs:
+            _logger.info(
+                "[sb.rec_d] reconciled batch of %d designs: %s",
+                len(designs), stats,
+            )
+        return stats
+
+    # ── Per-design reconciliation ──────────────────────────────────
+    def _reconcile_one(self, design, stats):
+        # 1) Ensure the design has a sale.order shell. Copies the
+        #    channel-priced structure from action_create_quotation
+        #    for a design that hasn't been quoted yet.
+        SaleOrder = self.env["sale.order"]
+        if not design.sale_order_id:
+            partner = design.partner_id
+            # sale.order.partner_id has a NOT NULL DB constraint. All
+            # 18 existing designs at the time of Sprint-1 rollout are
+            # partner-less scratchpads (per the 2026-07-01 audit data-
+            # hygiene finding). Skip them until a customer is
+            # assigned — the next cron tick after that write picks
+            # them up automatically.
+            if not partner:
+                _logger.info(
+                    "[sb.rec_d] skipping design id=%s — no partner "
+                    "assigned yet (will reconcile once customer is "
+                    "set)", design.id,
+                )
+                stats["skipped_no_partner"] = stats.get("skipped_no_partner", 0) + 1
+                return
+            vals = {
+                "partner_id":  partner.id,
+                "origin":      design.name,
+                "note":        design.notes or "",
+                "state":       "draft",
+            }
+            if hasattr(SaleOrder, "_resolve_channel_pricelist"):
+                pricelist = SaleOrder._resolve_channel_pricelist(partner)
+                if pricelist:
+                    vals["pricelist_id"] = pricelist.id
+            order = SaleOrder.sudo().create(vals)
+            design.sudo().sale_order_id = order.id
+            stats["created_orders"] += 1
+
+        # 2) Ensure the sale.order has one southbrook.room. Room dims
+        #    come from the design; the reverse-cron in Sprint 2 will
+        #    flip the direction so room edits propagate back to the
+        #    design during the deprecation window.
+        Room = self.env["southbrook.room"]
+        room = design.room_id
+        if not room:
+            room = Room.sudo().create({
+                "order_id":              design.sale_order_id.id,
+                "name":                  design.name or "Kitchen",
+                "room_type":             "kitchen",
+                "layout_shape":          "straight",
+                "ceiling_height_mm":     int(round((design.room_height_in or 0) * IN_TO_MM)),
+                "unit_preference":       "imperial",
+                "sb_soffit_height_mm":   int(round((design.soffit_height_in or 0) * IN_TO_MM)),
+                "sb_wall_cab_top_alignment": design.wall_cab_top_alignment or "fixed_gap",
+                "sb_filler_strategy":    design.filler_strategy or "split",
+                "sb_design_state":       design.state,
+                "x_kitchen_image":       design.x_kitchen_image or False,
+            })
+            design.sudo().room_id = room.id
+            stats["created_rooms"] += 1
+        else:
+            # Refresh scalars — a designer editing the design after
+            # a prior reconciliation must see updated room dims.
+            room.sudo().write({
+                "ceiling_height_mm":     int(round((design.room_height_in or 0) * IN_TO_MM)),
+                "sb_soffit_height_mm":   int(round((design.soffit_height_in or 0) * IN_TO_MM)),
+                "sb_wall_cab_top_alignment": design.wall_cab_top_alignment or "fixed_gap",
+                "sb_filler_strategy":    design.filler_strategy or "split",
+                "sb_design_state":       design.state,
+                "x_kitchen_image":       design.x_kitchen_image or False,
+            })
+
+        # 3) Ensure one synthetic wall spanning the design's room_width_in.
+        #    Sprint 2 introduces multi-wall room shapes (L/U/G/galley);
+        #    for Sprint 1 the design's flat room maps to a single wall.
+        Wall = self.env["southbrook.room.wall"]
+        wall = room.wall_ids[:1]
+        wall_length_mm = int(round((design.room_width_in or 0) * IN_TO_MM))
+        if not wall:
+            wall = Wall.sudo().create({
+                "room_id":            room.id,
+                "name":               "Wall A",
+                "length_mm":          wall_length_mm,
+                "wall_order":         10,
+                "has_base_cabinets":  True,
+                "has_upper_cabinets": True,
+                "has_tall_cabinets":  True,
+            })
+        elif wall.length_mm != wall_length_mm:
+            wall.sudo().length_mm = wall_length_mm
+
+        # 4) Mirror each configurator-origin design.line into a SO line.
+        Line = self.env["sale.order.line"]
+        for dline in design.cabinet_line_ids:
+            if dline.origin != "configurator":
+                # Manual-origin lines are user-authored on the design's
+                # backend form and reconciled Sprint 2. Skip in Sprint 1.
+                continue
+            sol = dline.sale_order_line_id
+            line_vals = {
+                "order_id":              design.sale_order_id.id,
+                "product_id":            dline.product_id.id,
+                "product_uom_qty":       dline.quantity,
+                "price_unit":            dline.price_unit,
+                "wall_id":               wall.id,
+                "position_from_left_mm": int(round((dline.x_position_in or 0) * IN_TO_MM)),
+                "sb_layout_x_mm":        (dline.x_position_in or 0) * IN_TO_MM,
+                "sb_layout_y_mm":        (dline.y_position_in or 0) * IN_TO_MM,
+                "sb_layout_z_mm":        (dline.z_position_in or 0) * IN_TO_MM,
+                "sb_layout_rotation_deg": dline.rotation_deg or 0,
+                "sb_layout_pinned":      bool(dline.pinned),
+                "sb_layout_key":         dline.layout_key or f"design-{design.id}-line-{dline.id}",
+                "sb_layout_origin":      "configurator",
+                "zone":                  dline.zone or False,
+            }
+            if not sol:
+                sol = Line.sudo().create(line_vals)
+                dline.sudo().sale_order_line_id = sol.id
+                stats["created_lines"] += 1
+            else:
+                sol.sudo().write(line_vals)
+
+        # 5) Unlink SO lines whose design.line disappeared. Only touches
+        #    configurator-origin SO lines to protect manually-added ones.
+        existing_dline_keys = {dl.layout_key or f"design-{design.id}-line-{dl.id}"
+                                for dl in design.cabinet_line_ids
+                                if dl.origin == "configurator"}
+        stale = Line.sudo().search([
+            ("order_id",         "=", design.sale_order_id.id),
+            ("sb_layout_origin", "=", "configurator"),
+            ("sb_layout_key",    "not in", list(existing_dline_keys) or [False]),
+        ])
+        if stale:
+            stale.unlink()
+
+        # 6) Divergence sensor — log-only, no auto-heal in Sprint 1.
+        so_total = sum(l.price_subtotal or 0 for l in design.sale_order_id.order_line)
+        if abs(so_total - (design.estimated_price or 0)) > 0.5:
+            _logger.warning(
+                "[sb.rec_d] price divergence on design id=%s: design=%.2f, SO=%.2f",
+                design.id, design.estimated_price or 0, so_total,
+            )
+            stats["divergence"] += 1
+
+        stats["mirrored"] += 1

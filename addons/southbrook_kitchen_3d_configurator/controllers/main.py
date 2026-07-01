@@ -342,9 +342,52 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         # primary UX signal.
         self._validate_end_cap_panel_placement(items)
 
+        # 2026-07-01 E2E audit — enforce the /products catalog contract
+        # on the save_design payload. The client posts product_ids
+        # sourced from the /products response (main.py:31-34 filters on
+        # southbrook_is_cabinet=True AND sale_ok=True), but the old
+        # loop just browsed whatever id the client shipped: an authed
+        # user could persist configurator lines pointing at archived,
+        # non-cabinet, or ACL-restricted products (implicit info-
+        # disclosure once /load_design_lines mirrors them back). Use
+        # search() so ir.rule + domain filter apply in one shot —
+        # rejected ids are logged + skipped per-line, the rest of the
+        # save proceeds. This mirrors the ACL discipline already used
+        # by save_position / delete_line / load_design_lines
+        # (check_access at :420 / :459 / :492).
+        Product = request.env["product.product"]
         incoming_keys = set()
         for seq, item in enumerate(items, start=1):
-            product = request.env["product.product"].browse(int(item["product_id"]))
+            try:
+                pid = int(item["product_id"])
+            except (KeyError, TypeError, ValueError):
+                _logger.warning(
+                    "save_design: item[%d] missing/invalid product_id (%r); "
+                    "skipping",
+                    seq, item.get("product_id"),
+                )
+                continue
+            product = Product.search([
+                ("id", "=", pid),
+                ("product_tmpl_id.southbrook_is_cabinet", "=", True),
+                ("sale_ok", "=", True),
+            ], limit=1)
+            if not product:
+                # Either the id doesn't exist, the caller can't read
+                # it, the template isn't tagged as a Southbrook cabinet,
+                # or it's not sale_ok. Reject in one branch — the
+                # client never gets to distinguish "which of those"
+                # (avoids existence-oracle leak; matches the
+                # AccessError convention set by southbrook_estimating_
+                # website/controllers/room_api.py:_get_room_scoped).
+                _logger.warning(
+                    "save_design: rejected product_id=%d on design=%s "
+                    "(fails /products catalog contract: must be "
+                    "southbrook_is_cabinet=True AND sale_ok=True AND "
+                    "readable by user)",
+                    pid, design.id,
+                )
+                continue
             tmpl    = product.product_tmpl_id
             layout_key = item.get("layout_key") or "auto-%d" % seq
             incoming_keys.add(layout_key)

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Recommendation D · Sprint 1 · one-way reconciliation cron.
+
+  Runs every 5 min. Reads southbrook.kitchen.design records whose
+  write_date is newer than the last successful run watermark
+  (ir.config_parameter `southbrook.rec_d.design_reconcile.last_run`)
+  and mirrors them into southbrook.room + southbrook.room.wall +
+  sale.order.line. One-way in Sprint 1 (design → room graph);
+  Sprint 2 will add the reverse cron; Sprint 3 will remove this cron
+  along with the deprecated design model.
+
+  noupdate="1" so ops-side interval / active tweaks (e.g. temporarily
+  pausing the cron during a heavy migration) survive a module -u.
+-->
+<odoo>
+    <data noupdate="1">
+
+        <record id="ir_cron_rec_d_reconcile_designs" model="ir.cron">
+            <field name="name">Rec D · Sprint 1 · Reconcile Kitchen Designs → Rooms</field>
+            <field name="model_id" ref="model_southbrook_design_reconcile"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_reconcile_designs()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

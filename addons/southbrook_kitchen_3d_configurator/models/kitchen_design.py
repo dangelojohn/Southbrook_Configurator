@@ -29,6 +29,23 @@ class SouthbrookKitchenDesign(models.Model):
     sale_order_id = fields.Many2one("sale.order", string="Quotation", readonly=True)
     notes = fields.Text(string="Design Notes")
 
+    # ── Recommendation D · Sprint 1 bridge field ────────────────────────
+    # Points at the southbrook.room record the reconciliation cron
+    # mirrors this design into. In Sprint 1 the design remains the
+    # authoring record and rooms are the mirror; Sprint 2 flips the
+    # direction; Sprint 3 retires this model entirely and only the
+    # room + sale.order.line + product.config.session graph remains.
+    room_id = fields.Many2one(
+        "southbrook.room",
+        string="Bridged Room",
+        index=True,
+        ondelete="set null",
+        copy=False,
+        help="Rec D Sprint 1 — non-authoring mirror onto the unified "
+             "room + wall + line graph. Managed by the "
+             "southbrook.design.reconcile cron. Do not set manually.",
+    )
+
     # 2026-07-01 v19.0.4.19.0 — Kanban preview thumbnail.
     # Named x_kitchen_image (not kitchen_image) to adopt the existing
     # manual custom-field column already in the runtime DB without a
@@ -789,6 +806,21 @@ class SouthbrookKitchenDesignLine(models.Model):
         default=0.0,
         copy=True,
         help="Y-axis rotation in degrees (0/90/180/270 in normal use).",
+    )
+
+    # ── Recommendation D · Sprint 1 bridge field ────────────────────────
+    # Points at the sale.order.line the reconciliation cron mirrors
+    # this design line into. See models/sale_order_line.py for the
+    # target-side field surface.
+    sale_order_line_id = fields.Many2one(
+        "sale.order.line",
+        string="Bridged Order Line",
+        index=True,
+        ondelete="set null",
+        copy=False,
+        help="Rec D Sprint 1 — non-authoring mirror onto the sale.order."
+             "line slot. Managed by the southbrook.design.reconcile "
+             "cron. Do not set manually.",
     )
 
     # Computed display
