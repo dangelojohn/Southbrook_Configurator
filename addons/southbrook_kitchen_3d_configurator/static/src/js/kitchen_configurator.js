@@ -26,6 +26,9 @@ import { loadThreeJS } from "@southbrook_kitchen_3d_configurator/js/canvas/three
 import { ndcFromEvent } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_helpers";
 import { computeViewSpecs } from "@southbrook_kitchen_3d_configurator/js/canvas/view_specs";
 import { makeMesh } from "@southbrook_kitchen_3d_configurator/js/canvas/mesh_factory";
+import { packRow } from "@southbrook_kitchen_3d_configurator/js/canvas/pack_row";
+import { easeInOutCubic } from "@southbrook_kitchen_3d_configurator/js/canvas/easing";
+import { computeOrthoFrustum } from "@southbrook_kitchen_3d_configurator/js/canvas/ortho_frustum";
 
 const actionRegistry = registry.category("actions");
 
@@ -693,38 +696,10 @@ class SouthbrookKitchenConfigurator extends Component {
         // no item in a row is pinned, behaviour is identical to the
         // pre-4.23 cascade (pack from x=0), so existing designs
         // render exactly as before until the user drags a cabinet.
-        const packRow = (row) => {
-            const pinned   = row.filter(it => it.pinned).sort(sortX);
-            const unpinned = row.filter(it => !it.pinned);
-            let cursor = 0;
-            let pi = 0;
-            for (const u of unpinned) {
-                const w = u.width_in || 0;
-                while (pi < pinned.length
-                       && (pinned[pi].x_position_in || 0) <= cursor) {
-                    cursor = Math.max(
-                        cursor,
-                        (pinned[pi].x_position_in || 0)
-                            + (pinned[pi].width_in || 0),
-                    );
-                    pi++;
-                }
-                if (pi < pinned.length
-                    && (pinned[pi].x_position_in || 0) >= cursor + w) {
-                    u.x_position_in = cursor;
-                    cursor += w;
-                } else if (pi < pinned.length) {
-                    cursor = (pinned[pi].x_position_in || 0)
-                           + (pinned[pi].width_in || 0);
-                    pi++;
-                    u.x_position_in = cursor;
-                    cursor += w;
-                } else {
-                    u.x_position_in = cursor;
-                    cursor += w;
-                }
-            }
-        };
+        // Rec D · Sprint 2d step 6 — the packRow closure moved to
+        // canvas/pack_row.esm.js as a pure exported function; the
+        // three call sites keep the same signature so scene-diff
+        // rebuild timings are unchanged.
         packRow(bases);
         packRow(walls);
         packRow(tailItems);
@@ -967,19 +942,21 @@ class SouthbrookKitchenConfigurator extends Component {
 
     // Apply the current view's ortho frustum + the wheel-zoom multiplier.
     // Safe to call even when the active camera is perspective (no-op).
+    // Rec D · Sprint 2d step 8 — frustum math moved to
+    // canvas/ortho_frustum.esm.js so <KitchenCanvas> can share it.
     _applyOrthoFrustum() {
         const t = this.T;
         const cam = t.cameras?.ortho;
         if (!cam || !t.renderer) return;
         const spec = t.viewSpecs?.[this.state.view];
-        const baseVs = (spec && spec.vs) || 9;
-        const vs = baseVs * (t.vsScale || 1);
-        const W = t.renderer.domElement.width;
-        const H = t.renderer.domElement.height;
-        const asp = (W && H) ? W / H : 1;
-        cam.left  = -vs * asp;  cam.right  = vs * asp;
-        cam.top   =  vs;        cam.bottom = -vs;
-        cam.near  = 0.1;        cam.far    = 300;
+        const f = computeOrthoFrustum(
+            spec && spec.vs, t.vsScale,
+            t.renderer.domElement.width,
+            t.renderer.domElement.height,
+        );
+        cam.left = f.left; cam.right = f.right;
+        cam.top  = f.top;  cam.bottom = f.bottom;
+        cam.near = f.near; cam.far    = f.far;
         cam.updateProjectionMatrix();
     }
 
@@ -1028,7 +1005,9 @@ class SouthbrookKitchenConfigurator extends Component {
         const fromPos = cam.position.clone();
         const fromTgt = t.currentTarget.clone();
         const t0 = performance.now();
-        const ease = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+        // Rec D · Sprint 2d step 7 — the ease closure moved to
+        // canvas/easing.esm.js as easeInOutCubic (same shape).
+        const ease = easeInOutCubic;
         t.animatingCamera = true;
         const step = () => {
             if (!this.T.activeCamera || this.T.activeCamera !== cam) {
