@@ -2,19 +2,21 @@
 <odoo>
 
     <!-- Kitchen Design – List ───────────────────────────────────────────────── -->
+    <!-- 2026-07-01 v19.0.4.19.0 — 4 dimension/count columns dropped
+         (width/depth/height/base_count/wall_count are already encoded
+         in the auto-named "Walk-in — 36×24 — 2026-07-01" design name);
+         thumbnail preview added leftmost using the fields.Image-
+         generated 128×128 companion for fast row rendering. -->
     <record id="view_sbk_kitchen_design_list" model="ir.ui.view">
         <field name="name">southbrook.kitchen.design.list</field>
         <field name="model">southbrook.kitchen.design</field>
         <field name="arch" type="xml">
             <list decoration-info="state == 'draft'"
                   decoration-success="state == 'quoted' or state == 'ordered'">
+                <field name="x_kitchen_image" widget="image" string="Preview"
+                       options="{'preview_image': 'x_kitchen_image_128', 'size': [80, 60]}"/>
                 <field name="name"/>
                 <field name="partner_id"/>
-                <field name="room_width_in" string="Width (in)"/>
-                <field name="room_depth_in" string="Depth (in)"/>
-                <field name="room_height_in" string="Height (in)"/>
-                <field name="base_count"/>
-                <field name="wall_count"/>
                 <field name="total_cabinets"/>
                 <field name="estimated_price" widget="monetary"/>
                 <field name="state" widget="badge"
@@ -23,6 +25,64 @@
                        decoration-success="state == 'quoted' or state == 'ordered'"/>
                 <field name="write_date" string="Last Modified"/>
             </list>
+        </field>
+    </record>
+
+    <!-- Kitchen Design – Kanban ─────────────────────────────────────────────── -->
+    <!-- 2026-07-01 v19.0.4.19.0 — visual browse of designs by preview
+         thumbnail. Kanban is the default view on the action so the
+         common "which design was that walk-in kitchen for the Smiths"
+         question is answered by looking, not by reading names. -->
+    <record id="view_sbk_kitchen_design_kanban" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.design.kanban</field>
+        <field name="model">southbrook.kitchen.design</field>
+        <field name="arch" type="xml">
+            <kanban>
+                <field name="x_kitchen_image"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="total_cabinets"/>
+                <field name="estimated_price"/>
+                <field name="currency_id"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div style="height:120px; overflow:hidden; background:#f5f5f5;
+                                    display:flex; align-items:center; justify-content:center;
+                                    border-bottom:1px solid #e0e0e0;">
+                            <t t-if="record.x_kitchen_image.raw_value">
+                                <img t-att-src="'/web/image/southbrook.kitchen.design/'
+                                                + record.id.raw_value
+                                                + '/x_kitchen_image/200x150'"
+                                     style="max-width:100%; max-height:120px; object-fit:contain;"
+                                     alt="Kitchen Preview"/>
+                            </t>
+                            <t t-else="">
+                                <i class="fa fa-camera fa-2x text-muted"
+                                   title="No preview yet"/>
+                            </t>
+                        </div>
+                        <div class="oe_kanban_content p-2">
+                            <strong class="o_kanban_record_title">
+                                <field name="name"/>
+                            </strong>
+                            <div class="text-muted small">
+                                <field name="partner_id"/>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1 small">
+                                <span>
+                                    <t t-esc="record.total_cabinets.value"/>
+                                    <span class="text-muted"> cabinets</span>
+                                </span>
+                                <field name="estimated_price" widget="monetary"/>
+                            </div>
+                            <div class="mt-1">
+                                <field name="state" widget="badge"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
         </field>
     </record>
 
@@ -137,11 +197,34 @@
         </field>
     </record>
 
+    <!-- Kitchen Design – Form (image widget in header) ──────────────────────── -->
+    <!-- 2026-07-01 v19.0.4.19.0 — attach the preview image to the top
+         of the form as an avatar-style right block so it's visible on
+         every design record open. Kept as a separate inherit so the
+         base form record stays unchanged and greppable. -->
+    <record id="view_sbk_kitchen_design_form_image" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.design.form.image</field>
+        <field name="model">southbrook.kitchen.design</field>
+        <field name="inherit_id" ref="view_sbk_kitchen_design_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@class='oe_title']" position="before">
+                <field name="x_kitchen_image"
+                       widget="image"
+                       string="Kitchen Preview"
+                       options="{'size': [200, 150]}"
+                       class="oe_avatar"/>
+            </xpath>
+        </field>
+    </record>
+
     <!-- Action: open Kitchen Designs list ───────────────────────────────────── -->
+    <!-- 2026-07-01 v19.0.4.19.0 — kanban is now default so the browse
+         experience is visual. Mobile lands on kanban too. -->
     <record id="action_sbk_kitchen_designs" model="ir.actions.act_window">
         <field name="name">Kitchen Designs</field>
         <field name="res_model">southbrook.kitchen.design</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="mobile_view_mode">kanban</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No kitchen designs yet

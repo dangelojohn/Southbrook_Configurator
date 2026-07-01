@@ -29,6 +29,24 @@ class SouthbrookKitchenDesign(models.Model):
     sale_order_id = fields.Many2one("sale.order", string="Quotation", readonly=True)
     notes = fields.Text(string="Design Notes")
 
+    # 2026-07-01 v19.0.4.19.0 — Kanban preview thumbnail.
+    # Named x_kitchen_image (not kitchen_image) to adopt the existing
+    # manual custom-field column already in the runtime DB without a
+    # data migration. The pre-migrate at migrations/19.0.4.19.0/
+    # deletes the ir_model_fields row so this code-defined field can
+    # take ownership of the same column. fields.Image auto-creates
+    # the thumbnail companions (x_kitchen_image_128/256/512/1024)
+    # used by the list/kanban widgets.
+    x_kitchen_image = fields.Image(
+        string="Kitchen Preview",
+        help="Screenshot of the 3D kitchen layout for at-a-glance identification.",
+        max_width=800,
+        max_height=600,
+        attachment=True,
+        store=True,
+        copy=True,
+    )
+
     # ── Room dimensions ─────────────────────────────────────────────────────────
     room_width_in  = fields.Float(string="Room Width (in)",  default=12.0,  required=True)
     room_depth_in  = fields.Float(string="Room Depth (in)",  default=24.0,  required=True)
