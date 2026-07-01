@@ -34,6 +34,7 @@ import { computeDropXIn } from "@southbrook_kitchen_3d_configurator/js/canvas/dr
 import { buildRoomShell } from "@southbrook_kitchen_3d_configurator/js/canvas/room_shell";
 import { buildDragHandle } from "@southbrook_kitchen_3d_configurator/js/canvas/drag_handle";
 import { buildDropLanes } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_lanes";
+import { installPbrEnvMap } from "@southbrook_kitchen_3d_configurator/js/canvas/pbr_env_map";
 
 const actionRegistry = registry.category("actions");
 
@@ -897,39 +898,12 @@ class SouthbrookKitchenConfigurator extends Component {
         window.addEventListener("keydown", this._onKeyDown);
     }
 
-    // ─── PBR environment map (PMREM) ────────────────────────────────────────────
-    // Builds a small studio HDR-equivalent from a vertical gradient on a
-    // canvas, runs it through PMREMGenerator, and assigns the result as
-    // scene.environment. Adds soft PBR reflections on MeshStandardMaterial
-    // metalness/roughness without needing an HDR file at runtime.
-    // Mirrors southbrook_estimating_website/kitchen_viewport.esm.js.
+    // Rec D · Sprint 2d step 14 — PBR env map install moved to
+    // canvas/pbr_env_map.esm.js. Same 512×256 gradient studio HDR
+    // + PMREM install path; identical rendering.
     _installPbrEnvMap() {
         const { THREE, scene, renderer } = this.T;
-        if (!THREE || !scene || !renderer) return;
-        if (!THREE.PMREMGenerator)        return;
-        try {
-            const canvas = document.createElement("canvas");
-            const w = 512, h = 256;
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            const grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0.00, "#fff5e8");   // overhead warm
-            grad.addColorStop(0.40, "#e8e4dc");   // soft mid
-            grad.addColorStop(0.70, "#c9c4ba");   // shadow side
-            grad.addColorStop(1.00, "#8a8680");   // floor
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, w, h);
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.mapping = THREE.EquirectangularReflectionMapping;
-            if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-            const pmrem = new THREE.PMREMGenerator(renderer);
-            const envRT = pmrem.fromEquirectangular(tex);
-            scene.environment = envRT.texture;
-            tex.dispose();
-            pmrem.dispose();
-        } catch (exc) {
-            console.warn("[SouthbrookKitchenConfigurator] PBR env install skipped:", exc);
-        }
+        installPbrEnvMap(THREE, scene, renderer);
     }
 
     // ─── D1 — Multi-view camera system ──────────────────────────────────────────
