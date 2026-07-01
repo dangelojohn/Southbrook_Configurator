@@ -36,6 +36,10 @@ import { buildDragHandle } from "@southbrook_kitchen_3d_configurator/js/canvas/d
 import { buildDropLanes } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_lanes";
 import { installPbrEnvMap } from "@southbrook_kitchen_3d_configurator/js/canvas/pbr_env_map";
 import { buildBaseCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/base_cabinet";
+import { buildWallCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/wall_cabinet";
+import {
+    buildOtherCabinet, buildFillerPanel, buildEndCapPanel,
+} from "@southbrook_kitchen_3d_configurator/js/canvas/other_cabinets";
 
 const actionRegistry = registry.category("actions");
 
@@ -1309,55 +1313,13 @@ class SouthbrookKitchenConfigurator extends Component {
             this.T.clickable.push(...clickable);
         });
 
-        wallItems.forEach((item, i) => {
-            const x   = item.x_position_in * IN;
-            const wbW = item.width_in  * IN;
-            const wbH = item.height_in * IN;
-            const wbD = item.depth_in  * IN;
-            // D8 follow-up — respect the per-item z_position_in the
-            // controller computed (varies by wall_cab_top_alignment:
-            // fixed_gap / to_ceiling / to_soffit). Falls back to WBY
-            // for items that pre-date D8.
-            const wbY = (item.z_position_in != null && item.z_position_in !== 0)
-                        ? item.z_position_in * IN
-                        : WBY;
-
-            // Wall body — satin-lacquer carcass
-            const wbody = mk(
-                new THREE.BoxGeometry(wbW - 0.02, wbH, wbD - 0.02), P.cab,
-                [x + wbW/2, wbY + wbH/2, wbD/2], null,
-                { cs: true, rs: true, rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "wall", item } }
-            );
-            this.T.cabObjs.push(wbody);
-            this.T.clickable.push(wbody);
-
-            // Shaker door
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(wbW - 0.10, wbH - 0.10, 0.016), P.cabDark,
-                [x + wbW/2, wbY + wbH/2, wbD - 0.001], null,
-                { rough: 0.6, metal: 0.05, ud: { cab: true, cabType: "wall", item } }
-            ));
-            // Wall handle — brushed metal
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(wbW * 0.38, 0.025, 0.038), P.handle,
-                [x + wbW/2, wbY + wbH * 0.60, wbD + 0.018], null,
-                { rough: 0.35, metal: 0.85 }
-            ));
-            // Bottom rail — matches the countertop sheen
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(wbW - 0.02, 0.025, wbD - 0.02), P.counter,
-                [x + wbW/2, wbY - 0.010, wbD/2], null,
-                { rough: 0.4, metal: 0.05 }
-            ));
-
-            // v19.0.4.24.0 P0#1 Stage 2 — pin indicator (see base loop)
-            if (item.pinned) {
-                this.T.cabObjs.push(mk(
-                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
-                    [x + wbW - 0.10, wbY + wbH - 0.10, wbD - 0.10], null,
-                    { rough: 0.3, metal: 0.5 }
-                ));
-            }
+        // Rec D · Sprint 2d step 16 — wall cabinet mesh builder moved
+        // to canvas/wall_cabinet.esm.js. Same body + door + handle +
+        // bottom rail + pin indicator set; D8 z_position_in honoured.
+        wallItems.forEach(item => {
+            const { objects, clickable } = buildWallCabinet(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
         // D13 — Generic-type fallback: tall / corner / panel cabinets
@@ -1365,91 +1327,27 @@ class SouthbrookKitchenConfigurator extends Component {
         // PBR box at the item's reported (x, z, dims) so the cabinet
         // becomes visible immediately instead of silently dropping out
         // of the scene. Detailed per-type geometry can layer on top later.
+        // Rec D · Sprint 2d steps 17-19 — tall/corner/panel/filler/
+        // end-cap mesh builders moved to canvas/other_cabinets.esm.js.
         const knownTypes = new Set(["base", "wall", "filler"]);
         const otherItems = items.filter(it => !knownTypes.has(it.cabinet_type));
+
         otherItems.forEach(item => {
-            const x  = (item.x_position_in || 0) * IN;
-            const w  = (item.width_in  || 24) * IN;
-            const h  = (item.height_in || 34.5) * IN;
-            const d  = (item.depth_in  || 24) * IN;
-            const z0 = (item.z_position_in || 0) * IN;
-
-            // Toe-kick for floor-standing types (tall / corner); panels
-            // sit flush, no toe-kick.
-            if (item.cabinet_type === "tall" || item.cabinet_type === "corner") {
-                this.T.cabObjs.push(mk(
-                    new THREE.BoxGeometry(w - 0.01, 3.5 * IN, d - 0.01), P.toekick,
-                    [x + w/2, z0 + 3.5*IN/2, d/2], null, { cs: true, rough: 0.95, metal: 0.0 }
-                ));
-                const body = mk(
-                    new THREE.BoxGeometry(w - 0.02, h - 3.5*IN, d - 0.02), P.cab,
-                    [x + w/2, z0 + 3.5*IN + (h - 3.5*IN)/2, d/2], null,
-                    { cs: true, rs: true, rough: 0.55, metal: 0.0,
-                      ud: { cab: true, cabType: item.cabinet_type, item } }
-                );
-                this.T.cabObjs.push(body);
-                this.T.clickable.push(body);
-            } else {
-                // Panel / corner-without-toekick / anything else.
-                const body = mk(
-                    new THREE.BoxGeometry(w - 0.02, h, d - 0.02), P.cab,
-                    [x + w/2, z0 + h/2, d/2], null,
-                    { cs: true, rs: true, rough: 0.55, metal: 0.0,
-                      ud: { cab: true, cabType: item.cabinet_type, item } }
-                );
-                this.T.cabObjs.push(body);
-                this.T.clickable.push(body);
-            }
-
-            // v19.0.4.24.0 P0#1 Stage 2 — pin indicator on tall/corner
-            // (skip panels — end-caps aren't user-pinnable per Stage 1's
-            // _onMouseUp filter).
-            if (item.pinned
-                && (item.cabinet_type === "tall"
-                    || item.cabinet_type === "corner")) {
-                this.T.cabObjs.push(mk(
-                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
-                    [x + w - 0.10, z0 + h + 0.16, d - 0.10], null,
-                    { rough: 0.3, metal: 0.5 }
-                ));
-            }
+            const { objects, clickable } = buildOtherCabinet(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
-        // Filler panels — matte/satin matching the door style
+        // Filler panels
         fillerItems.forEach(item => {
-            const x   = item.x_position_in * IN;
-            const fpW = item.width_in * IN;
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(fpW, BH, 0.042), P.cabDark,
-                [x + fpW/2, BH/2, 0.021], null,
-                { rough: 0.55, metal: 0.0 }
-            ));
+            this.T.cabObjs.push(buildFillerPanel(THREE, mk, P, item));
         });
 
-        // ── End cap decorative panels ──
-        // Rendered as a thin vertical panel: full height, full depth of the
-        // host cabinet, panel-width thick (default 3/4"). x_position_in is
-        // authoritative — it was set relative to the host cabinet's exposed
-        // side face by _addCabinetFromProduct (or by the server on load)
-        // and must NOT be recomputed. See _recomputeLayoutFromItems + the
-        // 2026-07-01 domain rule: end cap panels never attach to a wall.
+        // End-cap decorative panels
         endCapItems.forEach(item => {
-            const x  = (item.x_position_in || 0) * IN;
-            const w  = (item.width_in  || 0.75) * IN;
-            const h  = (item.height_in || 34.5) * IN;
-            const d  = (item.depth_in  || 24)   * IN;
-            const z0 = (item.z_position_in || 0) * IN;
-
-            const body = mk(
-                new THREE.BoxGeometry(w - 0.01, h, d - 0.01), P.cab,
-                [x + w/2, z0 + h/2, d/2], null,
-                {
-                    cs: true, rs: true, rough: 0.45, metal: 0.0,
-                    ud: { cab: true, cabType: "panel", item },
-                }
-            );
-            this.T.cabObjs.push(body);
-            this.T.clickable.push(body);
+            const { objects, clickable } = buildEndCapPanel(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
         // Rec D · Sprint 2d step 12 — drag handle + arrow cones
