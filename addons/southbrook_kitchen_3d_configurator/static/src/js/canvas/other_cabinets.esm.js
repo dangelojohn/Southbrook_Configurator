@@ -22,7 +22,7 @@
  * Zero behaviour change from the pre-2d inline blocks.
  */
 
-import { IN, BH } from "@southbrook_kitchen_3d_configurator/js/canvas/constants";
+import { IN, BH } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
 
 /**
  * @param {typeof THREE} THREE

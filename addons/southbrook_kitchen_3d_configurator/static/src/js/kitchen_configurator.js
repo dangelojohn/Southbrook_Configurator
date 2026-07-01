@@ -15,36 +15,19 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { rpc } from "@web/core/network/rpc";
 
+// Rec D · Sprint 2d Step 1 (retry after 5.4.13 rollback) — canvas
+// constants moved to canvas/constants.esm.js. Values identical.
+//
+// IMPORTANT: the path suffix is `.esm` (NOT bare `.../constants`) —
+// Odoo registers files named `foo.esm.js` as module id
+// `@addon/path/foo.esm`, not `@addon/path/foo`. The bare form is
+// the exact regression that broke 5.4.13; caught pre-deploy by
+// `scripts/rec_d_sprint2d_tripwire.sh` since the retry.
+import {
+    IN, BW, BH, BD, WW, WH, WD, CTR, GAP, WBY, P,
+} from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
+
 const actionRegistry = registry.category("actions");
-
-// ─── Cabinet constants (inches) ──────────────────────────────────────────────
-const IN  = 1 / 12;          // 1 inch in scene-feet
-const BW  = 24 * IN;         // base cabinet width  (2 ft)
-const BH  = 34.5 * IN;       // base cabinet height (34.5")
-const BD  = 24 * IN;         // base cabinet depth  (2 ft)
-const WW  = 24 * IN;         // wall cabinet width
-const WH  = 30 * IN;         // wall cabinet height (30")
-const WD  = 12 * IN;         // wall cabinet depth  (1 ft)
-const CTR = 1.5 * IN;        // countertop thickness
-const GAP = 18 * IN;         // clearance between counter and wall cab bottom
-const WBY = BH + CTR + GAP;  // wall cabinet bottom Y
-
-// ─── Colour palette ───────────────────────────────────────────────────────────
-const P = {
-    scene:   0xECE9E3,
-    floor:   0xCFC4A8,
-    wall1:   0xE7E2D9,   // back wall
-    wall2:   0xDED8CE,   // left wall
-    grid:    0xBAB4A8,
-    cab:     0xC9C4BC,
-    cabDark: 0xA9A59E,
-    counter: 0xE1DDD6,
-    handle:  0x3A3530,
-    sel:     0x1866D4,
-    drag:    0x1866D4,
-    toekick: 0x8A857E,
-    arrow:   0x1866D4,
-};
 
 // ─── Three.js loader ──────────────────────────────────────────────────────────
 // As of 19.0.3.0.0 we depend on southbrook_estimating, which ships a

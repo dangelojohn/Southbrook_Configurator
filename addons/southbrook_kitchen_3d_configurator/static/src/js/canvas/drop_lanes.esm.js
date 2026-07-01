@@ -14,7 +14,7 @@
  * pre-2d block; only their host module moved.
  */
 
-import { IN, WBY } from "@southbrook_kitchen_3d_configurator/js/canvas/constants";
+import { IN, WBY } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
 
 /**
  * @param {typeof THREE} THREE

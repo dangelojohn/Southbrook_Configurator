@@ -67,6 +67,23 @@ except Exception:
 PYEOF
 )
 
+# Pre-flight: source-level import-path sanity check. The bundle-
+# compile check below verifies STRING presence; it does NOT catch
+# imports that write "@addon/js/canvas/foo" against a file named
+# "foo.esm.js" (Odoo registers the module id as "foo.esm", not
+# "foo"). This is the exact bug that broke Sprint 2d at 5.4.13 —
+# the bundle compiled, strings were present, but module resolution
+# threw at runtime because the paths didn't match the on-disk
+# filenames. Grep locally BEFORE spending 30s on the bundle build.
+BROKEN_IMPORTS=$(grep -rEhn '^import[^"]*"@southbrook_kitchen_3d_configurator/js/canvas/[^"]*[^m]"' \
+  addons/southbrook_kitchen_3d_configurator/static/src/js/ 2>/dev/null || true)
+if [[ -n "$BROKEN_IMPORTS" ]]; then
+  echo "[tripwire] BROKEN IMPORTS — canvas/*.esm.js modules imported without the .esm suffix:"
+  echo "$BROKEN_IMPORTS"
+  echo "  Fix: append '.esm' to the import path so it matches the on-disk filename."
+  exit 5
+fi
+
 # Print only the relevant marker/status lines.
 echo "$out" | grep -E 'BUNDLE_SIZE|MARKER|TRIPWIRE_|Traceback|Error' || true
 

@@ -22,7 +22,7 @@
  * dispose pass at the top of _buildScene can walk them uniformly.
  */
 
-import { IN } from "@southbrook_kitchen_3d_configurator/js/canvas/constants";
+import { IN } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
 
 /**
  * @param {typeof THREE} THREE
