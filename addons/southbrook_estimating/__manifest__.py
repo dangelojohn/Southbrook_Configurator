@@ -32,7 +32,9 @@ This addon ships:
 * The southbrook.order.analytics companion model captures channel,
   series, lifecycle timestamps, and BoM-rollup counts on every order
   confirm — the AI data spine for future forecast / quote / yield work.
-* 95 automated tests including a 10-step Phase-1 smoke gate.
+* 212+ automated tests (post 2026-07-01 E2E audit) including a 10-step
+  Phase-1 smoke gate, declarative rule-firing tests (Rules 2/3/4),
+  per-channel pricelist math, and a Q7 per-line re-price assertion.
 
 Dependencies
 ------------
@@ -56,7 +58,7 @@ See CHANGELOG.md for the release notes, README.md for the canonical
 design-docs index, and PUNCHLIST.md for the locked-decisions trace
 (referenced from every commit body by Q-number and NF-number).
 """,
-    "version": "19.0.7.0.0",
+    "version": "19.0.7.1.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "maintainers": ["southbrook"],

@@ -222,14 +222,24 @@ Three sibling addons were referencing `southbrook_estimating` (or `southbrook_es
 
 - [x] Land the 15 fixes in §5 (7 test files, 1 controller, 1 data file, 1 report, 4 manifest updates — one pre-existing kitchen_3d_configurator bug surfaced during the audit).
 - [x] Re-run `docker exec sami-odoo odoo -u southbrook_estimating --test-enable --test-tags=/southbrook_estimating --stop-after-init`. **Baseline 11 failing → final 0/0/212 across 7 iterations** (`/tmp/estimating-test-run-{1..7}.log`).
-- [ ] Bump `southbrook_estimating` manifest from `19.0.7.0.0` → `19.0.7.1.0` (patch increment; no schema changes).
+- [x] **Bump `southbrook_estimating` manifest from `19.0.7.0.0` → `19.0.7.1.0`** (patch increment; no schema changes). Landed 2026-07-01 in the follow-up sweep.
 - [ ] File PRs for the 4 manifest updates in `southbrook_hermes`, `southbrook_customer_portal`, `southbrook_dealer_portal`, `southbrook_kitchen_3d_configurator`.
 
-### 8.2 Next branch (P1)
+### 8.2 Next branch (P1) — ALL LANDED 2026-07-01
 
-- [ ] Fill the 4 HIGH coverage gaps in §6.2 (positive + negative Rule 2 tests, negative Rule 3 test, per-channel price math for the 5 non-refacing pricelists).
-- [ ] Surface the BoM preview tab on Order Builder (§6.1 item 1).
-- [ ] Update manifest test-count docstring from "95" to "273".
+- [x] **Fill the 4 HIGH coverage gaps in §6.2.**
+  - `tests/test_rule_enforcement.py` (9 tests) — Rule 2 pos+neg (Contractor+Maple blocked), Rule 3 neg (12″+2dr blocked, 30″+1dr blocked), Rule 4 neg (bifold+soft-close blocked).
+  - `tests/test_pricelist_math.py` (10 tests) — per-channel price math verified against contract targets for all 8 pricelists (retail, dealer, tradesperson base + 3 tiers, KD, bigbox) plus cross-channel invariants.
+  - Final: **231 tagged / 0 failed / 0 error** across the 15-run iteration to green (`/tmp/estimating-test-run-{8..15}.log`).
+- [x] **Surface the BoM preview tab on Order Builder** (§6.1 item 1).
+  - `sb_bom_id` computed field on `sale.order.line` — canonical 2-step BoM resolver (mrp.bom._bom_find + fallback), safe on empty variants.
+  - `sb_bom_preview_html` computed HTML on `sale.order` — per-line summary table (Product · BoM · Qty · Panels · Doors) that avoids the Form field_info collision that a second `order_line` embed would have caused.
+  - New notebook page `BoM Preview` in `views/sale_order_views.xml`, xpath-appended after `3D Kitchen Preview`.
+- [x] **Update manifest test-count docstring** from "95" to "212+ automated tests including … declarative rule-firing tests + per-channel pricelist math + Q7 per-line re-price assertion."
+
+### 8.3 Bonus — real OCA v19 port bug fixed during the follow-up
+
+- [x] **`product_configurator/models/product_config.py:894`** — v19 `ValidationError` has no `.name` attribute (uses `.args[0]`). The wrapper at that line was upgrading every rule-blocked ValidationError into an `AttributeError`, masking the rule message. Fixed to use `exc.args[0] if exc.args else str(exc)`. Discovered because the new Rule 2/3/4 negative tests triggered genuine ValidationErrors from `validate_configuration` and the AttributeError surfaced. Real defensive fix — every negative rule surface in the wizard was previously misreporting as "Default values provided generate an invalid configuration" instead of the actual rule message.
 
 ### 8.3 Follow-up audit rounds
 

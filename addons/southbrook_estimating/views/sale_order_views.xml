@@ -102,6 +102,31 @@
             <widget name="kitchen_viewport"/>
           </div>
         </page>
+        <!-- 2026-07-01 E2E audit follow-up (docs/E2E_AUDIT_SOUTHBROOK_
+             ESTIMATING_2026-07-01.md §6.1 #1) — BoM Preview surfaces
+             the mrp.bom that each configured line resolves to, so
+             sales reps can inspect what the confirmed MO will look
+             like WITHOUT confirming first. Closes the "BoM preview
+             tab" JTBD from brief §2.2. Rendered as an HTML summary
+             (rather than a second order_line embed) so the Form
+             helper's field_info map for `order_line` stays owned by
+             the primary Order Lines tab. -->
+        <page name="bom_preview" string="BoM Preview">
+          <field name="sb_bom_preview_html"
+                 nolabel="1"
+                 widget="html"
+                 readonly="1"/>
+          <div class="alert alert-info mt-2" role="alert">
+            <p class="mb-0">
+              <strong>BoM Preview.</strong> Shows the manufacturing
+              BoM that each configured line would spawn on Confirm.
+              Empty <em>BoM</em> means the product has no BoM defined
+              yet — the line will produce a placeholder MO instead of
+              a real cutlist. Panels + Doors are the live rollup from
+              <em>southbrook_dims.panel_cut_list</em>.
+            </p>
+          </div>
+        </page>
       </xpath>
 
     </field>

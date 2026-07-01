@@ -104,6 +104,48 @@ class SaleOrderLine(models.Model):
             rec.is_positioned = bool(rec.wall_id)
 
     # ------------------------------------------------------------------
+    # BoM Preview resolver (2026-07-01 E2E audit follow-up).
+    #
+    # Walks the canonical Odoo BoM lookup path:
+    #   1. mrp.bom._bom_find(products=variant) — the standard resolver
+    #      used by MO creation. Handles variant-vs-template and
+    #      company-scoping automatically.
+    #   2. Fallback to a manual search for a template-level BoM
+    #      (product_id=False, product_tmpl_id=variant.product_tmpl_id)
+    #      in case _bom_find's contract narrows in a future upstream.
+    # Never raises — returns empty recordset when no BoM exists.
+    # ------------------------------------------------------------------
+    @api.depends("product_id", "product_id.product_tmpl_id")
+    def _compute_sb_bom_id(self):
+        Bom = self.env["mrp.bom"].sudo()
+        for line in self:
+            variant = line.product_id
+            if not variant:
+                line.sb_bom_id = False
+                continue
+            found = False
+            try:
+                # `_bom_find` in v19 returns a dict {product: bom}; safe
+                # to call even when no BoM exists. Guarded so a stack
+                # change in the OCA layer never breaks the Order Builder.
+                bom_map = Bom._bom_find(products=variant)
+                found = bom_map.get(variant) if bom_map else False
+            except Exception:  # noqa: BLE001
+                found = False
+            if not found:
+                # Manual fallback — variant-specific first, then template.
+                found = Bom.search([
+                    ("product_id", "=", variant.id),
+                    ("product_tmpl_id", "=", variant.product_tmpl_id.id),
+                ], limit=1, order="sequence asc")
+                if not found:
+                    found = Bom.search([
+                        ("product_id", "=", False),
+                        ("product_tmpl_id", "=", variant.product_tmpl_id.id),
+                    ], limit=1, order="sequence asc")
+            line.sb_bom_id = found or False
+
+    # ------------------------------------------------------------------
     # Phase 3 Sprint B2 — live-compute BoM rollup (option (b) from
     # docs/PHASE_3_PLAN.md). The demo seed creates variants without a
     # product.config.session, so the panel/door numbers can't be read
@@ -114,6 +156,24 @@ class SaleOrderLine(models.Model):
     # Closes the gate-walk D4 zero-rollup gap that PHASE_2_TRACK_2_GATE
     # documented as a known Phase-1 limitation.
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # 2026-07-01 E2E audit follow-up — BoM preview surface (brief §2.2).
+    # Resolves the mrp.bom that would drive the MO if this line were
+    # confirmed. Non-stored (mrp.bom set changes independently of the
+    # line's own state, and the value is cheap to recompute). Used by
+    # the new "BoM Preview" tab on the Order Builder form.
+    # ------------------------------------------------------------------
+    sb_bom_id = fields.Many2one(
+        "mrp.bom",
+        string="Manufacturing BoM",
+        compute="_compute_sb_bom_id",
+        store=False,
+        help="The mrp.bom that would be spawned from this line on "
+             "Confirm. Variant-scoped BoM preferred; falls back to the "
+             "template-level default. Empty when no BoM is defined for "
+             "this product yet.",
+    )
 
     sb_panel_count = fields.Integer(
         string="Panel Count",

@@ -26,6 +26,75 @@ _logger = logging.getLogger(__name__)
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
+    # 2026-07-01 E2E audit follow-up — BoM Preview HTML summary
+    # (docs/E2E_AUDIT_SOUTHBROOK_ESTIMATING_2026-07-01.md §6.1 #1).
+    # A single Html field beats a second `order_line` embed on the
+    # form: two embeds of the same one2many collide in Odoo's Form
+    # helper (`field_info` map is per-field, not per-view-key) and
+    # break Form-driven tests. Rendering per-line summaries into an
+    # HTML blob keeps the primary Order Lines tab clean.
+    sb_bom_preview_html = fields.Html(
+        string="BoM Preview",
+        compute="_compute_sb_bom_preview_html",
+        sanitize=False,  # we generate every tag; no user input
+        readonly=True,
+        store=False,
+    )
+
+    @api.depends("order_line", "order_line.product_id", "order_line.sb_bom_id",
+                 "order_line.sb_panel_count", "order_line.sb_door_count",
+                 "order_line.product_uom_qty")
+    def _compute_sb_bom_preview_html(self):
+        for order in self:
+            if not order.order_line:
+                order.sb_bom_preview_html = (
+                    "<div class='text-muted'>"
+                    "No configured lines yet — add a product to see its "
+                    "BoM preview here."
+                    "</div>"
+                )
+                continue
+            rows = []
+            for line in order.order_line:
+                bom_name = (
+                    line.sb_bom_id.display_name if line.sb_bom_id
+                    else "<em class='text-muted'>no BoM defined</em>"
+                )
+                product_name = (
+                    line.product_id.display_name if line.product_id
+                    else "(unassigned)"
+                )
+                rows.append(
+                    "<tr>"
+                    "<td>%(seq)d</td>"
+                    "<td>%(product)s</td>"
+                    "<td>%(bom)s</td>"
+                    "<td class='text-end'>%(qty).2f</td>"
+                    "<td class='text-end'>%(panels)d</td>"
+                    "<td class='text-end'>%(doors)d</td>"
+                    "</tr>" % dict(
+                        seq=line.sequence or 0,
+                        product=product_name,
+                        bom=bom_name,
+                        qty=line.product_uom_qty or 0.0,
+                        panels=line.sb_panel_count or 0,
+                        doors=line.sb_door_count or 0,
+                    )
+                )
+            order.sb_bom_preview_html = (
+                "<table class='table table-sm o_list_view'>"
+                "<thead><tr>"
+                "<th>#</th>"
+                "<th>Product</th>"
+                "<th>Manufacturing BoM</th>"
+                "<th class='text-end'>Qty</th>"
+                "<th class='text-end'>Panels</th>"
+                "<th class='text-end'>Doors</th>"
+                "</tr></thead>"
+                "<tbody>%s</tbody>"
+                "</table>" % "".join(rows)
+            )
+
     # G14 + G17 (customer-flow JTBD gap 2026-06-01) — customer-visible
     # progress timeline. Stamped by the portal 'Request a Price' action
     # so the StagePipeline can show 'Submitted on <date>' instead of

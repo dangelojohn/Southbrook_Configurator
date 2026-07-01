@@ -891,7 +891,17 @@ class ProductConfigSession(models.Model):
                     # TODO: Remove if cond when PR with
                     # raise error on github is merged
                 except ValidationError as exc:
-                    raise ValidationError(self.env._("%s") % exc.name) from exc
+                    # 2026-07-01 E2E audit — v19 ValidationError uses .args[0]
+                    # (no `.name` attribute); `exc.name` raises AttributeError
+                    # and masks the underlying rule-violation message. See
+                    # southbrook_estimating/tests/test_rule_enforcement.py:
+                    # the negative Rule 2/3/4 tests exposed this by triggering
+                    # a genuine ValidationError from validate_configuration,
+                    # which the old wrapper then upgraded to AttributeError.
+                    raise ValidationError(
+                        self.env._("%s") % (
+                            exc.args[0] if exc.args else str(exc))
+                    ) from exc
                 except Exception as exc:
                     raise ValidationError(
                         self.env._(
