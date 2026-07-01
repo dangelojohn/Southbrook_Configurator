@@ -42,18 +42,27 @@ if tmpl:
 else:
     # Fallback — open the Configurable Templates kanban so the user
     # can pick another cabinet. Avoid hardcoding action id 1018.
+    # 2026-07-01 E2E Configurator audit — the xmlid was
+    # `action_product_template_view` which is NOT defined in
+    # product_configurator (grep confirmed). The ref was silently
+    # returning falsy and falling through to the ad-hoc dict below on
+    # every miss-path. Correct xmlid is
+    # `product_configurable_template_action` (defined in
+    # data/menu_configurable_product.xml:23-32).
     action = env.ref(
-        'product_configurator.action_product_template_view'
-    ).read()[0] if env.ref(
-        'product_configurator.action_product_template_view',
+        'product_configurator.product_configurable_template_action',
         raise_if_not_found=False,
-    ) else {
-        'type': 'ir.actions.act_window',
-        'res_model': 'product.template',
-        'view_mode': 'kanban,list,form',
-        'domain': [('config_ok', '=', True)],
-        'name': 'Configurable Templates',
-    }
+    )
+    if action:
+        action = action.read()[0]
+    else:
+        action = {
+            'type': 'ir.actions.act_window',
+            'res_model': 'product.template',
+            'view_mode': 'kanban,list,form',
+            'domain': [('config_ok', '=', True)],
+            'name': 'Configurable Templates',
+        }
         </field>
     </record>
 

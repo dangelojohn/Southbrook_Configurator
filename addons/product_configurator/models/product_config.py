@@ -934,7 +934,19 @@ class ProductConfigSession(models.Model):
         try:
             self.validate_configuration()
         except ValidationError as exc:
-            raise ValidationError(self.env._("%s") % exc.name) from exc
+            # 2026-07-01 E2E Configurator audit — twin of the fix at
+            # product_config.py:894 (session.create) branch. v19
+            # ValidationError has no `.name` attribute (`.args[0]` is
+            # the message). Without this the wrapper elevates every
+            # rule-blocked ValidationError from validate_configuration
+            # into an AttributeError, masking the actionable message
+            # ("Box Material: Maple not available") behind a bogus
+            # "Invalid Configuration" fallback via the outer
+            # `except Exception`.
+            raise ValidationError(
+                self.env._("%s") % (
+                    exc.args[0] if exc.args else str(exc))
+            ) from exc
         except Exception as exc:
             raise ValidationError(self.env._("Invalid Configuration")) from exc
 

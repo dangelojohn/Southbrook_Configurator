@@ -273,3 +273,199 @@ class TestRule4BifoldSoftClose(TransactionCase):
             self.fail(
                 "Rule 4 rejected the Standard + soft-close baseline: "
                 "%s" % exc)
+
+
+@tagged("post_install", "-at_install", "southbrook", "rule_enforcement",
+        "configurator_v19_regression")
+class TestOCAValidationErrorWrappersV19(TransactionCase):
+    """Regression tests for the two v19 `ValidationError.name` twins in
+    OCA `product_configurator/models/product_config.py`. Both were
+    upgrading legitimate rule violations to `AttributeError` and masking
+    the actionable message.
+
+    Fixed 2026-07-01:
+      * :894 (session.create → validate_configuration wrapper)
+      * :937 (create_get_variant → validate_configuration wrapper)
+
+    Regression: exercise BOTH branches and assert the rule message
+    survives the wrapper (i.e. no AttributeError, ValidationError.args[0]
+    is a string that names the blocked attribute or value).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Session = cls.env["product.config.session"]
+        cls.tmpl = cls.env.ref("southbrook_estimating.base_1dr")
+        cls.series_contractor = cls.env.ref(
+            "southbrook_estimating.value_series_contractor")
+        cls.box_maple = cls.env.ref(
+            "southbrook_estimating.value_box_maple")
+
+    def test_01_session_create_wrapper_preserves_rule_message(self):
+        """`session.create({value_ids=[contractor, maple]})` triggers the
+        :894 wrapper. Verifies the wrapper renders the underlying
+        "Box Material: Maple" text — NOT an AttributeError or the
+        generic "Default values provided generate an invalid
+        configuration" fallback.
+        """
+        with self.assertRaises(ValidationError) as ctx:
+            self.Session.create({
+                "product_tmpl_id": self.tmpl.id,
+                "user_id": self.env.uid,
+                "value_ids": [(6, 0, [
+                    self.series_contractor.id, self.box_maple.id,
+                ])],
+            })
+        msg = str(ctx.exception)
+        # Must be a rule-blocked message, not the fallback text nor an
+        # AttributeError proxy.
+        self.assertNotIn(
+            "AttributeError", msg,
+            "The wrapper must not upgrade to AttributeError; "
+            "regression of the :894 exc.name bug.",
+        )
+        self.assertNotIn(
+            "Default values provided generate an invalid configuration",
+            msg,
+            "The wrapper must not fall through to the outer "
+            "except Exception branch; regression of the :894 "
+            "exc.name bug that made every rule error look like "
+            "'invalid default'.",
+        )
+        self.assertTrue(
+            "Maple" in msg or "Box Material" in msg,
+            f"The wrapper must preserve the rule-engine message; "
+            f"got: {msg!r}",
+        )
+
+    def test_02_create_get_variant_wrapper_source_is_v19_safe(self):
+        """Source-code regression for the `:937` twin fix.
+
+        `create_get_variant`'s wrapper cannot be triggered directly at
+        runtime without bypassing every ORM guard on `session.value_ids`
+        (`write()` silently prunes invalid values via
+        `values_available()`, so a fresh session cannot be goaded into
+        an invalid `self.value_ids` state through supported ORM calls).
+
+        The invariant is IDENTICAL to the `:894` sibling covered by
+        test_01: `except ValidationError as exc: raise ValidationError(
+        env._("%s") % exc.name)`. In v19 that `.name` attribute doesn't
+        exist and the wrapper elevates to `AttributeError`.
+
+        This test pins the fix at the source-code level so a regression
+        (e.g. a merge from upstream OCA that reintroduces `.name`)
+        surfaces immediately.
+        """
+        import inspect
+        from odoo.addons.product_configurator.models import product_config
+
+        source = inspect.getsource(
+            product_config.ProductConfigSession.create_get_variant)
+        # The fixed form uses exc.args[0]; the broken form uses exc.name.
+        self.assertIn(
+            "exc.args[0] if exc.args else str(exc)",
+            source,
+            "create_get_variant's ValidationError wrapper has "
+            "regressed to `exc.name`. See "
+            "product_configurator/models/product_config.py:937 — the "
+            "fix is the same as the :894 twin: use "
+            "`exc.args[0] if exc.args else str(exc)`.",
+        )
+        # And explicitly refuse a `.name` regression.
+        # `.name` alone would be too easy to false-positive on a
+        # comment; test the specific broken idiom.
+        self.assertNotIn(
+            'self.env._("%s") % exc.name',
+            source,
+            "create_get_variant's wrapper still contains the broken "
+            "`exc.name` string interpolation; v19 ValidationError "
+            "has no `.name`.",
+        )
+
+
+@tagged("post_install", "-at_install", "southbrook", "rule_enforcement",
+        "configurator_multi_attr_quirk")
+class TestOCAMultiAttributeSingleValueQuirk(TransactionCase):
+    """Document the OCA `product_configurator/models/product_config.py:1605`
+    multi-attribute quirk: `validate_configuration()` only surfaces the
+    "multi values not permitted" error when 2+ values are picked on a
+    multi-type attribute. A single picked value that violates the domain
+    slips through.
+
+    This is a KNOWN OCA behavior — not a bug we own. This test pins it
+    down so a future upstream OCA change (that starts firing the domain
+    check on single-value multi picks) surfaces as a green-to-fail on
+    Southbrook's side rather than a silent behavior change.
+
+    Concrete demo: on `corner` template with `family_subtype=bifold`,
+    accessory Rule 4 restricts accessories to {drawer_organisers,
+    pull_outs}. Picking JUST soft_close under bifold does NOT raise —
+    only picking soft_close + pull_outs does.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Session = cls.env["product.config.session"]
+        cls.tmpl = cls.env.ref("southbrook_estimating.corner")
+        cls.family_bifold = cls.env.ref(
+            "southbrook_estimating.value_family_subtype_bifold")
+        cls.acc_soft_close = cls.env.ref(
+            "southbrook_estimating.value_accessory_soft_close")
+        cls.acc_pull_outs = cls.env.ref(
+            "southbrook_estimating.value_accessory_pull_outs")
+
+    def test_01_single_multi_value_slip_through_is_the_status_quo(self):
+        """Pinning test: OCA lets [bifold, soft_close] pass, but it
+        should logically fail. When this test starts failing, OCA
+        has tightened its multi-check — that's a good day; update the
+        upstream Rule 4 test in test_rule_enforcement.py to use a
+        single-value pick instead of the two-value workaround.
+        """
+        session = self.Session.create({
+            "product_tmpl_id": self.tmpl.id,
+            "user_id": self.env.uid,
+        })
+        # If this ValidationError starts firing, the quirk is fixed
+        # upstream. Assert with a clear message so the failure is
+        # instantly readable in CI.
+        raised = False
+        try:
+            session.validate_configuration(
+                product_tmpl_id=self.tmpl.id,
+                value_ids=[
+                    self.family_bifold.id, self.acc_soft_close.id,
+                ],
+                final=True,
+            )
+        except ValidationError:
+            raised = True
+        self.assertFalse(
+            raised,
+            "OCA product_configurator has tightened its multi-attribute "
+            "validation: single-value multi picks now trigger rule "
+            "violations. UPDATE this test AND the Rule 4 test in "
+            "TestRule4BifoldSoftClose.test_01 — the two-value workaround "
+            "is no longer needed.",
+        )
+
+    def test_02_two_value_pick_correctly_raises(self):
+        """The complement — the same rule DOES fire when 2+ values are
+        picked. This is the shape Southbrook's Rule 4 negative test
+        relies on.
+        """
+        session = self.Session.create({
+            "product_tmpl_id": self.tmpl.id,
+            "user_id": self.env.uid,
+        })
+        with self.assertRaises(ValidationError):
+            session.validate_configuration(
+                product_tmpl_id=self.tmpl.id,
+                value_ids=[
+                    self.family_bifold.id,
+                    self.acc_soft_close.id,
+                    self.acc_pull_outs.id,
+                ],
+                final=True,
+            )

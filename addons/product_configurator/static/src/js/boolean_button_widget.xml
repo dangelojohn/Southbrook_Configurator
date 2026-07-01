@@ -3,9 +3,13 @@
 
     <t t-name="product_configurator.BooleanButtonField" owl="1">
         <div t-ref="root">
+            <!-- 2026-07-01 E2E audit — OWL tokenizer rejects `or`/`and`/`not`
+                 word operators in expression attributes ([[owl_tokenizer_constraints]]);
+                 use JS `||` instead. This XML compiles fine in current OWL
+                 but is a latent tokenizer-regression trap. -->
             <CheckBox
                 id="props.id"
-                value="props.state or false"
+                value="props.state || false"
                 className="'d-inline-block me-2'"
                 disabled="isReadonly"
             />

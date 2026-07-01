@@ -115,13 +115,17 @@ class ProductConfigBookmark(models.Model):
         "audit / sale-order-line backreferences.",
     )
 
-    _sql_constraints = [
-        (
-            "name_not_empty",
-            "CHECK (TRIM(name) <> '')",
-            "A bookmark must have a non-empty name.",
-        ),
-    ]
+    # 2026-07-01 E2E Configurator audit — v19 silently ignores the
+    # legacy `_sql_constraints` list ([[odoo19_sql_constraints_deprecated]]);
+    # the Postgres CHECK below was NOT being installed. Migrated to the
+    # v19 `models.Constraint(...)` idiom so the constraint actually
+    # reaches the DB. `_normalize_name_in_vals()` above still provides
+    # the friendly UserError for ORM callers; this DB CHECK is the
+    # defense-in-depth against direct SQL / bypass writes.
+    _name_not_empty = models.Constraint(
+        "CHECK (TRIM(name) <> '')",
+        "A bookmark must have a non-empty name.",
+    )
 
     # ------------------------------------------------------------------
     # CRUD overrides — bound-checking + ownership
