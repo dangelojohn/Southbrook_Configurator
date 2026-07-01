@@ -62,6 +62,16 @@ class TestSendToManufacturing(TransactionCase):
                 "product_uom_qty": 2.0,
             })],
         })
+        # 2026-07-01 audit fix — southbrook_mrp_pm's action_confirm
+        # gate (models/sale_order.py:166 _check_production_approval_gate)
+        # refuses to confirm any SO that would spawn an MO unless the
+        # SO is Production-Approved OR force_production_release=True.
+        # This test's whole intent is to prove the send_to_manufacturing
+        # controller behavior AFTER action_confirm — set the sanctioned
+        # bypass here if the field exists so the setup gate doesn't
+        # cross-contaminate the assertions.
+        if "force_production_release" in cls.order._fields:
+            cls.order.sudo().force_production_release = True
 
     def _fire(self):
         controller = ctrl_main.SouthbrookOrderBuilderPortal()

@@ -57,7 +57,8 @@ def stubbed_request(env, user=None):
         ctrl_main.request = saved
 
 
-@tagged("post_install", "-at_install", "southbrook_customer_flow")
+@tagged("post_install", "-at_install", "southbrook",
+        "southbrook_customer_flow")
 class TestCustomerFlowEndpoints(TransactionCase):
 
     @classmethod
@@ -575,6 +576,13 @@ class TestCustomerFlowEndpoints(TransactionCase):
     def test_add_line_clamps_qty_below_one_to_one(self):
         """A malformed payload (qty=0, qty=-2, qty='abc') must not
         produce a zero-quantity line — clamp to 1 silently.
+
+        2026-07-01 audit fix — the merge branch of add-line increments
+        an existing line's qty when the same variant is added twice.
+        On the second iteration below (qty=-2) the previous iteration's
+        line was still on the SO, so clamp-to-1 + merge produced qty=2,
+        not qty=1. Unlink after each assertion so every iteration is
+        clean; the clamp assertion is what's under test here.
         """
         controller = ctrl_main.SouthbrookOrderBuilderPortal()
         controller._southbrook_resolve_order = lambda _id: self.order
@@ -595,6 +603,7 @@ class TestCustomerFlowEndpoints(TransactionCase):
                 line.product_uom_qty, 1.0,
                 f"qty={bad_qty!r} should have clamped to 1",
             )
+            line.sudo().unlink()
 
     # ==================================================================
     # 2026-06-02 — channel-aware preview pricing in the catalog payload
@@ -751,6 +760,10 @@ class TestCustomerFlowEndpoints(TransactionCase):
         is the second-line defence. Negative or non-numeric input
         from a hand-crafted RPC must still produce qty=1, never 0
         or a 500.
+
+        2026-07-01 audit fix — see the sibling test above; unlink
+        each iteration's line so the merge branch doesn't accumulate
+        qty across iterations.
         """
         controller = ctrl_main.SouthbrookOrderBuilderPortal()
         controller._southbrook_resolve_order = lambda _id: self.order
@@ -768,3 +781,4 @@ class TestCustomerFlowEndpoints(TransactionCase):
                 f"qty={raw!r} must clamp to 1 (defence-in-depth for "
                 f"the JS qty stepper)",
             )
+            line.sudo().unlink()

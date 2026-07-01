@@ -29,25 +29,37 @@ from odoo.tests import TransactionCase, tagged
 
 from odoo.addons.southbrook_estimating_website.controllers import (
     room_api as ctrl_room,
+    main as ctrl_main,
 )
 
 
 @contextmanager
 def stubbed_request(env, user=None):
-    """Swap controllers.room_api.request for a MagicMock whose .env
-    resolves to a real Odoo env for the duration of the with-block.
-    Restores the original werkzeug LocalProxy on exit.
+    """Swap `request` in BOTH controller modules for a MagicMock whose
+    `.env` resolves to a real Odoo env for the duration of the with-
+    block. Restores the original werkzeug LocalProxy on exit.
+
+    2026-07-01 E2E website audit — this used to swap only
+    ctrl_room.request; but `_southbrook_resolve_order` lives on
+    _SouthbrookOrderAccessMixin defined in main.py, and its `request`
+    binding is main.py's, not room_api's. Result: every room_api test
+    that transitively called the resolver got
+        RuntimeError: Working outside of request context
+    from werkzeug's LocalProxy. Swap BOTH bindings.
     """
-    saved = ctrl_room.request
+    saved_room = ctrl_room.request
+    saved_main = ctrl_main.request
     mock = MagicMock()
     mock.env = env if user is None else env(user=user.id)
     mock.session = {}
     mock.params = {}
     ctrl_room.request = mock
+    ctrl_main.request = mock
     try:
         yield mock
     finally:
-        ctrl_room.request = saved
+        ctrl_room.request = saved_room
+        ctrl_main.request = saved_main
 
 
 @tagged("post_install", "-at_install", "southbrook", "southbrook_room_api")

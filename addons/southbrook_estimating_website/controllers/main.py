@@ -53,6 +53,62 @@ _logger = logging.getLogger(__name__)
 #      Odoo's existing 'Customer Reference' field, perfect for free-
 #      text project labels like 'Smith Kitchen Renovation'.
 # ======================================================================
+class _SouthbrookOrderAccessMixin:
+    """Shared helper for per-order auth checks used by both the
+    customer-facing planner routes and the portal Order Builder.
+
+    Kept as a plain mixin (NOT a Controller subclass) so it can be
+    inherited without polluting Odoo's controller-route registry.
+    Owns exactly one method — `_southbrook_resolve_order` — so any
+    sibling controller can look up + auth-check a sale.order without
+    duplicating the partner-chain rules.
+
+    Regression 2026-07-01: `SouthbrookRoomApi(SouthbrookKitchenPlanner)`
+    was silently inheriting nothing useful because the resolver used
+    to live on `SouthbrookOrderBuilderPortal` (a sibling, not an
+    ancestor). Every /southbrook/api/order/<id>/... call blew up
+    with AttributeError. The mixin unifies the source of truth.
+    """
+
+    def _southbrook_resolve_order(self, order_id):
+        """Look up the sale.order and check the user has access.
+
+        Access rule:
+
+          • Internal users (admin, sales reps, anyone whose
+            res.users.share is False) see every order — they're
+            staff with full backend access anyway, the portal page
+            is just an alternate presentation.
+
+          • Portal users (res.users.share=True — customers and
+            dealers logged in via the public portal): the logged-in
+            partner must equal order.partner_id, OR order.partner_id
+            .parent_id must equal the logged-in partner (dealer
+            views customer order), OR the logged-in partner's
+            parent_id must equal order.partner_id (parent partner
+            views child's order).
+
+          • Anything else → AccessError, controller redirects to /my.
+        """
+        order = request.env["sale.order"].sudo().browse(order_id).exists()
+        if not order:
+            raise MissingError("Sale order not found.")
+
+        user = request.env.user
+        if not user.share:
+            return order
+
+        my_partner = user.partner_id
+        order_partner = order.partner_id
+        if my_partner == order_partner:
+            return order
+        if order_partner.parent_id and order_partner.parent_id == my_partner:
+            return order
+        if my_partner.parent_id and my_partner.parent_id == order_partner:
+            return order
+        raise AccessError("This order is not accessible to your account.")
+
+
 class SouthbrookAuthSignup(AuthSignupHome):
 
     _SESSION_KEY = "southbrook_project_name"
@@ -112,7 +168,7 @@ class SouthbrookAuthSignup(AuthSignupHome):
 # customer logs in as an Odoo portal user (light auth — name + email).
 # No SSO yet; Phase 4 polish.
 # ======================================================================
-class SouthbrookKitchenPlanner(http.Controller):
+class SouthbrookKitchenPlanner(_SouthbrookOrderAccessMixin, http.Controller):
     """Customer-facing /kitchen-planner one-page configurator route."""
 
     @http.route(
@@ -748,7 +804,7 @@ class SouthbrookKitchenPlanner(http.Controller):
         }
 
 
-class SouthbrookOrderBuilderPortal(CustomerPortal):
+class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
     """Portal route hosting the OWL Order Builder."""
 
     # T2C1 NF: website=True is required after all. The portal layout
@@ -838,50 +894,10 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
         )
 
     # ------------------------------------------------------------------
-    # Auth helpers
+    # Auth helpers — `_southbrook_resolve_order` lives on the shared
+    # `_SouthbrookOrderAccessMixin` above so RoomApi + KitchenPlanner
+    # can reuse it via MRO.
     # ------------------------------------------------------------------
-
-    def _southbrook_resolve_order(self, order_id):
-        """Look up the sale.order and check the user has access.
-
-        Access rule:
-
-          • Internal users (admin, sales reps, anyone whose
-            res.users.share is False) see every order — they're
-            staff with full backend access anyway, the portal page
-            is just an alternate presentation.
-
-          • Portal users (res.users.share=True — customers and
-            dealers logged in via the public portal): the logged-in
-            partner must equal order.partner_id, OR order.partner_id
-            .parent_id must equal the logged-in partner (dealer
-            views customer order), OR the logged-in partner's
-            parent_id must equal order.partner_id (parent partner
-            views child's order).
-
-          • Anything else → AccessError, controller redirects to /my.
-        """
-        order = request.env["sale.order"].sudo().browse(order_id).exists()
-        if not order:
-            raise MissingError("Sale order not found.")
-
-        user = request.env.user
-        if not user.share:
-            # Internal user — full access.
-            return order
-
-        my_partner = user.partner_id
-        order_partner = order.partner_id
-        if my_partner == order_partner:
-            return order
-        if order_partner.parent_id and order_partner.parent_id == my_partner:
-            return order
-        if my_partner.parent_id and my_partner.parent_id == order_partner:
-            return order
-        # Phase 3: dealer-portal page lists every order under the
-        # dealer's whole partner tree; for commit 1 we keep access
-        # tight to the same partner or first-level parent/child.
-        raise AccessError("This order is not accessible to your account.")
 
     def _prepare_southbrook_portal_values(self, order):
         """Common template context (sidebar, breadcrumb, palette tokens)."""
@@ -1036,8 +1052,18 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
     # qty autosave at /api/line/<id>/update).
     def _southbrook_resolve_line(self, line_id):
         """Return the sale.order.line if the current user owns its
-        order; raise AccessError / MissingError otherwise. Mirrors
-        the partner-chain check used by /api/order/<id>."""
+        order; raise AccessError otherwise. Mirrors the partner-chain
+        check used by /api/order/<id>.
+
+        2026-07-01 E2E website audit — this used to raise MissingError
+        when the line didn't exist and AccessError when it did but
+        wasn't owned. That distinction is an existence oracle: a probe
+        of line IDs across orders can tell the difference between
+        "doesn't exist" (`not_found`) and "belongs to someone else"
+        (`forbidden`). Room API (`room_api.py:_get_room_scoped`) fixed
+        this convention months earlier: return AccessError for both
+        missing AND wrong-owner. Match that here.
+        """
         line = (
             request.env["sale.order.line"]
             .sudo()
@@ -1045,10 +1071,18 @@ class SouthbrookOrderBuilderPortal(CustomerPortal):
             .exists()
         )
         if not line:
-            raise MissingError("line not found")
+            # Same as room_api's convention — collapse "missing" and
+            # "not yours" into a single AccessError so callers cannot
+            # distinguish the two from the outside.
+            raise AccessError("line not accessible")
         # Walks back through the order to the existing resolver,
-        # which is the canonical access check.
-        self._southbrook_resolve_order(line.order_id.id)
+        # which is the canonical access check. Any MissingError from
+        # the order resolver is likewise collapsed to AccessError so
+        # a deleted order under a foreign partner doesn't leak either.
+        try:
+            self._southbrook_resolve_order(line.order_id.id)
+        except MissingError:
+            raise AccessError("line not accessible")
         return line
 
     @http.route(
