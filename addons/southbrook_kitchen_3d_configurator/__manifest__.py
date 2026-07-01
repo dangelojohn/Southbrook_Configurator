@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.4.20.2",
+    "version": "19.0.4.21.0",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -30,6 +30,14 @@
         "views/kitchen_design_views.xml",
         "views/kitchen_configurator_views.xml",
         "data/demo_cabinets.xml",
+        # v19.0.4.21.0 — audit P0#2 fix. Tags the 11 canonical
+        # cabinet templates owned by southbrook_estimating with
+        # southbrook_is_cabinet=True so they become visible to
+        # the 3D configurator inventory. Worktop is intentionally
+        # excluded (it's a countertop, not a cabinet).
+        # MUST LOAD AFTER demo_cabinets.xml so any migration that
+        # walks the data list bottom-up doesn't hit missing xmlids.
+        "data/canonical_catalog_tag.xml",
     ],
     "assets": {
         "web.assets_backend": [

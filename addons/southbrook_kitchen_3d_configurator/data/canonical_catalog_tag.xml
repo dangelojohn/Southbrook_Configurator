@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Southbrook Kitchen 3D Configurator — v19.0.4.21.0
+  Canonical catalog overlay.
+
+  Tags the 12 CLAUDE.md-locked cabinet templates (owned by
+  southbrook_estimating) so the 3D Configurator's inventory pane
+  can see them. Without this overlay, the estimating templates
+  are invisible to the configurator (which searches
+  product_template_id.southbrook_is_cabinet = True) and the
+  inventory falls back to only the 7 demo cabinets in
+  data/demo_cabinets.xml. Audit 2026-07-01 (§6.2) flagged this
+  as the P0 catalog integration gap.
+
+  Why the overlay lives here, not in southbrook_estimating:
+    southbrook_kitchen_3d_configurator depends on
+    southbrook_estimating (per CLAUDE.md §3 — estimating is the
+    OCA foundation, configurator sits on top). The
+    `southbrook_is_cabinet` field is defined by
+    southbrook_kitchen_3d_configurator/models/product_template.py.
+    Adding the field to estimating's product_templates.xml would
+    reference a field that doesn't exist yet at estimating install
+    time — install would fail. The overlay pattern loads AFTER
+    estimating so the ref lookups resolve and the fields are
+    already in the ORM.
+
+  Two of the 12 canonicals are handled specially:
+
+    * `worktop` — NOT tagged. It's a countertop / surface product,
+      not a cabinet. None of the 6 valid cabinet_type values
+      (base/wall/tall/filler/panel/corner) fits. PRODBOARD_MANIFEST
+      §4.3 / §5.1 documents worktop as its own module class with a
+      length-based dimension model, distinct from carcasses.
+
+    * `accessory` — tagged with cabinet_type=panel as a fallback.
+      The canonical `accessory` template carries a sub-attribute
+      `accessory_type: end_panel/filler/cornice/pelmet/plinth` per
+      CLAUDE.md §3, so it's really a container for 5 different
+      product classes. "panel" is the least-wrong single type;
+      accessory-with-filler variants render correctly regardless.
+
+  Dimensions:
+    * `southbrook_width_in` is set to the MIDPOINT of each
+      template's width envelope (per Southbrook_Excel_to_Odoo_
+      Mapping §3.1). Width on the canonicals is a VARIANT
+      attribute (attr_width value_ids in product_templates.xml),
+      not a scalar — so template-level southbrook_width_in is a
+      fallback the configurator uses when no variant is picked.
+      Follow-up P1: compute variant-level southbrook_width_in
+      from product_template_attribute_value_ids so each variant
+      reports its true width.
+    * `southbrook_height_in` and `southbrook_depth_in` are
+      NA-cabinetry standards. None of the four canonical docs
+      specifies per-template H/D — the audit agent inferred them
+      from convention. If Southbrook's Consolidated Dataset
+      differs, override here.
+
+  Retirement path for the 7 demo cabinets in data/demo_cabinets.xml:
+    Deferred — no name/default_code/xmlid collision exists (audit
+    confirmed), so both catalogs can coexist. Semantic overlap is
+    real (e.g. "B24 Base Cabinet" vs "Base 2-Door" width=24)
+    but not broken. Retire demos in a future clean-up sprint
+    once the canonical variants ship variant-aware widths.
+
+  noupdate="0" so a bump of this addon re-applies the tags —
+  guards against accidental UI edits (or a Studio user) that
+  clears the flag on a template.
+-->
+<odoo noupdate="0">
+
+  <!-- Wall cabinets ─────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.wall_1dr" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">wall</field>
+    <field name="southbrook_width_in">15</field>
+    <field name="southbrook_height_in">30</field>
+    <field name="southbrook_depth_in">12</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <record id="southbrook_estimating.wall_2dr" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">wall</field>
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">30</field>
+    <field name="southbrook_depth_in">12</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <!-- Base cabinets ─────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.base_1dr" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">base</field>
+    <field name="southbrook_width_in">15</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <record id="southbrook_estimating.base_2dr" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">base</field>
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <record id="southbrook_estimating.drawer_bank" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">base</field>
+    <field name="southbrook_width_in">18</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <record id="southbrook_estimating.sink_base" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">base</field>
+    <field name="southbrook_width_in">33</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <!-- Vanity is a base carcass with distinct 32"H / 21"D
+       dimensions (Excel Mapping §7). Contemporary/Elegance only. -->
+  <record id="southbrook_estimating.vanity" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">base</field>
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">32</field>
+    <field name="southbrook_depth_in">21</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <!-- Tall cabinets ─────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.tall_pantry" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">tall</field>
+    <field name="southbrook_width_in">24</field>
+    <field name="southbrook_height_in">84</field>
+    <field name="southbrook_depth_in">24</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <record id="southbrook_estimating.tall_oven" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">tall</field>
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">84</field>
+    <field name="southbrook_depth_in">24</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <!-- Corner ─────────────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.corner" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">corner</field>
+    <field name="southbrook_width_in">36</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <!-- Accessory: container for end_panel/filler/cornice/pelmet/
+       plinth per CLAUDE.md §3. Tagged as `panel` because that's
+       the least-wrong of the 6 valid cabinet_type values. Filler
+       sub-variants will still render correctly at drop-time
+       because the model derives filler behavior from the specific
+       variant's accessory_type attribute — the template-level tag
+       just gates visibility in the inventory pane. -->
+  <record id="southbrook_estimating.accessory" model="product.template">
+    <field name="southbrook_is_cabinet" eval="True"/>
+    <field name="southbrook_cabinet_type">panel</field>
+    <field name="southbrook_width_in">3</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">0.75</field>
+    <field name="sale_ok" eval="True"/>
+  </record>
+
+  <!--
+    NOT TAGGED: southbrook_estimating.worktop
+    Worktop is a countertop surface, not a cabinet. It doesn't
+    fit any of the 6 southbrook_cabinet_type values (base/wall/
+    tall/filler/panel/corner) and its dimension model is
+    length-based per PRODBOARD_MANIFEST §5.1. If worktops need
+    to appear anywhere in the configurator later, they belong
+    in a separate "surface product" catalog gated by a distinct
+    flag (e.g. southbrook_is_surface).
+  -->
+
+</odoo>
