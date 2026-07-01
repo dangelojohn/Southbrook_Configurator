@@ -1129,11 +1129,35 @@ $sbk-amber:      #B45309;
     flex: 1 1 0% !important;
 }
 
+// The pre-existing @media (max-width: 960px) block earlier in this
+// file makes .o_sbk_controls a full-width top bar (grid-column: 1/-1
+// + display:flex). When the user runs with DevTools split-screen the
+// backend viewport falls below 960px and that media query fires —
+// controls becomes a 25px top bar and grid auto-creates an implicit
+// row for scene+inventory (computed: [1fr=25px][auto=526.5px]). Undo
+// the responsive layout for our client-action; the workspace panels
+// stay side-by-side at every width inside the configurator.
 .o_sbk_controls {
+    grid-column: 1 / span 1 !important;
+    grid-row: 1 !important;
+    display: block !important;
+    flex-wrap: initial !important;
+    padding: 18px 16px !important;
+    border-right: 1px solid $sbk-border !important;
+    border-bottom: none !important;
     height: 100% !important;
     max-height: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
+}
+
+.o_sbk_field {
+    // The @media block above set margin:0 + flex:1 on fields for a
+    // horizontal wrap layout. Restore the vertical stack our aside
+    // was designed for.
+    margin-bottom: 14px !important;
+    flex: initial !important;
+    min-width: 0 !important;
 }
 
 .o_sbk_scene_panel {
@@ -1152,14 +1176,14 @@ $sbk-amber:      #B45309;
 .o_sbk_product_list {
     overflow-y: auto !important;
     flex: 1 1 0% !important;
-    min-height: 80px !important;
+    min-height: 160px !important;   // was 80 — give the list enough room to show ~3 rows before scroll kicks in
 }
 
 .o_sbk_detail {
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    max-height: 45% !important;
-    flex-shrink: 0 !important;
+    max-height: 35% !important;     // was 45% — detail was starving product list at short heights
+    flex-shrink: 1 !important;      // was 0 — allow detail to shrink when product list has more items visible
 }
 
 // Thin styled scrollbars so gutters don't eat layout width in the aside +
