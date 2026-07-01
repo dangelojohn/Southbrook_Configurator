@@ -29,6 +29,8 @@ import { makeMesh } from "@southbrook_kitchen_3d_configurator/js/canvas/mesh_fac
 import { packRow } from "@southbrook_kitchen_3d_configurator/js/canvas/pack_row";
 import { easeInOutCubic } from "@southbrook_kitchen_3d_configurator/js/canvas/easing";
 import { computeOrthoFrustum } from "@southbrook_kitchen_3d_configurator/js/canvas/ortho_frustum";
+import { highlightSelected } from "@southbrook_kitchen_3d_configurator/js/canvas/selection";
+import { computeDropXIn } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_raycaster";
 
 const actionRegistry = registry.category("actions");
 
@@ -466,21 +468,16 @@ class SouthbrookKitchenConfigurator extends Component {
     // back to inches and snap to the 6" grid. Returns null when the
     // ray doesn't hit the floor (e.g. the cursor was over the sky in
     // a perspective view tilted upward).
+    // Rec D · Sprint 2d step 10 — thin wrapper delegating to the
+    // shared raycast helper so <KitchenCanvas> can compute drop-X
+    // from any camera + raycaster + ndc + room-width pair.
     _computeDropX(ev) {
         const t = this.T;
-        if (!t.activeCamera || !t.raycaster || !t.THREE) return null;
-        t.raycaster.setFromCamera(this._ndcFromEvent(ev), t.activeCamera);
-        const floor  = new t.THREE.Plane(new t.THREE.Vector3(0, 1, 0), 0);
-        const hit    = new t.THREE.Vector3();
-        const result = t.raycaster.ray.intersectPlane(floor, hit);
-        if (!result) return null;
-        // hit.x is in scene-feet (IN = 1/12). Multiply by 12 to get inches.
-        let xIn = hit.x * 12;
-        // Clamp inside the room, leave at least 6" headroom on the right
-        // for the cabinet to fit, then snap to the 6" grid.
-        const maxX = Math.max(0, this.state.room.width_in - 6);
-        xIn = Math.max(0, Math.min(maxX, xIn));
-        return Math.round(xIn / 6) * 6;
+        return computeDropXIn(
+            t.THREE, t.activeCamera, t.raycaster,
+            this._ndcFromEvent(ev),
+            this.state.room.width_in,
+        );
     }
 
     // Generic add — used by drop AND by a future "click to add" button.
@@ -1648,20 +1645,11 @@ class SouthbrookKitchenConfigurator extends Component {
         }
     }
 
+    // Rec D · Sprint 2d step 9 — thin wrapper delegating to the
+    // shared selection helper so <KitchenCanvas> can highlight its
+    // own cabObjs with the same reset+paint cycle.
     _highlightSelected(item) {
-        // Reset all cabinet colours (always — needed for the deselect
-        // path so Esc/arrow-cycle visibly clears the previous highlight).
-        this.T.cabObjs.forEach(m => {
-            if (m.userData?.cab) m.material.color.setHex(P.cab);
-        });
-        if (!item) return;
-        // Highlight matching item
-        this.T.cabObjs.forEach(m => {
-            if (m.userData?.cab &&
-                m.userData.item?.layout_key === item.layout_key) {
-                m.material.color.setHex(P.sel);
-            }
-        });
+        highlightSelected(this.T.cabObjs, item, P);
     }
 
     // ─── Mouse events ────────────────────────────────────────────────────────────
