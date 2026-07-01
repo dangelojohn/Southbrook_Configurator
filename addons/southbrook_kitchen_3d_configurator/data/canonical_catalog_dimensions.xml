@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Southbrook Kitchen 3D Configurator — Canonical catalog DIMENSION overlay.
+  Split 2026-07-01 (E2E audit §4.A) — sibling to canonical_catalog_tag.xml.
+
+  This file carries the per-template dimension seed values
+  (southbrook_width_in, southbrook_height_in, southbrook_depth_in)
+  for the 11 canonical templates. Loaded with `noupdate="1"` so a
+  customer or rep who edits a template's dimensions from the UI
+  does NOT get their edit clobbered on the next module -u.
+
+  Before this split (2026-07-01 audit §4.A), dimensions lived
+  inside canonical_catalog_tag.xml with noupdate="0", so every -u
+  reverted UI edits back to these seed values.
+
+  Follow-up P1 (documented in the header of the pre-split file):
+  compute variant-level southbrook_width_in from
+  product_template_attribute_value_ids so each variant reports its
+  true width and the template-level scalar becomes advisory.
+
+  Dimension source:
+    * southbrook_width_in — MIDPOINT of each template's width envelope
+      per Southbrook_Excel_to_Odoo_Mapping §3.1. Width is a VARIANT
+      attribute on the canonicals (attr_width value_ids), so this
+      template-level scalar is a fallback the configurator uses when
+      no variant is picked.
+    * southbrook_height_in / southbrook_depth_in — NA-cabinetry
+      standards. If Southbrook's Consolidated Dataset differs,
+      override these values here.
+-->
+<odoo noupdate="1">
+
+  <!-- Wall cabinets ─────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.wall_1dr" model="product.template">
+    <field name="southbrook_width_in">15</field>
+    <field name="southbrook_height_in">30</field>
+    <field name="southbrook_depth_in">12</field>
+  </record>
+
+  <record id="southbrook_estimating.wall_2dr" model="product.template">
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">30</field>
+    <field name="southbrook_depth_in">12</field>
+  </record>
+
+  <!-- Base cabinets ─────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.base_1dr" model="product.template">
+    <field name="southbrook_width_in">15</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+  </record>
+
+  <record id="southbrook_estimating.base_2dr" model="product.template">
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+  </record>
+
+  <record id="southbrook_estimating.drawer_bank" model="product.template">
+    <field name="southbrook_width_in">18</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+  </record>
+
+  <record id="southbrook_estimating.sink_base" model="product.template">
+    <field name="southbrook_width_in">33</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+  </record>
+
+  <record id="southbrook_estimating.vanity" model="product.template">
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">32</field>
+    <field name="southbrook_depth_in">21</field>
+  </record>
+
+  <!-- Tall cabinets ─────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.tall_pantry" model="product.template">
+    <field name="southbrook_width_in">24</field>
+    <field name="southbrook_height_in">84</field>
+    <field name="southbrook_depth_in">24</field>
+  </record>
+
+  <record id="southbrook_estimating.tall_oven" model="product.template">
+    <field name="southbrook_width_in">30</field>
+    <field name="southbrook_height_in">84</field>
+    <field name="southbrook_depth_in">24</field>
+  </record>
+
+  <!-- Corner ─────────────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.corner" model="product.template">
+    <field name="southbrook_width_in">36</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">24</field>
+  </record>
+
+  <!-- Accessory ─────────────────────────────────────────────── -->
+
+  <record id="southbrook_estimating.accessory" model="product.template">
+    <field name="southbrook_width_in">3</field>
+    <field name="southbrook_height_in">34.5</field>
+    <field name="southbrook_depth_in">0.75</field>
+  </record>
+
+</odoo>

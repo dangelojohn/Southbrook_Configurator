@@ -1305,9 +1305,11 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         line.sudo().write({
             "product_id": variant.id,
         })
-        # Trigger the standard onchange so name/description rebuild.
-        if hasattr(line, "product_id_change"):
-            line.product_id_change()
+        # 2026-07-01 audit cleanup — the previous hasattr guard for
+        # `product_id_change` was v16-era; v19 removed the method
+        # entirely (recomputes fire via @api.onchange on price_unit
+        # / product_uom / name automatically when product_id is
+        # written). Guard was always-False in v19 → dead code.
 
         return {"ok": True}
 
@@ -1471,9 +1473,9 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "zone": resolved_zone,
             })
         )
-        # Trigger Odoo's onchange-equivalent so price_unit /
-        # product_uom / name get populated from the variant.
-        line.product_id_change() if hasattr(line, "product_id_change") else None
+        # v19 removed `sale.order.line.product_id_change` — the
+        # equivalent recomputes fire from @api.onchange('product_id')
+        # on the ORM write above. Nothing needed here.
 
         # 2026-06-27 — smart attribute defaults (FE reviewer P1#7).
         # Inherit the prior in-zone line's attribute choices (door
@@ -1565,8 +1567,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         if not variant:
             return 0
         new_line.sudo().write({"product_id": variant.id})
-        if hasattr(new_line, "product_id_change"):
-            new_line.product_id_change()
+        # v19 onchange fires automatically on the write above.
         return len(inherited)
 
     # 2026-06-27 — bulk-add endpoint (BE reviewer P2#8). Accepts
@@ -1658,8 +1659,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 "product_uom_qty": qty_int,
                 "zone": resolved_zone,
             })
-            if hasattr(line, "product_id_change"):
-                line.product_id_change()
+            # v19 onchange fires automatically on ORM write above.
             created_ids.append(line.id)
 
         return {
@@ -1834,8 +1834,7 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
                 })
                 continue
             line.sudo().write({"product_id": variant.id})
-            if hasattr(line, "product_id_change"):
-                line.product_id_change()
+            # v19 onchange fires automatically on ORM write above.
             updated.append(line.id)
 
         return {

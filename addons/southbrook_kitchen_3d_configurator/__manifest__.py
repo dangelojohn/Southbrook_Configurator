@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.5.2.0",
+    "version": "19.0.5.3.0",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -48,6 +48,12 @@
         # MUST LOAD AFTER demo_cabinets.xml so any migration that
         # walks the data list bottom-up doesn't hit missing xmlids.
         "data/canonical_catalog_tag.xml",
+        # 2026-07-01 E2E audit §4.A — dimensions split into a
+        # noupdate="1" sibling so runtime UI edits survive -u.
+        # MUST LOAD AFTER canonical_catalog_tag.xml so the two files'
+        # write ordering matches the intent (tags re-apply every -u,
+        # dimensions seed once and stay editable).
+        "data/canonical_catalog_dimensions.xml",
         # Rec D · Sprint 1 · reconciliation cron (design → room + SO
         # line). Runs every 5 min; watermark-driven.
         "data/rec_d_reconcile_cron.xml",

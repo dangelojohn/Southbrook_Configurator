@@ -1,28 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Southbrook Kitchen 3D Configurator — v19.0.4.21.0
-  Canonical catalog overlay.
+  Southbrook Kitchen 3D Configurator — Canonical catalog TAG overlay.
+  Split 2026-07-01 (E2E audit §4.A) — this file now carries only the
+  STRUCTURAL invariants of the canonical templates:
 
-  Tags the 12 CLAUDE.md-locked cabinet templates (owned by
-  southbrook_estimating) so the 3D Configurator's inventory pane
-  can see them. Without this overlay, the estimating templates
-  are invisible to the configurator (which searches
-  product_template_id.southbrook_is_cabinet = True) and the
-  inventory falls back to only the 7 demo cabinets in
-  data/demo_cabinets.xml. Audit 2026-07-01 (§6.2) flagged this
-  as the P0 catalog integration gap.
+    * southbrook_is_cabinet   — visibility flag for the 3D pane
+    * southbrook_cabinet_type — one of {base,wall,tall,filler,panel,corner}
+    * sale_ok                 — quotation-eligible
 
-  Why the overlay lives here, not in southbrook_estimating:
-    southbrook_kitchen_3d_configurator depends on
-    southbrook_estimating (per CLAUDE.md §3 — estimating is the
-    OCA foundation, configurator sits on top). The
-    `southbrook_is_cabinet` field is defined by
-    southbrook_kitchen_3d_configurator/models/product_template.py.
-    Adding the field to estimating's product_templates.xml would
-    reference a field that doesn't exist yet at estimating install
-    time — install would fail. The overlay pattern loads AFTER
-    estimating so the ref lookups resolve and the fields are
-    already in the ORM.
+  These are re-applied on every -u (noupdate="0") — a Studio user or
+  accidental UI edit that clears one of them is auto-healed.
+
+  Per-template DIMENSIONS live in the sibling file
+  canonical_catalog_dimensions.xml with noupdate="1" so runtime edits
+  survive -u. Before the split, dimension writes shipped in this file
+  with noupdate="0" — clobbering any customer/rep dimension edit on
+  every module upgrade (documented at
+  docs/E2E_AUDIT_KITCHEN_3D_CONFIGURATOR_2026-07-01.md §4.A).
 
   Two of the 12 canonicals are handled specially:
 
@@ -39,32 +33,9 @@
       product classes. "panel" is the least-wrong single type;
       accessory-with-filler variants render correctly regardless.
 
-  Dimensions:
-    * `southbrook_width_in` is set to the MIDPOINT of each
-      template's width envelope (per Southbrook_Excel_to_Odoo_
-      Mapping §3.1). Width on the canonicals is a VARIANT
-      attribute (attr_width value_ids in product_templates.xml),
-      not a scalar — so template-level southbrook_width_in is a
-      fallback the configurator uses when no variant is picked.
-      Follow-up P1: compute variant-level southbrook_width_in
-      from product_template_attribute_value_ids so each variant
-      reports its true width.
-    * `southbrook_height_in` and `southbrook_depth_in` are
-      NA-cabinetry standards. None of the four canonical docs
-      specifies per-template H/D — the audit agent inferred them
-      from convention. If Southbrook's Consolidated Dataset
-      differs, override here.
-
   Retirement path for the 7 demo cabinets in data/demo_cabinets.xml:
     Deferred — no name/default_code/xmlid collision exists (audit
-    confirmed), so both catalogs can coexist. Semantic overlap is
-    real (e.g. "B24 Base Cabinet" vs "Base 2-Door" width=24)
-    but not broken. Retire demos in a future clean-up sprint
-    once the canonical variants ship variant-aware widths.
-
-  noupdate="0" so a bump of this addon re-applies the tags —
-  guards against accidental UI edits (or a Studio user) that
-  clears the flag on a template.
+    confirmed), so both catalogs can coexist.
 -->
 <odoo noupdate="0">
 
@@ -73,18 +44,12 @@
   <record id="southbrook_estimating.wall_1dr" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">wall</field>
-    <field name="southbrook_width_in">15</field>
-    <field name="southbrook_height_in">30</field>
-    <field name="southbrook_depth_in">12</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
   <record id="southbrook_estimating.wall_2dr" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">wall</field>
-    <field name="southbrook_width_in">30</field>
-    <field name="southbrook_height_in">30</field>
-    <field name="southbrook_depth_in">12</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
@@ -93,36 +58,24 @@
   <record id="southbrook_estimating.base_1dr" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">base</field>
-    <field name="southbrook_width_in">15</field>
-    <field name="southbrook_height_in">34.5</field>
-    <field name="southbrook_depth_in">24</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
   <record id="southbrook_estimating.base_2dr" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">base</field>
-    <field name="southbrook_width_in">30</field>
-    <field name="southbrook_height_in">34.5</field>
-    <field name="southbrook_depth_in">24</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
   <record id="southbrook_estimating.drawer_bank" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">base</field>
-    <field name="southbrook_width_in">18</field>
-    <field name="southbrook_height_in">34.5</field>
-    <field name="southbrook_depth_in">24</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
   <record id="southbrook_estimating.sink_base" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">base</field>
-    <field name="southbrook_width_in">33</field>
-    <field name="southbrook_height_in">34.5</field>
-    <field name="southbrook_depth_in">24</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
@@ -131,9 +84,6 @@
   <record id="southbrook_estimating.vanity" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">base</field>
-    <field name="southbrook_width_in">30</field>
-    <field name="southbrook_height_in">32</field>
-    <field name="southbrook_depth_in">21</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
@@ -142,18 +92,12 @@
   <record id="southbrook_estimating.tall_pantry" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">tall</field>
-    <field name="southbrook_width_in">24</field>
-    <field name="southbrook_height_in">84</field>
-    <field name="southbrook_depth_in">24</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
   <record id="southbrook_estimating.tall_oven" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">tall</field>
-    <field name="southbrook_width_in">30</field>
-    <field name="southbrook_height_in">84</field>
-    <field name="southbrook_depth_in">24</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
@@ -162,9 +106,6 @@
   <record id="southbrook_estimating.corner" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">corner</field>
-    <field name="southbrook_width_in">36</field>
-    <field name="southbrook_height_in">34.5</field>
-    <field name="southbrook_depth_in">24</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
@@ -178,9 +119,6 @@
   <record id="southbrook_estimating.accessory" model="product.template">
     <field name="southbrook_is_cabinet" eval="True"/>
     <field name="southbrook_cabinet_type">panel</field>
-    <field name="southbrook_width_in">3</field>
-    <field name="southbrook_height_in">34.5</field>
-    <field name="southbrook_depth_in">0.75</field>
     <field name="sale_ok" eval="True"/>
   </record>
 
