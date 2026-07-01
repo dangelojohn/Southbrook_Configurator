@@ -215,6 +215,16 @@
         const cached = getCachedName();
         renderBadge(cached);
         postJSON("/sb/qr/whoami", {}).then((res) => {
+            // Global feature-toggle (ir.config_parameter
+            // southbrook.qr_kit.operator_pin_modal_enabled). When
+            // disabled: strip the badge, clear the cached name, and
+            // return before any auto-prompt fires. See W035 (R8.14).
+            if (res && res.pin_modal_enabled === false) {
+                const b = document.getElementById(BADGE_ID);
+                if (b) b.remove();
+                setCachedName("");
+                return;
+            }
             if (res && res.ok) {
                 if (res.employee && res.employee.name) {
                     setCachedName(res.employee.name);

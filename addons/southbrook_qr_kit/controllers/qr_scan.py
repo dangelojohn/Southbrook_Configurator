@@ -823,17 +823,28 @@ class QrScanController(http.Controller):
                 csrf=False, methods=["POST", "GET"])
     def whoami(self, **kw):
         """Return the currently-bound operator (if any). UI uses this
-        on tablet load to decide whether to prompt for a PIN."""
+        on tablet load to decide whether to prompt for a PIN. The
+        `pin_modal_enabled` flag is a global feature-toggle read from
+        ir.config_parameter — when False the client glue silently
+        removes the badge and never auto-prompts."""
         emp = self._get_operator_employee()
         timeout_sec = _operator_timeout_seconds(request.env)
-        if not emp:
-            return {"ok": True, "employee": None,
-                    "timeout_min": timeout_sec // 60}
-        return {
+        raw = request.env["ir.config_parameter"].sudo().get_param(
+            "southbrook.qr_kit.operator_pin_modal_enabled", "1"
+        )
+        pin_modal_enabled = str(raw).strip().lower() not in (
+            "0", "false", "no", "off", ""
+        )
+        base = {
             "ok": True,
-            "employee": {"id": emp.id, "name": emp.name},
             "timeout_min": timeout_sec // 60,
+            "pin_modal_enabled": pin_modal_enabled,
         }
+        if not emp:
+            base["employee"] = None
+            return base
+        base["employee"] = {"id": emp.id, "name": emp.name}
+        return base
 
     def _get_operator_employee(self):
         """Resolve the operator for the current request.

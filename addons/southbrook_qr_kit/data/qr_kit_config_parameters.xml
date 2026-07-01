@@ -49,6 +49,19 @@
         <field name="value">600</field>
     </record>
 
+    <!-- W035 (R8.14) — global on/off for the operator PIN gate. "1" =
+         default behaviour (badge + auto-modal on /odoo /web /sb/ URLs
+         when no operator is bound). "0" = feature completely disabled:
+         no badge injected, no auto-prompt, no /sb/qr/whoami loops from
+         the client glue. Flip in Settings → Technical → System
+         Parameters when a site has no shop-floor tablet workflow (or
+         when the modal is blocking backend admin use). -->
+    <record id="ir_config_param_operator_pin_modal_enabled"
+            model="ir.config_parameter">
+        <field name="key">southbrook.qr_kit.operator_pin_modal_enabled</field>
+        <field name="value">0</field>
+    </record>
+
     <!-- W038 (R8.5) — night-shift dark mode auto-engage flag. When
          "1" the dark_mode_toggle.js will auto-flip to dark in the
          22:00-06:00 local window IF the user has NEVER set an
