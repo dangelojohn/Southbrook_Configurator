@@ -87,3 +87,59 @@ class TestFabioAsk(TransactionCase):
         self.assertEqual(menu.name, "Ask")
         self.assertEqual(action.name, "Ask Fabio")
         self.assertIn("Ask Fabio", form.arch_db)
+
+    def test_internal_pricing_question_routes_to_pricing_help(self):
+        """Rec #3 keyword branch — 'how much does a 24 inch cabinet cost'
+        used to fall through to the production summary; now it hits the
+        pricing branch and returns Order Builder guidance."""
+        for text in [
+            "How much does a 24 inch 3-door base cabinet cost?",
+            "What's the price for the Signature wall cabinet?",
+            "Show me pricing for Contractor tier 3",
+            "Can you draft a quote?",
+        ]:
+            question = self.env["southbrook.hermes.question"].create({
+                "question": text,
+                "scope": "internal",
+            })
+            question.action_answer()
+            self.assertIn("Order Builder", question.answer,
+                          "Pricing keyword branch missed on: %r" % text)
+            self.assertIn("channel", question.answer.lower(),
+                          "Pricing answer should mention channels: %r" % text)
+
+    def test_customer_pricing_lists_projects_without_orders_gracefully(self):
+        """No orders yet → 'pricing not yet set' branch. Creating a
+        priced order in test setup requires products + pricelists which
+        varies per DB — the empty-order path is what customers actually
+        hit first."""
+        partner = self.env["res.partner"].create(
+            {"name": "Pricing Customer"})
+        project = self.env["sb.kitchen.project"].create({
+            "name": "Pricing Kitchen",
+            "partner_id": partner.id,
+            "state": "awaiting_customer",
+        })
+
+        question = self.env["southbrook.hermes.question"].create({
+            "question": "How much will my kitchen cost?",
+            "scope": "customer",
+            "partner_id": partner.id,
+            "project_id": project.id,
+        })
+        question.action_answer()
+
+        self.assertIn("Pricing Kitchen", question.answer)
+        self.assertIn("not yet set", question.answer.lower())
+
+    def test_customer_pricing_without_projects_is_graceful(self):
+        partner = self.env["res.partner"].create(
+            {"name": "New Customer, No Projects"})
+        question = self.env["southbrook.hermes.question"].create({
+            "question": "What will my quote cost?",
+            "scope": "customer",
+            "partner_id": partner.id,
+        })
+        question.action_answer()
+
+        self.assertIn("no kitchen projects", question.answer.lower())

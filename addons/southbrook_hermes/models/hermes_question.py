@@ -133,6 +133,17 @@ class SouthbrookHermesQuestion(models.Model):
             return self._answer_mi_checks("blocker")
         if self._mentions_any(text, ("warn", "warning", "risk", "issue")):
             return self._answer_mi_checks("warning")
+        # Pricing branch — 2026-07-01. Real-data pricing lookup is a
+        # sidecar+LLM job (needs regex-driven dimension extraction +
+        # catalog browse + attribute resolution — see get_cabinet_price
+        # tool). Without the sidecar, redirect to the Order Builder
+        # where live pricing already works.
+        if self._mentions_any(
+            text,
+            ("price", "pricing", "cost", "how much", "quote", "quotation",
+             "dollar", "$"),
+        ):
+            return self._answer_pricing_help()
         if self._mentions_any(
             text,
             ("production", "mo", "manufacturing", "shop", "status", "today"),
@@ -141,9 +152,9 @@ class SouthbrookHermesQuestion(models.Model):
         return "\n\n".join([
             self._answer_production_summary(),
             _(
-                "Ask about blockers, warnings, production status, customer "
-                "projects, or the Southbrook production users for a more "
-                "specific answer."
+                "Ask about blockers, warnings, production status, "
+                "pricing, customer projects, or the Southbrook "
+                "production users for a more specific answer."
             ),
         ])
 
@@ -172,15 +183,68 @@ class SouthbrookHermesQuestion(models.Model):
             text, ("production", "manufacturing", "build", "shop")
         ):
             return self._answer_customer_production(projects)
+        if self._mentions_any(
+            text,
+            ("price", "pricing", "cost", "how much", "quote", "quotation",
+             "dollar", "$"),
+        ):
+            return self._answer_customer_pricing(projects)
         return self._answer_customer_status(projects)
 
     def _answer_help(self):
         return _(
             "Fabio can answer questions about production blockers, warnings, "
-            "manufacturing status, customer project status, approvals, and "
-            "the Southbrook production users. Fabio can also turn an answer "
-            "into a draft recommendation for human review."
+            "manufacturing status, customer project status, approvals, "
+            "pricing (via the Order Builder — full sidecar pricing tools "
+            "land when the LLM sidecar is deployed), and the Southbrook "
+            "production users. Fabio can also turn an answer into a draft "
+            "recommendation for human review."
         )
+
+    def _answer_pricing_help(self):
+        return _(
+            "For accurate cabinet pricing, open the Order Builder — "
+            "/my/southbrook/order-builder — or add cabinets to a draft "
+            "order. Live prices update as you configure width, doors, "
+            "series, box material, door style, and finish. Channel "
+            "discounts apply automatically based on the partner's "
+            "res.partner.channel: Retail (list), Dealer -50%, Contractor "
+            "tiered 25%/30%/35%, Central KD ~46% off list, Refacing per "
+            "SF, Big-Box wholesale. Once the Fabio sidecar with the "
+            "list_catalog / get_cabinet_price / get_pricelist tools is "
+            "deployed, Fabio will answer specific price questions here "
+            "directly."
+        )
+
+    def _answer_customer_pricing(self, projects):
+        if not projects:
+            return _(
+                "I do not see any kitchen projects for you yet. Once "
+                "your sales rep starts one, pricing will appear in the "
+                "Order Builder here."
+            )
+        lines = [_("Here is what I see for pricing on your projects:")]
+        for project in projects[:5]:
+            sale_orders = project.sale_order_id
+            if sale_orders and sale_orders.amount_total:
+                lines.append(
+                    _(
+                        "- %(name)s: %(total)s total (currency %(cur)s). "
+                        "Open the Order Builder for line-item detail."
+                    ) % {
+                        "name": project.display_name,
+                        "total": sale_orders.amount_total,
+                        "cur": sale_orders.currency_id.name or "USD",
+                    }
+                )
+            else:
+                lines.append(
+                    _(
+                        "- %s: pricing not yet set. Your sales rep needs "
+                        "to add cabinets to the draft order first."
+                    ) % project.display_name
+                )
+        return "\n".join(lines)
 
     def _answer_users(self):
         known_roles = {

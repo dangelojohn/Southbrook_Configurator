@@ -87,19 +87,36 @@ class HermesProxyController(http.Controller):
         sidecar_url = (ICP.get_param("southbrook_hermes.sidecar_url") or "").strip()
 
         if not sidecar_enabled or not sidecar_url:
-            # Stub fallback — used before the sidecar is deployed or while
-            # debugging. The OWL component renders stub.answer as a single
-            # assistant message.
-            claims = jwt_helper.verify_jwt(request.env, token)
-            stub_answer = (
-                f"(Stub answer — sidecar not yet wired.) Question received: "
-                f"'{body.get('q', '')}'.")
+            # 2026-07-01 unification — instead of echoing an empty stub,
+            # route through the same `southbrook.hermes.question`
+            # machinery `/my/fabio` uses. That way both Fabio surfaces
+            # answer identically even before the sidecar comes online:
+            # keyword-matched answers grounded in real Odoo data (MI
+            # checks, production summary, user list, project state,
+            # pricing help). See hermes_question.py `_answer_internal`
+            # / `_answer_customer` for the keyword branches.
+            user = request.env.user
+            scope = "customer" if user.share else "internal"
+            vals = {
+                "question": (body.get("q") or "").strip(),
+                "scope": scope,
+                "partner_id": user.partner_id.id if scope == "customer" else False,
+                "asked_by_id": user.id,
+            }
+            order_id = body.get("order_id")
+            if order_id:
+                try:
+                    vals["sale_order_id"] = int(order_id)
+                except (TypeError, ValueError):
+                    pass
+            question = request.env["southbrook.hermes.question"].sudo().create(vals)
+            question.action_answer()
             return self._json({
                 "stub": True,
-                "answer": stub_answer,
+                "answer": question.answer or "(No answer generated.)",
                 "persona": persona,
                 "tier": tier,
-                "jwt_iat_seen": claims["iat"],
+                "question_id": question.id,
             })
 
         # Live path — proxy to the sidecar.

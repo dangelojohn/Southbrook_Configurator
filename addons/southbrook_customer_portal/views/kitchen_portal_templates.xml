@@ -46,7 +46,7 @@
                     <label for="fabio_question" class="form-label">Question</label>
                     <textarea id="fabio_question" name="question"
                               class="form-control" rows="4"
-                              placeholder="Ask about status, approvals, production, or next steps."
+                              placeholder="Ask about status, approvals, production, pricing, or next steps."
                               required="required"></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary">Ask Fabio</button>
