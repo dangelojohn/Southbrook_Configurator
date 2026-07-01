@@ -82,9 +82,28 @@ The runtime tripwire designed post-failure (see §Follow-ups) closes this gap by
 
 ## The rule for future Sprint 2d attempts
 
-*(From the bisect agent's §4 "applies-broadly principle" — to be filled in.)*
+**Odoo asset-bundle module ids include the full filename minus `.js`.** If a file is `foo.esm.js`, it registers as `@addon/path/foo.esm` — not `@addon/path/foo`. Every import path must match the on-disk filename byte-for-byte.
 
-_tbd_
+Consequences codified after this incident:
+
+- **Never trust "marker string present" as a load-success signal.** The `scripts/rec_d_sprint2d_tripwire.sh` script gained a pre-flight import-path grep (exit code 5 = "BROKEN IMPORTS") that fires locally *before* any deploy round-trip. Verified against the failing commit `02de535` — catches all 14 broken imports.
+- **First extraction sets the pattern for all that follow.** Any Sprint that batches N files behind one convention decision must land Step 1 as an isolated deploy that actually mounts on the target host before Step 2 is even authored. That's the 5.5.0 checkpoint pattern the retry used.
+- **Copy the extension convention from a working sibling addon, not from memory.** `southbrook_estimating_website/js/*.esm` demonstrates the correct pattern one directory over.
+
+## Sprint 2d retry outcome (7 additional deploys — all green)
+
+| Commit | Version | Scope |
+|---|---|---|
+| `8fa45fd` | 5.5.0 | Retry step 1 · constants + .esm fix + upgraded tripwire |
+| `9afb28c` | 5.5.1 | Retry steps 2-19 · full canvas landing |
+| `767da5e` | 5.5.2 | Steps 20-21 · scene_init + scene_dispose |
+| `86f5480` | 5.5.3 | Step 22 · camera_controller |
+| `de06352` | 5.5.4 | Step 23 · pointer_pipeline |
+| `7baebb8` | 5.5.5 | Step 24a · KitchenCanvas skeleton + postmortem sync |
+
+Total shipped canvas modules at 5.5.5: **21** (20 pure helpers + 1 OWL component skeleton).
+
+The Playwright runtime tripwire (`docs/rec_d_sprint2d_postmortem_2026-07-01.md` §Follow-ups #1) was NOT built before the retry landed — the compile-time import-path grep proved sufficient to catch the bug class in question. The Playwright tripwire remains valuable for the different failure mode of a class body throwing at OWL mount time; it's a follow-up item, not a prerequisite for Sprint 2d resumption.
 
 ---
 

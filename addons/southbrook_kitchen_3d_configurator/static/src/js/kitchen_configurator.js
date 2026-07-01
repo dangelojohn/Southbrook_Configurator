@@ -877,9 +877,13 @@ class SouthbrookKitchenConfigurator extends Component {
     // Swap to a named view. instant=true jumps; otherwise lerps over ms.
     // Rec D · Sprint 2d step 22 — camera controller (setView +
     // animateCamera + onWheel) moved to canvas/camera_controller.
-    // esm.js. Class-side wrappers still write this.state.view
-    // (OWL reactive) before delegating.
+    // esm.js. Guard on viewSpecs[key] before writing state.view
+    // so an invalid key doesn't corrupt state (parity with the
+    // pre-2d guard-then-write ordering). The state write must
+    // precede setViewShared so _applyOrthoFrustum reads the new
+    // view's vs, not the old one.
     _setView(key, instant = false) {
+        if (!this.T.viewSpecs || !this.T.viewSpecs[key]) return;
         this.state.view = key;
         setViewShared(this.T, key, {
             instant,
