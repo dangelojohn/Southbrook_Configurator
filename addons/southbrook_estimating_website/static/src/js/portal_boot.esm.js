@@ -32,7 +32,8 @@
  *     },
  *   };
  */
-import { Component, mount, markup, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
+import { Component, markup, onMounted, onWillUnmount, onWillUpdateProps, useState, whenReady, xml } from "@odoo/owl";
+import { mountComponent } from "@web/env";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
 import { RoomLayoutTab, AssignToWallModal, GapRecommendModal } from "@southbrook_estimating_website/js/room_layout.esm";
@@ -5535,7 +5536,6 @@ class OrderBuilder extends Component {
 async function mountOrderBuilder() {
     const root = document.getElementById("order_builder_root");
     if (!root || root.dataset.owlMounted === "1") return;
-    root.dataset.owlMounted = "1";
 
     const orderId = root.dataset.orderId || "";
     const orderName = root.dataset.orderName || "";
@@ -5560,10 +5560,20 @@ async function mountOrderBuilder() {
     root.innerHTML = "";
 
     try {
-        await mount(OrderBuilder, root, {
+        // 2026-07-01 fix — use `mountComponent` from `@web/env` rather
+        // than raw OWL `mount()`. mountComponent seeds a fresh Odoo
+        // env (env.services populated via `startServices`, template
+        // registry wired via `getTemplate`), which is what descendants
+        // like `AppliancePalette` need — its `setup()` calls
+        // `useService("orm")` and would crash with "Cannot use 'in'
+        // operator to search for 'orm' in undefined" against a bare
+        // OWL App that has no env.
+        root.dataset.owlMounted = "1";
+        await mountComponent(OrderBuilder, root, {
             props: { orderId, orderName, mode },
         });
     } catch (err) {
+        delete root.dataset.owlMounted;
         // Surface mount failures in the DOM so they're discoverable
         // without DevTools — important during scaffold verification.
         root.innerHTML =
@@ -5576,8 +5586,11 @@ async function mountOrderBuilder() {
     }
 }
 
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mountOrderBuilder);
-} else {
-    queueMicrotask(mountOrderBuilder);
-}
+whenReady(mountOrderBuilder).catch((err) => {
+    // Async work outside the try/catch above (DOM lookup, dataset
+    // reads, URL parsing) is theoretical but possible — hardened
+    // portals with Trusted Types can throw on innerHTML=""; make
+    // sure it doesn't become an "Uncaught (in promise)".
+    // eslint-disable-next-line no-console
+    console.error("[southbrook_estimating_website] mountOrderBuilder failed before mount:", err);
+});

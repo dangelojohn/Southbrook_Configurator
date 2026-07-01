@@ -6,8 +6,12 @@ the upcoming Room Setup tab (Phase 2.B) and the 3-step wizard (Phase
 2.C). Server-side only; no OWL changes ship in 2.A.
 
 Auth + ownership reuse `_southbrook_resolve_order` from main.py via
-class inheritance — `SouthbrookRoomApi` is a subclass of
-`SouthbrookKitchenPlanner` so the helper resolves on `self` cleanly.
+class inheritance — `SouthbrookKitchenPlanner` inherits the shared
+`_SouthbrookOrderAccessMixin`, so `SouthbrookRoomApi` picks the helper
+up through MRO. Pre-2026-07-01 the mixin didn't exist and the resolver
+lived only on `SouthbrookOrderBuilderPortal` (a sibling class RoomApi
+does NOT extend) — every /southbrook/api/order/<id>/... call raised
+AttributeError at runtime. See test_room_api_inheritance.py.
 
 Error convention follows the existing add-line endpoint
 (main.py:1223-1260): return `{"error": "<code>"}` strings; never raise
