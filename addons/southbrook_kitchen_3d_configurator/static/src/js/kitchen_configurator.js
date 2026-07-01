@@ -54,6 +54,10 @@ import {
     isPinnable,
     cursorForPointerState,
 } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_pipeline.esm";
+// Rec D · Sprint 2d Step 24b — hidden-sibling <KitchenCanvas> mount.
+// Child renders its own Three.js scene off-screen from the same
+// props snapshot; parent's <div t-ref="canvas3d"/> stays visible.
+import { KitchenCanvas } from "@southbrook_kitchen_3d_configurator/js/canvas/kitchen_canvas.esm";
 
 const actionRegistry = registry.category("actions");
 
@@ -1739,6 +1743,10 @@ SouthbrookKitchenConfigurator.template = xml`
           t-on-dragleave="_onCanvasDragLeave"
           t-on-drop="_onCanvasDrop">
       <div t-ref="canvas3d" class="o_sbk_canvas3d"/>
+      <!-- 24b: hidden-sibling <KitchenCanvas> proves the child can
+           build a scene from props without swapping the visible
+           surface. Event props deferred to 24c-e. -->
+      <KitchenCanvas items="state.items" room="state.room" view="state.view" selected="state.selected"/>
 
       <!-- Dimension ruler overlay -->
       <div class="o_sbk_ruler">
@@ -2006,5 +2014,7 @@ SouthbrookKitchenConfigurator.props = {
     "*":            true,
 };
 SouthbrookKitchenConfigurator.defaultProps = {};
+// Rec D · Sprint 2d Step 24b — register <KitchenCanvas> as a child.
+SouthbrookKitchenConfigurator.components = { KitchenCanvas };
 
 actionRegistry.add("southbrook_kitchen_configurator", SouthbrookKitchenConfigurator);
