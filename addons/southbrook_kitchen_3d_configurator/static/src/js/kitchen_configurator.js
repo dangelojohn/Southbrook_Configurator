@@ -31,6 +31,7 @@ import { easeInOutCubic } from "@southbrook_kitchen_3d_configurator/js/canvas/ea
 import { computeOrthoFrustum } from "@southbrook_kitchen_3d_configurator/js/canvas/ortho_frustum";
 import { highlightSelected } from "@southbrook_kitchen_3d_configurator/js/canvas/selection";
 import { computeDropXIn } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_raycaster";
+import { buildRoomShell } from "@southbrook_kitchen_3d_configurator/js/canvas/room_shell";
 
 const actionRegistry = registry.category("actions");
 
@@ -1300,26 +1301,14 @@ class SouthbrookKitchenConfigurator extends Component {
         const mk = (geo, color, pos, rotE, opts) =>
             makeMesh(THREE, scene, geo, color, pos, rotE, opts);
 
-        // ── Room shell ── (matte plaster + flooring; high roughness)
-        const floor = mk(new THREE.PlaneGeometry(rw, rd), P.floor, [rw/2, 0, rd/2], [-Math.PI/2, 0, 0], { rs: true, rough: 0.95, metal: 0.0 });
-        const bwall = mk(new THREE.PlaneGeometry(rw, rh), P.wall1, [rw/2, rh/2, 0],  null,              { rs: true, rough: 0.9,  metal: 0.0 });
-        const lwall = mk(new THREE.PlaneGeometry(rd, rh), P.wall2, [0, rh/2, rd/2],  [0, Math.PI/2, 0], { rs: true, rough: 0.9,  metal: 0.0 });
-
-        // Wainscoting rail on back wall — semi-gloss wood trim
-        const railY = 36 * IN;
-        this.T.roomObjs.push(
-            floor, bwall, lwall,
-            mk(new THREE.BoxGeometry(rw, 0.012, 0.02), P.cabDark, [rw/2, railY, 0.01], null, { rough: 0.55, metal: 0.0 })
+        // Rec D · Sprint 2d step 11 — room shell (floor + 2 walls +
+        // wainscoting rail + floor grid) moved to canvas/room_shell.
+        // esm.js. Returns the objects list; we push into roomObjs so
+        // the dispose loop at the top of _buildScene handles them.
+        const { objects: shellObjects } = buildRoomShell(
+            THREE, scene, mk, P, rw, rh, rd,
         );
-
-        // Floor grid
-        const gSz = Math.max(rw, rd) + 6;
-        const grid = new THREE.GridHelper(gSz, Math.ceil(gSz * 2), P.grid, P.grid);
-        grid.position.set(rw/2, 0.002, rd/2);
-        grid.material.transparent = true;
-        grid.material.opacity     = 0.18;
-        scene.add(grid);
-        this.T.roomObjs.push(grid);
+        this.T.roomObjs.push(...shellObjects);
 
         // ── Cabinet fill ──
         const items = this.state.items;
