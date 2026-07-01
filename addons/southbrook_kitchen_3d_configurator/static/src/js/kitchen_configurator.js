@@ -23,6 +23,7 @@ import {
     IN, BW, BH, BD, WW, WH, WD, CTR, GAP, WBY, P,
 } from "@southbrook_kitchen_3d_configurator/js/canvas/constants";
 import { loadThreeJS } from "@southbrook_kitchen_3d_configurator/js/canvas/three_loader";
+import { ndcFromEvent } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_helpers";
 
 const actionRegistry = registry.category("actions");
 
@@ -1729,13 +1730,11 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     // ─── Mouse events ────────────────────────────────────────────────────────────
+    // Rec D · Sprint 2d step 3 — thin wrapper delegating to the
+    // shared pure function so future <KitchenCanvas> can reuse the
+    // same math with its own canvas element.
     _ndcFromEvent(e) {
-        const rect = this.canvas3dRef.el?.getBoundingClientRect();
-        if (!rect) return { x: 0, y: 0 };
-        return {
-            x:  ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-            y: -((e.clientY - rect.top)  / rect.height) * 2 + 1,
-        };
+        return ndcFromEvent(e, this.canvas3dRef.el);
     }
 
     _onMouseDown(e) {
