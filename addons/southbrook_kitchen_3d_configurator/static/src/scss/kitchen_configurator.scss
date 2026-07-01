@@ -1027,15 +1027,41 @@ $sbk-amber:      #B45309;
 // !important is scoped to the two selectors we don't own (.o_action_manager
 // and internal Odoo layout) — for our own .o_sbk_* selectors it's redundant
 // with source order but kept for parity with the tested devtools patch.
+//
+// v2 (2026-06-30): expand coverage to the full container chain the
+// backend webclient wraps us in — .o_action_manager > .o_action >
+// .o_content > .o_sbk_root. Each intermediate has its own overflow
+// rules in Odoo core; if we only pin .o_action_manager the mid-chain
+// container can still clip. Root switched from calc(100vh - 48px) to
+// height:100% so it fills whatever the parent gives it — the fixed
+// vh math didn't match the actual container height at all viewports.
 .o_action_manager {
     overflow-y: auto !important;
     overflow-x: hidden !important;
 }
 
-.o_sbk_root {
-    min-height: calc(100vh - 48px) !important;
-    height: calc(100vh - 48px) !important;
+.o_action_manager > .o_action {
+    height: 100% !important;
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.o_action_manager > .o_action > .o_content {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.o_sbk_root {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    flex: 1 1 0% !important;
 }
 
 .o_sbk_workspace {
