@@ -15,34 +15,33 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { rpc } from "@web/core/network/rpc";
 
-// Rec D · Sprint 2d Step 1 (retry after 5.4.13 rollback) — canvas
-// constants moved to canvas/constants.esm.js. Values identical.
-//
-// IMPORTANT: the path suffix is `.esm` (NOT bare `.../constants`) —
-// Odoo registers files named `foo.esm.js` as module id
-// `@addon/path/foo.esm`, not `@addon/path/foo`. The bare form is
-// the exact regression that broke 5.4.13; caught pre-deploy by
-// `scripts/rec_d_sprint2d_tripwire.sh` since the retry.
+// Rec D · Sprint 2d · Step 1 · shared canvas constants.
+// Values are identical to the pre-2d inline block (kept verbatim);
+// the file just moved so future <KitchenCanvas> can import the
+// same palette + sizing without duplicating.
 import {
     IN, BW, BH, BD, WW, WH, WD, CTR, GAP, WBY, P,
 } from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
+import { loadThreeJS } from "@southbrook_kitchen_3d_configurator/js/canvas/three_loader.esm";
+import { ndcFromEvent } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_helpers.esm";
+import { computeViewSpecs } from "@southbrook_kitchen_3d_configurator/js/canvas/view_specs.esm";
+import { makeMesh } from "@southbrook_kitchen_3d_configurator/js/canvas/mesh_factory.esm";
+import { packRow } from "@southbrook_kitchen_3d_configurator/js/canvas/pack_row.esm";
+import { easeInOutCubic } from "@southbrook_kitchen_3d_configurator/js/canvas/easing.esm";
+import { computeOrthoFrustum } from "@southbrook_kitchen_3d_configurator/js/canvas/ortho_frustum.esm";
+import { highlightSelected } from "@southbrook_kitchen_3d_configurator/js/canvas/selection.esm";
+import { computeDropXIn } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_raycaster.esm";
+import { buildRoomShell } from "@southbrook_kitchen_3d_configurator/js/canvas/room_shell.esm";
+import { buildDragHandle } from "@southbrook_kitchen_3d_configurator/js/canvas/drag_handle.esm";
+import { buildDropLanes } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_lanes.esm";
+import { installPbrEnvMap } from "@southbrook_kitchen_3d_configurator/js/canvas/pbr_env_map.esm";
+import { buildBaseCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/base_cabinet.esm";
+import { buildWallCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/wall_cabinet.esm";
+import {
+    buildOtherCabinet, buildFillerPanel, buildEndCapPanel,
+} from "@southbrook_kitchen_3d_configurator/js/canvas/other_cabinets.esm";
 
 const actionRegistry = registry.category("actions");
-
-// ─── Three.js loader ──────────────────────────────────────────────────────────
-// As of 19.0.3.0.0 we depend on southbrook_estimating, which ships a
-// vendored r160 build of THREE in web.assets_backend (via this addon's
-// manifest). The previous CDN load of three@0.128 was dropped — it
-// lacked SRGBColorSpace / ACESFilmicToneMapping (r152+) and double-
-// loaded against the catalog's local copy. window.THREE is guaranteed
-// to be present at module load time.
-function loadThreeJS() {
-    if (window.THREE) return Promise.resolve(window.THREE);
-    return Promise.reject(new Error(
-        "Three.js not available. southbrook_estimating's vendored " +
-        "three.min.js must load before kitchen_configurator.js (see manifest)."
-    ));
-}
 
 // ─── OWL Component ────────────────────────────────────────────────────────────
 class SouthbrookKitchenConfigurator extends Component {
@@ -478,21 +477,16 @@ class SouthbrookKitchenConfigurator extends Component {
     // back to inches and snap to the 6" grid. Returns null when the
     // ray doesn't hit the floor (e.g. the cursor was over the sky in
     // a perspective view tilted upward).
+    // Rec D · Sprint 2d step 10 — thin wrapper delegating to the
+    // shared raycast helper so <KitchenCanvas> can compute drop-X
+    // from any camera + raycaster + ndc + room-width pair.
     _computeDropX(ev) {
         const t = this.T;
-        if (!t.activeCamera || !t.raycaster || !t.THREE) return null;
-        t.raycaster.setFromCamera(this._ndcFromEvent(ev), t.activeCamera);
-        const floor  = new t.THREE.Plane(new t.THREE.Vector3(0, 1, 0), 0);
-        const hit    = new t.THREE.Vector3();
-        const result = t.raycaster.ray.intersectPlane(floor, hit);
-        if (!result) return null;
-        // hit.x is in scene-feet (IN = 1/12). Multiply by 12 to get inches.
-        let xIn = hit.x * 12;
-        // Clamp inside the room, leave at least 6" headroom on the right
-        // for the cabinet to fit, then snap to the 6" grid.
-        const maxX = Math.max(0, this.state.room.width_in - 6);
-        xIn = Math.max(0, Math.min(maxX, xIn));
-        return Math.round(xIn / 6) * 6;
+        return computeDropXIn(
+            t.THREE, t.activeCamera, t.raycaster,
+            this._ndcFromEvent(ev),
+            this.state.room.width_in,
+        );
     }
 
     // Generic add — used by drop AND by a future "click to add" button.
@@ -708,38 +702,10 @@ class SouthbrookKitchenConfigurator extends Component {
         // no item in a row is pinned, behaviour is identical to the
         // pre-4.23 cascade (pack from x=0), so existing designs
         // render exactly as before until the user drags a cabinet.
-        const packRow = (row) => {
-            const pinned   = row.filter(it => it.pinned).sort(sortX);
-            const unpinned = row.filter(it => !it.pinned);
-            let cursor = 0;
-            let pi = 0;
-            for (const u of unpinned) {
-                const w = u.width_in || 0;
-                while (pi < pinned.length
-                       && (pinned[pi].x_position_in || 0) <= cursor) {
-                    cursor = Math.max(
-                        cursor,
-                        (pinned[pi].x_position_in || 0)
-                            + (pinned[pi].width_in || 0),
-                    );
-                    pi++;
-                }
-                if (pi < pinned.length
-                    && (pinned[pi].x_position_in || 0) >= cursor + w) {
-                    u.x_position_in = cursor;
-                    cursor += w;
-                } else if (pi < pinned.length) {
-                    cursor = (pinned[pi].x_position_in || 0)
-                           + (pinned[pi].width_in || 0);
-                    pi++;
-                    u.x_position_in = cursor;
-                    cursor += w;
-                } else {
-                    u.x_position_in = cursor;
-                    cursor += w;
-                }
-            }
-        };
+        // Rec D · Sprint 2d step 6 — the packRow closure moved to
+        // canvas/pack_row.esm.js as a pure exported function; the
+        // three call sites keep the same signature so scene-diff
+        // rebuild timings are unchanged.
         packRow(bases);
         packRow(walls);
         packRow(tailItems);
@@ -937,99 +903,39 @@ class SouthbrookKitchenConfigurator extends Component {
         window.addEventListener("keydown", this._onKeyDown);
     }
 
-    // ─── PBR environment map (PMREM) ────────────────────────────────────────────
-    // Builds a small studio HDR-equivalent from a vertical gradient on a
-    // canvas, runs it through PMREMGenerator, and assigns the result as
-    // scene.environment. Adds soft PBR reflections on MeshStandardMaterial
-    // metalness/roughness without needing an HDR file at runtime.
-    // Mirrors southbrook_estimating_website/kitchen_viewport.esm.js.
+    // Rec D · Sprint 2d step 14 — PBR env map install moved to
+    // canvas/pbr_env_map.esm.js. Same 512×256 gradient studio HDR
+    // + PMREM install path; identical rendering.
     _installPbrEnvMap() {
         const { THREE, scene, renderer } = this.T;
-        if (!THREE || !scene || !renderer) return;
-        if (!THREE.PMREMGenerator)        return;
-        try {
-            const canvas = document.createElement("canvas");
-            const w = 512, h = 256;
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            const grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0.00, "#fff5e8");   // overhead warm
-            grad.addColorStop(0.40, "#e8e4dc");   // soft mid
-            grad.addColorStop(0.70, "#c9c4ba");   // shadow side
-            grad.addColorStop(1.00, "#8a8680");   // floor
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, w, h);
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.mapping = THREE.EquirectangularReflectionMapping;
-            if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-            const pmrem = new THREE.PMREMGenerator(renderer);
-            const envRT = pmrem.fromEquirectangular(tex);
-            scene.environment = envRT.texture;
-            tex.dispose();
-            pmrem.dispose();
-        } catch (exc) {
-            console.warn("[SouthbrookKitchenConfigurator] PBR env install skipped:", exc);
-        }
+        installPbrEnvMap(THREE, scene, renderer);
     }
 
     // ─── D1 — Multi-view camera system ──────────────────────────────────────────
-    // Compute view specs from current room dimensions. Each entry =
-    // { pos: Vector3, target: Vector3, up: Vector3, cam: 'ortho'|'persp',
-    //   vs?: number (ortho frustum half-height in scene-feet) }.
+    // Rec D · Sprint 2d step 4 — thin wrapper delegating to the
+    // shared pure function so <KitchenCanvas> can compute its own
+    // view specs. Same dict shape assigned to the same class ref.
     _recomputeViews(rw, rh, rd) {
-        const THREE = this.T.THREE;
-        const max3  = Math.max(rw, rd, rh);
-        const max2  = Math.max(rw, rd);
-        const wallH = Math.max(rw, rh);
-        const sideH = Math.max(rd, rh);
-        this.T.viewSpecs = {
-            iso:   { cam: "ortho",
-                     pos:    new THREE.Vector3(rw + 12, rh * 0.7 + 6, rd + 12),
-                     target: new THREE.Vector3(rw / 2, rh * 0.28, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     max3  * 0.68 + 4.5 },
-            top:   { cam: "ortho",
-                     pos:    new THREE.Vector3(rw / 2, rh + 20, rd / 2),
-                     target: new THREE.Vector3(rw / 2, 0, rd / 2),
-                     up:     new THREE.Vector3(0, 0, -1),
-                     vs:     max2  * 0.60 + 3.0 },
-            front: { cam: "ortho",
-                     pos:    new THREE.Vector3(rw / 2, rh / 2, rd + 18),
-                     target: new THREE.Vector3(rw / 2, rh / 2, 0),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     wallH * 0.60 + 2.0 },
-            left:  { cam: "ortho",
-                     pos:    new THREE.Vector3(-18, rh / 2, rd / 2),
-                     target: new THREE.Vector3(0, rh / 2, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     sideH * 0.60 + 2.0 },
-            right: { cam: "ortho",
-                     pos:    new THREE.Vector3(rw + 18, rh / 2, rd / 2),
-                     target: new THREE.Vector3(rw, rh / 2, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0),
-                     vs:     sideH * 0.60 + 2.0 },
-            persp: { cam: "persp",
-                     pos:    new THREE.Vector3(rw + 10, rh * 0.9, rd + 10),
-                     target: new THREE.Vector3(rw / 2, rh * 0.35, rd / 2),
-                     up:     new THREE.Vector3(0, 1, 0) },
-        };
+        this.T.viewSpecs = computeViewSpecs(this.T.THREE, rw, rh, rd);
     }
 
     // Apply the current view's ortho frustum + the wheel-zoom multiplier.
     // Safe to call even when the active camera is perspective (no-op).
+    // Rec D · Sprint 2d step 8 — frustum math moved to
+    // canvas/ortho_frustum.esm.js so <KitchenCanvas> can share it.
     _applyOrthoFrustum() {
         const t = this.T;
         const cam = t.cameras?.ortho;
         if (!cam || !t.renderer) return;
         const spec = t.viewSpecs?.[this.state.view];
-        const baseVs = (spec && spec.vs) || 9;
-        const vs = baseVs * (t.vsScale || 1);
-        const W = t.renderer.domElement.width;
-        const H = t.renderer.domElement.height;
-        const asp = (W && H) ? W / H : 1;
-        cam.left  = -vs * asp;  cam.right  = vs * asp;
-        cam.top   =  vs;        cam.bottom = -vs;
-        cam.near  = 0.1;        cam.far    = 300;
+        const f = computeOrthoFrustum(
+            spec && spec.vs, t.vsScale,
+            t.renderer.domElement.width,
+            t.renderer.domElement.height,
+        );
+        cam.left = f.left; cam.right = f.right;
+        cam.top  = f.top;  cam.bottom = f.bottom;
+        cam.near = f.near; cam.far    = f.far;
         cam.updateProjectionMatrix();
     }
 
@@ -1078,7 +984,9 @@ class SouthbrookKitchenConfigurator extends Component {
         const fromPos = cam.position.clone();
         const fromTgt = t.currentTarget.clone();
         const t0 = performance.now();
-        const ease = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+        // Rec D · Sprint 2d step 7 — the ease closure moved to
+        // canvas/easing.esm.js as easeInOutCubic (same shape).
+        const ease = easeInOutCubic;
         t.animatingCamera = true;
         const step = () => {
             if (!this.T.activeCamera || this.T.activeCamera !== cam) {
@@ -1365,46 +1273,23 @@ class SouthbrookKitchenConfigurator extends Component {
         this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = []; this.T.handleMesh = null;
         this.T.arrowMeshes = [];
 
-        // Helper: make + add mesh — now PBR (MeshStandardMaterial).
-        // opts.rough / opts.metal control the PBR contract; if absent
-        // we default to a matte-carcass profile (rough=0.7, metal=0.0).
-        // cs/rs flags toggle shadow casting/receiving as before.
-        const mk = (geo, color, pos, rotE, opts = {}) => {
-            const mat = new THREE.MeshStandardMaterial({
-                color,
-                roughness: opts.rough != null ? opts.rough : 0.7,
-                metalness: opts.metal != null ? opts.metal : 0.0,
-            });
-            const m = new THREE.Mesh(geo, mat);
-            m.position.set(...pos);
-            if (rotE) { m.rotation.x = rotE[0]; m.rotation.y = rotE[1]; m.rotation.z = rotE[2]; }
-            if (opts.cs) m.castShadow    = true;
-            if (opts.rs) m.receiveShadow = true;
-            if (opts.ud) m.userData      = opts.ud;
-            scene.add(m);
-            return m;
-        };
+        // Rec D · Sprint 2d step 5 — thin closure over the shared
+        // makeMesh factory so the ~40 call sites below stay
+        // signature-compatible with the pre-2d code (`mk(geo, color,
+        // pos, rotE, opts)`) while the actual mesh construction lives
+        // in canvas/mesh_factory.esm.js for future <KitchenCanvas>
+        // reuse.
+        const mk = (geo, color, pos, rotE, opts) =>
+            makeMesh(THREE, scene, geo, color, pos, rotE, opts);
 
-        // ── Room shell ── (matte plaster + flooring; high roughness)
-        const floor = mk(new THREE.PlaneGeometry(rw, rd), P.floor, [rw/2, 0, rd/2], [-Math.PI/2, 0, 0], { rs: true, rough: 0.95, metal: 0.0 });
-        const bwall = mk(new THREE.PlaneGeometry(rw, rh), P.wall1, [rw/2, rh/2, 0],  null,              { rs: true, rough: 0.9,  metal: 0.0 });
-        const lwall = mk(new THREE.PlaneGeometry(rd, rh), P.wall2, [0, rh/2, rd/2],  [0, Math.PI/2, 0], { rs: true, rough: 0.9,  metal: 0.0 });
-
-        // Wainscoting rail on back wall — semi-gloss wood trim
-        const railY = 36 * IN;
-        this.T.roomObjs.push(
-            floor, bwall, lwall,
-            mk(new THREE.BoxGeometry(rw, 0.012, 0.02), P.cabDark, [rw/2, railY, 0.01], null, { rough: 0.55, metal: 0.0 })
+        // Rec D · Sprint 2d step 11 — room shell (floor + 2 walls +
+        // wainscoting rail + floor grid) moved to canvas/room_shell.
+        // esm.js. Returns the objects list; we push into roomObjs so
+        // the dispose loop at the top of _buildScene handles them.
+        const { objects: shellObjects } = buildRoomShell(
+            THREE, scene, mk, P, rw, rh, rd,
         );
-
-        // Floor grid
-        const gSz = Math.max(rw, rd) + 6;
-        const grid = new THREE.GridHelper(gSz, Math.ceil(gSz * 2), P.grid, P.grid);
-        grid.position.set(rw/2, 0.002, rd/2);
-        grid.material.transparent = true;
-        grid.material.opacity     = 0.18;
-        scene.add(grid);
-        this.T.roomObjs.push(grid);
+        this.T.roomObjs.push(...shellObjects);
 
         // ── Cabinet fill ──
         const items = this.state.items;
@@ -1418,133 +1303,23 @@ class SouthbrookKitchenConfigurator extends Component {
         // reposition here; see _recomputeLayoutFromItems for the rule).
         const endCapItems = items.filter(it => it.cabinet_type === "panel");
 
-        baseItems.forEach((item, i) => {
-            const x   = item.x_position_in * IN;
-            const cbW = item.width_in  * IN;
-            const cbH = item.height_in * IN;
-            const cbD = item.depth_in  * IN;
-
-            // Toe kick — flat black/matte
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW - 0.01, 3.5 * IN, cbD - 0.01), P.toekick,
-                [x + cbW/2, 3.5*IN/2, cbD/2], null, { cs: true, rough: 0.95, metal: 0.0 }
-            ));
-
-            // Cabinet body — satin-lacquer carcass
-            const body = mk(
-                new THREE.BoxGeometry(cbW - 0.02, cbH - 3.5*IN, cbD - 0.02), P.cab,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN)/2, cbD/2], null,
-                { cs: true, rs: true, rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "base", item } }
-            );
-            this.T.cabObjs.push(body);
-            this.T.clickable.push(body);
-
-            // Shaker door upper inset — slightly glossier than carcass
-            const dH = (cbH - 3.5*IN) * 0.60;
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW - 0.10, dH, 0.016), P.cabDark,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.72 - dH/2, cbD - 0.001], null,
-                { rough: 0.6, metal: 0.05, ud: { cab: true, cabType: "base", item } }
-            ));
-
-            // Drawer face
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW - 0.10, (cbH - 3.5*IN) * 0.21, 0.016), P.cab,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.13, cbD - 0.001], null,
-                { rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "base", item } }
-            ));
-
-            // Door handle — brushed metal (this is the realism win — handles
-            // were the flattest part of the old Lambert pass)
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW * 0.44, 0.025, 0.040), P.handle,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.42, cbD + 0.018], null,
-                { rough: 0.35, metal: 0.85 }
-            ));
-            // Drawer handle — same brushed metal
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW * 0.30, 0.025, 0.038), P.handle,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.13, cbD + 0.018], null,
-                { rough: 0.35, metal: 0.85 }
-            ));
-
-            // Countertop — quartz/stone (low roughness, faint specular)
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW + 0.005, CTR, cbD + 0.07), P.counter,
-                [x + cbW/2, cbH + CTR/2, cbD/2 + 0.03], null,
-                { cs: true, rough: 0.4, metal: 0.05 }
-            ));
-            // Countertop drip edge
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW + 0.005, CTR * 0.6, 0.022), P.cabDark,
-                [x + cbW/2, cbH + CTR * 0.3, cbD + 0.07], null,
-                { rough: 0.5, metal: 0.05 }
-            ));
-
-            // v19.0.4.24.0 P0#1 Stage 2 — Visual pin indicator. Small
-            // teal sphere hovering just above the countertop's back-
-            // right corner marks the cabinet as manually placed.
-            // Gated behind item.pinned so a fresh page render adds
-            // zero geometry (no regression on non-pinned scenes).
-            // Disposed by the existing cabObjs cleanup at frame start.
-            if (item.pinned) {
-                this.T.cabObjs.push(mk(
-                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
-                    [x + cbW - 0.10, cbH + CTR + 0.16, cbD - 0.10], null,
-                    { rough: 0.3, metal: 0.5 }
-                ));
-            }
+        // Rec D · Sprint 2d step 15 — base cabinet mesh builder moved
+        // to canvas/base_cabinet.esm.js. Same toe-kick + carcass + door
+        // + drawer + handles + countertop + drip edge + pin indicator
+        // set, gated behind item.pinned as before.
+        baseItems.forEach(item => {
+            const { objects, clickable } = buildBaseCabinet(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
-        wallItems.forEach((item, i) => {
-            const x   = item.x_position_in * IN;
-            const wbW = item.width_in  * IN;
-            const wbH = item.height_in * IN;
-            const wbD = item.depth_in  * IN;
-            // D8 follow-up — respect the per-item z_position_in the
-            // controller computed (varies by wall_cab_top_alignment:
-            // fixed_gap / to_ceiling / to_soffit). Falls back to WBY
-            // for items that pre-date D8.
-            const wbY = (item.z_position_in != null && item.z_position_in !== 0)
-                        ? item.z_position_in * IN
-                        : WBY;
-
-            // Wall body — satin-lacquer carcass
-            const wbody = mk(
-                new THREE.BoxGeometry(wbW - 0.02, wbH, wbD - 0.02), P.cab,
-                [x + wbW/2, wbY + wbH/2, wbD/2], null,
-                { cs: true, rs: true, rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "wall", item } }
-            );
-            this.T.cabObjs.push(wbody);
-            this.T.clickable.push(wbody);
-
-            // Shaker door
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(wbW - 0.10, wbH - 0.10, 0.016), P.cabDark,
-                [x + wbW/2, wbY + wbH/2, wbD - 0.001], null,
-                { rough: 0.6, metal: 0.05, ud: { cab: true, cabType: "wall", item } }
-            ));
-            // Wall handle — brushed metal
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(wbW * 0.38, 0.025, 0.038), P.handle,
-                [x + wbW/2, wbY + wbH * 0.60, wbD + 0.018], null,
-                { rough: 0.35, metal: 0.85 }
-            ));
-            // Bottom rail — matches the countertop sheen
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(wbW - 0.02, 0.025, wbD - 0.02), P.counter,
-                [x + wbW/2, wbY - 0.010, wbD/2], null,
-                { rough: 0.4, metal: 0.05 }
-            ));
-
-            // v19.0.4.24.0 P0#1 Stage 2 — pin indicator (see base loop)
-            if (item.pinned) {
-                this.T.cabObjs.push(mk(
-                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
-                    [x + wbW - 0.10, wbY + wbH - 0.10, wbD - 0.10], null,
-                    { rough: 0.3, metal: 0.5 }
-                ));
-            }
+        // Rec D · Sprint 2d step 16 — wall cabinet mesh builder moved
+        // to canvas/wall_cabinet.esm.js. Same body + door + handle +
+        // bottom rail + pin indicator set; D8 z_position_in honoured.
+        wallItems.forEach(item => {
+            const { objects, clickable } = buildWallCabinet(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
         // D13 — Generic-type fallback: tall / corner / panel cabinets
@@ -1552,170 +1327,40 @@ class SouthbrookKitchenConfigurator extends Component {
         // PBR box at the item's reported (x, z, dims) so the cabinet
         // becomes visible immediately instead of silently dropping out
         // of the scene. Detailed per-type geometry can layer on top later.
+        // Rec D · Sprint 2d steps 17-19 — tall/corner/panel/filler/
+        // end-cap mesh builders moved to canvas/other_cabinets.esm.js.
         const knownTypes = new Set(["base", "wall", "filler"]);
         const otherItems = items.filter(it => !knownTypes.has(it.cabinet_type));
+
         otherItems.forEach(item => {
-            const x  = (item.x_position_in || 0) * IN;
-            const w  = (item.width_in  || 24) * IN;
-            const h  = (item.height_in || 34.5) * IN;
-            const d  = (item.depth_in  || 24) * IN;
-            const z0 = (item.z_position_in || 0) * IN;
-
-            // Toe-kick for floor-standing types (tall / corner); panels
-            // sit flush, no toe-kick.
-            if (item.cabinet_type === "tall" || item.cabinet_type === "corner") {
-                this.T.cabObjs.push(mk(
-                    new THREE.BoxGeometry(w - 0.01, 3.5 * IN, d - 0.01), P.toekick,
-                    [x + w/2, z0 + 3.5*IN/2, d/2], null, { cs: true, rough: 0.95, metal: 0.0 }
-                ));
-                const body = mk(
-                    new THREE.BoxGeometry(w - 0.02, h - 3.5*IN, d - 0.02), P.cab,
-                    [x + w/2, z0 + 3.5*IN + (h - 3.5*IN)/2, d/2], null,
-                    { cs: true, rs: true, rough: 0.55, metal: 0.0,
-                      ud: { cab: true, cabType: item.cabinet_type, item } }
-                );
-                this.T.cabObjs.push(body);
-                this.T.clickable.push(body);
-            } else {
-                // Panel / corner-without-toekick / anything else.
-                const body = mk(
-                    new THREE.BoxGeometry(w - 0.02, h, d - 0.02), P.cab,
-                    [x + w/2, z0 + h/2, d/2], null,
-                    { cs: true, rs: true, rough: 0.55, metal: 0.0,
-                      ud: { cab: true, cabType: item.cabinet_type, item } }
-                );
-                this.T.cabObjs.push(body);
-                this.T.clickable.push(body);
-            }
-
-            // v19.0.4.24.0 P0#1 Stage 2 — pin indicator on tall/corner
-            // (skip panels — end-caps aren't user-pinnable per Stage 1's
-            // _onMouseUp filter).
-            if (item.pinned
-                && (item.cabinet_type === "tall"
-                    || item.cabinet_type === "corner")) {
-                this.T.cabObjs.push(mk(
-                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
-                    [x + w - 0.10, z0 + h + 0.16, d - 0.10], null,
-                    { rough: 0.3, metal: 0.5 }
-                ));
-            }
+            const { objects, clickable } = buildOtherCabinet(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
-        // Filler panels — matte/satin matching the door style
+        // Filler panels
         fillerItems.forEach(item => {
-            const x   = item.x_position_in * IN;
-            const fpW = item.width_in * IN;
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(fpW, BH, 0.042), P.cabDark,
-                [x + fpW/2, BH/2, 0.021], null,
-                { rough: 0.55, metal: 0.0 }
-            ));
+            this.T.cabObjs.push(buildFillerPanel(THREE, mk, P, item));
         });
 
-        // ── End cap decorative panels ──
-        // Rendered as a thin vertical panel: full height, full depth of the
-        // host cabinet, panel-width thick (default 3/4"). x_position_in is
-        // authoritative — it was set relative to the host cabinet's exposed
-        // side face by _addCabinetFromProduct (or by the server on load)
-        // and must NOT be recomputed. See _recomputeLayoutFromItems + the
-        // 2026-07-01 domain rule: end cap panels never attach to a wall.
+        // End-cap decorative panels
         endCapItems.forEach(item => {
-            const x  = (item.x_position_in || 0) * IN;
-            const w  = (item.width_in  || 0.75) * IN;
-            const h  = (item.height_in || 34.5) * IN;
-            const d  = (item.depth_in  || 24)   * IN;
-            const z0 = (item.z_position_in || 0) * IN;
-
-            const body = mk(
-                new THREE.BoxGeometry(w - 0.01, h, d - 0.01), P.cab,
-                [x + w/2, z0 + h/2, d/2], null,
-                {
-                    cs: true, rs: true, rough: 0.45, metal: 0.0,
-                    ud: { cab: true, cabType: "panel", item },
-                }
-            );
-            this.T.cabObjs.push(body);
-            this.T.clickable.push(body);
+            const { objects, clickable } = buildEndCapPanel(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
-        // ── Drag handle ── (PBR sphere with self-emissive glow so it
-        // pops out of the scene against any background/exposure)
-        const THREE3 = this.T.THREE;
-        const hdl = new THREE3.Mesh(
-            new THREE3.SphereGeometry(0.18, 20, 20),
-            new THREE3.MeshStandardMaterial({
-                color: P.drag, emissive: 0x001166, emissiveIntensity: 0.4,
-                roughness: 0.3, metalness: 0.1,
-            })
+        // Rec D · Sprint 2d step 12 — drag handle + arrow cones
+        // moved to canvas/drag_handle.esm.js.
+        const { handleMesh, arrowMeshes } = buildDragHandle(
+            THREE, scene, P, rw, rd,
         );
-        hdl.position.set(rw + 0.08, 0.18, rd / 2);
-        hdl.userData = { isDragHandle: true };
-        scene.add(hdl);
-        this.T.handleMesh = hdl;
+        this.T.handleMesh = handleMesh;
+        this.T.arrowMeshes.push(...arrowMeshes);
 
-        // Arrow cones flanking handle
-        [{ offset: -0.42, rotZ: Math.PI/2 }, { offset: 0.42, rotZ: -Math.PI/2 }].forEach(({ offset, rotZ }) => {
-            const arr = new THREE3.Mesh(
-                new THREE3.ConeGeometry(0.08, 0.22, 8),
-                new THREE3.MeshStandardMaterial({
-                    color: P.arrow, roughness: 0.4, metalness: 0.1,
-                })
-            );
-            arr.rotation.z = rotZ;
-            arr.position.set(rw + offset, 0.18, rd / 2);
-            scene.add(arr);
-            this.T.arrowMeshes.push(arr);
-        });
-
-        // ── D16 — Per-zone drop lanes (visible during drag-from-inventory).
-        // BASE lane: thin floor band 24" deep along the back wall.
-        // WALL lane: tall band on the back wall sitting at the
-        //   configured wall_z (D8 alignment-aware).
-        // TALL_END lane: full-height band at the right end of the
-        //   base run, where dropped tall / corner / panel land.
-        const wallH    = 30 * IN;
-        const baseD    = 24 * IN;
-        const wallBotZ = WBY;                 // bottom of wall cabinet
-        // BASE lane — floor band along back wall, full room width
-        const baseLane = new THREE.Mesh(
-            new THREE.PlaneGeometry(rw, baseD),
-            new THREE.MeshBasicMaterial({
-                color: 0x1866d4, transparent: true, opacity: 0.0,
-                side: THREE.DoubleSide, depthWrite: false,
-            }),
-        );
-        baseLane.rotation.x = -Math.PI / 2;
-        baseLane.position.set(rw / 2, 0.004, baseD / 2);
-        baseLane.visible = false;
-        scene.add(baseLane);
-        // WALL lane — vertical band on the back wall at wall cab z
-        const wallLane = new THREE.Mesh(
-            new THREE.PlaneGeometry(rw, wallH),
-            new THREE.MeshBasicMaterial({
-                color: 0x1e9e6a, transparent: true, opacity: 0.0,
-                side: THREE.DoubleSide, depthWrite: false,
-            }),
-        );
-        wallLane.position.set(rw / 2, wallBotZ + wallH / 2, 0.004);
-        wallLane.visible = false;
-        scene.add(wallLane);
-        // TALL_END lane — full-height band at the right end of base run,
-        //   24" wide × room_height × cabinet depth. Caps at room height.
-        const tallH = Math.max(rh - 3.5 * IN, 60 * IN);
-        const tallW = 24 * IN;
-        const tallLane = new THREE.Mesh(
-            new THREE.BoxGeometry(tallW, tallH, baseD),
-            new THREE.MeshBasicMaterial({
-                color: 0xc89b5a, transparent: true, opacity: 0.0,
-                depthWrite: false,
-            }),
-        );
-        // Position at the right edge of current room width
-        tallLane.position.set(rw - tallW / 2, 3.5 * IN + tallH / 2, baseD / 2);
-        tallLane.visible = false;
-        scene.add(tallLane);
-        this.T.laneMeshes = { base: baseLane, wall: wallLane, tall: tallLane };
+        // Rec D · Sprint 2d step 13 — three drop lanes moved to
+        // canvas/drop_lanes.esm.js.
+        this.T.laneMeshes = buildDropLanes(THREE, scene, rw, rh);
         this._updateLaneVisibility();
 
         // ── D1 — Re-compute view specs from current room dims and
@@ -1730,30 +1375,19 @@ class SouthbrookKitchenConfigurator extends Component {
         }
     }
 
+    // Rec D · Sprint 2d step 9 — thin wrapper delegating to the
+    // shared selection helper so <KitchenCanvas> can highlight its
+    // own cabObjs with the same reset+paint cycle.
     _highlightSelected(item) {
-        // Reset all cabinet colours (always — needed for the deselect
-        // path so Esc/arrow-cycle visibly clears the previous highlight).
-        this.T.cabObjs.forEach(m => {
-            if (m.userData?.cab) m.material.color.setHex(P.cab);
-        });
-        if (!item) return;
-        // Highlight matching item
-        this.T.cabObjs.forEach(m => {
-            if (m.userData?.cab &&
-                m.userData.item?.layout_key === item.layout_key) {
-                m.material.color.setHex(P.sel);
-            }
-        });
+        highlightSelected(this.T.cabObjs, item, P);
     }
 
     // ─── Mouse events ────────────────────────────────────────────────────────────
+    // Rec D · Sprint 2d step 3 — thin wrapper delegating to the
+    // shared pure function so future <KitchenCanvas> can reuse the
+    // same math with its own canvas element.
     _ndcFromEvent(e) {
-        const rect = this.canvas3dRef.el?.getBoundingClientRect();
-        if (!rect) return { x: 0, y: 0 };
-        return {
-            x:  ((e.clientX - rect.left) / rect.width)  * 2 - 1,
-            y: -((e.clientY - rect.top)  / rect.height) * 2 + 1,
-        };
+        return ndcFromEvent(e, this.canvas3dRef.el);
     }
 
     _onMouseDown(e) {
