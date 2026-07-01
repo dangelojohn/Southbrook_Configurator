@@ -1018,3 +1018,81 @@ $sbk-amber:      #B45309;
         min-width: 120px;
     }
 }
+
+// ─── Scroll / overflow fix (2026-06-30) ──────────────────────────────────────
+// The configurator client-action mounts inside .o_action_manager, which the
+// backend webclient sets to `overflow:hidden` with a fixed height. Our root
+// grew past that box, clipping ~750px of workspace (the whole right inventory
+// column disappeared when the grid collapsed to 2-column at short heights).
+// !important is scoped to the two selectors we don't own (.o_action_manager
+// and internal Odoo layout) — for our own .o_sbk_* selectors it's redundant
+// with source order but kept for parity with the tested devtools patch.
+.o_action_manager {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+.o_sbk_root {
+    min-height: calc(100vh - 48px) !important;
+    height: calc(100vh - 48px) !important;
+    overflow: hidden !important;
+}
+
+.o_sbk_workspace {
+    grid-template-columns: 210px 1fr 300px !important;
+    grid-template-rows: 1fr !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    flex: 1 1 0% !important;
+}
+
+.o_sbk_controls {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+.o_sbk_scene_panel {
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+.o_sbk_inventory {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.o_sbk_product_list {
+    overflow-y: auto !important;
+    flex: 1 1 0% !important;
+    min-height: 80px !important;
+}
+
+.o_sbk_detail {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: 45% !important;
+    flex-shrink: 0 !important;
+}
+
+// Thin styled scrollbars so gutters don't eat layout width in the aside +
+// inventory panels. WebKit-only; Firefox uses `scrollbar-width: thin` set on
+// each panel would be a nicer future addition.
+.o_sbk_controls,
+.o_sbk_product_list,
+.o_sbk_detail,
+.o_action_manager {
+    &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-track { background: $sbk-bg; }
+    &::-webkit-scrollbar-thumb {
+        background: $sbk-border;
+        border-radius: 3px;
+
+        &:hover { background: #b0a89e; }
+    }
+}
