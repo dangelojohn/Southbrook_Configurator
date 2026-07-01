@@ -35,6 +35,7 @@ import { buildRoomShell } from "@southbrook_kitchen_3d_configurator/js/canvas/ro
 import { buildDragHandle } from "@southbrook_kitchen_3d_configurator/js/canvas/drag_handle";
 import { buildDropLanes } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_lanes";
 import { installPbrEnvMap } from "@southbrook_kitchen_3d_configurator/js/canvas/pbr_env_map";
+import { buildBaseCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/base_cabinet";
 
 const actionRegistry = registry.category("actions");
 
@@ -1298,82 +1299,14 @@ class SouthbrookKitchenConfigurator extends Component {
         // reposition here; see _recomputeLayoutFromItems for the rule).
         const endCapItems = items.filter(it => it.cabinet_type === "panel");
 
-        baseItems.forEach((item, i) => {
-            const x   = item.x_position_in * IN;
-            const cbW = item.width_in  * IN;
-            const cbH = item.height_in * IN;
-            const cbD = item.depth_in  * IN;
-
-            // Toe kick — flat black/matte
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW - 0.01, 3.5 * IN, cbD - 0.01), P.toekick,
-                [x + cbW/2, 3.5*IN/2, cbD/2], null, { cs: true, rough: 0.95, metal: 0.0 }
-            ));
-
-            // Cabinet body — satin-lacquer carcass
-            const body = mk(
-                new THREE.BoxGeometry(cbW - 0.02, cbH - 3.5*IN, cbD - 0.02), P.cab,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN)/2, cbD/2], null,
-                { cs: true, rs: true, rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "base", item } }
-            );
-            this.T.cabObjs.push(body);
-            this.T.clickable.push(body);
-
-            // Shaker door upper inset — slightly glossier than carcass
-            const dH = (cbH - 3.5*IN) * 0.60;
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW - 0.10, dH, 0.016), P.cabDark,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.72 - dH/2, cbD - 0.001], null,
-                { rough: 0.6, metal: 0.05, ud: { cab: true, cabType: "base", item } }
-            ));
-
-            // Drawer face
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW - 0.10, (cbH - 3.5*IN) * 0.21, 0.016), P.cab,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.13, cbD - 0.001], null,
-                { rough: 0.55, metal: 0.0, ud: { cab: true, cabType: "base", item } }
-            ));
-
-            // Door handle — brushed metal (this is the realism win — handles
-            // were the flattest part of the old Lambert pass)
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW * 0.44, 0.025, 0.040), P.handle,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.42, cbD + 0.018], null,
-                { rough: 0.35, metal: 0.85 }
-            ));
-            // Drawer handle — same brushed metal
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW * 0.30, 0.025, 0.038), P.handle,
-                [x + cbW/2, 3.5*IN + (cbH - 3.5*IN) * 0.13, cbD + 0.018], null,
-                { rough: 0.35, metal: 0.85 }
-            ));
-
-            // Countertop — quartz/stone (low roughness, faint specular)
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW + 0.005, CTR, cbD + 0.07), P.counter,
-                [x + cbW/2, cbH + CTR/2, cbD/2 + 0.03], null,
-                { cs: true, rough: 0.4, metal: 0.05 }
-            ));
-            // Countertop drip edge
-            this.T.cabObjs.push(mk(
-                new THREE.BoxGeometry(cbW + 0.005, CTR * 0.6, 0.022), P.cabDark,
-                [x + cbW/2, cbH + CTR * 0.3, cbD + 0.07], null,
-                { rough: 0.5, metal: 0.05 }
-            ));
-
-            // v19.0.4.24.0 P0#1 Stage 2 — Visual pin indicator. Small
-            // teal sphere hovering just above the countertop's back-
-            // right corner marks the cabinet as manually placed.
-            // Gated behind item.pinned so a fresh page render adds
-            // zero geometry (no regression on non-pinned scenes).
-            // Disposed by the existing cabObjs cleanup at frame start.
-            if (item.pinned) {
-                this.T.cabObjs.push(mk(
-                    new THREE.SphereGeometry(0.06, 14, 14), 0x18B4A6,
-                    [x + cbW - 0.10, cbH + CTR + 0.16, cbD - 0.10], null,
-                    { rough: 0.3, metal: 0.5 }
-                ));
-            }
+        // Rec D · Sprint 2d step 15 — base cabinet mesh builder moved
+        // to canvas/base_cabinet.esm.js. Same toe-kick + carcass + door
+        // + drawer + handles + countertop + drip edge + pin indicator
+        // set, gated behind item.pinned as before.
+        baseItems.forEach(item => {
+            const { objects, clickable } = buildBaseCabinet(THREE, mk, P, item);
+            this.T.cabObjs.push(...objects);
+            this.T.clickable.push(...clickable);
         });
 
         wallItems.forEach((item, i) => {
