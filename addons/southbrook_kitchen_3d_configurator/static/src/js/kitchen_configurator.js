@@ -40,6 +40,8 @@ import { buildWallCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/
 import {
     buildOtherCabinet, buildFillerPanel, buildEndCapPanel,
 } from "@southbrook_kitchen_3d_configurator/js/canvas/other_cabinets.esm";
+import { initScene } from "@southbrook_kitchen_3d_configurator/js/canvas/scene_init.esm";
+import { destroyScene } from "@southbrook_kitchen_3d_configurator/js/canvas/scene_dispose.esm";
 
 const actionRegistry = registry.category("actions");
 
@@ -778,98 +780,22 @@ class SouthbrookKitchenConfigurator extends Component {
         const mount  = this.canvas3dRef.el;
         if (!mount) return;
 
-        const W = mount.clientWidth  || 900;
-        const H = mount.clientHeight || 560;
+        // Rec D · Sprint 2d step 20 — scene + cameras + renderer +
+        // lighting rig + orbit setup moved to canvas/scene_init.esm.js.
+        // Class-scope wiring (animation loop, resize observer, event
+        // listeners) stays here since it needs `this`.
+        const core = initScene(THREE, mount, P);
+        Object.assign(this.T, core);
 
-        // Scene
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(P.scene);
-        this.T.scene = scene;
-
-        // D1 — Two camera instances: orthographic for the locked angles
-        // (iso/top/front/left/right) and perspective for free-orbit.
-        // Swap between them on view change. The vs scalar is bootstrap
-        // only; _recomputeViews + _applyOrthoFrustum take over once
-        // _buildScene runs.
-        const asp = W / H, vs = 9;
-        const ortho = new THREE.OrthographicCamera(-vs * asp, vs * asp, vs, -vs, 0.1, 300);
-        ortho.position.set(20, 14, 20);
-        ortho.lookAt(4, 2.5, 1.5);
-        ortho.up.set(0, 1, 0);
-
-        const persp = new THREE.PerspectiveCamera(45, asp, 0.1, 300);
-        persp.position.set(20, 14, 20);
-        persp.lookAt(4, 2.5, 1.5);
-        persp.up.set(0, 1, 0);
-
-        this.T.cameras = { ortho, persp };
-        this.T.activeCamera = ortho;
-        this.T.currentTarget = new THREE.Vector3(4, 2.5, 1.5);
-
-        // Renderer — ACES Filmic + sRGB for the canonical Southbrook
-        // PBR pipeline (matches cabinet_viewport.esm.js Phase 2.5 spec).
-        // The previous NoToneMapping + MeshLambertMaterial combo crushed
-        // mid-tones and made the cabinets look uniformly dark.
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.setSize(W, H);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
-        if (THREE.SRGBColorSpace) {
-            renderer.outputColorSpace = THREE.SRGBColorSpace;
-        }
-        renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.0;
-        mount.appendChild(renderer.domElement);
-        this.T.renderer = renderer;
-
-        // Lighting — 4-light rig (hemi + key/fill/front directional)
-        // ported from southbrook_estimating/cabinet_viewport.esm.js.
-        // HemisphereLight does the heavy lift for "cabinets aren't dark";
-        // the key + fill + front trio gives every face direct illumination
-        // without flat shadowing.
-        const hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbf, 0.5);
-        scene.add(hemi);
-
-        const dirA = new THREE.DirectionalLight(0xffffff, 0.9);
-        dirA.position.set(20, 30, 20);
-        dirA.castShadow = true;
-        dirA.shadow.mapSize.set(2048, 2048);
-        Object.assign(dirA.shadow.camera, {
-            left: -25, right: 25, top: 25, bottom: -25, near: 0.1, far: 120,
-        });
-        dirA.shadow.bias = -0.0005;
-        scene.add(dirA);
-
-        const dirB = new THREE.DirectionalLight(0xffffff, 0.3);
-        dirB.position.set(-10, 12, -8);
-        scene.add(dirB);
-
-        const dirFront = new THREE.DirectionalLight(0xffffff, 0.4);
-        dirFront.position.set(0, 8, 25);
-        scene.add(dirFront);
-
-        // PBR env map — async, non-blocking. Falls back silently if the
-        // PMREM step fails on the user's GL stack; the direct-lit rig
-        // above still renders the scene fine.
+        // PBR env map — async, non-blocking. Falls back silently if
+        // the PMREM step fails on the user's GL stack.
         this._installPbrEnvMap();
 
-        // D1 — OrbitControls on the persp camera, disabled until persp
-        // view is activated. Defensive: skip if THREE.OrbitControls
-        // didn't load (e.g. asset bundle didn't include the UMD shim).
-        if (THREE.OrbitControls) {
-            const oc = new THREE.OrbitControls(persp, renderer.domElement);
-            oc.enableDamping = true;
-            oc.dampingFactor = 0.08;
-            oc.minDistance   = 4;
-            oc.maxDistance   = 80;
-            oc.maxPolarAngle = Math.PI / 2 - 0.05;   // never under floor
-            oc.enabled       = false;
-            this.T.orbit = oc;
-        }
-
-        // Render loop — render activeCamera, advance orbit damping when
-        // the persp orbit is active.
+        // Render loop — render activeCamera, advance orbit damping
+        // when the persp orbit is active.
+        const scene = this.T.scene;
+        const renderer = this.T.renderer;
+        const { persp } = this.T.cameras;
         const tick = () => {
             this.T.animId = requestAnimationFrame(tick);
             if (this.T.orbit && this.T.orbit.enabled) this.T.orbit.update();
@@ -890,15 +816,12 @@ class SouthbrookKitchenConfigurator extends Component {
 
         // Events — D15: mousedown in capture phase so we intercept
         // before OrbitControls (bound to renderer.domElement, child
-        // of mount) sees it. Lets us cancel orbit when arming a
-        // cabinet move via stopPropagation.
+        // of mount) sees it.
         mount.addEventListener("mousedown",  this._onMouseDown, { capture: true });
         mount.addEventListener("mousemove",  this._onMouseMove);
         mount.addEventListener("mouseup",    this._onMouseUp);
         mount.addEventListener("mouseleave", this._onMouseUp);
         mount.addEventListener("mousemove",  this._onMouseOver);
-        // D1 — wheel zoom (Ortho frustum scale / Persp dolly via orbit)
-        // and view-switch hotkeys (1-6 + R + +/-).
         mount.addEventListener("wheel", this._onWheel, { passive: false });
         window.addEventListener("keydown", this._onKeyDown);
     }
@@ -1187,10 +1110,14 @@ class SouthbrookKitchenConfigurator extends Component {
         this._queueAutoSave();
     }
 
+    // Rec D · Sprint 2d step 21 — orbit + renderer disposal moved to
+    // canvas/scene_dispose.esm.js. Class-scope cleanup (autoSave
+    // timer, resize observer, event listener removal) stays here
+    // since it needs `this` bindings.
     _destroyScene() {
         const t = this.T;
-        // D5 — clear any pending auto-save so we don't fire after the
-        // component unmounts (would leak network and warn the console).
+        // D5 — clear any pending auto-save so we don't fire after
+        // the component unmounts.
         if (this._autoSaveTimer) {
             clearTimeout(this._autoSaveTimer);
             this._autoSaveTimer = null;
@@ -1208,15 +1135,7 @@ class SouthbrookKitchenConfigurator extends Component {
             mount.removeEventListener("wheel",      this._onWheel);
         }
         window.removeEventListener("keydown", this._onKeyDown);
-        if (t.orbit) {
-            try { t.orbit.dispose(); } catch (_) { /* noop */ }
-        }
-        if (t.renderer) {
-            t.renderer.dispose();
-            if (mount && t.renderer.domElement && mount.contains(t.renderer.domElement)) {
-                mount.removeChild(t.renderer.domElement);
-            }
-        }
+        destroyScene(t, mount);
     }
 
     // ─── Scene builder ──────────────────────────────────────────────────────────
