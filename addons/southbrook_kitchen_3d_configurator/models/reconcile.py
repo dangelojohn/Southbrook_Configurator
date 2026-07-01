@@ -116,10 +116,12 @@ class SouthbrookDesignReconcile(models.AbstractModel):
                 "note":        design.notes or "",
                 "state":       "draft",
             }
-            if hasattr(SaleOrder, "_resolve_channel_pricelist"):
-                pricelist = SaleOrder._resolve_channel_pricelist(partner)
-                if pricelist:
-                    vals["pricelist_id"] = pricelist.id
+            # 2026-07-01 audit cleanup — southbrook_estimating is a
+            # hard dep, so _resolve_channel_pricelist is guaranteed
+            # to be defined at reconcile-time.
+            pricelist = SaleOrder._resolve_channel_pricelist(partner)
+            if pricelist:
+                vals["pricelist_id"] = pricelist.id
             order = SaleOrder.sudo().create(vals)
             design.sudo().sale_order_id = order.id
             stats["created_orders"] += 1

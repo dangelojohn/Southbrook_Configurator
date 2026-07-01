@@ -44,6 +44,45 @@
         </field>
     </record>
 
+    <!-- ── v19.0.5.2.0 Sprint 2b · Room Layout tab inline on SO form
+         Adds a "Room Layout" notebook page to the sale.order form
+         showing the linked southbrook.room's walls + constraints +
+         the Sprint 1 Rec D settings (soffit, filler strategy, wall-
+         cab top alignment) without leaving the SO. Estimating's
+         existing smart button on the button box still opens the
+         room in a dedicated form; this page just avoids the extra
+         click for reps who want a glance while working the line
+         list.
+
+         Zero JS. Zero backend logic. XML-only additive tab. -->
+    <record id="view_sale_order_form_rec_d_room_tab" model="ir.ui.view">
+        <field name="name">sale.order.form.rec_d.room.tab</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Room Layout" name="rec_d_room_layout"
+                      invisible="not room_ids">
+                    <field name="room_ids" mode="list">
+                        <list create="false" delete="false">
+                            <field name="name"/>
+                            <field name="room_type"/>
+                            <field name="layout_shape"/>
+                            <field name="ceiling_height_mm"/>
+                            <field name="sb_soffit_height_mm" optional="show"/>
+                            <field name="sb_wall_cab_top_alignment" optional="show"/>
+                            <field name="sb_filler_strategy" optional="show"/>
+                            <field name="wall_count" readonly="1"/>
+                            <field name="constraint_count" readonly="1"/>
+                            <field name="layout_complete" readonly="1" widget="boolean_toggle"/>
+                            <field name="sb_design_state" optional="show"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
     <!-- ── Extra columns on sale.order.line embedded list ───────────
          All added as optional="hide" so the default view stays
          uncluttered; power users can enable via the column-toggle

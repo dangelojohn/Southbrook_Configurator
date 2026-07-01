@@ -633,11 +633,13 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         # archetype_id is the canonical M2O to southbrook.cabinet.
         # archetype (223 records: body_class / collection / code from
         # the Prodboard manifest clone). Falls back silently when the
-        # field doesn't exist (older southbrook_estimating builds) or
-        # the template isn't mapped.
-        archetype = None
-        if hasattr(tmpl, "x_prodboard_archetype_id"):
-            archetype = tmpl.x_prodboard_archetype_id or None
+        # template isn't mapped to an archetype.
+        # 2026-07-01 audit cleanup — southbrook_estimating became a
+        # hard dep on 2026-06-28 (__manifest__.py:22-26), so
+        # x_prodboard_archetype_id is guaranteed present at runtime.
+        # The hasattr guard was defensive from before the manifest
+        # hardened; dead code now.
+        archetype = tmpl.x_prodboard_archetype_id or None
         if archetype:
             payload["archetype_code"]       = getattr(archetype, "code", "") or ""
             payload["archetype_body_class"] = getattr(archetype, "body_class", "") or ""
@@ -694,14 +696,16 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         # configurator's live preview matches the price the Order
         # Builder + spec sheet PDF will charge. Falls back to retail
         # when no partner.
+        # 2026-07-01 audit cleanup — southbrook_estimating is a hard
+        # dep since 2026-06-28, so _resolve_channel_pricelist is
+        # guaranteed present. Try/except kept as it protects against
+        # partner-side data problems (missing channel, invalid tier).
         SaleOrder = request.env["sale.order"]
-        if hasattr(SaleOrder, "_resolve_channel_pricelist"):
-            try:
-                return SaleOrder._resolve_channel_pricelist(partner)
-            except Exception:
-                pass
-        # Fallback if southbrook_estimating isn't installed: partner's
-        # property pricelist, else the env default.
+        try:
+            return SaleOrder._resolve_channel_pricelist(partner)
+        except Exception:
+            pass
+        # Fallback path: partner's property pricelist, else env default.
         if partner:
             pl = partner.property_product_pricelist
             if pl:
