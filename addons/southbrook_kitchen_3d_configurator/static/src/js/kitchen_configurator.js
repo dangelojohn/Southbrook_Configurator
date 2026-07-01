@@ -535,8 +535,31 @@ class SouthbrookKitchenConfigurator extends Component {
         // sort-key so the new cabinet lands at that ordered position.
         // No-target case retains the 1e6 sentinel so the cabinet
         // appends at the end of its group.
-        const sortX = (typeof targetX === "number" && !Number.isNaN(targetX))
-                      ? targetX : 1e6;
+        let sortX = (typeof targetX === "number" && !Number.isNaN(targetX))
+                    ? targetX : 1e6;
+
+        // Panel-placement rule (2026-07-01): end cap decorative panels
+        // (cabinet_type === "panel") must snap to the exposed side face
+        // of an existing cabinet, NEVER land at the wall edge that the
+        // tails-loop sentinel would place them at. Default: right side
+        // of the rightmost base cabinet (fallback to wall cabinet, then
+        // 0 if no cabinets yet).
+        if (type === "panel"
+                && (typeof targetX !== "number" || Number.isNaN(targetX))) {
+            const hosts = (this.state.items || []).filter(
+                it => it.cabinet_type === "base"
+                   || it.cabinet_type === "wall");
+            if (hosts.length) {
+                const sorted = hosts.slice().sort(
+                    (a, b) => (a.x_position_in || 0) - (b.x_position_in || 0));
+                const last = sorted[sorted.length - 1];
+                sortX = (last.x_position_in || 0) + (last.width_in || 0);
+            } else {
+                sortX = 0;   // no host cabinet yet — start at left origin
+            }
+            // Base end caps sit on the floor; wall end caps track wall Z.
+            // Product data drives z via product.z_position_in when set.
+        }
         const newItem = {
             ...product,
             layout_key:    layoutKey,
@@ -662,20 +685,37 @@ class SouthbrookKitchenConfigurator extends Component {
     //    base run (so a drag-dropped tall cab lands after the bases).
     //  - Summary price excludes fillers per the existing convention.
     _recomputeLayoutFromItems() {
+        // Panel-placement rule (Southbrook domain, 2026-07-01):
+        //   Panels come in TWO shapes, both of which must NEVER attach to a
+        //   room wall.
+        //   1. Filler ("filler")  — plain spacers, sit between cabinets, may
+        //      touch a wall only as a consequence of filling the gap between
+        //      the last cabinet and the wall. Server /layout drives their X.
+        //   2. End cap ("panel")  — decorative panels that finish the exposed
+        //      left/right SIDE FACE of a base or wall cabinet. Their X is
+        //      relative to the cabinet they cap and MUST NOT be overwritten
+        //      by the tails-loop that packs tall/corner items after the base
+        //      run (packing there placed them against the room wall — the
+        //      visual bug this fix corrects).
         const items = this.state.items || [];
         const sortX = (a, b) => (a.x_position_in || 0) - (b.x_position_in || 0);
 
         const bases   = items.filter(it => it.cabinet_type === "base").sort(sortX);
         const walls   = items.filter(it => it.cabinet_type === "wall").sort(sortX);
-        const tails   = items.filter(it =>
-            ["tall", "corner", "filler", "panel"].includes(it.cabinet_type)
+        // Only tall + corner items pack after the base run; filler + panel
+        // carry their own X and must not be repositioned here.
+        const tailItems = items.filter(it =>
+            ["tall", "corner"].includes(it.cabinet_type)
         ).sort(sortX);
 
         let bx = 0;
         for (const b of bases) { b.x_position_in = bx; bx += (b.width_in || 0); }
         let wx = 0;
         for (const w of walls) { w.x_position_in = wx; wx += (w.width_in || 0); }
-        for (const t of tails) { t.x_position_in = bx; bx += (t.width_in || 0); }
+        for (const t of tailItems) { t.x_position_in = bx; bx += (t.width_in || 0); }
+        // NOTE: filler items get X from server /layout; end-cap panels get X
+        //       relative to their host cabinet (set by _addCabinetFromProduct
+        //       or downstream). Both are left untouched here on purpose.
 
         let price = 0;
         for (const it of items) {
@@ -688,6 +728,52 @@ class SouthbrookKitchenConfigurator extends Component {
             total: bases.length + walls.length,
             price: price,
         };
+
+        // Runtime validation — surface a warning if any end-cap panel would
+        // end up flush against or beyond a room wall. End caps must attach
+        // ONLY to the left/right side face of a base or wall cabinet; a
+        // panel whose X pushes it past the room boundary means the anchor
+        // logic upstream lost track of its host cabinet.
+        this._validateEndCapPlacement(
+            items.filter(it => it.cabinet_type === "panel"),
+        );
+    }
+
+    _validateEndCapPlacement(endCapItems) {
+        const rw = (this.state.room && this.state.room.width_in) || 0;
+        const warnings = [];
+        for (const item of endCapItems) {
+            const x = item.x_position_in || 0;
+            const w = item.width_in || 0;
+            const rightEdge = x + w;
+            if (x < 0 || (rw && rightEdge > rw + 0.01)) {
+                console.warn(
+                    "[SBK] End cap panel " +
+                    (item.product_name || item.layout_key || item.id) +
+                    " is positioned at x=" + x + "\" (width " + w + "\"), " +
+                    "which places it against or beyond the room wall. " +
+                    "End cap panels must attach ONLY to the left or right " +
+                    "side face of a base or wall cabinet — never to a room wall."
+                );
+                warnings.push({
+                    code:     "PANEL_WALL_ATTACH",
+                    severity: "error",
+                    message:  "End cap panel \"" +
+                              (item.product_name || item.layout_key || "") +
+                              "\" cannot be placed against a wall. Attach " +
+                              "it to the side of a cabinet instead.",
+                });
+            }
+        }
+        if (warnings.length) {
+            const existing = (this.state.warnings || []).filter(
+                w => w.code !== "PANEL_WALL_ATTACH");
+            this.state.warnings = existing.concat(warnings);
+        } else if (this.state.warnings) {
+            // Clear stale PANEL_WALL_ATTACH warnings once fixed.
+            this.state.warnings = this.state.warnings.filter(
+                w => w.code !== "PANEL_WALL_ATTACH");
+        }
     }
 
     // ─── Three.js initialisation ────────────────────────────────────────────────
@@ -1191,6 +1277,11 @@ class SouthbrookKitchenConfigurator extends Component {
         const baseItems = items.filter(it => it.cabinet_type === "base");
         const wallItems = items.filter(it => it.cabinet_type === "wall");
         const fillerItems = items.filter(it => it.cabinet_type === "filler");
+        // End-cap decorative panels — anchored to a cabinet's exposed left
+        // or right side face. Rendered as a thin vertical panel matching
+        // the host cabinet's H×D at the pre-set x_position_in (do NOT
+        // reposition here; see _recomputeLayoutFromItems for the rule).
+        const endCapItems = items.filter(it => it.cabinet_type === "panel");
 
         baseItems.forEach((item, i) => {
             const x   = item.x_position_in * IN;
@@ -1349,6 +1440,32 @@ class SouthbrookKitchenConfigurator extends Component {
                 [x + fpW/2, BH/2, 0.021], null,
                 { rough: 0.55, metal: 0.0 }
             ));
+        });
+
+        // ── End cap decorative panels ──
+        // Rendered as a thin vertical panel: full height, full depth of the
+        // host cabinet, panel-width thick (default 3/4"). x_position_in is
+        // authoritative — it was set relative to the host cabinet's exposed
+        // side face by _addCabinetFromProduct (or by the server on load)
+        // and must NOT be recomputed. See _recomputeLayoutFromItems + the
+        // 2026-07-01 domain rule: end cap panels never attach to a wall.
+        endCapItems.forEach(item => {
+            const x  = (item.x_position_in || 0) * IN;
+            const w  = (item.width_in  || 0.75) * IN;
+            const h  = (item.height_in || 34.5) * IN;
+            const d  = (item.depth_in  || 24)   * IN;
+            const z0 = (item.z_position_in || 0) * IN;
+
+            const body = mk(
+                new THREE.BoxGeometry(w - 0.01, h, d - 0.01), P.cab,
+                [x + w/2, z0 + h/2, d/2], null,
+                {
+                    cs: true, rs: true, rough: 0.45, metal: 0.0,
+                    ud: { cab: true, cabType: "panel", item },
+                }
+            );
+            this.T.cabObjs.push(body);
+            this.T.clickable.push(body);
         });
 
         // ── Drag handle ── (PBR sphere with self-emissive glow so it

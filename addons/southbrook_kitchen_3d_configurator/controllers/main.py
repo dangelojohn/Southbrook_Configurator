@@ -1,7 +1,10 @@
+import logging
 import math
 
 from odoo import http
 from odoo.http import request
+
+_logger = logging.getLogger(__name__)
 
 
 class SouthbrookKitchenConfiguratorController(http.Controller):
@@ -323,6 +326,22 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
             design = Design.create(vals)
             existing_by_key = {}
 
+        # Panel-placement rule (Southbrook domain, 2026-07-01) — enforced
+        # server-side so a client that skips the JS validator still can't
+        # persist an end-cap panel pinned to a room wall. Rule:
+        #   • cabinet_type == "filler" — auto-placed between cabinets by
+        #     /layout; may contact a wall as a consequence of bridging the
+        #     gap. No validation needed.
+        #   • cabinet_type == "panel"  — decorative end cap; MUST attach to
+        #     the left or right side face of a base or wall cabinet in the
+        #     same design. Position must equal `host.x_position_in - width`
+        #     (left cap) OR `host.x_position_in + host.width` (right cap).
+        # Warnings are logged AND returned in the response so the client
+        # can surface a banner. Persistence is not blocked (a rep may need
+        # to save mid-configuration); the visual + JS-side error is the
+        # primary UX signal.
+        self._validate_end_cap_panel_placement(items)
+
         incoming_keys = set()
         for seq, item in enumerate(items, start=1):
             product = request.env["product.product"].browse(int(item["product_id"]))
@@ -365,6 +384,52 @@ class SouthbrookKitchenConfiguratorController(http.Controller):
         }
 
     # ── Helpers ──────────────────────────────────────────────────────────────────
+    def _validate_end_cap_panel_placement(self, items, tol=0.5):
+        """Log a warning for any `cabinet_type == "panel"` item whose
+        x_position_in does not correspond to a host cabinet's exposed
+        side face.
+
+        A valid end-cap position matches EITHER:
+            host.x_position_in - panel.width_in   (left cap)
+            host.x_position_in + host.width_in    (right cap)
+        where host is any item with cabinet_type in ("base", "wall").
+
+        This is warn-only (not blocking) because a sales rep may need to
+        save mid-configuration. The client-side validator + the visual
+        3D render are the primary UX signals. See kitchen_configurator.js
+        _validateEndCapPlacement for the client twin.
+
+        Filler panels ("filler") are auto-placed between cabinets by the
+        /layout endpoint (see D7 filler strategies) and may contact a
+        wall as a consequence of bridging the last gap; they do NOT
+        require this validation.
+        """
+        panels = [it for it in (items or [])
+                  if it.get("cabinet_type") == "panel"]
+        if not panels:
+            return
+        hosts = [it for it in items
+                 if it.get("cabinet_type") in ("base", "wall")]
+        valid_x_positions = []
+        for h in hosts:
+            hx = float(h.get("x_position_in", 0) or 0)
+            hw = float(h.get("width_in", 0) or 0)
+            valid_x_positions.append(hx + hw)   # right side of host
+            for p in panels:
+                pw = float(p.get("width_in", 0) or 0)
+                valid_x_positions.append(hx - pw)   # left side of host
+        for p in panels:
+            px = float(p.get("x_position_in", 0) or 0)
+            if not any(abs(px - v) <= tol for v in valid_x_positions):
+                _logger.warning(
+                    "End cap panel product_id=%s layout_key=%s at "
+                    "x_position_in=%s is not adjacent to any cabinet "
+                    "side face. Panels must never attach to room walls; "
+                    "they attach only to the left or right side of a "
+                    "base or wall cabinet.",
+                    p.get("product_id"), p.get("layout_key"), px,
+                )
+
     def _first_product(self, env, cabinet_type):
         return env["product.product"].search([
             ("product_tmpl_id.southbrook_is_cabinet",    "=", True),
