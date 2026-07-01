@@ -29,15 +29,16 @@
 
 ## Root cause
 
-*(To be filled in from the bisect agent's report.)*
+**Winner:** Sprint 2d step 1 (`canvas/constants.esm.js` import). Set the wrong pattern for all 19 imports that followed.
 
-Ranked suspects and confirmed winner:
+**Failure mode:** Odoo's asset bundler registers `foo.esm.js` as module id `@addon/path/foo.esm`, NOT `@addon/path/foo`. Every Sprint 2d import wrote the bare form. Odoo compiled the bundle fine (strings all present — which is why the string-tripwire passed), but at the first authenticated hit the module registry couldn't resolve any of the imports. `kitchen_configurator.js` threw at module-load time BEFORE reaching its `actionRegistry.add("southbrook_kitchen_configurator", …)` call at the end of the file.
 
-**Winner:** _tbd_
-
-**Failure mode:** _tbd_
-
-**The exact code that threw:** _tbd_
+**The exact code that threw:**
+```js
+import { IN, BW, BH, BD, WW, WH, WD, CTR, GAP, WBY, P }
+    from "@southbrook_kitchen_3d_configurator/js/canvas/constants";
+```
+against a file registered as `@southbrook_kitchen_3d_configurator/js/canvas/constants.esm`. All 19 imports had this defect (14 in the main file + 5 cross-imports inside `canvas/`).
 
 ---
 

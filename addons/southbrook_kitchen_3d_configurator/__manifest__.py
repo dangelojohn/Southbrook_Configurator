@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.5.5.4",
+    "version": "19.0.5.5.5",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -95,6 +95,10 @@
             "southbrook_kitchen_3d_configurator/static/src/js/canvas/scene_dispose.esm.js",
             "southbrook_kitchen_3d_configurator/static/src/js/canvas/camera_controller.esm.js",
             "southbrook_kitchen_3d_configurator/static/src/js/canvas/pointer_pipeline.esm.js",
+            # Rec D · Sprint 2d Step 24a — KitchenCanvas skeleton.
+            # Empty component registered so the module id resolves;
+            # migrated from parent in 24b-e.
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/kitchen_canvas.esm.js",
             "southbrook_kitchen_3d_configurator/static/src/js/kitchen_configurator.js",
         ],
     },
