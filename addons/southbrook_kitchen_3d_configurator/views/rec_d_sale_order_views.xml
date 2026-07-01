@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Recommendation D · Sprint 2 first-touch · sale.order visibility.
+
+  Adds a smart button on the sale.order form that jumps to the
+  linked kitchen design record (via the reverse M2O from
+  southbrook.kitchen.design.sale_order_id) so a rep can see at a
+  glance whether an order came from the 3D configurator.
+
+  Also exposes the Sprint 1 sb_layout_* fields as optional columns
+  on the sale.order.line embedded list so the same rep can inspect
+  the 3D scene coords + pinned + rotation state per line without
+  leaving the SO form.
+
+  XML-only, additive. Zero JS. Zero backend logic. Safe.
+-->
+<odoo>
+
+    <!-- ── Smart button on sale.order form ─────────────────────────
+         Counts the southbrook.kitchen.design records where
+         .sale_order_id = this order. In Sprint 1 the design →
+         SO link is written by action_create_quotation AND by the
+         reconciliation cron; in Sprint 2 the link becomes bi-
+         directional. Empty state hides the button. -->
+    <record id="view_sale_order_form_rec_d_design_button" model="ir.ui.view">
+        <field name="name">sale.order.form.rec_d.design.button</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="%(southbrook_kitchen_3d_configurator.action_sbk_kitchen_designs)d"
+                        type="action"
+                        class="oe_stat_button"
+                        icon="fa-cube"
+                        context="{'search_default_sale_order_id': id}"
+                        invisible="not id">
+                    <field name="id" invisible="1"/>
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Kitchen</span>
+                        <span class="o_stat_text">Designs</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ── Extra columns on sale.order.line embedded list ───────────
+         All added as optional="hide" so the default view stays
+         uncluttered; power users can enable via the column-toggle
+         chevron. Grouped in the visual order the 3D scene owns:
+         key → origin → pinned → rotation → x/y/z coords. -->
+    <record id="view_order_line_form_rec_d_layout_cols" model="ir.ui.view">
+        <field name="name">sale.order.line.list.rec_d.layout</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']//list//field[@name='product_id']" position="after">
+                <field name="sb_layout_key" optional="hide"/>
+                <field name="sb_layout_origin" optional="hide"/>
+                <field name="sb_layout_pinned" optional="hide"/>
+                <field name="sb_layout_rotation_deg" optional="hide"/>
+                <field name="sb_layout_x_mm" optional="hide"/>
+                <field name="sb_layout_y_mm" optional="hide"/>
+                <field name="sb_layout_z_mm" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

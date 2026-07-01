@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.5.0.2",
+    "version": "19.0.5.1.0",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -51,6 +51,8 @@
         # Rec D · Sprint 1 · reconciliation cron (design → room + SO
         # line). Runs every 5 min; watermark-driven.
         "data/rec_d_reconcile_cron.xml",
+        # Rec D · Sprint 2 first-touch · sale.order visibility
+        "views/rec_d_sale_order_views.xml",
     ],
     "assets": {
         "web.assets_backend": [
