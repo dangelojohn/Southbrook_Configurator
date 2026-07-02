@@ -781,6 +781,208 @@ class SouthbrookKitchenDesign(models.Model):
         copy = self.copy({"name": "%s (Copy)" % self.name, "state": "draft"})
         return copy.action_open_configurator()
 
+    # ── v19.0.5.6.12 — Template gallery (customer-onboarding) ─────────────
+    # Biggest UX win for first-time users: instead of an empty canvas the
+    # rep/customer picks one of four preset layouts (Empty / L / U /
+    # Galley) which pre-seeds room dimensions AND (for the shaped
+    # presets) fills the primary wall run with canonical cabinets from
+    # southbrook_estimating. Users iterate from a starting point, not
+    # from a blank page.
+    #
+    # Sizes below are inches to match the model's existing inch-native
+    # fields (room_width_in / room_depth_in / room_height_in). The
+    # room_length_mm equivalents from the design brief (3600×3000×2400 mm
+    # etc.) are converted to nearest round US kitchen dimensions
+    # (12'/10'/8') because Southbrook's shop floor cuts to inches.
+    _KITCHEN_TEMPLATE_PRESETS = {
+        "empty": {
+            "name":           "Empty Room",
+            "description":    "Blank canvas — 12' × 10' room, no cabinets. "
+                              "Best when the customer wants full creative "
+                              "control from the first click.",
+            "room_width_in":  144.0,   # 3658 mm ≈ 3600 mm target
+            "room_depth_in":  120.0,   # 3048 mm ≈ 3000 mm target
+            "room_height_in": 96.0,    # 2438 mm ≈ 2400 mm target
+            "generate_layout": False,
+            "starter_cabinets": [],
+        },
+        "l_shape": {
+            "name":           "L-Shaped Kitchen",
+            "description":    "12' × 12' room with an L-run of cabinets: "
+                              "long primary wall + short return leg. Classic "
+                              "starter layout for corner kitchens.",
+            "room_width_in":  144.0,
+            "room_depth_in":  144.0,
+            "room_height_in": 96.0,
+            "generate_layout": True,
+            # xmlids are seeded via southbrook_estimating; missing xmlids
+            # degrade to a chatter warning (see _apply_kitchen_template).
+            "starter_cabinets": [
+                # Primary wall (y=0) — base row of 5 cabinets (24" ea)
+                ("southbrook_estimating.sink_base",  "base", 24.0,  0.0, 0.0,  0),
+                ("southbrook_estimating.base_2dr",   "base", 48.0,  0.0, 0.0, 10),
+                ("southbrook_estimating.drawer_bank","base", 72.0,  0.0, 0.0, 20),
+                ("southbrook_estimating.base_1dr",   "base", 96.0,  0.0, 0.0, 30),
+                ("southbrook_estimating.corner",     "base", 120.0, 0.0, 0.0, 40),
+                # Wall cabinets over primary wall (z=54")
+                ("southbrook_estimating.wall_2dr",   "wall", 24.0,  0.0, 54.0, 50),
+                ("southbrook_estimating.wall_2dr",   "wall", 72.0,  0.0, 54.0, 60),
+                ("southbrook_estimating.wall_1dr",   "wall", 96.0,  0.0, 54.0, 70),
+                # Short return leg (x=0, y offset)
+                ("southbrook_estimating.tall_pantry","tall", 0.0,   30.0, 0.0, 80),
+            ],
+        },
+        "u_shape": {
+            "name":           "U-Shaped Kitchen",
+            "description":    "12' × 10' room with cabinets on three walls: "
+                              "prep zone + return legs. Best for busy family "
+                              "kitchens and dedicated cooking work-triangles.",
+            "room_width_in":  144.0,
+            "room_depth_in":  120.0,
+            "room_height_in": 96.0,
+            "generate_layout": True,
+            "starter_cabinets": [
+                # Back wall (y=0) — 6 base cabinets, 24" each = 144"
+                ("southbrook_estimating.base_1dr",   "base", 0.0,   0.0, 0.0,  0),
+                ("southbrook_estimating.base_2dr",   "base", 24.0,  0.0, 0.0, 10),
+                ("southbrook_estimating.sink_base",  "base", 48.0,  0.0, 0.0, 20),
+                ("southbrook_estimating.drawer_bank","base", 72.0,  0.0, 0.0, 30),
+                ("southbrook_estimating.base_2dr",   "base", 96.0,  0.0, 0.0, 40),
+                ("southbrook_estimating.base_1dr",   "base", 120.0, 0.0, 0.0, 50),
+                # Wall cabinets over back wall
+                ("southbrook_estimating.wall_2dr",   "wall", 0.0,   0.0, 54.0, 60),
+                ("southbrook_estimating.wall_2dr",   "wall", 48.0,  0.0, 54.0, 70),
+                ("southbrook_estimating.wall_2dr",   "wall", 96.0,  0.0, 54.0, 80),
+                # Left return leg
+                ("southbrook_estimating.tall_pantry","tall", 0.0,   30.0, 0.0, 90),
+                # Right return leg
+                ("southbrook_estimating.tall_oven",  "tall", 120.0, 30.0, 0.0, 100),
+            ],
+        },
+        "galley": {
+            "name":           "Galley Kitchen",
+            "description":    "12' × 8' narrow room with two parallel cabinet "
+                              "runs. Efficient for apartments, secondary "
+                              "kitchens, and butlers' pantries.",
+            "room_width_in":  144.0,
+            "room_depth_in":  96.0,
+            "room_height_in": 96.0,
+            "generate_layout": True,
+            "starter_cabinets": [
+                # Back run (y=0) — 6 base + 3 wall
+                ("southbrook_estimating.sink_base",  "base", 0.0,   0.0, 0.0,  0),
+                ("southbrook_estimating.base_2dr",   "base", 24.0,  0.0, 0.0, 10),
+                ("southbrook_estimating.drawer_bank","base", 48.0,  0.0, 0.0, 20),
+                ("southbrook_estimating.base_2dr",   "base", 72.0,  0.0, 0.0, 30),
+                ("southbrook_estimating.base_1dr",   "base", 96.0,  0.0, 0.0, 40),
+                ("southbrook_estimating.base_1dr",   "base", 120.0, 0.0, 0.0, 50),
+                ("southbrook_estimating.wall_2dr",   "wall", 0.0,   0.0, 54.0, 60),
+                ("southbrook_estimating.wall_2dr",   "wall", 48.0,  0.0, 54.0, 70),
+                ("southbrook_estimating.wall_2dr",   "wall", 96.0,  0.0, 54.0, 80),
+                # Front run (parallel, y offset — 12" gap for the aisle)
+                ("southbrook_estimating.base_2dr",   "base", 24.0,  72.0, 0.0, 90),
+                ("southbrook_estimating.base_2dr",   "base", 72.0,  72.0, 0.0, 100),
+            ],
+        },
+    }
+
+    @api.model
+    def _get_preset_layout(self, preset):
+        """Return the preset dict for `preset` or None if the key is
+        unknown. Public helper so tests + the wizard can introspect the
+        catalog without duplicating the source of truth.
+
+        Preset keys: 'empty', 'l_shape', 'u_shape', 'galley'.
+        """
+        return self._KITCHEN_TEMPLATE_PRESETS.get(preset)
+
+    def _apply_kitchen_template(self, preset):
+        """Seed room dimensions + starter cabinets from a preset spec.
+
+        Called after `create()` by the wizard. Missing cabinet xmlids
+        (e.g. installs without southbrook_estimating catalog seeds) are
+        skipped and reported in a single chatter note so the rep sees
+        exactly which starters didn't land — the design still opens,
+        just with fewer cabinets.
+        """
+        self.ensure_one()
+        spec = self._get_preset_layout(preset)
+        if not spec:
+            raise UserError("Unknown kitchen template preset: %r" % preset)
+
+        self.write({
+            "room_width_in":  spec["room_width_in"],
+            "room_depth_in":  spec["room_depth_in"],
+            "room_height_in": spec["room_height_in"],
+        })
+
+        seeded, skipped = [], []
+        Line = self.env["southbrook.kitchen.design.line"]
+        for xmlid, cabinet_type, x, y, z, sequence in spec["starter_cabinets"]:
+            tmpl = self.env.ref(xmlid, raise_if_not_found=False)
+            if not tmpl:
+                skipped.append(xmlid)
+                continue
+            variant = tmpl.product_variant_id
+            if not variant:
+                skipped.append(xmlid)
+                continue
+            Line.create({
+                "design_id":     self.id,
+                "sequence":      sequence,
+                "product_id":    variant.id,
+                "quantity":      1,
+                "price_unit":    variant.lst_price or tmpl.list_price,
+                "cabinet_type":  cabinet_type,
+                "width_in":      tmpl.southbrook_width_in or 24.0,
+                "height_in":     tmpl.southbrook_height_in or 34.5,
+                "depth_in":      tmpl.southbrook_depth_in or 24.0,
+                "x_position_in": x,
+                "y_position_in": y,
+                "z_position_in": z,
+                "origin":        "configurator",
+            })
+            seeded.append(xmlid)
+
+        # Chatter audit trail — critical for the "why did my L-shape
+        # only get 3 cabinets" support ticket case.
+        summary = "Applied template preset: %s" % spec["name"]
+        details = []
+        if seeded:
+            details.append("Seeded %d starter cabinet(s)." % len(seeded))
+        if skipped:
+            details.append(
+                "Skipped %d cabinet(s) with missing xmlids: %s"
+                % (len(skipped), ", ".join(sorted(set(skipped))))
+            )
+        if not spec["starter_cabinets"]:
+            details.append("No starter cabinets in this preset (blank canvas).")
+        self.message_post(body="%s<br/>%s" % (summary, "<br/>".join(details)))
+
+        # Move designs with starters straight to 'configured'; blank
+        # canvas stays at 'draft'.
+        if seeded:
+            self.state = "configured"
+        return {"seeded": seeded, "skipped": skipped}
+
+    @api.model
+    def action_open_template_gallery(self):
+        """Open the "Start from template" wizard.
+
+        Called from the Kitchen Designs list header button. Returns an
+        ir.actions.act_window for the transient
+        kitchen.design.template.picker so the rep sees the 4-preset
+        radio card set instead of a blank Create form.
+        """
+        return {
+            "type":      "ir.actions.act_window",
+            "name":      "Start from Template",
+            "res_model": "kitchen.design.template.picker",
+            "view_mode": "form",
+            "target":    "new",
+            "context":   self.env.context,
+        }
+
     # ── BOM autoseed (v19.0.5.6.0) ─────────────────────────────────────────────
     # Sprint 2d workstream that dodges the JS/canvas failure surface. The
     # goal is narrow: at quote-time, for every unique product.template on
@@ -1329,3 +1531,68 @@ class SouthbrookKitchenDesignLine(models.Model):
         for line in self:
             label = type_map.get(line.cabinet_type, line.cabinet_type)
             line.position_label = "%s @ X=%.0f\"" % (label, line.x_position_in)
+
+
+# ── v19.0.5.6.12 — Template gallery wizard ────────────────────────────────
+# Transient model backing the "Start from Template" customer-onboarding
+# gallery. Kept in this file (not a separate wizards/ subdir) because
+# the preset catalog lives on SouthbrookKitchenDesign and the two models
+# are always deployed together.
+class SouthbrookKitchenDesignTemplatePicker(models.TransientModel):
+    _name = "kitchen.design.template.picker"
+    _description = "Kitchen Design Template Picker"
+
+    preset = fields.Selection(
+        selection=[
+            ("empty",   "Empty Room · Blank Canvas"),
+            ("l_shape", "L-Shaped Kitchen"),
+            ("u_shape", "U-Shaped Kitchen"),
+            ("galley",  "Galley Kitchen"),
+        ],
+        string="Layout Preset",
+        required=True,
+        default="l_shape",
+        help="Pick a starting layout. 'Empty' just seeds room dimensions; "
+             "the shaped presets also seed a starter cabinet run so you "
+             "iterate from a working design instead of an empty canvas.",
+    )
+    preset_description = fields.Text(
+        string="Description",
+        compute="_compute_preset_description",
+        readonly=True,
+    )
+    partner_id = fields.Many2one(
+        "res.partner",
+        string="Customer (optional)",
+        help="Assign a customer up-front so pricing resolves against the "
+             "channel pricelist immediately. Leave empty for a walk-in or "
+             "showroom demo.",
+    )
+
+    @api.depends("preset")
+    def _compute_preset_description(self):
+        Design = self.env["southbrook.kitchen.design"]
+        for rec in self:
+            spec = Design._get_preset_layout(rec.preset) if rec.preset else None
+            rec.preset_description = spec["description"] if spec else ""
+
+    def action_create(self):
+        """Materialise a new southbrook.kitchen.design from the picked
+        preset and open the 3D configurator on it. Handles the whole
+        onboarding transition in a single click.
+        """
+        self.ensure_one()
+        Design = self.env["southbrook.kitchen.design"]
+        spec = Design._get_preset_layout(self.preset)
+        if not spec:
+            raise UserError("Please pick a template before continuing.")
+
+        design_vals = {
+            "name":  spec["name"],
+            "state": "draft",
+        }
+        if self.partner_id:
+            design_vals["partner_id"] = self.partner_id.id
+        design = Design.create(design_vals)
+        design._apply_kitchen_template(self.preset)
+        return design.action_open_configurator()

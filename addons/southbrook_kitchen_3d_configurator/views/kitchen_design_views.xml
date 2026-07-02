@@ -385,6 +385,9 @@
     <!-- Action: open Kitchen Designs list ───────────────────────────────────── -->
     <!-- 2026-07-01 v19.0.4.19.0 — kanban is now default so the browse
          experience is visual. Mobile lands on kanban too. -->
+    <!-- 2026-07-02 v19.0.5.6.12 — empty-state help now points at the
+         "Start from Template" gallery so first-time users don't hit
+         a blank canvas cold. -->
     <record id="action_sbk_kitchen_designs" model="ir.actions.act_window">
         <field name="name">Kitchen Designs</field>
         <field name="res_model">southbrook.kitchen.design</field>
@@ -401,15 +404,90 @@
                 Start your first kitchen design
             </p>
             <p>
-                Open the <b>3D Configurator</b> from the top navigation, drag
-                cabinets into a virtual room, and hit <b>Save Design</b>. Your
-                design will appear here — with a customer, a live estimate,
-                and one-click quote generation.
+                Pick a <b>Start from Template</b> preset (Empty, L-Shape,
+                U-Shape, or Galley) from the ⚙️ Actions menu to jump
+                straight into the 3D configurator with a working starter
+                layout — no blank canvas.
+            </p>
+            <p>
+                Or open the <b>3D Configurator</b> from the top navigation,
+                drag cabinets into a virtual room, and hit <b>Save Design</b>.
+                Your design will appear here — with a customer, a live
+                estimate, and one-click quote generation.
             </p>
             <p class="text-muted small">
                 Tip: click any design row to open the 3D scene and edit it.
             </p>
         </field>
+    </record>
+
+    <!-- v19.0.5.6.12 — Template gallery wizard form ─────────────────────────── -->
+    <record id="view_kitchen_design_template_picker_form" model="ir.ui.view">
+        <field name="name">kitchen.design.template.picker.form</field>
+        <field name="model">kitchen.design.template.picker</field>
+        <field name="arch" type="xml">
+            <form string="Start from Template">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Start from a Template</h1>
+                        <p class="text-muted">
+                            Pick a starter layout. We'll spin up a fresh
+                            design with the right room dimensions and,
+                            for the shaped presets, drop in a working
+                            cabinet run so you iterate from a real
+                            starting point.
+                        </p>
+                    </div>
+                    <group>
+                        <field name="preset" widget="radio"/>
+                    </group>
+                    <group>
+                        <field name="preset_description" readonly="1" nolabel="1"/>
+                    </group>
+                    <group>
+                        <field name="partner_id"
+                               options="{'no_create': false, 'no_open': true}"
+                               placeholder="Optional — leave blank for walk-in / demo…"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_create"
+                            type="object"
+                            string="Create Design"
+                            class="btn-primary"
+                            icon="fa-cube"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- v19.0.5.6.12 — Template gallery action ──────────────────────────────── -->
+    <!-- Model-level action_open_template_gallery reuses this act_window
+         so the same wizard opens whether the entry point is the list
+         Actions menu (server action below) or a direct RPC call. -->
+    <record id="action_kitchen_design_template_gallery" model="ir.actions.act_window">
+        <field name="name">Start from Template</field>
+        <field name="res_model">kitchen.design.template.picker</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_kitchen_design_template_picker_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Server action to surface "Start from Template" on the list view
+         Actions menu. Fires the gallery act_window for the current
+         model. Works from the Kitchen Designs list even when the list
+         is empty (so the empty-state help + this menu are consistent
+         entry points). -->
+    <record id="action_kitchen_design_template_gallery_server" model="ir.actions.server">
+        <field name="name">Start from Template…</field>
+        <field name="model_id" ref="model_southbrook_kitchen_design"/>
+        <field name="binding_model_id" ref="model_southbrook_kitchen_design"/>
+        <field name="binding_view_types">list,kanban</field>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_template_gallery()</field>
     </record>
 
 </odoo>

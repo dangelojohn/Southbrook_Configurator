@@ -546,3 +546,103 @@ class TestTrackBEndToEnd(TransactionCase):
             "chatter note must name the cancelled SO (%s) so the "
             "audit trail links back" % so_name,
         )
+
+    # ==================================================================
+    # 5.6.12 * template gallery (customer-onboarding presets)
+    # ==================================================================
+    def test_preset_empty_creates_design_with_room_dims(self):
+        """5.6.12 regression pin -- picking the 'empty' preset from the
+        wizard creates a kitchen.design with the preset's canonical
+        12'x10'x8' room dimensions and NO cabinet lines.
+
+        Locks in the blank-canvas onboarding contract: room dims land,
+        but the user is fully in control of the layout from cabinet #1.
+        """
+        Picker = self.env["kitchen.design.template.picker"]
+        wizard = Picker.create({"preset": "empty"})
+        # Sanity: preset catalog exposes 'empty' correctly.
+        spec = self.Design._get_preset_layout("empty")
+        self.assertTrue(spec, "'empty' preset must be defined")
+        self.assertEqual(spec["room_width_in"],  144.0)
+        self.assertEqual(spec["room_depth_in"],  120.0)
+        self.assertEqual(spec["room_height_in"], 96.0)
+
+        act = wizard.action_create()
+        # action_create returns action_open_configurator dict
+        self.assertEqual(act.get("tag"), "southbrook_kitchen_configurator")
+        design_id = act["params"]["design_id"]
+        design = self.Design.browse(design_id)
+        self.assertTrue(design.exists(), "wizard must create a design")
+        # Room dims match the preset spec.
+        self.assertEqual(design.room_width_in,  144.0)
+        self.assertEqual(design.room_depth_in,  120.0)
+        self.assertEqual(design.room_height_in, 96.0)
+        # No starter cabinets on the blank-canvas preset.
+        self.assertEqual(
+            len(design.cabinet_line_ids), 0,
+            "'empty' preset must not seed any cabinet lines",
+        )
+        # Design still in draft (only shaped presets flip to configured).
+        self.assertEqual(
+            design.state, "draft",
+            "'empty' preset must leave state='draft' since there's "
+            "nothing to configure yet",
+        )
+
+    def test_preset_l_shape_creates_design_with_starters(self):
+        """5.6.12 regression pin -- picking the 'l_shape' preset creates
+        a 12'x12'x8' design with a starter cabinet run.
+
+        The starter cabinets are canonical southbrook_estimating
+        templates. In a full install those xmlids resolve and the
+        design gets >=1 cabinet line. In a bare test DB the xmlids
+        may not resolve; the contract in that case is a chatter note
+        listing the skipped starters so the rep isn't left guessing.
+        """
+        Picker = self.env["kitchen.design.template.picker"]
+        wizard = Picker.create({"preset": "l_shape"})
+        spec = self.Design._get_preset_layout("l_shape")
+        self.assertTrue(spec, "'l_shape' preset must be defined")
+        self.assertTrue(spec["starter_cabinets"],
+                        "'l_shape' preset must declare starter cabinets")
+
+        act = wizard.action_create()
+        design_id = act["params"]["design_id"]
+        design = self.Design.browse(design_id)
+        self.assertTrue(design.exists(), "wizard must create a design")
+        self.assertEqual(design.room_width_in,  144.0)
+        self.assertEqual(design.room_depth_in,  144.0)
+        self.assertEqual(design.room_height_in, 96.0)
+
+        # Either starter cabinets landed OR a chatter note documents
+        # the skips -- one of the two must hold so the rep always has
+        # actionable feedback.
+        seeded_count = len(design.cabinet_line_ids)
+        note_msgs = design.message_ids.filtered(
+            lambda m: "template preset" in (m.body or "").lower()
+        )
+        self.assertTrue(
+            note_msgs,
+            "expected a chatter note documenting the preset application",
+        )
+        if seeded_count == 0:
+            # No cabinets landed -- the audit note MUST list the skipped
+            # xmlids so the rep can install southbrook_estimating and
+            # retry, or manually add the equivalent cabinets.
+            self.assertTrue(
+                any("Skipped" in (m.body or "") for m in note_msgs),
+                "when no cabinets are seeded, chatter must document "
+                "the skipped xmlids",
+            )
+        else:
+            self.assertGreaterEqual(
+                seeded_count, 1,
+                "l_shape preset must seed at least 1 starter cabinet "
+                "when canonical xmlids are available",
+            )
+            # Design flipped to 'configured' once any starter landed.
+            self.assertEqual(
+                design.state, "configured",
+                "state must advance to 'configured' when starter "
+                "cabinets are seeded",
+            )
