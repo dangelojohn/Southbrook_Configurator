@@ -258,3 +258,188 @@ class TestCatalogAndPricingTools(TransactionCase):
             self.assertEqual(entry["scope"], "global")
             for persona in ("trade_partner", "sales_rep", "mfg_manager"):
                 self.assertIn(persona, entry["personas"])
+
+
+@tagged("post_install", "-at_install", "southbrook", "southbrook_hermes")
+class TestShopOpsTools(TransactionCase):
+    """Tests for get_shop_capacity / list_shop_blockers / list_work_queue.
+
+    The three shop-wide operations tools give Hermes (mfg_manager persona)
+    a live read of the plant floor. All three run scope="global" with
+    sudo() under the hood, so we don't need portal-user setup.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from odoo.addons.southbrook_hermes.tools import read_tools  # noqa
+        self.tools = read_tools
+
+    # ---- get_shop_capacity -------------------------------------------
+
+    def test_get_shop_capacity_returns_expected_shape(self):
+        result = self.tools.get_shop_capacity(self.env)
+        for k in ("window", "window_start_iso", "window_end_iso",
+                  "mo_counts", "top_work_centers", "note"):
+            self.assertIn(k, result)
+        # Default window is this_week.
+        self.assertEqual(result["window"], "this_week")
+        for state in ("confirmed", "progress", "to_close", "done"):
+            self.assertIn(state, result["mo_counts"])
+            self.assertIsInstance(result["mo_counts"][state], int)
+        self.assertIsInstance(result["top_work_centers"], list)
+
+    def test_get_shop_capacity_this_month_window(self):
+        result = self.tools.get_shop_capacity(self.env, window="this_month")
+        self.assertEqual(result["window"], "this_month")
+        # Window end is the last day of the current month — must be >=
+        # window start.
+        self.assertGreaterEqual(
+            result["window_end_iso"], result["window_start_iso"])
+
+    def test_get_shop_capacity_empty_shop(self):
+        """When no MOs fall in the window, mo_counts is all zeros and the
+        note is the canonical empty-state message. We assert semantics
+        rather than "shop must be empty" (this DB may have prod data).
+        """
+        # Pick a window guaranteed to be empty: the "today" window on a
+        # test DB that has just been rolled up rarely has MOs
+        # start-dated today, but we can't guarantee it. So we verify
+        # only the counts are non-negative ints + the note is a string.
+        result = self.tools.get_shop_capacity(self.env, window="today")
+        for state in ("confirmed", "progress", "to_close", "done"):
+            self.assertGreaterEqual(result["mo_counts"][state], 0)
+        self.assertIsInstance(result["note"], str)
+        # If the shop truly is empty for today, the note must announce it.
+        total = sum(result["mo_counts"].values())
+        if total == 0 and not result["top_work_centers"]:
+            self.assertIn("No manufacturing orders", result["note"])
+            self.assertIn("today", result["note"])
+
+    # ---- list_shop_blockers ------------------------------------------
+
+    def test_list_shop_blockers_default_blocker_severity(self):
+        if "southbrook.mi.check" not in self.env:
+            self.skipTest("southbrook.mi.check model not available")
+        Check = self.env["southbrook.mi.check"].sudo()
+        Check.create({
+            "name": "Test Blocker",
+            "severity": "blocker",
+            "message": "Blocker under test",
+            "recommendation": "Take shop-floor action",
+            "category": "production",
+        })
+        Check.create({
+            "name": "Test Warning",
+            "severity": "warning",
+            "message": "Warning under test",
+            "category": "production",
+        })
+        result = self.tools.list_shop_blockers(self.env)
+        self.assertEqual(result["severity"], "blocker")
+        self.assertGreaterEqual(result["count"], 1)
+        # Every returned item must be a blocker.
+        names = [i["name"] for i in result["items"]]
+        self.assertIn("Test Blocker", names)
+        self.assertNotIn("Test Warning", names)
+        # Shape check on first item.
+        item = result["items"][0]
+        for k in ("id", "name", "target", "category", "message",
+                  "recommendation"):
+            self.assertIn(k, item)
+
+    def test_list_shop_blockers_warning_severity(self):
+        if "southbrook.mi.check" not in self.env:
+            self.skipTest("southbrook.mi.check model not available")
+        Check = self.env["southbrook.mi.check"].sudo()
+        Check.create({
+            "name": "Warning Only",
+            "severity": "warning",
+            "message": "Warning selector test",
+            "category": "cut",
+        })
+        result = self.tools.list_shop_blockers(
+            self.env, severity="warning")
+        self.assertEqual(result["severity"], "warning")
+        names = [i["name"] for i in result["items"]]
+        self.assertIn("Warning Only", names)
+
+    def test_list_shop_blockers_gracefully_handles_no_mi_installed(self):
+        if "southbrook.mi.check" in self.env:
+            # Model IS present — assert normal happy-path shape at empty
+            # severity that will not match production data.
+            result = self.tools.list_shop_blockers(
+                self.env, severity="blocker", limit=1)
+            for k in ("severity", "count", "items", "note"):
+                self.assertIn(k, result)
+            return
+        # Model absent — assert the graceful error contract.
+        result = self.tools.list_shop_blockers(self.env)
+        self.assertEqual(result, {"error": "mi_not_installed"})
+
+    # ---- list_work_queue ---------------------------------------------
+
+    def test_list_work_queue_persona_mapping(self):
+        # Seed the Chris CNC known user if the fixture doesn't provide it.
+        Users = self.env["res.users"].sudo()
+        existing = Users.search([("name", "=", "Chris CNC")], limit=1)
+        if not existing:
+            partner = self.env["res.partner"].create({"name": "Chris CNC"})
+            Users.create({
+                "name": "Chris CNC",
+                "login": "chris.cnc.test@example.com",
+                "partner_id": partner.id,
+            })
+        result = self.tools.list_work_queue(self.env, persona="cnc")
+        self.assertEqual(result["persona"], "cnc")
+        self.assertEqual(result["user_name"], "Chris CNC")
+        self.assertIsNotNone(result["user_id"])
+        for k in ("persona", "user_name", "user_id", "count",
+                  "items", "note"):
+            self.assertIn(k, result)
+        self.assertIsInstance(result["items"], list)
+        self.assertEqual(result["count"], len(result["items"]))
+
+    def test_list_work_queue_unknown_persona_returns_empty(self):
+        # Persona is a known key but no user matches the KNOWN_ROLES
+        # name — the KNOWN_ROLES lookup should still resolve, but the
+        # res.users search returns nothing (delete any pre-seeded user
+        # with the mapped name first).
+        Users = self.env["res.users"].sudo()
+        # Take a role that's unlikely to be seeded in the test DB.
+        target_name = "Taylor Install"
+        pre = Users.search([("name", "=", target_name)], limit=1)
+        if pre:
+            # Rename it out of the way for this test (don't delete —
+            # unlinking res.users can break unrelated fixtures).
+            pre.write({"name": target_name + " (renamed for test)"})
+        try:
+            result = self.tools.list_work_queue(
+                self.env, persona="installer")
+            self.assertEqual(result["count"], 0)
+            self.assertEqual(result["items"], [])
+            self.assertIsNone(result["user_id"])
+            self.assertIsNone(result["user_name"])
+            self.assertIn("installer", result["note"])
+        finally:
+            if pre:
+                pre.write({"name": target_name})
+
+    # ---- registry ----------------------------------------------------
+
+    def test_tools_registered_in_registry(self):
+        from odoo.addons.southbrook_hermes.tools.decorator import TOOL_REGISTRY
+        by_slug = {t["slug"]: t for t in TOOL_REGISTRY}
+        for slug in ("get_shop_capacity", "list_shop_blockers",
+                     "list_work_queue"):
+            self.assertIn(slug, by_slug, f"{slug} not registered")
+            entry = by_slug[slug]
+            self.assertEqual(entry["tier"], "T0")
+            self.assertEqual(entry["scope"], "global")
+        # list_work_queue is mfg_manager-only; the other two include
+        # sales_rep too.
+        self.assertIn("mfg_manager", by_slug["list_work_queue"]["personas"])
+        self.assertNotIn(
+            "sales_rep", by_slug["list_work_queue"]["personas"])
+        for slug in ("get_shop_capacity", "list_shop_blockers"):
+            self.assertIn("mfg_manager", by_slug[slug]["personas"])
+            self.assertIn("sales_rep", by_slug[slug]["personas"])

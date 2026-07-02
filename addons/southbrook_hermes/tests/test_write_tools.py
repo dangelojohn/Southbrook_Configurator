@@ -90,3 +90,117 @@ class TestProposeRecommendation(TransactionCase):
                 payload={}, summary="Force a cut-spec change",
                 persona="trade_partner",
             )
+
+
+@tagged("post_install", "-at_install", "southbrook", "hermes")
+class TestDraftCustomerEmail(TransactionCase):
+    def setUp(self):
+        super().setUp()
+        self.partner = self.env["res.partner"].create({
+            "name": "Draft Email Test Partner",
+            "email": "draft_email_test@example.com",
+        })
+        product = self.env["product.product"].search([], limit=1)
+        if not product:
+            self.skipTest("No products")
+        self.order = self.env["sale.order"].create({
+            "partner_id": self.partner.id,
+            "order_line": [(0, 0, {
+                "product_id": product.id, "product_uom_qty": 1,
+            })],
+        })
+        from odoo.addons.southbrook_hermes.tools import write_tools  # noqa
+        self.tools = write_tools
+
+    def _note_subtype_id(self):
+        return self.env.ref("mail.mt_note").id
+
+    def test_draft_customer_email_posts_internal_note(self):
+        before = len(self.order.message_ids)
+        result = self.tools.draft_customer_email(
+            self.env, order_id=self.order.id,
+            subject="Follow-up on your kitchen order",
+            body="Hi there — just checking whether the door style you "
+                 "picked is still what you want.",
+        )
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["human_review_required"])
+        self.assertEqual(result["order_id"], self.order.id)
+        self.assertEqual(result["order_name"], self.order.name)
+        self.assertIn("message_id", result)
+        # A new message was posted.
+        self.assertGreater(len(self.order.message_ids), before)
+        msg = self.env["mail.message"].browse(result["message_id"])
+        self.assertTrue(msg.exists())
+        # Body contains the marker (mail.message sanitizes but keeps text).
+        self.assertIn("Fabio-drafted customer email", msg.body)
+        self.assertIn("NOT SENT", msg.body)
+        # Subtype is note, NOT email — the whole point of this tool.
+        self.assertEqual(msg.subtype_id.id, self._note_subtype_id())
+        # And message_type must be comment (never 'email').
+        self.assertEqual(msg.message_type, "comment")
+
+    def test_draft_customer_email_rejects_empty_body(self):
+        before = len(self.order.message_ids)
+        result = self.tools.draft_customer_email(
+            self.env, order_id=self.order.id,
+            subject="Empty-body test", body="   ",
+        )
+        self.assertEqual(result, {"error": "empty_body"})
+        # No message posted.
+        self.assertEqual(len(self.order.message_ids), before)
+
+    def test_draft_customer_email_missing_order(self):
+        result = self.tools.draft_customer_email(
+            self.env, order_id=999999,
+            subject="Ghost order", body="Should not post.",
+        )
+        self.assertEqual(result, {"error": "order_not_found"})
+
+    def test_draft_customer_email_truncates_long_subject(self):
+        long_subject = "A" * 500
+        result = self.tools.draft_customer_email(
+            self.env, order_id=self.order.id,
+            subject=long_subject,
+            body="Body is fine.",
+        )
+        self.assertTrue(result["ok"])
+        msg = self.env["mail.message"].browse(result["message_id"])
+        # The stored mail.message.subject should be capped at 256 chars.
+        self.assertLessEqual(len(msg.subject or ""), 256)
+        self.assertEqual(msg.subject, "A" * 256)
+
+    def test_draft_customer_email_warns_if_partner_has_no_email(self):
+        partner_no_email = self.env["res.partner"].create({
+            "name": "No Email Partner",
+        })
+        product = self.env["product.product"].search([], limit=1)
+        order = self.env["sale.order"].create({
+            "partner_id": partner_no_email.id,
+            "order_line": [(0, 0, {
+                "product_id": product.id, "product_uom_qty": 1,
+            })],
+        })
+        before = len(order.message_ids)
+        result = self.tools.draft_customer_email(
+            self.env, order_id=order.id,
+            subject="Status update",
+            body="Wanted to touch base on your order.",
+        )
+        self.assertTrue(result["ok"])
+        self.assertIn("warning", result)
+        self.assertEqual(result["warning"], "customer has no email on file")
+        # Message still posted despite missing partner email.
+        self.assertGreater(len(order.message_ids), before)
+
+    def test_draft_customer_email_registered_with_correct_persona(self):
+        from odoo.addons.southbrook_hermes.tools.decorator import TOOL_REGISTRY
+        entry = next(
+            (t for t in TOOL_REGISTRY if t["slug"] == "draft_customer_email"),
+            None,
+        )
+        self.assertIsNotNone(entry, "draft_customer_email not in TOOL_REGISTRY")
+        self.assertEqual(set(entry["personas"]), {"sales_rep", "mfg_manager"})
+        self.assertEqual(entry["tier"], "T2")
+        self.assertEqual(entry["scope"], "own_order")
+        self.assertNotIn("trade_partner", entry["personas"])

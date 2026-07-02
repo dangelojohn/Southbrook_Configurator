@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 """Read tools — list_my_orders, get_order_status, get_order_line, etc."""
+import calendar
+import datetime
+
 from odoo.exceptions import MissingError, UserError
 
 from .decorator import hermes_tool
@@ -26,7 +29,7 @@ def list_my_orders(env, partner_id: int):
 
 
 @hermes_tool(
-    personas=["trade_partner", "sales_rep"],
+    personas=["trade_partner", "sales_rep", "mfg_manager"],
     tier="T0", scope="own_order",
     description=(
         "Return the production status of a specific order, including stage, "
@@ -67,7 +70,7 @@ def _count_mos_for_order(env, order):
 
 
 @hermes_tool(
-    personas=["trade_partner", "sales_rep"],
+    personas=["trade_partner", "sales_rep", "mfg_manager"],
     tier="T0", scope="own_order",
     description="Return the configured detail of a single order line.",
 )
@@ -125,7 +128,7 @@ def list_my_kitchen_projects(env, partner_id: int = None):
 
 
 @hermes_tool(
-    personas=["trade_partner", "sales_rep"],
+    personas=["trade_partner", "sales_rep", "mfg_manager"],
     tier="T0", scope="own_order",
     description="Return options + approval status of a kitchen project.",
 )
@@ -150,7 +153,7 @@ def get_kitchen_project(env, project_id: int):
 
 
 @hermes_tool(
-    personas=["trade_partner", "sales_rep"],
+    personas=["trade_partner", "sales_rep", "mfg_manager"],
     tier="T0", scope="own_order",
     description="Return install schedule + risk flag for an order.",
 )
@@ -533,4 +536,333 @@ def get_pricelist(env, channel, tradesperson_tier=None):
         "label": label,
         "discount_pct": pct,
         "notes": notes,
+    }
+
+
+# ----------------------------------------------------------------------
+# Shop-wide operations visibility (mfg_manager + sales_rep personas).
+#
+# Three tools give Hermes a live read on the shop floor without exposing
+# raw ORM search:
+#   - get_shop_capacity   — rolling-window MO counts + WC load
+#   - list_shop_blockers  — active MI blockers/warnings shop-wide
+#   - list_work_queue     — next-up WOs for a named shop persona
+#
+# Design notes:
+#   • These are SHOP-wide reads: sudo() is safe because scope="global"
+#     matches how catalog / pricelist tools work — internal staff view
+#     of the plant floor, not partner-scoped.
+#   • Window math is bounded to the current calendar frame (today /
+#     this ISO week Mon-Sun / current calendar month) so the LLM does
+#     not need to reason about arbitrary datetime arithmetic; the
+#     window enum locks the query shape.
+#   • Empty state returns a self-explanatory note rather than raising —
+#     matches the "empty dict/list on miss" convention set by the T0
+#     read tools above.
+# ----------------------------------------------------------------------
+
+# Persona -> canonical known-user name. Mirrors hermes_question._answer_users
+# so a fabio caller and this tool report matching identities.
+_WORK_QUEUE_KNOWN_ROLES = {
+    "estimator":  "Alex Estimator",
+    "cnc":        "Chris CNC",
+    "assembler":  "Sam Assembler",
+    "finisher":   "Jordan Finisher",
+    "installer":  "Taylor Install",
+    "production": "Morgan Production",
+}
+
+
+def _shop_window_bounds(window):
+    """Return (start_date, end_date) as date objects for the enum.
+
+    Bounds are inclusive: `date_start >= start` and `date_start < end +
+    one day` — the search domain adds the +1 day so we return the calendar
+    edges here.
+
+    "this_week" is ISO Monday..Sunday. "this_month" is 1st..last-day.
+    Unknown windows fall back to today.
+    """
+    today = datetime.date.today()
+    if window == "today":
+        return today, today
+    if window == "this_month":
+        first = today.replace(day=1)
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        last = today.replace(day=last_day)
+        return first, last
+    # Default: this_week (Monday..Sunday of the current ISO week).
+    monday = today - datetime.timedelta(days=today.weekday())
+    sunday = monday + datetime.timedelta(days=6)
+    return monday, sunday
+
+
+@hermes_tool(
+    personas=["sales_rep", "mfg_manager"],
+    tier="T0", scope="global",
+    description=(
+        "Return shop-wide MO capacity for a rolling window. Counts "
+        "mrp.production records by state (confirmed/progress/to_close/"
+        "done) and reports work-center load. Use to answer 'how many MOs "
+        "are open this week' or 'is the shop bottlenecked'."),
+    parameters={
+        "window": {"type": "string", "required": False,
+                    "enum": ["today", "this_week", "this_month"],
+                    "default": "this_week"},
+    },
+)
+def get_shop_capacity(env, window="this_week"):
+    """Aggregate MO counts + work-center load for the requested window.
+
+    The window is a bounded enum; unknown values fall back to this_week.
+    Filters `mrp.production` records by their `date_start` (planned or
+    actual start — v19 CE unified field, see mrp/models/mrp_production.py).
+    Empty shop returns all zeros + a human-readable note.
+    """
+    if "mrp.production" not in env:
+        return {"error": "mrp_not_installed"}
+
+    start, end = _shop_window_bounds(window)
+    # Inclusive-end: search domain uses `< end + 1 day` so anything on
+    # `end` at any time-of-day is caught.
+    end_exclusive = datetime.datetime.combine(
+        end + datetime.timedelta(days=1), datetime.time.min)
+    start_dt = datetime.datetime.combine(start, datetime.time.min)
+
+    Production = env["mrp.production"].sudo()
+    base_domain = [
+        ("date_start", ">=", start_dt),
+        ("date_start", "<", end_exclusive),
+    ]
+
+    mo_counts = {}
+    for state in ("confirmed", "progress", "to_close", "done"):
+        mo_counts[state] = Production.search_count(
+            base_domain + [("state", "=", state)])
+    total = sum(mo_counts.values())
+
+    top_work_centers = []
+    if "mrp.workorder" in env:
+        Workorder = env["mrp.workorder"].sudo()
+        wo_domain = [
+            ("date_start", ">=", start_dt),
+            ("date_start", "<", end_exclusive),
+            ("state", "in", ["ready", "progress", "pending", "waiting"]),
+        ]
+        # read_group aggregates duration_expected per workcenter without
+        # loading every WO into memory.
+        try:
+            grouped = Workorder.read_group(
+                wo_domain,
+                fields=["workcenter_id", "duration_expected:sum"],
+                groupby=["workcenter_id"],
+                orderby="duration_expected desc",
+                limit=5,
+            )
+        except Exception:  # noqa: BLE001 — defensive: read_group signature
+            grouped = []                    # varies across Odoo minor versions
+        for row in grouped:
+            wc = row.get("workcenter_id")
+            wc_name = wc[1] if wc else "(unassigned)"
+            top_work_centers.append({
+                "work_center": wc_name,
+                "open_workorder_count": int(row.get("workcenter_id_count", 0)),
+                "planned_hours": float(
+                    (row.get("duration_expected") or 0.0) / 60.0),
+            })
+        # read_group returns highest planned_hours first via orderby, but
+        # defensively re-sort in case the ORM ordered by internal key.
+        top_work_centers.sort(
+            key=lambda r: r["planned_hours"], reverse=True)
+
+    if total == 0 and not top_work_centers:
+        note = "No manufacturing orders in the %s window." % window
+    else:
+        note = (
+            "Window %s: %d MOs total (%d in progress, %d confirmed, "
+            "%d to close, %d done). Top WCs by planned load listed."
+        ) % (window, total, mo_counts["progress"], mo_counts["confirmed"],
+             mo_counts["to_close"], mo_counts["done"])
+
+    return {
+        "window": window,
+        "window_start_iso": start.isoformat(),
+        "window_end_iso": end.isoformat(),
+        "mo_counts": mo_counts,
+        "top_work_centers": top_work_centers,
+        "note": note,
+    }
+
+
+@hermes_tool(
+    personas=["sales_rep", "mfg_manager"],
+    tier="T0", scope="global",
+    description=(
+        "Return active shop-wide MI checks — blockers (stop-the-line) "
+        "or warnings (needs review). Use to answer 'what's blocking "
+        "production today' or 'what warnings should we address'."),
+    parameters={
+        "severity": {"type": "string", "required": False,
+                      "enum": ["blocker", "warning"],
+                      "default": "blocker"},
+        "limit": {"type": "integer", "required": False, "default": 15},
+    },
+)
+def list_shop_blockers(env, severity="blocker", limit=15):
+    """Roll up active MI checks at the given severity for the shop.
+
+    Mirrors the guard pattern in hermes_question._answer_mi_checks:
+    returns `{"error": "mi_not_installed"}` when the MI addon isn't
+    loaded rather than raising. Empty search returns `count=0, items=[]`
+    with a human note.
+    """
+    if "southbrook.mi.check" not in env:
+        return {"error": "mi_not_installed"}
+
+    Check = env["southbrook.mi.check"].sudo()
+    checks = Check.search([
+        ("active", "=", True),
+        ("severity", "=", severity),
+    ], order="create_date desc, id desc", limit=limit)
+
+    items = []
+    for check in checks:
+        target = (
+            (check.production_id.display_name if check.production_id else None)
+            or (check.production_package_id.display_name
+                if check.production_package_id else None)
+            or "(unlinked)"
+        )
+        items.append({
+            "id": check.id,
+            "name": check.name or "",
+            "target": target,
+            "category": check.category or "",
+            "message": check.message or "",
+            "recommendation": (
+                check.recommendation or check.message or ""),
+        })
+
+    if not items:
+        note = "No active %s MI checks." % severity
+    else:
+        note = "Found %d active %s check(s)." % (len(items), severity)
+
+    return {
+        "severity": severity,
+        "count": len(items),
+        "items": items,
+        "note": note,
+    }
+
+
+@hermes_tool(
+    personas=["mfg_manager"],
+    tier="T0", scope="global",
+    description=(
+        "Return the next-up work items for a specific shop persona "
+        "(estimator, cnc, assembler, finisher, installer, production). "
+        "For mfg_manager use to answer 'what's on Chris's plate' or "
+        "'who is behind schedule'."),
+    parameters={
+        "persona": {"type": "string", "required": True,
+                     "enum": ["estimator", "cnc", "assembler",
+                              "finisher", "installer", "production"]},
+        "limit": {"type": "integer", "required": False, "default": 10},
+    },
+)
+def list_work_queue(env, persona, limit=10):
+    """Return the ready/progress WOs for the named shop persona.
+
+    Persona -> known user name mapping mirrors hermes_question._answer_users.
+    v19 CE mrp.workorder has no per-WO user assignment field (only
+    working_user_ids / last_working_user_id historical rows); the
+    plate-of-work semantic that closest matches the KNOWN_ROLES table
+    is the mrp.production.user_id (responsible for the MO). We match
+    that way when native mrp.workorder.user_id is absent.
+
+    Unknown persona -> user match returns count=0, items=[] with a note.
+    """
+    known_name = _WORK_QUEUE_KNOWN_ROLES.get(persona)
+    if not known_name:
+        return {
+            "persona": persona,
+            "user_name": None,
+            "user_id": None,
+            "count": 0,
+            "items": [],
+            "note": "No user matched for persona %s." % persona,
+        }
+
+    user = env["res.users"].sudo().search([
+        ("name", "=", known_name),
+        ("active", "=", True),
+    ], limit=1)
+    if not user:
+        return {
+            "persona": persona,
+            "user_name": None,
+            "user_id": None,
+            "count": 0,
+            "items": [],
+            "note": "No user matched for persona %s." % persona,
+        }
+
+    if "mrp.workorder" not in env:
+        return {
+            "persona": persona,
+            "user_name": user.name,
+            "user_id": user.id,
+            "count": 0,
+            "items": [],
+            "note": (
+                "mrp not installed on this deployment; no work-queue "
+                "tracking available."),
+        }
+
+    Workorder = env["mrp.workorder"].sudo()
+    wo_fields = Workorder._fields
+    # Prefer a direct WO user_id/assign field if the model exposes one;
+    # otherwise fall back to production.user_id (v19 CE default surface).
+    if "user_id" in wo_fields:
+        domain = [
+            ("user_id", "=", user.id),
+            ("state", "in", ["ready", "progress"]),
+        ]
+    else:
+        domain = [
+            ("production_id.user_id", "=", user.id),
+            ("state", "in", ["ready", "progress"]),
+        ]
+
+    # date_planned_start doesn't exist on v19 CE mrp.workorder — the
+    # canonical planned/actual start column is `date_start`.
+    order = "date_start asc, id asc"
+    workorders = Workorder.search(domain, order=order, limit=limit)
+
+    items = []
+    for wo in workorders:
+        items.append({
+            "id": wo.id,
+            "name": wo.display_name or wo.name or "",
+            "production": (
+                wo.production_id.name if wo.production_id else ""),
+            "state": wo.state,
+            "date_start": (
+                wo.date_start.isoformat() if wo.date_start else None),
+            "duration_expected": float(wo.duration_expected or 0.0),
+        })
+
+    if not items:
+        note = "No ready or in-progress work orders for %s." % user.name
+    else:
+        note = "%s has %d ready/in-progress WO(s)." % (user.name, len(items))
+
+    return {
+        "persona": persona,
+        "user_name": user.name,
+        "user_id": user.id,
+        "count": len(items),
+        "items": items,
+        "note": note,
     }

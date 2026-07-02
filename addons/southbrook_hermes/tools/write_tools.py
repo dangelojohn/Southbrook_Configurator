@@ -133,3 +133,62 @@ def propose_recommendation(env, intent: str, payload: dict, summary: str,
         "state": "draft",
     })
     return {"ok": True, "rec_id": rec.id, "summary": summary, "intent": intent}
+
+
+@hermes_tool(
+    personas=["sales_rep", "mfg_manager"],
+    tier="T2", scope="own_order",
+    description=(
+        "Draft an internal note on the given sale.order that mocks up an "
+        "email to the customer — subject + body. The note is posted as an "
+        "internal message (NOT sent as email) so a human sales rep or "
+        "manager can review and either edit + click Send by Email OR "
+        "reject. Use for 'draft a follow-up email' or 'compose a status "
+        "update to Richwood on order S00123'."),
+    parameters={
+        "order_id": {"type": "integer", "required": True},
+        "subject": {"type": "string", "required": True},
+        "body": {"type": "string", "required": True,
+                 "description": "The proposed email body. Plain text or "
+                                "simple HTML (mail.message will "
+                                "sanitize). Keep under 2000 chars."},
+    },
+)
+def draft_customer_email(env, order_id, subject, body):
+    order = env["sale.order"].sudo().browse(order_id)
+    if not order.exists():
+        return {"error": "order_not_found"}
+    # Trim + truncate subject to 1-256 chars
+    subject_clean = (subject or "").strip()[:256]
+    # Trim + truncate body to 1-2000 chars
+    body_clean = (body or "").strip()[:2000]
+    if not body_clean:
+        return {"error": "empty_body"}
+    # Compose marker-prefixed note so a human reviewer can see this is a
+    # Fabio draft, not a message the customer already received.
+    marker_body = (
+        "📝 <b>Fabio-drafted customer email "
+        "(NOT SENT — review before delivering)</b><br/><br/>"
+        f"<b>Subject:</b> {subject_clean}<br/><br/>"
+        "<hr/>"
+        f"{body_clean}"
+    )
+    message = order.message_post(
+        body=marker_body,
+        subject=subject_clean,
+        message_type="comment",
+        subtype_xmlid="mail.mt_note",
+    )
+    result = {
+        "ok": True,
+        "order_id": order.id,
+        "order_name": order.name,
+        "message_id": message.id,
+        "human_review_required": True,
+        "note": ("Draft email posted to the order thread as an internal "
+                 "note. Sales rep can open the order in Odoo and click "
+                 "'Send by Email' to deliver, or reject the draft."),
+    }
+    if not (order.partner_id and order.partner_id.email):
+        result["warning"] = "customer has no email on file"
+    return result
