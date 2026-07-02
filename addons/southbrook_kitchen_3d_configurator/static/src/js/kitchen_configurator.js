@@ -10,53 +10,18 @@
  *  - Scene rebuilds whenever room dimensions or product list change
  */
 
-import { Component, onMounted, onWillStart, onWillUnmount, useRef, useState, xml } from "@odoo/owl";
+import { Component, onMounted, onWillStart, onWillUnmount, useState, xml } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { rpc } from "@web/core/network/rpc";
 
-// Rec D · Sprint 2d · Step 1 · shared canvas constants.
-// Values are identical to the pre-2d inline block (kept verbatim);
-// the file just moved so future <KitchenCanvas> can import the
-// same palette + sizing without duplicating.
-import {
-    IN, BW, BH, BD, WW, WH, WD, CTR, GAP, WBY, P,
-} from "@southbrook_kitchen_3d_configurator/js/canvas/constants.esm";
-import { loadThreeJS } from "@southbrook_kitchen_3d_configurator/js/canvas/three_loader.esm";
-import { ndcFromEvent } from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_helpers.esm";
-import { computeViewSpecs } from "@southbrook_kitchen_3d_configurator/js/canvas/view_specs.esm";
-import { makeMesh } from "@southbrook_kitchen_3d_configurator/js/canvas/mesh_factory.esm";
+// Rec D · Sprint 2d Step 24e — dead 3D imports excised.
+// 24c moved the visible surface into <KitchenCanvas>; the parent's
+// inline scene was already self-disabled (canvas3dRef.el === null).
+// Survivors from the pre-24e canvas import block:
+//   packRow (state math — drives _recomputeLayoutFromItems)
+//   KitchenCanvas (the child component)
 import { packRow } from "@southbrook_kitchen_3d_configurator/js/canvas/pack_row.esm";
-import { easeInOutCubic } from "@southbrook_kitchen_3d_configurator/js/canvas/easing.esm";
-import { computeOrthoFrustum } from "@southbrook_kitchen_3d_configurator/js/canvas/ortho_frustum.esm";
-import { highlightSelected } from "@southbrook_kitchen_3d_configurator/js/canvas/selection.esm";
-import { computeDropXIn } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_raycaster.esm";
-import { buildRoomShell } from "@southbrook_kitchen_3d_configurator/js/canvas/room_shell.esm";
-import { buildDragHandle } from "@southbrook_kitchen_3d_configurator/js/canvas/drag_handle.esm";
-import { buildDropLanes } from "@southbrook_kitchen_3d_configurator/js/canvas/drop_lanes.esm";
-import { installPbrEnvMap } from "@southbrook_kitchen_3d_configurator/js/canvas/pbr_env_map.esm";
-import { buildBaseCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/base_cabinet.esm";
-import { buildWallCabinet } from "@southbrook_kitchen_3d_configurator/js/canvas/wall_cabinet.esm";
-import {
-    buildOtherCabinet, buildFillerPanel, buildEndCapPanel,
-} from "@southbrook_kitchen_3d_configurator/js/canvas/other_cabinets.esm";
-import { initScene } from "@southbrook_kitchen_3d_configurator/js/canvas/scene_init.esm";
-import { destroyScene } from "@southbrook_kitchen_3d_configurator/js/canvas/scene_dispose.esm";
-import {
-    setView as setViewShared,
-    animateCamera as animateCameraShared,
-    onWheel as onWheelShared,
-} from "@southbrook_kitchen_3d_configurator/js/canvas/camera_controller.esm";
-import {
-    isHandleActiveView,
-    resolveRoomWidthFromDrag,
-    isCabinetDragCommitted,
-    isPinnable,
-    cursorForPointerState,
-} from "@southbrook_kitchen_3d_configurator/js/canvas/pointer_pipeline.esm";
-// Rec D · Sprint 2d Step 24b — hidden-sibling <KitchenCanvas> mount.
-// Child renders its own Three.js scene off-screen from the same
-// props snapshot; parent's <div t-ref="canvas3d"/> stays visible.
 import { KitchenCanvas } from "@southbrook_kitchen_3d_configurator/js/canvas/kitchen_canvas.esm";
 
 const actionRegistry = registry.category("actions");
@@ -66,7 +31,6 @@ class SouthbrookKitchenConfigurator extends Component {
     setup() {
         this.notification = useService("notification");
         this.action       = useService("action");
-        this.canvas3dRef  = useRef("canvas3d");
 
         // ── Reactive state ────────────────────────────────────────────────────
         this.state = useState({
@@ -135,62 +99,50 @@ class SouthbrookKitchenConfigurator extends Component {
         // Auto-save debounce timer (not reactive; managed imperatively).
         this._autoSaveTimer = null;
 
-        // ── Three.js scene state (not reactive — managed imperatively) ────────
-        // D1 — `camera` is now `activeCamera`, swapped between the two
-        // instances on `cameras`. `currentTarget` is the live lookAt
-        // point so view transitions can lerp from where we are.
-        this.T = {
-            THREE: null, scene: null, renderer: null,
-            cameras: { ortho: null, persp: null },
-            activeCamera: null,
-            currentTarget: null,
-            viewSpecs: null,    // dict of {iso, top, front, left, right, persp} → {pos, target, up}
-            vsScale:   1,       // ortho zoom multiplier (wheel)
-            orbit:     null,    // OrbitControls instance (persp only)
-            raycaster: null,
-            roomObjs: [], cabObjs: [], clickable: [],
-            handleMesh: null, arrowMeshes: [],
-            // D16 — Per-zone drop lanes (visible during drag)
-            laneMeshes: null,
-            dragging: false, dragX0: 0, dragW0: 0,
-            animId: null,
-            animatingCamera: false,
-            // D15 — Drag-to-reposition existing cabinets
-            movingItem:      null,
-            moveStartClient: { x: 0, y: 0 },
-            moveLastX:       null,
-            moveCommitted:   false,
-        };
+        // Rec D · Sprint 2d Step 24c/24e — child <KitchenCanvas> owns
+        // the visible 3D scene and every scene-side handler (mouse,
+        // wheel, resize observer). Parent keeps only an imperative
+        // handle so window-scoped shortcuts (view keys, zoom keys,
+        // Cmd/Ctrl+S) and the HTML5 drop handler can delegate on
+        // demand. Populated by _onCanvasReady once the child's
+        // onMounted finishes initScene + buildScene.
+        this._canvasApi = null;
 
-        this._onMouseDown = this._onMouseDown.bind(this);
-        this._onMouseMove = this._onMouseMove.bind(this);
-        this._onMouseUp   = this._onMouseUp.bind(this);
-        this._onMouseOver = this._onMouseOver.bind(this);
-        this._onWheel     = this._onWheel.bind(this);
-        this._onKeyDown   = this._onKeyDown.bind(this);
+        // Only _onKeyDown remains pre-bound — it attaches to `window`
+        // so we need a stable reference for add/removeEventListener.
+        // The five mouse/wheel binds excised at 24e moved into
+        // <KitchenCanvas> at 24b/24c.
+        this._onKeyDown = this._onKeyDown.bind(this);
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
         onWillStart(async () => {
-            const [THREE] = await Promise.all([
-                loadThreeJS(),
+            // 24e — loadThreeJS moved into <KitchenCanvas>.onMounted;
+            // parent no longer touches THREE. Product + defaults still
+            // load in parallel so first paint isn't gated.
+            await Promise.all([
                 this._loadProducts(),
                 this._loadUserDefaults(),
             ]);
-            this.T.THREE    = THREE;
-            this.T.raycaster = new THREE.Raycaster();
             await this._refreshLayout();
             this.state.loading = false;
         });
 
         onMounted(() => {
-            if (this.T.THREE) {
-                this._initScene();
-                this._buildScene();
-            }
+            // 24e — scene bring-up is <KitchenCanvas>'s job. Parent
+            // only wires window-scoped keyboard shortcuts here.
+            window.addEventListener("keydown", this._onKeyDown);
         });
 
         onWillUnmount(() => {
-            this._destroyScene();
+            // 24e — no scene to destroy at parent scope. Clear the
+            // pending auto-save (so we don't fire after unmount) and
+            // detach the window listener; the child's onWillUnmount
+            // handles scene disposal itself.
+            if (this._autoSaveTimer) {
+                clearTimeout(this._autoSaveTimer);
+                this._autoSaveTimer = null;
+            }
+            window.removeEventListener("keydown", this._onKeyDown);
         });
     }
 
@@ -273,8 +225,7 @@ class SouthbrookKitchenConfigurator extends Component {
                 this.state.selected = this.state.items[0];
             }
             // Rebuild 3D after data refresh
-            if (this.T.scene) this._buildScene();
-        } catch (e) {
+            } catch (e) {
             this.state.error = "Layout error: " + (e.message || e);
         }
     }
@@ -338,8 +289,10 @@ class SouthbrookKitchenConfigurator extends Component {
     }
 
     _selectCabinet(item) {
+        // 24e — parent no longer owns cabObjs. <KitchenCanvas>
+        // observes state.selected via onWillUpdateProps and calls
+        // highlightSelected against its own scene.
         this.state.selected = item;
-        this._highlightSelected(item);
     }
 
     // ─── D13 — Searchable inventory + drag-and-drop add ─────────────────────────
@@ -410,7 +363,6 @@ class SouthbrookKitchenConfigurator extends Component {
         );
         ev.dataTransfer.setData("text/plain", String(product.product_id));
         this.state.draggedProduct = product;
-        this._updateLaneVisibility();
     }
 
     // D16 — Clear the dragged-product state when the gesture ends
@@ -418,7 +370,6 @@ class SouthbrookKitchenConfigurator extends Component {
     _onProductDragEnd(_ev) {
         this.state.draggedProduct = null;
         this.state.dragHover      = false;
-        this._updateLaneVisibility();
     }
 
     // Allow drop on the canvas wrapper. preventDefault is mandatory or
@@ -429,8 +380,7 @@ class SouthbrookKitchenConfigurator extends Component {
         ev.dataTransfer.dropEffect = "copy";
         if (!this.state.dragHover) {
             this.state.dragHover = true;
-            this._updateLaneVisibility();
-        }
+            }
     }
 
     _onCanvasDragLeave(ev) {
@@ -438,14 +388,12 @@ class SouthbrookKitchenConfigurator extends Component {
         // (children fire dragleave when crossing internal elements).
         if (ev.currentTarget && ev.currentTarget.contains(ev.relatedTarget)) return;
         this.state.dragHover = false;
-        this._updateLaneVisibility();
     }
 
     _onCanvasDrop(ev) {
         ev.preventDefault();
         this.state.dragHover     = false;
         this.state.draggedProduct = null;
-        this._updateLaneVisibility();
         let pid = null;
         try {
             const raw = ev.dataTransfer.getData("application/x-sbk-product");
@@ -465,46 +413,17 @@ class SouthbrookKitchenConfigurator extends Component {
         this._addCabinetFromProduct(product, dropX);
     }
 
-    // D16 — Show / hide the per-zone drop lanes and brighten the lane
-    // matching the dragged product's cabinet_type. Called from each
-    // drag-state mutation; no requestAnimationFrame needed because
-    // the scene's tick loop redraws every frame regardless.
-    _updateLaneVisibility() {
-        const lanes = this.T.laneMeshes;
-        if (!lanes) return;
-        const show  = !!(this.state.dragHover && this.state.draggedProduct);
-        const type  = (this.state.draggedProduct && this.state.draggedProduct.cabinet_type) || "";
-        // Bright opacity for the matching lane, dim for the others
-        // so the rep gets immediate "this goes here" feedback even
-        // before they release.
-        const baseHi = (type === "base" || type === "filler");
-        const wallHi = (type === "wall");
-        const tallHi = (type === "tall" || type === "corner" || type === "panel");
-        lanes.base.visible = show;
-        lanes.wall.visible = show;
-        lanes.tall.visible = show;
-        if (show) {
-            lanes.base.material.opacity = baseHi ? 0.42 : 0.14;
-            lanes.wall.material.opacity = wallHi ? 0.42 : 0.14;
-            lanes.tall.material.opacity = tallHi ? 0.42 : 0.14;
-        }
-    }
-
     // D14 — Cast a ray from the active camera through the drop point
     // and intersect the floor plane (Y=0) in world space, then convert
     // back to inches and snap to the 6" grid. Returns null when the
     // ray doesn't hit the floor (e.g. the cursor was over the sky in
     // a perspective view tilted upward).
-    // Rec D · Sprint 2d step 10 — thin wrapper delegating to the
-    // shared raycast helper so <KitchenCanvas> can compute drop-X
-    // from any camera + raycaster + ndc + room-width pair.
+    // D14 — floor-plane raycast for HTML5 drops onto the canvas.
+    // 24e — delegates to <KitchenCanvas>'s imperative API which owns
+    // the camera + raycaster. Returns null when the ray misses the
+    // floor OR the api isn't attached yet (mount race).
     _computeDropX(ev) {
-        const t = this.T;
-        return computeDropXIn(
-            t.THREE, t.activeCamera, t.raycaster,
-            this._ndcFromEvent(ev),
-            this.state.room.width_in,
-        );
+        return this._canvasApi?.computeDropX(ev) ?? null;
     }
 
     // Generic add — used by drop AND by a future "click to add" button.
@@ -574,7 +493,6 @@ class SouthbrookKitchenConfigurator extends Component {
         if (required > this.state.room.width_in) {
             this.state.room.width_in = Math.ceil(required / 6) * 6;
         }
-        if (this.T.scene) this._buildScene();
         // D14 — Drop UX feedback: tell the rep WHERE it landed when
         // they used drop-positioning (vs the bare "Added X" toast).
         if (typeof targetX === "number" && !Number.isNaN(targetX)) {
@@ -626,7 +544,6 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.items[idx].width_in = v;
         sel.width_in = v;
         this._recomputeLayoutFromItems();
-        if (this.T.scene) this._buildScene();
         this._queueAutoSave();    // D5
     }
 
@@ -655,7 +572,6 @@ class SouthbrookKitchenConfigurator extends Component {
         this.state.items[idx] = merged;
         this.state.selected = merged;
         this._recomputeLayoutFromItems();
-        if (this.T.scene) this._buildScene();
         this._queueAutoSave();    // D5
     }
 
@@ -669,7 +585,6 @@ class SouthbrookKitchenConfigurator extends Component {
         // Pick a neighbour as the new selection (or null if empty).
         this.state.selected = this.state.items[idx] || this.state.items[idx - 1] || null;
         this._recomputeLayoutFromItems();
-        if (this.T.scene) this._buildScene();
         // v19.0.4.24.0 P0#1 Stage 1 — sync delete server-side so
         // pinned-line rows don't resurrect on next load. Fire-and-
         // forget; the debounced /save is the fallback. Skipped when
@@ -794,121 +709,17 @@ class SouthbrookKitchenConfigurator extends Component {
         }
     }
 
-    // ─── Three.js initialisation ────────────────────────────────────────────────
-    _initScene() {
-        const THREE  = this.T.THREE;
-        const mount  = this.canvas3dRef.el;
-        if (!mount) return;
-
-        // Rec D · Sprint 2d step 20 — scene + cameras + renderer +
-        // lighting rig + orbit setup moved to canvas/scene_init.esm.js.
-        // Class-scope wiring (animation loop, resize observer, event
-        // listeners) stays here since it needs `this`.
-        const core = initScene(THREE, mount, P);
-        Object.assign(this.T, core);
-
-        // PBR env map — async, non-blocking. Falls back silently if
-        // the PMREM step fails on the user's GL stack.
-        this._installPbrEnvMap();
-
-        // Render loop — render activeCamera, advance orbit damping
-        // when the persp orbit is active.
-        const scene = this.T.scene;
-        const renderer = this.T.renderer;
-        const { persp } = this.T.cameras;
-        const tick = () => {
-            this.T.animId = requestAnimationFrame(tick);
-            if (this.T.orbit && this.T.orbit.enabled) this.T.orbit.update();
-            renderer.render(scene, this.T.activeCamera);
-        };
-        tick();
-
-        // Resize observer — update BOTH cameras so a swap doesn't pop.
-        this._resizeObserver = new ResizeObserver(() => {
-            const nw = mount.clientWidth, nh = mount.clientHeight;
-            if (!nw || !nh) return;
-            persp.aspect = nw / nh;
-            persp.updateProjectionMatrix();
-            renderer.setSize(nw, nh);
-            this._applyOrthoFrustum();
-        });
-        this._resizeObserver.observe(mount);
-
-        // Events — D15: mousedown in capture phase so we intercept
-        // before OrbitControls (bound to renderer.domElement, child
-        // of mount) sees it.
-        mount.addEventListener("mousedown",  this._onMouseDown, { capture: true });
-        mount.addEventListener("mousemove",  this._onMouseMove);
-        mount.addEventListener("mouseup",    this._onMouseUp);
-        mount.addEventListener("mouseleave", this._onMouseUp);
-        mount.addEventListener("mousemove",  this._onMouseOver);
-        mount.addEventListener("wheel", this._onWheel, { passive: false });
-        window.addEventListener("keydown", this._onKeyDown);
-    }
-
-    // Rec D · Sprint 2d step 14 — PBR env map install moved to
-    // canvas/pbr_env_map.esm.js. Same 512×256 gradient studio HDR
-    // + PMREM install path; identical rendering.
-    _installPbrEnvMap() {
-        const { THREE, scene, renderer } = this.T;
-        installPbrEnvMap(THREE, scene, renderer);
-    }
-
-    // ─── D1 — Multi-view camera system ──────────────────────────────────────────
-    // Rec D · Sprint 2d step 4 — thin wrapper delegating to the
-    // shared pure function so <KitchenCanvas> can compute its own
-    // view specs. Same dict shape assigned to the same class ref.
-    _recomputeViews(rw, rh, rd) {
-        this.T.viewSpecs = computeViewSpecs(this.T.THREE, rw, rh, rd);
-    }
-
-    // Apply the current view's ortho frustum + the wheel-zoom multiplier.
-    // Safe to call even when the active camera is perspective (no-op).
-    // Rec D · Sprint 2d step 8 — frustum math moved to
-    // canvas/ortho_frustum.esm.js so <KitchenCanvas> can share it.
-    _applyOrthoFrustum() {
-        const t = this.T;
-        const cam = t.cameras?.ortho;
-        if (!cam || !t.renderer) return;
-        const spec = t.viewSpecs?.[this.state.view];
-        const f = computeOrthoFrustum(
-            spec && spec.vs, t.vsScale,
-            t.renderer.domElement.width,
-            t.renderer.domElement.height,
-        );
-        cam.left = f.left; cam.right = f.right;
-        cam.top  = f.top;  cam.bottom = f.bottom;
-        cam.near = f.near; cam.far    = f.far;
-        cam.updateProjectionMatrix();
-    }
-
-    // Swap to a named view. instant=true jumps; otherwise lerps over ms.
-    // Rec D · Sprint 2d step 22 — camera controller (setView +
-    // animateCamera + onWheel) moved to canvas/camera_controller.
-    // esm.js. Guard on viewSpecs[key] before writing state.view
-    // so an invalid key doesn't corrupt state (parity with the
-    // pre-2d guard-then-write ordering). The state write must
-    // precede setViewShared so _applyOrthoFrustum reads the new
-    // view's vs, not the old one.
-    _setView(key, instant = false) {
-        if (!this.T.viewSpecs || !this.T.viewSpecs[key]) return;
+    // ─── Camera view (state-only wrapper) ────────────────────────────────────
+    // Rec D · Sprint 2d Step 24e — view-swap orchestration moved to
+    // <KitchenCanvas>. Parent writes state.view so the child re-runs
+    // its own _setView via onWillUpdateProps AND fires the imperative
+    // api.setView(key) so a "reset" click at the current view still
+    // re-lerps the camera (preserving the pre-24e Reset button UX).
+    // The child's _setView is idempotent under _currentView === key,
+    // so the two paths never race.
+    _setView(key) {
         this.state.view = key;
-        setViewShared(this.T, key, {
-            instant,
-            applyOrthoFrustum: () => this._applyOrthoFrustum(),
-            animateCamera: (p, tgt, up, ms) => this._animateCamera(p, tgt, up, ms),
-        });
-    }
-
-    _animateCamera(toPos, toTarget, toUp, ms = 400) {
-        animateCameraShared(
-            this.T, toPos, toTarget, toUp, ms,
-            easeInOutCubic, requestAnimationFrame,
-        );
-    }
-
-    _onWheel(e) {
-        onWheelShared(this.T, e, () => this._applyOrthoFrustum());
+        if (this._canvasApi) this._canvasApi.setView(key);
     }
 
     _onKeyDown(e) {
@@ -933,14 +744,13 @@ class SouthbrookKitchenConfigurator extends Component {
         if (!ctrl && (k === "r" || k === "R")) { e.preventDefault(); this._setView("iso"); return; }
         if (!ctrl && (k === "+" || k === "=")) {
             e.preventDefault();
-            this.T.vsScale = Math.max(0.3, (this.T.vsScale || 1) * 0.9);
-            this._applyOrthoFrustum();
+            // 24e — vsScale + frustum are child-owned now.
+            this._canvasApi?.zoomBy(0.9);
             return;
         }
         if (!ctrl && (k === "-" || k === "_")) {
             e.preventDefault();
-            this.T.vsScale = Math.min(3.0, (this.T.vsScale || 1) * 1.1);
-            this._applyOrthoFrustum();
+            this._canvasApi?.zoomBy(1.1);
             return;
         }
 
@@ -974,8 +784,9 @@ class SouthbrookKitchenConfigurator extends Component {
         // D6 — Esc clears the cabinet selection.
         if (k === "Escape") {
             if (this.state.selected) {
+                // 24e — child observes state.selected and clears its
+                // own highlight via onWillUpdateProps.
                 this.state.selected = null;
-                this._highlightSelected(null);
                 e.preventDefault();
             }
             return;
@@ -1074,318 +885,6 @@ class SouthbrookKitchenConfigurator extends Component {
             );
         }
         this._queueAutoSave();
-    }
-
-    // Rec D · Sprint 2d step 21 — orbit + renderer disposal moved to
-    // canvas/scene_dispose.esm.js. Class-scope cleanup (autoSave
-    // timer, resize observer, event listener removal) stays here
-    // since it needs `this` bindings.
-    _destroyScene() {
-        const t = this.T;
-        // D5 — clear any pending auto-save so we don't fire after
-        // the component unmounts.
-        if (this._autoSaveTimer) {
-            clearTimeout(this._autoSaveTimer);
-            this._autoSaveTimer = null;
-        }
-        if (t.animId) cancelAnimationFrame(t.animId);
-        if (this._resizeObserver) this._resizeObserver.disconnect();
-        const mount = this.canvas3dRef.el;
-        if (mount) {
-            // D15 — mousedown must match the capture-phase add.
-            mount.removeEventListener("mousedown",  this._onMouseDown, { capture: true });
-            mount.removeEventListener("mousemove",  this._onMouseMove);
-            mount.removeEventListener("mouseup",    this._onMouseUp);
-            mount.removeEventListener("mouseleave", this._onMouseUp);
-            mount.removeEventListener("mousemove",  this._onMouseOver);
-            mount.removeEventListener("wheel",      this._onWheel);
-        }
-        window.removeEventListener("keydown", this._onKeyDown);
-        destroyScene(t, mount);
-    }
-
-    // ─── Scene builder ──────────────────────────────────────────────────────────
-    _buildScene() {
-        const { THREE, scene, renderer } = this.T;
-        if (!scene || !renderer) return;
-
-        const rw = this.state.room.width_in  * IN;
-        const rd = this.state.room.depth_in  * IN;
-        const rh = this.state.room.height_in * IN;
-
-        // Dispose previous geometry.
-        // v19.0.4.25.0 P0#1 Stage 3 — cabObjs may now include
-        // THREE.Group wrappers per rotated cabinet (see rotationGroup
-        // helper). Groups have no .geometry / .material of their own,
-        // so a bare `if (m.geometry) m.geometry.dispose()` silently
-        // leaks the child meshes' resources. We `.traverse()` every
-        // node — Meshes get their geometry + material disposed,
-        // Groups just visit their descendants. Post-mortem of 4.20.0
-        // (see audit §P0#1) identified this as the WebGL context loss
-        // that follows ~10 refreshes once grouping is introduced.
-        const disposeNode = (n) => {
-            if (!n) return;
-            if (n.geometry) n.geometry.dispose();
-            if (n.material) {
-                if (Array.isArray(n.material)) n.material.forEach(x => x.dispose());
-                else n.material.dispose();
-            }
-        };
-        [...this.T.roomObjs, ...this.T.cabObjs].forEach(m => {
-            if (m && typeof m.traverse === "function") {
-                m.traverse(disposeNode);
-            } else {
-                disposeNode(m);
-            }
-            scene.remove(m);
-        });
-        if (this.T.handleMesh) {
-            scene.remove(this.T.handleMesh);
-            this.T.handleMesh.geometry?.dispose();
-            this.T.handleMesh.material?.dispose();
-        }
-        // D16 — Dispose lane meshes from the previous build.
-        if (this.T.laneMeshes) {
-            for (const k of ["base", "wall", "tall"]) {
-                const m = this.T.laneMeshes[k];
-                if (!m) continue;
-                scene.remove(m);
-                m.geometry?.dispose();
-                m.material?.dispose();
-            }
-            this.T.laneMeshes = null;
-        }
-        this.T.roomObjs = []; this.T.cabObjs = []; this.T.clickable = []; this.T.handleMesh = null;
-        this.T.arrowMeshes = [];
-
-        // Rec D · Sprint 2d step 5 — thin closure over the shared
-        // makeMesh factory so the ~40 call sites below stay
-        // signature-compatible with the pre-2d code (`mk(geo, color,
-        // pos, rotE, opts)`) while the actual mesh construction lives
-        // in canvas/mesh_factory.esm.js for future <KitchenCanvas>
-        // reuse.
-        const mk = (geo, color, pos, rotE, opts) =>
-            makeMesh(THREE, scene, geo, color, pos, rotE, opts);
-
-        // Rec D · Sprint 2d step 11 — room shell (floor + 2 walls +
-        // wainscoting rail + floor grid) moved to canvas/room_shell.
-        // esm.js. Returns the objects list; we push into roomObjs so
-        // the dispose loop at the top of _buildScene handles them.
-        const { objects: shellObjects } = buildRoomShell(
-            THREE, scene, mk, P, rw, rh, rd,
-        );
-        this.T.roomObjs.push(...shellObjects);
-
-        // ── Cabinet fill ──
-        const items = this.state.items;
-        // Group base and wall items for geometry creation
-        const baseItems = items.filter(it => it.cabinet_type === "base");
-        const wallItems = items.filter(it => it.cabinet_type === "wall");
-        const fillerItems = items.filter(it => it.cabinet_type === "filler");
-        // End-cap decorative panels — anchored to a cabinet's exposed left
-        // or right side face. Rendered as a thin vertical panel matching
-        // the host cabinet's H×D at the pre-set x_position_in (do NOT
-        // reposition here; see _recomputeLayoutFromItems for the rule).
-        const endCapItems = items.filter(it => it.cabinet_type === "panel");
-
-        // Rec D · Sprint 2d step 15 — base cabinet mesh builder moved
-        // to canvas/base_cabinet.esm.js. Same toe-kick + carcass + door
-        // + drawer + handles + countertop + drip edge + pin indicator
-        // set, gated behind item.pinned as before.
-        baseItems.forEach(item => {
-            const { objects, clickable } = buildBaseCabinet(THREE, mk, P, item);
-            this.T.cabObjs.push(...objects);
-            this.T.clickable.push(...clickable);
-        });
-
-        // Rec D · Sprint 2d step 16 — wall cabinet mesh builder moved
-        // to canvas/wall_cabinet.esm.js. Same body + door + handle +
-        // bottom rail + pin indicator set; D8 z_position_in honoured.
-        wallItems.forEach(item => {
-            const { objects, clickable } = buildWallCabinet(THREE, mk, P, item);
-            this.T.cabObjs.push(...objects);
-            this.T.clickable.push(...clickable);
-        });
-
-        // D13 — Generic-type fallback: tall / corner / panel cabinets
-        // dropped via the inventory drag-and-drop. Renders as a simple
-        // PBR box at the item's reported (x, z, dims) so the cabinet
-        // becomes visible immediately instead of silently dropping out
-        // of the scene. Detailed per-type geometry can layer on top later.
-        // Rec D · Sprint 2d steps 17-19 — tall/corner/panel/filler/
-        // end-cap mesh builders moved to canvas/other_cabinets.esm.js.
-        const knownTypes = new Set(["base", "wall", "filler"]);
-        const otherItems = items.filter(it => !knownTypes.has(it.cabinet_type));
-
-        otherItems.forEach(item => {
-            const { objects, clickable } = buildOtherCabinet(THREE, mk, P, item);
-            this.T.cabObjs.push(...objects);
-            this.T.clickable.push(...clickable);
-        });
-
-        // Filler panels
-        fillerItems.forEach(item => {
-            this.T.cabObjs.push(buildFillerPanel(THREE, mk, P, item));
-        });
-
-        // End-cap decorative panels
-        endCapItems.forEach(item => {
-            const { objects, clickable } = buildEndCapPanel(THREE, mk, P, item);
-            this.T.cabObjs.push(...objects);
-            this.T.clickable.push(...clickable);
-        });
-
-        // Rec D · Sprint 2d step 12 — drag handle + arrow cones
-        // moved to canvas/drag_handle.esm.js.
-        const { handleMesh, arrowMeshes } = buildDragHandle(
-            THREE, scene, P, rw, rd,
-        );
-        this.T.handleMesh = handleMesh;
-        this.T.arrowMeshes.push(...arrowMeshes);
-
-        // Rec D · Sprint 2d step 13 — three drop lanes moved to
-        // canvas/drop_lanes.esm.js.
-        this.T.laneMeshes = buildDropLanes(THREE, scene, rw, rh);
-        this._updateLaneVisibility();
-
-        // ── D1 — Re-compute view specs from current room dims and
-        //         re-apply the active view. instant=true on rebuild so
-        //         the camera doesn't lerp every time a cabinet is added.
-        this._recomputeViews(rw, rh, rd);
-        this._setView(this.state.view || "iso", true);
-
-        // Re-apply selection highlight after rebuild
-        if (this.state.selected) {
-            this._highlightSelected(this.state.selected);
-        }
-    }
-
-    // Rec D · Sprint 2d step 9 — thin wrapper delegating to the
-    // shared selection helper so <KitchenCanvas> can highlight its
-    // own cabObjs with the same reset+paint cycle.
-    _highlightSelected(item) {
-        highlightSelected(this.T.cabObjs, item, P);
-    }
-
-    // ─── Mouse events ────────────────────────────────────────────────────────────
-    // Rec D · Sprint 2d step 3 — thin wrapper delegating to the
-    // shared pure function so future <KitchenCanvas> can reuse the
-    // same math with its own canvas element.
-    _ndcFromEvent(e) {
-        return ndcFromEvent(e, this.canvas3dRef.el);
-    }
-
-    // Rec D · Sprint 2d step 23 — pointer pipeline helpers moved to
-    // canvas/pointer_pipeline.esm.js. The handlers keep their `this`-
-    // scoped orchestration (state writes, RPC fire-and-forget, cursor
-    // sets, notification.add) but delegate testable geometry math +
-    // threshold checks + cursor decision to the shared module.
-    _onMouseDown(e) {
-        const { activeCamera, raycaster, handleMesh, clickable } = this.T;
-        if (!activeCamera || !raycaster) return;
-
-        raycaster.setFromCamera(this._ndcFromEvent(e), activeCamera);
-
-        // D1 — drag handle is only sensible in iso/top views.
-        const handleActive = isHandleActiveView(this.state.view);
-        if (handleActive && handleMesh && raycaster.intersectObject(handleMesh).length) {
-            this.T.dragging = true;
-            this.T.dragX0   = e.clientX;
-            this.T.dragW0   = this.state.room.width_in;
-            e.preventDefault();
-            return;
-        }
-
-        // Cabinet selection — works in every view. D15 — also arms
-        // a potential move (commits only on >5px cursor travel).
-        const hits = raycaster.intersectObjects(clickable, false);
-        if (hits.length) {
-            const h = hits[0].object;
-            if (h.userData?.item) {
-                this._selectCabinet(h.userData.item);
-                if (h.userData.item.cabinet_type !== "filler") {
-                    this.T.movingItem      = h.userData.item;
-                    this.T.moveStartClient = { x: e.clientX, y: e.clientY };
-                    this.T.moveLastX       = h.userData.item.x_position_in;
-                    this.T.moveCommitted   = false;
-                    // D15 — stopPropagation gates OrbitControls off
-                    // this drag; empty-space clicks fall through.
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            }
-        }
-    }
-
-    _onMouseMove(e) {
-        if (this.T.dragging) {
-            this.state.room.width_in = resolveRoomWidthFromDrag(
-                e.clientX, this.T.dragX0, this.T.dragW0,
-            );
-            return;
-        }
-
-        if (this.T.movingItem) {
-            if (!this.T.moveCommitted &&
-                !isCabinetDragCommitted(this.T.moveStartClient, e)) return;
-            if (!this.T.moveCommitted) {
-                this.T.moveCommitted = true;
-                const cvs = this.T.renderer && this.T.renderer.domElement;
-                if (cvs) cvs.style.cursor = "move";
-            }
-            const targetX = this._computeDropX(e);
-            if (targetX == null) return;
-            if (this.T.movingItem.x_position_in === targetX) return;
-            this.T.movingItem.x_position_in = targetX;
-            this.T.moveLastX = targetX;
-            if (this.T.scene) this._buildScene();
-        }
-    }
-
-    _onMouseUp() {
-        if (this.T.dragging) {
-            this.T.dragging = false;
-            this._refreshLayout().then(() => this._queueAutoSave());   // D5
-        }
-        if (this.T.movingItem) {
-            const item = this.T.movingItem;
-            const wasCommitted = this.T.moveCommitted;
-            this.T.movingItem    = null;
-            this.T.moveCommitted = false;
-            const cvs = this.T.renderer && this.T.renderer.domElement;
-            if (cvs) cvs.style.cursor = "";
-            if (wasCommitted) {
-                if (isPinnable(item.cabinet_type)) {
-                    item.pinned = true;
-                    this._savePinnedPosition(item);
-                }
-                this._recomputeLayoutFromItems();
-                if (this.T.scene) this._buildScene();
-                this.notification.add(
-                    `Moved ${item.product_name || item.name || "cabinet"} to ${Math.round(item.x_position_in)}″`,
-                    { type: "success" }
-                );
-                this._queueAutoSave();
-            }
-        }
-    }
-
-    _onMouseOver(e) {
-        const mount = this.canvas3dRef.el;
-        if (!mount || !this.T.activeCamera || !this.T.raycaster) return;
-        // D15 — Don't override cursor mid-move (_onMouseMove already
-        // set it to "move").
-        if (this.T.movingItem && this.T.moveCommitted) return;
-        this.T.raycaster.setFromCamera(this._ndcFromEvent(e), this.T.activeCamera);
-        const handleActive = isHandleActiveView(this.state.view);
-        const onHandle = handleActive && this.T.handleMesh &&
-            this.T.raycaster.intersectObject(this.T.handleMesh).length > 0;
-        const onCabinet = !onHandle &&
-            this.T.raycaster.intersectObjects(this.T.clickable, false).length > 0;
-        const cvs = this.T.renderer?.domElement;
-        if (cvs) cvs.style.cursor = cursorForPointerState({
-            dragging: this.T.dragging, onHandle, onCabinet,
-        });
     }
 
     // ─── Save ─────────────────────────────────────────────────────────────────────
