@@ -34,71 +34,66 @@
   Defense-in-depth: `kitchen_design._ensure_kitchen_bom` also re-applies the
   Manufacture route on every entry so runtime-created templates (Track B fast
   path from the 3D configurator) don't fall through this seed's cracks.
+
+  XML idiom: we directly target the existing xmlid owned by southbrook_estimating.
+  Prior attempt used `<record id="route_wall_1dr"><field name="id" ref="..."/>`
+  which is not the canonical Odoo pattern and raised ParseError at install time.
 -->
 <odoo noupdate="1">
 
   <!-- Wall cabinets ─────────────────────────────────────────── -->
 
-  <record id="route_wall_1dr" model="product.template">
-    <field name="id" ref="southbrook_estimating.wall_1dr"/>
+  <record id="southbrook_estimating.wall_1dr" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <record id="route_wall_2dr" model="product.template">
-    <field name="id" ref="southbrook_estimating.wall_2dr"/>
+  <record id="southbrook_estimating.wall_2dr" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
   <!-- Base cabinets ─────────────────────────────────────────── -->
 
-  <record id="route_base_1dr" model="product.template">
-    <field name="id" ref="southbrook_estimating.base_1dr"/>
+  <record id="southbrook_estimating.base_1dr" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <record id="route_base_2dr" model="product.template">
-    <field name="id" ref="southbrook_estimating.base_2dr"/>
+  <record id="southbrook_estimating.base_2dr" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <record id="route_drawer_bank" model="product.template">
-    <field name="id" ref="southbrook_estimating.drawer_bank"/>
+  <!-- Specialised base cabinets ─────────────────────────────── -->
+
+  <record id="southbrook_estimating.drawer_bank" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <record id="route_sink_base" model="product.template">
-    <field name="id" ref="southbrook_estimating.sink_base"/>
+  <record id="southbrook_estimating.sink_base" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <record id="route_vanity" model="product.template">
-    <field name="id" ref="southbrook_estimating.vanity"/>
+  <record id="southbrook_estimating.vanity" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <!-- Tall cabinets ─────────────────────────────────────────── -->
+  <!-- Tall cabinets ──────────────────────────────────────────── -->
 
-  <record id="route_tall_pantry" model="product.template">
-    <field name="id" ref="southbrook_estimating.tall_pantry"/>
+  <record id="southbrook_estimating.tall_pantry" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <record id="route_tall_oven" model="product.template">
-    <field name="id" ref="southbrook_estimating.tall_oven"/>
+  <record id="southbrook_estimating.tall_oven" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
-  <!-- Corner ─────────────────────────────────────────────────── -->
+  <!-- Corner cabinets ────────────────────────────────────────── -->
 
-  <record id="route_corner" model="product.template">
-    <field name="id" ref="southbrook_estimating.corner"/>
+  <record id="southbrook_estimating.corner" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
   <!-- Accessory ─────────────────────────────────────────────── -->
 
-  <record id="route_accessory" model="product.template">
-    <field name="id" ref="southbrook_estimating.accessory"/>
+  <record id="southbrook_estimating.accessory" model="product.template">
     <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
   </record>
 
