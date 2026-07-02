@@ -53,3 +53,6 @@ dist/
 .venv/
 venv/
 env/
+
+# Claude Code session config (per-clone, not shared)
+.claude/
