@@ -818,8 +818,13 @@ class SouthbrookKitchenDesign(models.Model):
         mfg_route = self.env.ref(
             "mrp.route_warehouse0_manufacture", raise_if_not_found=False,
         )
-        if mfg_route and mfg_route.id not in product_tmpl.route_ids.ids:
-            product_tmpl.sudo().write({"route_ids": [(4, mfg_route.id)]})
+        # Defense-in-depth — writes route on product.product variants (the
+        # stock module defines route_ids on the variant, not the template;
+        # template-level writes silently no-op in v19).
+        if mfg_route:
+            for variant in product_tmpl.product_variant_ids:
+                if mfg_route.id not in variant.route_ids.ids:
+                    variant.sudo().write({"route_ids": [(4, mfg_route.id)]})
 
         # Fast path — the template already carries a normal-type BOM.
         # active_test=False so we don't autoseed a duplicate on top of an
