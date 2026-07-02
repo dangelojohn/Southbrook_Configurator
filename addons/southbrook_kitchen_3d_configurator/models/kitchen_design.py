@@ -797,8 +797,43 @@ class SouthbrookKitchenDesign(models.Model):
             # "Create & Confirm →" button (context={'confirm_
             # immediately': True}). Confirms the SO in place and
             # pivots the return action from SO form to mrp.production.
+            #
+            # v19.0.5.6.6 fix (Track B P0-A) — wrap action_confirm in a
+            # savepoint. If the Production Approval gate raises UserError
+            # (southbrook_mrp_pm.sale_order.action_confirm calls
+            # `_check_production_approval_gate` BEFORE super()), the
+            # bare call would roll the WHOLE request transaction —
+            # including the autoseeded BOMs, SO create, and design
+            # state="quoted". With the savepoint, only the confirm
+            # attempt reverts; everything upstream persists so the rep
+            # can navigate to the SO and click Request Production.
             if self.env.context.get("confirm_immediately"):
-                order.action_confirm()
+                confirm_error = None
+                try:
+                    with self.env.cr.savepoint():
+                        order.action_confirm()
+                except UserError as e:
+                    confirm_error = str(e)
+                    _logger.warning(
+                        "action_create_quotation: auto-confirm blocked "
+                        "for %s: %s", order.name, confirm_error,
+                    )
+                    order.message_post(body=(
+                        "Auto-confirm blocked: %s\n\n"
+                        "Order left in draft. Use Request Production → "
+                        "Approve Production before confirming."
+                    ) % confirm_error)
+                if confirm_error:
+                    # Fall back to SO form so the rep sees the draft +
+                    # chatter message + Request Production button.
+                    return {
+                        "type":      "ir.actions.act_window",
+                        "res_model": "sale.order",
+                        "res_id":    order.id,
+                        "views":     [(False, "form")],
+                        "view_mode": "form",
+                        "target":    "current",
+                    }
                 Mo = self.env["mrp.production"].sudo()
                 mos = Mo.search([("origin", "=", order.name)])
                 if len(mos) == 1:
