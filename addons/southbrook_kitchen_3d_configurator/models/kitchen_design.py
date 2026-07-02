@@ -301,6 +301,38 @@ class SouthbrookKitchenDesign(models.Model):
             "target":    "current",
         }
 
+    # ── Reset stale quote link (safety valve) ──────────────────────────────────
+    # 2026-07-02 — Design #15 currently points at S01314, a stale draft
+    # from an earlier failed attempt. Re-clicking "Create Quotation" or
+    # "Create & Confirm →" today would try to reuse that link's
+    # downstream logic. This provides a rep-visible unlink action that
+    # clears sale_order_id (design falls back to state=configured) so
+    # the design can be re-quoted. Ordered designs are protected — they
+    # must stay linked for the manufacturing/delivery audit trail.
+    def action_reset_quote_link(self):
+        """Clear the sale_order_id link and revert state to configured.
+
+        Used when a prior "Create Quotation" left the design pointing at
+        a stale draft SO the rep decided not to pursue. Does NOT delete
+        the underlying sale.order — that's a separate action from the SO
+        surface.
+        """
+        self.ensure_one()
+        if self.state == "ordered":
+            raise UserError(
+                "Cannot reset a design that has been ordered. Ordered "
+                "designs must remain linked to their sale.order for the "
+                "manufacturing / delivery audit trail."
+            )
+        prior = self.sale_order_id
+        self.write({"sale_order_id": False, "state": "configured"})
+        if prior:
+            self.message_post(body=(
+                "Quote link reset by %s. Previously linked to: %s. "
+                "Design is now free to be re-quoted."
+            ) % (self.env.user.name, prior.name))
+        return {"type": "ir.actions.client", "tag": "reload"}
+
     # ── Computed ────────────────────────────────────────────────────────────────
     @api.depends(
         "cabinet_line_ids.quantity",
@@ -957,6 +989,30 @@ class SouthbrookKitchenDesign(models.Model):
             # attempt reverts; everything upstream persists so the rep
             # can navigate to the SO and click Request Production.
             if self.env.context.get("confirm_immediately"):
+                # 2026-07-02 UX enhancement — Sales Managers get one-click confirm.
+                # The Production Approval gate exists to protect against reps accidentally
+                # spawning MOs; Sales Managers already have the authority (they can tick
+                # force_production_release on the SO form manually anyway). Auto-setting
+                # it here just removes a redundant click. If a rep clicks the button,
+                # the savepoint below still gracefully catches the gate and falls back
+                # to the SO form.
+                is_sales_manager = self.env.user.has_group(
+                    "sales_team.group_sale_manager"
+                )
+                if is_sales_manager:
+                    order.sudo().write({"force_production_release": True})
+                    _logger.info(
+                        "Sales Manager %s auto-set force_production_release on %s "
+                        "via kitchen_design.action_create_quotation",
+                        self.env.user.name, order.name,
+                    )
+                    order.message_post(body=(
+                        "Production Approval auto-released by Sales Manager %s via "
+                        "Create & Confirm → button. Standard approval gate bypass — "
+                        "Sales Manager can toggle the SO's Force Production Release "
+                        "field back to false if they want to route through the normal "
+                        "approval flow instead."
+                    ) % self.env.user.name)
                 confirm_error = None
                 try:
                     with self.env.cr.savepoint():

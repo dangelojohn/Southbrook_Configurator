@@ -194,6 +194,19 @@
                             class="btn-secondary"
                             icon="fa-file-text-o"
                             invisible="not sale_order_id"/>
+                    <!-- 2026-07-02 — safety valve for stale draft SO
+                         links. Design #15 currently points at a draft
+                         S01314 the rep chose not to pursue. Without
+                         this, "Create Quotation" would try to reuse
+                         the stale downstream. Hidden once the design
+                         reaches state=ordered (see model guard). -->
+                    <button name="action_reset_quote_link"
+                            type="object"
+                            string="Reset Quote Link"
+                            class="btn-secondary"
+                            icon="fa-unlink"
+                            invisible="not sale_order_id or state == 'ordered'"
+                            confirm="Clear the link to the current draft quotation? The SO record itself will not be deleted — this only lets the design be re-quoted."/>
                     <!-- D11 — Duplicate-and-Open: copy the design as draft
                          and jump into the 3D configurator on the new
                          record. Saves the typical 4-click clone flow.
