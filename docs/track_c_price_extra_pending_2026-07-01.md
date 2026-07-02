@@ -1,8 +1,24 @@
 # Track C · price_extra backfill — blocked pending product-owner input
 
 **Date:** 2026-07-01
-**Status:** Not applied. Design ready; numbers + anchor mapping unresolved.
-**Recommended action:** Product owner reviews the 3 anchor-mapping questions + supplies Price Master values, then this ships as one commit.
+**Status:** Partially landed: 5 anchors seeded at 7.2.0 with confident defaults; `finish_premium_colors` deferred (Q1 still open); regression pins landed at 7.3.0 in `tests/test_price_extra_flow.py`.
+**Recommended action:** Product owner reviews the 3 open questions below + supplies Price Master values so the deferred `finish_premium_colors` anchor and any per-template refinements can ship as a follow-up commit.
+
+## What landed (2026-07-01)
+
+* `models/ptav_price_extra_seed.py` — `southbrook.estimating.ptav_price_extra_seed` AbstractModel (`seed_price_extra_for_value` + `seed_price_extra_batch`).
+* `data/attribute_values_price_extra.xml` — noupdate="1" batch seeding 5 anchors:
+  * `value_box_maple` — hand-tuned per-template ($8.50 accessory → $89.50 tall_pantry), approximates CLAUDE.md §5 Rule 2 pending Price Master extraction.
+  * `value_door_five_piece_woodgrain` — $35 uniform on 10 templates.
+  * `value_accessory_soft_close` — $15 uniform on 10 templates (Blum per-cabinet).
+  * `value_drawer_metal_blum` — $65 on 6 drawer-carrying templates (Blum Legrabox).
+  * `value_series_signature` — $0 defensive on 11 templates (other series price DOWN from Signature; tactical layer in `southbrook_configurator_ux` overrides to $145 for demo).
+* `tests/test_price_extra_flow.py` — 7 regression pins: completeness, uniform-anchor pinning, Maple derivation (informational), Signature tactical-override lock-in, seed idempotency, `noupdate="1"` contract, missing-template graceful-skip.
+
+## Still deferred
+
+* `finish_premium_colors` — omitted from the seed; the `attr_finish` set is still an NF19 placeholder. Landing zeros here would create maintenance debt without customer value. See Q1 below.
+* Per-template refinements to `value_box_maple` and the uniform anchors, once Price Master numbers land (Q3 below).
 
 ---
 

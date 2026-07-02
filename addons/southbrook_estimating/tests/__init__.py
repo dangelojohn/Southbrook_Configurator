@@ -29,3 +29,4 @@ from . import test_room_wall_assignment
 # 2026-07-01 E2E audit follow-up.
 from . import test_rule_enforcement
 from . import test_pricelist_math
+from . import test_price_extra_flow
