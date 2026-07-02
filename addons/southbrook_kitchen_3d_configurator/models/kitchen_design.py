@@ -333,6 +333,26 @@ class SouthbrookKitchenDesign(models.Model):
             ) % (self.env.user.name, prior.name))
         return {"type": "ir.actions.client", "tag": "reload"}
 
+    # ── Send linked quotation by email (UX shortcut) ───────────────────────────
+    def action_send_quote_email(self):
+        """Open Odoo's standard email composer prepopulated with the
+        linked sale.order quotation.
+
+        2026-07-02 UX shortcut — replaces a 3-click nav (design →
+        quote → Send by Email) with a single button on the design.
+        Requires sale_order_id to be set. Delegates to the standard
+        sale.order.action_quotation_send which knows the correct
+        email template + mail composer args.
+        """
+        self.ensure_one()
+        if not self.sale_order_id:
+            raise UserError(
+                "This design has no linked quotation yet. Click 'Create "
+                "Quotation' or 'Create & Confirm →' first, then use this "
+                "button to send it by email."
+            )
+        return self.sale_order_id.action_quotation_send()
+
     # ── Computed ────────────────────────────────────────────────────────────────
     @api.depends(
         "cabinet_line_ids.quantity",

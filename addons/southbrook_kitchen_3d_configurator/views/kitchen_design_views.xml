@@ -194,6 +194,18 @@
                             class="btn-secondary"
                             icon="fa-file-text-o"
                             invisible="not sale_order_id"/>
+                    <!-- 2026-07-02 v19.0.5.6.9 — UX shortcut so the rep
+                         doesn't need to nav to the SO form and click
+                         "Send by Email" from there. Delegates straight
+                         to sale.order.action_quotation_send. Hidden
+                         once the design is ordered (already invoiced /
+                         in production — no reason to re-send quote). -->
+                    <button name="action_send_quote_email"
+                            type="object"
+                            string="Send Quote by Email"
+                            class="btn-primary"
+                            icon="fa-envelope"
+                            invisible="not sale_order_id or state == 'ordered'"/>
                     <!-- 2026-07-02 — safety valve for stale draft SO
                          links. Design #15 currently points at a draft
                          S01314 the rep chose not to pursue. Without
@@ -386,12 +398,16 @@
         <field name="context">{'search_default_filter_active': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No kitchen designs yet
+                Start your first kitchen design
             </p>
             <p>
-                Open the <strong>3D Configurator</strong>, design a room, and click
-                <strong>Save Design</strong> — or use the
-                <strong>Generate Layout</strong> button on a new design record.
+                Open the <b>3D Configurator</b> from the top navigation, drag
+                cabinets into a virtual room, and hit <b>Save Design</b>. Your
+                design will appear here — with a customer, a live estimate,
+                and one-click quote generation.
+            </p>
+            <p class="text-muted small">
+                Tip: click any design row to open the 3D scene and edit it.
             </p>
         </field>
     </record>
