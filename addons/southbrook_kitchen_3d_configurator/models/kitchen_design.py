@@ -681,10 +681,29 @@ class SouthbrookKitchenDesign(models.Model):
         for design in self:
             if not design.partner_id:
                 raise UserError("Select a customer before creating a quotation.")
+            # v19.0.5.6.4 fix — autoseed BEFORE the production-ready
+            # gate. Previously (5.6.0-5.6.3) autoseed ran after SO
+            # create, so the D12 MISSING_BOM gate rejected every design
+            # whose cabinet template had no BOM — defeating the whole
+            # point of Track B autoseed (users shouldn't have to hand-
+            # create BOMs to get a quote). Now: seed missing template-
+            # level BOM stubs first, then run the readiness check.
+            design_templates = design.cabinet_line_ids.mapped(
+                "product_id.product_tmpl_id"
+            )
+            for tmpl in design_templates:
+                try:
+                    design._ensure_kitchen_bom(tmpl)
+                except UserError as e:
+                    _logger.warning(
+                        "BOM autoseed (pre-quote) skipped for %s on design %s: %s",
+                        tmpl.display_name, design.name, e,
+                    )
             # D12 — Gate on production-readiness. Refuses to spawn a
             # quote when any blocking issue (collision, missing BOM,
             # wall-cab over ceiling) would burn the customer or the
-            # shop floor later.
+            # shop floor later. Runs AFTER autoseed so MISSING_BOM only
+            # fires on templates the autoseed genuinely couldn't fix.
             issues = design._check_production_ready()
             blocking = [i for i in issues if i["severity"] == "blocking"]
             if blocking:
