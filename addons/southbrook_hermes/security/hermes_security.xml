@@ -16,4 +16,62 @@
         <field name="implied_ids" eval="[(4, ref('southbrook_hermes.group_hermes_reviewer'))]"/>
     </record>
 
+    <!--
+        Fabio Asker — added 2026-07-02 (E2E audit fix).
+
+        The Reviewer group above was, until today, the ONLY group with
+        any ACL row on southbrook.hermes.question / .recommendation. It
+        is implied only by base.group_system, meaning any non-admin who
+        opened /odoo/action-<id>/new (deep-linked, past menu visibility)
+        got AccessError on Save. The web client rendered this as "I can't
+        make a new record."
+
+        The Asker group narrows the fix: internal users get create/read/
+        write on the Question model only, and are scoped to their own
+        rows by ir.rule. Recommendations remain reviewer-only so an
+        employee cannot accidentally approve one and spawn a
+        project.task or crm.lead. Reviewers keep unrestricted read via
+        their own permissive rule (ir.rule domains are OR'd across
+        groups the user is in).
+    -->
+    <record id="group_hermes_asker" model="res.groups">
+        <field name="name">Fabio Asker</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Ask Fabio operational questions. Users see their own history; approvers see all.</field>
+    </record>
+
+    <function model="res.groups" name="write">
+        <value eval="[ref('southbrook_hermes.group_hermes_asker')]"/>
+        <value eval="{'name': 'Fabio Asker', 'comment': 'Ask Fabio operational questions. Users see their own history; approvers see all.'}"/>
+    </function>
+
+    <!--
+        Force the base.group_user → group_hermes_asker implication via a
+        <function> call rather than a <record> write. In v19 the
+        <record id="base.group_user"> pattern silently no-ops when the
+        write only adds to implied_ids (empirically hit 2026-07-02 on the
+        southbrook DB — my <record> write was skipped even though the
+        sibling <record id="base.group_system"> above it landed). The
+        function-call pattern goes straight through res.groups.write and
+        also triggers Odoo's implied-groups propagation to existing users.
+    -->
+    <function model="res.groups" name="write">
+        <value eval="[ref('base.group_user')]"/>
+        <value eval="{'implied_ids': [(4, ref('southbrook_hermes.group_hermes_asker'))]}"/>
+    </function>
+
+    <record id="rule_hermes_question_asker_own" model="ir.rule">
+        <field name="name">Fabio Question: askers see their own</field>
+        <field name="model_id" ref="model_southbrook_hermes_question"/>
+        <field name="groups" eval="[(4, ref('southbrook_hermes.group_hermes_asker'))]"/>
+        <field name="domain_force">[('asked_by_id', '=', user.id)]</field>
+    </record>
+
+    <record id="rule_hermes_question_reviewer_all" model="ir.rule">
+        <field name="name">Fabio Question: reviewers see all</field>
+        <field name="model_id" ref="model_southbrook_hermes_question"/>
+        <field name="groups" eval="[(4, ref('southbrook_hermes.group_hermes_reviewer'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
 </odoo>
