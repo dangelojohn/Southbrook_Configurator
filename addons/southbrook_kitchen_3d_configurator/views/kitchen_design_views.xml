@@ -70,7 +70,10 @@
                 <filter name="filter_state_ordered"
                         string="Ordered"
                         domain="[('state','=','ordered')]"/>
-                <group expand="0" string="Group By">
+                <!-- v19 trap: <group string=> in search view = ParseError.
+                     Use <group> without string; grouping filters carry
+                     their own label via string=. -->
+                <group>
                     <filter name="group_partner"
                             string="Customer"
                             context="{'group_by': 'partner_id'}"/>
