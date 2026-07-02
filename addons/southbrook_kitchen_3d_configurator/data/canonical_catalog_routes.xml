@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Southbrook Kitchen 3D Configurator — Canonical catalog ROUTE overlay.
+  Added 2026-07-01 (Track B P0-B fix) — sibling to canonical_catalog_tag.xml
+  and canonical_catalog_dimensions.xml.
+
+  WHY THIS FILE EXISTS
+  ────────────────────
+  Live-prod verification on 2026-07-01 confirmed the 11 canonical Southbrook
+  cabinet product.templates were shipping with `route_ids = []`. When a
+  sale.order is confirmed, procurement.group only spawns the Delivery route
+  (present via warehouse default) — zero mrp.production records are created
+  even though a mrp.bom exists on the template. Result: Track B's autoseed
+  BOM path (kitchen_design._ensure_kitchen_bom) succeeds, but MO procurement
+  fails silently and manufacturing never sees the order.
+
+  Fix: attach the standard `mrp.route_warehouse0_manufacture` route to every
+  canonical `southbrook_is_cabinet=True` template so procurement can spawn
+  MOs from BOM. Loaded with `noupdate="1"` so:
+    * a rep who intentionally removes the Manufacture route (e.g. drop-ship
+      accessory) does NOT get their edit clobbered on the next module -u,
+    * a rep who adds ANOTHER route (e.g. Buy for bought-in accessories)
+      keeps their addition because the M2M command below is (4, ref) — LINK,
+      not (6, 0, [ids]) — REPLACE.
+
+  Two-of-twelve special cases:
+    * `worktop` — NOT included. Countertop / surface product, not a cabinet.
+      No BOM path yet (per canonical_catalog_tag.xml — same convention).
+    * `accessory` — INCLUDED. Some accessory sub-variants (end_panel, filler,
+      cornice, pelmet, plinth per CLAUDE.md §3) are milled from raw stock and
+      SHOULD manufacture. Sub-variants sourced from vendors can drop-ship;
+      the rep flips route_ids at the variant level on those.
+
+  Defense-in-depth: `kitchen_design._ensure_kitchen_bom` also re-applies the
+  Manufacture route on every entry so runtime-created templates (Track B fast
+  path from the 3D configurator) don't fall through this seed's cracks.
+-->
+<odoo noupdate="1">
+
+  <!-- Wall cabinets ─────────────────────────────────────────── -->
+
+  <record id="route_wall_1dr" model="product.template">
+    <field name="id" ref="southbrook_estimating.wall_1dr"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <record id="route_wall_2dr" model="product.template">
+    <field name="id" ref="southbrook_estimating.wall_2dr"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <!-- Base cabinets ─────────────────────────────────────────── -->
+
+  <record id="route_base_1dr" model="product.template">
+    <field name="id" ref="southbrook_estimating.base_1dr"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <record id="route_base_2dr" model="product.template">
+    <field name="id" ref="southbrook_estimating.base_2dr"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <record id="route_drawer_bank" model="product.template">
+    <field name="id" ref="southbrook_estimating.drawer_bank"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <record id="route_sink_base" model="product.template">
+    <field name="id" ref="southbrook_estimating.sink_base"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <record id="route_vanity" model="product.template">
+    <field name="id" ref="southbrook_estimating.vanity"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <!-- Tall cabinets ─────────────────────────────────────────── -->
+
+  <record id="route_tall_pantry" model="product.template">
+    <field name="id" ref="southbrook_estimating.tall_pantry"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <record id="route_tall_oven" model="product.template">
+    <field name="id" ref="southbrook_estimating.tall_oven"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <!-- Corner ─────────────────────────────────────────────────── -->
+
+  <record id="route_corner" model="product.template">
+    <field name="id" ref="southbrook_estimating.corner"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <!-- Accessory ─────────────────────────────────────────────── -->
+
+  <record id="route_accessory" model="product.template">
+    <field name="id" ref="southbrook_estimating.accessory"/>
+    <field name="route_ids" eval="[(4, ref('mrp.route_warehouse0_manufacture'))]"/>
+  </record>
+
+  <!--
+    NOT INCLUDED: southbrook_estimating.worktop
+    Worktop is a countertop surface, not a cabinet — same rationale as
+    canonical_catalog_tag.xml. No BOM autoseed path claims worktop today,
+    so no procurement route is needed.
+  -->
+
+</odoo>

@@ -605,6 +605,21 @@ class SouthbrookKitchenDesign(models.Model):
 
         Bom = self.env["mrp.bom"].sudo()
 
+        # v19.0.5.6.5 (Track B P0-B, defense-in-depth) — attach the
+        # Manufacture route on EVERY call, not just when we're about
+        # to autoseed a new BOM. Runtime-created templates (e.g. from
+        # the 3D configurator's fast-path) miss the noupdate="1"
+        # canonical_catalog_routes.xml seed, so without this check
+        # procurement.group would only spawn Delivery after SO
+        # confirm — mrp.production would never be created. The guards
+        # (raise_if_not_found=False + `if mfg_route`) let this degrade
+        # silently on installs where mrp isn't loaded yet.
+        mfg_route = self.env.ref(
+            "mrp.route_warehouse0_manufacture", raise_if_not_found=False,
+        )
+        if mfg_route and mfg_route.id not in product_tmpl.route_ids.ids:
+            product_tmpl.sudo().write({"route_ids": [(4, mfg_route.id)]})
+
         # Fast path — the template already carries a normal-type BOM.
         # active_test=False so we don't autoseed a duplicate on top of an
         # archived normal BOM (v19 default One2many context filters archived).

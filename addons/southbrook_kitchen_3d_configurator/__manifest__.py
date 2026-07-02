@@ -4,7 +4,7 @@
         "Isometric Three.js kitchen room configurator backed by "
         "live Odoo cabinet inventory — design, save, and quote."
     ),
-    "version": "19.0.5.6.4",
+    "version": "19.0.5.6.5",
     "category": "Manufacturing/Product Configurator",
     "author": "OdooIQ / REAL Partners Ltd.",
     "website": "https://odooiq.com",
@@ -54,6 +54,19 @@
         # write ordering matches the intent (tags re-apply every -u,
         # dimensions seed once and stay editable).
         "data/canonical_catalog_dimensions.xml",
+        # 2026-07-01 Track B P0-B fix — attach the Manufacture route
+        # (mrp.route_warehouse0_manufacture) to the 11 canonical
+        # cabinet templates. Without this, procurement.group only
+        # spawns Delivery after SO confirm — mrp.production is
+        # NEVER created even when a mrp.bom exists on the template,
+        # so Track B's autoseed path succeeds but MO handoff fails
+        # silently and manufacturing never sees the order.
+        # noupdate="1" so intentional per-template route edits
+        # (e.g. dropship-only accessory variants) survive -u.
+        # MUST LOAD AFTER canonical_catalog_tag.xml (dependency on
+        # southbrook_is_cabinet=True set of templates) and after
+        # canonical_catalog_dimensions.xml (same sibling pattern).
+        "data/canonical_catalog_routes.xml",
         # Rec D · Sprint 1 · reconciliation cron (design → room + SO
         # line). Runs every 5 min; watermark-driven.
         "data/rec_d_reconcile_cron.xml",
