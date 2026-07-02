@@ -606,7 +606,11 @@ class SouthbrookKitchenDesign(models.Model):
         Bom = self.env["mrp.bom"].sudo()
 
         # Fast path — the template already carries a normal-type BOM.
-        existing = product_tmpl.bom_ids.filtered(lambda b: b.type == "normal")
+        # active_test=False so we don't autoseed a duplicate on top of an
+        # archived normal BOM (v19 default One2many context filters archived).
+        existing = product_tmpl.with_context(active_test=False).bom_ids.filtered(
+            lambda b: b.type == "normal"
+        )
         if existing:
             return existing[:1]
 
@@ -651,21 +655,24 @@ class SouthbrookKitchenDesign(models.Model):
         )
 
         default_code = product_tmpl.default_code or ("TMPL-%d" % product_tmpl.id)
+        # v19.0.5.6.3 fix: mrp.bom has NO `note` field in Odoo v19 CE
+        # (verified against official v19 mrp/models/mrp_bom.py). The panel
+        # JSON was originally stashed there as a placeholder — dropped now
+        # so Bom.create() no longer raises ValueError on the first-ever
+        # autoseed. Panel geometry is deterministic from template dims +
+        # family + door_count; the follow-up commit that materialises
+        # bom_line_ids will recompute rather than re-read.
         bom = Bom.create({
             "product_tmpl_id": product_tmpl.id,
             "type":            "normal",
             "product_qty":     1.0,
             "code":            "KitchenAutoSeed-%s" % default_code,
             "bom_line_ids":    [],
-            # Panel geometry as JSON on the note field. When raw-material
-            # product.product records exist a follow-up commit walks this
-            # blob and materialises bom_line_ids from it.
-            "note": json.dumps(
-                panel, default=str, sort_keys=True, indent=2,
-            ),
         })
         _logger.info(
-            "auto-seeded BOM for %s", product_tmpl.display_name,
+            "auto-seeded BOM for %s | panel=%s",
+            product_tmpl.display_name,
+            json.dumps(panel, default=str, sort_keys=True),
         )
         return bom
 

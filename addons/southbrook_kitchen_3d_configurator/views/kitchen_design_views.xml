@@ -114,7 +114,7 @@
                          SO form. -->
                     <button name="action_create_quotation"
                             type="object"
-                            string="Create &amp;amp; Confirm →"
+                            string="Create &amp; Confirm →"
                             class="oe_highlight"
                             context="{'confirm_immediately': True}"
                             invisible="not cabinet_line_ids or state == 'quoted' or state == 'ordered'"/>
