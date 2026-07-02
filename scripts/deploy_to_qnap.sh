@@ -6,8 +6,20 @@
 #   1. rsync each addon dir to /share/CACHEDEV3_DATA/Container/southbrook/addons/
 #   2. exec the Odoo container via QNAP's system-docker binary (NOT plain
 #      docker — Container Station runs Odoo under a hidden inner daemon)
-#   3. run `odoo -u <modules> -d southbrook --stop-after-init`
-#   4. report rule counts, version, and tail of the log
+#   3. run `odoo -u <modules> -d southbrook --stop-after-init` (cold-load
+#      validation — a future restart will boot iff this succeeded)
+#   4. SIGHUP PID 1 so LIVE HTTP workers reload the new Python bytecode.
+#      Without this every fix looks like a no-op until someone manually
+#      runs `docker exec southbrook-odoo kill -HUP 1`. SIGHUP is the safe
+#      alternative to `docker restart`, which is BANNED on this container
+#      per memory: qnap_postgres_recovery_hazard — a restart there once
+#      compounded into ~90 min postgres fsync crash recovery. SIGHUP is
+#      best-effort; a failure WARNs but does not fail the deploy (a
+#      subsequent request will trigger a lazy registry reload).
+#   5. verify /web/login returns 200 — this now genuinely proves live
+#      workers picked up the new code, not just the transient cold-upgrade
+#      process
+#   6. report rule counts, version, and tail of the log
 #
 # Why this script exists: the QNAP system-docker binary lives at
 # /share/CACHEDEV3_DATA/.qpkg/container-station/bin/system-docker — a
@@ -134,7 +146,7 @@ inner_cmd="flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB 
 upgrade_cmd="$QNAP_DOCKER exec $CONTAINER bash -c \"$inner_cmd\""
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"
-  log "DRY: (would then assert cold-load success + live /web/login 200)"
+  log "DRY: (would then SIGHUP live workers + assert cold-load success + live /web/login 200)"
 else
   log "running cold upgrade under flock (validates a future restart will boot)…"
   # Capture the cold-upgrade log directly. Earlier shape was
@@ -178,6 +190,43 @@ exec $CONTAINER ps -ef | grep \"odoo.*-u\"'"
     fail "cold upgrade did not reach 'Modules loaded' — treat as FAILED."
   fi
   log "cold upgrade OK — registry loads cleanly (no lock contention)."
+
+  # ---- reload LIVE HTTP workers via SIGHUP (safe alt to restart) -------
+  # The cold upgrade above ran in a transient --stop-after-init process;
+  # the LIVE workers serving user traffic still hold the OLD Python
+  # bytecode in their ORM registry until they receive SIGHUP. Without
+  # this step, every fix looks like a no-op until someone manually runs
+  # `docker exec southbrook-odoo kill -HUP 1` (confirmed 2026-06-30 on
+  # 5.6.4 — code appeared to do nothing until SIGHUP, then worked).
+  #
+  # SIGHUP-to-PID-1 is documented safe on this container (see memory:
+  # odoo19_public_route_needs_sighup — ~10s worker reload). It is the
+  # ONLY sanctioned reload path: `docker restart` on southbrook-odoo is
+  # BANNED per memory: qnap_postgres_recovery_hazard, where a restart
+  # compounded into ~90 min postgres fsync crash recovery.
+  #
+  # STRICTLY gated on cold-upgrade success above: the two `fail` calls
+  # in the load-error and no-"Modules loaded" branches exit before we
+  # reach here, so we never SIGHUP on a registry error / partial commit.
+  #
+  # Best-effort: if the SIGHUP itself fails we WARN and continue — a
+  # subsequent request will trigger a lazy registry reload, and the
+  # /web/login gate below still executes (it may see stale code on the
+  # first few polls, but the retry loop absorbs that).
+  log "reloading live HTTP workers (SIGHUP PID 1)…"
+  sighup_result="ok"
+  ssh "$QNAP_HOST" "$QNAP_DOCKER exec $CONTAINER kill -HUP 1" \
+    || { sighup_result="warn"; \
+         log "WARNING: SIGHUP to $CONTAINER PID 1 failed — deploy CONTINUES. A subsequent request will lazy-reload workers. Do NOT restart $CONTAINER manually (qnap_postgres_recovery_hazard)."; }
+  if [[ "$sighup_result" == "ok" ]]; then
+    log "SIGHUP delivered — sleeping 8s for workers to reload registry…"
+    sleep 8
+  fi
+  # Audit trail for postmortems (best-effort — never fails the deploy).
+  printf '{"ts":"%s","host":"%s","container":"%s","modules":"%s","branch":"%s","sha":"%s","result":"%s"}\n' \
+    "$(date -u +%FT%TZ)" "$QNAP_HOST" "$CONTAINER" "$MODULES_ARG" \
+    "${CURRENT_BRANCH:-unknown}" "${CURRENT_SHA:-unknown}" "$sighup_result" \
+    >> /tmp/southbrook-deploy-sighup.jsonl 2>/dev/null || true
 fi
 
 # ---- health gate: the LIVE server must actually serve -----------------
