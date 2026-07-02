@@ -5,9 +5,17 @@
 # .git/hooks/pre-commit is a relative symlink to this file so the hook is
 # version-controlled and travels with the repo.
 #
-# Checks run only when XML files are staged:
-#   1. XML well-formedness  (scripts/lint-xml.sh — existing narrow check)
-#   2. OWL tokenizer rules  (scripts/lint-owl-expr.py — staged files only)
+# Checks:
+#   XML-staged:
+#     1. XML well-formedness    (scripts/lint-xml.sh — existing narrow check)
+#     2. OWL tokenizer rules    (scripts/lint-owl-expr.py — staged files only)
+#     3. View traps             (column_invisible="parent.<field>")
+#   JS-staged:
+#     4. canvas/*.esm suffix    (Rec D Sprint 2d 5.4.13 rollback tripwire —
+#                                imports of @southbrook_kitchen_3d_configurator
+#                                /js/canvas/* modules must include the .esm
+#                                suffix to match on-disk filenames; module
+#                                resolution throws at runtime otherwise)
 #
 # Bypass (last resort, with a good reason): git commit --no-verify
 
@@ -15,7 +23,8 @@ set -e
 ROOT=$(git rev-parse --show-toplevel)
 
 STAGED_XML=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.xml$' || true)
-if [ -z "$STAGED_XML" ]; then
+STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.js$' || true)
+if [ -z "$STAGED_XML" ] && [ -z "$STAGED_JS" ]; then
     exit 0
 fi
 
@@ -77,6 +86,48 @@ if [ -x "$ROOT/scripts/lint-xml-view-traps.py" ]; then
         echo " the PARENT FORM's model, not the line — registry validation"
         echo " fails at module upgrade time. Use per-row \`invisible=\` or"
         echo " \`readonly=\` instead, see [[odoo19_column_invisible_parent_trap]].)"
+        echo "Bypass (last resort): git commit --no-verify"
+        exit 1
+    fi
+fi
+
+# Check 4: canvas/*.esm suffix on 3d_configurator JS imports.
+# Backport of the pre-flight guard in scripts/rec_d_sprint2d_tripwire.sh
+# (lines 78-85). Odoo registers modules using the on-disk filename minus
+# .js, so a file named `constants.esm.js` registers as
+# `@…/js/canvas/constants.esm`. Importing it as `@…/js/canvas/constants`
+# (no .esm) passes lint, passes install, passes /web/login — but the
+# WebClient throws "Cannot read properties of undefined" at first mount
+# because the module id doesn't resolve. This was the exact bug that
+# forced the Rec D Sprint 2d 5.4.13 rollback.
+# See memory note: [[owl_tokenizer_constraints]] (adjacent OWL-lint
+# work; same class of "passes every server-side check, breaks in the
+# browser" trap).
+if [ -n "$STAGED_JS" ]; then
+    BROKEN=""
+    for f in $STAGED_JS; do
+        case "$f" in
+            addons/southbrook_kitchen_3d_configurator/static/src/js/*) ;;
+            *) continue ;;
+        esac
+        if [ -f "$ROOT/$f" ]; then
+            hits=$(grep -EHn '^import[^"]*"@southbrook_kitchen_3d_configurator/js/canvas/[^"]*[^m]"' "$ROOT/$f" 2>/dev/null || true)
+            if [ -n "$hits" ]; then
+                BROKEN="${BROKEN}${hits}
+"
+            fi
+        fi
+    done
+    if [ -n "$BROKEN" ]; then
+        echo
+        echo "(blocked: canvas/*.esm.js modules imported without the .esm suffix —"
+        echo " the on-disk filename ends in .esm.js so Odoo registers the module id"
+        echo " as \"…/canvas/foo.esm\", not \"…/canvas/foo\". Runtime WebClient mount"
+        echo " will throw. Passes XML lint, passes install, passes /web/login.)"
+        echo
+        printf '%s' "$BROKEN"
+        echo "  fix: append '.esm' to the import path so it matches the on-disk filename."
+        echo "See memory note: [[owl_tokenizer_constraints]] + Rec D Sprint 2d 5.4.13 rollback."
         echo "Bypass (last resort): git commit --no-verify"
         exit 1
     fi
