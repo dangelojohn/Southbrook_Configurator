@@ -490,3 +490,59 @@ class TestTrackBEndToEnd(TransactionCase):
             "new designs must default to active=True so they show up "
             "in the list without needing an explicit filter",
         )
+
+    # ==================================================================
+    # 5.6.11 * cancellation sync sale.order -> kitchen.design
+    # ==================================================================
+    def test_cancellation_reverts_linked_design(self):
+        """5.6.11 regression pin -- cancelling a sale.order tied to a
+        kitchen.design reverts the design to state='configured', clears
+        sale_order_id, and drops a chatter note on the design.
+
+        Reverse of the ordered->SO transition. Without this sync a rep
+        who cancels the SO from its own surface leaves an orphan
+        "quoted"/"ordered" design pointing at a cancelled quotation --
+        stuck out of the re-quote flow until manually reset via
+        action_reset_quote_link.
+        """
+        tmpl = self._make_cabinet_template(
+            "Track-B cancel sync", cabinet_type="base",
+        )
+        design = self._make_design(
+            name="Track-B cancel sync design",
+            with_lines=True, templates=[tmpl],
+        )
+        design.action_create_quotation()
+        so = design.sale_order_id
+        self.assertTrue(so, "precondition: action_create_quotation must "
+                            "have produced a linked SO")
+        self.assertEqual(design.state, "quoted",
+                         "precondition: design must be in state='quoted' "
+                         "before the cancel event")
+        so_name = so.name
+
+        so.action_cancel()
+
+        self.assertEqual(
+            design.state, "configured",
+            "design must revert to 'configured' when its linked SO is "
+            "cancelled so the rep can re-quote it",
+        )
+        self.assertFalse(
+            design.sale_order_id,
+            "sale_order_id must be cleared so the design is no longer "
+            "pinned to the cancelled SO",
+        )
+        cancel_notes = design.message_ids.filtered(
+            lambda m: "was cancelled" in (m.body or "")
+        )
+        self.assertTrue(
+            cancel_notes,
+            "expected a chatter note on the design mentioning 'was "
+            "cancelled'",
+        )
+        self.assertTrue(
+            any(so_name in (m.body or "") for m in cancel_notes),
+            "chatter note must name the cancelled SO (%s) so the "
+            "audit trail links back" % so_name,
+        )
