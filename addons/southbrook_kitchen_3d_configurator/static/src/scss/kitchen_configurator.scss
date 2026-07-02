@@ -1184,3 +1184,235 @@ $sbk-amber:      #B45309;
         &:hover { background: #b0a89e; }
     }
 }
+
+// ─── Task #48 — Top-bar customer picker + portal indicator ────────────────────
+.o_sbk_customer_picker {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.o_sbk_customer_input {
+    width: 200px;
+    padding: 6px 10px;
+    border: 1px solid $sbk-border;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: $sbk-ink;
+    background: $sbk-white;
+    transition: border-color 0.15s;
+
+    &::placeholder {
+        color: $sbk-muted;
+        font-style: italic;
+    }
+
+    &:focus {
+        outline: none;
+        border-color: $sbk-accent;
+        box-shadow: 0 0 0 2px $sbk-accent-bg;
+    }
+}
+
+.o_sbk_customer_dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    z-index: 1000;
+    max-height: 320px;
+    overflow-y: auto;
+    background: $sbk-white;
+    border: 1px solid $sbk-border;
+    border-radius: 3px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+}
+
+.o_sbk_customer_hint {
+    padding: 8px 10px;
+    font-size: 11px;
+    color: $sbk-muted;
+    font-style: italic;
+}
+
+.o_sbk_customer_option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid $sbk-bg;
+    text-align: left;
+    font-family: inherit;
+    font-size: 12px;
+    color: $sbk-ink;
+    cursor: pointer;
+    transition: background 0.1s;
+
+    &:hover, &:focus {
+        background: $sbk-accent-bg;
+        outline: none;
+    }
+
+    &[aria-selected="true"] {
+        background: $sbk-accent-bg;
+        font-weight: 600;
+    }
+}
+
+.o_sbk_customer_name {
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.o_sbk_customer_channel {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    background: $sbk-bg;
+    color: $sbk-mid;
+
+    // Channel-color tokens mirror the existing o_sbk_ch_* used by
+    // the top-bar channel badge, so a dealer picked from the dropdown
+    // and the resolved pricelist badge stay visually consistent.
+    &.o_sbk_ch_dealer       { background: #E0F2FE; color: #075985; }
+    &.o_sbk_ch_tradesperson { background: #FEF3C7; color: #92400E; }
+    &.o_sbk_ch_kd           { background: #EDE9FE; color: #5B21B6; }
+    &.o_sbk_ch_bigbox       { background: #FEE2E2; color: #991B1B; }
+    &.o_sbk_ch_refacing     { background: #DCFCE7; color: #14532D; }
+}
+
+.o_sbk_customer_sep {
+    height: 1px;
+    background: $sbk-border;
+    margin: 0;
+}
+
+.o_sbk_customer_walkin {
+    padding: 8px 10px;
+    background: $sbk-bg;
+    border: none;
+    text-align: left;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: $sbk-accent;
+    cursor: pointer;
+
+    &:hover, &:focus {
+        background: $sbk-accent-bg;
+        outline: none;
+    }
+}
+
+// Portal user reassurance pill — read-only "Designing as {name}"
+// takes the picker's slot so the customer never sees the choose-
+// customer affordance.
+.o_sbk_portal_indicator {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 6px 10px;
+    background: $sbk-accent-bg;
+    border-radius: 3px;
+    font-size: 11px;
+    color: $sbk-mid;
+    flex-shrink: 0;
+}
+
+.o_sbk_portal_prefix {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: $sbk-muted;
+}
+
+.o_sbk_portal_name {
+    font-size: 12px;
+    font-weight: 600;
+    color: $sbk-dark;
+}
+
+// ─── Task #48 — Count + estimate strip (scene panel top) ─────────────────────
+.o_sbk_count_strip {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid $sbk-border;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    font-size: 11px;
+    color: $sbk-mid;
+    pointer-events: none;
+
+    strong {
+        color: $sbk-dark;
+        font-weight: 700;
+    }
+}
+
+.o_sbk_count_item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+.o_sbk_count_label {
+    color: $sbk-muted;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.o_sbk_count_sep {
+    color: $sbk-border;
+    font-size: 10px;
+}
+
+.o_sbk_count_dim_x {
+    margin: 0 2px;
+    color: $sbk-muted;
+    font-size: 10px;
+}
+
+.o_sbk_count_price strong {
+    color: $sbk-accent;
+}
+
+// ─── Task #48 — Create & Confirm button (secondary CTA next to Save) ──────────
+.o_sbk_btn_confirm {
+    background: $sbk-success;
+    color: $sbk-white;
+    border: 1px solid $sbk-success;
+
+    &:hover:not([disabled]) {
+        background: #106e33;   // darker green on hover
+        border-color:  #106e33;
+    }
+
+    &[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}

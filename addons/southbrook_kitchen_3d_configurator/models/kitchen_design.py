@@ -20,6 +20,15 @@ class SouthbrookKitchenDesign(models.Model):
     _order = "write_date desc, id desc"
     _rec_name = "name"
 
+    # ── Archive flag ────────────────────────────────────────────────────────────
+    # 2026-07-01 task #49 — enables Odoo's standard archive/unarchive UX so
+    # historical designs (state=quoted/ordered) can be hidden from the
+    # default list without breaking the sale.order / mrp.production audit
+    # trail via unlink. tracking=True posts a chatter note on state flip
+    # (mail.thread is already inherited above); ir.rule / views filter on
+    # active automatically per Odoo convention.
+    active = fields.Boolean(default=True, tracking=True)
+
     # ── Identity ────────────────────────────────────────────────────────────────
     # D4 — default kept generic; auto-rename happens at save-time in
     # the controller using the resolved partner + room dims + date so
@@ -158,6 +167,140 @@ class SouthbrookKitchenDesign(models.Model):
         tracking=True,
     )
 
+    # ── default_get — portal-user partner autofill ─────────────────────────────
+    # 2026-07-01 task #48 — pre-select partner_id for two entry paths:
+    #   (a) partner-form "Create Kitchen Design" → context carries
+    #       default_partner_id already; we just honour it explicitly here
+    #       so the field pre-fills without a computed default.
+    #   (b) portal-user opens /my/ frontend → self.env.user.share is True
+    #       and their own partner is the only sensible pre-fill (they
+    #       cannot design for someone else through the portal).
+    # Internal users hit neither branch — vals["partner_id"] stays empty
+    # so the customer picker (Agent C's canvas) drives selection instead.
+    @api.model
+    def default_get(self, fields_list):
+        vals = super().default_get(fields_list)
+        if "partner_id" in fields_list and not vals.get("partner_id"):
+            ctx_partner = self.env.context.get("default_partner_id")
+            if ctx_partner:
+                vals["partner_id"] = ctx_partner
+            elif self.env.user.share:
+                # Portal user (share=True) — auto-set their own partner
+                vals["partner_id"] = self.env.user.partner_id.id
+        return vals
+
+    # ── unlink guard — protect quoted / ordered designs ────────────────────────
+    # 2026-07-01 task #49 — prevent accidental data loss. Designs linked
+    # to a sale.order or mrp.production must remain queryable for
+    # auditability; users archive instead of delete.
+    def unlink(self):
+        protected = self.filtered(lambda d: d.state in ("quoted", "ordered"))
+        if protected:
+            raise UserError(
+                "Cannot delete kitchen design(s): %s\n\n"
+                "Designs with state 'quoted' or 'ordered' must be archived "
+                "instead. Use the ⚙️ Actions menu → Archive to hide them from "
+                "the default list. Archived designs remain linked to their "
+                "sale.order and mrp.production records for auditability."
+                % ", ".join(protected.mapped("name"))
+            )
+        return super().unlink()
+
+    # ── Bulk archive action ────────────────────────────────────────────────────
+    # 2026-07-01 task #49 — wired to list-view multi-select bulk action
+    # by Agent B (views/kitchen_design_views.xml). Flips active=False in
+    # a single write() and reloads so the archived rows drop off the
+    # (active=True) default filter.
+    def action_archive_bulk(self):
+        self.write({"active": False})
+        return {"type": "ir.actions.client", "tag": "reload"}
+
+    # ── Recent-partners picker feed ────────────────────────────────────────────
+    # 2026-07-01 task #48 — feeds the 3D canvas customer picker's
+    # "Recently used" autocomplete section. Sourced from the current
+    # user's own recent designs (order=write_date desc) so the rep sees
+    # partners they've been working with lately without having to re-type
+    # partner names. Invoked from Agent C's territory via RPC.
+    # v19.0.5.6.7 — public name (no leading underscore) so the method is
+    # reachable via /web/dataset/call_kw from the 3D canvas. Odoo 17+ blocks
+    # RPC to `_`-prefixed methods as a security convention.
+    @api.model
+    def get_recent_partners_for_picker(self, limit=10):
+        """Feed the 3D canvas customer picker with a recency-sorted list."""
+        # Own designs first
+        own_designs = self.search([
+            ("create_uid", "=", self.env.uid),
+            ("partner_id", "!=", False),
+        ], limit=50, order="write_date desc")
+        partners = own_designs.mapped("partner_id")
+        # Deduplicate while preserving order
+        seen, out = set(), []
+        for p in partners:
+            if p.id not in seen:
+                seen.add(p.id)
+                out.append({
+                    "id": p.id,
+                    "name": p.name,
+                    "channel": getattr(p, "channel", None) or "",
+                })
+            if len(out) >= limit:
+                break
+        return out
+
+    # ── Walk-in customer partner ───────────────────────────────────────────────
+    # 2026-07-01 task #48 — anonymous / walk-in quote support. Called
+    # by Agent C's frontend when the rep picks "Walk-in" from the
+    # customer picker; returns the id of the singleton "Walk-in
+    # Customer" partner (created lazily on first use). Kept as a
+    # company partner + customer_rank=1 so it resolves the retail
+    # pricelist correctly and shows up in customer searches.
+    # v19.0.5.6.7 — public name for RPC accessibility (see get_recent_partners
+    # comment above).
+    @api.model
+    def get_or_create_walkin_partner(self):
+        Partner = self.env["res.partner"]
+        walkin = Partner.search([
+            ("name", "=", "Walk-in Customer"),
+            ("is_company", "=", True),
+        ], limit=1)
+        if not walkin:
+            walkin = Partner.create({
+                "name": "Walk-in Customer",
+                "is_company": True,
+                "customer_rank": 1,
+                "comment": "Generic partner for showroom walk-in quotes. "
+                           "Replace with the real customer once identified.",
+            })
+        return walkin.id
+
+    # ── Open linked Sale Order (Agent B smart button target) ───────────────────
+    # 2026-07-01 task #48 — wire target for the "Quote" oe_stat_button on the
+    # design form. If sale_order_id is unset returns a warning notification
+    # instead of a broken action.
+    def action_open_sale_order(self):
+        self.ensure_one()
+        if not self.sale_order_id:
+            return {
+                "type":  "ir.actions.client",
+                "tag":   "display_notification",
+                "params": {
+                    "type":    "info",
+                    "title":   "No quotation yet",
+                    "message": "This design has no linked Sale Order. Click "
+                               "'Create Quotation' or 'Create & Confirm →' to "
+                               "create one.",
+                    "sticky": False,
+                },
+            }
+        return {
+            "type":      "ir.actions.act_window",
+            "res_model": "sale.order",
+            "res_id":    self.sale_order_id.id,
+            "views":     [(False, "form")],
+            "view_mode": "form",
+            "target":    "current",
+        }
+
     # ── Computed ────────────────────────────────────────────────────────────────
     @api.depends(
         "cabinet_line_ids.quantity",
@@ -264,12 +407,18 @@ class SouthbrookKitchenDesign(models.Model):
             })
             return issues
 
-        # 2) Customer required
+        # 2) Customer required — message polished 2026-07-01 task #48
+        # from "Select a customer before quoting (needed for pricelist
+        # resolution)." to a customer-safe phrasing that surfaces the
+        # Walk-in escape hatch (the picker Agent C wires into the 3D
+        # canvas resolves 'Walk-in' via _get_or_create_walkin_partner).
         if not self.partner_id:
             issues.append({
                 "code":     "MISSING_CUSTOMER",
                 "severity": "blocking",
-                "message":  "Select a customer before quoting (needed for pricelist resolution).",
+                "message":  "This design needs a customer before it can become a quote. "
+                            "Assign a Customer at the top of the form (or, for a walk-in, "
+                            "pick 'Walk-in Customer').",
             })
 
         # 3) Collision detection per cabinet_type (skip fillers — they

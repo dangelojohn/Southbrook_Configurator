@@ -11,8 +11,17 @@
         <field name="name">southbrook.kitchen.design.list</field>
         <field name="model">southbrook.kitchen.design</field>
         <field name="arch" type="xml">
+            <!-- v19.0.4.20.0 task #49 — archive/restore workflow.
+                 * active field loaded (hidden per row) so Odoo's std
+                   toolbar surfaces Archive/Unarchive automatically.
+                 * decoration-muted greys archived rows if the user
+                   toggles "Archived" in the search view.
+                 * Bulk-archive server action (below) shows in the
+                   Actions menu when rows are selected. -->
             <list decoration-info="state == 'draft'"
-                  decoration-success="state == 'quoted' or state == 'ordered'">
+                  decoration-success="state == 'quoted' or state == 'ordered'"
+                  decoration-muted="not active">
+                <field name="active" column_invisible="1"/>
                 <field name="x_kitchen_image" widget="image" string="Preview"
                        options="{'size': [80, 60]}"/>
                 <field name="name"/>
@@ -27,6 +36,64 @@
                 <field name="write_date" string="Last Modified"/>
             </list>
         </field>
+    </record>
+
+    <!-- Kitchen Design – Search ─────────────────────────────────────────────── -->
+    <!-- v19.0.4.20.0 task #49 — provides Active/Archived filters so the
+         list action's default context {'search_default_filter_active':1}
+         hides archived rows by default. Sales reps toggle "Archived" to
+         review the graveyard, then unarchive individually. -->
+    <record id="view_sbk_kitchen_design_search" model="ir.ui.view">
+        <field name="name">southbrook.kitchen.design.search</field>
+        <field name="model">southbrook.kitchen.design</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="sale_order_id"/>
+                <filter name="filter_active"
+                        string="Active"
+                        domain="[('active','=',True)]"/>
+                <filter name="filter_archived"
+                        string="Archived"
+                        domain="[('active','=',False)]"/>
+                <separator/>
+                <filter name="filter_state_draft"
+                        string="Draft"
+                        domain="[('state','=','draft')]"/>
+                <filter name="filter_state_configured"
+                        string="Configured"
+                        domain="[('state','=','configured')]"/>
+                <filter name="filter_state_quoted"
+                        string="Quoted"
+                        domain="[('state','=','quoted')]"/>
+                <filter name="filter_state_ordered"
+                        string="Ordered"
+                        domain="[('state','=','ordered')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_partner"
+                            string="Customer"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_state"
+                            string="Status"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Bulk-archive server action ──────────────────────────────────────────── -->
+    <!-- v19.0.4.20.0 task #49 — appears in the Kitchen Designs list's
+         Actions menu when 1+ rows are selected. Calls the model
+         helper action_archive_bulk (added by Agent A) which handles
+         the guard (unlink rules apply — active=False, not delete). -->
+    <record id="action_archive_designs_server" model="ir.actions.server">
+        <field name="name">Archive selected</field>
+        <field name="model_id" ref="model_southbrook_kitchen_design"/>
+        <field name="binding_model_id" ref="model_southbrook_kitchen_design"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_archive_bulk()</field>
     </record>
 
     <!-- Kitchen Design – Kanban ─────────────────────────────────────────────── -->
@@ -126,12 +193,16 @@
                             invisible="not sale_order_id"/>
                     <!-- D11 — Duplicate-and-Open: copy the design as draft
                          and jump into the 3D configurator on the new
-                         record. Saves the typical 4-click clone flow. -->
+                         record. Saves the typical 4-click clone flow.
+                         v19.0.4.20.0 task #49 — relabeled "Duplicate as
+                         New Version" so reps stop treating it as a
+                         throwaway clone and start using it for
+                         iterative pricing revisions. -->
                     <button name="action_duplicate_and_open"
                             type="object"
-                            string="Duplicate &amp; Open"
+                            string="Duplicate as New Version"
                             class="btn-secondary"
-                            icon="fa-copy"/>
+                            icon="fa-code-fork"/>
                     <!-- D12 — Pre-quote production-readiness validator.
                          Runs collision + BOM + width + soffit checks,
                          surfaces issues in a sticky notification. -->
@@ -145,6 +216,14 @@
                            statusbar_visible="draft,configured,quoted,ordered"/>
                 </header>
                 <sheet>
+                    <!-- widget="web_ribbon" surfaces archived state at
+                         the top-right of the sheet — v19 std pattern
+                         for records with active=False. Complements the
+                         list's decoration-muted row styling. -->
+                    <widget name="web_ribbon"
+                            title="Archived"
+                            bg_color="text-bg-danger"
+                            invisible="active"/>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_open_configurator"
                                 type="object"
@@ -155,14 +234,56 @@
                                 <span class="o_stat_text">Cabinets</span>
                             </div>
                         </button>
+                        <!-- v19.0.4.20.0 task #48 — smart-button back-link
+                             to the linked SO. Complements the header
+                             "View Quotation" button by making the
+                             relationship visible even before the user
+                             scans the header row. Hidden until an SO
+                             exists. TODO Agent A: add
+                             action_open_sale_order to the model (the
+                             existing "View Quotation" header button
+                             cheats by calling action_create_quotation
+                             which then branches on sale_order_id — a
+                             dedicated open method is cleaner). -->
+                        <button name="action_open_sale_order"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-file-text-o"
+                                invisible="not sale_order_id">
+                            <field name="sale_order_id"
+                                   widget="statinfo"
+                                   string="Quote"/>
+                        </button>
                     </div>
+                    <field name="active" invisible="1"/>
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="Kitchen Design Name"/></h1>
                     </div>
+                    <!-- v19.0.4.20.0 task #48 — Customer prominence.
+                         partner_id lifted out of the two-column group
+                         into a full-width row directly under the
+                         title so it's the first thing a rep sees on
+                         open. Walk-in fallback button one-clicks in
+                         a generic partner for rare unnamed walk-ins
+                         (calls Agent A's get_or_create_walkin_partner
+                         helper). Hidden once a partner is set. -->
                     <group>
-                        <group string="Customer">
-                            <field name="partner_id"/>
+                        <group>
+                            <field name="partner_id"
+                                   widget="many2one"
+                                   options="{'no_create': false, 'no_open': false}"
+                                   placeholder="Type to search or create a customer…"/>
+                            <button name="get_or_create_walkin_partner"
+                                    type="object"
+                                    string="Walk-in"
+                                    icon="fa-user-o"
+                                    class="btn-link"
+                                    invisible="partner_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Order">
                             <field name="sale_order_id" readonly="1"
                                    invisible="not sale_order_id"/>
                         </group>
@@ -241,6 +362,12 @@
         <field name="res_model">southbrook.kitchen.design</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="mobile_view_mode">kanban</field>
+        <field name="search_view_id" ref="view_sbk_kitchen_design_search"/>
+        <!-- v19.0.4.20.0 task #49 — hide archived designs by default.
+             Reps flip the "Archived" filter in the search panel to
+             review the graveyard. Keeps the primary browse surface
+             focused on live work. -->
+        <field name="context">{'search_default_filter_active': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No kitchen designs yet

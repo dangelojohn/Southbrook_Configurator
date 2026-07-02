@@ -14,6 +14,12 @@ import { Component, onMounted, onWillStart, onWillUnmount, useState, xml } from 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { rpc } from "@web/core/network/rpc";
+// Task #48 — portal-user detection for the customer picker + reassurance
+// pill. v19 exposes `isInternalUser` on the `@web/core/user` singleton
+// (mapped from res.users.share server-side; internal users have
+// share=False → isInternalUser=true). No `share` prop directly on the
+// client side; do NOT read `user.share` — that's the server-side flag.
+import { user } from "@web/core/user";
 
 // Rec D · Sprint 2d Step 24e — dead 3D imports excised.
 // 24c moved the visible surface into <KitchenCanvas>; the parent's
@@ -95,9 +101,34 @@ class SouthbrookKitchenConfigurator extends Component {
             // dataTransfer payloads (only types) for security, so we
             // stash the product on dragstart / clear on dragend|drop.
             draggedProduct:  null,
+            // Task #48 — Top-bar customer picker.
+            //   partnerName mirrors state.partnerId for display; kept
+            //     alongside the Number id so the topbar can render the
+            //     selected customer's label without a second RPC.
+            //   portalUser is a memoized `!user.isInternalUser` — set
+            //     once in setup() so it survives OWL reactive reads.
+            //   picker* control the dropdown lifecycle (open, loading,
+            //     result list). Results fetched lazily on focus so the
+            //     initial paint isn't gated by the RPC.
+            partnerName:       this.props.partner_name || "",
+            portalUser:        false,
+            pickerOpen:        false,
+            pickerLoading:     false,
+            pickerResults:     [],
         });
         // Auto-save debounce timer (not reactive; managed imperatively).
         this._autoSaveTimer = null;
+
+        // Task #48 — Portal-user detection. v19's `@web/core/user`
+        // singleton exposes `isInternalUser` (server-side maps from
+        // res.users.share — internal users have share=False → this is
+        // true). A missing/null value is treated as internal so an
+        // office rep with a stale bundle still sees the picker.
+        try {
+            this.state.portalUser = user && user.isInternalUser === false;
+        } catch (_) {
+            this.state.portalUser = false;
+        }
 
         // Rec D · Sprint 2d Step 24c/24e — child <KitchenCanvas> owns
         // the visible 3D scene and every scene-side handler (mouse,
@@ -201,6 +232,107 @@ class SouthbrookKitchenConfigurator extends Component {
         } catch (_) {
             this.state.products = [];
         }
+    }
+
+    // ─── Task #48 — Top-bar customer picker ─────────────────────────────────────
+    // Agent A owns the model-side helpers (`_get_recent_partners_for_picker`
+    // and `_get_or_create_walkin_partner`). Both are called via call_kw so
+    // ACLs + rules resolve exactly as they would from any other client.
+    //
+    // Never opens for portal users — Agent A's default_get already
+    // auto-fills partner_id from user.partner_id, and we render a
+    // reassurance pill ("Designing as {name}") in the same slot.
+    async _openCustomerPicker() {
+        if (this.state.portalUser) return;
+        this.state.pickerOpen = true;
+        if (this.state.pickerResults && this.state.pickerResults.length) {
+            // Cached from a prior focus — refetch only on _refreshPicker.
+            return;
+        }
+        await this._refreshPicker();
+    }
+
+    async _refreshPicker() {
+        if (this.state.portalUser) return;
+        this.state.pickerLoading = true;
+        try {
+            const results = await rpc("/web/dataset/call_kw", {
+                model:  "southbrook.kitchen.design",
+                method: "get_recent_partners_for_picker",
+                args:   [10],
+                kwargs: {},
+            });
+            this.state.pickerResults = Array.isArray(results) ? results : [];
+        } catch (e) {
+            // Non-fatal — the walk-in option below still works.
+            console.warn("[SouthbrookKitchenConfigurator] picker fetch failed:", e);
+            this.state.pickerResults = [];
+        } finally {
+            this.state.pickerLoading = false;
+        }
+    }
+
+    // Blur-driven close needs a small delay so a click on a dropdown
+    // option gets its mousedown->click cycle before we tear down the
+    // list. 150ms is enough for even a slow tap on tablet.
+    _closeCustomerPicker() {
+        setTimeout(() => { this.state.pickerOpen = false; }, 150);
+    }
+
+    // Input handler mirrors the typed text into state.partnerName so
+    // the field is controlled + rerenders on paste. Selecting an
+    // option overwrites partnerName with the canonical record label.
+    _onCustomerTyped(ev) {
+        this.state.partnerName = ev.target.value || "";
+    }
+
+    async _setCustomer(partner) {
+        if (!partner || !partner.id) return;
+        this.state.partnerId    = partner.id;
+        this.state.partnerName  = partner.name || "";
+        this.state.pickerOpen   = false;
+        // Refetching /products picks up the new channel pricelist and
+        // repaints the inventory prices; /layout follows so the summary
+        // and any per-item price fields also update.
+        await this._loadProducts();
+        await this._refreshLayout();
+        // Persist server-side so the design carries the new partner
+        // into the next session even if the browser refreshes before
+        // the debounced auto-save fires.
+        this._queueAutoSave();
+    }
+
+    async _useWalkInCustomer() {
+        this.state.pickerLoading = true;
+        try {
+            const partnerId = await rpc("/web/dataset/call_kw", {
+                model:  "southbrook.kitchen.design",
+                method: "get_or_create_walkin_partner",
+                args:   [],
+                kwargs: {},
+            });
+            const pid = parseInt(partnerId, 10);
+            if (Number.isFinite(pid) && pid > 0) {
+                await this._setCustomer({ id: pid, name: "Walk-in Customer" });
+            }
+        } catch (e) {
+            this.notification.add(
+                "Couldn't set walk-in customer: " + (e.message || e),
+                { type: "danger", sticky: true }
+            );
+        } finally {
+            this.state.pickerLoading = false;
+        }
+    }
+
+    // Task #48 — Count summary. Filler is NEVER counted since fillers
+    // are billing-invisible (no line on the SO, no cabinet on the
+    // shop floor) — matching the existing convention in the price
+    // summary (`if it.cabinet_type !== "filler"`).
+    _nonFillerCount() {
+        return (this.state.items || []).filter(
+            it => it.cabinet_type !== "filler"
+        ).length;
     }
 
     async _refreshLayout() {
@@ -902,9 +1034,92 @@ class SouthbrookKitchenConfigurator extends Component {
             this.state.designId       = result.id;
             this.state.designName     = result.name;
             this.state.lastAutoSaveAt = Date.now();
-            this.notification.add(`Saved: ${result.name}`, { type: "success" });
+            // Task #48 — quiet, non-sticky toast on the happy path.
+            // Previous format ("Saved: ${name}") leaked implementation
+            // detail into the message; the rep already sees the design
+            // title in the header pill.
+            this.notification.add("Design saved", { type: "success", sticky: false });
         } catch (e) {
-            this.notification.add("Save failed: " + (e.message || e), { type: "danger" });
+            // Task #48 — actionable error when the server rejects for
+            // missing partner. Server-side validation raises with a
+            // message that includes "partner" or "customer"; sniff for
+            // that so the CTA is only added on the exact case.
+            const msg = e && (e.message || String(e)) || "Save failed";
+            const missingPartner = !this.state.partnerId
+                && !this.state.portalUser
+                && /partner|customer/i.test(msg);
+            if (missingPartner) {
+                this.notification.add(
+                    "Assign a customer via the picker (top-right) — " + msg,
+                    { type: "warning", sticky: true }
+                );
+            } else {
+                this.notification.add(msg, { type: "danger", sticky: true });
+            }
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    // Task #48 — Create & Confirm. Runs the server-side action that
+    // materializes a sale.order from the current design + partner,
+    // toasts success with the SO name, and dispatches the returned
+    // action so the rep lands on the SO form. Uses call_kw so ACLs
+    // resolve the same way any backend button would.
+    async _createAndConfirm() {
+        // Ensure the design is persisted before we ask the server to
+        // materialize a quotation from it; save-in-flight is fine —
+        // _saveDesign is idempotent under `state.designId`.
+        if (!this.state.designId) {
+            await this._saveDesign();
+        }
+        if (!this.state.designId) {
+            // Save failed — _saveDesign already surfaced the reason.
+            return;
+        }
+        this.state.saving = true;
+        try {
+            const action = await rpc("/web/dataset/call_kw", {
+                model:  "southbrook.kitchen.design",
+                method: "action_create_quotation",
+                args:   [[this.state.designId]],
+                kwargs: {},
+            });
+            // Server may return either an ir.actions.act_window dict
+            // (open the SO form) or a bare {order_name, order_id} payload
+            // for reps who just want the confirmation toast. Handle both.
+            let orderName = "";
+            let actionToDispatch = null;
+            if (action && typeof action === "object") {
+                orderName = action.order_name
+                    || (action.context && action.context.default_name)
+                    || "";
+                if (action.type && action.type.startsWith("ir.actions.")) {
+                    actionToDispatch = action;
+                }
+            }
+            this.notification.add(
+                orderName
+                    ? `Quotation created (${orderName}) — check the Sale Order form`
+                    : "Quotation created — check the Sale Order form",
+                { type: "success", sticky: false }
+            );
+            if (actionToDispatch) {
+                return this.action.doAction(actionToDispatch);
+            }
+        } catch (e) {
+            const msg = e && (e.message || String(e)) || "Quotation failed";
+            const missingPartner = !this.state.partnerId
+                && !this.state.portalUser
+                && /partner|customer/i.test(msg);
+            if (missingPartner) {
+                this.notification.add(
+                    "Assign a customer via the picker (top-right) — " + msg,
+                    { type: "warning", sticky: true }
+                );
+            } else {
+                this.notification.add(msg, { type: "danger", sticky: true });
+            }
         } finally {
             this.state.saving = false;
         }
@@ -1080,6 +1295,54 @@ SouthbrookKitchenConfigurator.template = xml`
                t-on-change="(ev) => this._changeRoom('height_in', ev.target.value)"/>
       </label>
     </div>
+    <!-- Task #48 — Customer picker (top-bar).
+         Hidden entirely for portal users — Agent A's default_get
+         autofills partner_id from user.partner_id so the customer
+         doesn't need to pick themselves. In that case we show a
+         subtle reassurance pill instead. -->
+    <div t-if="!state.portalUser" class="o_sbk_customer_picker">
+      <input type="text" class="o_sbk_customer_input"
+             placeholder="Customer…"
+             autocomplete="off"
+             role="combobox"
+             aria-haspopup="listbox"
+             t-att-aria-expanded="state.pickerOpen ? 'true' : 'false'"
+             t-att-value="state.partnerName"
+             t-on-focus="_openCustomerPicker"
+             t-on-blur="_closeCustomerPicker"
+             t-on-input="_onCustomerTyped"
+             aria-label="Assign customer to this design"/>
+      <div t-if="state.pickerOpen" class="o_sbk_customer_dropdown" role="listbox">
+        <div t-if="state.pickerLoading" class="o_sbk_customer_hint">Loading recent customers…</div>
+        <div t-if="!state.pickerLoading &amp;&amp; !state.pickerResults.length"
+             class="o_sbk_customer_hint">No recent customers</div>
+        <button t-foreach="state.pickerResults" t-as="picked" t-key="picked.id"
+                class="o_sbk_customer_option"
+                type="button"
+                role="option"
+                t-att-aria-selected="state.partnerId === picked.id ? 'true' : 'false'"
+                t-on-mousedown="() => this._setCustomer(picked)">
+          <span class="o_sbk_customer_name" t-esc="picked.name"/>
+          <span t-if="picked.channel" class="o_sbk_customer_channel"
+                t-att-class="'o_sbk_customer_channel o_sbk_ch_' + picked.channel"
+                t-esc="picked.channel"/>
+        </button>
+        <div class="o_sbk_customer_sep"/>
+        <button class="o_sbk_customer_walkin"
+                type="button"
+                t-on-mousedown="_useWalkInCustomer">
+          + Walk-in Customer
+        </button>
+      </div>
+    </div>
+    <!-- Portal user reassurance pill. Only rendered when we actually
+         know the partner's name (partnerName may be blank if the
+         design opened without props). Silent otherwise. -->
+    <div t-elif="state.partnerName" class="o_sbk_portal_indicator"
+         t-att-title="'You are designing as ' + state.partnerName">
+      <span class="o_sbk_portal_prefix">Designing as</span>
+      <strong class="o_sbk_portal_name" t-esc="state.partnerName"/>
+    </div>
     <!-- D3 — Channel pricing badge. Shows the partner-resolved
          pricelist so every price the user sees in the configurator
          is the one the quote will use. Suppressed for the default
@@ -1110,10 +1373,24 @@ SouthbrookKitchenConfigurator.template = xml`
       <span t-if="state.autoSaving" class="o_sbk_autosave">Saving…</span>
       <span t-elif="state.lastAutoSaveAt &gt; 0" class="o_sbk_autosave is-ok">✓ Auto-saved</span>
       <button class="o_sbk_btn o_sbk_btn_primary"
-              t-att-disabled="state.saving || !state.items.length"
+              t-att-disabled="state.saving || (!state.items.length &amp;&amp; !state.portalUser)"
               t-on-click="_saveDesign">
         <t t-if="state.saving">Saving…</t>
+        <t t-elif="state.portalUser">Save Draft</t>
         <t t-else="">Save Design</t>
+      </button>
+      <!-- Task #48 — Create &amp; Confirm. Only surfaces for internal
+           users (portal customers don't create quotes directly; they
+           submit the design and the assigned rep confirms). Disabled
+           until the design has at least one cabinet, or a save is
+           already in flight. -->
+      <button t-if="!state.portalUser"
+              class="o_sbk_btn o_sbk_btn_confirm"
+              t-att-disabled="state.saving || !state.items.length"
+              t-on-click="_createAndConfirm"
+              title="Save the design and create a draft Sale Order for this customer">
+        <t t-if="state.saving">Working…</t>
+        <t t-else="">Create &amp; Confirm</t>
       </button>
     </div>
   </header>
@@ -1259,6 +1536,33 @@ SouthbrookKitchenConfigurator.template = xml`
                      onResizeRoom="(nw, f) => this._onCanvasResize(nw, f)"
                      onViewChange="(k) => this._onCanvasViewChange(k)"
                      onReady="(api) => this._onCanvasReady(api)"/>
+
+      <!-- Task #48 — Persistent count + room + estimate strip.
+           Real-time sanity check for the customer / rep. Filler is
+           excluded from the cabinet count to match the pricing rule
+           (fillers don't ship on the SO, don't get built). Room
+           feet come straight from state.room; estimated total is the
+           already-computed state.summary.price so we don't overlap
+           model-side pricing work Agent A hasn't scoped. -->
+      <div class="o_sbk_count_strip" role="status" aria-live="polite">
+        <span class="o_sbk_count_item">
+          <strong t-esc="_nonFillerCount()"/>
+          <span class="o_sbk_count_label"> cabinets</span>
+        </span>
+        <span class="o_sbk_count_sep">•</span>
+        <span class="o_sbk_count_item">
+          <t t-esc="(state.room.width_in / 12).toFixed(1)"/>′ W
+          <span class="o_sbk_count_dim_x">×</span>
+          <t t-esc="(state.room.depth_in / 12).toFixed(1)"/>′ D
+        </span>
+        <t t-if="state.summary.price &gt; 0">
+          <span class="o_sbk_count_sep">•</span>
+          <span class="o_sbk_count_item o_sbk_count_price">
+            <span class="o_sbk_count_label">Est. </span>
+            <strong t-esc="_money(state.summary.price)"/>
+          </span>
+        </t>
+      </div>
 
       <!-- Dimension ruler overlay -->
       <div class="o_sbk_ruler">
@@ -1523,6 +1827,10 @@ SouthbrookKitchenConfigurator.props = {
     room_height_in: { type: Number, optional: true },
     // D3 — partner for channel pricelist resolution.
     partner_id:     { type: Number, optional: true },
+    // Task #48 — partner display label. Not RPC-critical (server can
+    // re-resolve from partner_id), just avoids a synchronous name_get
+    // round-trip on component mount when a design carries the label.
+    partner_name:   { type: String, optional: true },
     "*":            true,
 };
 SouthbrookKitchenConfigurator.defaultProps = {};
