@@ -67,7 +67,12 @@ export class KitchenViewport extends Component {
                 <span class="o_owl_kitchen_title">3D Kitchen Preview</span>
                 <button class="btn btn-sm o_owl_kitchen_mode_btn"
                         t-on-click="onToggleMode"
-                        t-att-disabled="!state.threeLoaded">
+                        t-att-disabled="!state.threeLoaded"
+                        t-att-title="state.mode === 'solid'
+                                     ? 'Switch to dimensioned blueline view'
+                                     : 'Switch to solid rendered view'">
+                    <!-- Label is the TARGET mode (what you'll switch TO),
+                         not the current one — the title spells that out. -->
                     <t t-if="state.mode === 'solid'">Blueline</t>
                     <t t-else="">Solid</t>
                 </button>
@@ -110,6 +115,13 @@ export class KitchenViewport extends Component {
         // change triggers a refetch so the kitchen stays in sync
         // with the rest of the SPA after autosaves / state changes.
         payloadVersion: { type: Number, optional: true },
+        // 2026-07-03 — reverse selection sync. The parent OrderBuilder's
+        // state.ui.selected_line_id (a line id Number, or null). When it
+        // changes — e.g. the user clicks a row in the Lines tab — the
+        // matching cabinet gets a persistent amber outline so switching
+        // to the 3D tab shows which line is selected. Loosely typed
+        // (Number | null); left untyped-strict to tolerate null cleanly.
+        selectedLineId: { optional: true },
     };
 
     setup() {
@@ -146,6 +158,10 @@ export class KitchenViewport extends Component {
         // line id matching the L{id}_ panel name prefix).
         this._linesIndex = {};
         this._hoveredLineId = null;
+        // 2026-07-03 — persistent selection outline (reverse sync with the
+        // parent's selected_line_id). Distinct from _hoveredLineId so hover
+        // and selection can coexist on different cabinets.
+        this._selectedLineId = null;
         this._raycaster = null;
         this._mouse = null;
         this._mouseDownAt = null;
@@ -159,7 +175,8 @@ export class KitchenViewport extends Component {
         onMounted(() => this._init());
         onWillUpdateProps((nextProps) => {
             const next = nextProps.payloadVersion || 0;
-            if (next !== this._lastPayloadVersion) {
+            const versionChanged = next !== this._lastPayloadVersion;
+            if (versionChanged) {
                 this._lastPayloadVersion = next;
                 // Re-fetch only when the Three.js scene is built;
                 // otherwise the initial _init's fetch will pick up
@@ -167,6 +184,16 @@ export class KitchenViewport extends Component {
                 if (this._renderer && this._cabinetGroup) {
                     queueMicrotask(() => this._fetchAndBuild());
                 }
+            }
+            // 2026-07-03 — reverse selection sync. Apply the outline in
+            // place when only the selection changed. When the payload
+            // version ALSO changed we skip it here: the pending refetch
+            // rebuilds the scene and _build re-applies selection from the
+            // current prop, so applying now would just be undone.
+            const nextSel = nextProps.selectedLineId ?? null;
+            if (!versionChanged && nextSel !== this._selectedLineId
+                && this._cabinetGroup) {
+                this._applySelectionHighlight(nextSel);
             }
         });
         onWillUnmount(() => this._dispose());
@@ -326,6 +353,17 @@ export class KitchenViewport extends Component {
             // OutlinePass example module required.
             outline: new THREE.MeshBasicMaterial({
                 color: 0x2b4f6b,          // --sb-sky
+                side: THREE.BackSide,
+                depthWrite: false,
+                transparent: false,
+            }),
+            // 2026-07-03 — persistent SELECTION outline (reverse sync with
+            // the parent's selected_line_id). Same inverted-hull technique
+            // as `outline`, in amber so a selected cabinet is visually
+            // distinct from the sky-blue hover highlight (both can show at
+            // once on different cabinets).
+            selected: new THREE.MeshBasicMaterial({
+                color: 0xd4a24e,          // --sb-amber
                 side: THREE.BackSide,
                 depthWrite: false,
                 transparent: false,
@@ -772,6 +810,12 @@ export class KitchenViewport extends Component {
                 this._camera.lookAt(new THREE.Vector3(...tgt));
             }
         }
+
+        // 2026-07-03 — re-apply the persistent selection outline to the
+        // freshly-built meshes (the parent's current selection). _build
+        // cleared the old shells along with their host meshes.
+        this._selectedLineId = null;   // shells are gone; force re-add
+        this._applySelectionHighlight(this.props.selectedLineId ?? null);
     }
 
     // ------------------------------------------------------------------
@@ -840,6 +884,12 @@ export class KitchenViewport extends Component {
             });
             this._cabinetGroup.add(scene);
         }
+
+        // 2026-07-03 — GLB swaps removed the box meshes (and their
+        // selection shells) for the swapped lines; re-apply the selection
+        // outline to whatever meshes now represent the selected line.
+        this._selectedLineId = null;
+        this._applySelectionHighlight(this.props.selectedLineId ?? null);
     }
 
     // ------------------------------------------------------------------
@@ -855,9 +905,17 @@ export class KitchenViewport extends Component {
         // material doesn't get cached as the "original" during the
         // blueline swap.
         this._setHoveredLine(null);
+        // 2026-07-03 — likewise drop the persistent selection shell before
+        // the material swap so it isn't captured as a mesh's _origMaterial;
+        // re-applied (as a no-op in blueline) after the swap below.
+        const keepSelection = this._selectedLineId;
+        this._clearSelectionShells();
 
         this.state.mode = this.state.mode === "solid" ? "blueline" : "solid";
-        if (!this._cabinetGroup) return;
+        if (!this._cabinetGroup) {
+            this._selectedLineId = keepSelection;
+            return;
+        }
         const blueline = this._materials.blueline;
         this._cabinetGroup.traverse((obj) => {
             if (!obj.isMesh) return;
@@ -876,6 +934,11 @@ export class KitchenViewport extends Component {
         if (this._dimensionGroup) {
             this._dimensionGroup.visible = this.state.mode === "blueline";
         }
+        // 2026-07-03 — re-apply the selection outline. No-op in blueline
+        // mode (where _applySelectionHighlight early-returns), restored on
+        // the swap back to solid.
+        this._selectedLineId = null;
+        this._applySelectionHighlight(keepSelection);
     }
 
     // ------------------------------------------------------------------
@@ -971,6 +1034,56 @@ export class KitchenViewport extends Component {
         } else {
             this.state.hoveredLineInfo = null;
         }
+    }
+
+    // ------------------------------------------------------------------
+    // 2026-07-03 — persistent selection outline (reverse sync with the
+    // parent OrderBuilder's state.ui.selected_line_id).
+    //
+    // Same inverted-hull technique as the hover outline in _setHoveredLine,
+    // but the shell persists until the selection changes and uses the amber
+    // `selected` material so it reads distinctly from the sky-blue hover
+    // (both can show at once, on different cabinets). Hidden in blueline
+    // mode, like the hover highlight. Shells reuse the host mesh geometry
+    // (not cloned) so removal only detaches them — it must NOT dispose the
+    // shared geometry.
+    // ------------------------------------------------------------------
+    _applySelectionHighlight(lineId) {
+        this._clearSelectionShells();
+        const isNull = (lineId === null || lineId === undefined);
+        this._selectedLineId = isNull ? null : lineId;
+        // mesh.userData.lineId is the L{id}_ capture group — a string.
+        const key = isNull ? null : String(lineId);
+        if (key === null || !this._cabinetGroup
+            || this.state.mode === "blueline" || !this._materials.selected) {
+            return;
+        }
+        const THREE = this._THREE;
+        const mat = this._materials.selected;
+        this._cabinetGroup.traverse((obj) => {
+            if (obj.isMesh
+                && obj.userData?.lineId === key
+                && !obj.userData._isSelectionShell
+                && !obj.userData._selectionShell) {
+                const shell = new THREE.Mesh(obj.geometry, mat);
+                shell.scale.set(1.045, 1.045, 1.045);   // just past hover's 1.03
+                shell.userData._isSelectionShell = true;
+                shell.renderOrder = 998;
+                obj.add(shell);
+                obj.userData._selectionShell = shell;
+            }
+        });
+    }
+
+    _clearSelectionShells() {
+        if (!this._cabinetGroup) return;
+        this._cabinetGroup.traverse((obj) => {
+            if (obj.isMesh && obj.userData?._selectionShell) {
+                obj.remove(obj.userData._selectionShell);
+                // Geometry is SHARED with the host mesh — never dispose here.
+                obj.userData._selectionShell = null;
+            }
+        });
     }
 
     _onMouseDown(event) {

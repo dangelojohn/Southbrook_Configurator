@@ -22,6 +22,7 @@ Auth model: portal user; `partner_id.parent_id` chain identifies
 the dealer. The controller verifies the order belongs to either
 the logged-in partner OR the partner's parent (dealer org).
 """
+import json
 import logging
 
 from odoo import fields, http
@@ -913,23 +914,50 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         # G14 (2026-06-01) — auto-select customer mode for portal users
         # (res.users.share=True). Internal users still get dealer mode
         # by default so the dealer/sales-rep workflow is unchanged.
-        # Override at any time via ?mode=customer or ?mode=dealer on
-        # the URL (the OWL bootstrap reads URL param first).
+        # Override to customer via ?mode=customer on the URL.
+        #
+        # 2026-07-03 — this used to be resolved client-side in the OWL
+        # bootstrap (portal_boot mountOrderBuilder). Now that OrderBuilder
+        # mounts via the public_components registry, its props come from
+        # the server-rendered `props` JSON attribute, so the mode is
+        # resolved here. The rule mirrors the prior client logic exactly:
+        # customer iff the user is a portal user OR ?mode=customer is
+        # present (there was never a path that forced dealer via URL).
         user = request.env.user
         is_portal_user = bool(user.share)
-        order_mode = "customer" if is_portal_user else "dealer"
+        # Case-sensitive, untrimmed — EXACT parity with the prior client
+        # check `URLSearchParams.get("mode") === "customer"`. (Deliberately
+        # not .lower()/.strip(): a dealer must not be dropped into the
+        # reduced customer surface by ?mode=Customer / trailing space.)
+        url_mode = request.httprequest.args.get("mode") or ""
+        order_mode = (
+            "customer" if (is_portal_user or url_mode == "customer") else "dealer"
+        )
         values.update({
             "page_name": "southbrook_order_builder",
             "order": order,
             "order_id": order.id if order else None,
             "order_name": order.name if order else "New Order",
             "user_partner": request.env.user.partner_id,
-            # Track 2 commits 2+ will add an "owl_mount_id" used by the
-            # OWL bootstrap to find its mount point on the page.
+            # The mount <div> keeps this id + the .o_southbrook_owl_mount
+            # class purely as the SCSS scope and the southbrook_hermes
+            # chat-inject XPath anchor. (The old data-order-id/-name/-mode
+            # attributes were dropped — their only reader was the deleted
+            # mountOrderBuilder bootstrap; props now flow via owl_props_json.)
             "owl_mount_id": "order_builder_root",
-            # G14 — written to data-mode on the mount div; the OWL
-            # bootstrap reads it and propagates as props.mode.
+            # Kept in the render context for any inheriting view that may
+            # branch on mode; the OWL app itself receives it via owl_props_json.
             "order_mode": order_mode,
+            # 2026-07-03 — props for the <owl-component> that mounts
+            # OrderBuilder via the public_components registry. Read as
+            # JSON by web's PublicComponentInteraction. orderId is a
+            # STRING to match OrderBuilder.props (type: String) and the
+            # prior dataset-derived value.
+            "owl_props_json": json.dumps({
+                "orderId": str(order.id) if order else "",
+                "orderName": order.name if order else "New Order",
+                "mode": order_mode,
+            }),
         })
         return values
 

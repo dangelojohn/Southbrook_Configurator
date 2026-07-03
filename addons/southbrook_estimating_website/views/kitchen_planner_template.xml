@@ -35,6 +35,13 @@
            class="o_kp_owl_mount"
            t-att-data-user-partner-id="user_partner.id"
            t-att-data-user-partner-name="user_partner.name">
+        <!-- 2026-07-03 — KitchenPlanner mounts via the public_components
+             registry (see planner_boot.esm.js), not a manual mountComponent
+             (which double-ran startServices on this public page → duplicate
+             NotificationContainer). The .o_kp_owl_mount wrapper is kept for
+             SCSS scope; the child placeholder is the pre-hydration fallback
+             (PublicComponentInteraction clears it before mounting). -->
+        <owl-component name="southbrook_estimating_website.KitchenPlanner">
         <div class="o_kp_root o_kp_boot_placeholder">
           <aside class="o_kp_rail"/>
           <section class="o_kp_catalog">
@@ -50,6 +57,7 @@
             </div>
           </main>
         </div>
+        </owl-component>
       </div>
     </t>
   </template>
