@@ -126,15 +126,31 @@
                 </div>
             </t>
 
-            <!-- OWL mount point. Commit 2 mounts <OrderBuilder/> here.
-                 The placeholder text appears in commit-1 builds so it's
-                 obvious the route + frame work even before the JS bundle
-                 lands. -->
+            <!-- OWL mount point. OrderBuilder mounts here.
+                 2026-07-03 — the mount moved from a manual
+                 mountComponent() bootstrap (which created a second root
+                 env and re-ran startServices, duplicating the
+                 NotificationContainer main_component → DuplicatedKeyError)
+                 to web's public_components registry. The <owl-component>
+                 element below is the mount trigger; PublicComponentInteraction
+                 mounts OrderBuilder on the SHARED public-root env (services
+                 already started) and reads its props from the JSON `props`
+                 attribute.
+                 The wrapper <div class="o_southbrook_owl_mount"> is kept
+                 verbatim: it is the SCSS scope for the whole OrderBuilder
+                 and the southbrook_hermes chat-inject XPath anchor. Its
+                 data-* attributes are retained for legacy readers. -->
             <div t-att-id="owl_mount_id"
                  class="o_southbrook_owl_mount"
                  t-att-data-order-id="order_id or ''"
                  t-att-data-order-name="order_name"
                  t-att-data-mode="order_mode or 'dealer'">
+                <owl-component name="southbrook_estimating_website.OrderBuilder"
+                               t-att-props="owl_props_json">
+                <!-- Pre-hydration placeholder. PublicComponentInteraction
+                     clears these child nodes before mounting OrderBuilder,
+                     so they only show until the frontend interactions run
+                     (and for no-JS visitors). -->
                 <div class="o_southbrook_owl_placeholder">
                     <t t-if="not order">
                         <!-- G9 fix (2026-06-01): self-service entry
@@ -164,6 +180,7 @@
                         </p>
                     </t>
                 </div>
+                </owl-component>
             </div>
 
             </div>

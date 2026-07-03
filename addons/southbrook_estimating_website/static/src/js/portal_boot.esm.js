@@ -32,8 +32,8 @@
  *     },
  *   };
  */
-import { Component, markup, onMounted, onWillUnmount, onWillUpdateProps, useState, whenReady, xml } from "@odoo/owl";
-import { mountComponent } from "@web/env";
+import { Component, markup, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
+import { registry } from "@web/core/registry";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
 import { RoomLayoutTab, AssignToWallModal, GapRecommendModal } from "@southbrook_estimating_website/js/room_layout.esm";
@@ -5529,68 +5529,35 @@ class OrderBuilder extends Component {
 }
 
 // ----------------------------------------------------------------------
-// Bootstrap — finds the mount-point div on portal pages and mounts
-// the OrderBuilder root. Idempotent against double-mount.
+// Bootstrap — register OrderBuilder as a public component.
+//
+// 2026-07-03 — replaces the previous manual `whenReady(mountOrderBuilder)`
+// + `mountComponent(OrderBuilder, root, …)` bootstrap. That path (added
+// 2026-07-01) created a SECOND root env via `mountComponent`'s implicit
+// `makeEnv()` + `startServices()`. The frontend public root ALSO starts
+// services, and the notification service's `start()` adds
+// "NotificationContainer" to the global `main_components` registry — so
+// starting services twice threw
+//   DuplicatedKeyError: Cannot add key "NotificationContainer" …
+// on every page load (fired from the public root's own startServices).
+//
+// The `public_components` registry is web's sanctioned way to mount an
+// OWL component that needs services on a public/portal page (see Odoo
+// core: web.user_switch, web.install_scoped_app). web's
+// PublicComponentInteraction mounts the component on the ALREADY-STARTED
+// public-root env — services (orm, notification, …) and the template
+// registry are shared, and startServices is NOT run a second time, so
+// the collision disappears. Descendants like AppliancePalette that call
+// `useService("orm")` still resolve correctly.
+//
+// The <owl-component name="southbrook_estimating_website.OrderBuilder"
+// props="…"> element is rendered by views/portal_template.xml inside the
+// .o_southbrook_owl_mount wrapper; props (orderId / orderName / mode) are
+// resolved server-side and passed as a JSON `props` attribute, which
+// PublicComponentInteraction JSON-parses. Only pages carrying that
+// element mount OrderBuilder; every other frontend page is unaffected.
 // ----------------------------------------------------------------------
 
-async function mountOrderBuilder() {
-    const root = document.getElementById("order_builder_root");
-    if (!root || root.dataset.owlMounted === "1") return;
-
-    const orderId = root.dataset.orderId || "";
-    const orderName = root.dataset.orderName || "";
-
-    // T2C13 — view-mode resolution.
-    //   1. Explicit URL param ?mode=customer wins (test path + dealer
-    //      previewing the customer view).
-    //   2. Otherwise the data-mode attribute set by the controller
-    //      (Phase 3 polish — backend reads user.share + a partner
-    //      preference and emits the default).
-    //   3. Fallback "dealer".
-    const params = new URLSearchParams(window.location.search);
-    const urlMode = params.get("mode");
-    const datasetMode = root.dataset.mode || "";
-    const mode = (
-        urlMode === "customer" || datasetMode === "customer"
-            ? "customer"
-            : "dealer"
-    );
-
-    // Clear the placeholder so it doesn't flash beneath the OWL render.
-    root.innerHTML = "";
-
-    try {
-        // 2026-07-01 fix — use `mountComponent` from `@web/env` rather
-        // than raw OWL `mount()`. mountComponent seeds a fresh Odoo
-        // env (env.services populated via `startServices`, template
-        // registry wired via `getTemplate`), which is what descendants
-        // like `AppliancePalette` need — its `setup()` calls
-        // `useService("orm")` and would crash with "Cannot use 'in'
-        // operator to search for 'orm' in undefined" against a bare
-        // OWL App that has no env.
-        root.dataset.owlMounted = "1";
-        await mountComponent(OrderBuilder, root, {
-            props: { orderId, orderName, mode },
-        });
-    } catch (err) {
-        delete root.dataset.owlMounted;
-        // Surface mount failures in the DOM so they're discoverable
-        // without DevTools — important during scaffold verification.
-        root.innerHTML =
-            "<div class='alert alert-danger'>" +
-            "OWL mount failed: " +
-            String(err?.message || err) +
-            "</div>";
-        // eslint-disable-next-line no-console
-        console.error("[southbrook_estimating_website] OWL mount failed:", err);
-    }
-}
-
-whenReady(mountOrderBuilder).catch((err) => {
-    // Async work outside the try/catch above (DOM lookup, dataset
-    // reads, URL parsing) is theoretical but possible — hardened
-    // portals with Trusted Types can throw on innerHTML=""; make
-    // sure it doesn't become an "Uncaught (in promise)".
-    // eslint-disable-next-line no-console
-    console.error("[southbrook_estimating_website] mountOrderBuilder failed before mount:", err);
-});
+registry
+    .category("public_components")
+    .add("southbrook_estimating_website.OrderBuilder", OrderBuilder);
