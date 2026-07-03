@@ -19,11 +19,20 @@
  * Normals point INTO the room interior (so cabinets project off the
  * wall toward the interior when drawn at `+normal * depth`).
  *
- * Geometry contract per shape:
- *   - straight  (1 wall)  : A horizontal across the top, normal +Y
- *   - l_shape   (2 walls) : A across top, B down right side, both normals interior
- *   - u_shape   (3 walls) : A across top, B down right, C across bottom
- *   - galley    (2 walls) : two parallel horizontal walls (gap = 1200 mm default)
+ * Geometry contract per shape — CANONICAL. Do not silently reorient any wall
+ * without updating BOTH this docstring AND the RoomOutlinePreview wizard +
+ * FloorPlanSVG renderer; the wall metrics panel, cabinet placement, and gap
+ * markers all key off this exact orientation. Phase 3.C SHOULD-FIX #3 —
+ * documented explicitly to head off "quiet" reorients across contributors.
+ *   - straight  (1 wall)  : A = top, horizontal L->R, normal +Y (interior below)
+ *   - l_shape   (2 walls) : A = top,   horizontal L->R,       normal +Y
+ *                           B = right, vertical top->bottom,  normal -X
+ *   - u_shape   (3 walls) : A = top,    horizontal L->R
+ *                           B = right,  vertical top->bottom
+ *                           C = bottom, horizontal R->L (returns toward origin)
+ *   - galley    (2 walls) : A = top,    horizontal L->R, normal +Y (interior below)
+ *                           B = bottom (offset by galleyGap),
+ *                                       horizontal L->R, normal -Y (interior above)
  *
  * Unsupported shapes (g_shape, peninsula, island, custom) return
  * `null` — callers should fall back to a flat "stacked wall list"

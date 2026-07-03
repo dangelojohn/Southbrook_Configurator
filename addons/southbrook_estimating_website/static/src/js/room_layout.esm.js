@@ -139,6 +139,28 @@ function _elevationRangeFor(line) {
 const ZONE_CLASS = (zone) =>
     "sb-room-plan-cab sb-room-plan-cab--" + (zone || "other");
 
+// Phase 3.C SHOULD-FIX #4 — surface seed-data drift where a placed
+// cabinet arrives with no zone (silently falls back to "other").
+// Deduped per line so devtools shows one warn per offending line, not
+// one per render. Dev-time signal only; production seed data should
+// never trigger it, so a warn firing means sale.order.line.zone drifted.
+const _warnedZonelessLines = new Set();
+function _warnIfZoneless(line) {
+    if (!line || line.zone) {
+        return;
+    }
+    const key = line.id != null ? "id:" + line.id : (line.name || "unknown");
+    if (_warnedZonelessLines.has(key)) {
+        return;
+    }
+    _warnedZonelessLines.add(key);
+    console.warn(
+        "[room_layout] cabinet line " + key +
+        " has empty/undefined zone; falling back to 'other'." +
+        " Likely seed-data drift on sale.order.line.zone."
+    );
+}
+
 // SVG canvas geometry. Single global scale applied to room mm
 // coordinates so the bbox fits within (viewWidth - 2*padding) by
 // (viewHeight - 2*padding).
@@ -1105,6 +1127,7 @@ class FloorPlanSVG extends Component {
                     dragCy = dcy / 4;
                 }
 
+                _warnIfZoneless(line);
                 out.push({
                     key: "cab-" + line.id,
                     // Phase 3.C.2a — surface the line id explicitly so
