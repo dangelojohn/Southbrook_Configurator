@@ -26,6 +26,7 @@ Run with:
 Or with the explicit tag filter:
     --test-tags=southbrook_customer_flow
 """
+import json
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 
@@ -36,10 +37,15 @@ from odoo.addons.southbrook_estimating_website.controllers import main as ctrl_m
 
 
 @contextmanager
-def stubbed_request(env, user=None):
+def stubbed_request(env, user=None, args=None):
     """Swap controllers.main.request for a MagicMock whose .env
     resolves to a real Odoo env for the duration of the with-block.
     Restores the original werkzeug LocalProxy on exit.
+
+    `args` seeds request.httprequest.args (the URL query string) as a
+    real dict so `.get("mode")` returns None rather than a truthy
+    MagicMock — matters since _prepare_southbrook_portal_values now
+    resolves the ?mode= override server-side.
     """
     saved = ctrl_main.request
     mock = MagicMock()
@@ -50,6 +56,7 @@ def stubbed_request(env, user=None):
         pass
     mock.session = {}
     mock.params = {}
+    mock.httprequest.args = dict(args or {})
     ctrl_main.request = mock
     try:
         yield mock
@@ -134,6 +141,59 @@ class TestCustomerFlowEndpoints(TransactionCase):
             values["order_mode"], "dealer",
             "Internal user (share=False) must default to dealer mode",
         )
+
+    # ==================================================================
+    # 2026-07-03 — mode resolution + owl_props_json now that OrderBuilder
+    # mounts via the public_components registry (props come from the
+    # server-rendered JSON attribute, not the old client bootstrap).
+    # ==================================================================
+    def test_url_mode_customer_overrides_dealer_for_internal_user(self):
+        """?mode=customer forces customer mode for an internal user —
+        replicates the prior client-side URL override exactly."""
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._prepare_portal_layout_values = lambda: {}
+        with stubbed_request(self.env, args={"mode": "customer"}):
+            values = controller._prepare_southbrook_portal_values(self.order)
+        self.assertEqual(values["order_mode"], "customer")
+        self.assertEqual(
+            json.loads(values["owl_props_json"])["mode"], "customer",
+            "owl_props_json.mode must reflect the ?mode=customer override",
+        )
+
+    def test_url_mode_dealer_does_not_override_portal_user(self):
+        """?mode=dealer must NOT downgrade a portal user — the old client
+        logic only ever forced customer, never dealer."""
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._prepare_portal_layout_values = lambda: {}
+        with stubbed_request(
+            self.env, user=self.user_customer, args={"mode": "dealer"},
+        ):
+            values = controller._prepare_southbrook_portal_values(self.order)
+        self.assertEqual(values["order_mode"], "customer")
+
+    def test_owl_props_json_shape(self):
+        """owl_props_json is valid JSON carrying the exact prop names +
+        string types OrderBuilder.props declares (orderId is a str)."""
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._prepare_portal_layout_values = lambda: {}
+        with stubbed_request(self.env, user=self.user_customer):
+            values = controller._prepare_southbrook_portal_values(self.order)
+        props = json.loads(values["owl_props_json"])
+        self.assertEqual(props["orderId"], str(self.order.id))
+        self.assertIsInstance(props["orderId"], str)
+        self.assertEqual(props["orderName"], self.order.name)
+        self.assertEqual(props["mode"], "customer")
+
+    def test_owl_props_json_empty_order_has_blank_string_id(self):
+        """No order → orderId is "" (not "None") so OrderBuilder's
+        `if (!orderId)` empty-state branch triggers correctly."""
+        controller = ctrl_main.SouthbrookOrderBuilderPortal()
+        controller._prepare_portal_layout_values = lambda: {}
+        with stubbed_request(self.env, user=self.user_customer):
+            values = controller._prepare_southbrook_portal_values(None)
+        props = json.loads(values["owl_props_json"])
+        self.assertEqual(props["orderId"], "")
+        self.assertEqual(props["orderName"], "New Order")
 
     # ==================================================================
     # G17 — order payload includes timeline timestamps
