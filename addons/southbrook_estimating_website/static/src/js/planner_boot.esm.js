@@ -41,10 +41,9 @@ import {
     Component,
     onMounted,
     useState,
-    whenReady,
     xml,
 } from "@odoo/owl";
-import { mountComponent } from "@web/env";
+import { registry } from "@web/core/registry";
 
 // ---------------------------------------------------------------------
 // rpcCall — pure fetch + JSON-RPC envelope.
@@ -542,44 +541,27 @@ class KitchenPlanner extends Component {
 }
 
 // ---------------------------------------------------------------------
-// mountKitchenPlanner — idempotent boot.
+// Bootstrap — register KitchenPlanner as a public component.
+//
+// 2026-07-03 — replaces the manual `whenReady(mountKitchenPlanner)` +
+// `mountComponent(KitchenPlanner, root, …)` boot (added 2026-07-01).
+// `/kitchen-planner` is an anonymous PUBLIC page, so — exactly like the
+// portal OrderBuilder — mountComponent's implicit `startServices()` ran
+// a second service suite against the already-started public root and
+// threw `DuplicatedKeyError: NotificationContainer`. Mounting through
+// the `public_components` registry reuses the public-root env (services
+// + template registry shared, no second startServices), so it is safe
+// today (KitchenPlanner uses inline xml`` + no services) AND for the
+// Phase-3 3D children that will need services. See
+// [[odoo19_mountcomponent_startservices_trap]].
+//
+// views/kitchen_planner_template.xml renders
+// <owl-component name="southbrook_estimating_website.KitchenPlanner"/>
+// inside the .o_kp_owl_mount wrapper. KitchenPlanner takes no props
+// (static props = {}); it fetches partner + catalog via
+// /southbrook/api/kitchen-planner/state, so no props attribute needed.
 // ---------------------------------------------------------------------
-async function mountKitchenPlanner() {
-    const root = document.getElementById("kitchen_planner_root");
-    if (!root || root.dataset.owlMounted === "1") return;
 
-    // Clear the P2C1 placeholder (rail + catalog + viewport
-    // skeletons) before mounting.
-    root.innerHTML = "";
-
-    try {
-        // 2026-07-01 defensive migration — use `mountComponent` from
-        // `@web/env` rather than raw OWL `mount()`. mountComponent
-        // seeds a fresh Odoo env (env.services populated via
-        // startServices, template registry via getTemplate) so any
-        // future child of KitchenPlanner that uses
-        // `static template = "module.Name"` OR `useService(...)` just
-        // works. Today's KitchenPlanner uses only inline xml`` and
-        // no services, but Phase 3 (3D viewport, catalog_tile,
-        // dimensioning) will need both — see
-        // [[odoo19_public_owl_mount_env_services]].
-        root.dataset.owlMounted = "1";
-        await mountComponent(KitchenPlanner, root, {
-            props: {},
-        });
-    } catch (err) {
-        delete root.dataset.owlMounted;
-        root.innerHTML =
-            '<div class="o_kp_state o_kp_error">' +
-            '<strong>Planner failed to mount.</strong>' +
-            '<div class="o_kp_error_msg">' + (err.message || String(err))
-            + '</div></div>';
-    }
-}
-
-whenReady(mountKitchenPlanner).catch((err) => {
-    // Async work outside the try/catch above (DOM lookup,
-    // dataset reads, innerHTML="") can throw on hardened portals.
-    // eslint-disable-next-line no-console
-    console.error("[southbrook_estimating_website] mountKitchenPlanner failed before mount:", err);
-});
+registry
+    .category("public_components")
+    .add("southbrook_estimating_website.KitchenPlanner", KitchenPlanner);
