@@ -2207,6 +2207,199 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
         # extension (Track 1 T1C6). Same env, same source of truth.
         return order.with_user(request.env.user).get_kitchen_3d_payload()
 
+    # ------------------------------------------------------------------
+    # 2026-07-03 T1 — "3D Design" tab (persisted drag editor).
+    #
+    # get-or-create the order's southbrook.kitchen.design and seed its
+    # cabinet lines from the order's SB-SKU lines, then return the
+    # KitchenCanvas payload (room + flat items).
+    #
+    # Ownership is enforced by _southbrook_resolve_order (the portal user
+    # must own the order). Portal customers hold NO ACL on
+    # southbrook.kitchen.design, so the design is read/written under
+    # sudo() AFTER that ownership check — the standard portal pattern.
+    # This route only ever touches southbrook.kitchen.design(.line); it
+    # never writes sale.order / MO. Positions ride the pre-existing,
+    # unmodified design→order reconcile cron.
+    # ------------------------------------------------------------------
+    _FAM_TO_CABTYPE = {
+        "base": "base", "sink": "base", "drawer": "base", "vanity": "base",
+        "wall": "wall", "tall": "tall", "corner": "corner",
+        "accessory": "filler", "worktop": "panel",
+    }
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/design-3d",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_design_3d(self, order_id, **kw):
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        design = self._southbrook_get_or_create_design(order)
+        return self._southbrook_design_payload(design)
+
+    def _southbrook_get_or_create_design(self, order):
+        """Find (or create + seed) the southbrook.kitchen.design linked to
+        this order. Runs under sudo() because portal customers hold no ACL
+        on the model; safe because the caller already verified the user
+        owns `order`."""
+        Design = request.env["southbrook.kitchen.design"].sudo()
+        design = Design.search([("sale_order_id", "=", order.id)], limit=1)
+        if not design:
+            design = Design.create({
+                "name": order.name or "Kitchen Design",
+                "partner_id": order.partner_id.id if order.partner_id else False,
+                "sale_order_id": order.id,
+                "state": "draft",
+            })
+        # Seed only when no configurator-origin lines exist yet, so a
+        # user's persisted drag edits are preserved on re-open.
+        if not design.cabinet_line_ids.filtered(lambda l: l.origin == "configurator"):
+            self._southbrook_seed_design_lines(order, design)
+        return design
+
+    def _southbrook_seed_design_lines(self, order, design):
+        """Materialise design lines from the order's SB-SKU lines using the
+        SAME _SKU_DEFAULTS dims + _ZONE_LAYOUT cursor pack the read-only
+        Preview (sale_order.get_kitchen_3d_payload) uses, so the first open
+        of the Arrange tab matches the Preview. mm → inches."""
+        SaleOrder = request.env["sale.order"]
+        Session = request.env["product.config.session"]
+        Line = request.env["southbrook.kitchen.design.line"].sudo()
+        sku_defaults = Session._SKU_DEFAULTS
+        zone_layout = SaleOrder._ZONE_LAYOUT
+        worktop_cursor = SaleOrder._WORKTOP_CURSOR
+        worktop_y = SaleOrder._WORKTOP_Y_FLOOR
+        mm_to_in = 1.0 / 25.4
+        cursors = {"ground": 0, "wall": 0, "island": 0, "other": 0}
+        seq = 0
+        for oline in order.order_line:
+            tmpl = oline.product_id.product_tmpl_id if oline.product_id else None
+            sku = tmpl.default_code if tmpl else None
+            row = sku_defaults.get(sku) if sku else None
+            if not row:
+                continue   # non-SB product → skip (matches the Preview)
+            fam, _doors, _drawers, w, h, d = row
+            if fam == "worktop":
+                cursor_name, y_floor, z_offset = worktop_cursor, worktop_y, 0
+            else:
+                zone = oline.zone or "base_run"
+                cursor_name, y_floor, z_offset = zone_layout.get(
+                    zone, ("ground", 0, 0),
+                )
+            x_offset = cursors[cursor_name] + w / 2.0
+            cursors[cursor_name] += w
+            seq += 1
+            cabinet_type = (
+                tmpl.southbrook_cabinet_type
+                or self._FAM_TO_CABTYPE.get(fam, "base")
+            )
+            Line.create({
+                "design_id":     design.id,
+                "sequence":      seq * 10,
+                "product_id":    oline.product_id.id,
+                "quantity":      1,
+                "price_unit":    oline.price_unit or (tmpl.list_price if tmpl else 0.0),
+                "cabinet_type":  cabinet_type,
+                "width_in":      w * mm_to_in,
+                "height_in":     h * mm_to_in,
+                "depth_in":      d * mm_to_in,
+                "x_position_in": x_offset * mm_to_in,
+                "y_position_in": y_floor * mm_to_in,
+                "z_position_in": z_offset * mm_to_in,
+                "pinned":        False,
+                "rotation_deg":  0.0,
+                "layout_key":    "L%d-%s" % (oline.id, fam),
+                "origin":        "configurator",
+            })
+
+    def _southbrook_design_payload(self, design):
+        """KitchenCanvas payload: room dims + one flat item per
+        configurator-origin design line (mirrors the configurator's
+        /load_design_lines shape)."""
+        design = design.sudo()
+        items = []
+        for line in design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator"
+        ):
+            prod = line.product_id
+            items.append({
+                "id":            prod.id,
+                "product_id":    prod.id,
+                "product_name":  prod.display_name,
+                "layout_key":    line.layout_key,
+                "cabinet_type":  line.cabinet_type,
+                "width_in":      line.width_in,
+                "height_in":     line.height_in,
+                "depth_in":      line.depth_in,
+                "x_position_in": line.x_position_in,
+                "y_position_in": line.y_position_in,
+                "z_position_in": line.z_position_in,
+                "rotation_deg":  line.rotation_deg,
+                "pinned":        line.pinned,
+                "price":         line.price_unit,
+                "quantity":      line.quantity,
+            })
+        return {
+            "design_id": design.id,
+            "room": {
+                "width_in":  design.room_width_in,
+                "depth_in":  design.room_depth_in,
+                "height_in": design.room_height_in,
+            },
+            "items": items,
+        }
+
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/design-3d/move",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_design_3d_move(self, order_id, layout_key,
+                                      x_position_in=None, y_position_in=None,
+                                      z_position_in=None, rotation_deg=None, **kw):
+        """Persist a drag-move to the order's design line. Portal-safe:
+        order ownership is enforced via _southbrook_resolve_order, then the
+        write runs under sudo() (portal customers hold no ACL on
+        southbrook.kitchen.design). Writes ONLY kitchen.design.line — the
+        design→order position mirror is the existing reconcile cron's job."""
+        try:
+            order = self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+        if not layout_key:
+            return {"error": "no_layout_key"}
+        Design = request.env["southbrook.kitchen.design"].sudo()
+        design = Design.search([("sale_order_id", "=", order.id)], limit=1)
+        if not design:
+            return {"error": "no_design"}
+        line = design.cabinet_line_ids.filtered(
+            lambda l: l.origin == "configurator" and l.layout_key == layout_key
+        )[:1]
+        if not line:
+            return {"error": "no_matching_line"}
+        vals = {}
+        if x_position_in is not None:
+            vals["x_position_in"] = float(x_position_in)
+        if y_position_in is not None:
+            vals["y_position_in"] = float(y_position_in)
+        if z_position_in is not None:
+            vals["z_position_in"] = float(z_position_in)
+        if rotation_deg is not None:
+            vals["rotation_deg"] = float(rotation_deg) % 360.0
+        if vals:
+            line.write(vals)
+        return {"ok": True, "id": line.id}
+
     def _southbrook_order_signature(self, order):
         """Cheap server-side change-detection signature for the order
         payload. Includes everything the OWL store would notice as a

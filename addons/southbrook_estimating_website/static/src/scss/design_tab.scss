@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// 2026-07-03 T1 — "3D Design" tab layout. KitchenCanvas renders into its
+// own `.o_sbk_canvas3d` div and sizes the renderer from that div's
+// clientWidth/Height (kitchen_canvas.esm.js:130), so the host must carry a
+// definite height. We do NOT load the configurator's kitchen_configurator.scss
+// (backend-scoped); these rules give the reused canvas its box in the portal.
+.o_owl_design3d {
+    display: flex;
+    flex-direction: column;
+
+    .o_owl_design3d_toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 4px 10px;
+        font-size: 13px;
+    }
+
+    .o_owl_design3d_title {
+        font-weight: 600;
+    }
+
+    .o_owl_design3d_status {
+        opacity: 0.75;
+    }
+
+    .o_owl_design3d_stage {
+        position: relative;
+        width: 100%;
+        height: 62vh;
+        min-height: 460px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 6px;
+        overflow: hidden;
+
+        .o_sbk_canvas3d {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    }
+}

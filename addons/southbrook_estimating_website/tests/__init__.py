@@ -7,3 +7,4 @@ from . import test_multi_currency
 from . import test_commercial_page
 from . import test_room_api
 from . import test_room_api_inheritance
+from . import test_design_3d_tab

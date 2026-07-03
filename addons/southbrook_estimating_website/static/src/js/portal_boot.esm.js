@@ -35,6 +35,7 @@
 import { Component, markup, onError, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
+import { KitchenDesignTab } from "@southbrook_estimating_website/js/design_tab.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
 import { RoomLayoutTab, AssignToWallModal, GapRecommendModal } from "@southbrook_estimating_website/js/room_layout.esm";
 
@@ -3409,6 +3410,12 @@ const TEMPLATE = xml`
                                  selectedLineId="state.ui.selected_line_id"
                                  onLineSelected.bind="_onKitchen3dLineSelected"/>
             </div>
+            <div t-elif="state.ui.current_tab === 'kitchen3d_design'"
+                 class="o_owl_tab_panel o_owl_panel_kitchen3d_design"
+                 role="tabpanel" aria-labelledby="o_owl_tab_kitchen3d_design">
+                <KitchenDesignTab orderId="props.orderId"
+                                  payloadVersion="state.payload_version"/>
+            </div>
             <div t-elif="state.ui.current_tab === 'bom'"
                  class="o_owl_tab_panel o_owl_panel_bom"
                  role="tabpanel" aria-labelledby="o_owl_tab_bom"
@@ -3553,6 +3560,7 @@ class OrderBuilder extends Component {
         ValidationStrip,
         FooterActions,
         KitchenViewport,
+        KitchenDesignTab,
         CatalogPicker,
         RoomSetupWizard,
         RoomLayoutTab,
@@ -4371,10 +4379,17 @@ class OrderBuilder extends Component {
                 label: "Order Lines",
                 count: this.state.lines.length,
             },
-            // Phase 2.5 commit 1 — 3D Kitchen tab.
+            // Phase 2.5 commit 1 — 3D Kitchen tab (read-only zone-tiled preview).
             {
                 code: "kitchen3d",
                 label: "3D Kitchen",
+                count: this.state.lines.length || null,
+            },
+            // 2026-07-03 T1 — 3D Design tab: interactive, persisted drag
+            // editor (KitchenCanvas over the order's kitchen.design).
+            {
+                code: "kitchen3d_design",
+                label: "3D Design",
                 count: this.state.lines.length || null,
             },
             {
@@ -4408,7 +4423,8 @@ class OrderBuilder extends Component {
             // Phase 2.B — "room_setup" is customer-visible (room
             // measurement is a customer concern, not a power-user tool).
             const customerCodes = new Set([
-                "room_setup", "room_layout", "lines", "kitchen3d", "print",
+                "room_setup", "room_layout", "lines", "kitchen3d",
+                "kitchen3d_design", "print",
             ]);
             return all.filter((t) => customerCodes.has(t.code));
         }

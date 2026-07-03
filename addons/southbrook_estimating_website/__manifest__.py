@@ -3,7 +3,7 @@
     "name": "Southbrook Estimating — Website",
     "summary": "The customer-facing one-page kitchen configurator on "
                "southbrookcabinetry.space (Phase 2 + Phase 3 deliverable).",
-    "version": "19.0.28.4.0",
+    "version": "19.0.28.5.0",
     "license": "LGPL-3",
     "author": "Southbrook Cabinetry",
     "website": "https://southbrookcabinetry.space",
@@ -20,6 +20,12 @@
         "southbrook_estimating",
         "website_product_configurator",   # OCA — public-facing wizard base
         "portal",                          # /my/... portal layout + auth
+        # 2026-07-03 T1 — the new "3D Design" tab reuses the standalone
+        # Configurator's KitchenCanvas OWL engine + persists cabinet
+        # positions to the existing southbrook.kitchen.design(.line)
+        # model. We depend on the configurator for those models + the
+        # canvas/* JS modules (added to web.assets_frontend below).
+        "southbrook_kitchen_3d_configurator",
     ],
     "data": [
         # Track 2 commit 1 — portal-route view templates.
@@ -68,6 +74,38 @@
             # southbrook_estimating Track 1. Same vendored r160 bundle.
             "southbrook_estimating/static/lib/three/three.min.js",
             "southbrook_estimating/static/lib/three/OrbitControls.js",
+            # 2026-07-03 T1 — the standalone Configurator's KitchenCanvas
+            # engine, reused verbatim for the new "3D Design" tab. These
+            # are the SAME files the configurator loads in web.assets_backend
+            # (southbrook_kitchen_3d_configurator/__manifest__.py); an Odoo
+            # bundle may reference files from any installed addon. Order
+            # mirrors the backend bundle's dependency order. kitchen_configurator.js
+            # (the backend parent) is deliberately NOT included — it uses
+            # useService("action"), whose service is absent from
+            # web.assets_frontend. A new portal parent (design_tab.esm.js)
+            # drives KitchenCanvas instead.
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/constants.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/three_loader.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/pointer_helpers.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/view_specs.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/mesh_factory.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/pack_row.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/easing.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/ortho_frustum.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/selection.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/drop_raycaster.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/room_shell.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/drag_handle.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/drop_lanes.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/pbr_env_map.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/base_cabinet.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/wall_cabinet.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/other_cabinets.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/scene_init.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/scene_dispose.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/camera_controller.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/pointer_pipeline.esm.js",
+            "southbrook_kitchen_3d_configurator/static/src/js/canvas/kitchen_canvas.esm.js",
             # 2026-06-22 — Tier-1 cabinet GLB pipeline (see
             # static/lib/cabinets/README.md). The GLTFLoader entry is
             # COMMENTED until the vendor lib is dropped at
@@ -97,9 +135,15 @@
             # Loads AFTER portal_root.scss so the :root tokens defined
             # there are available to .o_kp_* selectors.
             "southbrook_estimating_website/static/src/scss/planner.scss",
+            # 2026-07-03 T1 — "3D Design" tab layout (hosts the reused
+            # KitchenCanvas .o_sbk_canvas3d in the portal).
+            "southbrook_estimating_website/static/src/scss/design_tab.scss",
             # Order matters: KitchenViewport class is imported by
             # portal_boot, so it must load first.
             "southbrook_estimating_website/static/src/js/kitchen_viewport.esm.js",
+            # 2026-07-03 T1 — new portal parent that drives KitchenCanvas
+            # in the "3D Design" tab (imported by portal_boot below).
+            "southbrook_estimating_website/static/src/js/design_tab.esm.js",
             "southbrook_estimating_website/static/src/js/portal_boot.esm.js",
             # Phase 2.C (2026-06-27) — Room Setup wizard. Loaded AFTER
             # portal_boot.esm.js so the rpcJsonCall export resolves; the
