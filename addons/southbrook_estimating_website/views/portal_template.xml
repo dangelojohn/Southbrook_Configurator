@@ -136,15 +136,15 @@
                  mounts OrderBuilder on the SHARED public-root env (services
                  already started) and reads its props from the JSON `props`
                  attribute.
-                 The wrapper <div class="o_southbrook_owl_mount"> is kept
-                 verbatim: it is the SCSS scope for the whole OrderBuilder
-                 and the southbrook_hermes chat-inject XPath anchor. Its
-                 data-* attributes are retained for legacy readers. -->
+                 The wrapper <div class="o_southbrook_owl_mount"> is kept:
+                 it is the SCSS scope for the whole OrderBuilder and the
+                 southbrook_hermes chat-inject XPath anchor
+                 (//div[hasclass('o_southbrook_owl_mount')]). The old
+                 data-order-id/-order-name/-mode attributes were dropped —
+                 the only reader was the deleted mountOrderBuilder bootstrap;
+                 props now flow through owl_props_json instead. -->
             <div t-att-id="owl_mount_id"
-                 class="o_southbrook_owl_mount"
-                 t-att-data-order-id="order_id or ''"
-                 t-att-data-order-name="order_name"
-                 t-att-data-mode="order_mode or 'dealer'">
+                 class="o_southbrook_owl_mount">
                 <owl-component name="southbrook_estimating_website.OrderBuilder"
                                t-att-props="owl_props_json">
                 <!-- Pre-hydration placeholder. PublicComponentInteraction

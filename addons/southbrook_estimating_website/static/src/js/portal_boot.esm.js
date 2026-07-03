@@ -32,7 +32,7 @@
  *     },
  *   };
  */
-import { Component, markup, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
+import { Component, markup, onError, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { RoomSetupWizard } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
@@ -3406,6 +3406,7 @@ const TEMPLATE = xml`
                  tabindex="0">
                 <KitchenViewport orderId="props.orderId"
                                  payloadVersion="state.payload_version"
+                                 selectedLineId="state.ui.selected_line_id"
                                  onLineSelected.bind="_onKitchen3dLineSelected"/>
             </div>
             <div t-elif="state.ui.current_tab === 'bom'"
@@ -3577,6 +3578,23 @@ class OrderBuilder extends Component {
     };
 
     setup() {
+        // 2026-07-03 — mount/render error boundary. Migrating this SPA to
+        // the public_components registry dropped the old manual bootstrap's
+        // in-DOM "OWL mount failed" alert (PublicComponentInteraction only
+        // console.errors on a mount throw). onError catches a descendant
+        // render/setup error — e.g. a child's useService failing to resolve
+        // — and re-surfaces it through the existing error card (top-level
+        // `t-elif="state.error"`, with a Retry button) instead of leaving a
+        // silently-blank configurator. Guarded because the callback can fire
+        // before `this.state` is assigned if the useState call itself throws.
+        onError((err) => {
+            // eslint-disable-next-line no-console
+            console.error("[OrderBuilder] render/setup error:", err);
+            if (this.state) {
+                this.state.loading = false;
+                this.state.error = (err && err.message) ? err.message : String(err);
+            }
+        });
         this.state = useState({
             // P0 bugfix 2026-06-22: split "first-page-paint loading" from
             // "background poll loading". `loading` only flips true on the

@@ -939,11 +939,14 @@ class SouthbrookOrderBuilderPortal(_SouthbrookOrderAccessMixin, CustomerPortal):
             "order_id": order.id if order else None,
             "order_name": order.name if order else "New Order",
             "user_partner": request.env.user.partner_id,
-            # Retained for backwards-compat: the mount <div> still carries
-            # this id + data attributes for SCSS scoping (.o_southbrook_owl_mount)
-            # and the southbrook_hermes chat-inject XPath anchor.
+            # The mount <div> keeps this id + the .o_southbrook_owl_mount
+            # class purely as the SCSS scope and the southbrook_hermes
+            # chat-inject XPath anchor. (The old data-order-id/-name/-mode
+            # attributes were dropped — their only reader was the deleted
+            # mountOrderBuilder bootstrap; props now flow via owl_props_json.)
             "owl_mount_id": "order_builder_root",
-            # G14 — written to data-mode on the mount div (legacy readers).
+            # Kept in the render context for any inheriting view that may
+            # branch on mode; the OWL app itself receives it via owl_props_json.
             "order_mode": order_mode,
             # 2026-07-03 — props for the <owl-component> that mounts
             # OrderBuilder via the public_components registry. Read as
