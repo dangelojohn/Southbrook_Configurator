@@ -65,7 +65,27 @@
             <div t-else=""
                  class="sb-room-plan-layout">
 
-                <div class="sb-room-plan-canvas">
+                <div class="sb-room-plan-canvas"
+                     t-on-click="(ev) => this._onArmedCanvasClick(ev)">
+
+                    <!-- Click-to-place (2026-07-03) — shown whenever an
+                         item is armed via the palette's "Place" button
+                         (or Enter/Space on a focused item). Clicking
+                         anywhere on the floor-plan SVG below, or on a
+                         wall row in the sidebar table, drops the item;
+                         Escape (anywhere) or this Cancel button clears
+                         the armed state without placing anything. -->
+                    <div t-if="state.armedItem"
+                         class="sb-room-plan-arm-banner">
+                        <span class="sb-room-plan-arm-banner-text">
+                            Placing <t t-esc="state.armedItem.name"/> — click a wall to drop • Esc to cancel
+                        </span>
+                        <button type="button"
+                                class="sb-room-plan-arm-banner-cancel"
+                                t-on-click="(ev) => this._onCancelArmClick(ev)">
+                            Cancel
+                        </button>
+                    </div>
 
                     <!-- Phase 3.C.2c — view toggle + wall picker.
                          "Floor" stays the default; switching to
@@ -147,7 +167,10 @@
                                     class="sb-room-plan-wall-row"
                                     t-att-class="{
                                         'sb-room-plan-wall-row--conflict': m.has_conflicts,
-                                    }">
+                                        'sb-room-plan-wall-row--armable': !!state.armedItem,
+                                    }"
+                                    t-att-title="state.armedItem ? ('Click to place ' + state.armedItem.name + ' on ' + m.name) : null"
+                                    t-on-click="() => this._onWallRowClick(m.id)">
                                     <td t-esc="m.name"/>
                                     <td class="sb-room-plan-num mono">
                                         <t t-esc="_humanLen(m.length_mm)"/>
@@ -162,14 +185,36 @@
                                              200mm clamp lives in the
                                              RoomLayoutTab._onWallShift
                                              helper so the template
-                                             stays declarative. -->
+                                             stays declarative.
+
+                                             Phase 4.x (2026-07-03) adds
+                                             a free-text numeric input
+                                             alongside the steppers —
+                                             uncontrolled (t-att-value,
+                                             not t-model) so a re-render
+                                             mid-typing never steals
+                                             focus; _onWallLenCommit
+                                             (fired on native `change`,
+                                             i.e. blur/Enter) parses and
+                                             clamps. Every control here
+                                             stops click propagation so
+                                             it doesn't also trigger the
+                                             row's click-to-place. -->
                                         <span t-if="props.onWallResizeEnd"
                                               class="sb-room-plan-wall-len-shifter">
                                             <button type="button"
-                                                    t-on-click="() => this._onWallShift(m.id, m.length_mm, -100)"
+                                                    t-on-click="(ev) => this._onWallShift(m.id, m.length_mm, -100, ev)"
                                                     t-att-aria-label="'Shrink ' + m.name + ' by 100 mm'">−</button>
+                                            <input type="text"
+                                                   class="sb-room-plan-wall-len-input"
+                                                   t-att-id="'sb-wall-len-' + m.id"
+                                                   t-key="'sb-wall-len-' + m.id"
+                                                   t-att-value="_humanLen(m.length_mm)"
+                                                   t-on-change="(ev) => this._onWallLenCommit(m.id, ev)"
+                                                   t-on-click="(ev) => ev.stopPropagation()"
+                                                   t-att-aria-label="'Set ' + m.name + ' length'"/>
                                             <button type="button"
-                                                    t-on-click="() => this._onWallShift(m.id, m.length_mm, 100)"
+                                                    t-on-click="(ev) => this._onWallShift(m.id, m.length_mm, 100, ev)"
                                                     t-att-aria-label="'Grow ' + m.name + ' by 100 mm'">+</button>
                                         </span>
                                     </td>
@@ -278,7 +323,9 @@
                                       roomId="(props.room &amp;&amp; props.room.id) || false"
                                       unitPreference="props.unitPreference || 'mm'"
                                       onTemplateDrop="_onTemplateDrop"
-                                      getDropTarget="_getDropTarget"/>
+                                      getDropTarget="_getDropTarget"
+                                      armedKey="state.armedKey"
+                                      onArmChange="_onPaletteArm"/>
                 </aside>
             </div>
         </div>

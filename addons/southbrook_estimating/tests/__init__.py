@@ -26,6 +26,7 @@ from . import test_variant_sku_cost
 from . import test_3d_payload_phase2
 from . import test_southbrook_room
 from . import test_room_wall_assignment
+from . import test_room_wall_conflict_count
 # 2026-07-01 E2E audit follow-up.
 from . import test_rule_enforcement
 from . import test_pricelist_math

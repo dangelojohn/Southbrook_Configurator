@@ -82,7 +82,7 @@ def _serialize_room(room):
          total_linear_mm, wall_count, constraint_count,
          walls: [{id, name, length_mm, wall_order, has_upper_cabinets,
                   has_base_cabinets, has_tall_cabinets, used_mm,
-                  remaining_mm, has_conflicts,
+                  remaining_mm, has_conflicts, conflict_count,
                   constraints: [{id, constraint_type,
                                  distance_from_left_mm, width_mm,
                                  height_mm, height_from_floor_mm,
@@ -112,6 +112,7 @@ def _serialize_room(room):
             "used_mm": w.used_mm,
             "remaining_mm": w.remaining_mm,
             "has_conflicts": w.has_conflicts,
+            "conflict_count": w.conflict_count,
             "has_constraint_out_of_bounds": w.has_constraint_out_of_bounds,
             "has_constraint_overlap": w.has_constraint_overlap,
             "constraints": constraints,
@@ -671,7 +672,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
     # Phase 3.A — wall placement for cabinet lines. Backs the Room
     # Layout tab drag-and-drop interactivity coming in Phase 3.C. The
     # response returns BOTH the updated line dict AND the after-mutation
-    # wall metrics (used_mm / remaining_mm / has_conflicts) so the
+    # wall metrics (used_mm / remaining_mm / has_conflicts / conflict_count) so the
     # caller can refresh the line list AND the floor-plan SVG in one
     # round-trip without a follow-up /room/get fetch.
     #
@@ -777,20 +778,20 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
         except (ValidationError, ValueError) as e:
             return {"error": "invalid", "detail": str(e)}
 
-        # Refresh ORM cache so wall.used_mm / remaining_mm / has_conflicts
-        # reflect the just-written placement.
+        # Refresh ORM cache so wall.used_mm / remaining_mm / has_conflicts /
+        # conflict_count reflect the just-written placement.
         line.invalidate_recordset()
         if wall is not None:
             wall.invalidate_recordset()
         # Phase 3.C.1 — when the line moved between walls, the FROM
         # wall's computed metrics are stale too (cabinet_line_ids O2m
         # membership flipped) — invalidate so the response carries
-        # fresh used_mm / remaining_mm / has_conflicts.
+        # fresh used_mm / remaining_mm / has_conflicts / conflict_count.
         if previous_wall_rec and (
             wall is None or previous_wall_rec.id != wall.id
         ):
             previous_wall_rec.invalidate_recordset(
-                ["used_mm", "remaining_mm", "has_conflicts"]
+                ["used_mm", "remaining_mm", "has_conflicts", "conflict_count"]
             )
 
         line_dict = {
@@ -806,6 +807,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                 "used_mm": wall.used_mm,
                 "remaining_mm": wall.remaining_mm,
                 "has_conflicts": wall.has_conflicts,
+                "conflict_count": wall.conflict_count,
             }
         # Phase 3.C.1 — previous_wall is only meaningful when the line
         # MOVED off a different wall (not unplace-from-same / first-place).
@@ -818,6 +820,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                 "used_mm": previous_wall_rec.used_mm,
                 "remaining_mm": previous_wall_rec.remaining_mm,
                 "has_conflicts": previous_wall_rec.has_conflicts,
+                "conflict_count": previous_wall_rec.conflict_count,
             }
         return {
             "ok": True,

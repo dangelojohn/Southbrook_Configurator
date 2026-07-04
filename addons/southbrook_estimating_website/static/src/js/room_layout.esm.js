@@ -82,6 +82,38 @@ function _humanLenWithPref(mm, pref) {
     return `${Math.round(Number(mm) || 0)} mm`;
 }
 
+// Phase 4.x (2026-07-03) — free-text wall-length parser, the inverse
+// of _imperialFromMm/_humanLenWithPref above. No parser previously
+// existed in either direction (grep for parseFeet/_parseLen/ftin came
+// up empty) — this is deliberately permissive rather than clever:
+//   - imperial pref: try feet+inches notation first — 6'6", 6' 6",
+//     6ft6in, 78", 78in, or feet/inches alone (6', 78in).
+//   - always (both prefs, and as the imperial fallback when the
+//     feet/inches match fails): a bare number, optionally suffixed
+//     "mm" — 1800, 1800mm. A designer on the imperial toggle typing
+//     a raw mm value (e.g. pasted from a spec sheet) still works.
+// Returns null — never throws — on anything unparseable so the caller
+// can reset the field instead of committing garbage.
+function _parseWallLenInput(raw, pref) {
+    const s = (raw || "").trim().toLowerCase();
+    if (!s) return null;
+    if (pref === "imperial") {
+        const ftIn = s.match(
+            /^(?:(\d+(?:\.\d+)?)\s*(?:'|ft|feet))?\s*(?:(\d+(?:\.\d+)?)\s*(?:"|in|inch|inches))?$/
+        );
+        if (ftIn && (ftIn[1] || ftIn[2])) {
+            const feet = parseFloat(ftIn[1] || "0");
+            const inches = parseFloat(ftIn[2] || "0");
+            return Math.round((feet * 12 + inches) * 25.4);
+        }
+    }
+    const mmSuffixed = s.match(/^(\d+(?:\.\d+)?)\s*mm$/);
+    if (mmSuffixed) return Math.round(parseFloat(mmSuffixed[1]));
+    const bareNumber = s.match(/^(\d+(?:\.\d+)?)$/);
+    if (bareNumber) return Math.round(parseFloat(bareNumber[1]));
+    return null;
+}
+
 // ----------------------------------------------------------------------
 // Zone-based cabinet depth defaults — mirror sale_order_line.py's
 // _SB_DEFAULT_*_DEPTH_MM constants. Wall cabinets float higher and
@@ -1625,6 +1657,17 @@ export class RoomLayoutTab extends Component {
         this.state = useState({
             viewMode: "floor",
             selectedWallId: null,
+            // Click-to-place (2026-07-03) — the palette item currently
+            // "armed" for placement (or null), and the constraint_type
+            // it resolves to. Set via _onPaletteArm (threaded to
+            // AppliancePalette as onArmChange) or _placeOnWallAppend/
+            // _onArmedCanvasClick clearing it after a successful drop.
+            armedItem: null,
+            armedConstraintType: null,
+            // Key (id or syntheticKey) of the armed item — passed down
+            // to AppliancePalette so it (not the palette's own state)
+            // owns the armed highlight; any disarm here clears it there.
+            armedKey: null,
         });
         // Stage D — mutable handle the child FloorPlanSVG fills with
         // its public methods (today: findDropTarget). NOT reactive —
@@ -1632,7 +1675,20 @@ export class RoomLayoutTab extends Component {
         // would break the child's attachment, so it lives on `this`
         // (not in useState).
         this.floorPlanApi = {};
+        // Click-to-place — Escape anywhere on the page cancels an armed
+        // placement. AppliancePalette already handles Escape while one
+        // of its own <li> items has focus; this document-level listener
+        // covers the case where focus has moved to the canvas (or
+        // anywhere else) after arming.
+        useExternalListener(document, "keydown", this._onDocumentKeydown);
     }
+
+    _onDocumentKeydown = (ev) => {
+        if (ev.key === "Escape" && this.state.armedItem) {
+            ev.preventDefault();
+            this._disarm();
+        }
+    };
 
     _setViewMode(mode) {
         this.state.viewMode = mode;
@@ -1701,23 +1757,25 @@ export class RoomLayoutTab extends Component {
         return this.floorPlanApi.findDropTarget(clientX, clientY, itemWidthMm);
     };
 
-    // Stage C/D — AppliancePalette drop handler. Receives the raw drop
-    // event from the palette (browser client coords). Stage D now uses
-    // the FloorPlanSVG-attached api.findDropTarget() to resolve the
-    // closest wall + projected offset (snapped to 25mm). Falls back to
-    // the v0 "first wall at midpoint" path only when the api hasn't
-    // attached yet or no wall is reachable.
-    _onTemplateDrop = (dropInfo) => {
-        if (!this.props.onConstraintCreate) return;
+    // Stage D — shared payload builder. Factored out of _onTemplateDrop
+    // (2026-07-03) so both the pointer-drag drop path and the new
+    // click-to-place paths (_onArmedCanvasClick, _placeOnWallAppend)
+    // build the exact same /constraint/add payload from one place.
+    // Uses the FloorPlanSVG-attached api.findDropTarget() to resolve
+    // the closest wall + projected offset (snapped to 25mm) when
+    // client coords are given; falls back to the v0 "first wall at
+    // midpoint" path when the api hasn't attached yet or no wall is
+    // reachable at that point. Returns null when there is no wall to
+    // place on at all (empty room).
+    _buildConstraintPayload(template, constraintType, clientX, clientY) {
         const walls = (this.props.room && this.props.room.walls) || [];
-        if (walls.length === 0) return;
-        const tmpl = dropInfo.template;
-        const itemWidthMm = Math.round(tmpl.kitchen_appliance_width_mm || 600);
+        if (walls.length === 0) return null;
+        const itemWidthMm = Math.round(template.kitchen_appliance_width_mm || 600);
         let wallId = null;
         let offsetMm = null;
         if (typeof this.floorPlanApi.findDropTarget === "function") {
             const hit = this.floorPlanApi.findDropTarget(
-                dropInfo.clientX, dropInfo.clientY, itemWidthMm,
+                clientX, clientY, itemWidthMm,
             );
             if (hit) {
                 wallId = hit.wallId;
@@ -1734,21 +1792,128 @@ export class RoomLayoutTab extends Component {
             offsetMm = Math.round(offsetMm / 25) * 25;
         }
         const payload = {
-            constraint_type: dropInfo.constraintType,
+            constraint_type: constraintType,
             wall_id: wallId,
             distance_from_left_mm: offsetMm,
             width_mm: itemWidthMm,
-            height_mm: Math.round(tmpl.kitchen_appliance_height_mm || 0),
-            height_from_floor_mm: Math.round(tmpl.kitchen_appliance_sill_mm || 0),
+            height_mm: Math.round(template.kitchen_appliance_height_mm || 0),
+            height_from_floor_mm: Math.round(template.kitchen_appliance_sill_mm || 0),
         };
-        if (tmpl.id && !tmpl.synthetic) {
-            payload.appliance_template_id = tmpl.id;
+        if (template.id && !template.synthetic) {
+            payload.appliance_template_id = template.id;
         }
-        if (tmpl.swing_direction) {
-            payload.swing_direction = tmpl.swing_direction;
+        if (template.swing_direction) {
+            payload.swing_direction = template.swing_direction;
         }
+        return payload;
+    }
+
+    // Stage C/D — AppliancePalette drop handler. Receives the raw drop
+    // event from the palette (browser client coords). Delegates to
+    // _buildConstraintPayload for the px→wall snap math.
+    _onTemplateDrop = (dropInfo) => {
+        if (!this.props.onConstraintCreate) return;
+        const payload = this._buildConstraintPayload(
+            dropInfo.template, dropInfo.constraintType,
+            dropInfo.clientX, dropInfo.clientY,
+        );
+        if (!payload) return;
         this.props.onConstraintCreate(payload);
     };
+
+    // Click-to-place (2026-07-03) — AppliancePalette's onArmChange
+    // callback. Stores/clears the armed item so the template can show
+    // the "Placing… click a wall" banner and _onArmedCanvasClick /
+    // _placeOnWallAppend know what to create.
+    _onPaletteArm = (info) => {
+        if (info && info.active) {
+            this.state.armedItem = info.item;
+            this.state.armedConstraintType = info.constraintType;
+            this.state.armedKey =
+                (info.item && (info.item.id || info.item.syntheticKey)) || null;
+        } else {
+            this.state.armedItem = null;
+            this.state.armedConstraintType = null;
+            this.state.armedKey = null;
+        }
+    };
+
+    _disarm() {
+        this.state.armedItem = null;
+        this.state.armedConstraintType = null;
+        this.state.armedKey = null;
+    }
+
+    // Banner's Cancel button — stopPropagation so the click doesn't
+    // also bubble to the canvas's own click-to-place handler (the
+    // banner sits inside .sb-room-plan-canvas).
+    _onCancelArmClick(ev) {
+        ev.stopPropagation();
+        this._disarm();
+    }
+
+    // Click-to-place — click handler on .sb-room-plan-canvas. No-ops
+    // unless an item is armed AND the click actually landed on the
+    // floor-plan SVG itself (not the view-toggle toolbar or other
+    // canvas chrome) — mirrors the hit-test AppliancePalette._onDragEnd
+    // already does for pointer-drag. Also requires floor view: the
+    // read-only WallElevationSVG shares the "sb-room-plan-svg" class
+    // (plus its own "sb-room-plan-elev-svg" modifier) but isn't backed
+    // by a live floorPlanApi.findDropTarget, so a click there would
+    // silently fall back to "first wall, centred" instead of doing
+    // nothing — worse than a no-op.
+    _onArmedCanvasClick(ev) {
+        if (!this.state.armedItem) return;
+        if (!this.props.onConstraintCreate) return;
+        if (this.state.viewMode !== "floor") return;
+        const svg = ev.target.closest ? ev.target.closest("svg.sb-room-plan-svg") : null;
+        if (!svg) return;
+        const payload = this._buildConstraintPayload(
+            this.state.armedItem, this.state.armedConstraintType,
+            ev.clientX, ev.clientY,
+        );
+        if (payload) {
+            this.props.onConstraintCreate(payload);
+        }
+        this._disarm();
+    }
+
+    // Click-to-place — clicking a wall ROW in the sidebar metrics table
+    // while armed. No canvas required: places the item at the END of
+    // that wall's used run (append), which is both the most common
+    // intent and fully keyboard/screen-reader reachable (unlike the
+    // SVG click path). Guarded so an unarmed row click stays a no-op —
+    // the table has no other row-click behavior today.
+    _onWallRowClick(wallId) {
+        if (!this.state.armedItem) return;
+        this._placeOnWallAppend(wallId);
+    }
+
+    _placeOnWallAppend(wallId) {
+        if (!this.state.armedItem) return;
+        if (!this.props.onConstraintCreate) return;
+        const walls = (this.props.room && this.props.room.walls) || [];
+        const wall = walls.find((w) => w.id === wallId);
+        if (!wall) return;
+        const template = this.state.armedItem;
+        const itemWidthMm = Math.round(template.kitchen_appliance_width_mm || 600);
+        const payload = {
+            constraint_type: this.state.armedConstraintType,
+            wall_id: wallId,
+            distance_from_left_mm: wall.used_mm || 0,
+            width_mm: itemWidthMm,
+            height_mm: Math.round(template.kitchen_appliance_height_mm || 0),
+            height_from_floor_mm: Math.round(template.kitchen_appliance_sill_mm || 0),
+        };
+        if (template.id && !template.synthetic) {
+            payload.appliance_template_id = template.id;
+        }
+        if (template.swing_direction) {
+            payload.swing_direction = template.swing_direction;
+        }
+        this.props.onConstraintCreate(payload);
+        this._disarm();
+    }
 
     // Phase 4 — template-facing length formatter. Honours the
     // unit-preference passed in from the parent OrderBuilder.
@@ -1759,12 +1924,37 @@ export class RoomLayoutTab extends Component {
     // Phase 3.C.2d — sidebar ± 100mm wall-length shifter. Clamps to
     // min 200mm (same floor as the SVG drag). Fires the same RPC
     // handler the SVG handle uses so the parent has one code path
-    // to maintain.
-    _onWallShift = (wallId, currentMm, deltaMm) => {
+    // to maintain. `ev` is optional (kept for callers that don't have
+    // one) — when present we stopPropagation so this click doesn't
+    // also bubble up to the wall row's click-to-place handler.
+    _onWallShift = (wallId, currentMm, deltaMm, ev) => {
+        if (ev) ev.stopPropagation();
         if (!this.props.onWallResizeEnd) return;
         const next = Math.max(200, (Number(currentMm) || 0) + deltaMm);
         this.props.onWallResizeEnd(wallId, next);
     };
+
+    // Phase 4.x (2026-07-03) — numeric wall-length text entry. The
+    // input is uncontrolled (t-att-value, not t-model — see the XML
+    // comment) so mid-typing re-renders never steal focus; the value
+    // is only read + committed here, on native `change` (blur / Enter).
+    // Parse failure resets the field to the last-known-good value
+    // instead of crashing or silently committing garbage.
+    _onWallLenCommit(wallId, ev) {
+        const pref = this.props.unitPreference || "mm";
+        const walls = (this.props.room && this.props.room.walls) || [];
+        const wall = walls.find((w) => w.id === wallId);
+        const currentMm = wall ? (wall.length_mm || 0) : 0;
+        const parsed = _parseWallLenInput(ev.target.value, pref);
+        if (parsed === null || !Number.isFinite(parsed)) {
+            ev.target.value = _humanLenWithPref(currentMm, pref);
+            return;
+        }
+        const clamped = Math.max(200, parsed);
+        if (this.props.onWallResizeEnd) {
+            this.props.onWallResizeEnd(wallId, clamped);
+        }
+    }
 
     // ------------------------------------------------------------------
     // Empty-state predicates — drive the t-if/t-elif cascade in the
@@ -1812,11 +2002,17 @@ export class RoomLayoutTab extends Component {
             length_mm: w.length_mm || 0,
             used_mm: w.used_mm || 0,
             remaining_mm: w.remaining_mm || 0,
-            has_conflicts: !!w.has_conflicts,
-            // Conflict count isn't directly exposed by Phase 1/2 — we
-            // surface the boolean as 0 or 1. Phase 3.C upgrade can
-            // count overlapping constraint×cabinet pairs.
-            conflict_count: w.has_conflicts ? 1 : 0,
+            // 2026-07-03 — the server now exposes a real conflict_count
+            // (overlapping constraint×cabinet pair count) on some
+            // payloads; older/partial payloads still only have the
+            // has_conflicts boolean. Prefer the count when present,
+            // fall back to 0/1 from the boolean, and derive
+            // has_conflicts from whichever field is actually populated
+            // so the table stays correct either way.
+            conflict_count: (typeof w.conflict_count === "number")
+                ? w.conflict_count : (w.has_conflicts ? 1 : 0),
+            has_conflicts: !!w.has_conflicts
+                || (typeof w.conflict_count === "number" && w.conflict_count > 0),
         }));
     }
 

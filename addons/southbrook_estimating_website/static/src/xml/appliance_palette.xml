@@ -16,6 +16,9 @@
             <h3 class="sb-room-plan-section-title">
                 Catalog Palette
             </h3>
+            <p class="sb-palette-help">
+                Drag an item onto a wall, or click Place then click a wall.
+            </p>
 
             <div class="sb-palette-toolbar">
                 <input class="sb-palette-search"
@@ -62,12 +65,26 @@
                                 t-as="item"
                                 t-key="item.id || item.syntheticKey"
                                 class="sb-palette-item"
+                                t-att-class="_itemArmedClass(item)"
                                 t-att-data-type="item.kitchen_appliance_type"
-                                t-on-pointerdown="(ev) => this._onItemPointerDown(item, ev)">
+                                tabindex="0"
+                                t-on-pointerdown="(ev) => this._onItemPointerDown(item, ev)"
+                                t-on-keydown="(ev) => this._onItemKeydown(item, ev)">
                                 <span class="sb-palette-item-name"
                                       t-esc="item.name"/>
                                 <span class="sb-palette-item-size mono"
                                       t-esc="_itemDisplaySize(item)"/>
+                                <!-- Click-to-place affordance — additive
+                                     alongside pointer-drag. stopPropagation
+                                     on pointerdown so clicking the button
+                                     never starts a drag ghost. -->
+                                <button type="button"
+                                        class="sb-palette-item-place"
+                                        t-on-pointerdown="(ev) => ev.stopPropagation()"
+                                        t-on-click="(ev) => this._onArmItem(item, ev)"
+                                        t-att-aria-label="'Place ' + item.name">
+                                    Place
+                                </button>
                             </li>
                         </ul>
                     </div>

@@ -277,6 +277,7 @@ class SouthbrookRoom(models.Model):
                     "used_mm": w.used_mm,
                     "remaining_mm": w.remaining_mm,
                     "conflicts": w.has_conflicts,
+                    "conflict_count": w.conflict_count,
                     "constraint_count": len(w.constraint_ids),
                 }
                 for w in walls_sorted

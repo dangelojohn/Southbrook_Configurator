@@ -337,6 +337,49 @@ class TestRoomGeometry(TransactionCase):
                 walls=[{"id": wid, "length_mm": 2500}])
         self.assertEqual(res.get("error"), "invalid_geometry", res)
 
+    # ------------------------------------------------------------------
+    # 2026-07-03 — conflict_count exposed in the /room serializer payload
+    # so the Room Layout metrics table can render an exact count instead
+    # of a bare boolean.
+    # ------------------------------------------------------------------
+    def test_room_payload_includes_conflict_count(self):
+        """_serialize_room emits conflict_count per wall alongside
+        has_conflicts. Overrun constraint (2800 + 600 = 3400 > 3000)
+        must surface as conflict_count == 1."""
+        room = self.Room.create({
+            "name": "PayloadCount", "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "A", "length_mm": 3000})],
+        })
+        wall = room.wall_ids[0]
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": wall.id, "constraint_type": "sink",
+            "distance_from_left_mm": 2800, "width_mm": 600,
+        })
+        payload = ctrl_room._serialize_room(room)
+        wall_dict = payload["walls"][0]
+        self.assertIn("conflict_count", wall_dict)
+        self.assertTrue(wall_dict["has_conflicts"])
+        self.assertEqual(wall_dict["conflict_count"], 1)
+
+    def test_place_on_wall_payload_includes_conflict_count(self):
+        """The place-on-wall response wall dict carries conflict_count."""
+        room = self.Room.create({
+            "name": "PlaceCount", "order_id": self.order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "A", "length_mm": 3000})],
+        })
+        wall = room.wall_ids[0]
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id, "name": "Place me",
+        })
+        with stubbed_request(self.env):
+            res = self.controller.southbrook_api_line_place_on_wall(
+                self.order.id, line.id, wall_id=wall.id,
+                position_from_left_mm=100)
+        self.assertTrue(res.get("ok"), res)
+        self.assertIn("conflict_count", res["wall"])
+
     def test_edit_rejects_bad_geometry(self):
         with stubbed_request(self.env):
             created = self.controller.southbrook_api_room_create(

@@ -51,6 +51,15 @@ class SouthbrookRoomWall(models.Model):
         compute="_compute_capacity", store=False, string="Remaining (mm)")
     has_conflicts = fields.Boolean(
         compute="_compute_conflicts", store=False)
+    # 2026-07-03 QA follow-up: the wizard/Room Layout tab only ever showed
+    # a boolean, so a wall with 3 stacked problems looked identical to one
+    # with a single overrun. conflict_count tallies DISTINCT constraints
+    # that trip ANY of the three conditions above (out-of-bounds, overlap,
+    # cabinet collision) — a constraint hit by two reasons still counts
+    # once. Always == 0 when has_conflicts is False and >= 1 when True;
+    # see _compute_conflicts for the shared derivation.
+    conflict_count = fields.Integer(
+        compute="_compute_conflicts", store=False, string="Conflict Count")
 
     # sb_width_mm is itself a non-stored compute on sale.order.line that
     # also depends on `name` (line free-text). Capacity recomputes when
@@ -83,11 +92,14 @@ class SouthbrookRoomWall(models.Model):
         for rec in self:
             length = rec.length_mm or 0
             # ranges = "blocking" constraint spans (things a cabinet must
-            # not collide with). power_outlet / structural_post are point
-            # markers, not cabinet-blocking, so they're excluded from the
-            # cabinet-collision AND the overlap checks below.
+            # not collide with), paired with the source constraint record
+            # so conflict_count can attribute a conflict back to a
+            # specific constraint. power_outlet / structural_post are
+            # point markers, not cabinet-blocking, so they're excluded
+            # from the cabinet-collision AND the overlap checks below.
             ranges = []
             oob = False
+            conflicting = set()  # ids of constraints in ANY conflict below
             for c in rec.constraint_ids:
                 start = c.distance_from_left_mm or 0
                 width = c.width_mm or 0
@@ -95,19 +107,19 @@ class SouthbrookRoomWall(models.Model):
                 # markers (a power point) only fail if placed off the end.
                 if start < 0 or start + width > length:
                     oob = True
+                    conflicting.add(c.id)
                 if width and c.constraint_type not in ("power_outlet", "structural_post"):
-                    ranges.append((start, start + width))
+                    ranges.append((c, start, start + width))
             # Constraint-vs-constraint overlap on the same wall.
             overlap = False
             for i in range(len(ranges)):
-                a0, a1 = ranges[i]
+                ci, a0, a1 = ranges[i]
                 for j in range(i + 1, len(ranges)):
-                    b0, b1 = ranges[j]
+                    cj, b0, b1 = ranges[j]
                     if a0 < b1 and a1 > b0:
                         overlap = True
-                        break
-                if overlap:
-                    break
+                        conflicting.add(ci.id)
+                        conflicting.add(cj.id)
             # Cabinet-vs-constraint collision (original behaviour).
             cab_conflict = False
             for line in rec.cabinet_line_ids:
@@ -115,12 +127,11 @@ class SouthbrookRoomWall(models.Model):
                     continue
                 lo = line.position_from_left_mm or 0
                 hi = lo + int(line.sb_width_mm)
-                for clo, chi in ranges:
+                for ci, clo, chi in ranges:
                     if lo < chi and hi > clo:
                         cab_conflict = True
-                        break
-                if cab_conflict:
-                    break
+                        conflicting.add(ci.id)
             rec.has_constraint_out_of_bounds = oob
             rec.has_constraint_overlap = overlap
             rec.has_conflicts = cab_conflict or oob or overlap
+            rec.conflict_count = len(conflicting)

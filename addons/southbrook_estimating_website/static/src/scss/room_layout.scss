@@ -1290,6 +1290,16 @@
     overflow: hidden;
 }
 
+// Affordance helper text (2026-07-03) — sits under the "Catalog
+// Palette" title, above the search box.
+.sb-palette-help {
+    margin: 0;
+    color: var(--sb-ink-dim, #6f6a60);
+    font-size: 11px;
+    font-family: var(--sb-font-sans);
+    line-height: 1.35;
+}
+
 .sb-palette-toolbar {
     display: flex;
     align-items: center;
@@ -1405,6 +1415,56 @@
         cursor: grabbing;
         background: var(--sb-walnut-tint, #ebe5db);
     }
+    // tabindex="0" (2026-07-03, click-to-place keyboard path) — visible
+    // focus ring so Tab-navigating the palette is legible.
+    &:focus-visible {
+        outline: 2px solid var(--sb-walnut, #8c6d4f);
+        outline-offset: 1px;
+    }
+}
+
+// Click-to-place (2026-07-03) — armed-item highlight. Applied via
+// t-att-class alongside the static "sb-palette-item" class.
+.sb-palette-item--armed {
+    border-color: var(--sb-walnut, #8c6d4f);
+    background: var(--sb-walnut-tint, #ebe5db);
+    box-shadow: 0 0 0 1px var(--sb-walnut, #8c6d4f) inset;
+}
+
+// Per-item "Place" button — the click-to-place entry point alongside
+// pointer-drag. Hidden until hover/focus on desktop (mouse users have
+// the drag handle); always visible on coarse-pointer devices below,
+// since there's no hover state to reveal it.
+.sb-palette-item-place {
+    appearance: none;
+    -webkit-appearance: none;
+    flex-shrink: 0;
+    border: 1px solid var(--sb-rule, #d8d3c8);
+    border-radius: 4px;
+    background: var(--sb-paper, #fff);
+    color: var(--sb-walnut-d, #6b4f36);
+    font-family: var(--sb-font-sans);
+    font-size: 11px;
+    padding: 3px 8px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+
+    .sb-palette-item:hover &,
+    .sb-palette-item:focus-visible &,
+    .sb-palette-item:focus-within &,
+    .sb-palette-item--armed & {
+        opacity: 1;
+    }
+    &:hover {
+        background: var(--sb-walnut, #8c6d4f);
+        color: var(--sb-paper, #fff);
+    }
+    &:focus-visible {
+        opacity: 1;
+        outline: 2px solid var(--sb-walnut, #8c6d4f);
+        outline-offset: 1px;
+    }
 }
 
 // ─── Stage E — iPad/tablet adaptations ─────────────────────────────
@@ -1432,6 +1492,13 @@
         font-size: 13px;
         padding: 8px 14px;
         min-width: 180px;
+    }
+    // No hover state on touch — the Place button has to be visible
+    // up-front rather than reveal-on-hover.
+    .sb-palette-item-place {
+        opacity: 1;
+        font-size: 12px;
+        padding: 4px 10px;
     }
 }
 
@@ -1663,6 +1730,17 @@
 .sb-room-plan-wall-row--conflict {
     background: rgba(220, 80, 80, 0.06);
     color: var(--sb-alert);
+}
+
+// Click-to-place (2026-07-03) — while an item is armed, every wall row
+// becomes a drop target (append-to-end of that wall). Cursor + subtle
+// hover tint signal the row is clickable; unarmed rows keep the plain
+// table look (no click affordance existed before this feature).
+.sb-room-plan-wall-row--armable {
+    cursor: pointer;
+    &:hover {
+        background: var(--sb-walnut-tint, #ebe5db);
+    }
 }
 
 .sb-room-plan-wall-total {
@@ -2312,6 +2390,53 @@
     font-family: var(--sb-font-sans);
 }
 
+// Click-to-place (2026-07-03) — banner shown at the top of
+// .sb-room-plan-canvas while a palette item is armed. width: 100%
+// explicit (rather than relying on flex defaults) so it reads as a
+// full-width bar regardless of the canvas's own flex sizing.
+.sb-room-plan-arm-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--sb-walnut-tint, #ebe5db);
+    border: 1px solid var(--sb-walnut);
+    border-radius: var(--sb-radius);
+    font-family: var(--sb-font-sans);
+    font-size: 0.85rem;
+    color: var(--sb-walnut-d);
+}
+
+.sb-room-plan-arm-banner-text {
+    flex: 1;
+}
+
+.sb-room-plan-arm-banner-cancel {
+    appearance: none;
+    -webkit-appearance: none;
+    flex-shrink: 0;
+    border: 1px solid var(--sb-walnut-d);
+    border-radius: var(--sb-radius-sm);
+    background: var(--sb-paper);
+    color: var(--sb-walnut-d);
+    padding: 0.25rem 0.7rem;
+    font-family: var(--sb-font-sans);
+    font-size: 0.8rem;
+    cursor: pointer;
+
+    &:hover {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+    }
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+}
+
 .sb-room-plan-view-toggle {
     display: inline-flex;
     border: 1px solid var(--sb-rule-d);
@@ -2681,6 +2806,7 @@
 // reading the number.
 .sb-room-plan-wall-len-shifter {
     display: inline-flex;
+    align-items: center;
     gap: 0.25rem;
     margin-left: 0.4rem;
     vertical-align: middle;
@@ -2700,6 +2826,32 @@
             border-color: var(--sb-walnut);
             background: var(--sb-linen);
         }
+    }
+}
+
+// Numeric wall-length entry (2026-07-03) — free-text alternative to
+// the ± steppers, sitting between them. Deliberately narrow — the
+// steppers cover the common 100mm-nudge case; this is for "type the
+// exact number".
+.sb-room-plan-wall-len-input {
+    width: 4.6rem;
+    font-size: 0.7rem;
+    font-family: var(--sb-font-sans);
+    font-variant-numeric: tabular-nums;
+    padding: 0.1rem 0.3rem;
+    background: var(--sb-paper);
+    color: var(--sb-ink);
+    border: 1px solid var(--sb-rule);
+    border-radius: var(--sb-radius-sm);
+    text-align: right;
+
+    &:hover {
+        border-color: var(--sb-walnut);
+    }
+    &:focus-visible {
+        outline: 2px solid var(--sb-walnut);
+        outline-offset: 1px;
+        border-color: var(--sb-walnut);
     }
 }
 

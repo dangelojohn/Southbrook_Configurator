@@ -125,37 +125,59 @@ const TEMPLATE_TYPE_TO_CONSTRAINT = {
 
 // Group display order — drives the section ordering in the palette
 // so designers always find the same category in the same spot.
+//
+// NOTE — `_grouped` (below) keys sections by the RAW
+// `kitchen_appliance_type` field on product.template (e.g. wall_oven,
+// refrigerator, range_hood), NOT by constraint_type (oven,
+// fridge_space, rangehood…). Both vocabularies are listed here so
+// every real-world key gets a stable slot instead of falling through
+// to the unmapped catch-loop in `_grouped`.
 const GROUP_ORDER = [
     "window", "door",
-    "range", "cooktop", "oven", "microwave", "warming_drawer",
+    "range", "cooktop",
+    "wall_oven", "wall_oven_double", "steam_oven", "speed_oven",
+    "oven", "microwave", "warming_drawer",
     "sink", "dishwasher",
-    "fridge_space", "freezer", "wine_fridge", "beverage_center", "ice_maker",
-    "rangehood",
-    "coffee_built_in", "trash_compactor",
+    "fridge_space", "refrigerator", "refrigerator_drawer",
+    "freezer", "wine_fridge", "beverage_center", "ice_maker",
+    "rangehood", "range_hood",
+    "coffee_built_in", "trash_compactor", "disposal",
     "other",
 ];
 
 // Human labels for the section headers — kept in this file (not derived
 // from the constraint_type selection at runtime) so the palette is
-// self-contained.
+// self-contained. Covers both the constraint_type keys (oven,
+// fridge_space, rangehood…) and the raw kitchen_appliance_type keys
+// (wall_oven, refrigerator, range_hood…) that `_grouped` actually
+// buckets on. Any key not listed here falls back to `_humanizeKey()`
+// rather than rendering raw (e.g. "wall_oven_double").
 const GROUP_LABELS = {
     window: "Windows",
     door: "Doors",
     range: "Ranges",
     cooktop: "Cooktops",
     oven: "Wall Ovens",
+    wall_oven: "Wall Ovens",
+    wall_oven_double: "Double Wall Ovens",
+    steam_oven: "Steam Ovens",
+    speed_oven: "Speed Ovens",
     microwave: "Microwaves",
     warming_drawer: "Warming Drawers",
     sink: "Sinks",
     dishwasher: "Dishwashers",
     fridge_space: "Refrigerators",
+    refrigerator: "Refrigerators",
+    refrigerator_drawer: "Refrigerator Drawers",
     freezer: "Freezers",
     wine_fridge: "Wine Fridges",
     beverage_center: "Beverage Centers",
     ice_maker: "Ice Makers",
     rangehood: "Range Hoods",
+    range_hood: "Range Hoods",
     coffee_built_in: "Built-In Coffee",
     trash_compactor: "Trash Compactors",
+    disposal: "Disposals",
     other: "Other",
 };
 
@@ -175,6 +197,21 @@ export class AppliancePalette extends Component {
         // real time. Optional — when absent, ghost shows only the
         // template name + dimensions (Stage C behavior).
         getDropTarget: { type: Function, optional: true },
+        // Click-to-place (2026-07-03) — parent-supplied callback fired
+        // whenever an item is armed/disarmed via the per-item "Place"
+        // button or Enter/Space/Escape on the focused <li>. Mirrors
+        // onDragStateChange's { active, item, constraintType } shape
+        // so RoomLayoutTab can reuse one mental model for "something
+        // is about to be placed" regardless of which path triggered it.
+        onArmChange: { type: Function, optional: true },
+        // Click-to-place — the currently-armed item key (id or
+        // syntheticKey), owned by the PARENT (RoomLayoutTab). The
+        // palette derives its highlight from this prop rather than a
+        // local state so a parent-side disarm (Escape at the document
+        // level, or after a canvas / wall-row placement) reliably
+        // clears the highlight — otherwise the placed item would stay
+        // visually armed until its next click.
+        armedKey: { type: [Number, String, Boolean], optional: true },
     };
 
     setup() {
@@ -253,18 +290,21 @@ export class AppliancePalette extends Component {
             if (groups[k] && groups[k].length) {
                 ordered.push({
                     key: k,
-                    label: GROUP_LABELS[k] || k,
+                    label: GROUP_LABELS[k] || this._humanizeKey(k),
                     items: groups[k],
                     collapsed: !!this.state.collapsedGroups[k],
                 });
             }
         }
-        // Catch any unmapped group keys.
+        // Catch any unmapped group keys. GROUP_LABELS/GROUP_ORDER above
+        // should cover every real kitchen_appliance_type, but this stays
+        // as a safety net for future catalog values — humanized, never
+        // raw, so a new type never shows a bare snake_case key.
         for (const k of Object.keys(groups)) {
             if (!GROUP_ORDER.includes(k)) {
                 ordered.push({
                     key: k,
-                    label: GROUP_LABELS[k] || k,
+                    label: GROUP_LABELS[k] || this._humanizeKey(k),
                     items: groups[k],
                     collapsed: !!this.state.collapsedGroups[k],
                 });
@@ -273,9 +313,29 @@ export class AppliancePalette extends Component {
         return ordered;
     }
 
+    // Fallback label formatter for any group key not covered by
+    // GROUP_LABELS — "refrigerator_drawer" → "Refrigerator Drawer".
+    // Never returns the raw snake_case key.
+    _humanizeKey(k) {
+        return (k || "")
+            .split("_")
+            .filter((word) => word)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+    }
+
     _toggleGroup(groupKey) {
         this.state.collapsedGroups[groupKey] =
             !this.state.collapsedGroups[groupKey];
+    }
+
+    // Click-to-place — is this specific item the currently armed one?
+    // Returns the modifier class (or "") so the template can compose
+    // it additively alongside the static "sb-palette-item" class.
+    _itemArmedClass(item) {
+        const key = item.id || item.syntheticKey;
+        return (this.props.armedKey && this.props.armedKey === key)
+            ? "sb-palette-item--armed" : "";
     }
 
     _itemDisplaySize(item) {
@@ -320,6 +380,59 @@ export class AppliancePalette extends Component {
         };
         if (this.props.onDragStateChange) {
             this.props.onDragStateChange({ active: true, item, constraintType });
+        }
+    }
+
+    // Click-to-place (2026-07-03) — "arm then click a wall" path,
+    // additive alongside pointer-drag. Toggles the armed state for
+    // this item: arming a second item implicitly disarms whatever was
+    // armed before (only one at a time makes sense — the designer is
+    // placing one thing). Called from the per-item "Place" button
+    // (t-on-click, already stops its own pointerdown from bubbling)
+    // and from _onItemKeydown (Enter/Space). ev is optional — Escape
+    // disarming goes through _disarmItem() instead, which has no event.
+    _onArmItem(item, ev) {
+        if (ev) ev.stopPropagation();
+        const key = item.id || item.syntheticKey;
+        // Toggle against the parent-owned armedKey — arming the already-
+        // armed item disarms it; arming a different item re-arms. The
+        // parent flips its state in onArmChange and the new armedKey
+        // flows back down as a prop.
+        const nextActive = this.props.armedKey !== key;
+        if (this.props.onArmChange) {
+            const constraintType = nextActive
+                ? (TEMPLATE_TYPE_TO_CONSTRAINT[item.kitchen_appliance_type] || "other")
+                : null;
+            this.props.onArmChange({
+                active: nextActive,
+                item: nextActive ? item : null,
+                constraintType,
+            });
+        }
+    }
+
+    // Escape (from _onItemKeydown) or an external disarm request —
+    // clears the armed state without toggling (Escape always cancels,
+    // it never re-arms).
+    _disarmItem() {
+        if (!this.props.armedKey) return;
+        if (this.props.onArmChange) {
+            this.props.onArmChange({ active: false, item: null, constraintType: null });
+        }
+    }
+
+    // Keyboard path for the focusable <li> (tabindex="0"): Enter/Space
+    // arms (mirrors clicking "Place"); Escape disarms. Any other key
+    // is left alone (no interference with normal tab/arrow navigation).
+    _onItemKeydown(item, ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this._onArmItem(item, ev);
+        } else if (ev.key === "Escape") {
+            if (this.props.armedKey) {
+                ev.preventDefault();
+                this._disarmItem();
+            }
         }
     }
 
