@@ -151,6 +151,22 @@ class TestQrPartModel(TransactionCase):
         for bad in ("not-a-qr-payload", "", None, 12345, "sb-package:abc"):
             self.assertIsNone(self.QrPart.resolve_package_id(bad))
 
+    def test_resolve_out_of_range_id_rejected(self):
+        # HIGH-1 regression: a package id beyond PostgreSQL int4 range
+        # (or non-positive) must resolve to None — NOT reach the ORM,
+        # where `WHERE id IN (<huge>)` would raise "integer out of range"
+        # (unhandled 500). The id is attacker-controlled via the QR string.
+        for bad in (
+            "sb-package:99999999999999999999",   # >> int4 max
+            "sb-package:2147483648",              # int4 max + 1
+            "sb-package:0",
+            "sb-package:-5",
+        ):
+            self.assertIsNone(
+                self.QrPart.resolve_package_id(bad),
+                "out-of-range/non-positive id must not resolve: %r" % bad,
+            )
+
     # ------------------------------------------------------------------
     # serialize
     # ------------------------------------------------------------------
@@ -302,18 +318,28 @@ class TestScanPartController(TransactionCase):
     # ------------------------------------------------------------------
     # (c) ownership: package belonging to a DIFFERENT customer's order
     # ------------------------------------------------------------------
-    def test_ownership_forbidden_for_other_customers_package(self):
+    def test_ownership_rejected_for_other_customers_package(self):
         """Portal user owns order A and is scanning WITHIN order A's
         route, but the scanned QR resolves to a package that belongs
-        to order B (partner B, a different customer). Must be
-        forbidden — owning order A does not grant access to order B's
-        data just because the id was guessed/scanned."""
+        to order B (partner B, a different customer). Must be rejected
+        with NO part data — owning order A does not grant access to
+        order B's data just because the id was guessed/scanned.
+
+        MEDIUM-1: the rejection is `not_found` (NOT `forbidden`) — the
+        scanned-package id is attacker-controlled, so returning
+        `forbidden` for "exists but not yours" vs `not_found` for
+        "doesn't exist" would be an existence oracle for enumerating
+        valid package ids. Both collapse to not_found; no data leaks."""
         with stubbed_request(self.env, user=self.portal_user_a):
             result = self.controller.southbrook_api_scan_part(
                 self.order_a.id,
                 payload="sb-package:%s" % self.package_b.id,
             )
-        self.assertEqual(result.get("error"), "forbidden")
+        self.assertEqual(result.get("error"), "not_found")
+        # regardless of the code, NO cross-customer data is ever returned
+        self.assertNotIn("part", result)
+        self.assertNotIn("quote_number", result)
+        self.assertIsNot(result.get("ok"), True)
 
     def test_ownership_rejection_for_non_owning_portal_user_own_route(self):
         """A portal user who doesn't own order_a at all is rejected at

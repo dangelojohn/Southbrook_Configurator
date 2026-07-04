@@ -373,12 +373,17 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
         if not pkg_order:
             return {"error": "not_found"}
 
+        # SECURITY — collapse "not yours" into "not_found" here (unlike
+        # the route order_id check above, which returns forbidden). The
+        # scanned package id is attacker-controlled, so distinguishing a
+        # package that exists-but-isn't-yours (forbidden) from one that
+        # doesn't exist (not_found) would be an existence oracle letting
+        # an authed user enumerate valid package ids / production volume.
+        # Both cases return not_found — no part data is ever served.
         try:
             self._southbrook_resolve_order(pkg_order.id)
-        except MissingError:
+        except (MissingError, AccessError):
             return {"error": "not_found"}
-        except AccessError:
-            return {"error": "forbidden"}
 
         resolved = QrPart.serialize(package, order_id)
         return {

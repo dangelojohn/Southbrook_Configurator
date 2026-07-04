@@ -272,6 +272,11 @@ export class QrScanDialog extends Component {
             video.srcObject = null;
         }
         this._barcodeDetector = null;
+        // Privacy hygiene: drop the throwaway decode canvas (holds the
+        // last frame's ImageData) so it's GC'd promptly rather than
+        // lingering referenced after teardown. Frames never leave the
+        // browser regardless, but don't keep one around longer than needed.
+        this._canvas = null;
     }
 
     // Fallback UI (no camera / permission denied). `capture="environment"`

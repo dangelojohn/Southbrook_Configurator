@@ -39,6 +39,24 @@ from odoo import api, models
 
 _logger = logging.getLogger(__name__)
 
+# sb.production.package.id is a PostgreSQL int4 column. A scanned id
+# beyond int4 range makes `WHERE id IN (<huge>)` raise "integer out of
+# range" (an unhandled 500), and a non-positive id can never match a
+# real record — so both are treated as an unresolved lookup (None),
+# never reaching the ORM. The id is attacker-controlled (any decoded
+# `sb-package:<...>` string), so this guard is a hard requirement.
+_PG_INT4_MAX = 2147483647
+
+
+def _bounded_pkg_id(value):
+    """int()-coerce `value` and return it only if it is a valid, in-range
+    positive int4; otherwise None. Never raises."""
+    try:
+        pid = int(value)
+    except (TypeError, ValueError):
+        return None
+    return pid if 0 < pid <= _PG_INT4_MAX else None
+
 
 class SouthbrookQrPart(models.AbstractModel):
     _name = "southbrook.qr.part"
@@ -63,10 +81,7 @@ class SouthbrookQrPart(models.AbstractModel):
             return None
 
         if payload.startswith("sb-package:"):
-            try:
-                return int(payload.split(":", 1)[1])
-            except (TypeError, ValueError):
-                return None
+            return _bounded_pkg_id(payload.split(":", 1)[1])
 
         if payload.startswith("sb://"):
             Payload = self.env.get("southbrook.qr.payload")
@@ -77,10 +92,7 @@ class SouthbrookQrPart(models.AbstractModel):
             except Exception:  # noqa: BLE001 — malformed payload, never raise
                 return None
             if parsed.get("kind") == "pkg" and parsed.get("valid_signature"):
-                try:
-                    return int(parsed["ident"])
-                except (TypeError, ValueError):
-                    return None
+                return _bounded_pkg_id(parsed.get("ident"))
             return None
 
         return None
