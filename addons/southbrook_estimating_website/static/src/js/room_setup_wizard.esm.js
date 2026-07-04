@@ -72,12 +72,19 @@ import {
 // Negatives clamp to 0 (never enter a total); the server re-validates.
 // ----------------------------------------------------------------------
 function mmToImperial(mm) {
-    const inches = Math.round((Number(mm) || 0) / 25.4);
-    const feet = Math.floor(inches / 12);
-    const rem = inches - feet * 12;
-    if (feet === 0) return `${rem}"`;
+    // Keep ~0.1" precision so an imperial *edit* round-trip (display →
+    // parse → store) doesn't drift the stored mm. Whole-inch rounding lost
+    // up to ~12mm per field, so 2400mm displayed as 7'10" re-saved as
+    // 2388mm. 0.1" ≈ 2.5mm — within cabinetry tolerance and matches the
+    // pre-existing decimal-inch precision this replaced.
+    const totalIn = Math.round(((Number(mm) || 0) / 25.4) * 10) / 10;
+    let feet = Math.floor(totalIn / 12);
+    let rem = Math.round((totalIn - feet * 12) * 10) / 10;
+    if (rem >= 12) { feet += 1; rem -= 12; }   // guard the rounding carry
+    const remStr = Number.isInteger(rem) ? String(rem) : rem.toFixed(1);
+    if (feet === 0) return `${remStr}"`;
     if (rem === 0) return `${feet}'`;
-    return `${feet}' ${rem}"`;
+    return `${feet}' ${remStr}"`;
 }
 
 function parseImperialToMm(raw) {
@@ -121,6 +128,14 @@ function parseDisplayToMm(raw, unit) {
     const n = parseFloat(raw);
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.round(n));
+}
+
+// Single constraint-type → human label lookup, shared by all three
+// components (SVG preview, constraint list, inline validation) so the
+// fallback behaviour stays consistent in one place.
+function constraintLabelFor(code) {
+    const found = CONSTRAINT_TYPES.find((c) => c.code === code);
+    return found ? found.label : (code || "");
 }
 
 // ----------------------------------------------------------------------
@@ -360,8 +375,7 @@ class RoomOutlinePreview extends Component {
     }
 
     _constraintLabel(code) {
-        const found = CONSTRAINT_TYPES.find((c) => c.code === code);
-        return found ? found.label : (code || "");
+        return constraintLabelFor(code);
     }
 
     get _fallbackBox() {
@@ -506,8 +520,7 @@ class ConstraintsStep extends Component {
     }
 
     _humanType(code) {
-        const found = CONSTRAINT_TYPES.find((c) => c.code === code);
-        return found ? found.label : code;
+        return constraintLabelFor(code);
     }
 
     _onPickType(code) {
@@ -638,6 +651,12 @@ export class RoomSetupWizard extends Component {
                         0, Number(c.distance_from_left_mm) || 0),
                     width_mm: Math.max(0, Number(c.width_mm) || 0),
                     height_mm: c.height_mm || 0,
+                    // Carry the fields the wizard UI doesn't expose so the
+                    // server's unlink-and-recreate reconcile doesn't wipe
+                    // them on an unrelated edit (e.g. window sill height +
+                    // notes set via the backend / constraint-add endpoint).
+                    height_from_floor_mm: c.height_from_floor_mm || 0,
+                    notes: c.notes || "",
                 });
             });
         });
@@ -813,8 +832,7 @@ export class RoomSetupWizard extends Component {
     }
 
     _humanShapeType(code) {
-        const found = CONSTRAINT_TYPES.find((c) => c.code === code);
-        return found ? found.label : code;
+        return constraintLabelFor(code);
     }
 
     _dispMm(mm) {
@@ -947,6 +965,12 @@ export class RoomSetupWizard extends Component {
                 unit_preference: this.state.room.unit_preference,
                 walls: walls,
                 constraints: this.state.constraints,
+                // Authorise the server to DELETE walls removed during an
+                // edit (shape shrink). Only the wizard sends the full wall
+                // set, so only the wizard opts into deletion — partial
+                // callers (single-wall resize) omit this and keep their
+                // other walls. Ignored by /create.
+                reconcile: true,
             };
             // Edit mode → UPDATE the existing room (reconcile walls +
             // replace constraints) so we never duplicate or blank it out.

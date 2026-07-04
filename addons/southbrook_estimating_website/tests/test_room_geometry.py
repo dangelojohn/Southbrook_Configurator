@@ -221,6 +221,7 @@ class TestRoomGeometry(TransactionCase):
                 walls=[{"id": wall_ids[0], "name": "A", "length_mm": 3000},
                        {"id": wall_ids[1], "name": "B", "length_mm": 2000}],
                 constraints=[],
+                reconcile=True,
             )
         self.assertTrue(updated.get("ok"), updated)
         self.assertEqual(len(updated["room"]["walls"]), 2)
@@ -231,6 +232,110 @@ class TestRoomGeometry(TransactionCase):
         line.invalidate_recordset()
         self.assertTrue(line.exists())
         self.assertFalse(line.wall_id)
+
+    # ------------------------------------------------------------------
+    # Regressions from the 2026-07-04 code review
+    # ------------------------------------------------------------------
+    def test_partial_wall_update_without_reconcile_keeps_other_walls(self):
+        """Single-wall resize (no reconcile flag) must NOT delete the rest.
+
+        Review finding: the Room Layout tab's _onPlanWallResizeEnd POSTs a
+        one-wall list; the full-reconcile delete would wipe the other walls.
+        """
+        with stubbed_request(self.env):
+            created = self.controller.southbrook_api_room_create(
+                self.order.id, name="Multi", layout_shape="u_shape",
+                walls=[{"name": "A", "length_mm": 3000},
+                       {"name": "B", "length_mm": 2000},
+                       {"name": "C", "length_mm": 3000}])
+        room = created["room"]
+        wids = [w["id"] for w in room["walls"]]
+        with stubbed_request(self.env):
+            res = self.controller.southbrook_api_room_update(
+                self.order.id, room["id"],
+                walls=[{"id": wids[0], "length_mm": 3400}])
+        self.assertTrue(res.get("ok"), res)
+        self.assertEqual(len(res["room"]["walls"]), 3)
+        self.assertTrue(all(
+            self.env["southbrook.room.wall"].browse(w).exists() for w in wids))
+        wall_a = next(w for w in res["room"]["walls"] if w["id"] == wids[0])
+        self.assertEqual(wall_a["length_mm"], 3400)
+
+    def test_edit_preserves_height_from_floor_and_notes(self):
+        """Editing a room must not wipe constraint sill height / notes."""
+        with stubbed_request(self.env):
+            created = self.controller.southbrook_api_room_create(
+                self.order.id, name="Sill", layout_shape="straight",
+                walls=[{"name": "A", "length_mm": 3600}])
+        room = created["room"]
+        wid = room["walls"][0]["id"]
+        self.env["southbrook.room.constraint"].create({
+            "wall_id": wid, "constraint_type": "window",
+            "distance_from_left_mm": 300, "width_mm": 1200,
+            "height_from_floor_mm": 900, "notes": "Fixed glazing"})
+        with stubbed_request(self.env):
+            res = self.controller.southbrook_api_room_update(
+                self.order.id, room["id"], name="Sill Renamed",
+                walls=[{"id": wid, "name": "A", "length_mm": 3600}],
+                constraints=[{"wall_index": 0, "constraint_type": "window",
+                              "distance_from_left_mm": 300, "width_mm": 1200,
+                              "height_from_floor_mm": 900,
+                              "notes": "Fixed glazing"}],
+                reconcile=True)
+        self.assertTrue(res.get("ok"), res)
+        c = res["room"]["walls"][0]["constraints"][0]
+        self.assertEqual(c["height_from_floor_mm"], 900)
+        self.assertEqual(c["notes"], "Fixed glazing")
+
+    def test_malformed_constraint_payload_does_not_wipe_existing(self):
+        """A bad constraints payload is rejected BEFORE the unlink."""
+        with stubbed_request(self.env):
+            created = self.controller.southbrook_api_room_create(
+                self.order.id, name="Atomic", layout_shape="straight",
+                walls=[{"name": "A", "length_mm": 3600}],
+                constraints=[{"wall_index": 0, "constraint_type": "window",
+                              "distance_from_left_mm": 300, "width_mm": 1200}])
+        room = created["room"]
+        wid = room["walls"][0]["id"]
+        with stubbed_request(self.env):
+            res = self.controller.southbrook_api_room_update(
+                self.order.id, room["id"],
+                walls=[{"id": wid, "name": "A", "length_mm": 3600}],
+                constraints=[
+                    {"wall_index": 0, "constraint_type": "sink",
+                     "distance_from_left_mm": 1800, "width_mm": 900},
+                    {"wall_index": 0, "distance_from_left_mm": 100,
+                     "width_mm": 200}],
+                reconcile=True)
+        self.assertEqual(res.get("error"), "invalid", res)
+        design = self.env["southbrook.room"].browse(room["id"])
+        design.invalidate_recordset()
+        self.assertEqual(len(design.constraint_ids), 1)
+        self.assertEqual(design.constraint_ids.constraint_type, "window")
+
+    def test_validate_non_numeric_constraint_width(self):
+        errors = self.Room.validate_geometry(
+            [{"length_mm": 3000}],
+            [{"wall_index": 0, "constraint_type": "sink",
+              "distance_from_left_mm": 100, "width_mm": "abc"}])
+        self.assertTrue(any("must be a number" in e for e in errors), errors)
+
+    def test_shrink_wall_without_resending_constraints_flags_oob(self):
+        """Resizing a wall shorter than an existing constraint is rejected
+        even when the caller doesn't resend the constraint."""
+        with stubbed_request(self.env):
+            created = self.controller.southbrook_api_room_create(
+                self.order.id, name="Shrink2", layout_shape="straight",
+                walls=[{"name": "A", "length_mm": 3000}],
+                constraints=[{"wall_index": 0, "constraint_type": "sink",
+                              "distance_from_left_mm": 2000, "width_mm": 900}])
+        room = created["room"]
+        wid = room["walls"][0]["id"]
+        with stubbed_request(self.env):
+            res = self.controller.southbrook_api_room_update(
+                self.order.id, room["id"],
+                walls=[{"id": wid, "length_mm": 2500}])
+        self.assertEqual(res.get("error"), "invalid_geometry", res)
 
     def test_edit_rejects_bad_geometry(self):
         with stubbed_request(self.env):

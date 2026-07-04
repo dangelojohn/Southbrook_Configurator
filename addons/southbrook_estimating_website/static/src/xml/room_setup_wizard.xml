@@ -478,10 +478,14 @@
 
                 <!-- Supported shape: per-wall lines + labels + constraint
                      markers. Renders the schematic from Step 1 (nominal
-                     lengths) so the shape reads before dimensions exist. -->
-                <g t-if="_supportsShape &amp;&amp; _layout">
+                     lengths) so the shape reads before dimensions exist.
+                     _layout is an un-memoized getter that does a full
+                     bbox-fit + projection — bind it ONCE via t-set so the
+                     t-if + two t-foreach don't recompute it three times. -->
+                <t t-set="lay" t-value="_layout"/>
+                <g t-if="_supportsShape &amp;&amp; lay">
                     <!-- Constraint markers first (under the wall lines). -->
-                    <g t-foreach="_layout.constraints" t-as="c" t-key="c_index">
+                    <g t-foreach="lay.constraints" t-as="c" t-key="c_index">
                         <polygon t-att-points="c.points"
                                  class="sb-room-wizard-svg-constraint"
                                  t-att-class="{ 'sb-room-wizard-svg-constraint--oob': c.oob }"/>
@@ -491,7 +495,7 @@
                               t-esc="c.label"/>
                     </g>
                     <!-- Wall lines + A/B/C + dimension labels. -->
-                    <g t-foreach="_layout.segments" t-as="s" t-key="s_index">
+                    <g t-foreach="lay.segments" t-as="s" t-key="s_index">
                         <line t-att-x1="s.x0" t-att-y1="s.y0"
                               t-att-x2="s.x1" t-att-y2="s.y1"
                               class="sb-room-wizard-svg-wall"/>

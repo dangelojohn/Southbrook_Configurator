@@ -394,19 +394,28 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
         # walls / constraints are guarded on `is not None` (NOT truthiness)
         # so the scalar-only callers (e.g. the summary unit toggle, which
         # POSTs {unit_preference} alone) never accidentally wipe the room's
-        # walls — while the wizard's edit-mode submit, which always sends
-        # both lists (possibly empty), does a full reconcile.
+        # walls.
         reconcile_walls = walls is not None
         replace_constraints = constraints is not None
+        # `reconcile` (sent ONLY by the wizard's full edit-save) authorises
+        # DELETING walls that are absent from the payload. Partial callers —
+        # e.g. the Room Layout tab's single-wall resize, which POSTs just
+        # {walls: [{id, length_mm}]} — must NOT trigger deletion or they
+        # wipe every OTHER wall of a multi-wall room (cascade its
+        # constraints + unplace its cabinets). Default False = upsert-only,
+        # preserving the pre-2026-07-03 endpoint contract for those callers.
+        delete_removed = bool(kw.get("reconcile")) and reconcile_walls
         walls_payload = walls or []
         constraints_payload = constraints or []
 
         if not scalar_updates and not reconcile_walls and not replace_constraints:
             return {"error": "invalid", "detail": "no fields to update"}
 
-        # Bounds-check constraint wall_index against the incoming walls
-        # array (edit mode replaces walls + constraints together, so
-        # wall_index references the payload order, same as /create).
+        # --- validate EVERYTHING before any write (atomicity) -------------
+        # wall_index maps onto the wall set the constraints will land on:
+        # the incoming walls list when walls are (re)sent, else the room's
+        # current walls in display order.
+        wall_index_bound = len(walls_payload) if reconcile_walls else len(room.wall_ids)
         if replace_constraints:
             for idx, c in enumerate(constraints_payload):
                 wi = c.get("wall_index")
@@ -415,24 +424,47 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                         "error": "invalid",
                         "detail": f"constraints[{idx}].wall_index missing or non-int",
                     }
-                if wi < 0 or wi >= len(walls_payload):
+                if wi < 0 or wi >= wall_index_bound:
                     return {
                         "error": "invalid",
                         "detail": f"constraints[{idx}].wall_index {wi} out of bounds",
                     }
+                if "constraint_type" not in c:
+                    return {
+                        "error": "invalid",
+                        "detail": f"constraints[{idx}] missing constraint_type",
+                    }
 
-        # Geometry validation — source of truth. Only validate the pieces
-        # actually being written so a scalar-only unit toggle isn't
-        # blocked by pre-existing (grandfathered) bad data.
+        # Geometry validation — source of truth. Validate the EFFECTIVE
+        # final geometry: the walls being written, checked against whichever
+        # constraints will survive (resent ones, or the existing ones that
+        # sit on a wall being resized) so a shrink can't strand a fixture
+        # off the wall edge even when the caller doesn't resend constraints.
         if reconcile_walls or replace_constraints or "ceiling_height_mm" in scalar_updates:
-            geom_errors = request.env["southbrook.room"].validate_geometry(
-                walls_payload if reconcile_walls else [
+            if reconcile_walls:
+                val_walls = walls_payload
+                if replace_constraints:
+                    val_constraints = constraints_payload
+                else:
+                    id_to_idx = {
+                        w.get("id"): i for i, w in enumerate(walls_payload)
+                        if w.get("id")
+                    }
+                    val_constraints = [
+                        {"wall_index": id_to_idx[c.wall_id.id],
+                         "distance_from_left_mm": c.distance_from_left_mm,
+                         "width_mm": c.width_mm}
+                        for c in room.constraint_ids
+                        if c.wall_id.id in id_to_idx
+                    ]
+            else:
+                val_walls = [
                     {"length_mm": w.length_mm} for w in room.wall_ids.sorted(
                         key=lambda x: (x.wall_order, x.id))
-                ],
-                constraints_payload if replace_constraints else [],
-                scalar_updates.get("ceiling_height_mm"),
-            )
+                ]
+                val_constraints = constraints_payload if replace_constraints else []
+            geom_errors = request.env["southbrook.room"].validate_geometry(
+                val_walls, val_constraints, scalar_updates.get("ceiling_height_mm"))
             if geom_errors:
                 return {
                     "error": "invalid_geometry",
@@ -446,11 +478,9 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
 
             ordered_walls = []
             if reconcile_walls:
-                # Full reconcile: update id-bearing walls in place, create
-                # id-less ones, delete walls no longer present. wall_id
-                # on sale.order.line is ondelete="set null", so deleting a
-                # wall cleanly UNPLACES any cabinets sitting on it rather
-                # than failing on the FK — the customer just re-assigns.
+                # Update id-bearing walls in place, create id-less ones.
+                # wall_id on sale.order.line is ondelete="set null", so
+                # deleting a wall cleanly UNPLACES any cabinets on it.
                 seen_ids = set()
                 for item in walls_payload:
                     wid = item.get("id")
@@ -470,38 +500,30 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                             wall_vals)
                         seen_ids.add(wall.id)
                         ordered_walls.append(wall)
-                # Delete removed walls (their constraints cascade; their
-                # cabinet lines set_null → unplaced).
-                removed = room.wall_ids.filtered(lambda w: w.id not in seen_ids)
-                if removed:
-                    removed.sudo().unlink()
+                # Delete removed walls ONLY when the caller is the wizard's
+                # full edit-save (delete_removed). Partial resize callers
+                # keep the untouched walls.
+                if delete_removed:
+                    removed = room.wall_ids.filtered(
+                        lambda w: w.id not in seen_ids)
+                    if removed:
+                        removed.sudo().unlink()
 
             if replace_constraints:
-                # Full-replace: constraints have no downstream FK
-                # dependents (only wall_id), so wiping + recreating is
-                # simpler and more correct than diffing. Map wall_index
-                # against the reconciled wall order.
-                room.constraint_ids.sudo().unlink()
+                # Full-replace: constraints have no downstream FK dependents
+                # (only wall_id). Build the replacement set FIRST (all
+                # payloads already validated above), THEN unlink + recreate,
+                # so a bad payload can never leave the room constraint-less.
                 if not ordered_walls:
                     ordered_walls = list(
                         room.wall_ids.sorted(key=lambda w: (w.wall_order, w.id)))
                 cons_cmds = []
                 for c in constraints_payload:
-                    if "constraint_type" not in c:
-                        return {
-                            "error": "invalid",
-                            "detail": "constraint missing constraint_type",
-                        }
-                    wi = c["wall_index"]
-                    if wi >= len(ordered_walls):
-                        return {
-                            "error": "invalid",
-                            "detail": f"constraint wall_index {wi} out of bounds",
-                        }
                     vals = {k: c[k] for k in _CONSTRAINT_SCALAR_FIELDS if k in c}
                     vals["constraint_type"] = c["constraint_type"]
-                    vals["wall_id"] = ordered_walls[wi].id
+                    vals["wall_id"] = ordered_walls[c["wall_index"]].id
                     cons_cmds.append(vals)
+                room.constraint_ids.sudo().unlink()
                 if cons_cmds:
                     request.env["southbrook.room.constraint"].sudo().create(
                         cons_cmds)

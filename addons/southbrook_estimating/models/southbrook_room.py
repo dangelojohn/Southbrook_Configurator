@@ -168,6 +168,19 @@ class SouthbrookRoom(models.Model):
         except (TypeError, ValueError):
             return default
 
+    @staticmethod
+    def _parse_dim(value):
+        """Parse a dimension to int mm. Empty/None → 0 (an omitted field);
+        a non-numeric value → None so the caller flags it as an error
+        rather than silently coercing to 0 (the server is the source of
+        truth — a bypassed client must not persist a zero-size fixture)."""
+        if value in (None, ""):
+            return 0
+        try:
+            return int(round(float(value)))
+        except (TypeError, ValueError):
+            return None
+
     @classmethod
     def validate_geometry(cls, walls_payload, constraints_payload=None,
                           ceiling_height_mm=None):
@@ -198,13 +211,22 @@ class SouthbrookRoom(models.Model):
 
         for cidx, c in enumerate(constraints_payload):
             wi = c.get("wall_index")
-            start = cls._coerce_int(c.get("distance_from_left_mm"), default=0)
-            width = cls._coerce_int(c.get("width_mm"), default=0)
-            if start < 0:
+            start = cls._parse_dim(c.get("distance_from_left_mm"))
+            width = cls._parse_dim(c.get("width_mm"))
+            if start is None:
+                errors.append(
+                    f"Constraint {cidx + 1}: distance from left must be a "
+                    f"number.")
+                start = 0
+            elif start < 0:
                 errors.append(
                     f"Constraint {cidx + 1}: distance from left cannot be "
                     f"negative.")
-            if width < 0:
+            if width is None:
+                errors.append(
+                    f"Constraint {cidx + 1}: width must be a number.")
+                width = 0
+            elif width < 0:
                 errors.append(
                     f"Constraint {cidx + 1}: width cannot be negative.")
             if isinstance(wi, int) and 0 <= wi < len(wall_lengths):
