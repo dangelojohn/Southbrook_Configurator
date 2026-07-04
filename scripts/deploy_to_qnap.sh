@@ -52,6 +52,18 @@ LOCK_PATH="${LOCK_PATH:-/tmp/southbrook-odoo-upgrade.lock}"
 LOCK_WAIT_SEC="${LOCK_WAIT_SEC:-600}"
 
 MODULES_ARG="${1:-southbrook_estimating,southbrook_configurator_ux}"
+# First-time installs: `odoo -u` only UPGRADES already-installed modules and
+# silently skips ones not yet in ir_module_module, so a brand-new addon never
+# lands. List new (never-installed) modules in INSTALL_MODULES (comma-sep) to
+# have them `-i`'d in the SAME flock'd cold-load as the `-u` set, and rsynced
+# alongside. Defaults empty → zero change for normal upgrade deploys.
+#   INSTALL_MODULES=southbrook_room_capture RESTART=1 \
+#     ./scripts/deploy_to_qnap.sh southbrook_estimating_website
+INSTALL_MODULES="${INSTALL_MODULES:-}"
+# Union of upgrade + install modules — drives the rsync loop and the
+# post-flight inventory query so new modules are shipped and reported too.
+ALL_MODULES_CSV="$MODULES_ARG"
+[[ -n "$INSTALL_MODULES" ]] && ALL_MODULES_CSV="$MODULES_ARG,$INSTALL_MODULES"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -118,7 +130,7 @@ log "modules: $MODULES_ARG"
 log "db: $DB"
 
 # ---- rsync each addon dir ---------------------------------------------
-IFS=',' read -ra MODULES <<< "$MODULES_ARG"
+IFS=',' read -ra MODULES <<< "$ALL_MODULES_CSV"
 for mod in "${MODULES[@]}"; do
   src="addons/$mod"
   if [[ ! -d "$src" ]]; then
@@ -141,8 +153,12 @@ done
 # We also wrap odoo -u in flock INSIDE the container so concurrent upgrade
 # attempts queue instead of racing; `-E 75` makes a lock timeout return exit
 # 75 (surfaced explicitly below) rather than silently "succeeding".
-log "upgrading $MODULES_ARG on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
-inner_cmd="flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo -u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
+log "upgrading $MODULES_ARG${INSTALL_MODULES:+ (installing: $INSTALL_MODULES)} on $CONTAINER (db=$DB, lock-wait=${LOCK_WAIT_SEC}s)"
+# `-i` any first-time modules AND `-u` the rest in one transactional cold-load,
+# so a partial failure rolls back together and the 'Modules loaded' gate below
+# covers both. `${INSTALL_MODULES:+-i $INSTALL_MODULES }` expands to nothing
+# when INSTALL_MODULES is empty (normal upgrade path, unchanged).
+inner_cmd="flock -E 75 -w $LOCK_WAIT_SEC $LOCK_PATH odoo ${INSTALL_MODULES:+-i $INSTALL_MODULES }-u $MODULES_ARG -d $DB --stop-after-init --no-http --logfile=/dev/stderr"
 upgrade_cmd="$QNAP_DOCKER exec $CONTAINER bash -c \"$inner_cmd\""
 if [[ "$DRY_RUN" == "1" ]]; then
   log "DRY: ssh $QNAP_HOST '$upgrade_cmd'"
@@ -277,7 +293,7 @@ if [[ "$DRY_RUN" != "1" ]]; then
   ssh "$QNAP_HOST" "$QNAP_DOCKER exec southbrook-postgres psql -U odoo -d $DB -t -c \"
     SELECT name, latest_version
     FROM ir_module_module
-    WHERE name = ANY (string_to_array('$MODULES_ARG', ','))
+    WHERE name = ANY (string_to_array('$ALL_MODULES_CSV', ','))
     ORDER BY name;
   \"" || log "(postgres status query failed — non-fatal)"
 fi
