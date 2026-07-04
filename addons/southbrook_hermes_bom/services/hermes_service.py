@@ -69,13 +69,22 @@ class HermesService:
                 "'southbrook_hermes_bom.api_key' before running research."
             ))
 
-    def _is_demo_mode(self):
+    @staticmethod
+    def is_demo_mode(env):
         """True when southbrook_hermes_bom.demo_mode is set to a truthy
         value. Default is False (production, fail-closed) — this param
-        must be explicitly opted into for offline/demo testing."""
-        ICP = self.env["ir.config_parameter"].sudo()
-        raw = ICP.get_param("southbrook_hermes_bom.demo_mode", "False")
+        must be explicitly opted into for offline/demo testing.
+
+        Static so the wizard's `hermes_available` compute can share ONE
+        source of truth with the service's actual gate (otherwise the UI
+        'is Hermes runnable' hint could silently diverge from what
+        research() really does)."""
+        raw = env["ir.config_parameter"].sudo().get_param(
+            "southbrook_hermes_bom.demo_mode", "False")
         return str(raw).strip().lower() in _TRUTHY_STRINGS
+
+    def _is_demo_mode(self):
+        return self.is_demo_mode(self.env)
 
     def research(self, payload):
         """Call Hermes /research and return the validated response dict.
@@ -202,8 +211,18 @@ class HermesService:
         # Read-only, deterministic ordering, hard-limited — this never
         # fabricates SKUs that won't match (an empty result is handled
         # gracefully by the wizard's BOM-apply step).
+        # active=True matches _apply_bom's own product lookup (an
+        # archived product would be proposed then silently dropped as
+        # not_found). Exclude the product being enriched, or its own
+        # variant could become a BOM line for its own BOM and Odoo's
+        # mrp.bom cycle check would raise on apply.
         components = self.env["product.product"].sudo().search(
-            [("default_code", "!=", False)], order="id", limit=3,
+            [
+                ("default_code", "!=", False),
+                ("active", "=", True),
+                ("product_tmpl_id", "!=", payload.get("product_template_id")),
+            ],
+            order="id", limit=3,
         )
         bom_lines = [
             {

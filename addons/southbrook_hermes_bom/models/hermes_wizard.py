@@ -277,9 +277,9 @@ class HermesWizard(models.TransientModel):
     def _compute_hermes_available(self):
         ICP = self.env["ir.config_parameter"].sudo()
         api_key = ICP.get_param("southbrook_hermes_bom.api_key", "")
-        demo_mode = str(ICP.get_param(
-            "southbrook_hermes_bom.demo_mode", "False"
-        )).strip().lower() in ("1", "true", "yes", "on")
+        # Share the service's single demo-mode source of truth so this
+        # UI gate can't drift from what research() actually does.
+        demo_mode = HermesService.is_demo_mode(self.env)
         available = bool(demo_mode or api_key)
         hint = "" if available else _(
             "Hermes can't run: set the 'southbrook_hermes_bom.api_key' "
@@ -511,9 +511,32 @@ class HermesWizard(models.TransientModel):
         """
         s = "" if text is None else str(text)
         s = "".join(
-            ch for ch in s if ch in ("\n", "\t") or ord(ch) >= 0x20
+            ch for ch in s
+            if ch in ("\n", "\t") or (ord(ch) >= 0x20 and ord(ch) != 0x7F)
         )
         return s[:limit]
+
+    # Hard cap on the number of items kept from any list-shaped
+    # enrichment field, so a runaway/hostile (real) Hermes response
+    # can't produce a giant JSON blob / heavy review-form HTML table.
+    _MAX_LIST_ITEMS = 50
+
+    def _clip_list(self, seq):
+        """Return a list of at most _MAX_LIST_ITEMS from `seq`; [] if it
+        isn't a list (untrusted Hermes output)."""
+        if not isinstance(seq, list):
+            return []
+        return seq[: self._MAX_LIST_ITEMS]
+
+    def _cap_bom(self, bom):
+        """Return the bom dict with its `lines` capped to _MAX_LIST_ITEMS.
+        Non-dict / missing-lines input degrades to a safe empty shape."""
+        if not isinstance(bom, dict):
+            return {}
+        capped = dict(bom)
+        if isinstance(capped.get("lines"), list):
+            capped["lines"] = capped["lines"][: self._MAX_LIST_ITEMS]
+        return capped
 
     def _populate_from_response(self, response):
         """Stash response fields onto the wizard for the review form."""
@@ -535,14 +558,14 @@ class HermesWizard(models.TransientModel):
             "proposed_manufacturer_pn": self._clip(
                 enrichment.get("manufacturer_pn") or "", 128),
             "proposed_dimensions_json": json.dumps(
-                enrichment.get("dimensions") or [], default=str),
+                self._clip_list(enrichment.get("dimensions")), default=str),
             "proposed_specs_json": json.dumps(
-                enrichment.get("specs") or [], default=str),
+                self._clip_list(enrichment.get("specs")), default=str),
             "proposed_install_notes_json": json.dumps(
-                enrichment.get("install_notes") or [], default=str),
-            "proposed_bom_json": json.dumps(bom, default=str),
+                self._clip_list(enrichment.get("install_notes")), default=str),
+            "proposed_bom_json": json.dumps(self._cap_bom(bom), default=str),
             "source_urls_json": json.dumps(
-                audit.get("source_urls") or [], default=str),
+                self._clip_list(audit.get("source_urls")), default=str),
             "confidence_score": float(
                 audit.get("overall_confidence", 0.0) or 0.0
             ),
