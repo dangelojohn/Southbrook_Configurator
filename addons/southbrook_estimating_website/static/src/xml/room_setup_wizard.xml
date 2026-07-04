@@ -33,7 +33,7 @@
                     <div class="sb-room-wizard-head-text">
                         <h2 id="sb-room-wizard-title"
                             class="sb-room-wizard-title">
-                            Set Up Your Room
+                            <t t-esc="state.isEdit ? 'Edit Room' : 'Set Up Your Room'"/>
                         </h2>
                         <ol class="sb-room-wizard-steps"
                             t-if="_isNumberStep()">
@@ -44,7 +44,11 @@
                                 t-att-class="{
                                     'sb-room-wizard-step--active': state.step === n,
                                     'sb-room-wizard-step--done': state.step &gt; n,
-                                }">
+                                    'sb-room-wizard-step--clickable': n &lt;= state.maxStepReached,
+                                }"
+                                t-att-role="n &lt;= state.maxStepReached ? 'button' : null"
+                                t-att-tabindex="n &lt;= state.maxStepReached ? '0' : null"
+                                t-on-click="() => this._goToStep(n)">
                                 <span class="sb-room-wizard-step-num"
                                       t-esc="n"/>
                                 <span class="sb-room-wizard-step-label"
@@ -82,6 +86,9 @@
                         <ConstraintsStep t-if="_isStep(3)"
                                          walls="state.walls"
                                          constraints="state.constraints"
+                                         room="state.room"
+                                         geometryErrors="_geometryErrors()"
+                                         geometryWarnings="_geometryWarnings()"
                                          onAddConstraint="_onAddConstraint"
                                          onRemoveConstraint="_onRemoveConstraint"/>
 
@@ -111,7 +118,9 @@
 
                     <aside class="sb-room-wizard-preview-pane">
                         <RoomOutlinePreview shape="state.room.layout_shape"
-                                            walls="state.walls"/>
+                                            walls="state.walls"
+                                            constraints="state.constraints"
+                                            unitPreference="state.room.unit_preference"/>
                     </aside>
                 </div>
 
@@ -119,6 +128,9 @@
                      spinner + done states so the user can't double-fire. -->
                 <footer class="sb-room-wizard-foot"
                         t-if="_isNumberStep()">
+                    <span class="sb-room-wizard-foot-hint"
+                          t-if="!_canAdvance() &amp;&amp; _advanceBlockedReason()"
+                          t-esc="_advanceBlockedReason()"/>
                     <button type="button"
                             class="sb-room-wizard-btn sb-room-wizard-btn--ghost"
                             t-on-click="_close">
@@ -138,6 +150,33 @@
                         <t t-esc="_nextLabel()"/>
                     </button>
                 </footer>
+
+                <!-- Unsaved-changes confirm (2026-07-03 QA fix). In-wizard
+                     overlay — a native confirm() would block OWL's event
+                     loop. Shown only when _close() detected dirty input. -->
+                <div t-if="state.confirmDiscard"
+                     class="sb-room-wizard-confirm-backdrop"
+                     t-on-click.stop="_cancelDiscard">
+                    <div class="sb-room-wizard-confirm-card"
+                         role="alertdialog"
+                         t-on-click.stop="">
+                        <h3>Discard changes?</h3>
+                        <p>You have unsaved edits to this room. Leaving now
+                           will lose them.</p>
+                        <div class="sb-room-wizard-confirm-actions">
+                            <button type="button"
+                                    class="sb-room-wizard-btn sb-room-wizard-btn--secondary"
+                                    t-on-click="_cancelDiscard">
+                                Keep editing
+                            </button>
+                            <button type="button"
+                                    class="sb-room-wizard-btn sb-room-wizard-btn--danger"
+                                    t-on-click="_confirmDiscard">
+                                Discard
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </t>
@@ -286,12 +325,11 @@
                                    t-on-input="(ev) => this._onNameInput(w_index, ev)"/>
                         </td>
                         <td class="sb-room-wizard-th-right">
-                            <input type="number"
-                                   min="0"
-                                   step="1"
+                            <input type="text"
+                                   inputmode="decimal"
                                    class="sb-room-wizard-input sb-room-wizard-input--num mono"
                                    t-att-value="_toDisplay(w.length_mm)"
-                                   t-on-input="(ev) => this._onLenInput(w_index, ev)"/>
+                                   t-on-change="(ev) => this._onLenInput(w_index, ev)"/>
                         </td>
                     </tr>
                 </tbody>
@@ -299,12 +337,11 @@
 
             <label class="sb-room-wizard-label sb-room-wizard-label--ceiling">
                 Ceiling Height (<t t-esc="_unitLabel()"/>)
-                <input type="number"
-                       min="0"
-                       step="1"
+                <input type="text"
+                       inputmode="decimal"
                        class="sb-room-wizard-input sb-room-wizard-input--num mono"
                        t-att-value="_toDisplay(props.room.ceiling_height_mm)"
-                       t-on-input="_onCeilingInput"/>
+                       t-on-change="_onCeilingInput"/>
             </label>
         </div>
     </t>
@@ -337,8 +374,8 @@
                         on <t t-esc="_wallLabel(c.wall_index)"/>
                     </span>
                     <span class="sb-room-wizard-constraint-pos mono">
-                        @ <t t-esc="c.distance_from_left_mm"/> mm
-                        · <t t-esc="c.width_mm"/> mm wide
+                        @ <t t-esc="_dispWithUnit(c.distance_from_left_mm)"/>
+                        · <t t-esc="_dispWithUnit(c.width_mm)"/> wide
                     </span>
                     <button type="button"
                             class="sb-room-wizard-constraint-remove"
@@ -348,6 +385,19 @@
                     </button>
                 </li>
             </ul>
+
+            <!-- Geometry feedback (2026-07-03 QA fix). Out-of-bounds
+                 constraints block Save (error); overlaps only warn. -->
+            <div t-if="props.geometryErrors &amp;&amp; props.geometryErrors.length"
+                 class="sb-room-wizard-geom-errors">
+                <p t-foreach="props.geometryErrors" t-as="e" t-key="e_index"
+                   class="sb-room-wizard-geom-error">⚠ <t t-esc="e"/></p>
+            </div>
+            <div t-if="props.geometryWarnings &amp;&amp; props.geometryWarnings.length"
+                 class="sb-room-wizard-geom-warnings">
+                <p t-foreach="props.geometryWarnings" t-as="wn" t-key="wn_index"
+                   class="sb-room-wizard-geom-warning">⚑ <t t-esc="wn"/></p>
+            </div>
 
             <div class="sb-room-wizard-constraint-form">
                 <div class="sb-room-wizard-chip-row">
@@ -379,22 +429,20 @@
                         </select>
                     </label>
                     <label class="sb-room-wizard-label">
-                        Distance from left (mm)
-                        <input type="number"
-                               min="0"
-                               step="10"
+                        Distance from left (<t t-esc="_unitLabel()"/>)
+                        <input type="text"
+                               inputmode="decimal"
                                class="sb-room-wizard-input sb-room-wizard-input--num mono"
-                               t-att-value="draft.distance_from_left_mm"
-                               t-on-input="_onDistanceInput"/>
+                               t-att-value="_disp(draft.distance_from_left_mm)"
+                               t-on-change="_onDistanceInput"/>
                     </label>
                     <label class="sb-room-wizard-label">
-                        Width (mm)
-                        <input type="number"
-                               min="0"
-                               step="10"
+                        Width (<t t-esc="_unitLabel()"/>)
+                        <input type="text"
+                               inputmode="decimal"
                                class="sb-room-wizard-input sb-room-wizard-input--num mono"
-                               t-att-value="draft.width_mm"
-                               t-on-input="_onWidthInput"/>
+                               t-att-value="_disp(draft.width_mm)"
+                               t-on-change="_onWidthInput"/>
                     </label>
                     <button type="button"
                             class="sb-room-wizard-btn sb-room-wizard-btn--secondary"
@@ -428,11 +476,31 @@
                 <rect x="0" y="0" width="720" height="540"
                       class="sb-room-wizard-svg-bg"/>
 
-                <!-- Supported shape: render a polyline. -->
-                <polyline t-if="_supportsShape &amp;&amp; _polylinePoints"
-                          t-att-points="_polylinePoints"
-                          class="sb-room-wizard-svg-poly"
-                          fill="none"/>
+                <!-- Supported shape: per-wall lines + labels + constraint
+                     markers. Renders the schematic from Step 1 (nominal
+                     lengths) so the shape reads before dimensions exist. -->
+                <g t-if="_supportsShape &amp;&amp; _layout">
+                    <!-- Constraint markers first (under the wall lines). -->
+                    <g t-foreach="_layout.constraints" t-as="c" t-key="c_index">
+                        <polygon t-att-points="c.points"
+                                 class="sb-room-wizard-svg-constraint"
+                                 t-att-class="{ 'sb-room-wizard-svg-constraint--oob': c.oob }"/>
+                        <text t-att-x="c.cx" t-att-y="c.cy"
+                              class="sb-room-wizard-svg-constraint-label"
+                              text-anchor="middle"
+                              t-esc="c.label"/>
+                    </g>
+                    <!-- Wall lines + A/B/C + dimension labels. -->
+                    <g t-foreach="_layout.segments" t-as="s" t-key="s_index">
+                        <line t-att-x1="s.x0" t-att-y1="s.y0"
+                              t-att-x2="s.x1" t-att-y2="s.y1"
+                              class="sb-room-wizard-svg-wall"/>
+                        <text t-att-x="s.lx" t-att-y="s.ly"
+                              class="sb-room-wizard-svg-wall-label"
+                              text-anchor="middle"
+                              t-esc="s.label"/>
+                    </g>
+                </g>
 
                 <!-- Fallback: labelled rectangle + note. -->
                 <g t-if="!_supportsShape">
@@ -454,10 +522,10 @@
                     </text>
                 </g>
 
-                <!-- Linear total caption (always visible). -->
+                <!-- Linear total caption (unit-aware). -->
                 <text x="40" y="510"
                       class="sb-room-wizard-svg-caption">
-                    Total linear: <t t-esc="_totalLinear"/> mm
+                    Total linear: <t t-esc="_totalLinearLabel"/>
                 </text>
             </svg>
         </div>

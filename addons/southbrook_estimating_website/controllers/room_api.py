@@ -112,6 +112,8 @@ def _serialize_room(room):
             "used_mm": w.used_mm,
             "remaining_mm": w.remaining_mm,
             "has_conflicts": w.has_conflicts,
+            "has_constraint_out_of_bounds": w.has_constraint_out_of_bounds,
+            "has_constraint_overlap": w.has_constraint_overlap,
             "constraints": constraints,
         })
     return {
@@ -269,6 +271,17 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                     "detail": f"constraints[{idx}].wall_index {wi} out of bounds",
                 }
 
+        # Geometry validation — source of truth (2026-07-03 QA fix).
+        # Negative lengths / off-the-wall constraints never persist.
+        geom_errors = request.env["southbrook.room"].validate_geometry(
+            walls_payload, constraints_payload, ceiling_height_mm)
+        if geom_errors:
+            return {
+                "error": "invalid_geometry",
+                "detail": geom_errors[0],
+                "errors": geom_errors,
+            }
+
         try:
             # Step 1: create the room + walls in one shot via O2m
             # commands. Walls keep their array order so wall_index
@@ -341,6 +354,7 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
         order_id,
         room_id,
         walls=None,
+        constraints=None,
         **kw,
     ):
         try:
@@ -377,32 +391,120 @@ class SouthbrookRoomApi(SouthbrookKitchenPlanner):
                     "detail": "ceiling_height_mm not int",
                 }
 
+        # walls / constraints are guarded on `is not None` (NOT truthiness)
+        # so the scalar-only callers (e.g. the summary unit toggle, which
+        # POSTs {unit_preference} alone) never accidentally wipe the room's
+        # walls — while the wizard's edit-mode submit, which always sends
+        # both lists (possibly empty), does a full reconcile.
+        reconcile_walls = walls is not None
+        replace_constraints = constraints is not None
         walls_payload = walls or []
-        if not scalar_updates and not walls_payload:
+        constraints_payload = constraints or []
+
+        if not scalar_updates and not reconcile_walls and not replace_constraints:
             return {"error": "invalid", "detail": "no fields to update"}
+
+        # Bounds-check constraint wall_index against the incoming walls
+        # array (edit mode replaces walls + constraints together, so
+        # wall_index references the payload order, same as /create).
+        if replace_constraints:
+            for idx, c in enumerate(constraints_payload):
+                wi = c.get("wall_index")
+                if wi is None or not isinstance(wi, int):
+                    return {
+                        "error": "invalid",
+                        "detail": f"constraints[{idx}].wall_index missing or non-int",
+                    }
+                if wi < 0 or wi >= len(walls_payload):
+                    return {
+                        "error": "invalid",
+                        "detail": f"constraints[{idx}].wall_index {wi} out of bounds",
+                    }
+
+        # Geometry validation — source of truth. Only validate the pieces
+        # actually being written so a scalar-only unit toggle isn't
+        # blocked by pre-existing (grandfathered) bad data.
+        if reconcile_walls or replace_constraints or "ceiling_height_mm" in scalar_updates:
+            geom_errors = request.env["southbrook.room"].validate_geometry(
+                walls_payload if reconcile_walls else [
+                    {"length_mm": w.length_mm} for w in room.wall_ids.sorted(
+                        key=lambda x: (x.wall_order, x.id))
+                ],
+                constraints_payload if replace_constraints else [],
+                scalar_updates.get("ceiling_height_mm"),
+            )
+            if geom_errors:
+                return {
+                    "error": "invalid_geometry",
+                    "detail": geom_errors[0],
+                    "errors": geom_errors,
+                }
 
         try:
             if scalar_updates:
                 room.sudo().write(scalar_updates)
 
-            # Walls upsert. id-bearing items update; id-less create.
-            # Out-of-scope wall_id (belongs to a different room) →
-            # forbidden, not silent.
-            for item in walls_payload:
-                wid = item.get("id")
-                wall_vals = {
-                    k: item[k] for k in _WALL_SCALAR_FIELDS if k in item
-                }
-                if wid:
-                    # Scope-check then update.
-                    wall = self._get_wall_scoped(room, wid)
-                    if wall_vals:
-                        wall.sudo().write(wall_vals)
-                else:
-                    # Create new wall.
-                    wall_vals.setdefault("name", "Wall")
-                    wall_vals["room_id"] = room.id
-                    request.env["southbrook.room.wall"].sudo().create(wall_vals)
+            ordered_walls = []
+            if reconcile_walls:
+                # Full reconcile: update id-bearing walls in place, create
+                # id-less ones, delete walls no longer present. wall_id
+                # on sale.order.line is ondelete="set null", so deleting a
+                # wall cleanly UNPLACES any cabinets sitting on it rather
+                # than failing on the FK — the customer just re-assigns.
+                seen_ids = set()
+                for item in walls_payload:
+                    wid = item.get("id")
+                    wall_vals = {
+                        k: item[k] for k in _WALL_SCALAR_FIELDS if k in item
+                    }
+                    if wid:
+                        wall = self._get_wall_scoped(room, wid)
+                        if wall_vals:
+                            wall.sudo().write(wall_vals)
+                        seen_ids.add(wall.id)
+                        ordered_walls.append(wall)
+                    else:
+                        wall_vals.setdefault("name", "Wall")
+                        wall_vals["room_id"] = room.id
+                        wall = request.env["southbrook.room.wall"].sudo().create(
+                            wall_vals)
+                        seen_ids.add(wall.id)
+                        ordered_walls.append(wall)
+                # Delete removed walls (their constraints cascade; their
+                # cabinet lines set_null → unplaced).
+                removed = room.wall_ids.filtered(lambda w: w.id not in seen_ids)
+                if removed:
+                    removed.sudo().unlink()
+
+            if replace_constraints:
+                # Full-replace: constraints have no downstream FK
+                # dependents (only wall_id), so wiping + recreating is
+                # simpler and more correct than diffing. Map wall_index
+                # against the reconciled wall order.
+                room.constraint_ids.sudo().unlink()
+                if not ordered_walls:
+                    ordered_walls = list(
+                        room.wall_ids.sorted(key=lambda w: (w.wall_order, w.id)))
+                cons_cmds = []
+                for c in constraints_payload:
+                    if "constraint_type" not in c:
+                        return {
+                            "error": "invalid",
+                            "detail": "constraint missing constraint_type",
+                        }
+                    wi = c["wall_index"]
+                    if wi >= len(ordered_walls):
+                        return {
+                            "error": "invalid",
+                            "detail": f"constraint wall_index {wi} out of bounds",
+                        }
+                    vals = {k: c[k] for k in _CONSTRAINT_SCALAR_FIELDS if k in c}
+                    vals["constraint_type"] = c["constraint_type"]
+                    vals["wall_id"] = ordered_walls[wi].id
+                    cons_cmds.append(vals)
+                if cons_cmds:
+                    request.env["southbrook.room.constraint"].sudo().create(
+                        cons_cmds)
         except AccessError:
             return {"error": "forbidden"}
         except (ValidationError, ValueError) as e:

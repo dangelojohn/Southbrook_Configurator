@@ -150,6 +150,74 @@ class SouthbrookRoom(models.Model):
                 c.constraint_type in plumbing for c in rec.constraint_ids)
 
     # ------------------------------------------------------------------
+    # Geometry validation (2026-07-03 QA fix). Shared source-of-truth
+    # for the /room/create + /room/update controllers. The wizard runs a
+    # mirror of these rules client-side for instant feedback, but the
+    # server is authoritative: a hand-crafted curl (or a stale client)
+    # can never persist a negative length or an off-the-wall constraint.
+    #
+    # Returns a list of human-readable BLOCKING error strings (empty ==
+    # valid). Overlaps are intentionally NOT blocking — they're a real
+    # possibility (a sink beneath a window) and are surfaced as a warning
+    # via wall.has_constraint_overlap instead of rejected here.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _coerce_int(value, default=0):
+        try:
+            return int(round(float(value)))
+        except (TypeError, ValueError):
+            return default
+
+    @classmethod
+    def validate_geometry(cls, walls_payload, constraints_payload=None,
+                          ceiling_height_mm=None):
+        """Validate a wizard payload. `walls_payload` is a list of dicts
+        each with `length_mm`; `constraints_payload` a list of dicts with
+        `wall_index`, `distance_from_left_mm`, `width_mm`. Non-numeric or
+        negative dimensions are errors (never silently coerced on the
+        server — the client already clamps, so a negative reaching here
+        means a bypassed client)."""
+        errors = []
+        walls_payload = walls_payload or []
+        constraints_payload = constraints_payload or []
+
+        if ceiling_height_mm is not None:
+            ch = cls._coerce_int(ceiling_height_mm, default=-1)
+            if ch < 0:
+                errors.append("Ceiling height must be zero or positive.")
+
+        wall_lengths = []
+        for idx, w in enumerate(walls_payload):
+            raw = w.get("length_mm")
+            length = cls._coerce_int(raw, default=-1)
+            if raw not in (None, "") and length < 0:
+                errors.append(
+                    f"Wall {chr(ord('A') + idx)} length must be zero or "
+                    f"positive.")
+            wall_lengths.append(max(0, length))
+
+        for cidx, c in enumerate(constraints_payload):
+            wi = c.get("wall_index")
+            start = cls._coerce_int(c.get("distance_from_left_mm"), default=0)
+            width = cls._coerce_int(c.get("width_mm"), default=0)
+            if start < 0:
+                errors.append(
+                    f"Constraint {cidx + 1}: distance from left cannot be "
+                    f"negative.")
+            if width < 0:
+                errors.append(
+                    f"Constraint {cidx + 1}: width cannot be negative.")
+            if isinstance(wi, int) and 0 <= wi < len(wall_lengths):
+                wall_len = wall_lengths[wi]
+                if wall_len and start + max(0, width) > wall_len:
+                    errors.append(
+                        f"Constraint {cidx + 1} on Wall "
+                        f"{chr(ord('A') + wi)} extends "
+                        f"{start + max(0, width) - wall_len}mm past the wall "
+                        f"edge.")
+        return errors
+
+    # ------------------------------------------------------------------
     # Phase 5 — QWeb-friendly helpers for the Customer Spec Sheet PDF
     # (rooms page + floor-plan page). The helpers also feed any future
     # API surface that wants a snapshot of the configured room.
