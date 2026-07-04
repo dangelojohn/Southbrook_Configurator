@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SPDX-License-Identifier: LGPL-3.0-only
+
+    southbrook_room_capture — QR part-scan dialog.
+
+    A standalone Component template (NOT a t-inherit — QrScanDialog is
+    a brand-new component owned entirely by this addon, mounted via
+    the `dialog` service from qr_scan.esm.js's `openScanner`). Visual
+    chrome mirrors the existing sb-room-plan-modal-* pattern used by
+    AssignToWallModal / GapRecommendModal (southbrook_estimating_website
+    /static/src/xml/room_layout.xml) — backdrop + header w/ × close +
+    body + footer — under this addon's own sb-qr-modal-* class prefix
+    so nothing here depends on that addon's stylesheet.
+
+    Phases (state.phase, set in qr_scan.esm.js):
+      starting      — getUserMedia in flight
+      scanning      — live camera preview + decode loop
+      fallback      — no camera / permission denied: file-input capture
+      fallback_busy — decoding the chosen photo
+      looking_up    — POSTing the decoded payload to scan-part
+      result        — success card
+      error         — "couldn't read that part" card
+
+    OWL tokenizer rules followed (project convention, see
+    scripts/lint-owl-expr.py): t-if/t-esc/etc. use only ||, &amp;&amp;, !
+    (never Python or/and/not); `&amp;&amp;` used wherever a real `&&` is
+    needed; no JS regex literals in any t-* attribute.
+-->
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_room_capture.QrScanDialog">
+        <div class="sb-qr-modal-backdrop">
+            <div class="sb-qr-modal"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="sb-qr-modal-title">
+                <header class="sb-qr-modal-head">
+                    <h2 id="sb-qr-modal-title" class="sb-qr-modal-title">
+                        <t t-if="state.phase === 'result'">Part found</t>
+                        <t t-elif="state.phase === 'error'">Couldn't read that part</t>
+                        <t t-else="">Scan a cabinet label</t>
+                    </h2>
+                    <button type="button"
+                            class="sb-qr-modal-close"
+                            aria-label="Close scanner"
+                            t-on-click="_onCancelClick">×</button>
+                </header>
+
+                <div class="sb-qr-modal-body">
+
+                    <!-- Camera phases -->
+                    <t t-if="state.phase === 'starting' || state.phase === 'scanning'">
+                        <div class="sb-qr-camera-wrap">
+                            <video t-ref="sb_qr_video"
+                                   class="sb-qr-camera-video"
+                                   autoplay="autoplay"
+                                   muted="muted"
+                                   playsinline="playsinline"
+                                   webkit-playsinline="webkit-playsinline"></video>
+                            <div class="sb-qr-camera-reticle" aria-hidden="true"/>
+                        </div>
+                        <p class="sb-qr-hint">
+                            <t t-if="state.phase === 'starting'">Starting camera…</t>
+                            <t t-else=""><t t-esc="state.hint"/></t>
+                        </p>
+                        <p t-if="state.flashMessage" class="sb-qr-flash" t-esc="state.flashMessage"/>
+                    </t>
+
+                    <!-- Fallback: still-photo capture (no camera / denied) -->
+                    <t t-if="state.phase === 'fallback' || state.phase === 'fallback_busy'">
+                        <div class="sb-qr-fallback">
+                            <p class="sb-qr-hint" t-esc="state.hint"/>
+                            <label class="sb-qr-fallback-btn"
+                                   t-att-class="state.phase === 'fallback_busy' ? 'sb-qr-fallback-btn--busy' : ''">
+                                <input type="file"
+                                       accept="image/*"
+                                       capture="environment"
+                                       class="sb-qr-fallback-input"
+                                       t-att-disabled="state.phase === 'fallback_busy' ? 'disabled' : ''"
+                                       t-on-change="_onFallbackFileChange"/>
+                                <span t-if="state.phase === 'fallback_busy'">Reading photo…</span>
+                                <span t-else="">📷 Take or choose a photo</span>
+                            </label>
+                            <button type="button"
+                                    class="sb-qr-modal-btn sb-qr-modal-btn--secondary"
+                                    t-att-disabled="state.phase === 'fallback_busy' ? 'disabled' : ''"
+                                    t-on-click="_onRetryCameraClick">
+                                Try camera again
+                            </button>
+                            <p t-if="state.lookupError" class="sb-qr-modal-error" t-esc="state.lookupError"/>
+                        </div>
+                    </t>
+
+                    <!-- Looking up -->
+                    <t t-if="state.phase === 'looking_up'">
+                        <div class="sb-qr-busy">
+                            <span class="sb-qr-busy-spinner" aria-hidden="true"/>
+                            <span>Looking up that part…</span>
+                        </div>
+                    </t>
+
+                    <!-- Error -->
+                    <t t-if="state.phase === 'error'">
+                        <div class="sb-qr-result-error">
+                            <p t-esc="state.lookupError"/>
+                        </div>
+                    </t>
+
+                    <!-- Result -->
+                    <t t-if="state.phase === 'result' &amp;&amp; state.result">
+                        <t t-set="part" t-value="state.result.part || {}"/>
+                        <div class="sb-qr-result">
+                            <div class="sb-qr-result-quote">
+                                <span class="sb-qr-result-quote-label">Quote</span>
+                                <span class="sb-qr-result-quote-num mono" t-esc="state.result.quote_number || '—'"/>
+                            </div>
+
+                            <div t-if="state.result.in_current_order"
+                                 class="sb-qr-result-badge sb-qr-result-badge--here">
+                                ✓ This part is on this order
+                            </div>
+                            <div t-else="" class="sb-qr-result-badge sb-qr-result-badge--elsewhere">
+                                This part is on a different quote
+                            </div>
+
+                            <h3 class="sb-qr-result-name">
+                                <t t-esc="(part.product &amp;&amp; part.product.name) || 'Cabinet part'"/>
+                                <span t-if="part.product &amp;&amp; part.product.default_code"
+                                      class="sb-qr-result-code mono"
+                                      t-esc="part.product.default_code"/>
+                            </h3>
+                            <p t-if="part.name" class="sb-qr-result-spec" t-esc="part.name"/>
+
+                            <dl class="sb-qr-result-grid">
+                                <t t-if="part.zone_label || part.zone">
+                                    <dt>Zone</dt>
+                                    <dd t-esc="part.zone_label || part.zone"/>
+                                </t>
+                                <t t-if="part.product_uom_qty">
+                                    <dt>Qty</dt>
+                                    <dd t-esc="part.product_uom_qty"/>
+                                </t>
+                                <t t-if="part.sb_width_mm">
+                                    <dt>Width</dt>
+                                    <dd><t t-esc="_fmtMm(part.sb_width_mm)"/></dd>
+                                </t>
+                                <t t-if="part.sb_door_count">
+                                    <dt>Doors</dt>
+                                    <dd t-esc="part.sb_door_count"/>
+                                </t>
+                                <t t-if="part.sb_panel_count">
+                                    <dt>Panels</dt>
+                                    <dd t-esc="part.sb_panel_count"/>
+                                </t>
+                                <t t-if="part.wall_id &amp;&amp; part.wall_id.name">
+                                    <dt>Wall</dt>
+                                    <dd t-esc="part.wall_id.name"/>
+                                </t>
+                                <t t-if="part.price_unit">
+                                    <dt>Unit price</dt>
+                                    <dd class="mono"><t t-esc="_fmtUsd(part.price_unit)"/></dd>
+                                </t>
+                                <t t-if="part.price_subtotal">
+                                    <dt>Subtotal</dt>
+                                    <dd class="mono"><t t-esc="_fmtUsd(part.price_subtotal)"/></dd>
+                                </t>
+                            </dl>
+                        </div>
+                    </t>
+                </div>
+
+                <footer class="sb-qr-modal-foot">
+                    <t t-if="state.phase === 'result' || state.phase === 'error'">
+                        <button type="button"
+                                class="sb-qr-modal-btn sb-qr-modal-btn--secondary"
+                                t-on-click="_onScanAnotherClick">
+                            Scan another
+                        </button>
+                        <button type="button"
+                                class="sb-qr-modal-btn sb-qr-modal-btn--primary"
+                                t-on-click="_onDoneClick">
+                            Done
+                        </button>
+                    </t>
+                    <t t-else="">
+                        <button type="button"
+                                class="sb-qr-modal-btn sb-qr-modal-btn--secondary"
+                                t-on-click="_onCancelClick">
+                            Cancel
+                        </button>
+                    </t>
+                </footer>
+            </div>
+        </div>
+    </t>
+
+</templates>

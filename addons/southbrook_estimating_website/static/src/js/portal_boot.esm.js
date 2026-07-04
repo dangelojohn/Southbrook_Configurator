@@ -1235,6 +1235,15 @@ class ConfigDrawer extends Component {
 //
 // Click anywhere on the row → parent OrderBuilder's selected_line_id
 // updates and the row gets .o_owl_line_selected (yellow highlight).
+//
+// 2026-07-04 — QR PART SCAN additions (both purely additive, both
+// optional so existing callers are unaffected): the root div carries
+// a `data-sb-line-id` attribute (the scrollIntoView target
+// _sbOpenQrScan uses after a scan resolves) and, when `isScanned` is
+// true, an `sb-qr-scanned-flash` class — a class contract + keyframe
+// animation owned by southbrook_room_capture's qr_scan.scss (same
+// cross-addon styling split as this file's existing .sb-capture-*
+// button classes, owned by that addon's room_capture.scss).
 // ----------------------------------------------------------------------
 
 class OrderLine extends Component {
@@ -1244,9 +1253,11 @@ class OrderLine extends Component {
              tabindex="0"
              t-att-aria-pressed="props.isSelected ? 'true' : 'false'"
              t-att-aria-label="'Line ' + props.line.sequence + ': ' + props.line.product_name + (props.line.spec_summary ? ' — ' + props.line.spec_summary : '')"
+             t-att-data-sb-line-id="props.line.id"
              t-att-class="{
                  'o_owl_line_selected': props.isSelected,
-                 'o_owl_line_bulk_checked': props.isBulkChecked
+                 'o_owl_line_bulk_checked': props.isBulkChecked,
+                 'sb-qr-scanned-flash': props.isScanned
              }"
              t-on-click="() => props.onSelect(props.line.id)"
              t-on-keydown="_onKeydown">
@@ -1356,6 +1367,9 @@ class OrderLine extends Component {
     static props = {
         line: Object,
         isSelected: { type: Boolean, optional: true },
+        // 2026-07-04 — QR PART SCAN transient highlight. See the
+        // class-level comment above.
+        isScanned: { type: Boolean, optional: true },
         onSelect: Function,
         onDelete: { type: Function, optional: true },
         // 2026-06-27 — inline qty stepper. Optional so customer-view
@@ -1541,6 +1555,7 @@ class ZoneGroup extends Component {
                            t-esc="_chipDot(chipStatus)"/>
                     <OrderLine line="line"
                                isSelected="line.id === props.selectedLineId"
+                               isScanned="props.scannedLineId ? line.id === props.scannedLineId : false"
                                onSelect="props.onSelectLine"
                                onDelete="props.onDeleteLine"
                                onQtyChange="props.onLineQtyChange"
@@ -1593,6 +1608,12 @@ class ZoneGroup extends Component {
         zone: Object,
         lines: Array,
         selectedLineId: { type: [Number, { value: null }], optional: true },
+        // 2026-07-04 — QR PART SCAN. Id of the line most recently
+        // resolved by a successful "in this order" QR scan (see
+        // OrderBuilder's state.ui.scannedLineId / _sbOpenQrScan).
+        // Optional + defaults to null so customer-view mounts that
+        // never pass it just never highlight a row.
+        scannedLineId: { type: [Number, { value: null }], optional: true },
         onSelectLine: Function,
         onLineSaved: Function,
         onAddToZone: Function,
@@ -3399,6 +3420,21 @@ const TEMPLATE = xml`
                                 t-on-click="_openCatalog">
                             + Add Another Cabinet
                         </button>
+                        <!-- 2026-07-04 — QR PART SCAN entry point.
+                             Thin UI hook owned by southbrook_room_capture
+                             (same "OrderBuilder's inline template can't be
+                             cross-addon-patched" constraint as the AI ROOM
+                             CAPTURE button above — see _sbOpenQrScan below
+                             for the full cross-addon mechanism). Styling
+                             (.sb-capture-btn) is reused from that addon's
+                             existing button contract. -->
+                        <button type="button"
+                                class="sb-capture-btn"
+                                t-att-disabled="state.ui.qr_scan_busy"
+                                t-on-click="_sbOpenQrScan">
+                            <span class="sb-capture-btn-icon" aria-hidden="true">▦</span>
+                            Scan part QR
+                        </button>
                         <span class="o_owl_lines_count">
                             <t t-esc="state.lines.length"/>
                             <t t-if="state.lines.length === 1"> cabinet</t>
@@ -3448,6 +3484,7 @@ const TEMPLATE = xml`
                                zone="zone"
                                lines="_linesForZone(zone.code)"
                                selectedLineId="state.ui.selected_line_id"
+                               scannedLineId="state.ui.scannedLineId"
                                onSelectLine="_setSelectedLine"
                                onLineSaved="_onLineSaved"
                                onAddToZone="_onAddToZone"
@@ -3847,6 +3884,17 @@ class OrderBuilder extends Component {
                 // _onGapBrowseAll (escape to full catalog), or
                 // _onGapCancel (× / Cancel).
                 gapRecommend: null,
+                // 2026-07-04 — QR PART SCAN. `qr_scan_busy` disables the
+                // "Scan part QR" button while the southbrook_room_capture
+                // scanner dialog is open (prevents opening a second one on
+                // a rapid double-click). `scannedLineId` is set to the
+                // matching sale.order.line id when a scan resolves to a
+                // part already on THIS order (in_current_order=true) so
+                // OrderLine can render a transient highlight
+                // (isScanned prop below) — cleared a few seconds later by
+                // _sbOpenQrScan so the highlight doesn't linger forever.
+                qr_scan_busy: false,
+                scannedLineId: null,
             },
             // Phase 3.C.2a — gap-click stash. When the user taps a gap
             // rect on the Room Layout, we record the wall+position here
@@ -4924,6 +4972,80 @@ class OrderBuilder extends Component {
             this.state.ui.wizard = "room_setup";
         } finally {
             this.state.room_capture_busy = false;
+        }
+    };
+
+    // ------------------------------------------------------------------
+    // 2026-07-04 — QR PART SCAN (southbrook_room_capture addon).
+    //
+    // Exactly the same cross-addon shape as the "AI ROOM CAPTURE" hook
+    // above: this addon is not imported here (and never will be — that
+    // would break southbrook_estimating_website's standalone
+    // installability). Instead, southbrook_room_capture's
+    // qr_scan.esm.js registers an opener function into the
+    // `sb_qr_scanner` registry category at import time; this handler
+    // only looks that opener up BY NAME at click time and calls it.
+    // If the addon isn't installed (or its bundle hasn't loaded for
+    // some other reason), the registry lookup simply returns null and
+    // this handler shows a graceful "scanner unavailable" toast rather
+    // than throwing.
+    //
+    // ALL camera / jsQR / result-card / scan-part-RPC logic lives in
+    // that addon's qr_scan.esm.js + qr_scan.xml + qr_scan.scss. This
+    // handler's only job, once the opener resolves, is to reflect a
+    // successful "this part is already on this order" scan back into
+    // the Lines UI: switch to the Lines tab if needed, flag the
+    // matching line via state.ui.scannedLineId (OrderLine reads this
+    // as its `isScanned` prop, threaded through ZoneGroup below), and
+    // scroll it into view. The flag self-clears after a few seconds.
+    // ------------------------------------------------------------------
+    _sbOpenQrScan = async () => {
+        if (this.state.ui.qr_scan_busy) return;
+        const opener = registry.category("sb_qr_scanner").get("open", null);
+        if (!opener) {
+            this._pushToast(
+                "Part scanner isn't available right now — try reloading the page.",
+                "error", 4000,
+            );
+            return;
+        }
+        this.state.ui.qr_scan_busy = true;
+        let res = null;
+        try {
+            res = await opener({ orderId: this.props.orderId, env: this.env });
+        } finally {
+            this.state.ui.qr_scan_busy = false;
+        }
+        if (!res || !res.ok) {
+            // Cancelled, or the dialog was closed without a successful
+            // scan — nothing further to do; the dialog already showed
+            // any error message itself.
+            return;
+        }
+        if (res.in_current_order && res.line_id) {
+            this.state.ui.current_tab = "lines";
+            this.state.ui.scannedLineId = res.line_id;
+            const targetLineId = res.line_id;
+            // Give OWL a render tick to switch tabs / mount the Lines
+            // panel before we try to scroll to a row inside it.
+            setTimeout(() => {
+                const el = document.querySelector(
+                    '[data-sb-line-id="' + targetLineId + '"]',
+                );
+                if (el && el.scrollIntoView) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+            }, 50);
+            setTimeout(() => {
+                if (this.state.ui.scannedLineId === targetLineId) {
+                    this.state.ui.scannedLineId = null;
+                }
+            }, 4000);
+        } else if (res.quote_number) {
+            this._pushToast(
+                "That part is on quote " + res.quote_number + ", not this order.",
+                "success", 4000,
+            );
         }
     };
 

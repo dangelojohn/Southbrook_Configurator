@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: LGPL-3.0-only
-"""JSON-RPC endpoint backing AI-assisted room capture.
+"""JSON-RPC endpoints backing AI-assisted room capture + QR part lookup.
 
-One route: POST /southbrook/api/order/<order_id>/room/analyze-photos.
+Two routes:
+  * POST /southbrook/api/order/<order_id>/room/analyze-photos
+  * POST /southbrook/api/order/<order_id>/scan-part
 
 Mirrors the pattern in addons/southbrook_estimating_website/controllers/
 room_api.py + main.py exactly:
@@ -12,7 +14,7 @@ room_api.py + main.py exactly:
     error shape {"error": "<code>", "detail": "<msg>"};
   * every ORM op is .sudo() (ownership already checked at this layer).
 
-This controller NEVER creates southbrook.room / .wall / .constraint
+analyze-photos NEVER creates southbrook.room / .wall / .constraint
 records and NEVER creates ir.attachment — uploaded photo bytes exist
 only as local Python variables for the life of this request; they are
 decoded, size/mime-validated, handed to
@@ -21,6 +23,19 @@ The AI estimate is a suggestion for the EXISTING Room Setup wizard to
 pre-fill; persistence still requires a human to review + submit
 through the wizard, which validates via
 southbrook.room.validate_geometry exactly as for hand-typed geometry.
+
+scan-part (2026-07-04) resolves a customer/estimator's scanned
+Southbrook QR (decoded client-side from the physical cabinet's
+Floor-Traveler label) to its `sb.production.package`, verifies the
+scanning user owns the sale order that package's line belongs to
+(NOT just the route's own <order_id> — the scanned id is
+attacker-controlled), and returns customer-safe part details for
+the Order Lines estimate display. READ-ONLY: never creates a record,
+never calls record_scan() / advances a work order — that's the
+shop-floor scan endpoint in southbrook_floor_traveler, a different
+route entirely. The parse + serialize logic lives in the
+`southbrook.qr.part` AbstractModel (models/southbrook_qr_part.py) so
+it's unit-testable without HTTP.
 """
 import base64
 import logging
@@ -101,6 +116,65 @@ def _rate_limit_check(key):
     if cnt + 1 > limit:
         return False
     _RATE_BUCKETS[key] = (head, cnt + 1)
+    return True
+
+
+# ----------------------------------------------------------------------
+# Per-user outbound rate limiter for scan-part — independent bucket +
+# ir.config_parameter keys from the analyze-photos limiter above. A QR
+# scan is a cheap read-only ORM lookup (no AI call), so it gets its own,
+# more generous budget rather than sharing analyze-photos' quota. Same
+# sliding-window algorithm as `_rate_limit_check`, deliberately
+# duplicated (not parameterized) to keep each route's limiter simple to
+# read and independently tunable.
+# ----------------------------------------------------------------------
+_SCAN_RATE_WINDOW_SEC_DEFAULT = 3600
+_SCAN_RATE_LIMIT_DEFAULT = 60
+_SCAN_RATE_BUCKETS = {}
+
+
+def _scan_rate_limit_params():
+    """Read window + limit from ir.config_parameter. Defaults: 60
+    requests / 3600 s / user."""
+    try:
+        Param = request.env["ir.config_parameter"].sudo()
+        window = int(Param.get_param(
+            "southbrook_room_capture.scan_rate_window_sec",
+            str(_SCAN_RATE_WINDOW_SEC_DEFAULT)))
+        limit = int(Param.get_param(
+            "southbrook_room_capture.scan_rate_limit",
+            str(_SCAN_RATE_LIMIT_DEFAULT)))
+    except Exception:  # noqa: BLE001
+        window, limit = _SCAN_RATE_WINDOW_SEC_DEFAULT, _SCAN_RATE_LIMIT_DEFAULT
+    window = max(1, min(window, 24 * 3600))
+    limit = max(1, min(limit, 10_000))
+    return window, limit
+
+
+def _scan_rate_limit_check(key):
+    """Return True if `key` (a user id) is within budget, False if it
+    exceeded. Side effect: bumps the counter on True. Bounded to
+    _RATE_CAP distinct keys; LRU-trims when full."""
+    if not key:
+        return True  # don't block requests with no identifiable key
+    window, limit = _scan_rate_limit_params()
+    now = int(time.time())
+    if len(_SCAN_RATE_BUCKETS) >= _RATE_CAP:
+        for k in list(_SCAN_RATE_BUCKETS.keys()):
+            head, _cnt = _SCAN_RATE_BUCKETS[k]
+            if now - head > window:
+                _SCAN_RATE_BUCKETS.pop(k, None)
+        if len(_SCAN_RATE_BUCKETS) >= _RATE_CAP:
+            items = sorted(_SCAN_RATE_BUCKETS.items(), key=lambda kv: kv[1][0])
+            for k, _v in items[:_RATE_CAP // 2]:
+                _SCAN_RATE_BUCKETS.pop(k, None)
+    head, cnt = _SCAN_RATE_BUCKETS.get(key, (now, 0))
+    if now - head > window:
+        _SCAN_RATE_BUCKETS[key] = (now, 1)
+        return True
+    if cnt + 1 > limit:
+        return False
+    _SCAN_RATE_BUCKETS[key] = (head, cnt + 1)
     return True
 
 
@@ -235,4 +309,82 @@ class SouthbrookRoomCaptureApi(_SouthbrookOrderAccessMixin, http.Controller):
             "estimate": estimate,
             "existing_room": Capture._estimate_to_existing_room(estimate),
             "low_confidence": bool(result.get("low_confidence")),
+        }
+
+    # ------------------------------------------------------------------
+    # QR part lookup (2026-07-04)
+    # ------------------------------------------------------------------
+    @http.route(
+        "/southbrook/api/order/<int:order_id>/scan-part",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
+    def southbrook_api_scan_part(self, order_id, payload=None, **kw):
+        """Resolve a scanned Southbrook QR payload to its manufactured
+        part (sb.production.package) and return customer-safe details
+        for display in the Order Lines estimate.
+
+        Request:  {"payload": "sb-package:<id>"}  (or the signed
+                   "sb://pkg/<id>?t=<ts>&s=<hmac>" format).
+        Response: {"ok": True, "part": {...}, "in_current_order": bool,
+                   "line_id": <id or null>, "quote_number": "<S...>"}
+                  or {"error": "<code>", "detail": "..."} — codes:
+                  forbidden / not_found / invalid / rate_limited.
+
+        Security: the scanned <id> is attacker-controlled, so ownership
+        is checked TWICE — once for the route's own <order_id> (so an
+        unauthenticated-for-this-order caller can't probe at all), and
+        again for the scanned package's OWN sale order (so a customer
+        who owns order A can't read another customer's part just
+        because they guessed/scanned a package id from order B). Both
+        checks go through the same `_southbrook_resolve_order` used
+        everywhere else in this codebase — never a bespoke ACL check.
+        """
+        try:
+            self._southbrook_resolve_order(order_id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        if not _scan_rate_limit_check(request.env.user.id):
+            return {"error": "rate_limited"}
+
+        if not isinstance(payload, str) or not payload.strip():
+            return {
+                "error": "invalid",
+                "detail": "payload must be a non-empty string.",
+            }
+
+        QrPart = request.env["southbrook.qr.part"].sudo()
+        package_id = QrPart.resolve_package_id(payload)
+        if package_id is None:
+            return {"error": "invalid", "detail": "unrecognized QR"}
+
+        Package = request.env["sb.production.package"].sudo()
+        package = Package.browse(package_id).exists()
+        if not package:
+            return {"error": "not_found"}
+
+        # The scanned package's OWN order — NOT necessarily the route's
+        # order_id. Nullable (legacy packages may carry no line).
+        pkg_order = package.sale_order_line_id.order_id
+        if not pkg_order:
+            return {"error": "not_found"}
+
+        try:
+            self._southbrook_resolve_order(pkg_order.id)
+        except MissingError:
+            return {"error": "not_found"}
+        except AccessError:
+            return {"error": "forbidden"}
+
+        resolved = QrPart.serialize(package, order_id)
+        return {
+            "ok": True,
+            "part": resolved["part"],
+            "in_current_order": resolved["in_current_order"],
+            "line_id": resolved["line_id"],
+            "quote_number": resolved["quote_number"],
         }

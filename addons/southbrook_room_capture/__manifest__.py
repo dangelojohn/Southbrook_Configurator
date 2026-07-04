@@ -46,6 +46,17 @@ file comment for exactly which file owns which piece of the UI and
 why (OrderBuilder's inline-template constraint pushed the button
 markup itself into a small, documented, additive edit in
 southbrook_estimating_website/static/src/js/portal_boot.esm.js).
+
+QR part lookup (2026-07-04): a customer/estimator scans the Southbrook
+QR printed on a physical cabinet's Floor-Traveler label; the frontend
+decodes it client-side and POSTs the decoded string to
+POST /southbrook/api/order/<id>/scan-part, which resolves it (via the
+southbrook.qr.part AbstractModel) to its sb.production.package,
+verifies the caller owns the sale order that package's line belongs
+to, and returns customer-safe quote/product/spec details for display
+in the Order Lines estimate. Read-only: no record is ever created, and
+this never touches the shop-floor scan/work-order-advance path owned
+by southbrook_floor_traveler.
 """,
     "author": "Southbrook Cabinetry",
     "license": "LGPL-3",
@@ -54,6 +65,13 @@ southbrook_estimating_website/static/src/js/portal_boot.esm.js).
     "depends": [
         "southbrook_estimating",
         "southbrook_estimating_website",
+        # 2026-07-04 — QR part-lookup backend: sb.production.package
+        # lives in southbrook_kitchen_mrp; the signed-payload dual-
+        # accept parse (env["southbrook.qr.payload"].parse()) lives in
+        # southbrook_qr_kit. Both are read-only dependencies for the
+        # new /southbrook/api/order/<id>/scan-part route.
+        "southbrook_kitchen_mrp",
+        "southbrook_qr_kit",
     ],
     # httpx is imported lazily inside southbrook.room.capture._call_anthropic
     # (guarded exactly like addons/southbrook_ai_design/models/
@@ -88,6 +106,14 @@ southbrook_estimating_website/static/src/js/portal_boot.esm.js).
             "southbrook_room_capture/static/src/js/room_capture.esm.js",
             "southbrook_room_capture/static/src/xml/room_capture.xml",
             "southbrook_room_capture/static/src/scss/room_capture.scss",
+            # 2026-07-04 — QR part-lookup frontend (client-side decode +
+            # POST to /southbrook/api/order/<id>/scan-part). Listed
+            # AFTER the room_capture assets above; owned by a parallel
+            # agent, registered here only.
+            "southbrook_room_capture/static/src/lib/jsqr.js",
+            "southbrook_room_capture/static/src/js/qr_scan.esm.js",
+            "southbrook_room_capture/static/src/xml/qr_scan.xml",
+            "southbrook_room_capture/static/src/scss/qr_scan.scss",
         ],
     },
     "installable": True,
