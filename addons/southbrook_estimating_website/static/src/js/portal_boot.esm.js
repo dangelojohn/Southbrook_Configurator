@@ -3145,11 +3145,14 @@ const TEMPLATE = xml`
                  class="o_owl_tab_panel sb-room-setup-panel"
                  role="tabpanel" aria-labelledby="o_owl_tab_room_setup"
                  tabindex="0">
-                <!-- 2026-07-04 — AI ROOM CAPTURE. Single persistent
-                     hidden file input (present regardless of the
-                     room / no-room branch below) triggered by
-                     _sbOpenRoomCapture from either CTA. Styling
-                     (.sb-capture-file-input) owned by
+                <!-- 2026-07-04 — AI ROOM CAPTURE. Empty-state-only:
+                     capture is for fast INITIAL room entry, not for
+                     re-scanning a saved room (editing a saved room
+                     uses the normal Edit Room flow). This hidden file
+                     input is only reachable from the no-room branch's
+                     "Capture room from photos" CTA below, via
+                     _sbOpenRoomCapture. Styling (.sb-capture-file-input)
+                     owned by
                      southbrook_room_capture/static/src/scss/room_capture.scss. -->
                 <input type="file"
                        t-ref="sb_room_capture_file_input"
@@ -3240,28 +3243,12 @@ const TEMPLATE = xml`
                             <h2 class="sb-room-title">
                                 <t t-esc="state.room.name"/>
                             </h2>
-                            <div class="sb-capture-cta-row">
-                                <button type="button"
-                                        class="sb-room-edit-btn"
-                                        t-on-click="_openRoomSetupWizard">
-                                    Edit Room
-                                </button>
-                                <!-- 2026-07-04 — AI ROOM CAPTURE re-scan entry point. -->
-                                <button type="button"
-                                        class="sb-capture-btn"
-                                        t-att-disabled="state.room_capture_busy"
-                                        t-on-click="_sbOpenRoomCapture">
-                                    <span class="sb-capture-btn-icon" aria-hidden="true">📷</span>
-                                    Re-scan from photos
-                                </button>
-                            </div>
+                            <button type="button"
+                                    class="sb-room-edit-btn"
+                                    t-on-click="_openRoomSetupWizard">
+                                Edit Room
+                            </button>
                         </div>
-                        <div t-if="state.room_capture_busy" class="sb-capture-busy">
-                            <span class="sb-capture-busy-spinner" aria-hidden="true"></span>
-                            <span>Analyzing your photos…</span>
-                        </div>
-                        <p t-if="state.room_capture_error" class="sb-capture-error"
-                           t-esc="state.room_capture_error"/>
                         <div class="sb-room-meta">
                             <span class="sb-room-shape">
                                 <t t-esc="_humanShape(state.room.layout_shape)"/>
@@ -3587,7 +3574,7 @@ const TEMPLATE = xml`
                  above all OrderBuilder chrome. -->
             <RoomSetupWizard t-if="state.ui.wizard === 'room_setup'"
                              orderId="props.orderId"
-                             existingRoom="state.room"
+                             existingRoom="state.ui.aiPrefillRoom || state.room"
                              onClose="_closeRoomSetupWizard"
                              onSubmitted="_onRoomSubmitted"/>
 
@@ -3755,10 +3742,13 @@ class OrderBuilder extends Component {
             // 2026-07-04 — AI ROOM CAPTURE fallback UI hook.
             //
             // This block + _sbOpenRoomCapture / _sbOnCaptureFilesSelected
-            // / _sbOnCeilingHintChanged below are the ONLY changes the
-            // southbrook_room_capture addon needed to make in THIS
-            // file. They are additive (new state keys, new methods, a
-            // few new template nodes) and change no existing behavior.
+            // / _sbOnCeilingHintChanged below (plus the aiPrefillRoom
+            // slot under state.ui, and small additive touch-ups in
+            // _closeRoomSetupWizard / _onRoomSubmitted to clear it) are
+            // the ONLY changes the southbrook_room_capture addon needed
+            // to make in THIS file. They are additive (new state keys,
+            // new methods, a few new template nodes) and change no
+            // existing behavior.
             //
             // Why here and not a cross-addon patch()/t-inherit from
             // the new addon: OrderBuilder is declared
@@ -3794,6 +3784,18 @@ class OrderBuilder extends Component {
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
+                // 2026-07-04 — AI ROOM CAPTURE (H1 fix). Dedicated prefill
+                // slot for the AI room estimate. NEVER assign the
+                // persisted room to this key, and NEVER read/write
+                // state.room from the capture handlers — that field is
+                // reserved for the real create/edit/load paths. The
+                // RoomSetupWizard mount below binds
+                // existingRoom="state.ui.aiPrefillRoom || state.room" so
+                // a trustworthy AI estimate pre-fills the wizard without
+                // ever touching the saved room. Cleared to null on wizard
+                // close/submit so a stale estimate can't leak into a
+                // later normal edit.
+                aiPrefillRoom: null,
                 // G11 — modal visibility.
                 catalog_open: false,
                 // 2026-06-27 — when false (default), single Add auto-closes
@@ -4771,6 +4773,10 @@ class OrderBuilder extends Component {
     // summary card from Phase 2.B.
     _closeRoomSetupWizard = () => {
         this.state.ui.wizard = null;
+        // 2026-07-04 — AI ROOM CAPTURE (H1 fix). Clear the prefill slot
+        // additively so a cancelled AI-prefilled wizard never leaks the
+        // estimate into a later normal edit of the (still unset) room.
+        this.state.ui.aiPrefillRoom = null;
     };
 
     _onRoomSubmitted = (room) => {
@@ -4779,6 +4785,11 @@ class OrderBuilder extends Component {
         }
         this.state.ui.wizard = null;
         this.state.ui.current_tab = "room_setup";
+        // 2026-07-04 — AI ROOM CAPTURE (H1 fix). The estimate has done
+        // its job (prefilled the wizard, which the user then reviewed
+        // and submitted as `room` above) — clear it so it never
+        // reappears on a later normal edit.
+        this.state.ui.aiPrefillRoom = null;
     };
 
     // ------------------------------------------------------------------
@@ -4812,14 +4823,33 @@ class OrderBuilder extends Component {
 
     _sbOnCaptureFilesSelected = async (ev) => {
         const input = ev.target;
-        const files = Array.from(input.files || []).slice(0, 5);
+        const selected = Array.from(input.files || []).slice(0, 5);
         // Reset the input value immediately so selecting the exact same
         // file(s) again still fires a fresh "change" event next time.
         input.value = "";
-        if (!files.length) return;
+        if (!selected.length) return;
+
+        // L3 — client-side per-file size guard, applied BEFORE the
+        // base64 read/POST. Mirrors the server's _MAX_IMAGE_BYTES cap
+        // (southbrook_room_capture/models/southbrook_room_capture.py).
+        // A handful of full-res phone photos can each run 10-50MB raw;
+        // without this guard, base64-encoding 5 of them can produce a
+        // ~50MB+ JSON body that trips an Odoo/proxy request-body limit
+        // before the server ever gets a chance to reject it cleanly.
+        // Oversized files are skipped (not fatal) as long as at least
+        // one file remains under the cap; if none remain, abort.
+        const MAX_CAPTURE_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB, matches _MAX_IMAGE_BYTES
+        const hasOversized = selected.some((f) => f.size > MAX_CAPTURE_IMAGE_BYTES);
+        const files = selected.filter((f) => f.size <= MAX_CAPTURE_IMAGE_BYTES);
+        if (!files.length) {
+            this.state.room_capture_error = "Each photo must be under 8 MB.";
+            return;
+        }
 
         this.state.room_capture_busy = true;
-        this.state.room_capture_error = null;
+        this.state.room_capture_error = hasOversized
+            ? "Each photo must be under 8 MB."
+            : null;
         try {
             const readAsBase64 = (file) => new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -4850,31 +4880,47 @@ class OrderBuilder extends Component {
                 { images, scale_reference: scaleReference },
             );
 
-            if (res && res.ok && res.existing_room) {
+            // H2 — gate prefill on actual trustworthiness. `res.ok` alone
+            // is NOT enough: the server always returns an existing_room
+            // dict when ok, even for a low-confidence/no-walls estimate.
+            // Only treat the estimate as usable when it has walls AND
+            // isn't flagged low_confidence.
+            const trustworthy = !!(res && res.ok && res.existing_room
+                && res.existing_room.walls && res.existing_room.walls.length
+                && !res.low_confidence);
+
+            if (trustworthy) {
                 // existing_room carries NO id fields — RoomSetupWizard
-                // (patched by southbrook_room_capture) treats an
-                // idless-but-present existingRoom as an AI prefill and
-                // opens in CREATE mode, showing the "review before
-                // saving" banner. Nothing is persisted by this step.
-                this.state.room = res.existing_room;
+                // (patched by southbrook_room_capture) treats a truthy
+                // aiPrefillRoom the same way it treats an idless
+                // existingRoom: an AI prefill, opened in CREATE mode
+                // with the "review before saving" banner. Nothing is
+                // persisted by this step.
+                // H1 — the estimate lives ONLY in the dedicated prefill
+                // slot. state.room (the persisted room) is NEVER
+                // assigned here.
+                this.state.ui.aiPrefillRoom = res.existing_room;
                 this.state.ui.wizard = "room_setup";
             } else {
-                // Any error, or an ok response without walls to show,
-                // is treated as "AI failed" — never prefill from a
-                // partial/garbage estimate. Open the wizard blank so
+                // Any error, low-confidence estimate, or zero-wall
+                // result is treated as "AI failed" — never prefill from
+                // a partial/garbage estimate. Open the wizard blank so
                 // the user can enter the room by hand.
+                // H1 — state.room is NEVER nulled here; only the
+                // prefill slot is cleared, so a real persisted room
+                // (if one somehow existed) would be unaffected.
                 const detail = (res && (res.detail || res.error)) || "";
                 this.state.room_capture_error = detail
                     ? "Couldn't read the room from photos (" + detail
                         + ") — please enter it manually."
                     : "Couldn't read the room from photos — please enter it manually.";
-                this.state.room = null;
+                this.state.ui.aiPrefillRoom = null;
                 this.state.ui.wizard = "room_setup";
             }
         } catch (e) {
             this.state.room_capture_error =
                 "Couldn't read the room from photos — please enter it manually.";
-            this.state.room = null;
+            this.state.ui.aiPrefillRoom = null;
             this.state.ui.wizard = "room_setup";
         } finally {
             this.state.room_capture_busy = false;

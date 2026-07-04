@@ -29,6 +29,7 @@ import io
 import json
 import logging
 import os
+import warnings
 
 from odoo import api, models
 
@@ -132,6 +133,13 @@ class SouthbrookRoomCapture(models.AbstractModel):
     _MODEL = "claude-sonnet-5"  # vision-capable; deliberate cost-controlled choice
     _MAX_IMAGES = 5
     _MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MB pre-downscale cap per image
+    # M1 fix: the byte cap above does NOT bound decoded pixel count — a
+    # ~12000x12000 PNG (~144MP) can fit under 8MB on disk yet decode to
+    # ~430MB in memory. Pillow only WARNS (DecompressionBombWarning) in
+    # that band rather than raising, so `except Exception` in analyze()
+    # never catches it. This explicit pixel-count cap is the primary
+    # guard; see _downscale_image.
+    _MAX_IMAGE_PIXELS = 40_000_000
     _MAX_LONG_EDGE_PX = 1568
     _TIMEOUT = 60.0
     _LOW_CONFIDENCE_THRESHOLD = 0.35
@@ -269,7 +277,40 @@ class SouthbrookRoomCapture(models.AbstractModel):
                 "installed"
             ) from exc
 
-        img = Image.open(io.BytesIO(raw_bytes))
+        # M1 fix — DecompressionBomb guard, part 1: open under a
+        # warnings filter that promotes Pillow's own
+        # DecompressionBombWarning (a warning-only signal Pillow emits
+        # for large-but-not-huge images) to an exception, so it can't
+        # silently slip past the `except Exception` in analyze() the
+        # way a bare warning would. This is defense-in-depth; the
+        # primary guard is the explicit pixel-count check below, which
+        # catches everything above our OWN (much lower)
+        # _MAX_IMAGE_PIXELS cap regardless of where Pillow's own
+        # threshold happens to sit.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            img = Image.open(io.BytesIO(raw_bytes))
+
+        # M1 fix — DecompressionBomb guard, part 2 (primary guard):
+        # bound decoded pixel count. The 8MB _MAX_IMAGE_BYTES cap in
+        # analyze() does NOT bound this — a ~12000x12000 PNG (~144MP)
+        # comfortably fits under 8MB on disk yet decodes to ~430MB in
+        # memory once `.thumbnail()`/`.save()` touch it below. Guard
+        # defensively in case a PIL build/version lacks .width/.height.
+        # Raising ValueError here is caught by analyze()'s broad
+        # `except Exception` around the downscale loop and turned into
+        # a normal {"ok": False, ...} response — never an unhandled
+        # exception / 500.
+        width = getattr(img, "width", None)
+        height = getattr(img, "height", None)
+        if not isinstance(width, int) or not isinstance(height, int):
+            raise ValueError("could not determine image dimensions")
+        if width * height > self._MAX_IMAGE_PIXELS:
+            raise ValueError(
+                "image exceeds the maximum allowed pixel dimensions "
+                "(%s x %s)" % (width, height)
+            )
+
         # EXIF-transpose so a phone photo taken sideways doesn't get
         # analyzed rotated.
         try:
@@ -377,9 +418,15 @@ class SouthbrookRoomCapture(models.AbstractModel):
             "output_config": {
                 "format": {"type": "json_schema", "schema": _ESTIMATE_SCHEMA},
             },
-            # Deliberately no temperature/top_p/top_k, no thinking
-            # override — Sonnet 5 rejects non-default sampling params
-            # and adaptive thinking is the correct default.
+            # M2 fix: explicitly disable thinking. claude-sonnet-5 runs
+            # adaptive thinking by default when `thinking` is omitted,
+            # and thinking tokens draw down the SAME max_tokens=4096
+            # budget as the structured JSON output below — risking
+            # truncation of a large wall/constraint list. {"type":
+            # "disabled"} is accepted on Sonnet 5 (unlike Fable 5, where
+            # it 400s). Deliberately still no temperature/top_p/top_k —
+            # Sonnet 5 rejects non-default sampling params.
+            "thinking": {"type": "disabled"},
         }
         headers = {
             "x-api-key": api_key,
