@@ -248,17 +248,26 @@
 
           <!--
             Phase 5 — Floor Plan page. SVG returned by to_svg() is
-            inlined via t-out with a Markup wrapper (the markup is
-            trusted — we generate it and html-escape any user-supplied
-            label text inside). v19 deprecated t-raw in favour of
-            t-out(Markup(...)); QWeb still supports t-raw but warns
-            noisily and will remove it in a future release.
+            inlined via plain t-out. The markup is trusted — to_svg()
+            itself now returns a markupsafe.Markup-wrapped string (the
+            standard Odoo pattern for "trusted HTML/SVG from Python"),
+            html-escaping any user-supplied label text before assembly.
+            QA fix (2026-07-04, found while testing Print): the
+            original `t-out="Markup(room.to_svg(720, 540))"` referenced
+            `Markup` BY NAME inside the template expression, but that
+            name isn't bound in the namespace t-out/t-if expressions
+            evaluate against (only in ir.qweb's own internal compiler
+            globals) — every render of this report raised `KeyError:
+            'Markup'`. Pre-wrapping the return value in Python and
+            using a plain t-out here is the correct fix; t-raw is
+            deprecated (noisy warning, removal planned) so it isn't
+            used as the alternative.
           -->
           <div class="page" t-if="o.room_ids">
             <t t-set="room" t-value="o.room_ids[0]"/>
             <h2 class="report_h2" style="margin: 0 0 8px 0;">Floor Plan</h2>
             <div style="text-align:center; margin: 8px 0;">
-              <t t-out="Markup(room.to_svg(720, 540))"/>
+              <t t-out="room.to_svg(720, 540)"/>
             </div>
             <p style="font-size: 8pt; color:#776B5C; text-align:center; margin-top: 6px;">
               Top-down view. Cabinet positions are nominal — verify against

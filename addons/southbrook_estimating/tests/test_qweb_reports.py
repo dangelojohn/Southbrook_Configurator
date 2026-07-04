@@ -114,6 +114,38 @@ class TestQWebReports(SouthbrookTestCase):
         )
         self.assertIn("ILLUSTRATIVE SEED", html)
 
+    def test_06b_signature_spec_sheet_renders_floor_plan_when_room_present(self):
+        """QA regression (2026-07-04, found while testing Print on a
+        real order): the Floor Plan page (t-if="o.room_ids") was NEVER
+        exercised by this test class because cls.order never carries a
+        room -- so a template bug there (referencing `Markup` by name
+        inside a t-out expression, which isn't bound in that
+        evaluation namespace) shipped unnoticed and crashed every
+        real-world Print click on any order with a room. Attach a
+        room with one wall to a FRESH order (not cls.order, to avoid
+        coupling this room onto the shared fixture other tests rely
+        on) and confirm the report still renders."""
+        order = self.env["sale.order"].create({"partner_id": self.partner.id})
+        self.env["sale.order.line"].create({
+            "order_id": order.id,
+            "product_id": self.product.id,
+            "product_uom_qty": 1.0,
+            "zone": "base_run",
+        })
+        room = self.env["southbrook.room"].create({
+            "name": "QA Regression Room",
+            "order_id": order.id,
+            "layout_shape": "straight",
+            "wall_ids": [(0, 0, {"name": "Wall A", "length_mm": 3600})],
+        })
+        self.assertTrue(room.wall_ids, "room fixture must have a wall")
+        html = self._render(
+            "action_report_signature_spec_sheet", [order.id]
+        )
+        self.assertIn("Floor Plan", html)
+        self.assertIn("<svg", html, "the room's SVG floor plan must be inlined")
+        self.assertIn("3600", html, "the wall length label must appear")
+
     # ------------------------------------------------------------------
     # Render assertions — shop copy (against a real MO)
     # ------------------------------------------------------------------

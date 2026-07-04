@@ -9,6 +9,8 @@ sibling files.
 import html
 import math
 
+from markupsafe import Markup
+
 from odoo import api, fields, models
 
 
@@ -319,14 +321,29 @@ class SouthbrookRoom(models.Model):
     #   - no `display:flex` anywhere in the markup.
     # ------------------------------------------------------------------
     def to_svg(self, width_px=720, height_px=540):
-        """Return an SVG string (with outer <svg> wrapper) of the
-        top-down floor plan."""
+        """Return a Markup-wrapped SVG string (with outer <svg> wrapper)
+        of the top-down floor plan.
+
+        QA bug (2026-07-04, found while testing the Print action):
+        returning a plain str here made the Signature Spec Sheet report
+        crash with `KeyError: 'Markup'` — its QWeb template calls
+        `t-out="Markup(room.to_svg(...))"`, but `Markup` is only bound
+        in ir.qweb's internal compiler globals, not in the expression
+        namespace `t-out`/`t-if` strings are evaluated against, so
+        referencing it BY NAME inside a template expression fails.
+        Returning an already-Markup-wrapped string here (the standard
+        Odoo pattern for "trusted, pre-escaped HTML/SVG from Python")
+        lets the template just do `t-out="room.to_svg(...)"` with no
+        in-template Markup() call needed at all. Safe to trust: every
+        user-supplied substring embedded below (wall names, constraint
+        labels) is already run through html.escape() before insertion.
+        """
         self.ensure_one()
         rec = self
 
         walls = rec.wall_ids.sorted(key=lambda x: (x.wall_order, x.id))
         if not walls:
-            return (
+            return Markup(
                 f'<svg width="{int(width_px)}" height="{int(height_px)}" '
                 f'viewBox="0 0 {int(width_px)} {int(height_px)}" '
                 f'xmlns="http://www.w3.org/2000/svg">'
@@ -569,7 +586,7 @@ class SouthbrookRoom(models.Model):
             )
 
         parts.append('</svg>')
-        return "".join(parts)
+        return Markup("".join(parts))
 
     # ------------------------------------------------------------------
     # Internal helpers — wall-segment geometry. Mirrors
