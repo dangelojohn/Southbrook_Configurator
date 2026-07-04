@@ -24,7 +24,7 @@
  * idless-draft detection southbrook_room_capture's RoomSetupWizard patch
  * already established.
  */
-import { Component, mount, useState, whenReady } from "@odoo/owl";
+import { Component, mount, useRef, useState, whenReady } from "@odoo/owl";
 import { getTemplate } from "@web/core/templates";
 import { rpcJsonCall } from "@southbrook_estimating_website/js/portal_boot.esm";
 import { RoomOutlinePreview } from "@southbrook_estimating_website/js/room_setup_wizard.esm";
@@ -56,6 +56,12 @@ export class RoomChatWidget extends Component {
             draft: _blankDraft(),
             reviewSent: false,
         });
+        // `this.el` is NOT a valid API for a component mounted via raw
+        // `mount()` the way this widget is (see autoMount() below) — it
+        // threw `Cannot read properties of undefined (reading
+        // 'dispatchEvent')` in production. useRef is the correct way to
+        // reach the root DOM node here, same as HermesChat's own refs.
+        this.rootRef = useRef("root");
     }
 
     get orderId() {
@@ -151,7 +157,9 @@ export class RoomChatWidget extends Component {
     reviewInWizard() {
         if (!this.hasDraftContent) return;
         this.state.reviewSent = true;
-        this.el.dispatchEvent(new CustomEvent("sb:room-chat-review", {
+        const root = this.rootRef.el;
+        if (!root) return;
+        root.dispatchEvent(new CustomEvent("sb:room-chat-review", {
             detail: this.state.draft,
             bubbles: true,
         }));
