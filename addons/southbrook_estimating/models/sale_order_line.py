@@ -372,6 +372,26 @@ class SaleOrderLine(models.Model):
     # lands on Select Template first, same as a genuinely-fresh
     # configure — while leaving the normal re-open-existing-session
     # behavior for lines that DO have config_session_id untouched.
+    #
+    # Round 2 fix (2026-07-04, live-browser-diagnosed regression): the
+    # first attempt still passed product_id in extra_vals (copied from
+    # the base reconfigure_product's own extra_vals). That's wrong for
+    # THIS branch specifically: ProductConfigurator.get_state_selection()
+    # (product_configurator/wizard/product_configurator.py:108) does
+    # `steps = open_steps if wiz.product_id else steps + open_steps` --
+    # whenever the wizard record has product_id set, "select" is
+    # dropped from the statusbar's OWN option list entirely, even
+    # though the record's actual state value is still 'select'. Result:
+    # the backend was 100% correct (state='select', product_tmpl_id
+    # pre-filled) but the statusbar widget had no matching option to
+    # highlight, so no step showed as current. configure_product() (the
+    # header button, confirmed working) never sets product_id at wizard-
+    # creation time, only product_tmpl_id -- mirroring that exactly
+    # (dropping product_id here) is the fix. order_line_id is enough
+    # for action_config_done to write the final result back to the
+    # right line; the final variant is resolved from the wizard's
+    # value_ids at confirm time regardless of what product_id started
+    # the wizard.
     # ------------------------------------------------------------------
     def reconfigure_product(self):
         self.ensure_one()
@@ -379,7 +399,6 @@ class SaleOrderLine(models.Model):
             extra_vals = {
                 "order_id": self.order_id.id,
                 "order_line_id": self.id,
-                "product_id": self.product_id.id,
             }
             return self.with_context(
                 default_order_id=self.order_id.id,

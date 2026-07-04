@@ -132,6 +132,36 @@ class TestConfiguratorFromOrder(TransactionCase):
             "Template, not jump straight past it",
         )
         self.assertEqual(wizard.product_tmpl_id, self.tmpl)
+        # Regression (round 2, live-browser-diagnosed): the backend
+        # state can correctly be 'select' while the statusbar widget
+        # STILL fails to highlight anything, if get_state_selection()'s
+        # own option list doesn't include 'select' as a choice --
+        # which happens whenever wizard.product_id is set (see
+        # get_state_selection, product_configurator.py:108). Assert on
+        # the actual selection options the statusbar renders from, not
+        # just the field value, so a regression here fails loudly.
+        self.assertFalse(
+            wizard.product_id,
+            "product_id must NOT be set on this wizard -- setting it "
+            "makes get_state_selection() drop 'select' from the "
+            "statusbar's own option list even though state=='select', "
+            "so no step highlights as current (round-1 regression)",
+        )
+        # get_state_selection() resolves the wizard via context (matching
+        # exactly how get_wizard_action(wizard=...) sets it for a real
+        # render), not via self.id -- must replicate that here or the
+        # method silently no-ops and this assertion would pass for the
+        # wrong reason.
+        state_options = dict(
+            wizard.with_context(
+                wizard_id=wizard.id, wizard_id_view_ref=wizard.id,
+            ).get_state_selection()
+        )
+        self.assertIn(
+            "select", state_options,
+            "'select' must be a valid statusbar option so the current "
+            "state can actually be highlighted in the UI",
+        )
 
     def test_reconfigure_existing_session_line_unchanged(self):
         """Regression companion: a line that DOES have a real prior
