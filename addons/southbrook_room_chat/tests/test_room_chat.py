@@ -131,6 +131,41 @@ class TestRoomChatSession(TransactionCase):
         self.assertEqual(session.get_transcript(), [])
         self.assertIsNone(session.get_draft()["layout_shape"])
 
+    def test_unique_constraint_rejects_duplicate_order_session(self):
+        """Regression: the UNIQUE(order_id) constraint must exist so a
+        raced create() can be caught, not silently produce two rows."""
+        order2 = self.env["sale.order"].create({"partner_id": self.partner.id})
+        self.Session.create({"order_id": order2.id})
+        with self.assertRaises(Exception):
+            with self.env.cr.savepoint():
+                self.Session.create({"order_id": order2.id})
+
+    def test_get_or_create_race_safe(self):
+        """Regression: two callers racing for the same order must not
+        both succeed in creating a session — the loser's create() must
+        hit the unique constraint and be caught, resolving to the
+        winner's row instead of raising or stranding an orphan."""
+        order2 = self.env["sale.order"].create({"partner_id": self.partner.id})
+        orig_search = type(self.Session).search
+        state = {"seeded": False}
+
+        def racy_search(rec_self, domain, **kw):
+            if not state["seeded"]:
+                state["seeded"] = True
+                # A "concurrent" request wins the race between our
+                # search-miss and our own create() call below.
+                self.env["southbrook.room.chat.session"].sudo().create(
+                    {"order_id": order2.id})
+                return rec_self.browse([])
+            return orig_search(rec_self, domain, **kw)
+
+        with patch.object(type(self.Session), "search", racy_search):
+            session = self.Session.get_or_create_for_order(order2.id)
+
+        self.assertTrue(session)
+        self.assertEqual(
+            self.Session.search_count([("order_id", "=", order2.id)]), 1)
+
 
 @tagged("post_install", "-at_install", "southbrook", "southbrook_room_chat")
 class TestRoomChatAgentModel(TransactionCase):
@@ -243,6 +278,57 @@ class TestRoomChatAgentModel(TransactionCase):
         result = self.Agent._tool_add_constraint(
             draft, wall_index=0, constraint_type="window",
             distance_from_left_mm=100, width_mm=900)
+        self.assertFalse(result["ok"])
+
+    def test_tool_add_constraint_missing_distance_rejected(self):
+        """Regression: a null/missing distance_from_left_mm must be
+        REJECTED, not silently coerced to 0 — 0 is a legitimate distance
+        (flush against the wall's left edge) and must not be
+        indistinguishable from 'the caller never said'."""
+        draft = self._blank_draft()
+        self.Agent._tool_add_wall(draft, length_mm=3000)
+        result = self.Agent._tool_add_constraint(
+            draft, wall_index=0, constraint_type="window",
+            distance_from_left_mm=None, width_mm=900)
+        self.assertFalse(result["ok"])
+        self.assertEqual(draft["walls"][0]["constraints"], [])
+
+    def test_tool_add_constraint_zero_distance_is_valid(self):
+        """Regression companion: an EXPLICIT distance_from_left_mm=0
+        must still be accepted (it's a real, legitimate position)."""
+        draft = self._blank_draft()
+        self.Agent._tool_add_wall(draft, length_mm=3000)
+        result = self.Agent._tool_add_constraint(
+            draft, wall_index=0, constraint_type="window",
+            distance_from_left_mm=0, width_mm=900)
+        self.assertTrue(result["ok"], msg=result)
+        self.assertEqual(draft["walls"][0]["constraints"][0]["distance_from_left_mm"], 0)
+
+    def test_tool_add_constraint_non_numeric_distance_rejected(self):
+        draft = self._blank_draft()
+        self.Agent._tool_add_wall(draft, length_mm=3000)
+        result = self.Agent._tool_add_constraint(
+            draft, wall_index=0, constraint_type="window",
+            distance_from_left_mm="not-a-number", width_mm=900)
+        self.assertFalse(result["ok"])
+
+    def test_tool_add_constraint_optional_heights_default_to_zero(self):
+        draft = self._blank_draft()
+        self.Agent._tool_add_wall(draft, length_mm=3000)
+        result = self.Agent._tool_add_constraint(
+            draft, wall_index=0, constraint_type="window",
+            distance_from_left_mm=100, width_mm=900)
+        self.assertTrue(result["ok"], msg=result)
+        c = draft["walls"][0]["constraints"][0]
+        self.assertEqual(c["height_mm"], 0)
+        self.assertEqual(c["height_from_floor_mm"], 0)
+
+    def test_tool_add_constraint_non_numeric_optional_height_rejected(self):
+        draft = self._blank_draft()
+        self.Agent._tool_add_wall(draft, length_mm=3000)
+        result = self.Agent._tool_add_constraint(
+            draft, wall_index=0, constraint_type="window",
+            distance_from_left_mm=100, width_mm=900, height_mm="garbage")
         self.assertFalse(result["ok"])
 
     def test_tool_remove_constraint_out_of_range(self):

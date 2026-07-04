@@ -15,6 +15,8 @@ suggestion for the existing "Set Up Your Room" wizard.
 """
 import json
 
+from psycopg2 import IntegrityError
+
 from odoo import fields, models
 
 _BLANK_DRAFT = {
@@ -40,6 +42,11 @@ class SouthbrookRoomChatSession(models.Model):
     draft_json = fields.Text(
         default=lambda self: json.dumps(_BLANK_DRAFT))
     transcript_json = fields.Text(default="[]")
+
+    _order_id_uniq = models.Constraint(
+        "UNIQUE(order_id)",
+        "Each order can have at most one AI room-chat session.",
+    )
 
     def get_draft(self):
         """Return the current draft as a plain dict. Never raises — a
@@ -82,8 +89,20 @@ class SouthbrookRoomChatSession(models.Model):
     def get_or_create_for_order(self, order_id):
         """env['southbrook.room.chat.session'].get_or_create_for_order(id)
         — return the (singleton) session for this order, creating a blank
-        one if none exists yet."""
+        one if none exists yet.
+
+        Race-safe: two concurrent requests for the same order (two open
+        tabs, a client retry) can both pass the search below and both
+        attempt create() — the UNIQUE(order_id) constraint rejects the
+        loser, which is caught here and re-resolved to the winner's row
+        rather than silently stranding the loser's draft on an orphan
+        session no future call will ever find again.
+        """
         session = self.search([("order_id", "=", order_id)], limit=1)
         if session:
             return session
-        return self.create({"order_id": order_id})
+        try:
+            with self.env.cr.savepoint():
+                return self.create({"order_id": order_id})
+        except IntegrityError:
+            return self.search([("order_id", "=", order_id)], limit=1)

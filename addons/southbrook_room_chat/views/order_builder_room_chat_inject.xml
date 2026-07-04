@@ -10,7 +10,7 @@
        is auto-discovered by this addon's OWL bundle's autoMount()
        routine and appears as its own panel alongside Hermes's chat,
        below the order header card. -->
-  <template id="hermes_room_chat_inject_order_builder"
+  <template id="room_chat_inject_order_builder"
             inherit_id="southbrook_estimating_website.portal_order_builder"
             name="Room Chat — Order Builder mount">
     <xpath expr="//div[hasclass('o_southbrook_portal_header')]" position="after">

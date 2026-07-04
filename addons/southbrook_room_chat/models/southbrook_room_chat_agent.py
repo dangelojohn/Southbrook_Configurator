@@ -281,17 +281,35 @@ class SouthbrookRoomChatAgent(models.AbstractModel):
             return {"ok": False, "error": "wall_index out of range"}
         if constraint_type not in CONSTRAINT_TYPES:
             return {"ok": False, "error": "invalid constraint_type: %r" % constraint_type}
-        distance = self._coerce_int(distance_from_left_mm, default=0) or 0
-        width = self._coerce_int(width_mm, default=0) or 0
-        if distance < 0 or width <= 0:
-            return {"ok": False, "error": "distance_from_left_mm/width_mm must be non-negative"}
+        # distance_from_left_mm=0 is a legitimate value (flush against the
+        # wall's left edge) — it must NOT be indistinguishable from a
+        # missing/non-numeric value defaulting to 0, or a model call with
+        # an unset distance silently reports success at the wrong
+        # position. Reject explicitly instead of coercing to a default.
+        distance = self._coerce_int(distance_from_left_mm)
+        if distance is None or distance < 0:
+            return {"ok": False, "error": "distance_from_left_mm must be a non-negative number"}
+        width = self._coerce_int(width_mm)
+        if width is None or width <= 0:
+            return {"ok": False, "error": "width_mm must be a positive number"}
+        if height_mm is None:
+            height = 0
+        else:
+            height = self._coerce_int(height_mm)
+            if height is None or height < 0:
+                return {"ok": False, "error": "height_mm must be a non-negative number"}
+        if height_from_floor_mm is None:
+            height_from_floor = 0
+        else:
+            height_from_floor = self._coerce_int(height_from_floor_mm)
+            if height_from_floor is None or height_from_floor < 0:
+                return {"ok": False, "error": "height_from_floor_mm must be a non-negative number"}
         constraint = {
             "constraint_type": constraint_type,
-            "distance_from_left_mm": max(0, distance),
-            "width_mm": max(0, width),
-            "height_mm": max(0, self._coerce_int(height_mm, default=0) or 0),
-            "height_from_floor_mm": max(
-                0, self._coerce_int(height_from_floor_mm, default=0) or 0),
+            "distance_from_left_mm": distance,
+            "width_mm": width,
+            "height_mm": height,
+            "height_from_floor_mm": height_from_floor,
             "notes": notes if isinstance(notes, str) else "",
         }
         walls[idx].setdefault("constraints", []).append(constraint)
