@@ -261,6 +261,35 @@ class HermesWizard(models.TransientModel):
     user_notes = fields.Text(string="Reviewer Notes")
     error_detail = fields.Text(string="Error Detail")
 
+    # ── Early validation (before dispatch) ─────────────────────────
+    # Computed rather than stored so a config-parameter change (e.g.
+    # setting the api_key or flipping demo_mode) is reflected the next
+    # time the wizard form is opened/refreshed, with no stale value to
+    # worry about.
+    hermes_available = fields.Boolean(
+        string="Hermes Runnable", compute="_compute_hermes_available",
+    )
+    hermes_config_hint = fields.Char(
+        string="Hermes Config Hint", compute="_compute_hermes_available",
+    )
+
+    @api.depends_context("uid")
+    def _compute_hermes_available(self):
+        ICP = self.env["ir.config_parameter"].sudo()
+        api_key = ICP.get_param("southbrook_hermes_bom.api_key", "")
+        demo_mode = str(ICP.get_param(
+            "southbrook_hermes_bom.demo_mode", "False"
+        )).strip().lower() in ("1", "true", "yes", "on")
+        available = bool(demo_mode or api_key)
+        hint = "" if available else _(
+            "Hermes can't run: set the 'southbrook_hermes_bom.api_key' "
+            "System Parameter, or enable demo mode "
+            "('southbrook_hermes_bom.demo_mode') to test offline."
+        )
+        for w in self:
+            w.hermes_available = available
+            w.hermes_config_hint = hint
+
     # ── Current-side mirrors of product.template (read-only) ──────
     # Surfaced so the review form can show "current vs proposed" side
     # by side without the view having to dot-walk job_id →
@@ -468,6 +497,24 @@ class HermesWizard(models.TransientModel):
             "user_notes": self.user_notes or "",
         }
 
+    def _clip(self, text, limit):
+        """Coerce untrusted Hermes text to a safe, bounded plain string.
+
+        Hermes output is external, untrusted content. Before it lands
+        in a Char/Text field we (a) coerce to str, (b) strip ASCII
+        control characters other than newline/tab (defends against a
+        response smuggling e.g. terminal escapes or NUL bytes into
+        chatter/exports), and (c) truncate to `limit` characters so a
+        runaway/hostile response can't blow up a Char column or the
+        review form. long_description is exempt — it's Html and
+        already goes through html_sanitize() separately.
+        """
+        s = "" if text is None else str(text)
+        s = "".join(
+            ch for ch in s if ch in ("\n", "\t") or ord(ch) >= 0x20
+        )
+        return s[:limit]
+
     def _populate_from_response(self, response):
         """Stash response fields onto the wizard for the review form."""
         enrichment = response.get("product_enrichment", {}) or {}
@@ -475,17 +522,18 @@ class HermesWizard(models.TransientModel):
         audit = response.get("audit", {}) or {}
 
         vals = {
-            "proposed_name": enrichment.get("name") or "",
-            "proposed_short_description": enrichment.get(
-                "short_description") or "",
+            "proposed_name": self._clip(enrichment.get("name") or "", 256),
+            "proposed_short_description": self._clip(
+                enrichment.get("short_description") or "", 1024),
             "proposed_long_description": html_sanitize(
                 enrichment.get("long_description") or "",
             ),
-            "proposed_technical_description": enrichment.get(
-                "technical_description") or "",
-            "proposed_manufacturer": enrichment.get("manufacturer") or "",
-            "proposed_manufacturer_pn": enrichment.get(
-                "manufacturer_pn") or "",
+            "proposed_technical_description": self._clip(
+                enrichment.get("technical_description") or "", 8192),
+            "proposed_manufacturer": self._clip(
+                enrichment.get("manufacturer") or "", 256),
+            "proposed_manufacturer_pn": self._clip(
+                enrichment.get("manufacturer_pn") or "", 128),
             "proposed_dimensions_json": json.dumps(
                 enrichment.get("dimensions") or [], default=str),
             "proposed_specs_json": json.dumps(

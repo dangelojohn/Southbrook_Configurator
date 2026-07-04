@@ -14,6 +14,15 @@ Security contract for callers:
     long_description).
   * The validator below only checks the top-level shape — downstream
     code must still defensively .get() each nested key.
+
+Demo/mock mode:
+  * Controlled by ``southbrook_hermes_bom.demo_mode`` (ir.config_parameter,
+    default "False"). When truthy, research() short-circuits BEFORE the
+    api_key gate and before `requests` is even imported — demo mode must
+    work offline, with no key configured, and even if the `requests`
+    package is missing entirely. See _demo_response() below.
+  * Demo mode NEVER touches the network. Production behaviour (key gate,
+    real HTTP call) is completely unchanged when demo mode is off.
 """
 import json
 import logging
@@ -25,6 +34,17 @@ _logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 120
 REQUIRED_TOP_LEVEL_KEYS = ("product_enrichment", "bom", "audit")
+
+# Values that count as "on" for southbrook_hermes_bom.demo_mode. Kept
+# permissive (any of the common truthy spellings a human might type into
+# System Parameters) since this is an ops toggle, not user input.
+_TRUTHY_STRINGS = ("1", "true", "yes", "on")
+
+# Deterministic demo fixtures — see _demo_response().
+_DEMO_MANUFACTURER = "Southbrook Cabinetry (demo)"
+_DEMO_SOURCE_URL = "https://demo.local/hermes/mock"
+_DEMO_CONFIDENCE = 0.9
+_DEMO_BOM_QTYS = (1.0, 2.0, 1.0)
 
 
 class HermesService:
@@ -49,6 +69,14 @@ class HermesService:
                 "'southbrook_hermes_bom.api_key' before running research."
             ))
 
+    def _is_demo_mode(self):
+        """True when southbrook_hermes_bom.demo_mode is set to a truthy
+        value. Default is False (production, fail-closed) — this param
+        must be explicitly opted into for offline/demo testing."""
+        ICP = self.env["ir.config_parameter"].sudo()
+        raw = ICP.get_param("southbrook_hermes_bom.demo_mode", "False")
+        return str(raw).strip().lower() in _TRUTHY_STRINGS
+
     def research(self, payload):
         """Call Hermes /research and return the validated response dict.
 
@@ -56,6 +84,11 @@ class HermesService:
         :returns: parsed JSON response
         :raises UserError: on transport, timeout, JSON, or shape errors
         """
+        if self._is_demo_mode():
+            # Deliberately BEFORE _load_config()/the api_key gate and
+            # before `requests` is imported — demo mode must work with
+            # no key configured and even if `requests` isn't installed.
+            return self._demo_response(payload)
         self._load_config()
         # Import locally so a missing `requests` install only breaks
         # this code path, not the whole module load.
@@ -122,3 +155,98 @@ class HermesService:
                 ", ".join(missing),
                 ", ".join(sorted(data.keys())),
             ))
+
+    def _demo_response(self, payload):
+        """Deterministic, offline stand-in for a real Hermes response.
+
+        Pure — only reads (the component lookup below) — never writes
+        anything. Product-specific (keyed off `payload`) so a reviewer
+        exercising the wizard in demo mode still sees plausible,
+        distinguishable content per product, but the exact same payload
+        always yields the exact same response (no randomness, no clock
+        reads) so tests can assert on it.
+
+        Every enrichment text field explicitly says DEMO/MOCK so no one
+        downstream mistakes this for real Hermes research.
+        """
+        product_name = payload.get("product_name") or "Unnamed Product"
+        internal_reference = payload.get("internal_reference") or ""
+        pn = internal_reference or "DEMO-PN"
+        user_notes = (payload.get("user_notes") or "").strip()
+
+        install_notes = [{
+            "text": (
+                "DEMO MODE: this is a mock Hermes response generated "
+                "locally for '%s' (ref: %s) — no external research was "
+                "performed and no network call was made."
+            ) % (product_name, pn),
+        }]
+        long_description = (
+            "<p><strong>[DEMO/MOCK]</strong> This enrichment for "
+            "<em>%s</em> (ref: %s) was generated offline by the Hermes "
+            "demo responder for testing purposes. It does not reflect "
+            "real product research.</p>"
+        ) % (product_name, pn)
+        if user_notes:
+            # Prove the reviewer's notes actually flow through the demo
+            # path, same as they would through the real one.
+            install_notes.append({
+                "text": "Reviewer notes (echoed back): %s" % user_notes,
+            })
+            long_description += (
+                "<p>Reviewer notes considered: %s</p>" % user_notes
+            )
+
+        # Look up a handful of real, existing components so the BOM
+        # build path has something to actually match against offline.
+        # Read-only, deterministic ordering, hard-limited — this never
+        # fabricates SKUs that won't match (an empty result is handled
+        # gracefully by the wizard's BOM-apply step).
+        components = self.env["product.product"].sudo().search(
+            [("default_code", "!=", False)], order="id", limit=3,
+        )
+        bom_lines = [
+            {
+                "sku": component.default_code,
+                "name": component.display_name,
+                "qty": _DEMO_BOM_QTYS[i % len(_DEMO_BOM_QTYS)],
+            }
+            for i, component in enumerate(components)
+        ]
+
+        return {
+            "product_enrichment": {
+                "name": "%s (Demo)" % product_name,
+                "short_description": (
+                    "[DEMO] Mock enrichment for '%s' — generated offline "
+                    "by Hermes demo mode; no real research performed."
+                ) % product_name,
+                "long_description": long_description,
+                "technical_description": (
+                    "[DEMO MODE] Placeholder technical description for "
+                    "'%s' (ref: %s), produced by "
+                    "HermesService._demo_response() for offline testing. "
+                    "Not real research output."
+                ) % (product_name, pn),
+                "manufacturer": _DEMO_MANUFACTURER,
+                "manufacturer_pn": pn,
+                "dimensions": [
+                    {"label": "Width", "value": "600 mm"},
+                    {"label": "Height", "value": "720 mm"},
+                    {"label": "Depth", "value": "560 mm"},
+                ],
+                "specs": [
+                    {"name": "Material", "value": "Demo placeholder"},
+                    {"name": "Finish", "value": "Demo placeholder"},
+                ],
+                "install_notes": install_notes,
+            },
+            "bom": {
+                "bom_type": "normal",
+                "lines": bom_lines,
+            },
+            "audit": {
+                "source_urls": [_DEMO_SOURCE_URL],
+                "overall_confidence": _DEMO_CONFIDENCE,
+            },
+        }

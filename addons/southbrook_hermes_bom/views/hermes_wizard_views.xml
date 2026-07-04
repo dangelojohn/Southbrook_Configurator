@@ -9,9 +9,15 @@
         <field name="state" invisible="1"/>
         <field name="job_id" invisible="1"/>
         <field name="existing_bom_state" invisible="1"/>
+        <field name="hermes_available" invisible="1"/>
+        <field name="hermes_config_hint" invisible="1"/>
 
         <!-- ── Phase: collecting (pre-dispatch) ────────────────── -->
         <group invisible="state != 'collecting'">
+          <div class="alert alert-warning" role="alert"
+               invisible="hermes_available or state != 'collecting'">
+            <field name="hermes_config_hint" readonly="1" nolabel="1"/>
+          </div>
           <div class="alert alert-info" role="alert">
             <field name="status_message" readonly="1" nolabel="1"/>
           </div>
@@ -126,7 +132,7 @@
                   string="Run Hermes"
                   type="object"
                   class="btn-primary"
-                  invisible="state != 'collecting'"/>
+                  invisible="state != 'collecting' or not hermes_available"/>
           <button name="action_apply"
                   string="Apply Selected Changes"
                   type="object"
