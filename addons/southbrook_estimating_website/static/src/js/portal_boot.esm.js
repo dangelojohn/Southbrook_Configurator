@@ -32,7 +32,7 @@
  *     },
  *   };
  */
-import { Component, markup, onError, onMounted, onWillUnmount, onWillUpdateProps, useState, xml } from "@odoo/owl";
+import { Component, markup, onError, onMounted, onWillUnmount, onWillUpdateProps, useRef, useState, xml } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { KitchenViewport } from "@southbrook_estimating_website/js/kitchen_viewport.esm";
 import { KitchenDesignTab } from "@southbrook_estimating_website/js/design_tab.esm";
@@ -3145,6 +3145,19 @@ const TEMPLATE = xml`
                  class="o_owl_tab_panel sb-room-setup-panel"
                  role="tabpanel" aria-labelledby="o_owl_tab_room_setup"
                  tabindex="0">
+                <!-- 2026-07-04 — AI ROOM CAPTURE. Single persistent
+                     hidden file input (present regardless of the
+                     room / no-room branch below) triggered by
+                     _sbOpenRoomCapture from either CTA. Styling
+                     (.sb-capture-file-input) owned by
+                     southbrook_room_capture/static/src/scss/room_capture.scss. -->
+                <input type="file"
+                       t-ref="sb_room_capture_file_input"
+                       class="sb-capture-file-input"
+                       accept="image/*"
+                       capture="environment"
+                       multiple="multiple"
+                       t-on-change="_sbOnCaptureFilesSelected"/>
                 <t t-if="state.room">
                     <!-- Phase 4 — Room Setup panel header bar. Hosts the
                          persistent unit toggle (mm | ft/in). The toggle
@@ -3227,12 +3240,28 @@ const TEMPLATE = xml`
                             <h2 class="sb-room-title">
                                 <t t-esc="state.room.name"/>
                             </h2>
-                            <button type="button"
-                                    class="sb-room-edit-btn"
-                                    t-on-click="_openRoomSetupWizard">
-                                Edit Room
-                            </button>
+                            <div class="sb-capture-cta-row">
+                                <button type="button"
+                                        class="sb-room-edit-btn"
+                                        t-on-click="_openRoomSetupWizard">
+                                    Edit Room
+                                </button>
+                                <!-- 2026-07-04 — AI ROOM CAPTURE re-scan entry point. -->
+                                <button type="button"
+                                        class="sb-capture-btn"
+                                        t-att-disabled="state.room_capture_busy"
+                                        t-on-click="_sbOpenRoomCapture">
+                                    <span class="sb-capture-btn-icon" aria-hidden="true">📷</span>
+                                    Re-scan from photos
+                                </button>
+                            </div>
                         </div>
+                        <div t-if="state.room_capture_busy" class="sb-capture-busy">
+                            <span class="sb-capture-busy-spinner" aria-hidden="true"></span>
+                            <span>Analyzing your photos…</span>
+                        </div>
+                        <p t-if="state.room_capture_error" class="sb-capture-error"
+                           t-esc="state.room_capture_error"/>
                         <div class="sb-room-meta">
                             <span class="sb-room-shape">
                                 <t t-esc="_humanShape(state.room.layout_shape)"/>
@@ -3295,10 +3324,41 @@ const TEMPLATE = xml`
                             then be placed against walls with live conflict
                             detection.
                         </p>
-                        <button class="o_owl_add_cabinet_btn sb-room-setup-cta"
-                                t-on-click="_openRoomSetupWizard">
-                            Set Up Room
-                        </button>
+                        <div class="sb-capture-cta-row">
+                            <button class="o_owl_add_cabinet_btn sb-room-setup-cta"
+                                    t-on-click="_openRoomSetupWizard">
+                                Set Up Room
+                            </button>
+                            <!-- 2026-07-04 — AI ROOM CAPTURE entry point.
+                                 Fallback UI hook owned by
+                                 southbrook_room_capture; see the
+                                 room_capture_* state comment above for
+                                 why this lives directly in OrderBuilder
+                                 rather than a cross-addon patch. -->
+                            <button type="button"
+                                    class="sb-capture-btn"
+                                    t-att-disabled="state.room_capture_busy"
+                                    t-on-click="_sbOpenRoomCapture">
+                                <span class="sb-capture-btn-icon" aria-hidden="true">📷</span>
+                                Capture room from photos
+                            </button>
+                        </div>
+                        <div t-if="state.room_capture_busy" class="sb-capture-busy">
+                            <span class="sb-capture-busy-spinner" aria-hidden="true"></span>
+                            <span>Analyzing your photos…</span>
+                        </div>
+                        <p t-if="state.room_capture_error" class="sb-capture-error"
+                           t-esc="state.room_capture_error"/>
+                        <div class="sb-capture-scale-hint">
+                            <label for="sb_room_capture_ceiling_hint">
+                                Known ceiling height (mm, optional)
+                            </label>
+                            <input id="sb_room_capture_ceiling_hint"
+                                   type="number"
+                                   min="0"
+                                   t-att-value="state.room_capture_ceiling_hint_mm"
+                                   t-on-change="_sbOnCeilingHintChanged"/>
+                        </div>
                         <p class="sb-room-empty-note">
                             <small>You can still add cabinets and design without
                                    setting up a room — it just unlocks the Room
@@ -3691,6 +3751,46 @@ class OrderBuilder extends Component {
             // while it's null. Non-blocking: initial render does NOT
             // wait on this.
             room: null,
+            // ------------------------------------------------------
+            // 2026-07-04 — AI ROOM CAPTURE fallback UI hook.
+            //
+            // This block + _sbOpenRoomCapture / _sbOnCaptureFilesSelected
+            // / _sbOnCeilingHintChanged below are the ONLY changes the
+            // southbrook_room_capture addon needed to make in THIS
+            // file. They are additive (new state keys, new methods, a
+            // few new template nodes) and change no existing behavior.
+            //
+            // Why here and not a cross-addon patch()/t-inherit from
+            // the new addon: OrderBuilder is declared
+            // `class OrderBuilder extends Component` (not exported)
+            // and its `static template = TEMPLATE` is an inline owl
+            // xml`...` tagged-template literal. Odoo's `xml()` helper
+            // (odoo/addons/web/static/lib/owl/owl.js) auto-generates
+            // an unstable per-page-load name (`__template__<n>`) for
+            // such templates and keeps it in a private registry —
+            // there is no stable qweb template name for another
+            // addon's t-inherit to extend, and no exported class
+            // reference for patch() to target. Rather than export the
+            // class and duplicate/fork this whole template in the new
+            // addon (fragile — any future edit here would silently
+            // desync), southbrook_room_capture ships this addon a
+            // tiny, self-contained UI hook that calls its endpoint by
+            // URL only (no JS import either direction, so each addon
+            // still installs/works independently). All AI/API logic
+            // (the endpoint, the vision-model call, the response
+            // contract) lives entirely in southbrook_room_capture.
+            // Visual styling of the button/spinner/error below is also
+            // owned by that addon (see
+            // southbrook_room_capture/static/src/scss/room_capture.scss
+            // — the .sb-capture-* class names here are its contract).
+            //
+            // No image bytes are ever stored in this state — only a
+            // busy flag, a short error string, and an optional
+            // scale-reference number the user may type in.
+            // ------------------------------------------------------
+            room_capture_busy: false,
+            room_capture_error: null,
+            room_capture_ceiling_hint_mm: null,
             ui: {
                 current_tab: "lines",
                 selected_line_id: null,
@@ -3774,6 +3874,10 @@ class OrderBuilder extends Component {
         this._onDeleteLine = this._onDeleteLine.bind(this);
         this._onLineQtyChange = this._onLineQtyChange.bind(this);
         this._onBulkToggle = this._onBulkToggle.bind(this);
+
+        // 2026-07-04 — AI ROOM CAPTURE. Ref to the hidden file input
+        // that _sbOpenRoomCapture clicks programmatically.
+        this._sbRoomCaptureFileRef = useRef("sb_room_capture_file_input");
 
         // P1 bugfix: synchronous lock prevents double-add on rapid clicks
         // (the reactive `state.catalog_busy` flag flips inside an async
@@ -4675,6 +4779,106 @@ class OrderBuilder extends Component {
         }
         this.state.ui.wizard = null;
         this.state.ui.current_tab = "room_setup";
+    };
+
+    // ------------------------------------------------------------------
+    // 2026-07-04 — AI ROOM CAPTURE (southbrook_room_capture addon).
+    // See the "why here" comment on the room_capture_* state keys above
+    // for the cross-addon rationale. These three methods are the ENTIRE
+    // fallback UI hook: open the native file/camera picker, read the
+    // chosen photos client-side, POST them to the new addon's endpoint,
+    // and either pre-fill the (unsaved, idless) wizard room or fall
+    // back to a blank wizard. No image bytes are ever kept past this
+    // function's lifetime — the base64 array is a local const, dropped
+    // when the call resolves; nothing is written to localStorage, and
+    // nothing image-related is logged.
+    // ------------------------------------------------------------------
+
+    _sbOpenRoomCapture = () => {
+        if (this.state.room_capture_busy) return;
+        this.state.room_capture_error = null;
+        const el = this._sbRoomCaptureFileRef.el;
+        if (el) {
+            el.value = "";   // reset so re-picking the same file re-fires change
+            el.click();
+        }
+    };
+
+    _sbOnCeilingHintChanged = (ev) => {
+        const raw = ev.target.value;
+        const n = raw === "" ? null : Number(raw);
+        this.state.room_capture_ceiling_hint_mm = (n && n > 0) ? n : null;
+    };
+
+    _sbOnCaptureFilesSelected = async (ev) => {
+        const input = ev.target;
+        const files = Array.from(input.files || []).slice(0, 5);
+        // Reset the input value immediately so selecting the exact same
+        // file(s) again still fires a fresh "change" event next time.
+        input.value = "";
+        if (!files.length) return;
+
+        this.state.room_capture_busy = true;
+        this.state.room_capture_error = null;
+        try {
+            const readAsBase64 = (file) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = String(reader.result || "");
+                    const commaIdx = result.indexOf(",");
+                    // Strip the "data:<mime>;base64," prefix — the
+                    // endpoint wants raw base64 only.
+                    resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+                };
+                reader.onerror = () => reject(reader.error || new Error("file read failed"));
+                reader.readAsDataURL(file);
+            });
+
+            // images/scaleReference live only as local consts in this
+            // async function — never assigned to `this.state` or any
+            // module-level variable, so nothing image-related survives
+            // past this call.
+            const images = await Promise.all(files.map(readAsBase64));
+            const scaleReference = this.state.room_capture_ceiling_hint_mm
+                ? { ceiling_height_mm: this.state.room_capture_ceiling_hint_mm }
+                : null;
+
+            const res = await rpcJsonCall(
+                "/southbrook/api/order/"
+                + encodeURIComponent(this.props.orderId)
+                + "/room/analyze-photos",
+                { images, scale_reference: scaleReference },
+            );
+
+            if (res && res.ok && res.existing_room) {
+                // existing_room carries NO id fields — RoomSetupWizard
+                // (patched by southbrook_room_capture) treats an
+                // idless-but-present existingRoom as an AI prefill and
+                // opens in CREATE mode, showing the "review before
+                // saving" banner. Nothing is persisted by this step.
+                this.state.room = res.existing_room;
+                this.state.ui.wizard = "room_setup";
+            } else {
+                // Any error, or an ok response without walls to show,
+                // is treated as "AI failed" — never prefill from a
+                // partial/garbage estimate. Open the wizard blank so
+                // the user can enter the room by hand.
+                const detail = (res && (res.detail || res.error)) || "";
+                this.state.room_capture_error = detail
+                    ? "Couldn't read the room from photos (" + detail
+                        + ") — please enter it manually."
+                    : "Couldn't read the room from photos — please enter it manually.";
+                this.state.room = null;
+                this.state.ui.wizard = "room_setup";
+            }
+        } catch (e) {
+            this.state.room_capture_error =
+                "Couldn't read the room from photos — please enter it manually.";
+            this.state.room = null;
+            this.state.ui.wizard = "room_setup";
+        } finally {
+            this.state.room_capture_busy = false;
+        }
     };
 
     async _refreshRoomState() {

@@ -1,0 +1,240 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// ---------------------------------------------------------------------
+// southbrook_room_capture — frontend styles.
+//
+// Two surfaces styled here, both owned by this addon even though one
+// of them (the button) is structurally rendered by ANOTHER addon's
+// file (see room_capture.esm.js's top-of-file comment for why):
+//
+//   1. .sb-capture-*   — the "Capture room from photos" / "Re-scan
+//                         from photos" button, its visually-hidden
+//                         file input, the busy spinner, the inline
+//                         error message, and the optional ceiling-
+//                         height scale-reference input. Markup lives
+//                         in southbrook_estimating_website's
+//                         portal_boot.esm.js (OrderBuilder template,
+//                         "AI ROOM CAPTURE" comment block) — this
+//                         addon supplies the class contract + look.
+//
+//   2. .sb-ai-banner-* — the "these are AI estimates, review them"
+//                         banner injected into RoomSetupWizard via
+//                         t-inherit (room_capture.xml).
+//
+// Loaded (per this addon's manifest) after
+// southbrook_estimating_website's portal_root.scss + room_layout.scss
+// + fonts.scss + design tokens, so every var(--sb-*) below already
+// resolves to the live theme (light/dark rebind included) — no
+// hardcoded colors, matching the rest of the portal.
+// ---------------------------------------------------------------------
+
+.sb-capture-cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.sb-capture-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    // Comfortable tap target (WCAG 2.5.5 AAA target size / mobile-
+    // friendly) — this is the primary way a phone user starts the
+    // camera-capture flow.
+    min-height: 44px;
+    padding: 0.6rem 1.2rem;
+    background: var(--sb-paper);
+    color: var(--sb-walnut-d);
+    border: 1px solid var(--sb-walnut);
+    border-radius: var(--sb-radius);
+    font-family: var(--sb-font-display);
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+
+    &:hover:not(:disabled) {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    &-icon {
+        font-size: 1.05rem;
+        line-height: 1;
+    }
+}
+
+// Visually-hidden file input — kept in the DOM (not display:none) so
+// mobile Safari / Chrome still honor the native file-picker / camera
+// affordance when triggered programmatically via .click().
+.sb-capture-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.sb-capture-scale-hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.6rem 0;
+    font-family: var(--sb-font-sans);
+    font-size: 0.78rem;
+    color: var(--sb-ink-dim);
+
+    label {
+        cursor: pointer;
+    }
+
+    input {
+        width: 6rem;
+        padding: 0.3rem 0.5rem;
+        border: 1px solid var(--sb-rule);
+        border-radius: var(--sb-radius-sm);
+        font-family: var(--sb-font-sans);
+        font-size: 0.82rem;
+        color: var(--sb-ink);
+        background: var(--sb-paper);
+
+        &:focus-visible {
+            outline: 2px solid var(--sb-sky);
+            outline-offset: 2px;
+        }
+    }
+}
+
+.sb-capture-busy {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    font-family: var(--sb-font-sans);
+    font-size: 0.85rem;
+    color: var(--sb-ink-dim);
+
+    &-spinner {
+        flex: 0 0 auto;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid var(--sb-rule);
+        border-top-color: var(--sb-walnut);
+        animation: sb-capture-spin 700ms linear infinite;
+    }
+}
+
+@keyframes sb-capture-spin {
+    to { transform: rotate(360deg); }
+}
+
+.sb-capture-error {
+    font-family: var(--sb-font-sans);
+    font-size: 0.85rem;
+    color: var(--sb-alert);
+    margin: 0.35rem 0 0 0;
+    line-height: 1.4;
+}
+
+// ---------------------------------------------------------------------
+// AI-estimate review banner (inside RoomSetupWizard, injected via
+// room_capture.xml's t-inherit).
+// ---------------------------------------------------------------------
+
+.sb-ai-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin: 0 1.5rem 1rem 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--sb-hl);
+    border: 1px solid var(--sb-rule-d);
+    border-radius: var(--sb-radius);
+
+    &-icon {
+        flex: 0 0 auto;
+        font-size: 1.1rem;
+        line-height: 1.3;
+        color: var(--sb-walnut-d);
+    }
+
+    &-text {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    &-headline {
+        margin: 0;
+        font-family: var(--sb-font-sans);
+        font-size: 0.86rem;
+        font-weight: 600;
+        color: var(--sb-ink);
+        line-height: 1.4;
+    }
+
+    &-warnings {
+        margin: 0.4rem 0 0 0;
+        padding-left: 1.1rem;
+        font-family: var(--sb-font-sans);
+        font-size: 0.8rem;
+        color: var(--sb-ink-dim);
+
+        li {
+            margin: 0.15rem 0;
+        }
+    }
+
+    &-dismiss {
+        flex: 0 0 auto;
+        background: transparent;
+        border: none;
+        font-size: 1.1rem;
+        line-height: 1;
+        color: var(--sb-ink-dim);
+        cursor: pointer;
+        padding: 0.1rem 0.3rem;
+
+        &:hover {
+            color: var(--sb-ink);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--sb-sky);
+            outline-offset: 2px;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// Mobile — the capture button is the primary camera entry point on a
+// phone, so it gets the full tap-friendly width there.
+// ---------------------------------------------------------------------
+
+@media (max-width: 640px) {
+    .sb-capture-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .sb-capture-cta-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

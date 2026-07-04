@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SPDX-License-Identifier: LGPL-3.0-only
+
+    southbrook_room_capture — AI-estimate review banner.
+
+    Extends the EXISTING RoomSetupWizard template (owned + shipped by
+    southbrook_estimating_website, file-based template with a stable
+    qweb name — a normal, supported t-inherit target, unlike
+    OrderBuilder's inline xml`` template; see room_capture.esm.js's
+    top-of-file comment for the full explanation of that distinction).
+
+    Inserts a dismissible banner directly above the wizard's two-pane
+    body whenever the wizard was opened with an AI-prefilled-but-
+    unsaved room (state.aiEstimated, set by this addon's patch of
+    RoomSetupWizard.setup() in room_capture.esm.js). The banner tells
+    the user, in plain language, that every value must be reviewed
+    before saving — nothing from the AI estimate is ever persisted by
+    this addon; only the human's edits, submitted through the
+    unmodified wizard flow (which still calls
+    southbrook.room.validate_geometry server-side), are.
+
+    OWL tokenizer rules followed (project convention, see
+    scripts/lint-owl-expr.py):
+      * t-if / t-att-* use only ||, &&, ! (never Python or/and/not)
+      * `<` is encoded as &lt; inside expressions (none needed here)
+      * no JS regex literals in t-* attributes
+-->
+<templates xml:space="preserve">
+
+    <t t-name="southbrook_room_capture.RoomSetupWizardAiBanner"
+       t-inherit="southbrook_estimating_website.RoomSetupWizard"
+       t-inherit-mode="extension">
+
+        <xpath expr="//div[contains(@class,'sb-room-wizard-body')]" position="before">
+            <div t-if="state.aiEstimated &amp;&amp; !state.aiBannerDismissed"
+                 class="sb-ai-banner"
+                 role="status">
+                <span class="sb-ai-banner-icon" aria-hidden="true">&#10024;</span>
+                <div class="sb-ai-banner-text">
+                    <p class="sb-ai-banner-headline">
+                        These measurements are AI estimates from your
+                        photos. Review and correct every value before
+                        saving.
+                    </p>
+                    <ul t-if="state.aiWarnings.length" class="sb-ai-banner-warnings">
+                        <li t-foreach="state.aiWarnings" t-as="sb_ai_warning"
+                            t-key="sb_ai_warning_index"
+                            t-esc="sb_ai_warning"/>
+                    </ul>
+                </div>
+                <button type="button"
+                        class="sb-ai-banner-dismiss"
+                        aria-label="Dismiss AI estimate notice"
+                        t-on-click="_sbDismissAiBanner">&#215;</button>
+            </div>
+        </xpath>
+
+    </t>
+
+</templates>
