@@ -350,3 +350,44 @@ class SaleOrderLine(models.Model):
         if not tmpl:
             return False
         return tmpl.action_southbrook_launch_3d_configurator()
+
+    # ------------------------------------------------------------------
+    # QA fix (2026-07-04): the per-line "Reconfigure" gear icon
+    # (product_configurator_sale's reconfigure_product, upstream OCA —
+    # not patched in place) always jumps straight past the Select
+    # Template step into the first attribute step (Construction &
+    # Sizing) via create_config_wizard(click_next=True, the default).
+    # That's correct once a line has GENUINE prior config choices to
+    # re-open — but a line whose product_id was set WITHOUT ever going
+    # through the configurator (config_session_id is False: e.g. a
+    # directly-typed-in or demo-seeded line, exactly S01331's shape)
+    # has nothing of its own to "re"-configure. Jumping ahead there
+    # showed either a blank or an unrelated shared session with no
+    # visible way to see/change which template was implied, which QA
+    # flagged as confusing.
+    #
+    # For that specific case only, route through the SAME "start
+    # fresh" path product.template.configure_product() already uses
+    # (click_next=False, product_tmpl_id_readonly=True) so the wizard
+    # lands on Select Template first, same as a genuinely-fresh
+    # configure — while leaving the normal re-open-existing-session
+    # behavior for lines that DO have config_session_id untouched.
+    # ------------------------------------------------------------------
+    def reconfigure_product(self):
+        self.ensure_one()
+        if self.product_id and not self.config_session_id:
+            extra_vals = {
+                "order_id": self.order_id.id,
+                "order_line_id": self.id,
+                "product_id": self.product_id.id,
+            }
+            return self.with_context(
+                default_order_id=self.order_id.id,
+                default_order_line_id=self.id,
+                product_tmpl_id_readonly=True,
+            ).product_id.product_tmpl_id.create_config_wizard(
+                model_name="product.configurator.sale",
+                extra_vals=extra_vals,
+                click_next=False,
+            )
+        return super().reconfigure_product()

@@ -101,3 +101,52 @@ class TestConfiguratorFromOrder(TransactionCase):
             "product_id": variant.id,
         })
         self.assertTrue(wizard.config_session_id)
+
+    # ------------------------------------------------------------------
+    # QA follow-up (2026-07-04): per-line "Reconfigure" for a
+    # session-less line must land on Select Template, not jump ahead.
+    # ------------------------------------------------------------------
+    def _make_variant_and_line(self):
+        """A variant + order line matching S01331's actual shape:
+        product_id set, but never run through the configurator (no
+        config_session_id on the line)."""
+        variant = self.env["product.product"].create({
+            "product_tmpl_id": self.tmpl.id,
+        })
+        line = self.env["sale.order.line"].create({
+            "order_id": self.order.id,
+            "product_id": variant.id,
+            "product_uom_qty": 1,
+        })
+        return variant, line
+
+    def test_reconfigure_session_less_line_lands_on_select_template(self):
+        variant, line = self._make_variant_and_line()
+        self.assertFalse(line.config_session_id)
+        action = line.reconfigure_product()
+        self.assertTrue(action.get("res_id"), "must return a wizard action with a res_id")
+        wizard = self.env["product.configurator.sale"].browse(action["res_id"])
+        self.assertEqual(
+            wizard.state, "select",
+            "a session-less line's Reconfigure must land on Select "
+            "Template, not jump straight past it",
+        )
+        self.assertEqual(wizard.product_tmpl_id, self.tmpl)
+
+    def test_reconfigure_existing_session_line_unchanged(self):
+        """Regression companion: a line that DOES have a real prior
+        config session must keep the existing behavior (jump straight
+        to the first attribute step) -- this fix must be scoped to
+        session-less lines only."""
+        variant, line = self._make_variant_and_line()
+        session = self.env["product.config.session"].create({
+            "product_tmpl_id": self.tmpl.id, "user_id": self.env.uid,
+        })
+        line.config_session_id = session.id
+        action = line.reconfigure_product()
+        wizard = self.env["product.configurator.sale"].browse(action["res_id"])
+        self.assertNotEqual(
+            wizard.state, "select",
+            "a line with a genuine existing config session must still "
+            "jump straight past Select Template, unchanged from before",
+        )
