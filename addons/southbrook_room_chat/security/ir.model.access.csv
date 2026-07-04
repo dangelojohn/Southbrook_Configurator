@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_southbrook_room_chat_session_user,southbrook.room.chat.session user,model_southbrook_room_chat_session,base.group_user,1,0,0,0
+access_southbrook_room_chat_session_sales,southbrook.room.chat.session sales,model_southbrook_room_chat_session,sales_team.group_sale_salesman,1,1,1,1
+access_southbrook_room_chat_session_manager,southbrook.room.chat.session manager,model_southbrook_room_chat_session,sales_team.group_sale_manager,1,1,1,1

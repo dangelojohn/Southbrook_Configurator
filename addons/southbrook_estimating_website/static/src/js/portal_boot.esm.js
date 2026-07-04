@@ -3952,11 +3952,26 @@ class OrderBuilder extends Component {
             // Removed cleanly on unmount.
             this._onGlobalKeydown = this._onGlobalKeydown.bind(this);
             document.addEventListener("keydown", this._onGlobalKeydown);
+            // 2026-07-04 — AI ROOM CHAT (southbrook_room_chat addon).
+            // RoomChatWidget is a SEPARATE, standalone-mounted OWL root
+            // (see its own mount div injected via
+            // order_builder_room_chat_inject.xml) — it cannot reach this
+            // component's state directly. Instead it dispatches a
+            // bubbling CustomEvent when the user is happy with the
+            // chat-built draft; this listener is the entire hand-off.
+            // Reuses the SAME aiPrefillRoom slot + idless-draft detection
+            // the "AI ROOM CAPTURE" flow above already established, so no
+            // wizard changes were needed for this addon either.
+            this._onRoomChatReview = this._onRoomChatReview.bind(this);
+            document.addEventListener("sb:room-chat-review", this._onRoomChatReview);
         });
         onWillUnmount(() => {
             this._stopRealtimeSync();
             if (this._onGlobalKeydown) {
                 document.removeEventListener("keydown", this._onGlobalKeydown);
+            }
+            if (this._onRoomChatReview) {
+                document.removeEventListener("sb:room-chat-review", this._onRoomChatReview);
             }
         });
     }
@@ -4839,6 +4854,22 @@ class OrderBuilder extends Component {
         // reappears on a later normal edit.
         this.state.ui.aiPrefillRoom = null;
     };
+
+    // ------------------------------------------------------------------
+    // 2026-07-04 — AI ROOM CHAT (southbrook_room_chat addon).
+    // Fired by RoomChatWidget's "Looks good — finish in Room Setup"
+    // button. `ev.detail` is a draft room in the exact idless
+    // existing_room shape southbrook_room_capture's endpoint already
+    // returns (no `id` fields — nothing has been persisted), so the
+    // SAME aiPrefillRoom slot + RoomSetupWizard idless-detection patch
+    // handles it correctly with zero additional wizard changes.
+    // ------------------------------------------------------------------
+    _onRoomChatReview(ev) {
+        const draft = ev && ev.detail;
+        if (!draft) return;
+        this.state.ui.aiPrefillRoom = draft;
+        this.state.ui.wizard = "room_setup";
+    }
 
     // ------------------------------------------------------------------
     // 2026-07-04 — AI ROOM CAPTURE (southbrook_room_capture addon).

@@ -1,0 +1,222 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+// ---------------------------------------------------------------------
+// southbrook_room_chat — RoomChatWidget styles.
+//
+// Loaded (per this addon's manifest) after southbrook_estimating_website's
+// portal_root.scss + room_layout.scss + fonts.scss + design tokens, so
+// every var(--sb-*) below resolves to the live theme (light/dark rebind
+// included) — matching southbrook_room_capture.scss's convention rather
+// than hermes_chat.scss's older hardcoded-hex one.
+// ---------------------------------------------------------------------
+
+.o_room_chat {
+    font-family: var(--sb-font-sans, "Roboto Flex", "Inter", system-ui, sans-serif);
+
+    &__panels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    &__conversation {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 360px;
+        min-width: 280px;
+        min-height: 360px;
+        max-height: 70vh;
+        background: var(--sb-paper);
+        border: 1px solid var(--sb-border, var(--sb-rule));
+        border-radius: var(--sb-radius-card, var(--sb-radius));
+        overflow: hidden;
+    }
+
+    &__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 0.85rem;
+        border-bottom: 1px solid var(--sb-border, var(--sb-rule));
+        background: var(--sb-surface, var(--sb-linen));
+    }
+
+    &__title {
+        font-family: var(--sb-font-display);
+        font-weight: 600;
+        color: var(--sb-ink);
+        font-size: 0.95rem;
+    }
+
+    &__reset-btn {
+        background: none;
+        border: none;
+        color: var(--sb-ink-muted);
+        font-size: 0.8rem;
+        cursor: pointer;
+        text-decoration: underline;
+
+        &:hover:not(:disabled) {
+            color: var(--sb-ink);
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
+    &__scroll {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    &__placeholder {
+        color: var(--sb-ink-muted);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        padding: 0.5rem 0.2rem;
+    }
+
+    &__msg {
+        max-width: 88%;
+        padding: 0.5rem 0.75rem;
+        border-radius: var(--sb-radius-sm, 8px);
+        line-height: 1.45;
+        font-size: 0.92rem;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    &__msg--user {
+        align-self: flex-end;
+        background: var(--sb-walnut-tint, var(--sb-linen));
+        color: var(--sb-ink);
+    }
+
+    &__msg--assistant {
+        align-self: flex-start;
+        background: var(--sb-surface, var(--sb-linen));
+        color: var(--sb-ink);
+        border: 1px solid var(--sb-border, var(--sb-rule));
+    }
+
+    &__error {
+        margin: 0 0.85rem;
+        padding: 0.5rem;
+        color: var(--sb-danger);
+        background: var(--sb-warn-bg);
+        border: 1px solid var(--sb-warn-border);
+        border-radius: var(--sb-radius-sm, 8px);
+        font-size: 0.85rem;
+    }
+
+    &__input {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.85rem;
+        border-top: 1px solid var(--sb-border, var(--sb-rule));
+        background: var(--sb-paper);
+
+        textarea {
+            flex: 1 1 auto;
+            resize: none;
+            border: 1px solid var(--sb-border, var(--sb-rule));
+            border-radius: var(--sb-radius-sm, 8px);
+            padding: 0.5rem 0.6rem;
+            font-family: inherit;
+            font-size: 0.92rem;
+            line-height: 1.4;
+            background: var(--sb-paper);
+            color: var(--sb-ink);
+
+            &:focus {
+                outline: none;
+                border-color: var(--sb-sky);
+            }
+        }
+
+        button {
+            background: var(--sb-walnut-d, var(--sb-walnut));
+            color: var(--sb-paper);
+            border: none;
+            border-radius: var(--sb-radius-sm, 8px);
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 40px;
+
+            &:disabled {
+                background: var(--sb-ink-muted);
+                cursor: not-allowed;
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--sb-sky);
+                outline-offset: 2px;
+            }
+        }
+    }
+
+    &__preview-pane {
+        flex: 1 1 280px;
+        min-width: 260px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    &__preview-label {
+        font-family: var(--sb-font-display);
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--sb-ink-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    &__ai-note {
+        font-size: 0.8rem;
+        color: var(--sb-warn, var(--sb-ink-muted));
+        background: var(--sb-warn-bg);
+        border: 1px solid var(--sb-warn-border);
+        border-radius: var(--sb-radius-sm, 8px);
+        padding: 0.4rem 0.6rem;
+    }
+
+    &__review-btn {
+        background: var(--sb-gold, var(--sb-walnut));
+        color: var(--sb-ink);
+        border: none;
+        border-radius: var(--sb-radius, 8px);
+        padding: 0.6rem 1rem;
+        font-family: var(--sb-font-display);
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 44px;
+
+        &:hover:not(:disabled) {
+            background: var(--sb-gold-hover, var(--sb-walnut-d));
+        }
+
+        &:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--sb-sky);
+            outline-offset: 2px;
+        }
+    }
+}
+
+@media (max-width: 780px) {
+    .o_room_chat__panels {
+        flex-direction: column;
+    }
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Inject the RoomChatWidget mount point into the Order Builder portal
+       page. Mirrors southbrook_hermes's order_builder_chat_inject.xml
+       exactly (same inherit_id + xpath target) — OrderBuilder's own
+       template is an inline owl `xml\`...\`` literal (no stable qweb
+       name, not patchable), so a standalone panel injected at the
+       server-template level, same as Hermes's own chat, is the
+       established workaround for reaching this page at all. The mount
+       is auto-discovered by this addon's OWL bundle's autoMount()
+       routine and appears as its own panel alongside Hermes's chat,
+       below the order header card. -->
+  <template id="hermes_room_chat_inject_order_builder"
+            inherit_id="southbrook_estimating_website.portal_order_builder"
+            name="Room Chat — Order Builder mount">
+    <xpath expr="//div[hasclass('o_southbrook_portal_header')]" position="after">
+      <div class="o_room_chat_wrap mt-3 mb-3"
+           data-room-chat-mount="1"
+           t-att-data-order-id="order_id or ''"/>
+    </xpath>
+  </template>
+</odoo>

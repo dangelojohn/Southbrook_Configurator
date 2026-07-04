@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+  <t t-name="southbrook_room_chat.RoomChatWidget" owl="1">
+    <div class="o_room_chat">
+      <div class="o_room_chat__panels">
+        <div class="o_room_chat__conversation">
+          <div class="o_room_chat__header">
+            <span class="o_room_chat__title">Chat to build your room</span>
+            <button type="button" class="o_room_chat__reset-btn"
+                    t-on-click="startOver"
+                    t-att-disabled="state.sending">
+              Start over
+            </button>
+          </div>
+
+          <div class="o_room_chat__scroll">
+            <t t-if="state.messages.length === 0">
+              <div class="o_room_chat__placeholder">
+                Tell me about your kitchen — the shape, wall lengths, and
+                any windows or doors. Try: "It's a straight run, about 12
+                feet, with a window in the middle."
+              </div>
+            </t>
+            <t t-foreach="state.messages" t-as="m" t-key="m_index">
+              <div t-attf-class="o_room_chat__msg o_room_chat__msg--{{ m.role }}">
+                <div class="o_room_chat__msg-content" t-esc="m.content"/>
+              </div>
+            </t>
+          </div>
+
+          <div class="o_room_chat__error" t-if="state.error">
+            <t t-esc="state.error"/>
+          </div>
+
+          <div class="o_room_chat__input">
+            <textarea
+              t-model="state.inputValue"
+              t-on-keydown="onKeydown"
+              rows="2"
+              placeholder="Describe your kitchen…"
+              t-att-disabled="state.sending"/>
+            <button
+              type="button"
+              t-on-click="submit"
+              t-att-disabled="state.sending || !state.inputValue.trim()">
+              <t t-if="state.sending">…</t>
+              <t t-else="">Send</t>
+            </button>
+          </div>
+        </div>
+
+        <aside class="o_room_chat__preview-pane">
+          <div class="o_room_chat__preview-label">Draft preview</div>
+          <RoomOutlinePreview
+            shape="state.draft.layout_shape"
+            walls="state.draft.walls"
+            constraints="flatConstraints"
+            unitPreference="state.draft.unit_preference"/>
+          <div class="o_room_chat__ai-note" t-if="hasDraftContent">
+            AI-estimated from this conversation — review every value before
+            saving.
+          </div>
+          <button type="button" class="o_room_chat__review-btn"
+                  t-on-click="reviewInWizard"
+                  t-att-disabled="!hasDraftContent">
+            <t t-if="state.reviewSent">Opened in Room Setup ✓</t>
+            <t t-else="">Looks good — finish in Room Setup</t>
+          </button>
+        </aside>
+      </div>
+    </div>
+  </t>
+
+</templates>

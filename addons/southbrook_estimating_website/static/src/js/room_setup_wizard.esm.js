@@ -217,7 +217,14 @@ function defaultWalls(n) {
 // "preview not yet rendered for this shape" note inside the SVG.
 // ----------------------------------------------------------------------
 
-class RoomOutlinePreview extends Component {
+// Exported (2026-07-04, southbrook_room_chat) so it can be reused as a
+// standalone live-preview panel outside the wizard — it's a pure,
+// prop-driven component (no internal mutable state), so this is a safe,
+// purely-additive change. Its qweb template lives in this same file's
+// asset bundle, so importing the class elsewhere works as long as
+// room_setup_wizard.xml is loaded on the page (it always is, since
+// southbrook_room_chat depends on southbrook_estimating_website).
+export class RoomOutlinePreview extends Component {
     static template = "southbrook_estimating_website.RoomOutlinePreview";
     static props = {
         shape: { type: [String, { value: null }], optional: true },
