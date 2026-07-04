@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 {
     "name": "Southbrook Hermes Product Research & BOM Builder",
-    "version": "19.0.2.1.0",
+    "version": "19.0.2.2.0",
     "summary": "AI-powered product research and BOM generation via Hermes agent",
     "description": """
 Adds a wizard-driven research path to Configurable Templates and Configured

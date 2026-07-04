@@ -41,6 +41,21 @@
     </record>
 
     <!--
+      Demo/mock mode. When "True" (or any truthy spelling), HermesService
+      .research() short-circuits to a deterministic, offline, mock
+      response BEFORE the api_key gate and before any HTTP call — lets a
+      fresh install exercise the wizard end-to-end with no api_key and
+      no live Hermes endpoint. Defaults to "False" so fresh AND existing
+      installs stay fail-closed (production behaviour unchanged) unless
+      someone explicitly opts in via Settings → Technical → System
+      Parameters.
+    -->
+    <record id="param_hermes_demo_mode" model="ir.config_parameter">
+      <field name="key">southbrook_hermes_bom.demo_mode</field>
+      <field name="value">False</field>
+    </record>
+
+    <!--
       Sequence for hermes.research.job.name. The model falls back to
       a synthesized label if the sequence is missing (e.g. a partial
       install), so we never produce blank-named jobs.
