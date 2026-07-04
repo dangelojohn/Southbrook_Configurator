@@ -28,12 +28,12 @@
     <record id="room_template_standard_l_kitchen" model="southbrook.room.template">
         <field name="name">Standard L-Shape Kitchen</field>
         <field name="sequence">20</field>
-        <field name="description">L-shape kitchen — 3.6m + 2.4m walls, sink and window seeded on Wall A.</field>
+        <field name="description">L-shape kitchen — 3.6m + 2.4m walls, window then sink seeded on Wall A (non-overlapping).</field>
         <field name="room_type">kitchen</field>
         <field name="layout_shape">l_shape</field>
         <field name="ceiling_height_mm">2400</field>
         <field name="walls_json">[{"name": "Wall A", "length_mm": 3600, "wall_order": 10}, {"name": "Wall B", "length_mm": 2400, "wall_order": 20}]</field>
-        <field name="constraints_json">[{"wall_index": 0, "constraint_type": "sink", "distance_from_left_mm": 1500, "width_mm": 900}, {"wall_index": 0, "constraint_type": "window", "distance_from_left_mm": 1200, "width_mm": 1500, "height_mm": 1200}]</field>
+        <field name="constraints_json">[{"wall_index": 0, "constraint_type": "window", "distance_from_left_mm": 300, "width_mm": 1200, "height_mm": 1200}, {"wall_index": 0, "constraint_type": "sink", "distance_from_left_mm": 1800, "width_mm": 900}]</field>
     </record>
 
     <record id="room_template_galley_kitchen" model="southbrook.room.template">

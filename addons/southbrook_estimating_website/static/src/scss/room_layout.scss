@@ -316,6 +316,7 @@
 }
 
 .sb-room-wizard-card {
+    position: relative;
     width: 100%;
     max-width: 1100px;
     max-height: 92vh;
@@ -2700,4 +2701,187 @@
             background: var(--sb-linen);
         }
     }
+}
+
+// =====================================================================
+// 2026-07-03 QA fixes — Room Setup wizard: edit mode, geometry
+// validation feedback, clickable stepper, discard confirm, richer
+// live preview (wall labels + constraint markers).
+// =====================================================================
+
+// Clickable stepper badges — only the reached steps get the affordance.
+.sb-room-wizard-step--clickable {
+    cursor: pointer;
+
+    &:hover .sb-room-wizard-step-label {
+        text-decoration: underline;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+        border-radius: var(--sb-radius-sm);
+    }
+}
+
+// Inline "why is Next disabled" hint, left-aligned in the footer.
+.sb-room-wizard-foot-hint {
+    flex: 1 1 auto;
+    color: var(--sb-alert);
+    font-family: var(--sb-font-sans);
+    font-size: 0.8rem;
+    line-height: 1.2;
+}
+
+// Danger button (Discard).
+.sb-room-wizard-btn--danger {
+    background: var(--sb-danger);
+    color: var(--sb-paper);
+    border-color: var(--sb-danger);
+
+    &:hover {
+        filter: brightness(0.95);
+    }
+}
+
+// Geometry feedback banners in Step 3.
+.sb-room-wizard-geom-errors {
+    margin: 0.6rem 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--sb-alert);
+    border-radius: var(--sb-radius-sm);
+    background: rgba(168, 58, 43, 0.06);
+}
+
+.sb-room-wizard-geom-error {
+    margin: 0.15rem 0;
+    color: var(--sb-alert);
+    font-family: var(--sb-font-sans);
+    font-size: 0.82rem;
+}
+
+.sb-room-wizard-geom-warnings {
+    margin: 0.6rem 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--sb-warn-border);
+    border-radius: var(--sb-radius-sm);
+    background: var(--sb-warn-bg);
+}
+
+.sb-room-wizard-geom-warning {
+    margin: 0.15rem 0;
+    color: var(--sb-warn);
+    font-family: var(--sb-font-sans);
+    font-size: 0.82rem;
+}
+
+// Discard-changes confirm overlay (nested inside the wizard card).
+.sb-room-wizard-confirm-backdrop {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(30, 22, 14, 0.45);
+    border-radius: inherit;
+    z-index: 5;
+}
+
+.sb-room-wizard-confirm-card {
+    max-width: 22rem;
+    padding: 1.4rem 1.5rem;
+    border-radius: var(--sb-radius-md, 8px);
+    background: var(--sb-paper);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.28);
+
+    h3 {
+        margin: 0 0 0.5rem;
+        font-family: var(--sb-font-display);
+        color: var(--sb-ink);
+    }
+
+    p {
+        margin: 0 0 1rem;
+        color: var(--sb-ink-dim);
+        font-size: 0.88rem;
+    }
+}
+
+.sb-room-wizard-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+// --- Richer live preview: per-wall lines, labels, constraint markers ---
+.sb-room-wizard-svg-wall {
+    stroke: var(--sb-walnut);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.sb-room-wizard-svg-wall-label {
+    fill: var(--sb-walnut-d);
+    font-family: var(--sb-font-mono);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.sb-room-wizard-svg-constraint {
+    fill: var(--sb-sky);
+    fill-opacity: 0.35;
+    stroke: var(--sb-sky);
+    stroke-width: 1;
+
+    &--oob {
+        fill: var(--sb-alert);
+        fill-opacity: 0.4;
+        stroke: var(--sb-alert);
+    }
+}
+
+.sb-room-wizard-svg-constraint-label {
+    fill: var(--sb-ink);
+    font-family: var(--sb-font-sans);
+    font-size: 10px;
+}
+
+// --- Summary: edit button + per-wall conflict note ---
+.sb-room-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.sb-room-edit-btn {
+    flex: 0 0 auto;
+    padding: 0.4rem 0.9rem;
+    border-radius: var(--sb-radius-sm);
+    border: 1px solid var(--sb-walnut);
+    background: transparent;
+    color: var(--sb-walnut);
+    font-family: var(--sb-font-display);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+
+    &:hover {
+        background: var(--sb-walnut);
+        color: var(--sb-paper);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--sb-sky);
+        outline-offset: 2px;
+    }
+}
+
+.sb-room-wall-conflict-note {
+    margin-top: 0.4rem;
+    color: var(--sb-alert);
+    font-family: var(--sb-font-sans);
+    font-size: 0.76rem;
+    line-height: 1.25;
 }

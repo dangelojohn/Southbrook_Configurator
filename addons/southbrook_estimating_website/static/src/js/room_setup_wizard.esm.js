@@ -57,8 +57,71 @@ async function rpcJsonCall(url, params = {}) {
 }
 import {
     wallSegmentsForShape,
-    polylinePointsFromSegments,
 } from "@southbrook_estimating_website/js/room_geometry.esm";
+
+// ----------------------------------------------------------------------
+// Unit helpers (2026-07-03 QA fix — one display format everywhere).
+//
+// Canonical imperial display is feet-inches ("9' 10\"" / "10\"") to match
+// the Room Setup summary, the Room Layout tab, and the Customer Spec Sheet
+// PDF. The wizard's editable inputs are therefore `type="text"` (a number
+// input can't hold `'` / `"`); parseImperialToMm() is deliberately
+// tolerant so a contractor can type `9' 10"`, `9'10`, `9 ft 10 in`, `118`,
+// or `118"` and get the same result. Storage is always mm.
+//
+// Negatives clamp to 0 (never enter a total); the server re-validates.
+// ----------------------------------------------------------------------
+function mmToImperial(mm) {
+    const inches = Math.round((Number(mm) || 0) / 25.4);
+    const feet = Math.floor(inches / 12);
+    const rem = inches - feet * 12;
+    if (feet === 0) return `${rem}"`;
+    if (rem === 0) return `${feet}'`;
+    return `${feet}' ${rem}"`;
+}
+
+function parseImperialToMm(raw) {
+    if (raw === null || raw === undefined) return 0;
+    const s = String(raw).trim();
+    if (!s) return 0;
+    let inches = 0;
+    let matched = false;
+    const feetMatch = s.match(/(-?\d+(?:\.\d+)?)\s*(?:'|ft\b|feet\b)/i);
+    if (feetMatch) {
+        inches += parseFloat(feetMatch[1]) * 12;
+        matched = true;
+    }
+    const inchMatch = s.match(/(-?\d+(?:\.\d+)?)\s*(?:"|″|in\b|inch|inches)/i);
+    if (inchMatch) {
+        inches += parseFloat(inchMatch[1]);
+        matched = true;
+    } else if (feetMatch) {
+        // "9' 10" with no inch token — grab the trailing number after feet.
+        const after = s.slice(s.indexOf(feetMatch[0]) + feetMatch[0].length);
+        const trailing = after.match(/(-?\d+(?:\.\d+)?)/);
+        if (trailing) inches += parseFloat(trailing[1]);
+    }
+    if (!matched) {
+        const n = parseFloat(s);
+        inches = Number.isFinite(n) ? n : 0;
+    }
+    const mm = Math.round(inches * 25.4);
+    return mm < 0 ? 0 : mm;
+}
+
+// Display an mm value in the active unit. mm mode shows whole millimetres.
+function mmDisplay(mm, unit) {
+    if (unit === "imperial") return mmToImperial(mm);
+    return String(Math.round(Number(mm) || 0));
+}
+
+// Parse a raw input string in the active unit → non-negative mm.
+function parseDisplayToMm(raw, unit) {
+    if (unit === "imperial") return parseImperialToMm(raw);
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.round(n));
+}
 
 // ----------------------------------------------------------------------
 // Static catalogues — the tiles + chip lists. Plain JS objects so the
@@ -144,85 +207,18 @@ class RoomOutlinePreview extends Component {
     static props = {
         shape: { type: [String, { value: null }], optional: true },
         walls: { type: Array, optional: true },
+        // 2026-07-03 QA fix — the preview now also renders constraint
+        // markers + wall labels + dimension annotations, and honours the
+        // unit toggle in its caption.
+        constraints: { type: Array, optional: true },
+        unitPreference: { type: String, optional: true },
     };
 
-    // Bounding-box fitting: compute path points in raw mm, then scale
-    // into the 720x540 viewBox with 40px padding. Padding doubles as
-    // the gutter the SVG label text needs.
+    NOMINAL_MM = 3000;      // placeholder wall length before dims exist
+    CONSTRAINT_DEPTH_MM = 320;
+
     get _viewBox() {
         return "0 0 720 540";
-    }
-
-    get _polylinePoints() {
-        const shape = this.props.shape;
-        const walls = (this.props.walls || []).map(
-            (w) => Math.max(0, Number(w.length_mm) || 0),
-        );
-        const pts = this._rawPoints(shape, walls);
-        if (!pts || pts.length === 0) return "";
-        // Fit bounding box into 640x460 (= 720x540 minus 40px padding
-        // each side). Maintain aspect ratio — pick the smaller of the
-        // x/y scales so the whole outline fits.
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        for (const [x, y] of pts) {
-            if (x < minX) minX = x;
-            if (y < minY) minY = y;
-            if (x > maxX) maxX = x;
-            if (y > maxY) maxY = y;
-        }
-        const bw = Math.max(1, maxX - minX);
-        const bh = Math.max(1, maxY - minY);
-        const scale = Math.min(640 / bw, 460 / bh);
-        const offX = 40 + (640 - bw * scale) / 2;
-        const offY = 40 + (460 - bh * scale) / 2;
-        return pts
-            .map(([x, y]) => {
-                const px = offX + (x - minX) * scale;
-                const py = offY + (y - minY) * scale;
-                return px.toFixed(1) + "," + py.toFixed(1);
-            })
-            .join(" ");
-    }
-
-    // Pure mm-space geometry per shape. Delegates to the shared
-    // wallSegmentsForShape() helper (room_geometry.esm.js) which is
-    // also consumed by Phase 3.B's FloorPlanSVG. Returns an array of
-    // [x, y] points; unsupported shapes return null → fallback
-    // rectangle path.
-    //
-    // Galley gap is computed from the wall lengths (not a fixed mm)
-    // to keep the live preview visually balanced as the user types —
-    // a 6m galley needs a wider rendered aisle than a 2m one to read
-    // correctly inside the 720x540 viewBox. The Phase 3.B Room Layout
-    // tab uses a fixed 1200 mm aisle (real-world typical) instead.
-    _rawPoints(shape, walls) {
-        const safeWalls = (walls || []).map((mm, i) => ({
-            name: "Wall " + String.fromCharCode(65 + i),
-            length_mm: mm,
-        }));
-        // Match the previous wizard galley behaviour: gap scales with
-        // wall length so the preview stays balanced for both small +
-        // large kitchens.
-        const wA = walls[0] || 1000;
-        const wB = walls[1] || 1000;
-        const galleyGap = shape === "galley"
-            ? Math.max(wA, wB) * 0.6
-            : undefined;
-        const segs = wallSegmentsForShape(shape, safeWalls, {
-            galleyGapMm: galleyGap,
-        });
-        if (!segs) return null;
-        return polylinePointsFromSegments(segs);
-    }
-
-    // Fallback-rectangle path used for shapes we don't render properly.
-    get _fallbackBox() {
-        // 640x340 rectangle inside the 40px padding band, leaving room
-        // for a label below.
-        return { x: 40, y: 40, w: 640, h: 340 };
     }
 
     get _supportsShape() {
@@ -236,11 +232,140 @@ class RoomOutlinePreview extends Component {
         return found ? found.label : (this.props.shape || "(no shape picked)");
     }
 
-    get _totalLinear() {
-        return (this.props.walls || []).reduce(
-            (sum, w) => sum + (Number(w.length_mm) || 0),
-            0,
+    // Real (typed) wall lengths in mm, 0 where not yet entered.
+    _rawLengths() {
+        return (this.props.walls || []).map(
+            (w) => Math.max(0, Number(w.length_mm) || 0),
         );
+    }
+
+    get _totalLinearLabel() {
+        const total = this._rawLengths().reduce((a, b) => a + b, 0);
+        return mmDisplay(total, this.props.unitPreference || "mm")
+            + (this.props.unitPreference === "imperial" ? "" : " mm");
+    }
+
+    // ------------------------------------------------------------------
+    // The whole projected drawing, computed once per render. `segments`
+    // carry projected endpoints + a mid-point label (name + dimension);
+    // `constraints` carry a projected quad + a label, flagged red when
+    // out of bounds. When no dimensions exist yet (Step 1) we substitute
+    // a nominal length per wall so the SHAPE still renders — the label
+    // then reads "—" so we don't imply a real measurement.
+    // ------------------------------------------------------------------
+    get _layout() {
+        const shape = this.props.shape;
+        if (!this._supportsShape) return null;
+        const raw = this._rawLengths();
+        const geom = raw.map((mm) => (mm > 0 ? mm : this.NOMINAL_MM));
+        const geomWalls = geom.map((mm, i) => ({
+            name: "Wall " + String.fromCharCode(65 + i),
+            length_mm: mm,
+        }));
+        const wA = geom[0] || this.NOMINAL_MM;
+        const wB = geom[1] || this.NOMINAL_MM;
+        const galleyGap = shape === "galley"
+            ? Math.max(wA, wB) * 0.6
+            : undefined;
+        const segs = wallSegmentsForShape(shape, geomWalls, {
+            galleyGapMm: galleyGap,
+        });
+        if (!segs) return null;
+
+        const unit = this.props.unitPreference || "mm";
+        const depth = this.CONSTRAINT_DEPTH_MM;
+
+        // --- collect every mm-space point for the bbox fit ---
+        const pts = [];
+        for (const s of segs) {
+            pts.push([s.x0, s.y0], [s.x1, s.y1]);
+        }
+        const cons = (this.props.constraints || []);
+        for (const c of cons) {
+            const s = segs[c.wall_index];
+            if (!s) continue;
+            const start = Math.max(0, Number(c.distance_from_left_mm) || 0);
+            const width = Math.max(0, Number(c.width_mm) || 0);
+            const p0x = s.x0 + s.dx * start;
+            const p0y = s.y0 + s.dy * start;
+            const p1x = s.x0 + s.dx * (start + width);
+            const p1y = s.y0 + s.dy * (start + width);
+            pts.push([p0x + s.normalX * depth, p0y + s.normalY * depth]);
+            pts.push([p1x + s.normalX * depth, p1y + s.normalY * depth]);
+        }
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const [x, y] of pts) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+        }
+        const bw = Math.max(1, maxX - minX);
+        const bh = Math.max(1, maxY - minY);
+        const scale = Math.min(640 / bw, 460 / bh);
+        const offX = 40 + (640 - bw * scale) / 2;
+        const offY = 40 + (460 - bh * scale) / 2;
+        const proj = (x, y) => [
+            offX + (x - minX) * scale,
+            offY + (y - minY) * scale,
+        ];
+
+        // --- wall segments + labels ---
+        const segments = segs.map((s, i) => {
+            const [x0, y0] = proj(s.x0, s.y0);
+            const [x1, y1] = proj(s.x1, s.y1);
+            const lx = (x0 + x1) / 2 - s.normalX * 20;
+            const ly = (y0 + y1) / 2 - s.normalY * 20;
+            const dimLabel = raw[i] > 0 ? mmDisplay(raw[i], unit)
+                + (unit === "imperial" ? "" : " mm") : "—";
+            return {
+                x0: x0.toFixed(1), y0: y0.toFixed(1),
+                x1: x1.toFixed(1), y1: y1.toFixed(1),
+                lx: lx.toFixed(1), ly: ly.toFixed(1),
+                label: String.fromCharCode(65 + i) + "  " + dimLabel,
+            };
+        });
+
+        // --- constraint markers ---
+        const constraints = [];
+        for (const c of cons) {
+            const s = segs[c.wall_index];
+            if (!s) continue;
+            const start = Math.max(0, Number(c.distance_from_left_mm) || 0);
+            const width = Math.max(0, Number(c.width_mm) || 0);
+            if (width <= 0) continue;
+            const a = proj(s.x0 + s.dx * start, s.y0 + s.dy * start);
+            const b = proj(s.x0 + s.dx * (start + width),
+                           s.y0 + s.dy * (start + width));
+            const cc = proj(s.x0 + s.dx * (start + width) + s.normalX * depth,
+                            s.y0 + s.dy * (start + width) + s.normalY * depth);
+            const d = proj(s.x0 + s.dx * start + s.normalX * depth,
+                           s.y0 + s.dy * start + s.normalY * depth);
+            const realLen = raw[c.wall_index] || 0;
+            const oob = realLen > 0 && (start + width) > realLen;
+            constraints.push({
+                points: `${a[0].toFixed(1)},${a[1].toFixed(1)} `
+                    + `${b[0].toFixed(1)},${b[1].toFixed(1)} `
+                    + `${cc[0].toFixed(1)},${cc[1].toFixed(1)} `
+                    + `${d[0].toFixed(1)},${d[1].toFixed(1)}`,
+                cx: ((a[0] + b[0]) / 2).toFixed(1),
+                cy: ((a[1] + b[1]) / 2 - 6).toFixed(1),
+                label: this._constraintLabel(c.constraint_type),
+                oob,
+            });
+        }
+
+        return { segments, constraints };
+    }
+
+    _constraintLabel(code) {
+        const found = CONSTRAINT_TYPES.find((c) => c.code === code);
+        return found ? found.label : (code || "");
+    }
+
+    get _fallbackBox() {
+        return { x: 40, y: 40, w: 640, h: 340 };
     }
 }
 
@@ -299,22 +424,15 @@ class WallDimensionsStep extends Component {
         appliedTemplateName: { type: [String, { value: null }], optional: true },
     };
 
-    // Conversion helpers. Imperial unit shows inches (decimal) for v1;
-    // Phase 3 polish can layer feet+inches parsing on top.
+    // Conversion helpers — feet-inches in imperial mode (canonical
+    // display, matches the summary + PDF), whole mm otherwise. Inputs are
+    // type="text" so the imperial `'`/`"` tokens are accepted.
     _toDisplay(mm) {
-        if (this.props.room.unit_preference === "imperial") {
-            return (mm / 25.4).toFixed(1);
-        }
-        return String(Math.round(mm));
+        return mmDisplay(mm, this.props.room.unit_preference);
     }
 
     _fromDisplay(raw) {
-        const n = parseFloat(raw);
-        if (!Number.isFinite(n)) return 0;
-        if (this.props.room.unit_preference === "imperial") {
-            return Math.round(n * 25.4);
-        }
-        return Math.round(n);
+        return parseDisplayToMm(raw, this.props.room.unit_preference);
     }
 
     _onLenInput(idx, ev) {
@@ -352,6 +470,14 @@ class ConstraintsStep extends Component {
         constraints: Array,
         onAddConstraint: Function,
         onRemoveConstraint: Function,
+        // 2026-07-03 QA fix — Step 3 now respects the unit toggle rather
+        // than hardcoding "(mm)". `room` carries unit_preference.
+        room: Object,
+        // Client-side geometry validation surfaced inline (out-of-bounds
+        // errors + overlap warnings) — computed by the parent so the
+        // Save button and this list agree.
+        geometryErrors: { type: Array, optional: true },
+        geometryWarnings: { type: Array, optional: true },
     };
 
     setup() {
@@ -364,6 +490,15 @@ class ConstraintsStep extends Component {
     }
 
     get _constraintTypes() { return CONSTRAINT_TYPES; }
+
+    _unit() { return this.props.room.unit_preference || "mm"; }
+    _unitLabel() { return this._unit() === "imperial" ? "in" : "mm"; }
+    _disp(mm) { return mmDisplay(mm, this._unit()); }
+    _dispWithUnit(mm) {
+        return this._unit() === "imperial"
+            ? mmDisplay(mm, "imperial")
+            : mmDisplay(mm, "mm") + " mm";
+    }
 
     _wallLabel(idx) {
         const w = this.props.walls[idx];
@@ -384,13 +519,12 @@ class ConstraintsStep extends Component {
     }
 
     _onDistanceInput(ev) {
-        const n = parseInt(ev.target.value, 10);
-        this.draft.distance_from_left_mm = Number.isFinite(n) ? n : 0;
+        this.draft.distance_from_left_mm = parseDisplayToMm(
+            ev.target.value, this._unit());
     }
 
     _onWidthInput(ev) {
-        const n = parseInt(ev.target.value, 10);
-        this.draft.width_mm = Number.isFinite(n) ? n : 0;
+        this.draft.width_mm = parseDisplayToMm(ev.target.value, this._unit());
     }
 
     _add() {
@@ -426,20 +560,35 @@ export class RoomSetupWizard extends Component {
         orderId: { type: [String, Number] },
         onClose: Function,
         onSubmitted: Function,
+        // 2026-07-03 QA fix — edit mode. When the OrderBuilder opens the
+        // wizard on an already-saved room it passes the serialized room
+        // dict here; the wizard hydrates every field and switches its
+        // submit to /room/<id>/update. Null / absent → fresh create.
+        existingRoom: { type: [Object, { value: null }], optional: true },
     };
 
     setup() {
+        const existing = this.props.existingRoom || null;
         this.state = useState({
             step: 1,
+            // Edit-mode identity + the furthest step the user may jump to
+            // via the (now-clickable) stepper badges.
+            isEdit: !!existing,
+            roomId: existing ? existing.id : null,
+            maxStepReached: existing ? 3 : 1,
+            dirty: false,
+            confirmDiscard: false,
             room: {
-                name: "Main Kitchen",
-                room_type: "kitchen",
-                layout_shape: null,
-                ceiling_height_mm: 2400,
-                unit_preference: "mm",
+                name: existing ? (existing.name || "Main Kitchen") : "Main Kitchen",
+                room_type: existing ? (existing.room_type || "kitchen") : "kitchen",
+                layout_shape: existing ? existing.layout_shape : null,
+                ceiling_height_mm: existing
+                    ? (existing.ceiling_height_mm || 2400) : 2400,
+                unit_preference: existing
+                    ? (existing.unit_preference || "mm") : "mm",
             },
-            walls: [],
-            constraints: [],
+            walls: existing ? this._hydrateWalls(existing) : [],
+            constraints: existing ? this._hydrateConstraints(existing) : [],
             // Phase 6.2 — Room Templates library. Populated by a single
             // fetch on mount; an empty list means the wizard renders the
             // Step 1 templates section invisibly (existing custom-shape
@@ -459,6 +608,46 @@ export class RoomSetupWizard extends Component {
                     // Silent fail — wizard still works without templates.
                 });
         });
+    }
+
+    // ------------------------------------------------------------------
+    // Edit-mode hydration (2026-07-03 QA fix). The serialized room dict
+    // carries walls (in wall_order) each with nested constraints. We
+    // flatten to the wizard's flat state.walls + state.constraints
+    // (wall_index = the wall's position in the ordered array). Wall ids
+    // ride along so the update endpoint reconciles in place instead of
+    // creating duplicates.
+    // ------------------------------------------------------------------
+    _hydrateWalls(room) {
+        return (room.walls || []).map((w, i) => ({
+            id: w.id,
+            name: w.name || ("Wall " + String.fromCharCode(65 + i)),
+            length_mm: Math.max(0, Number(w.length_mm) || 0),
+            wall_order: w.wall_order,
+        }));
+    }
+
+    _hydrateConstraints(room) {
+        const out = [];
+        (room.walls || []).forEach((w, i) => {
+            (w.constraints || []).forEach((c) => {
+                out.push({
+                    wall_index: i,
+                    constraint_type: c.constraint_type,
+                    distance_from_left_mm: Math.max(
+                        0, Number(c.distance_from_left_mm) || 0),
+                    width_mm: Math.max(0, Number(c.width_mm) || 0),
+                    height_mm: c.height_mm || 0,
+                });
+            });
+        });
+        return out;
+    }
+
+    // Every state-mutating callback routes through here so Cancel / × can
+    // warn before discarding unsaved input.
+    _markDirty() {
+        this.state.dirty = true;
     }
 
     // ------------------------------------------------------------------
@@ -485,6 +674,8 @@ export class RoomSetupWizard extends Component {
         }));
         this.state.appliedTemplateName = template.name;
         this.state.step = 2;
+        this.state.maxStepReached = Math.max(this.state.maxStepReached, 2);
+        this._markDirty();
     };
 
     // ------------------------------------------------------------------
@@ -493,10 +684,12 @@ export class RoomSetupWizard extends Component {
 
     _onRoomTypePicked = (code) => {
         this.state.room.room_type = code;
+        this._markDirty();
     };
 
     _onShapePicked = (code) => {
         this.state.room.layout_shape = code;
+        this._markDirty();
         // Pre-populate walls with the default count for this shape so
         // Step 2 has scaffolding to edit. Don't clobber existing walls
         // if the user is re-picking the same shape. When the count
@@ -524,6 +717,7 @@ export class RoomSetupWizard extends Component {
 
     _onNameChanged = (ev) => {
         this.state.room.name = ev.target.value;
+        this._markDirty();
     };
 
     // ------------------------------------------------------------------
@@ -533,21 +727,25 @@ export class RoomSetupWizard extends Component {
     _onWallLengthChanged = (idx, mm) => {
         if (this.state.walls[idx]) {
             this.state.walls[idx].length_mm = mm;
+            this._markDirty();
         }
     };
 
     _onWallNameChanged = (idx, name) => {
         if (this.state.walls[idx]) {
             this.state.walls[idx].name = name;
+            this._markDirty();
         }
     };
 
     _onCeilingChanged = (mm) => {
         this.state.room.ceiling_height_mm = mm;
+        this._markDirty();
     };
 
     _onUnitChanged = (unit) => {
         this.state.room.unit_preference = unit;
+        this._markDirty();
     };
 
     // ------------------------------------------------------------------
@@ -556,15 +754,73 @@ export class RoomSetupWizard extends Component {
 
     _onAddConstraint = (c) => {
         this.state.constraints.push({ ...c });
+        this._markDirty();
     };
 
     _onRemoveConstraint = (idx) => {
         this.state.constraints.splice(idx, 1);
+        this._markDirty();
     };
 
     // ------------------------------------------------------------------
     // Step navigation
     // ------------------------------------------------------------------
+
+    // Client mirror of southbrook.room.validate_geometry — instant
+    // feedback. Out-of-bounds constraints BLOCK Save; overlaps only WARN.
+    _geometryErrors() {
+        const errs = [];
+        const walls = this.state.walls || [];
+        this.state.constraints.forEach((c, i) => {
+            const wall = walls[c.wall_index];
+            const start = Math.max(0, Number(c.distance_from_left_mm) || 0);
+            const width = Math.max(0, Number(c.width_mm) || 0);
+            if (wall && (wall.length_mm || 0) > 0
+                && start + width > wall.length_mm) {
+                const over = start + width - wall.length_mm;
+                errs.push(`${this._humanShapeType(c.constraint_type)} on `
+                    + `${wall.name || ("Wall " + String.fromCharCode(65 + c.wall_index))}`
+                    + ` extends ${this._dispMm(over)} past the wall edge.`);
+            }
+        });
+        return errs;
+    }
+
+    _geometryWarnings() {
+        const warns = [];
+        const byWall = {};
+        this.state.constraints.forEach((c) => {
+            if ((c.width_mm || 0) <= 0) return;
+            if (["power_outlet", "structural_post"].includes(c.constraint_type)) return;
+            (byWall[c.wall_index] = byWall[c.wall_index] || []).push(c);
+        });
+        Object.keys(byWall).forEach((wi) => {
+            const list = byWall[wi].slice().sort(
+                (a, b) => a.distance_from_left_mm - b.distance_from_left_mm);
+            for (let i = 1; i < list.length; i++) {
+                const prev = list[i - 1];
+                const cur = list[i];
+                if (cur.distance_from_left_mm
+                    < prev.distance_from_left_mm + prev.width_mm) {
+                    const wall = this.state.walls[wi];
+                    warns.push(`${this._humanShapeType(prev.constraint_type)} and `
+                        + `${this._humanShapeType(cur.constraint_type)} overlap on `
+                        + `${(wall && wall.name) || ("Wall " + String.fromCharCode(65 + Number(wi)))}.`);
+                }
+            }
+        });
+        return warns;
+    }
+
+    _humanShapeType(code) {
+        const found = CONSTRAINT_TYPES.find((c) => c.code === code);
+        return found ? found.label : code;
+    }
+
+    _dispMm(mm) {
+        return mmDisplay(mm, this.state.room.unit_preference)
+            + (this.state.room.unit_preference === "imperial" ? "" : " mm");
+    }
 
     _canAdvance() {
         if (this.state.step === 1) {
@@ -575,8 +831,41 @@ export class RoomSetupWizard extends Component {
             return this.state.walls.length > 0
                 && this.state.walls.every((w) => (w.length_mm || 0) > 0);
         }
+        if (this.state.step === 3) {
+            // Out-of-bounds constraints block Save (overlaps only warn).
+            return this._geometryErrors().length === 0;
+        }
         return true;
     }
+
+    // Inline hint explaining why Next / Save is disabled (empty when the
+    // button is enabled).
+    _advanceBlockedReason() {
+        if (this.state.step === 1) {
+            if (!this.state.room.room_type) return "Pick a room type to continue.";
+            if (!this.state.room.layout_shape) return "Pick a layout shape to continue.";
+        }
+        if (this.state.step === 2) {
+            if (!this.state.walls.length) return "Pick a layout shape first.";
+            if (this.state.walls.some((w) => (w.length_mm || 0) <= 0)) {
+                return "Enter a length for every wall.";
+            }
+        }
+        if (this.state.step === 3) {
+            const errs = this._geometryErrors();
+            if (errs.length) return errs[0];
+        }
+        return "";
+    }
+
+    // Clickable stepper — jump to any step already reached. Guards on
+    // maxStepReached so the user can't skip ahead past unfilled data.
+    _goToStep = (n) => {
+        if (typeof this.state.step !== "number") return;
+        if (n < 1 || n > 3) return;
+        if (n > this.state.maxStepReached) return;
+        this.state.step = n;
+    };
 
     _next = () => {
         // In-flight guard — prevents double-click double-submit (review #1).
@@ -588,6 +877,8 @@ export class RoomSetupWizard extends Component {
         }
         if (typeof this.state.step === "number") {
             this.state.step += 1;
+            this.state.maxStepReached = Math.max(
+                this.state.maxStepReached, this.state.step);
         }
     };
 
@@ -607,7 +898,26 @@ export class RoomSetupWizard extends Component {
         // would orphan the server-created room while the user thinks
         // they cancelled. Submit-in-flight blocks close.
         if (this.state.step === "submitting") return;
+        // Unsaved-changes guard (2026-07-03 QA fix) — an accidental
+        // backdrop / × click must not silently drop a fully-entered
+        // configuration. Show an in-wizard confirm instead of a native
+        // dialog (native dialogs block the OWL event loop).
+        if (this.state.dirty
+            && this.state.step !== "done"
+            && this.state.step !== "error") {
+            this.state.confirmDiscard = true;
+            return;
+        }
         this.props.onClose();
+    };
+
+    _confirmDiscard = () => {
+        this.state.confirmDiscard = false;
+        this.props.onClose();
+    };
+
+    _cancelDiscard = () => {
+        this.state.confirmDiscard = false;
     };
 
     // ------------------------------------------------------------------
@@ -621,21 +931,34 @@ export class RoomSetupWizard extends Component {
         this.state.step = "submitting";
         this.state.errorMessage = null;
         try {
+            // Renumber wall_order by array position so the saved room
+            // renders in the exact order shown in the wizard (new walls
+            // added during an edit would otherwise all default to the
+            // same wall_order and sort ambiguously).
+            const walls = this.state.walls.map((w, i) => ({
+                ...w,
+                wall_order: (i + 1) * 10,
+            }));
             const body = {
                 name: this.state.room.name,
                 room_type: this.state.room.room_type,
                 layout_shape: this.state.room.layout_shape,
                 ceiling_height_mm: this.state.room.ceiling_height_mm,
                 unit_preference: this.state.room.unit_preference,
-                walls: this.state.walls,
+                walls: walls,
                 constraints: this.state.constraints,
             };
-            const r = await rpcJsonCall(
-                "/southbrook/api/order/"
-                + encodeURIComponent(this.props.orderId)
-                + "/room/create",
-                body,
-            );
+            // Edit mode → UPDATE the existing room (reconcile walls +
+            // replace constraints) so we never duplicate or blank it out.
+            const url = this.state.isEdit
+                ? "/southbrook/api/order/"
+                    + encodeURIComponent(this.props.orderId)
+                    + "/room/" + encodeURIComponent(this.state.roomId)
+                    + "/update"
+                : "/southbrook/api/order/"
+                    + encodeURIComponent(this.props.orderId)
+                    + "/room/create";
+            const r = await rpcJsonCall(url, body);
             // Idempotency: server returns room_already_exists when the
             // order has a prior room — treat as success and hand the
             // existing room back, not as failure (review #2).
@@ -645,6 +968,7 @@ export class RoomSetupWizard extends Component {
                 return;
             }
             if (!r || r.error) {
+                // Geometry errors carry a friendly detail string.
                 this.state.errorMessage = (r && (r.detail || r.error))
                     || "The room could not be saved.";
                 this.state.step = "error";
@@ -681,7 +1005,9 @@ export class RoomSetupWizard extends Component {
     }
 
     _nextLabel() {
-        if (this.state.step === 3) return "Save Room";
+        if (this.state.step === 3) {
+            return this.state.isEdit ? "Save Changes" : "Save Room";
+        }
         return "Next";
     }
 }

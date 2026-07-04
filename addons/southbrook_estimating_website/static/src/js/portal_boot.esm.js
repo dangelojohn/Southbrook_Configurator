@@ -3223,9 +3223,16 @@ const TEMPLATE = xml`
 
                     <!-- Summary card + per-wall cards -->
                     <div class="sb-room-summary">
-                        <h2 class="sb-room-title">
-                            <t t-esc="state.room.name"/>
-                        </h2>
+                        <div class="sb-room-title-row">
+                            <h2 class="sb-room-title">
+                                <t t-esc="state.room.name"/>
+                            </h2>
+                            <button type="button"
+                                    class="sb-room-edit-btn"
+                                    t-on-click="_openRoomSetupWizard">
+                                Edit Room
+                            </button>
+                        </div>
                         <div class="sb-room-meta">
                             <span class="sb-room-shape">
                                 <t t-esc="_humanShape(state.room.layout_shape)"/>
@@ -3270,6 +3277,11 @@ const TEMPLATE = xml`
                                         <small>@ <t t-esc="_humanLen(c.distance_from_left_mm)"/></small>
                                     </li>
                                 </ul>
+                                <div t-if="wall.has_constraint_out_of_bounds || wall.has_constraint_overlap"
+                                     class="sb-room-wall-conflict-note">
+                                    <t t-if="wall.has_constraint_out_of_bounds">⚠ A fixture extends past the wall edge. </t>
+                                    <t t-if="wall.has_constraint_overlap">⚑ Fixtures overlap on this wall.</t>
+                                </div>
                             </div>
                         </t>
                     </div>
@@ -3515,6 +3527,7 @@ const TEMPLATE = xml`
                  above all OrderBuilder chrome. -->
             <RoomSetupWizard t-if="state.ui.wizard === 'room_setup'"
                              orderId="props.orderId"
+                             existingRoom="state.room"
                              onClose="_closeRoomSetupWizard"
                              onSubmitted="_onRoomSubmitted"/>
 
