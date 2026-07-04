@@ -193,6 +193,40 @@ class SaleOrder(models.Model):
                 order.pricelist_id = resolved.id
 
     # ------------------------------------------------------------------
+    # QA Bug 1 fix (2026-07-04): action_config_start (product_configurator_
+    # sale/models/sale.py) launches the "Configure Product" wizard for a
+    # brand-new order line with allow_preset_selection=True hardcoded into
+    # its own context dict — with_context() can't override that, since the
+    # base method rebuilds the dict itself and always wins. That flag
+    # forces an always-empty "Preset" field onto the same "Select
+    # Template" screen where no template has been chosen yet (its domain
+    # is [('product_tmpl_id', '=', product_tmpl_id)], guaranteed empty
+    # while product_tmpl_id is unset) — very likely why testers never
+    # notice/use the (already-working) template picker before clicking
+    # Next, which then hits product.config.session's product_tmpl_id
+    # NOT NULL constraint on Odoo's implicit pre-button-call save,
+    # surfacing as a raw, uncaught ValidationError.
+    #
+    # Presets only make sense once a template is already known — the
+    # OTHER two entry points (reconfigure_product on sale.order.line, and
+    # product.template.configure_product) are for an EXISTING line/
+    # product and correctly leave preset selection available. For a
+    # brand-new line there's nothing to preset from yet, so this override
+    # re-implements action_config_start with just that one flag changed.
+    # See models/product_configurator.py for the companion defensive
+    # guard (friendly error if a wizard somehow still reaches create()
+    # without a template).
+    def action_config_start(self):
+        configurator_obj = self.env["product.configurator.sale"]
+        ctx = dict(
+            self.env.context,
+            default_order_id=self.id,
+            wizard_model="product.configurator.sale",
+            allow_preset_selection=False,
+        )
+        return configurator_obj.with_context(**ctx).get_wizard_action()
+
+    # ------------------------------------------------------------------
     # Analytics capture (NF1 — Build Spec section 8 "AI data spine")
     # ------------------------------------------------------------------
     # Fire the southbrook.order.analytics.capture() hook at confirm-time.
@@ -363,7 +397,44 @@ class SaleOrder(models.Model):
             sku = tmpl.default_code if tmpl else None
             row = sku_defaults.get(sku) if sku else None
             if not row:
-                continue   # non-southbrook product → skip; only SB SKUs render
+                # QA Bug 3 fix (2026-07-04): used to `continue` here,
+                # silently dropping any line whose product_tmpl_id.
+                # default_code isn't one of the 12 hardcoded Q8 SKUs —
+                # e.g. every cabinet placed via the SEPARATE full-screen
+                # "Open in 3D" configurator (southbrook_kitchen_3d_
+                # configurator), whose catalog is flagged
+                # southbrook_is_cabinet=True and uses its own SKU codes
+                # (B24, DB24, SB30, ...) with no overlap with this
+                # table. An order made entirely of THOSE lines had every
+                # single one skipped, leaving all_panels empty and the
+                # embedded preview rendering a blank floor/lighting-only
+                # scene — even though every line was fully configured
+                # and priced correctly everywhere else in Odoo. This is
+                # documented as a known limitation in
+                # southbrook_elearning_internal's own training slides.
+                #
+                # Fall back to a generic box instead of skipping,
+                # mirroring the SAME "hard defaults when no SKU match"
+                # pattern _extract_cabinet_inputs() (product_config_line
+                # .py) already uses for the single-cabinet wizard
+                # preview — so an unrecognized line still renders SOME
+                # representative cabinet rather than vanishing.
+                #
+                # Only do this for lines that plausibly ARE cabinets —
+                # never for section/note lines, and never for an
+                # ordinary non-cabinet product (delivery fee, install
+                # labour, etc.), which should stay invisible in a 3D
+                # scene. southbrook_is_cabinet is defined by the
+                # (optionally installed, not a hard dependency)
+                # southbrook_kitchen_3d_configurator addon — getattr
+                # keeps this addon installable standalone.
+                if line.display_type:
+                    continue  # section/note lines never render as a box
+                is_cabinet_like = bool(tmpl) and bool(
+                    getattr(tmpl, "southbrook_is_cabinet", False))
+                if not is_cabinet_like:
+                    continue  # not a recognized SB SKU, not flagged as a cabinet either
+                row = ("base", 1, 0, 609, 762, 609)
 
             fam, doors, drawers, w, h, d = row
 

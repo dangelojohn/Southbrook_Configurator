@@ -20,12 +20,34 @@ forward path on a broken state.
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
 
 class ProductConfigurator(models.TransientModel):
     _inherit = "product.configurator"
+
+    # ------------------------------------------------------------------
+    # QA Bug 1 fix (2026-07-04): the base create() (product_configurator/
+    # wizard/product_configurator.py) unconditionally does
+    # `int(vals.get("product_tmpl_id"))` to seed/find a
+    # product.config.session. If neither product_id nor product_tmpl_id
+    # is in vals, that's `int(False) == 0`, and the resulting session
+    # create() hits product.config.session.product_tmpl_id's NOT NULL
+    # constraint — surfacing as a raw, uncaught ORM ValidationError to
+    # the end user (see models/sale_order.py's action_config_start
+    # override for the UX-level fix; this is the defensive backstop for
+    # any OTHER path that still reaches create() without a template).
+    # ------------------------------------------------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get("product_id") and not vals.get("product_tmpl_id"):
+                raise UserError(self.env._(
+                    "Please select a Configurable Template before "
+                    "continuing."))
+        return super().create(vals_list)
 
     is_last_step = fields.Boolean(
         compute="_compute_is_last_step",

@@ -274,15 +274,69 @@
 
   <!-- ============================================================== -->
   <!-- RULE 2 — Box Material → Series                                 -->
-  <!-- Contractor: white_melamine only                                -->
-  <!-- Signature:  maple only                                         -->
-  <!-- (Contemporary + Elegance: no restriction, both options shown)  -->
+  <!-- White Melamine: every series except Signature                  -->
+  <!-- Maple:          every series except Contractor                 -->
+  <!-- (net effect: Contractor=white only, Signature=maple only,      -->
+  <!--  Contemporary/Elegance=both.)                                  -->
+  <!--                                                                 -->
+  <!-- QA Bug 2 fix (2026-07-04) — CORRECTED after a first attempt     -->
+  <!-- caused a regression: the header used to say "Contemporary +    -->
+  <!-- Elegance: no restriction, both options shown" but no grant for  -->
+  <!-- either series ever existed, and values_available() is an       -->
+  <!-- allow-list gate — once ANY config_line for a template           -->
+  <!-- references a value, it's available ONLY when a matching        -->
+  <!-- line's domain holds. Contemporary/Elegance ended up with ZERO  -->
+  <!-- available Box Material values ("No records").                  -->
+  <!--                                                                 -->
+  <!-- First attempt added a SECOND config_line per value (a new       -->
+  <!-- Contemporary-or-Elegance grant alongside the existing           -->
+  <!-- Contractor/Signature ones) — but values_available() combines   -->
+  <!-- ALL matching lines' domains with an IMPLICIT AND when they come -->
+  <!-- from different product.config.domain records (compute_domain() -->
+  <!-- in product_configurator/models/product_config.py iterates       -->
+  <!-- `for domain in self:` with no OR inserted between DISTINCT      -->
+  <!-- domain records — only between LINES of the SAME domain). Two   -->
+  <!-- lines pointing at mutually-exclusive series conditions (e.g.    -->
+  <!-- "series=Contractor" AND "series in [Contemporary, Elegance]")  -->
+  <!-- can never both hold, so EVERY series — including the           -->
+  <!-- previously-working Contractor/Signature cases — regressed to   -->
+  <!-- zero available values.                                         -->
+  <!--                                                                 -->
+  <!-- Correct fix: each value must be referenced by exactly ONE       -->
+  <!-- config_line per template, whose domain expresses the FULL set  -->
+  <!-- of series it's valid under. The 24 rule2_series_is_contractor_  -->
+  <!-- box_material_* / rule2_series_is_signature_box_material_*      -->
+  <!-- records below are repointed (domain_id only, nothing else      -->
+  <!-- changed) at the two eligibility domains defined right below,   -->
+  <!-- instead of at domain_series_is_contractor / _signature.        -->
   <!-- ============================================================== -->
+<record id="domain_series_is_white_melamine_eligible" model="product.config.domain">
+  <field name="name">Series eligible for White Melamine (not Signature)</field>
+</record>
+<record id="domain_series_is_white_melamine_eligible_line" model="product.config.domain.line">
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
+  <field name="attribute_id" ref="attr_series"/>
+  <field name="condition">in</field>
+  <field name="operator">and</field>
+  <field name="value_ids" eval="[(6, 0, [ref('value_series_contractor'), ref('value_series_contemporary'), ref('value_series_elegance')])]"/>
+</record>
+
+<record id="domain_series_is_maple_eligible" model="product.config.domain">
+  <field name="name">Series eligible for Maple (not Contractor)</field>
+</record>
+<record id="domain_series_is_maple_eligible_line" model="product.config.domain.line">
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
+  <field name="attribute_id" ref="attr_series"/>
+  <field name="condition">in</field>
+  <field name="operator">and</field>
+  <field name="value_ids" eval="[(6, 0, [ref('value_series_contemporary'), ref('value_series_elegance'), ref('value_series_signature')])]"/>
+</record>
+
 <record id="rule2_series_is_contractor_box_material_wall_1dr" model="product.config.line">
   <field name="product_tmpl_id" ref="wall_1dr"/>
   <field name="attribute_line_id" ref="attr_line_wall_1dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10000</field>
 </record>
 
@@ -290,7 +344,7 @@
   <field name="product_tmpl_id" ref="wall_2dr"/>
   <field name="attribute_line_id" ref="attr_line_wall_2dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10010</field>
 </record>
 
@@ -298,7 +352,7 @@
   <field name="product_tmpl_id" ref="base_1dr"/>
   <field name="attribute_line_id" ref="attr_line_base_1dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10020</field>
 </record>
 
@@ -306,7 +360,7 @@
   <field name="product_tmpl_id" ref="base_2dr"/>
   <field name="attribute_line_id" ref="attr_line_base_2dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10030</field>
 </record>
 
@@ -314,7 +368,7 @@
   <field name="product_tmpl_id" ref="drawer_bank"/>
   <field name="attribute_line_id" ref="attr_line_drawer_bank_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10040</field>
 </record>
 
@@ -322,7 +376,7 @@
   <field name="product_tmpl_id" ref="sink_base"/>
   <field name="attribute_line_id" ref="attr_line_sink_base_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10050</field>
 </record>
 
@@ -330,7 +384,7 @@
   <field name="product_tmpl_id" ref="tall_pantry"/>
   <field name="attribute_line_id" ref="attr_line_tall_pantry_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10060</field>
 </record>
 
@@ -338,7 +392,7 @@
   <field name="product_tmpl_id" ref="tall_oven"/>
   <field name="attribute_line_id" ref="attr_line_tall_oven_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10070</field>
 </record>
 
@@ -346,7 +400,7 @@
   <field name="product_tmpl_id" ref="corner"/>
   <field name="attribute_line_id" ref="attr_line_corner_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10080</field>
 </record>
 
@@ -354,7 +408,7 @@
   <field name="product_tmpl_id" ref="vanity"/>
   <field name="attribute_line_id" ref="attr_line_vanity_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10090</field>
 </record>
 
@@ -362,7 +416,7 @@
   <field name="product_tmpl_id" ref="accessory"/>
   <field name="attribute_line_id" ref="attr_line_accessory_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10100</field>
 </record>
 
@@ -370,7 +424,7 @@
   <field name="product_tmpl_id" ref="worktop"/>
   <field name="attribute_line_id" ref="attr_line_worktop_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_white_melamine')])]"/>
-  <field name="domain_id" ref="domain_series_is_contractor"/>
+  <field name="domain_id" ref="domain_series_is_white_melamine_eligible"/>
   <field name="sequence">10110</field>
 </record>
 
@@ -378,7 +432,7 @@
   <field name="product_tmpl_id" ref="wall_1dr"/>
   <field name="attribute_line_id" ref="attr_line_wall_1dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10120</field>
 </record>
 
@@ -386,7 +440,7 @@
   <field name="product_tmpl_id" ref="wall_2dr"/>
   <field name="attribute_line_id" ref="attr_line_wall_2dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10130</field>
 </record>
 
@@ -394,7 +448,7 @@
   <field name="product_tmpl_id" ref="base_1dr"/>
   <field name="attribute_line_id" ref="attr_line_base_1dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10140</field>
 </record>
 
@@ -402,7 +456,7 @@
   <field name="product_tmpl_id" ref="base_2dr"/>
   <field name="attribute_line_id" ref="attr_line_base_2dr_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10150</field>
 </record>
 
@@ -410,7 +464,7 @@
   <field name="product_tmpl_id" ref="drawer_bank"/>
   <field name="attribute_line_id" ref="attr_line_drawer_bank_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10160</field>
 </record>
 
@@ -418,7 +472,7 @@
   <field name="product_tmpl_id" ref="sink_base"/>
   <field name="attribute_line_id" ref="attr_line_sink_base_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10170</field>
 </record>
 
@@ -426,7 +480,7 @@
   <field name="product_tmpl_id" ref="tall_pantry"/>
   <field name="attribute_line_id" ref="attr_line_tall_pantry_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10180</field>
 </record>
 
@@ -434,7 +488,7 @@
   <field name="product_tmpl_id" ref="tall_oven"/>
   <field name="attribute_line_id" ref="attr_line_tall_oven_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10190</field>
 </record>
 
@@ -442,7 +496,7 @@
   <field name="product_tmpl_id" ref="corner"/>
   <field name="attribute_line_id" ref="attr_line_corner_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10200</field>
 </record>
 
@@ -450,7 +504,7 @@
   <field name="product_tmpl_id" ref="vanity"/>
   <field name="attribute_line_id" ref="attr_line_vanity_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10210</field>
 </record>
 
@@ -458,7 +512,7 @@
   <field name="product_tmpl_id" ref="accessory"/>
   <field name="attribute_line_id" ref="attr_line_accessory_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10220</field>
 </record>
 
@@ -466,7 +520,7 @@
   <field name="product_tmpl_id" ref="worktop"/>
   <field name="attribute_line_id" ref="attr_line_worktop_box_material"/>
   <field name="value_ids" eval="[(6, 0, [ref('value_box_maple')])]"/>
-  <field name="domain_id" ref="domain_series_is_signature"/>
+  <field name="domain_id" ref="domain_series_is_maple_eligible"/>
   <field name="sequence">10230</field>
 </record>
 

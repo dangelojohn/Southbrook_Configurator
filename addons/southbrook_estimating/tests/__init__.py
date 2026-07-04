@@ -30,3 +30,7 @@ from . import test_room_wall_assignment
 from . import test_rule_enforcement
 from . import test_pricelist_math
 from . import test_price_extra_flow
+# QA bugs 2026-07-04 (configurator-from-order dead-end, Box Material
+# No records, blank inline 3D preview).
+from . import test_configurator_from_order
+from . import test_kitchen_3d_payload_order

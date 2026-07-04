@@ -60,6 +60,10 @@ class TestRule2BoxMaterialSeries(TransactionCase):
             "southbrook_estimating.value_series_signature")
         cls.series_contractor = cls.env.ref(
             "southbrook_estimating.value_series_contractor")
+        cls.series_contemporary = cls.env.ref(
+            "southbrook_estimating.value_series_contemporary")
+        cls.series_elegance = cls.env.ref(
+            "southbrook_estimating.value_series_elegance")
         cls.box_maple = cls.env.ref(
             "southbrook_estimating.value_box_maple")
         cls.box_white_melamine = cls.env.ref(
@@ -112,6 +116,70 @@ class TestRule2BoxMaterialSeries(TransactionCase):
             self.fail(
                 "Rule 2 rejected the Contractor + White Melamine baseline: "
                 "%s" % exc)
+
+    # ------------------------------------------------------------------
+    # QA Bug 2 (2026-07-04): Box Material showed "No records" for
+    # EVERY series, including Contemporary and Elegance, despite this
+    # class's own docstring saying Maple is offered on "Contemporary,
+    # Elegance, Signature". Root cause: values_available() is an
+    # allow-list gate — once ANY config_line references a value, that
+    # value is available ONLY when a matching domain fires. The old
+    # rule set referenced white_melamine (Contractor-only) and maple
+    # (Signature-only) but never granted either for Contemporary/
+    # Elegance, so both series ended up with zero available values.
+    # These tests call values_available() directly — the exact method
+    # the wizard's dropdown/"No records" rendering depends on — rather
+    # than validate_configuration(), since that's the precise seam the
+    # bug lived in.
+    # ------------------------------------------------------------------
+    def test_04_contemporary_offers_both_box_materials(self):
+        session = _fresh_session(self.env, self.tmpl)
+        attr_line = self.env.ref(
+            "southbrook_estimating.attr_line_base_1dr_box_material")
+        available = session.values_available(
+            check_val_ids=[self.box_white_melamine.id, self.box_maple.id],
+            value_ids=[self.series_contemporary.id],
+            product_tmpl_id=self.tmpl.id,
+            product_template_attribute_line_id=attr_line.id,
+        )
+        self.assertIn(
+            self.box_white_melamine.id, available,
+            "White Melamine must be selectable under Contemporary")
+        self.assertIn(
+            self.box_maple.id, available,
+            "Maple must be selectable under Contemporary")
+
+    def test_05_elegance_offers_both_box_materials(self):
+        session = _fresh_session(self.env, self.tmpl)
+        attr_line = self.env.ref(
+            "southbrook_estimating.attr_line_base_1dr_box_material")
+        available = session.values_available(
+            check_val_ids=[self.box_white_melamine.id, self.box_maple.id],
+            value_ids=[self.series_elegance.id],
+            product_tmpl_id=self.tmpl.id,
+            product_template_attribute_line_id=attr_line.id,
+        )
+        self.assertIn(
+            self.box_white_melamine.id, available,
+            "White Melamine must be selectable under Elegance")
+        self.assertIn(
+            self.box_maple.id, available,
+            "Maple must be selectable under Elegance")
+
+    def test_06_contractor_still_offers_only_white_melamine(self):
+        """Regression companion: the fix for Contemporary/Elegance must
+        not loosen Contractor's existing white-melamine-only rule."""
+        session = _fresh_session(self.env, self.tmpl)
+        attr_line = self.env.ref(
+            "southbrook_estimating.attr_line_base_1dr_box_material")
+        available = session.values_available(
+            check_val_ids=[self.box_white_melamine.id, self.box_maple.id],
+            value_ids=[self.series_contractor.id],
+            product_tmpl_id=self.tmpl.id,
+            product_template_attribute_line_id=attr_line.id,
+        )
+        self.assertIn(self.box_white_melamine.id, available)
+        self.assertNotIn(self.box_maple.id, available)
 
 
 @tagged("post_install", "-at_install", "southbrook", "rule_enforcement")
