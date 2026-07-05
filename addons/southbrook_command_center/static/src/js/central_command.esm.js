@@ -9,6 +9,7 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 import { rpc } from "@web/core/network/rpc";
 import { Component, useState, onWillStart, onMounted, onWillUnmount } from "@odoo/owl";
 
@@ -24,8 +25,6 @@ export class CentralCommand extends Component {
     setup() {
         this.action = useService("action");
         this.orm = useService("orm");
-        this.user = useService("user");
-        this.companyService = useService("company");
         this.busService = useService("bus_service");
 
         this.state = useState({
@@ -56,22 +55,29 @@ export class CentralCommand extends Component {
     }
 
     get companyId() {
-        const c = this.companyService && this.companyService.currentCompany;
-        return c ? c.id : 1;
+        try {
+            const ids = user.context && user.context.allowed_company_ids;
+            if (ids && ids.length) {
+                return ids[0];
+            }
+        } catch {
+            // fall through to default
+        }
+        return 1;
     }
 
     async _resolveRole() {
         const G = "southbrook_command_center.";
         try {
-            if (await this.user.hasGroup(G + "group_command_center_owner")) {
+            if (await user.hasGroup(G + "group_command_center_owner")) {
                 this.state.role = "owner";
-            } else if (await this.user.hasGroup(G + "group_command_center_production_manager")) {
+            } else if (await user.hasGroup(G + "group_command_center_production_manager")) {
                 this.state.role = "production_manager";
-            } else if (await this.user.hasGroup(G + "group_command_center_shop_foreman")) {
+            } else if (await user.hasGroup(G + "group_command_center_shop_foreman")) {
                 this.state.role = "shop_foreman";
-            } else if (await this.user.hasGroup(G + "group_command_center_purchasing_manager")) {
+            } else if (await user.hasGroup(G + "group_command_center_purchasing_manager")) {
                 this.state.role = "purchasing_manager";
-            } else if (await this.user.hasGroup(G + "group_command_center_warehouse_manager")) {
+            } else if (await user.hasGroup(G + "group_command_center_warehouse_manager")) {
                 this.state.role = "warehouse_manager";
             } else {
                 this.state.role = "owner";
