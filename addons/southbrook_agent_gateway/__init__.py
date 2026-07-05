@@ -7,31 +7,24 @@ from . import models
 # guard anyway so a manual re-run can't duplicate the block).
 _ROBOTS_MARKER = "# BEGIN southbrook_agent_gateway"
 
+# IMPORTANT (2026-07-05 code-review fix): this block is COMMENTS ONLY —
+# no `User-agent:` groups. In robots.txt group-selection semantics, a
+# named `User-agent: GPTBot` group makes that bot use ONLY that group and
+# ignore any operator-authored `User-agent: *` Disallow rules — so
+# emitting a bare per-bot `Allow: /` would silently STRIP the operator's
+# existing crawl restrictions (e.g. Disallow: /my/, /web/) for those
+# agents. We never want to weaken crawl policy from a module install. The
+# actual "allow AI crawlers" decision lives at the Cloudflare edge
+# (owner action); here we only advertise the machine-readable entry
+# points via comments, which no crawler treats as a rule.
 _ROBOTS_AI_SECTION = """
-# BEGIN southbrook_agent_gateway — AI agent guidance
+# BEGIN southbrook_agent_gateway — AI agent guidance (informational)
 # Southbrook Cabinetry welcomes AI shopping/research agents for
 # reference use. Machine-readable entry points:
 #   /llms.txt                    — agent briefing
 #   /agent/api/v1/openapi.json   — API contract (offerings + quote requests)
 # Content-Signal: search=yes, ai-input=yes, ai-train=no
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Claude-User
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
+# (Crawl allow/deny policy is managed at the CDN edge, not here.)
 # END southbrook_agent_gateway
 """
 

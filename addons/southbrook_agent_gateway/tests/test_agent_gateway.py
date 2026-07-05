@@ -149,6 +149,114 @@ class TestAgentInquiryModel(TransactionCase):
         self.assertFalse(status["email_verified"])
         self.assertIn("sales_stage", status)
 
+    # ------------------------------------------------------------------
+    # v2 — phone tightening, address capture, draft-quote line items
+    # ------------------------------------------------------------------
+    def test_validate_rejects_freetext_phone(self):
+        # Regression: phone_format echoes unparseable input back rather
+        # than raising; the tightened _format_phone must still reject it.
+        cleaned, err = self.Inquiry.validate_payload(
+            _payload(customer={"phone": "call me maybe"}))
+        self.assertIsNone(cleaned)
+        self.assertIn("phone", err)
+
+    def test_validate_captures_address(self):
+        cleaned, err = self.Inquiry.validate_payload(_payload(address={
+            "street": "123 Bank St",
+            "city": "Ottawa",
+            "state": "Ontario",
+            "zip": "K1P 1A1",
+            "country": "Canada",
+        }))
+        self.assertIsNone(err)
+        self.assertEqual(cleaned["street"], "123 Bank St")
+        self.assertEqual(cleaned["city"], "Ottawa")
+        self.assertEqual(cleaned["zip_code"], "K1P 1A1")
+
+    def test_new_partner_gets_address(self):
+        cleaned, _err = self.Inquiry.validate_payload(_payload(
+            customer={"email": "addr.test@example.com"},
+            address={"street": "500 King St", "city": "Toronto",
+                     "country": "Canada"}))
+        inquiry = self.Inquiry.submit(cleaned)
+        self.assertEqual(inquiry.partner_id.street, "500 King St")
+        self.assertEqual(inquiry.partner_id.city, "Toronto")
+        self.assertTrue(inquiry.partner_id.country_id)
+        self.assertEqual(inquiry.partner_id.country_id.code, "CA")
+
+    def test_existing_partner_address_not_overwritten(self):
+        existing = self.env["res.partner"].create({
+            "name": "Established Customer",
+            "email": "established@example.com",
+            "phone": False,
+        })
+        cleaned, _err = self.Inquiry.validate_payload(_payload(
+            customer={"email": "established@example.com",
+                      "phone": "+1 613 555 0142"},
+            address={"street": "999 Attacker Rd"}))
+        inquiry = self.Inquiry.submit(cleaned)
+        self.assertEqual(inquiry.partner_id, existing)
+        # SECURITY: unverified third-party submission must NOT write onto
+        # a pre-existing contact — not phone, not address.
+        self.assertFalse(existing.phone)
+        self.assertFalse(existing.street)
+
+    def test_validate_line_items_resolves_real_skus(self):
+        tmpl = self.env.ref("southbrook_estimating.base_1dr")
+        items, err = self.Inquiry.validate_line_items(
+            [{"sku": tmpl.default_code, "qty": 3}])
+        self.assertIsNone(err)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["template"], tmpl)
+        self.assertEqual(items[0]["qty"], 3)
+
+    def test_validate_line_items_rejects_unknown_sku(self):
+        items, err = self.Inquiry.validate_line_items(
+            [{"sku": "NOT-A-REAL-SKU", "qty": 1}])
+        self.assertIsNone(items)
+        self.assertIn("unknown SKU", err)
+
+    def test_validate_line_items_empty_is_lead_only(self):
+        items, err = self.Inquiry.validate_line_items(None)
+        self.assertIsNone(err)
+        self.assertEqual(items, [])
+
+    def test_validate_line_items_caps_qty(self):
+        tmpl = self.env.ref("southbrook_estimating.base_1dr")
+        items, err = self.Inquiry.validate_line_items(
+            [{"sku": tmpl.default_code, "qty": 9999}])
+        self.assertIsNone(items)
+        self.assertIn("between 1 and", err)
+
+    def test_submit_with_line_items_creates_draft_quote(self):
+        tmpl = self.env.ref("southbrook_estimating.base_1dr")
+        cleaned, _err = self.Inquiry.validate_payload(
+            _payload(customer={"email": "quote.buyer@example.com"}))
+        items, _e = self.Inquiry.validate_line_items(
+            [{"sku": tmpl.default_code, "qty": 2}])
+        inquiry = self.Inquiry.submit(cleaned, line_items=items)
+        order = inquiry.sale_order_id
+        self.assertTrue(order)
+        # Submitted for review, never confirmed (no MOs spawned).
+        self.assertEqual(order.state, "sent")
+        self.assertEqual(len(order.order_line), 1)
+        self.assertEqual(order.order_line.product_uom_qty, 2)
+        self.assertEqual(
+            order.order_line.product_id.product_tmpl_id, tmpl)
+        # Quote summary is customer-safe and priced.
+        summary = inquiry.quote_summary()
+        self.assertEqual(summary["quote_reference"], order.name)
+        self.assertEqual(len(summary["lines"]), 1)
+        self.assertGreater(summary["total"], 0)
+        self.assertNotIn("cost", summary)
+        self.assertNotIn("margin", summary)
+
+    def test_submit_without_line_items_creates_no_order(self):
+        cleaned, _err = self.Inquiry.validate_payload(_payload())
+        inquiry = self.Inquiry.submit(cleaned, line_items=[])
+        self.assertFalse(inquiry.sale_order_id)
+        self.assertIsNone(inquiry.quote_summary())
+
 
 @tagged("post_install", "-at_install", "southbrook", "agent_gateway")
 class TestAgentGatewayHttp(HttpCase):
@@ -251,3 +359,38 @@ class TestAgentGatewayHttp(HttpCase):
         page = self.url_open("/agent/verify/definitely-not-a-token")
         self.assertEqual(page.status_code, 200)
         self.assertIn("isn't valid", page.text)
+
+    def test_quote_endpoint_requires_line_items(self):
+        # /quote without line_items is a 400 pointing at /quote-request.
+        resp = self.url_open(
+            "/agent/api/v1/quote",
+            data=json.dumps(_payload()),
+            headers={"Content-Type": "application/json"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("line_items is required", resp.json()["detail"])
+
+    def test_quote_endpoint_returns_priced_quote(self):
+        tmpl = self.env.ref("southbrook_estimating.base_1dr")
+        body = _payload(
+            customer={"email": "http.quote@example.com"},
+            address={"city": "Ottawa", "country": "Canada"})
+        body["line_items"] = [{"sku": tmpl.default_code, "qty": 4}]
+        resp = self.url_open(
+            "/agent/api/v1/quote",
+            data=json.dumps(body),
+            headers={"Content-Type": "application/json"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("quote", data)
+        quote = data["quote"]
+        self.assertTrue(quote["quote_reference"].startswith("S"))
+        self.assertEqual(len(quote["lines"]), 1)
+        self.assertEqual(quote["lines"][0]["qty"], 4)
+        self.assertGreater(quote["total"], 0)
+
+    def test_offerings_advertises_instant_quote(self):
+        resp = self.url_open("/agent/api/v1/offerings")
+        data = resp.json()
+        self.assertEqual(
+            data["instant_quote_endpoint"], "/agent/api/v1/quote")

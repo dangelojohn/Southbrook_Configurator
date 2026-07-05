@@ -38,6 +38,7 @@ for this module.
     "license": "LGPL-3",
     "depends": [
         "southbrook_estimating",
+        "sale",
         "website",
         "crm",
         "utm",
@@ -49,6 +50,7 @@ for this module.
         "data/ir_sequence.xml",
         "data/utm_data.xml",
         "data/res_partner_category.xml",
+        "data/crm_tag.xml",
         "data/mail_template.xml",
         "views/agent_inquiry_views.xml",
         "views/website_templates.xml",

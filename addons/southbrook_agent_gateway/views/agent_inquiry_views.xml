@@ -44,6 +44,13 @@
                             <field name="agent_user_agent"/>
                         </group>
                     </group>
+                    <group string="Address (as submitted)">
+                        <field name="street"/>
+                        <field name="city"/>
+                        <field name="state_name"/>
+                        <field name="zip_code"/>
+                        <field name="country_name"/>
+                    </group>
                     <group string="Project">
                         <field name="project_description" nolabel="1"/>
                         <field name="room_type"/>
@@ -53,6 +60,7 @@
                     <group string="CRM Links">
                         <field name="partner_id"/>
                         <field name="lead_id"/>
+                        <field name="sale_order_id"/>
                     </group>
                 </sheet>
             </form>

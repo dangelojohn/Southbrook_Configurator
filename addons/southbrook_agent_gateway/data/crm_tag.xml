@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Shared CRM tag applied to AI-agent-originated leads AND the
+         self-service draft quotations (sale.order.tag_ids reuses
+         crm.tag). Makes AI-agent provenance a filterable dimension in
+         both the CRM pipeline and the Sales quotation list. -->
+    <record id="crm_tag_ai_agent" model="crm.tag">
+        <field name="name">AI Agent</field>
+        <field name="color">4</field>
+    </record>
+</odoo>
