@@ -18,6 +18,13 @@
                 <filter name="mine" string="Assigned to me"
                         domain="[('owner_id','=',uid)]"/>
                 <separator/>
+                <!-- Resolved/Dismissed are archived (active=False), so grouping
+                     by State hides them by default. This filter reveals them
+                     (active_test=False) so closed groups are visible. -->
+                <filter name="include_closed" string="Include Closed (Resolved/Dismissed)"
+                        domain="[('state','in',('resolved','dismissed'))]"
+                        context="{'active_test': False}"/>
+                <separator/>
                 <group>
                     <filter name="gb_severity" string="Severity"
                             context="{'group_by': 'severity'}"/>
@@ -108,6 +115,7 @@
                         <field name="workcenter_id"/>
                         <field name="acknowledged_date"/>
                         <field name="resolved_date"/>
+                        <field name="dismissed_date"/>
                     </group>
                 </sheet>
                 <chatter/>

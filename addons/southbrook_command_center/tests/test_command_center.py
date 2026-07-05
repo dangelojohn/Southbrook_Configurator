@@ -63,6 +63,9 @@ class TestCommandException(TransactionCase):
         rec.action_dismiss()
         self.assertEqual(rec.state, "dismissed")
         self.assertFalse(rec.active)
+        self.assertTrue(rec.dismissed_date, "dismiss stamps dismissed_date")
+        self.assertFalse(rec.resolved_date,
+                         "New->Dismissed must NOT set resolved_date")
 
     def test_reopen_undo(self):
         # action_reopen powers the dashboard undo-toast: a resolved/dismissed

@@ -206,6 +206,7 @@ class SouthbrookCommandException(models.Model):
     # ------------------------------------------------------------------
     acknowledged_date = fields.Datetime(readonly=True)
     resolved_date = fields.Datetime(readonly=True)
+    dismissed_date = fields.Datetime(readonly=True)
 
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
@@ -269,10 +270,12 @@ class SouthbrookCommandException(models.Model):
         return True
 
     def action_dismiss(self):
+        # Dismiss is NOT a resolution — stamp dismissed_date, never
+        # resolved_date (a New->Dismissed record was never resolved).
         self.write(
             {
                 "state": "dismissed",
-                "resolved_date": fields.Datetime.now(),
+                "dismissed_date": fields.Datetime.now(),
                 "active": False,
             }
         )
@@ -286,6 +289,7 @@ class SouthbrookCommandException(models.Model):
                 "state": "new",
                 "active": True,
                 "resolved_date": False,
+                "dismissed_date": False,
                 "acknowledged_date": False,
             }
         )

@@ -42,7 +42,7 @@ export class CentralCommand extends Component {
             flow: null,
             recommendations: [],
             alerts: [],
-            filterSeverity: "",
+            filterSeverities: [],
             filterType: "",
             groupBy: "",
             confirmingId: null,
@@ -78,16 +78,22 @@ export class CentralCommand extends Component {
         return 1;
     }
 
-    // Client-side filtered view of the loaded cards (severity + type chips).
+    // Client-side filtered view of the loaded cards. Severity chips are
+    // multi-select (OR): with none selected, all severities pass; with some
+    // selected, a card passes if its severity is any of them.
     get filteredExceptions() {
         let list = this.state.exceptions;
-        if (this.state.filterSeverity) {
-            list = list.filter((e) => e.severity === this.state.filterSeverity);
+        if (this.state.filterSeverities.length) {
+            list = list.filter((e) => this.state.filterSeverities.includes(e.severity));
         }
         if (this.state.filterType) {
             list = list.filter((e) => e.exception_type === this.state.filterType);
         }
         return list;
+    }
+
+    isSeverityOn(sev) {
+        return this.state.filterSeverities.includes(sev);
     }
 
     get exceptionTypesPresent() {
@@ -157,7 +163,13 @@ export class CentralCommand extends Component {
     }
 
     setSeverityFilter(sev) {
-        this.state.filterSeverity = this.state.filterSeverity === sev ? "" : sev;
+        const arr = this.state.filterSeverities;
+        const i = arr.indexOf(sev);
+        if (i === -1) {
+            arr.push(sev);
+        } else {
+            arr.splice(i, 1);
+        }
     }
 
     onTypeFilter(ev) {
@@ -165,13 +177,13 @@ export class CentralCommand extends Component {
     }
 
     clearFilters() {
-        this.state.filterSeverity = "";
+        this.state.filterSeverities = [];
         this.state.filterType = "";
         this.state.groupBy = "";
     }
 
     get hasFilter() {
-        return !!this.state.filterSeverity || !!this.state.filterType;
+        return this.state.filterSeverities.length > 0 || !!this.state.filterType;
     }
 
     get hasControls() {
@@ -283,16 +295,24 @@ export class CentralCommand extends Component {
         this.orm.call("southbrook.command.exception", method, [[id]])
             .then(() => {
                 this._loadAll(true);
-                // Undo toast — misclick recovery (reopens via action_reopen).
-                this.notification.add("Exception " + verb + ".", {
+                // Undo toast — STICKY so it never auto-closes before the click
+                // lands (the previous non-sticky toast was the real undo bug).
+                const close = this.notification.add("Exception " + verb + ".", {
                     type: "success",
+                    sticky: true,
                     buttons: [
                         {
                             name: "Undo",
                             onClick: () => {
+                                if (close) {
+                                    close();
+                                }
                                 this.orm
                                     .call("southbrook.command.exception", "action_reopen", [[id]])
-                                    .then(() => this._loadAll(true));
+                                    .then(() => {
+                                        this._loadAll(true);
+                                        this.notification.add("Reopened.", { type: "info" });
+                                    });
                             },
                         },
                     ],
@@ -302,7 +322,10 @@ export class CentralCommand extends Component {
 
     onAcknowledge(id) {
         this.orm.call("southbrook.command.exception", "action_acknowledge", [[id]])
-            .then(() => this._loadAll(true));
+            .then(() => {
+                this._loadAll(true);
+                this.notification.add("Acknowledged.", { type: "success" });
+            });
     }
 
     // -- bus (Phase 3) — live push. Publishers fire from the Phase-2 hooks;
@@ -322,6 +345,13 @@ export class CentralCommand extends Component {
             this.busService.subscribe("exception_resolved", this._onExceptionMsg);
             this.busService.subscribe("ops_event", this._onAlertMsg);
             this.busService.subscribe("hermes_upsert", this._onHermesMsg);
+            // The bus websocket connects at web-client load — usually BEFORE
+            // this component mounts — so the "connect" event has already fired
+            // and can't be caught by the listener below. Treat a successful
+            // subscribe as connected; the disconnect handler flips to "manual"
+            // if the socket actually drops. (This is why the badge previously
+            // read "manual" despite a working 101 handshake.)
+            this.state.busConnected = true;
         } catch {
             return; // subscription failed — stay in manual mode
         }

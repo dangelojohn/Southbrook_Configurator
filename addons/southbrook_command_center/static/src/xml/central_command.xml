@@ -71,7 +71,7 @@
                 <!-- Critical Issues (left, primary) -->
                 <div class="sb_cc_issues">
                     <div class="sb_cc_panel_h">
-                        Critical Issues (<t t-esc="state.exceptionsTotal"/>)
+                        Open Issues (<t t-esc="state.exceptionsTotal"/>)
                         <span class="sb_cc_showing"
                               t-if="hasFilter || state.exceptionsTotal > state.exceptions.length">
                             · showing <t t-esc="filteredExceptions.length"/>
@@ -80,11 +80,14 @@
 
                     <div class="sb_cc_filterbar">
                         <button class="sb_cc_chip"
-                                t-att-class="state.filterSeverity === 'critical' ? 'sb_cc_chip_on' : ''"
+                                t-att-class="isSeverityOn('critical') ? 'sb_cc_chip_on' : ''"
                                 t-on-click="() => this.setSeverityFilter('critical')">Critical</button>
                         <button class="sb_cc_chip"
-                                t-att-class="state.filterSeverity === 'high' ? 'sb_cc_chip_on' : ''"
+                                t-att-class="isSeverityOn('high') ? 'sb_cc_chip_on' : ''"
                                 t-on-click="() => this.setSeverityFilter('high')">High</button>
+                        <button class="sb_cc_chip"
+                                t-att-class="isSeverityOn('medium') ? 'sb_cc_chip_on' : ''"
+                                t-on-click="() => this.setSeverityFilter('medium')">Medium</button>
                         <select class="sb_cc_typesel" t-on-change="onTypeFilter">
                             <option value="" t-att-selected="!state.filterType">All types</option>
                             <option t-foreach="exceptionTypesPresent" t-as="ty" t-key="ty"
