@@ -56,22 +56,78 @@ class SouthbrookCommandExceptionMaterialize(models.Model):
     # ------------------------------------------------------------------
     # Idempotent upsert keyed on the unique 3-tuple.
     # ------------------------------------------------------------------
-    def _upsert_exception(self, exception_type, source_model, source_res_id, vals):
-        existing = self.sudo().with_context(active_test=False).search([
+    def _upsert_exception(self, exception_type, source_model, source_res_id, vals,
+                          reactivate=False):
+        """Idempotent create-or-update keyed on the unique 3-tuple.
+
+        On an EXISTING OPEN row only the narrative (severity/rank/impact/
+        action/why) is refreshed — owner and workflow state set by a human
+        are preserved. A resolved/dismissed row is reactivated ONLY when
+        ``reactivate=True`` (event hooks: the source defect genuinely
+        re-fired). The cron scan passes ``reactivate=False`` (the default) so
+        it never undoes a human's resolution of a still-present blocker.
+        (Unified materializer — single source of ``_upsert_exception``; the
+        Phase-2 hooks call this same method.)"""
+        Exc = self.sudo().with_context(active_test=False)
+        existing = Exc.search([
             ("source_model", "=", source_model),
             ("source_res_id", "=", source_res_id),
             ("exception_type", "=", exception_type),
         ], limit=1)
+        narrative = {k: vals[k] for k in
+                     ("severity", "severity_rank", "impact_summary",
+                      "recommended_action", "why_text") if k in vals}
         if existing:
-            # Only refresh the imperative narrative/severity; never clobber
-            # the human's own workflow state or ownership once set.
-            refresh = {k: vals[k] for k in
-                       ("severity", "severity_rank", "impact_summary",
-                        "recommended_action", "why_text") if k in vals}
-            if refresh:
-                existing.sudo().write(refresh)
+            if not existing.active and reactivate:
+                existing.write({**narrative, "active": True, "state": "new"})
+            elif narrative:
+                existing.write(narrative)
             return existing
-        return self.sudo().create(vals)
+        create_vals = dict(vals)
+        create_vals.update({
+            "exception_type": exception_type,
+            "source_model": source_model,
+            "source_res_id": source_res_id,
+        })
+        return Exc.create(create_vals)
+
+    def _resolve_exception(self, exception_type, source_model, source_res_id):
+        """Mark the matching OPEN exception resolved (no-op if none). Used by
+        hooks that observe a source record leave its exception-worthy state
+        (e.g. approval granted / force-release set). Reuses action_resolve()."""
+        existing = self.sudo().search([
+            ("source_model", "=", source_model),
+            ("source_res_id", "=", source_res_id),
+            ("exception_type", "=", exception_type),
+            ("active", "=", True),
+        ], limit=1)
+        if existing:
+            existing.action_resolve()
+        return existing
+
+    @api.model
+    def _cc_hooks_enabled(self):
+        """Kill-switch for the event-driven Phase-2 hooks. When
+        ``command_center.hooks_enabled`` != '1' every create/write override is
+        a pure pass-through — an instant, uninstall-free disable/rollback. The
+        cron-scan materializer is unaffected (always on)."""
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "command_center.hooks_enabled", "1") == "1"
+
+    def _publish(self, channel_suffix, ntype, payload):
+        """``bus.bus._sendone`` on ``<channel_suffix>_<company_id>`` (per
+        company, DELIVERABLE_5_DELIVERY.md §1). Always try/except-wrapped and
+        logged — a bus failure must never roll back the business write it
+        observes. (No delivery until Phase 3's Caddy websocket split, OQ-7;
+        publishing is a cheap no-op until then.)"""
+        try:
+            company_id = payload.get("company_id") or self.env.company.id
+            channel = "%s_%s" % (channel_suffix, company_id)
+            self.env["bus.bus"].sudo()._sendone(channel, ntype, payload)
+        except Exception:  # noqa: BLE001
+            _logger.exception(
+                "Central Command bus publish failed (channel_suffix=%s, "
+                "notification_type=%s) — non-fatal", channel_suffix, ntype)
 
     # ------------------------------------------------------------------
     # The scan. Each source wrapped independently so one failure never

@@ -9,3 +9,11 @@
 from . import southbrook_command_exception
 from . import command_center
 from . import command_center_materialize
+# Phase-2 event-driven hooks (gated by command_center.hooks_enabled kill-switch;
+# ship disabled for a dark launch). Override create/write on live business
+# models to materialize exceptions in real time; the cron scan stays the
+# always-on baseline.
+from . import mi_check
+from . import breakdown_alert
+from . import hermes_recommendation
+from . import sale_order

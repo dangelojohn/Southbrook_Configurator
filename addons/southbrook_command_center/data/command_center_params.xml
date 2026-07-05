@@ -126,4 +126,14 @@
         <field name="value">production.manager@southbrookcabinetry.local</field>
     </record>
 
+    <!-- Phase-2 kill-switch. '1' = event-driven create/write hooks active;
+         anything else = every hook is a pure pass-through (instant,
+         uninstall-free disable/rollback). The cron-scan materializer is
+         unaffected and always runs. Ships '0' for a dark launch, flipped to
+         '1' after a clean post-install window. -->
+    <record id="param_cc_hooks_enabled" model="ir.config_parameter">
+        <field name="key">command_center.hooks_enabled</field>
+        <field name="value">0</field>
+    </record>
+
 </odoo>
