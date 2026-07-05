@@ -316,7 +316,7 @@
                         t-as="w"
                         t-key="w_index">
                         <td class="sb-room-wizard-walls-pos mono">
-                            <t t-esc="String.fromCharCode(65 + w_index)"/>
+                            <t t-esc="this._wallLetter(w_index)"/>
                         </td>
                         <td>
                             <input type="text"

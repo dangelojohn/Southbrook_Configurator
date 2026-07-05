@@ -2,8 +2,9 @@
 """
 scripts/lint-owl-expr.py — fail on OWL tokenizer violations in t-* attrs.
 
-Catches three bug classes that pass server-side XML lint and Odoo module
-install but throw OwlError at browser-side template-compile time:
+Catches four bug classes that pass server-side XML lint and Odoo module
+install but throw OwlError at browser-side template-compile (or render)
+time:
 
 1. Bare-word logical operators (or / and / not) inside t-* attribute
    expressions. Python and legacy server-side QWeb accept these; OWL's
@@ -17,11 +18,26 @@ install but throw OwlError at browser-side template-compile time:
    the XML attribute prematurely. Use &quot; / &apos; XML entities
    instead. Added 2026-06-27 after the OdooIQ-supplied kitchen-3d
    addon hit it on its first mount (commit 85f8fa9 → fix 34e32fb).
+4. Bare use of a JS global constructor/function NOT on OWL's compiler
+   allowlist (String, Number, Boolean, JSON, Symbol, Map, Set, Promise,
+   parseInt, parseFloat, isNaN, isFinite, ...). OWL's expression
+   compiler special-cases a fixed RESERVED_WORDS list — Math, RegExp,
+   Array, Object, Date pass through to the real global — anything else
+   bare gets rewritten as a component-context property lookup instead,
+   which is `undefined` for a global like `String`, throwing "Cannot
+   read properties of undefined" at render time. Added 2026-07-04
+   after `t-esc="String.fromCharCode(...)"` in the Room Setup wizard's
+   WallDimensionsStep passed server-side XML lint + module install
+   clean but crashed the OrderBuilder's owl lifecycle on every attempt
+   to reach Step 2 (QA report via external E2E test agent, order
+   S01360). Fix: move the call into a real JS method and reference it
+   via `this._method()` in the template instead.
 
-These bug classes hit Southbrook four times in 5 days (see memory note
-owl-tokenizer-constraints): configurator-ux f05b99d, mrp_pm kanban
+These bug classes hit Southbrook five times in under 6 weeks (see memory
+note owl-tokenizer-constraints): configurator-ux f05b99d, mrp_pm kanban
 f3d13dd / ab45954, planner_boot.esm.js (2 latent caught by JS-block
-extension 2026-06-27), kitchen-3d t-esc escaped-quote 2026-06-27.
+extension 2026-06-27), kitchen-3d t-esc escaped-quote 2026-06-27, Room
+Setup wizard bare-`String` 2026-07-04.
 
 Scope:
 - OWL-compiled contexts only:
@@ -98,6 +114,52 @@ STRING_LIT_RE = re.compile(r"'[^']*'|\"[^\"]*\"")
 # {{...}} and #{...} interpolation blocks inside t-attf-* string templates.
 INTERP_RE = re.compile(r"\{\{([^}]*)\}\}|#\{([^}]*)\}")
 
+# Bug class 4: JS globals NOT on OWL's RESERVED_WORDS allowlist — the
+# compiler's own list (see addons/web/static/lib/owl/owl.js):
+#   true,false,NaN,null,undefined,debugger,console,window,in,instanceof,
+#   new,function,return,eval,void,Math,RegExp,Array,Object,Date,__globals__
+# Anything else referenced bare (not as `this.X` / `obj.X` / part of a
+# longer identifier) resolves to an undefined component-context property
+# instead of the real global.
+#
+# Rather than hand-enumerate "known bad" globals (String, Number, JSON,
+# ... — an open-ended, easily-incomplete list: Infinity, document,
+# Reflect, WeakMap, BigInt, globalThis, btoa, etc. are just as broken and
+# just as easy to reach for), this derives the check from the REAL
+# allowlist structurally: this codebase's convention never uses a
+# PascalCase identifier for component-local data (props/state/loop vars
+# are always camelCase or snake_case), so any bare PascalCase identifier
+# inside a t-* expression is almost certainly a global constructor/
+# namespace reference. Exclude it only if it's actually on OWL's
+# allowlist (Math, RegExp, Array, Object, Date, NaN all happen to be
+# PascalCase already). A separate fixed list covers common *lowercase*
+# global functions (parseInt, fetch, btoa, ...) that the PascalCase
+# check can't catch structurally.
+OWL_RESERVED_WORDS = frozenset(
+    "true false NaN null undefined debugger console window in "
+    "instanceof new function return eval void Math RegExp Array "
+    "Object Date __globals__".split()
+)
+PASCAL_GLOBAL_RE = re.compile(r"(?<![\w.$])([A-Z][a-zA-Z0-9_]*)\b")
+LOWERCASE_GLOBAL_FN_RE = re.compile(
+    r"(?<![\w.$])(parseInt|parseFloat|isNaN|isFinite|encodeURIComponent"
+    r"|decodeURIComponent|encodeURI|decodeURI|escape|unescape|btoa|atob"
+    r"|structuredClone|fetch|setTimeout|setInterval|clearTimeout"
+    r"|clearInterval|alert|confirm|prompt|globalThis"
+    r"|document|navigator|location|history|localStorage|sessionStorage"
+    r"|crypto|performance)\b"
+)
+
+
+def find_disallowed_global(stripped):
+    """Return the offending identifier, or None. `stripped` has string
+    literals already removed by the caller (STRING_LIT_RE.sub)."""
+    for m in PASCAL_GLOBAL_RE.finditer(stripped):
+        if m.group(1) not in OWL_RESERVED_WORDS:
+            return m.group(1)
+    m = LOWERCASE_GLOBAL_FN_RE.search(stripped)
+    return m.group(1) if m else None
+
 # OWL kanban-style record access. ONLY OWL templates use this pattern;
 # server-side QWeb has no `record.<field>.raw_value` / `.value` accessor.
 # Detection signal for inherit-view files that xpath into a parent kanban's
@@ -168,6 +230,12 @@ def violations_for_attr(name, value):
             if wm:
                 yield (f"word operator '{wm.group(1)}' inside interpolation",
                        "use ||, && (XML-escape as &amp;&amp;), !")
+            gd = find_disallowed_global(stripped)
+            if gd:
+                yield (f"bare global '{gd}' not on OWL's "
+                       f"RESERVED_WORDS allowlist inside interpolation",
+                       f"move the call into a component method and "
+                       f"reference it via this._method()")
     else:
         stripped = STRING_LIT_RE.sub("", value)
         wm = WORD_OP_RE.search(stripped)
@@ -178,6 +246,14 @@ def violations_for_attr(name, value):
         if rm:
             yield ("JS regex literal",
                    "use string methods (indexOf, startsWith, substring)")
+        gd = find_disallowed_global(stripped)
+        if gd:
+            yield (f"bare global '{gd}' not on OWL's "
+                   f"RESERVED_WORDS allowlist (Math/RegExp/Array/Object/"
+                   f"Date pass through; this one resolves to an "
+                   f"undefined component-context lookup instead)",
+                   f"move the call into a component method and "
+                   f"reference it via this._method()")
 
 
 def scan_file(path: Path):
@@ -205,16 +281,23 @@ def scan_file(path: Path):
     def in_owl_range(ln):
         return any(s <= ln <= e for s, e in ranges)
 
-    for lineno, line in enumerate(lines, 1):
+    # Whole-text scan (not per-line): a t-* attribute value CAN span
+    # multiple physical lines (a wrapped long expression). `[^"]*` /
+    # `[^']*` already match across newlines regardless of re.DOTALL —
+    # only iterating line-by-line was hiding that. Line number is
+    # recovered from the match's start offset via newline counting, same
+    # technique scan_js_file() already uses for JS-embedded templates.
+    text = "".join(lines)
+    for match in ATTR_RE.finditer(text):
+        name = match.group(1)
+        if not is_t_expr_attr(name):
+            continue
+        lineno = _offset_to_lineno(text, match.start())
         if not in_owl_range(lineno):
             continue
-        for match in ATTR_RE.finditer(line):
-            name = match.group(1)
-            if not is_t_expr_attr(name):
-                continue
-            value = match.group(2) if match.group(2) is not None else match.group(3)
-            for kind, fix in violations_for_attr(name, value):
-                yield (lineno, name, value, kind, fix)
+        value = match.group(2) if match.group(2) is not None else match.group(3)
+        for kind, fix in violations_for_attr(name, value):
+            yield (lineno, name, value, kind, fix)
 
 
 # ─────────────────────────────────────────────────────────────────────

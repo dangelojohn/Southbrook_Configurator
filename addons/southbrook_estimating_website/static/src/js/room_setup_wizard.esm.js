@@ -473,6 +473,19 @@ class WallDimensionsStep extends Component {
     _unitLabel() {
         return this.props.room.unit_preference === "imperial" ? "in" : "mm";
     }
+
+    // 2026-07-04 QA fix — OWL's expression compiler only allowlists a
+    // fixed set of bare globals inside t-esc/t-if/t-att (Math, Array,
+    // Object, Date, RegExp — see RESERVED_WORDS in owl's compiler).
+    // `String` is NOT on that list, so a template expression like
+    // `String.fromCharCode(...)` resolves `String` as an (undefined)
+    // component-context lookup instead of the real global, throwing
+    // "Cannot read properties of undefined (reading 'fromCharCode')"
+    // on every render of this step. Real JS methods have no such
+    // restriction, so the fix is just moving the call off the template.
+    _wallLetter(idx) {
+        return String.fromCharCode(65 + idx);
+    }
 }
 
 // ----------------------------------------------------------------------

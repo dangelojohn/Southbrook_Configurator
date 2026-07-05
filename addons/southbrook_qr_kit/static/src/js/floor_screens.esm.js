@@ -148,7 +148,7 @@ class BinScanScreen extends Component {
                 <label for="qty_input">3. Quantity</label>
                 <input id="qty_input" type="number" min="0.001" step="0.001"
                        t-att-value="state.qty"
-                       t-on-input="(e) => state.qty = parseFloat(e.target.value) || 0"/>
+                       t-on-input="_onQtyInput"/>
                 <span class="sb_floor_qty_hint">
                     <t t-if="state.selectedProductId">
                         Moving
@@ -235,6 +235,15 @@ class BinScanScreen extends Component {
         const pid = this.state.selectedProductId;
         const q = this.state.srcQuants.find((x) => x.product_id === pid);
         return q ? q.product_name : "";
+    }
+
+    // 2026-07-04 QA fix — the template used to call parseFloat(...) bare
+    // inside the t-on-input expression. OWL's expression compiler only
+    // allowlists a fixed set of globals (Math/RegExp/Array/Object/Date);
+    // `parseFloat` isn't on it, so it resolved to an undefined captured
+    // context variable and threw on every keystroke in the qty field.
+    _onQtyInput(ev) {
+        this.state.qty = parseFloat(ev.target.value) || 0;
     }
 
     _canConfirm() {

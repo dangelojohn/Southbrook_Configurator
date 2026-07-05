@@ -110,7 +110,7 @@
                         <div class="sb-room-plan-wall-picker"
                              t-if="state.viewMode === 'elevation'">
                             <label>Wall:</label>
-                            <select t-on-change="(ev) => this._setSelectedWall(parseInt(ev.target.value, 10))">
+                            <select t-on-change="(ev) => this._setSelectedWall(ev.target.value)">
                                 <t t-foreach="props.room.walls"
                                    t-as="w"
                                    t-key="w.id">
@@ -646,7 +646,7 @@
                                 t-as="opt"
                                 t-key="opt.id"
                                 t-att-value="opt.id"
-                                t-att-selected="String(opt.id) === String(state.wallId) ? 'selected' : null">
+                                t-att-selected="this._isWallOptionSelected(opt.id) ? 'selected' : null">
                             <t t-esc="opt.name"/>
                             ·
                             <t t-esc="_humanLen(opt.length_mm)"/>

@@ -1700,8 +1700,14 @@ export class RoomLayoutTab extends Component {
         }
     }
 
+    // 2026-07-04 QA fix — the template used to call parseInt(...) bare
+    // inside the t-on-change expression. OWL's expression compiler only
+    // allowlists a fixed set of globals (Math/RegExp/Array/Object/Date);
+    // `parseInt` isn't on it, so it resolved to an undefined captured
+    // context variable and threw "v2 is not a function" on every wall
+    // change in the elevation view. Parsing now happens here instead.
     _setSelectedWall(wallId) {
-        this.state.selectedWallId = wallId;
+        this.state.selectedWallId = parseInt(wallId, 10);
     }
 
     // The wall record the elevation view is currently rendering. Falls
@@ -2101,6 +2107,15 @@ export class AssignToWallModal extends Component {
     _onPositionInput = (ev) => {
         this.state.positionMm = ev.target.value;
     };
+
+    // 2026-07-04 QA fix — the template used to call String(...) bare
+    // inside a t-att-selected expression. OWL's expression compiler
+    // only allowlists a fixed set of globals (Math/RegExp/Array/Object/
+    // Date); `String` isn't on it, so it resolved to an undefined
+    // captured context variable and crashed the modal's render.
+    _isWallOptionSelected(optId) {
+        return String(optId) === String(this.state.wallId);
+    }
 
     _onCancelClick = () => {
         if (this.state.submitting) return;

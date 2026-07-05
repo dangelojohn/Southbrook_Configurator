@@ -3599,12 +3599,6 @@ const TEMPLATE = xml`
             <div t-if="state.action_message" class="o_owl_action_msg"
                  t-esc="state.action_message"/>
 
-            <p class="o_owl_status">
-                Phase 2 Track 2 — 12 of 14 commits live.
-                Commit 13 lands the customer-mode toggle; commit 14
-                is the gate review with John.
-            </p>
-
             <!-- Phase 2.C — Room Setup wizard overlay. Renders only
                  when the user clicks the "Set Up Room" CTA on the
                  Room Setup tab. Self-mounts as a fullscreen modal
