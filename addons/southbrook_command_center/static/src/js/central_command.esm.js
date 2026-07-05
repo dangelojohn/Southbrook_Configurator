@@ -53,6 +53,9 @@ export class CentralCommand extends Component {
         this._onExceptionMsg = this._onExceptionMsg.bind(this);
         this._onAlertMsg = this._onAlertMsg.bind(this);
         this._onHermesMsg = this._onHermesMsg.bind(this);
+        this._onBusConnect = this._onBusConnect.bind(this);
+        this._onBusDisconnect = this._onBusDisconnect.bind(this);
+        this._onBusReconnect = this._onBusReconnect.bind(this);
 
         onWillStart(async () => {
             await this._resolveRole();
@@ -302,8 +305,14 @@ export class CentralCommand extends Component {
             .then(() => this._loadAll(true));
     }
 
-    // -- bus (Phase 3 — no publishers yet; subscribing is harmless) -----
+    // -- bus (Phase 3) — live push. Publishers fire from the Phase-2 hooks;
+    // delivery requires the Caddy /websocket split to the gevent worker. The
+    // connection badge reflects the REAL socket state (via the bus service's
+    // own lifecycle events), so without the split it correctly reads "manual"
+    // rather than falsely "live". All event wiring is try/except-guarded so an
+    // API mismatch degrades to manual mode, never a render crash.
     _subscribeBus() {
+        this.state.busConnected = false;
         try {
             const cid = this.companyId;
             this.busService.addChannel("sb_cc_exceptions_" + cid);
@@ -313,9 +322,15 @@ export class CentralCommand extends Component {
             this.busService.subscribe("exception_resolved", this._onExceptionMsg);
             this.busService.subscribe("ops_event", this._onAlertMsg);
             this.busService.subscribe("hermes_upsert", this._onHermesMsg);
-            this.state.busConnected = true;
         } catch {
-            this.state.busConnected = false;
+            return; // subscription failed — stay in manual mode
+        }
+        try {
+            this.busService.addEventListener("connect", this._onBusConnect);
+            this.busService.addEventListener("disconnect", this._onBusDisconnect);
+            this.busService.addEventListener("reconnect", this._onBusReconnect);
+        } catch {
+            // bus lifecycle-event API differs — leave the badge on "manual".
         }
     }
 
@@ -328,6 +343,28 @@ export class CentralCommand extends Component {
         } catch {
             // best effort
         }
+        try {
+            this.busService.removeEventListener("connect", this._onBusConnect);
+            this.busService.removeEventListener("disconnect", this._onBusDisconnect);
+            this.busService.removeEventListener("reconnect", this._onBusReconnect);
+        } catch {
+            // best effort
+        }
+    }
+
+    _onBusConnect() {
+        this.state.busConnected = true;
+    }
+
+    _onBusDisconnect() {
+        this.state.busConnected = false;
+    }
+
+    _onBusReconnect() {
+        // Re-sync on reconnect to catch anything published while the socket
+        // was down (bus delivery is at-most-once across a disconnect).
+        this.state.busConnected = true;
+        this._loadAll(true);
     }
 
     _onExceptionMsg(payload) {
