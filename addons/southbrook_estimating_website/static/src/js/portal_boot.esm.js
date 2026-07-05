@@ -3176,7 +3176,7 @@ const TEMPLATE = xml`
                      2026-07-05 — TWO distinct hidden inputs feed the same
                      handler. A single input can't do both jobs: putting
                      capture="environment" on it makes iOS/Android open
-                     the rear CAMERA directly and IGNORE `multiple` (and
+                     the rear CAMERA directly and IGNORE 'multiple' (and
                      block the photo library); omitting capture gives the
                      LIBRARY (multi-select) but no direct-camera shortcut.
                      So the "Capture Room" button uses the camera input
