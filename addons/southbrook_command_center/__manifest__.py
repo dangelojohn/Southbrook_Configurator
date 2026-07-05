@@ -52,6 +52,7 @@ record this addon implements.
         "southbrook_installer",
         "southbrook_integrations",
         "southbrook_floor_traveler",
+        "southbrook_training_hub",  # contextual "learn this term" help lookup
     ],
     "data": [
         "security/command_center_groups.xml",

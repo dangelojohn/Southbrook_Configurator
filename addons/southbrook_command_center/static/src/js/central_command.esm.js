@@ -26,6 +26,7 @@ export class CentralCommand extends Component {
         this.action = useService("action");
         this.orm = useService("orm");
         this.busService = useService("bus_service");
+        this.notification = useService("notification");
 
         this.state = useState({
             loading: true,       // initial load only
@@ -43,8 +44,10 @@ export class CentralCommand extends Component {
             alerts: [],
             filterSeverity: "",
             filterType: "",
+            groupBy: "",
             confirmingId: null,
             confirmingAction: null,
+            helpDismissed: this._readHelpDismissed(),
         });
 
         this._onExceptionMsg = this._onExceptionMsg.bind(this);
@@ -167,6 +170,80 @@ export class CentralCommand extends Component {
         return !!this.state.filterSeverity || !!this.state.filterType;
     }
 
+    onGroupBy(ev) {
+        this.state.groupBy = ev.target.value;
+    }
+
+    // Grouped view of the filtered cards. Always returns an array of
+    // { key, label, count, items } — a single unlabeled group when no
+    // group-by is active, so the template renders uniformly.
+    get groupedExceptions() {
+        const list = this.filteredExceptions;
+        const by = this.state.groupBy;
+        if (!by) {
+            return [{ key: "", label: "", count: list.length, items: list }];
+        }
+        const order = [];
+        const map = {};
+        for (const e of list) {
+            let label = "";
+            if (by === "severity") {
+                label = e.severity || "unknown";
+            } else if (by === "exception_type") {
+                label = this.typeLabel(e.exception_type);
+            } else if (by === "owner_id") {
+                label = e.owner_id && e.owner_id[1] ? e.owner_id[1] : "Unassigned";
+            }
+            if (!(label in map)) {
+                map[label] = [];
+                order.push(label);
+            }
+            map[label].push(e);
+        }
+        return order.map((label) => ({
+            key: label,
+            label: label,
+            count: map[label].length,
+            items: map[label],
+        }));
+    }
+
+    // -- contextual help (semantic lesson lookup) ----------------------
+    _readHelpDismissed() {
+        try {
+            return window.localStorage.getItem("sb_cc_help_dismissed") === "1";
+        } catch {
+            return false;
+        }
+    }
+
+    dismissHelp() {
+        this.state.helpDismissed = true;
+        try {
+            window.localStorage.setItem("sb_cc_help_dismissed", "1");
+        } catch {
+            // ignore — dismissal just won't persist
+        }
+    }
+
+    openHelp(term) {
+        if (!term) {
+            return;
+        }
+        rpc("/command_center/help_lookup", { term })
+            .then((res) => {
+                const url = (res && res.url) || ("/slides?search=" + encodeURIComponent(term));
+                this.action.doAction({ type: "ir.actions.act_url", url, target: "new" });
+            })
+            .catch(() => {
+                this.action.doAction({
+                    type: "ir.actions.act_url",
+                    url: "/slides?search=" + encodeURIComponent(term),
+                    target: "new",
+                });
+            });
+    }
+
     // -- confirm-before-mutate (misclick protection, no dialog service) --
     askResolve(id) {
         this.state.confirmingId = id;
@@ -188,8 +265,25 @@ export class CentralCommand extends Component {
         this.state.confirmingId = null;
         this.state.confirmingAction = null;
         const method = action === "dismiss" ? "action_dismiss" : "action_resolve";
+        const verb = action === "dismiss" ? "dismissed" : "resolved";
         this.orm.call("southbrook.command.exception", method, [[id]])
-            .then(() => this._loadAll(true));
+            .then(() => {
+                this._loadAll(true);
+                // Undo toast — misclick recovery (reopens via action_reopen).
+                this.notification.add("Exception " + verb + ".", {
+                    type: "success",
+                    buttons: [
+                        {
+                            name: "Undo",
+                            onClick: () => {
+                                this.orm
+                                    .call("southbrook.command.exception", "action_reopen", [[id]])
+                                    .then(() => this._loadAll(true));
+                            },
+                        },
+                    ],
+                });
+            });
     }
 
     onAcknowledge(id) {

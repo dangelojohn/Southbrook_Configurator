@@ -277,3 +277,16 @@ class SouthbrookCommandException(models.Model):
             }
         )
         return True
+
+    def action_reopen(self):
+        """Undo a resolve/dismiss — return the exception to the open queue.
+        Powers the dashboard's undo-toast (misclick recovery)."""
+        self.write(
+            {
+                "state": "new",
+                "active": True,
+                "resolved_date": False,
+                "acknowledged_date": False,
+            }
+        )
+        return True

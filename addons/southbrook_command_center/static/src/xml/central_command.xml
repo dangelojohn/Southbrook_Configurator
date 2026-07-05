@@ -16,6 +16,15 @@
                         t-att-disabled="state.refreshing">Refresh</button>
             </div>
 
+            <div t-if="!state.helpDismissed" class="sb_cc_helpbanner">
+                <span>
+                    <i class="fa fa-graduation-cap"/>
+                    New to Central Command? Use the <b>?</b> help search (top-right) to look up any
+                    term, or click the <b>?</b> beside a type below to open its lesson.
+                </span>
+                <button class="sb_cc_help_x" t-on-click="dismissHelp" title="Dismiss">×</button>
+            </div>
+
             <!-- initial load skeleton (does NOT show on refresh) -->
             <div t-if="state.loading" class="sb_cc_skeleton">
                 <div class="sb_cc_sk_bar"/>
@@ -81,6 +90,12 @@
                             <option t-foreach="exceptionTypesPresent" t-as="ty" t-key="ty"
                                     t-att-value="ty" t-esc="typeLabel(ty)"/>
                         </select>
+                        <select class="sb_cc_typesel" t-on-change="onGroupBy">
+                            <option value="">No grouping</option>
+                            <option value="severity">Group: severity</option>
+                            <option value="exception_type">Group: type</option>
+                            <option value="owner_id">Group: owner</option>
+                        </select>
                         <button t-if="hasFilter" class="sb_cc_chip sb_cc_chip_clear"
                                 t-on-click="clearFilters">Clear</button>
                     </div>
@@ -89,42 +104,50 @@
                         <t t-if="hasFilter">No issues match this filter.</t>
                         <t t-else="">No open exceptions.</t>
                     </div>
-                    <div t-foreach="filteredExceptions" t-as="ex" t-key="ex.id" class="sb_cc_issue"
-                         t-att-class="'sb_cc_issue_' + (ex.severity || 'low')">
-                        <div class="sb_cc_issue_top">
-                            <span t-att-class="severityClass(ex.severity)" t-esc="ex.severity"/>
-                            <span class="sb_cc_issue_impact" t-esc="ex.impact_summary"/>
+                    <div t-foreach="groupedExceptions" t-as="grp" t-key="grp.key" class="sb_cc_group">
+                        <div t-if="grp.label" class="sb_cc_group_h">
+                            <t t-esc="grp.label"/> (<t t-esc="grp.count"/>)
                         </div>
-                        <div class="sb_cc_issue_meta">
-                            <span class="sb_cc_owner">
-                                <i class="fa fa-user-o"/>
-                                <t t-esc="ex.owner_id &amp;&amp; ex.owner_id[1] ? ex.owner_id[1] : 'Unassigned'"/>
-                            </span>
-                            <span class="sb_cc_type" t-esc="typeLabel(ex.exception_type)"/>
-                        </div>
-                        <div t-if="ex.recommended_action" class="sb_cc_action">
-                            <i class="fa fa-arrow-right"/> <t t-esc="ex.recommended_action"/>
-                        </div>
-                        <div t-if="ex.why_text" class="sb_cc_why" t-esc="ex.why_text"/>
-                        <div class="sb_cc_issue_btns">
-                            <button class="btn btn-sm btn-secondary"
-                                    t-on-click="() => this.onNavigate(ex.source_model, ex.source_res_id)">
-                                <i class="fa fa-external-link"/> Open source</button>
-                            <t t-if="state.confirmingId === ex.id">
-                                <span class="sb_cc_confirm">Confirm <t t-esc="state.confirmingAction"/>?</span>
-                                <button class="btn btn-sm btn-danger"
-                                        t-on-click="() => this.confirmAction(ex.id)">Yes</button>
-                                <button class="btn btn-sm btn-light"
-                                        t-on-click="() => this.cancelConfirm()">No</button>
-                            </t>
-                            <t t-else="">
-                                <button t-if="ex.state === 'new'" class="btn btn-sm btn-outline-secondary"
-                                        t-on-click="() => this.onAcknowledge(ex.id)">Acknowledge</button>
-                                <button class="btn btn-sm btn-outline-primary"
-                                        t-on-click="() => this.askResolve(ex.id)">Resolve</button>
-                                <button class="btn btn-sm btn-outline-danger"
-                                        t-on-click="() => this.askDismiss(ex.id)">Dismiss</button>
-                            </t>
+                        <div t-foreach="grp.items" t-as="ex" t-key="ex.id" class="sb_cc_issue"
+                             t-att-class="'sb_cc_issue_' + (ex.severity || 'low')">
+                            <div class="sb_cc_issue_top">
+                                <span t-att-class="severityClass(ex.severity)" t-esc="ex.severity"/>
+                                <span class="sb_cc_issue_impact" t-esc="ex.impact_summary"/>
+                            </div>
+                            <div class="sb_cc_issue_meta">
+                                <span class="sb_cc_owner">
+                                    <i class="fa fa-user-o"/>
+                                    <t t-esc="ex.owner_id &amp;&amp; ex.owner_id[1] ? ex.owner_id[1] : 'Unassigned'"/>
+                                </span>
+                                <span class="sb_cc_type" t-esc="typeLabel(ex.exception_type)"/>
+                                <button class="sb_cc_help_q"
+                                        t-on-click="() => this.openHelp(typeLabel(ex.exception_type))"
+                                        title="Learn about this term">?</button>
+                            </div>
+                            <div t-if="ex.recommended_action" class="sb_cc_action">
+                                <i class="fa fa-arrow-right"/> <t t-esc="ex.recommended_action"/>
+                            </div>
+                            <div t-if="ex.why_text" class="sb_cc_why" t-esc="ex.why_text"/>
+                            <div class="sb_cc_issue_btns">
+                                <button class="btn btn-sm btn-secondary"
+                                        t-on-click="() => this.onNavigate(ex.source_model, ex.source_res_id)">
+                                    <i class="fa fa-external-link"/> Open source</button>
+                                <t t-if="state.confirmingId === ex.id">
+                                    <span class="sb_cc_confirm">Confirm <t t-esc="state.confirmingAction"/>?</span>
+                                    <button class="btn btn-sm btn-danger"
+                                            t-on-click="() => this.confirmAction(ex.id)">Yes</button>
+                                    <button class="btn btn-sm btn-light"
+                                            t-on-click="() => this.cancelConfirm()">No</button>
+                                </t>
+                                <t t-else="">
+                                    <button t-if="ex.state === 'new'" class="btn btn-sm btn-outline-secondary"
+                                            t-on-click="() => this.onAcknowledge(ex.id)">Acknowledge</button>
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            t-on-click="() => this.askResolve(ex.id)">Resolve</button>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            t-on-click="() => this.askDismiss(ex.id)">Dismiss</button>
+                                </t>
+                            </div>
                         </div>
                     </div>
                 </div>

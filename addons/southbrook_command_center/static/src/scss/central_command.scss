@@ -201,4 +201,40 @@
     .sb_cc_rec_top { display: flex; gap: 8px; }
     .sb_cc_prio { font-size: 11px; color: #8a5a00; text-transform: uppercase; }
     .sb_cc_alert_type { color: #667; margin-right: 6px; font-size: 12px; }
+
+    // -- "New here?" help banner --
+    .sb_cc_helpbanner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 8px 10px 0;
+        padding: 7px 12px;
+        background: #eef4fb;
+        border: 1px solid #cfe0f3;
+        border-radius: 6px;
+        font-size: 13px;
+        color: #2b3a4a;
+        i { color: #1f6feb; margin-right: 4px; }
+        span { flex: 1 1 auto; }
+        .sb_cc_help_x {
+            border: none; background: transparent; cursor: pointer;
+            font-size: 18px; line-height: 1; color: #8a94a0;
+            &:hover { color: #2b3a4a; }
+        }
+    }
+
+    // -- group headers within Critical Issues --
+    .sb_cc_group_h {
+        font-size: 12px; font-weight: 700; text-transform: capitalize;
+        color: #55606c; background: #eef1f5; border-radius: 4px;
+        padding: 2px 8px; margin: 4px 0 6px;
+    }
+
+    // -- contextual "?" help icon next to a jargon term --
+    .sb_cc_help_q {
+        border: 1px solid #cfd6df; background: #fff; color: #1f6feb;
+        width: 16px; height: 16px; line-height: 12px; padding: 0;
+        border-radius: 50%; font-size: 11px; font-weight: 700; cursor: pointer;
+        &:hover { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+    }
 }

@@ -64,6 +64,27 @@ class CommandCenterController(http.Controller):
             _logger.exception("command_center: exceptions_total failed")
             return 0
 
+    # -- contextual help: semantic "learn this term" lookup ------------
+    @http.route("/command_center/help_lookup", type="json", auth="user")
+    def help_lookup(self, term=None, **kw):
+        """Return the single best training lesson for a jargon term, using the
+        training hub's semantic find_training. Degrades to an eLearning search
+        URL if the tool or a match is unavailable — never raises."""
+        fallback = {"name": term or "", "url": "/slides?search=%s" % (term or "")}
+        if not term:
+            return {"name": "", "url": "/slides"}
+        try:
+            from odoo.addons.southbrook_training_hub.tools.find_training import (
+                find_training,
+            )
+            result = find_training(request.env, term, 1)
+            items = (result or {}).get("items") or []
+            if items and items[0].get("url"):
+                return {"name": items[0].get("name") or term, "url": items[0]["url"]}
+        except Exception:  # noqa: BLE001
+            _logger.exception("command_center: help_lookup failed for %s", term)
+        return fallback
+
     # -- panel 1 -------------------------------------------------------
     def _factory_health(self, env):
         try:
@@ -88,7 +109,7 @@ class CommandCenterController(http.Controller):
                         "purchase_order_id", "hermes_recommendation_id",
                         "create_date"],
                 order="severity_rank asc, create_date desc",
-                limit=50,
+                limit=300,
             )
         except Exception:  # noqa: BLE001
             _logger.exception("command_center: exceptions panel failed")
