@@ -18,15 +18,15 @@
                 <filter name="mine" string="Assigned to me"
                         domain="[('owner_id','=',uid)]"/>
                 <separator/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="gb_severity" string="Severity"
-                            context="{'group_by':'severity'}"/>
+                            context="{'group_by': 'severity'}"/>
                     <filter name="gb_type" string="Type"
-                            context="{'group_by':'exception_type'}"/>
+                            context="{'group_by': 'exception_type'}"/>
                     <filter name="gb_state" string="State"
-                            context="{'group_by':'state'}"/>
+                            context="{'group_by': 'state'}"/>
                     <filter name="gb_owner" string="Owner"
-                            context="{'group_by':'owner_id'}"/>
+                            context="{'group_by': 'owner_id'}"/>
                 </group>
             </search>
         </field>
