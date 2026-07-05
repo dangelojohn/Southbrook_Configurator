@@ -46,13 +46,20 @@ RoomOutlinePreview for reuse).
     "author": "Southbrook Cabinetry",
     "license": "LGPL-3",
     "category": "Website/eCommerce",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "depends": [
         "southbrook_estimating",
         "southbrook_estimating_website",
         # Reuses southbrook.room.capture._get_api_key() so there is ONE
         # Anthropic API key configured for both AI features, not two.
         "southbrook_room_capture",
+        # v2 (2026-07-05): the chat now also gathers the customer's
+        # contact + project details and lands them in Contacts + CRM for
+        # live follow-up — mirroring the AI-agent gateway's gather/
+        # validate/CRM abilities. Reuses that addon's phone validator,
+        # shared offerings catalog, and the "AI Agent"/CRM tag pattern
+        # (crm + utm come transitively via the gateway).
+        "southbrook_agent_gateway",
     ],
     # httpx is imported lazily inside southbrook.room.chat.agent._call_anthropic
     # (guarded exactly like southbrook_room_capture's own _call_anthropic) so
@@ -61,6 +68,7 @@ RoomOutlinePreview for reuse).
     # installs/CI exercise.
     "data": [
         "security/ir.model.access.csv",
+        "data/utm_data.xml",
         "views/order_builder_room_chat_inject.xml",
     ],
     "assets": {

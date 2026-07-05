@@ -334,39 +334,12 @@ Machine-readable contract: {base}/agent/api/v1/openapi.json
         # hammer this sudo full-table search (2026-07-05 code-review fix).
         if not _rate_limit_check(_client_ip(), kind="read"):
             return _json_response({"error": "rate_limited"}, status=429)
-        env = request.env
-        # Filter on sale_ok so internal-only / not-for-sale templates that
-        # happen to carry a southbrook_category never leak to the public
-        # (2026-07-05 code-review fix — was southbrook_category+active only,
-        # exposing unpublished products + prices).
-        templates = env["product.template"].sudo().search(
-            [("southbrook_category", "!=", False),
-             ("active", "=", True),
-             ("sale_ok", "=", True)],
-            order="southbrook_category, list_price")
-        series_attr = env.ref(
-            "southbrook_estimating.attr_series", raise_if_not_found=False)
-        series = series_attr.sudo().value_ids.mapped("name") if series_attr else []
-        currency = env.company.sudo().currency_id.name or "CAD"
-        items = [{
-            "name": t.name,
-            "sku": t.default_code or "",
-            "category": t.southbrook_category,
-            "description": t.southbrook_description or "",
-            "dimensions": t.southbrook_dimensions or "",
-            "list_price": t.list_price,
-        } for t in templates]
-        return _json_response({
-            "company": "Southbrook Cabinetry",
-            "currency": currency,
-            "pricing_note": (
-                "Prices are retail list per cabinet before configuration "
-                "options; dealer/contractor programs are priced on "
-                "application. Maple carcass upgrade adds +10% and +2 "
-                "weeks lead time."),
-            "standard_lead_time_weeks": 2,
-            "series": series,
-            "cabinets": items,
+        # Catalog body is the shared single source of truth (also used by
+        # the room-chat agent's list_cabinet_offerings tool) — sale_ok-
+        # filtered so internal/not-for-sale templates never leak.
+        catalog = request.env["southbrook.agent.inquiry"].sudo() \
+            .offerings_catalog()
+        catalog.update({
             "quote_request_endpoint": "/agent/api/v1/quote-request",
             "instant_quote_endpoint": "/agent/api/v1/quote",
             "instant_quote_note": (
@@ -374,6 +347,7 @@ Machine-readable contract: {base}/agent/api/v1/openapi.json
                 "(SKUs from this list) to create a priced draft quotation "
                 "for your customer immediately."),
         })
+        return _json_response(catalog)
 
     # ------------------------------------------------------------------
     # Write paths. Two endpoints share one handler:

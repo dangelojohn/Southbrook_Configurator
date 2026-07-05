@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Distinct provenance so sales can tell a Room-Chat-Designer lead
+         apart from a third-party AI-agent-gateway lead in the CRM
+         pipeline. Medium reused from the gateway ("Agent API") would be
+         wrong here (this is first-party portal self-service), so a fresh
+         medium too. -->
+    <record id="utm_source_room_chat" model="utm.source">
+        <field name="name">Room Chat Designer</field>
+    </record>
+    <record id="utm_medium_room_chat" model="utm.medium">
+        <field name="name">Kitchen Planner Chat</field>
+    </record>
+</odoo>

@@ -220,6 +220,45 @@ class SouthbrookAgentInquiry(models.Model):
         return formatted
 
     # ------------------------------------------------------------------
+    # Public catalog — the single source of truth for BOTH the
+    # /agent/api/v1/offerings HTTP endpoint AND the room-chat agent's
+    # list_cabinet_offerings tool, so the two never drift. Read-only;
+    # sale_ok-filtered so internal/not-for-sale templates never leak.
+    # ------------------------------------------------------------------
+    @api.model
+    def offerings_catalog(self):
+        Template = self.env["product.template"].sudo()
+        templates = Template.search(
+            [("southbrook_category", "!=", False),
+             ("active", "=", True),
+             ("sale_ok", "=", True)],
+            order="southbrook_category, list_price")
+        series_attr = self.env.ref(
+            "southbrook_estimating.attr_series", raise_if_not_found=False)
+        series = (series_attr.sudo().value_ids.mapped("name")
+                  if series_attr else [])
+        currency = self.env.company.sudo().currency_id.name or "CAD"
+        return {
+            "company": "Southbrook Cabinetry",
+            "currency": currency,
+            "pricing_note": (
+                "Prices are retail list per cabinet before configuration "
+                "options; dealer/contractor programs are priced on "
+                "application. Maple carcass upgrade adds +10% and +2 "
+                "weeks lead time."),
+            "standard_lead_time_weeks": 2,
+            "series": series,
+            "cabinets": [{
+                "name": t.name,
+                "sku": t.default_code or "",
+                "category": t.southbrook_category,
+                "description": t.southbrook_description or "",
+                "dimensions": t.southbrook_dimensions or "",
+                "list_price": t.list_price,
+            } for t in templates],
+        }
+
+    # ------------------------------------------------------------------
     # Line-item validation for v2 draft quotes. Resolves customer-
     # supplied SKUs against the PUBLIC cabinet catalog only (templates
     # carrying southbrook_category) — an agent can never reference an

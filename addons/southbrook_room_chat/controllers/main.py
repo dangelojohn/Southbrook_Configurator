@@ -126,4 +126,8 @@ class SouthbrookRoomChatApi(_SouthbrookOrderAccessMixin, http.Controller):
             "ok": True,
             "reply": result["reply"],
             "room": result["room"],
+            # v2 — gathered customer profile + whether a CRM follow-up
+            # lead has been saved this session (frontend can reflect it).
+            "customer": result.get("customer"),
+            "lead_saved": result.get("lead_saved", False),
         }
