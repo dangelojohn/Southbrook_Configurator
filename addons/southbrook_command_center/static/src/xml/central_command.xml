@@ -86,17 +86,18 @@
                                 t-att-class="state.filterSeverity === 'high' ? 'sb_cc_chip_on' : ''"
                                 t-on-click="() => this.setSeverityFilter('high')">High</button>
                         <select class="sb_cc_typesel" t-on-change="onTypeFilter">
-                            <option value="">All types</option>
+                            <option value="" t-att-selected="!state.filterType">All types</option>
                             <option t-foreach="exceptionTypesPresent" t-as="ty" t-key="ty"
-                                    t-att-value="ty" t-esc="typeLabel(ty)"/>
+                                    t-att-value="ty" t-att-selected="state.filterType === ty"
+                                    t-esc="typeLabel(ty)"/>
                         </select>
                         <select class="sb_cc_typesel" t-on-change="onGroupBy">
-                            <option value="">No grouping</option>
-                            <option value="severity">Group: severity</option>
-                            <option value="exception_type">Group: type</option>
-                            <option value="owner_id">Group: owner</option>
+                            <option value="" t-att-selected="!state.groupBy">No grouping</option>
+                            <option value="severity" t-att-selected="state.groupBy === 'severity'">Group: severity</option>
+                            <option value="exception_type" t-att-selected="state.groupBy === 'exception_type'">Group: type</option>
+                            <option value="owner_id" t-att-selected="state.groupBy === 'owner_id'">Group: owner</option>
                         </select>
-                        <button t-if="hasFilter" class="sb_cc_chip sb_cc_chip_clear"
+                        <button t-if="hasControls" class="sb_cc_chip sb_cc_chip_clear"
                                 t-on-click="clearFilters">Clear</button>
                     </div>
 

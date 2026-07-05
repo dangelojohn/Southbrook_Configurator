@@ -164,10 +164,15 @@ export class CentralCommand extends Component {
     clearFilters() {
         this.state.filterSeverity = "";
         this.state.filterType = "";
+        this.state.groupBy = "";
     }
 
     get hasFilter() {
         return !!this.state.filterSeverity || !!this.state.filterType;
+    }
+
+    get hasControls() {
+        return this.hasFilter || !!this.state.groupBy;
     }
 
     onGroupBy(ev) {
@@ -232,14 +237,20 @@ export class CentralCommand extends Component {
         }
         rpc("/command_center/help_lookup", { term })
             .then((res) => {
-                const url = (res && res.url) || ("/slides?search=" + encodeURIComponent(term));
-                this.action.doAction({ type: "ir.actions.act_url", url, target: "new" });
+                // Only open a real lesson. If nothing matched, tell the user
+                // rather than dumping them into an empty eLearning portal.
+                if (res && res.found && res.url) {
+                    this.action.doAction({ type: "ir.actions.act_url", url: res.url, target: "new" });
+                } else {
+                    this.notification.add(
+                        'No training lesson found for "' + term + '" yet.',
+                        { type: "info" }
+                    );
+                }
             })
             .catch(() => {
-                this.action.doAction({
-                    type: "ir.actions.act_url",
-                    url: "/slides?search=" + encodeURIComponent(term),
-                    target: "new",
+                this.notification.add('Could not look up help for "' + term + '".', {
+                    type: "warning",
                 });
             });
     }
@@ -370,12 +381,21 @@ export class CentralCommand extends Component {
         if (!model || !resId) {
             return;
         }
-        this.action.doAction({
-            type: "ir.actions.act_window",
-            res_model: model,
-            res_id: resId,
-            views: [[false, "form"]],
-            target: "current",
+        Promise.resolve(
+            this.action.doAction({
+                type: "ir.actions.act_window",
+                res_model: model,
+                res_id: resId,
+                views: [[false, "form"]],
+                target: "current",
+            })
+        ).catch(() => {
+            // e.g. the source record type is ACL-restricted for this user
+            // (a breakdown alert needs CMMS group access). Fail softly.
+            this.notification.add(
+                "You don't have access to open this source record (" + model + ").",
+                { type: "warning" }
+            );
         });
     }
 
